@@ -17,6 +17,8 @@ export type ModuleId =
 
 export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; }
 export interface Module { id: ModuleId; name: string; description: string; features: string[]; status: 'ACTIF' | 'BETA'; dependencies: ModuleId[]; }
+export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
+export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
 export interface Dependency { source: ModuleId; target: ModuleId; reason: string; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; }
@@ -26,7 +28,7 @@ export interface Sale { id: string; reference: string; client: string; amount: n
 export interface Payment { id: string; reference: string; invoice: string; amount: number; status: Status; date: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; }
 export interface OrgNode { id: string; name: string; type: 'direction' | 'department' | 'service'; parentId: string | null; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; moduleStatuses?: ModuleStatusMap; }
 
 const today = new Date().toISOString();
 export const modules: Module[] = [
@@ -133,10 +135,12 @@ export function loadData(): StoreData {
     if (!saved) return seedData();
     const parsed = JSON.parse(saved) as StoreData;
     const initial = seedData();
+    const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
     const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
     return {
       ...initial,
       ...parsed,
+      moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       employees: parsed.employees.map(employee => {
         const seeded = seededByEmail.get(employee.email);
         return { ...employee, loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!', isSectorAdmin: employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false };

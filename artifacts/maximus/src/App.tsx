@@ -5,7 +5,7 @@ import { Link, useLocation, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { dependencies, loadData, modules, money, saveData, shortMoney, uid, type Company, type ModuleId, type OrgNode, type Role, type Sale, type StoreData } from '@/lib/store';
+import { dependencies, loadData, modules, money, saveData, shortMoney, uid, type Company, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
 
 const queryClient = new QueryClient();
@@ -75,6 +75,7 @@ function AppContent() {
     setData(prev => { const next = structuredClone(prev) as StoreData; fn(next); return next; });
     if (message) setToast(message);
   };
+  const notify = (message: string) => setToast(message);
   const login = (space: 'admin' | 'kora', email: string) => {
     if (space === 'kora') {
       const employee = data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
@@ -99,7 +100,9 @@ function AppContent() {
   const employeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
   const employee = employeeId ? data.employees.find(e => e.id === employeeId) ?? null : null;
   const employeeRole = employee ? data.roles.find(r => r.name === employee.role) : null;
-  const companyAllowed = data.companies.find(c => c.id === 'kora')?.allowedModules ?? [];
+  const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
+  const companyAllowed = (data.companies.find(c => c.id === 'kora')?.allowedModules ?? []).filter(isModuleActive);
   const allowed = session === 'kora'
     ? companyAllowed
     : employeeRole
@@ -115,7 +118,7 @@ function AppContent() {
         <div className="page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora'} employee={employee} />}
+            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora'} employee={employee} />}
           </ErrorBoundary>
         </div>
       </main>
@@ -180,11 +183,11 @@ function Topbar({ title, onLogout, onNavigate, onToggleMenu, notificationPath, a
 }
 function PageHeader({ kicker, title, description, location }: { kicker: string; title: string; description: string; location: string }) { return <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mono mb-2 text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">{kicker}</p><h1 data-testid="text-page-title" className="text-3xl font-bold tracking-[-.05em] sm:text-4xl">{title}</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{description}</p></div>{location !== '/maximus/dashboard' && location !== '/kora/dashboard' && <div className="mono hidden text-[10px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))] sm:block">Mis à jour à l’instant</div>}</div>; }
 
-function AdminRouter({ location, data, mutate, onNavigate }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void }) {
+function AdminRouter({ location, data, mutate, notify, onNavigate }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void; onNavigate: (path: string) => void }) {
   if (location === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
   if (location === '/maximus/entreprises' || location === '/maximus/entreprises/kora') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={location.endsWith('/kora')} />;
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  if (location === '/maximus/modules') return <ModulesPage data={data} mutate={mutate} />;
+  if (location === '/maximus/modules') return <ManageableModulesPage data={data} mutate={mutate} notify={notify} />;
   if (location === '/maximus/dependances') return <DependenciesPage />;
   if (location === '/maximus/utilisateurs') return <SimpleAdminPage type="users" data={data} />;
   if (location === '/maximus/roles') return <RolesPage data={data} mutate={mutate} />;
@@ -279,6 +282,53 @@ function ReportsPage({ data }: { data: StoreData }) { return <div className="gri
 function ReportCard({ title, text, date }: { title: string; text: string; date: string }) { return <section data-testid={`card-report-${title}`} className="card-surface rounded-2xl p-5"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><FileBarChart size={19} /></span><h2 className="mt-5 font-bold">{title}</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{text}</p><div className="mt-5 flex items-center justify-between border-t pt-4"><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{date}</span><button data-testid={`button-open-report-${title}`} onClick={() => window.print()} className="text-xs font-bold text-[hsl(var(--primary))]">Consulter <ChevronRight className="inline" size={14} /></button></div></section>; }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [onClose]); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--foreground)/.35)] p-4 backdrop-blur-sm"><div className="card-surface max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 fade-up"><div className="mb-6 flex items-center justify-between"><h2 className="text-xl font-bold">{title}</h2><button data-testid="button-close-modal" onClick={onClose} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div>{children}</div></div>; }
 function EmptyState({ title, text, action }: { title: string; text: string; action: () => void }) { return <div className="card-surface flex flex-col items-center justify-center rounded-2xl px-6 py-20 text-center"><span className="rounded-2xl bg-[hsl(var(--muted))] p-4 text-[hsl(var(--muted-foreground))]"><FolderKanban size={24} /></span><h2 className="mt-5 text-lg font-bold">{title}</h2><p className="mt-2 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">{text}</p><button data-testid="button-empty-action" onClick={action} className="mt-6 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Revenir au cockpit</button></div>; }
+
+function ManageableModulesPage({ data, mutate, notify }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void }) {
+  const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const toggleModule = (moduleId: ModuleId) => {
+    const module = modules.find(item => item.id === moduleId);
+    if (!module) return;
+    const isActive = statusOf(moduleId) !== 'INACTIF';
+    const activeDependents = modules.filter(item => item.dependencies.includes(moduleId) && statusOf(item.id) !== 'INACTIF');
+    const inactiveDependencies = module.dependencies.filter(id => statusOf(id) === 'INACTIF');
+    if (!isActive && inactiveDependencies.length > 0) {
+      notify(`Activez d’abord : ${inactiveDependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}.`);
+      return;
+    }
+    if (isActive && activeDependents.length > 0) {
+      notify(`Désactivez d’abord : ${activeDependents.map(item => item.name).join(', ')}.`);
+      return;
+    }
+    mutate(draft => {
+      draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [moduleId]: isActive ? 'INACTIF' : 'ACTIF' };
+      if (isActive) {
+        draft.companies.forEach(company => {
+          company.allowedModules = company.allowedModules.filter(id => id !== moduleId);
+        });
+      }
+    }, isActive ? `${module.name} a été désactivé pour tous les espaces.` : `${module.name} est maintenant actif.`);
+  };
+
+  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map((module, index) => {
+    const status = statusOf(module.id);
+    const isActive = status !== 'INACTIF';
+    const activeDependents = modules.filter(item => item.dependencies.includes(module.id) && statusOf(item.id) !== 'INACTIF');
+    return <section data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-70'}`}>
+      <div className="flex items-start justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={19} /></span>
+        <StatusBadge status={status} />
+      </div>
+      <h2 className="mt-5 text-lg font-bold">{module.name}</h2>
+      <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{module.description}</p>
+      <div className="mt-5 space-y-2 border-t pt-4">{module.features.map(feature => <div key={feature} className="flex items-center gap-2 text-xs"><Check size={14} className="text-[hsl(var(--primary))]" />{feature}</div>)}</div>
+      {module.dependencies.length > 0 && <p className="mt-4 text-[11px] text-[hsl(var(--muted-foreground))]">Nécessite : {module.dependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
+      {activeDependents.length > 0 && <p className="mt-2 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
+      <button data-testid={`button-toggle-module-${module.id}`} onClick={() => toggleModule(module.id)} className={`mt-5 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
+        {isActive ? 'Désactiver' : 'Activer'} <ChevronRight size={14} />
+      </button>
+    </section>;
+  })}</div>;
+}
 
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppContent /></WouterRouter></TooltipProvider></QueryClientProvider>; }
 export default App;
