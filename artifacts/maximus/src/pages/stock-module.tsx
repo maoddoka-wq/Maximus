@@ -105,6 +105,7 @@ function StockDashboard({ data, onTab }: { data: StockBootstrap; onTab: (tab: Ta
 }
 
 function StockRequestsPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ productId: data.products.find(product => !product.archived)?.id ?? '', warehouseId: data.warehouses.find(warehouse => !warehouse.archived)?.id ?? '', quantity: 1, reason: '' });
   const submit = () => { if (!form.productId || !form.warehouseId || form.quantity < 1 || !form.reason.trim()) return; void run(() => stockApi.createRequest({ ...form, reason: form.reason.trim(), createdBy: 'Administration KORA' }), 'Demande enregistrée.').then(() => { setModal(false); setForm(current => ({ ...current, quantity: 1, reason: '' })); }); };
@@ -132,6 +133,7 @@ function SettingToggle({ title, text, checked, onChange }: { title: string; text
 }
 
 function ProductsPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [query, setQuery] = useState(''); const [category, setCategory] = useState('Toutes'); const [page, setPage] = useState(1); const [modal, setModal] = useState<StockProduct | 'new' | null>(null); const [history, setHistory] = useState<StockProduct | null>(null);
   const products = data.products.filter(product => !product.archived).filter(product => `${product.name} ${product.sku} ${product.barcode} ${product.brand}`.toLowerCase().includes(query.toLowerCase())).filter(product => category === 'Toutes' || product.category === category); const categories = ['Toutes', ...new Set(data.products.map(product => product.category))]; const pageData = paginate(products, page);
   const getQuantity = (id: string) => data.balances.filter(balance => balance.productId === id).reduce((sum, balance) => sum + balance.quantity, 0);
@@ -139,11 +141,13 @@ function ProductsPanel({ data, run }: { data: StockBootstrap; run: (action: () =
 }
 
 function WarehousesPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [modal, setModal] = useState<StockWarehouse | 'new' | null>(null); const [locationWarehouse, setLocationWarehouse] = useState<string | null>(null); const [locationName, setLocationName] = useState('');
   return <div className="space-y-5"><Panel title="Entrepôts et emplacements" action={<button onClick={() => setModal('new')} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-white"><Plus size={15} />Ajouter un entrepôt</button>}><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.warehouses.filter(warehouse => !warehouse.archived).map(warehouse => { const quantity = data.balances.filter(balance => balance.warehouseId === warehouse.id).reduce((sum, balance) => sum + balance.quantity, 0); const locations = data.locations.filter(location => location.warehouseId === warehouse.id && !location.archived); return <section key={warehouse.id} className="rounded-2xl border p-5"><div className="flex items-start justify-between"><span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><Warehouse size={19} /></span><div className="flex gap-1"><button onClick={() => setModal(warehouse)} className="rounded p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={15} /></button><button onClick={() => { if (window.confirm(`Supprimer ${warehouse.name} ?`)) void run(() => stockApi.archiveWarehouse(warehouse.id), 'Entrepôt archivé.'); }} className="rounded p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={15} /></button></div></div><h2 className="mt-5 font-bold">{warehouse.name}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{warehouse.address || 'Adresse non renseignée'}</p><div className="mt-5 grid grid-cols-2 gap-3 border-y py-4"><div><p className="text-2xl font-bold">{quantity.toLocaleString('fr-FR')}</p><small className="text-xs text-[hsl(var(--muted-foreground))]">unités en stock</small></div><div><p className="text-2xl font-bold">{locations.length}</p><small className="text-xs text-[hsl(var(--muted-foreground))]">emplacements</small></div></div><p className="mt-4 flex items-center gap-2 text-xs"><span className="rounded-full bg-[hsl(var(--accent)/.22)] px-2 py-1 font-bold">Responsable</span>{warehouse.manager || 'Non défini'}</p><div className="mt-4 space-y-2">{locations.map(location => <div key={location.id} className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]"><MapPin size={13} />{location.name}<span className="ml-auto">{data.balances.filter(balance => balance.locationId === location.id).reduce((sum, balance) => sum + balance.quantity, 0)} unités</span></div>)}<button onClick={() => { setLocationWarehouse(warehouse.id); setLocationName(''); }} className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"><Plus size={13} className="mr-1 inline" />Ajouter un emplacement</button></div></section>; })}</div></Panel>{modal && <WarehouseModal value={modal === 'new' ? blankWarehouse : modal} onClose={() => setModal(null)} onSave={body => void run(() => modal === 'new' ? stockApi.createWarehouse(body) : stockApi.updateWarehouse(modal.id, body), modal === 'new' ? 'Entrepôt créé.' : 'Entrepôt modifié.').then(() => setModal(null))} />}{locationWarehouse && <Modal title="Nouvel emplacement" onClose={() => setLocationWarehouse(null)}><Input label="Nom de l’emplacement" value={locationName} onChange={setLocationName} /><div className="mt-6 flex justify-end"><Button primary onClick={() => { if (!locationName.trim()) return; void run(() => stockApi.createLocation(locationWarehouse, locationName.trim()), 'Emplacement créé.').then(() => setLocationWarehouse(null)); }}>Créer l’emplacement</Button></div></Modal>}</div>;
 }
 
 function StockExitsPanel({ data, run, services }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void>; services: { id: string; name: string }[] }) {
+  const api = useStockApi();
   const [modal, setModal] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -156,6 +160,7 @@ function StockExitsPanel({ data, run, services }: { data: StockBootstrap; run: (
 }
 
 function StockMovementModePanel({ data, run, mode }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void>; mode: 'entries' | 'exits' }) {
+  const api = useStockApi();
   const isEntry = mode === 'entries';
   const types: StockMovementType[] = isEntry ? ['ENTRÉE', 'ACHAT', 'RETOUR CLIENT', 'AJUSTEMENT+'] : ['SORTIE', 'VENTE', 'AJUSTEMENT-', 'PERTE', 'RETOUR FOURNISSEUR'];
   const [modal, setModal] = useState(false);
@@ -171,6 +176,7 @@ function StockMovementModePanel({ data, run, mode }: { data: StockBootstrap; run
 }
 
 function StockEntriesPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [modal, setModal] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -183,6 +189,7 @@ function StockEntriesPanel({ data, run }: { data: StockBootstrap; run: (action: 
 }
 
 function MovementsPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [modal, setModal] = useState(false); const [type, setType] = useState<StockMovementType>('ENTRÉE'); const [query, setQuery] = useState(''); const [page, setPage] = useState(1); const [form, setForm] = useState({ productId: data.products.find(product => !product.archived)?.id ?? '', warehouseId: data.warehouses.find(warehouse => !warehouse.archived)?.id ?? '', destinationWarehouseId: '', quantity: 1, purchasePrice: 0, reason: '', movementDate: new Date().toISOString().slice(0, 10), userName: 'Administration KORA', reference: '', comment: '' });
   const filtered = data.movements.filter(movement => `${movement.type} ${movement.reference} ${movement.reason} ${movement.userName}`.toLowerCase().includes(query.toLowerCase())); const pageData = paginate(filtered, page);
   const open = (nextType: StockMovementType) => { setType(nextType); setForm(current => ({ ...current, destinationWarehouseId: '', reason: '', quantity: 1 })); setModal(true); };
@@ -191,6 +198,7 @@ function MovementsPanel({ data, run }: { data: StockBootstrap; run: (action: () 
 }
 
 function InventoryPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [warehouseId, setWarehouseId] = useState(data.warehouses.find(warehouse => !warehouse.archived)?.id ?? ''); const [actuals, setActuals] = useState<Record<string, number>>({}); const [notes, setNotes] = useState('');
   const products = data.products.filter(product => !product.archived); const theoretical = (productId: string) => data.balances.filter(balance => balance.productId === productId && balance.warehouseId === warehouseId).reduce((sum, balance) => sum + balance.quantity, 0);
   const create = () => { if (!warehouseId) return; if (!window.confirm('Créer cet inventaire avec les quantités saisies ?')) return; void run(() => stockApi.createInventory({ warehouseId, notes, createdBy: 'Administration KORA', lines: products.map(product => ({ productId: product.id, actualQuantity: actuals[product.id] ?? theoretical(product.id) })) }), 'Inventaire créé.'); };
@@ -198,6 +206,7 @@ function InventoryPanel({ data, run }: { data: StockBootstrap; run: (action: () 
 }
 
 function SuppliersPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const api = useStockApi();
   const [modal, setModal] = useState<StockSupplier | 'new' | null>(null); const [selected, setSelected] = useState<StockSupplier | null>(null);
   const selectedProducts = selected ? data.products.filter(product => product.supplierId === selected.id) : [];
   return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]"><Panel title="Fournisseurs" action={<button onClick={() => setModal('new')} className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2.5 text-xs font-bold text-white"><Plus size={14} className="mr-1 inline" />Ajouter</button>}><div className="space-y-2">{data.suppliers.filter(supplier => !supplier.archived).map(supplier => <button key={supplier.id} onClick={() => setSelected(supplier)} className={`w-full rounded-xl border p-4 text-left ${selected?.id === supplier.id ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.05)]' : 'hover:bg-[hsl(var(--muted)/.4)]'}`}><div className="flex items-center justify-between"><strong>{supplier.name}</strong><Edit3 size={14} onClick={event => { event.stopPropagation(); setModal(supplier); }} /></div><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{supplier.contactName || 'Contact non défini'} · {supplier.phone || 'Téléphone non défini'}</p></button>)}</div></Panel><Panel title={selected ? selected.name : 'Produits fournis'}>{selected ? <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><Metric label="Produits fournis" value={String(selectedProducts.length)} detail="références liées" icon={Package} /><Metric label="Réceptions" value={String(data.movements.filter(movement => selectedProducts.some(product => product.id === movement.productId) && (movement.type === 'ENTRÉE' || movement.type === 'ACHAT')).length)} detail="historique enregistré" icon={ArrowDownToLine} /><Metric label="Dernière activité" value={selectedProducts.length && data.movements.some(movement => selectedProducts.some(product => product.id === movement.productId)) ? 'Active' : 'Aucune'} detail="sur les achats et réceptions" icon={History} /></div><DataTable headers={['Produit', 'SKU', 'Prix achat', 'Historique achats / réceptions']} rows={selectedProducts.map(product => [product.name, product.sku, money(product.purchasePrice), data.movements.filter(movement => movement.productId === product.id && (movement.type === 'ENTRÉE' || movement.type === 'ACHAT')).length])} /></div> : <Empty text="Sélectionnez un fournisseur pour voir ses produits et son historique." />}</Panel>{modal && <SupplierModal value={modal === 'new' ? blankSupplier : modal} onClose={() => setModal(null)} onSave={body => void run(() => modal === 'new' ? stockApi.createSupplier(body) : stockApi.updateSupplier(modal.id, body), modal === 'new' ? 'Fournisseur créé.' : 'Fournisseur modifié.').then(() => setModal(null))} />}</div>;
