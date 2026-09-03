@@ -618,13 +618,16 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 
 function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void }) {
   const [selectedId, setSelectedId] = useState<ModuleId | null>(null);
+  const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
+  const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [testMode, setTestMode] = useState(false);
   const [tests, setTests] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
+  const moduleDefinitions = modules.map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
   const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
-  const selected = selectedId ? modules.find(module => module.id === selectedId) ?? null : null;
+  const selected = selectedId ? moduleDefinitions.find(module => module.id === selectedId) ?? null : null;
   const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
   const categoryOf = (moduleId: ModuleId) => {
     if (['commerce', 'ventes', 'achats', 'crm', 'fournisseurs', 'logistique'].includes(moduleId)) return 'Commerce';
@@ -632,18 +635,46 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     if (['rh', 'presences', 'paie'].includes(moduleId)) return 'Ressources humaines';
     return 'Opérations';
   };
-  const visibleModules = modules.filter(module => {
+  const visibleModules = moduleDefinitions.filter(module => {
     const matchesQuery = `${module.name} ${module.description} ${module.features.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase());
     const matchesCategory = category === 'Toutes' || categoryOf(module.id) === category;
     const isActive = statusOf(module.id) !== 'INACTIF';
     const matchesStatus = statusFilter === 'TOUTES' || (statusFilter === 'ACTIFS' ? isActive : !isActive);
     return matchesQuery && matchesCategory && matchesStatus;
   });
-  const activeCount = modules.filter(module => statusOf(module.id) !== 'INACTIF').length;
-  const betaCount = modules.filter(module => statusOf(module.id) === 'BETA').length;
+  const activeCount = moduleDefinitions.filter(module => statusOf(module.id) !== 'INACTIF').length;
+  const betaCount = moduleDefinitions.filter(module => statusOf(module.id) === 'BETA').length;
+
+  const openEdit = (module: (typeof modules)[number]) => {
+    setEditingModule(module);
+    setModuleForm({ name: module.name, description: module.description, features: module.features.join('\n') });
+  };
+
+  const saveModule = () => {
+    if (!editingModule || !moduleForm.name.trim() || !moduleForm.description.trim()) return;
+    const features = moduleForm.features.split(/[\n,]/).map(feature => feature.trim()).filter(Boolean);
+    if (features.length === 0) return;
+    mutate(draft => {
+      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: { name: moduleForm.name.trim(), description: moduleForm.description.trim(), features } };
+    }, `${moduleForm.name.trim()} a été modifié.`);
+    setEditingModule(null);
+  };
+
+  const removeModule = (module: (typeof modules)[number]) => {
+    if (!window.confirm(`Supprimer le module « ${module.name} » ? Il sera désactivé pour tous les espaces et retiré des accès configurés.`)) return;
+    mutate(draft => {
+      draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [module.id]: 'INACTIF' };
+      draft.companies.forEach(company => {
+        company.allowedModules = company.allowedModules.filter(id => id !== module.id);
+      });
+      draft.sectorPresets = (draft.sectorPresets ?? []).map(preset => ({ ...preset, moduleIds: preset.moduleIds.filter(id => id !== module.id) }));
+      draft.orgNodes = draft.orgNodes.map(node => ({ ...node, moduleIds: node.moduleIds?.filter(id => id !== module.id) }));
+    }, `${module.name} a été supprimé et désactivé.`);
+    if (selectedId === module.id) setSelectedId(null);
+  };
 
   const toggleModule = (moduleId: ModuleId) => {
-    const module = modules.find(item => item.id === moduleId);
+    const module = moduleDefinitions.find(item => item.id === moduleId);
     if (!module) return;
     const isActive = statusOf(moduleId) !== 'INACTIF';
     mutate(draft => {
@@ -673,7 +704,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
             <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={21} /></span>
             <StatusBadge status={status} />
           </div>
-          <h2 className="mt-6 text-2xl font-bold">{selected.name}</h2>
+           <div className="mt-6 flex flex-wrap items-start justify-between gap-3"><h2 className="text-2xl font-bold">{selected.name}</h2><div className="flex gap-1"><button data-testid={`button-edit-module-${selected.id}`} title="Modifier le module" onClick={() => openEdit(selected)} className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={15} /></button><button data-testid={`button-delete-module-${selected.id}`} title="Supprimer le module" onClick={() => removeModule(selected)} className="rounded-lg border p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={15} /></button></div></div>
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
           <div className="mt-6 space-y-3 border-t pt-5 text-sm">
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
@@ -739,16 +770,19 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
         const status = statusOf(module.id);
         const isActive = status !== 'INACTIF';
         const ModuleIcon: Icon = categoryOf(module.id) === 'Commerce' ? ShoppingCart : categoryOf(module.id) === 'Finance' ? WalletCards : categoryOf(module.id) === 'Ressources humaines' ? Users : Boxes;
-        return <button type="button" data-testid={`button-open-module-${module.id}`} key={module.id} onClick={() => setSelectedId(module.id)} aria-label={`Ouvrir l’application ${module.name}`} className={`card-surface group relative flex min-h-[150px] flex-col items-center justify-center rounded-2xl p-4 text-center transition hover:-translate-y-1 hover:border-[hsl(var(--primary)/.45)] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-65'}`}>
-          <span className={`absolute right-3 top-3 h-2 w-2 rounded-full ${isActive ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.45)]'}`} title={isActive ? 'Application active' : 'Application inactive'} />
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))] transition group-hover:scale-105"><ModuleIcon size={25} /></span>
-          <span className="mt-4 line-clamp-2 text-sm font-bold leading-5">{module.name}</span>
-          <span className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</span>
-        </button>;
+         return <article data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface group relative flex min-h-[180px] flex-col rounded-2xl p-4 text-center transition hover:-translate-y-1 hover:border-[hsl(var(--primary)/.45)] hover:shadow-lg fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-65'}`}>
+           <button type="button" data-testid={`button-open-module-${module.id}`} onClick={() => setSelectedId(module.id)} aria-label={`Ouvrir l’application ${module.name}`} className="flex flex-1 flex-col items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))]">
+             <span className={`absolute right-3 top-3 h-2 w-2 rounded-full ${isActive ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.45)]'}`} title={isActive ? 'Application active' : 'Application inactive'} />
+             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))] transition group-hover:scale-105"><ModuleIcon size={25} /></span>
+             <span className="mt-4 line-clamp-2 text-sm font-bold leading-5">{module.name}</span>
+             <span className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</span>
+           </button>
+           <div className="mt-3 flex justify-center gap-1 border-t pt-3"><button type="button" data-testid={`button-edit-module-${module.id}`} title="Modifier le module" onClick={() => openEdit(module)} className="rounded-lg p-2 text-xs hover:bg-[hsl(var(--muted))]"><Edit3 size={14} /></button><button type="button" data-testid={`button-delete-module-${module.id}`} title="Supprimer le module" onClick={() => removeModule(module)} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={14} /></button></div>
+         </article>;
       })}
       {visibleModules.length === 0 && <div className="card-surface col-span-full rounded-2xl p-10 text-center"><Package className="mx-auto text-[hsl(var(--muted-foreground))]" size={28} /><h2 className="mt-4 font-bold">Aucune application trouvée</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Modifiez votre recherche ou réinitialisez les filtres.</p><button type="button" onClick={() => { setQuery(''); setCategory('Toutes'); setStatusFilter('TOUTES'); }} className="mt-4 text-xs font-bold text-[hsl(var(--primary))]">Réinitialiser les filtres</button></div>}
     </div>
-  </div>;
+   </div>;
 }
 
 function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof modules)[number]; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {

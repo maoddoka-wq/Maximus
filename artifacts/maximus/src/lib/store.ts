@@ -19,6 +19,7 @@ export interface Company { id: string; name: string; manager: string; email: str
 export interface Module { id: ModuleId; name: string; description: string; features: string[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
+export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features'>>>>;
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
@@ -35,7 +36,7 @@ export interface CrmOpportunity { id: string; client: string; contact: string; s
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
@@ -181,6 +182,7 @@ export function loadData(): StoreData {
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
+      moduleOverrides: parsed.moduleOverrides ?? {},
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
       accountingEntries: parsed.accountingEntries ?? initial.accountingEntries,
       payrollSlips: parsed.payrollSlips ?? initial.payrollSlips,
