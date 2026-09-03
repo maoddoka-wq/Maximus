@@ -292,6 +292,7 @@ function AdminRouter({ location, data, mutate, notify, onNavigate }: { location:
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
   if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
   if (location === '/maximus/dependances') return <DependenciesPage data={data} mutate={mutate} />;
+  if (location === '/maximus/secteurs') return <SectorPresetsPage data={data} mutate={mutate} />;
   if (location === '/maximus/abonnements') return <SubscriptionsPage data={data} />;
   if (location === '/maximus/notifications') return <NotificationsPage data={data} mutate={mutate} />;
   if (location === '/maximus/journal') return <JournalPage data={data} />;
@@ -436,11 +437,7 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
   const [target, setTarget] = useState<ModuleId>('stocks');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
-  const [sectorName, setSectorName] = useState('');
-  const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
-  const [sectorError, setSectorError] = useState('');
   const dependencyList = data.dependencies ?? [];
-  const sectorPresets = data.sectorPresets ?? [];
   const targetOptions = modules.filter(module => module.id !== source);
 
   const changeSource = (nextSource: ModuleId) => {
@@ -474,7 +471,35 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
       draft.dependencies = (draft.dependencies ?? []).filter(item => !(item.source === dependency.source && item.target === dependency.target));
     }, 'Dépendance supprimée.');
   };
+
+  return <div className="space-y-5">
+    <section className="card-surface rounded-2xl p-6">
+      <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Configuration du catalogue</p><h2 className="mt-2 text-xl font-bold">Ajouter une dépendance</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Définissez les modules qui doivent être disponibles ensemble. Cette règle s’appliquera à l’activation du catalogue et aux espaces des entreprises.</p></div></div>
+      <form onSubmit={createDependency} className="mt-6 grid gap-4 border-t pt-5 lg:grid-cols-[1fr_auto_1fr] lg:items-end">
+        <label className="block text-sm font-semibold">Module source<select data-testid="select-dependency-source" value={source} onChange={event => changeSource(event.target.value as ModuleId)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal">{modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
+        <ChevronRight className="hidden text-[hsl(var(--muted-foreground))] lg:block" />
+        <label className="block text-sm font-semibold">Dépend de<select data-testid="select-dependency-target" value={target} onChange={event => setTarget(event.target.value as ModuleId)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal">{targetOptions.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
+        <label className="block text-sm font-semibold lg:col-span-3">Explication<textarea data-testid="input-dependency-reason" value={reason} onChange={event => setReason(event.target.value)} placeholder="Ex. Les commandes utilisent le référentiel des fournisseurs." rows={3} className="mt-2 w-full resize-y rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
+        {error && <p data-testid="dependency-error" className="text-xs font-semibold text-[hsl(var(--destructive))] lg:col-span-3">{error}</p>}
+        <div className="lg:col-span-3"><button data-testid="button-create-dependency" type="submit" className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Enregistrer la dépendance</button></div>
+      </form>
+    </section>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Dépendances existantes</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{dependencyList.length} règle{dependencyList.length > 1 ? 's' : ''} configurée{dependencyList.length > 1 ? 's' : ''}</p></div></div>
+      {dependencyList.map(dependency => <article data-testid={`card-dependency-${dependency.source}-${dependency.target}`} key={`${dependency.source}-${dependency.target}`} className="card-surface flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Module source</p><strong>{moduleName(dependency.source)}</strong></div></div><ChevronRight className="hidden text-[hsl(var(--muted-foreground))] sm:block" /><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Dépend de</p><strong>{moduleName(dependency.target)}</strong></div><p className="border-t pt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))] sm:ml-auto sm:max-w-xs sm:border-l sm:border-t-0 sm:pl-5">{dependency.reason}</p><button type="button" data-testid={`button-delete-dependency-${dependency.source}-${dependency.target}`} onClick={() => deleteDependency(dependency)} aria-label={`Supprimer la dépendance ${moduleName(dependency.source)} vers ${moduleName(dependency.target)}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}
+      {dependencyList.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><GitBranch className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucune dépendance configurée</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez une première règle pour guider la configuration des modules.</p></div>}
+    </section>
+  </div>;
+}
+function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
+  const [sectorName, setSectorName] = useState('');
+  const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
+  const [sectorError, setSectorError] = useState('');
+  const dependencyList = data.dependencies ?? [];
+  const sectorPresets = data.sectorPresets ?? [];
+  const moduleName = (id: ModuleId) => modules.find(module => module.id === id)?.name ?? id;
   const sectorDependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
+
   const toggleSectorModule = (moduleId: ModuleId) => {
     setSectorModules(previous => {
       if (previous.includes(moduleId)) {
@@ -501,6 +526,7 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
       return [...previous, moduleId];
     });
   };
+
   const createSector = (event: FormEvent) => {
     event.preventDefault();
     const normalizedName = sectorName.trim();
@@ -522,6 +548,7 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
     setSectorModules([]);
     setSectorError('');
   };
+
   const deleteSector = (preset: SectorPreset) => {
     if (data.companies.some(company => company.sector === preset.name)) {
       setSectorError(`Le secteur « ${preset.name} » est déjà utilisé par une entreprise.`);
@@ -532,23 +559,7 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
 
   return <div className="space-y-5">
     <section className="card-surface rounded-2xl p-6">
-      <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Configuration du catalogue</p><h2 className="mt-2 text-xl font-bold">Ajouter une dépendance</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Définissez les modules qui doivent être disponibles ensemble. Cette règle s’appliquera à l’activation du catalogue et aux espaces des entreprises.</p></div></div>
-      <form onSubmit={createDependency} className="mt-6 grid gap-4 border-t pt-5 lg:grid-cols-[1fr_auto_1fr] lg:items-end">
-        <label className="block text-sm font-semibold">Module source<select data-testid="select-dependency-source" value={source} onChange={event => changeSource(event.target.value as ModuleId)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal">{modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
-        <ChevronRight className="hidden text-[hsl(var(--muted-foreground))] lg:block" />
-        <label className="block text-sm font-semibold">Dépend de<select data-testid="select-dependency-target" value={target} onChange={event => setTarget(event.target.value as ModuleId)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal">{targetOptions.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
-        <label className="block text-sm font-semibold lg:col-span-3">Explication<textarea data-testid="input-dependency-reason" value={reason} onChange={event => setReason(event.target.value)} placeholder="Ex. Les commandes utilisent le référentiel des fournisseurs." rows={3} className="mt-2 w-full resize-y rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
-        {error && <p data-testid="dependency-error" className="text-xs font-semibold text-[hsl(var(--destructive))] lg:col-span-3">{error}</p>}
-        <div className="lg:col-span-3"><button data-testid="button-create-dependency" type="submit" className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Enregistrer la dépendance</button></div>
-      </form>
-    </section>
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Dépendances existantes</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{dependencyList.length} règle{dependencyList.length > 1 ? 's' : ''} configurée{dependencyList.length > 1 ? 's' : ''}</p></div></div>
-      {dependencyList.map(dependency => <article data-testid={`card-dependency-${dependency.source}-${dependency.target}`} key={`${dependency.source}-${dependency.target}`} className="card-surface flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Module source</p><strong>{moduleName(dependency.source)}</strong></div></div><ChevronRight className="hidden text-[hsl(var(--muted-foreground))] sm:block" /><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Dépend de</p><strong>{moduleName(dependency.target)}</strong></div><p className="border-t pt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))] sm:ml-auto sm:max-w-xs sm:border-l sm:border-t-0 sm:pl-5">{dependency.reason}</p><button type="button" data-testid={`button-delete-dependency-${dependency.source}-${dependency.target}`} onClick={() => deleteDependency(dependency)} aria-label={`Supprimer la dépendance ${moduleName(dependency.source)} vers ${moduleName(dependency.target)}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}
-      {dependencyList.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><GitBranch className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucune dépendance configurée</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez une première règle pour guider la configuration des modules.</p></div>}
-    </section>
-    <section className="card-surface rounded-2xl p-6">
-      <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]"><Building2 size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Profils d’inscription</p><h2 className="mt-2 text-xl font-bold">Secteurs et modules par défaut</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Associez une sélection de modules à chaque secteur. Lors de l’inscription, le choix du secteur préremplit cette sélection, que l’entreprise pourra ensuite ajuster.</p></div></div>
+      <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]"><Building2 size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Profils d’inscription</p><h2 className="mt-2 text-xl font-bold">Configurer un secteur d’activité</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Associez une sélection de modules à chaque secteur. Lors de l’inscription, le choix du secteur préremplit cette sélection, que l’entreprise pourra ensuite ajuster.</p></div></div>
       <form onSubmit={createSector} className="mt-6 border-t pt-5">
         <label className="block max-w-md text-sm font-semibold">Nom du secteur<input data-testid="input-sector-name" value={sectorName} onChange={event => setSectorName(event.target.value)} placeholder="Ex. Bâtiment et travaux publics" className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
         <p className="mt-5 text-sm font-semibold">Modules proposés automatiquement</p>
@@ -557,7 +568,11 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
         {sectorError && <p data-testid="sector-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{sectorError}</p>}
         <button data-testid="button-create-sector" type="submit" className="btn mt-5 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Enregistrer le secteur</button>
       </form>
-      <div className="mt-7 space-y-3 border-t pt-5"><div className="flex items-center justify-between"><h3 className="font-bold">Secteurs configurés</h3><span className="mono text-xs text-[hsl(var(--muted-foreground))]">{sectorPresets.length}</span></div>{sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><strong>{preset.name}</strong><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)}</span>)}</div></div><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}</div>
+    </section>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Secteurs configurés</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{sectorPresets.length} secteur{sectorPresets.length > 1 ? 's' : ''} disponible{sectorPresets.length > 1 ? 's' : ''} à l’inscription</p></div></div>
+      {sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="card-surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-start gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><Building2 size={19} /></span><div><strong>{preset.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{preset.moduleIds.length} module{preset.moduleIds.length > 1 ? 's' : ''} proposé{preset.moduleIds.length > 1 ? 's' : ''} automatiquement</p><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)}</span>)}</div></div></div><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}
+      {sectorPresets.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><Building2 className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucun secteur configuré</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez un premier secteur pour guider les inscriptions.</p></div>}
     </section>
   </div>;
 }
