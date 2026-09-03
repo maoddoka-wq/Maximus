@@ -121,7 +121,7 @@ body { min-width: 320px; }
 .sidebar { overflow: hidden; }
 .sidebar > nav { flex: 1 1 0%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sidebar > div:last-child { margin-top: auto; }
-.sidebar > div:last-child > div:last-child { align-self: flex-start; justify-content: flex-start; padding-left: .5rem; }
+.sidebar > div:last-child > div:last-child { align-self: flex-start; justify-content: flex-start; padding-left: 1rem; }
 .card-surface { background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); box-shadow: var(--shadow-soft); }
 .nav-item { transition: background-color .2s ease, color .2s ease, transform .2s ease; }
 .nav-item:hover { background: hsl(var(--sidebar-accent)); transform: translateX(2px); }
