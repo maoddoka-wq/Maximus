@@ -50,9 +50,9 @@
   --card-border: 38 24% 87%;
   --border: 38 24% 86%;
   --input: 38 24% 82%;
-  --ring: 162 70% 28%;
-  --primary: 162 70% 28%;
-  --primary-foreground: 42 44% 98%;
+  --ring: 37 88% 55%;
+  --primary: 37 88% 55%;
+  --primary-foreground: 222 31% 16%;
   --secondary: 42 22% 90%;
   --secondary-foreground: 222 31% 16%;
   --muted: 39 19% 90%;
@@ -91,8 +91,8 @@
   --secondary-foreground: 42 33% 92%;
   --muted: 222 25% 23%;
   --muted-foreground: 42 12% 68%;
-  --accent: 162 56% 42%;
-  --accent-foreground: 42 44% 98%;
+  --accent: 37 88% 55%;
+  --accent-foreground: 222 31% 16%;
   --destructive: 2 67% 56%;
   --destructive-foreground: 42 44% 98%;
   --popover: 222 27% 16%;
