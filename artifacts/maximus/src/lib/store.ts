@@ -20,6 +20,7 @@ export interface Module { id: ModuleId; name: string; description: string; featu
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
 export interface Dependency { source: ModuleId; target: ModuleId; reason: string; }
+export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; }
@@ -35,7 +36,7 @@ export interface CrmOpportunity { id: string; client: string; contact: string; s
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; dependencies: Dependency[]; moduleStatuses?: ModuleStatusMap; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; dependencies: Dependency[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
@@ -66,12 +67,19 @@ export const dependencies: Dependency[] = [
   { source: 'crm', target: 'commerce', reason: 'Le CRM partage le référentiel client avec le commerce.' },
   { source: 'logistique', target: 'stocks', reason: 'Les livraisons et transferts utilisent les stocks.' },
 ];
+export const sectorPresets: SectorPreset[] = [
+  { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'] },
+  { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique', 'commerce'] },
+  { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'finance', 'rh', 'presences', 'documents', 'rapports'] },
+  { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'ventes', 'stocks', 'finance'] },
+];
 
 export function seedData(): StoreData {
   return {
     catalogVersion: 2,
     organizationVersion: 3,
     dependencies: dependencies.map(dependency => ({ ...dependency })),
+    sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
@@ -183,6 +191,7 @@ export function loadData(): StoreData {
       catalogVersion: 2,
       organizationVersion: 3,
       dependencies: parsed.dependencies ?? initial.dependencies,
+      sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,

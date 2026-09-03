@@ -5,7 +5,7 @@ import { Link, useLocation, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { loadData, modules, money, saveData, shortMoney, uid, type Company, type Dependency, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type StoreData } from '@/lib/store';
+import { loadData, modules, money, saveData, shortMoney, uid, type Company, type Dependency, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
@@ -118,7 +118,7 @@ function AppContent() {
   const logout = () => { setSession(null); localStorage.removeItem('maximus-session'); setLocation('/'); };
   const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
 
-  if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage data={data} mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} onCancel={() => setLocation('/maximus/entreprises')} /> : <Signup onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
+  if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage data={data} mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} onCancel={() => setLocation('/maximus/entreprises')} /> : <Signup data={data} onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
   const loginEmployees = [...data.employees, ...data.companies.filter(company => company.status === 'ACTIF' && company.adminPassword).map(company => ({ id: `company-admin:${company.id}`, firstName: company.manager.split(' ')[0] ?? company.name, lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur', email: company.email, phone: company.phone, position: 'Administrateur', department: '', subDepartment: '', role: 'Administrateur entreprise', status: 'ACTIF' as const, loginPassword: company.adminPassword, companyId: company.id }))];
   if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
@@ -204,11 +204,58 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
   </div>;
 }
 
-function Signup({ onComplete }: { onComplete: () => void }) {
-  const [step, setStep] = useState(1); const [submitted, setSubmitted] = useState(false); const [name, setName] = useState(''); const [manager, setManager] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [passwordConfirm, setPasswordConfirm] = useState(''); const [sector, setSector] = useState('Distribution'); const [orgName, setOrgName] = useState(''); const [orgCode, setOrgCode] = useState(''); const [orgType, setOrgType] = useState<OrgNode['type']>('direction'); const [selectedModules, setSelectedModules] = useState<ModuleId[]>(['finance', 'commerce', 'stocks']);
-  const toggle = (id: ModuleId) => setSelectedModules(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void }) {
+  const fallbackPreset: SectorPreset = { id: 'default', name: 'Distribution', moduleIds: ['finance', 'commerce', 'stocks'] };
+  const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
+  const [step, setStep] = useState(1);
+  const [submitted, setSubmitted] = useState(false);
+  const [name, setName] = useState('');
+  const [manager, setManager] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [sector, setSector] = useState(initialPreset.name);
+  const [orgName, setOrgName] = useState('');
+  const [orgCode, setOrgCode] = useState('');
+  const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
+  const [moduleError, setModuleError] = useState('');
+  const dependencyList = data.dependencies ?? [];
+  const dependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
+  const changeSector = (nextSector: string) => {
+    const preset = data.sectorPresets.find(item => item.name === nextSector);
+    setSector(nextSector);
+    setSelectedModules(preset ? [...preset.moduleIds] : []);
+    setModuleError('');
+  };
+  const toggle = (id: ModuleId) => {
+    setSelectedModules(previous => {
+      if (previous.includes(id)) {
+        const toRemove = new Set<ModuleId>([id]);
+        let expanded = true;
+        while (expanded) {
+          expanded = false;
+          modules.forEach(candidate => {
+            if (!toRemove.has(candidate.id) && dependenciesFor(candidate.id).some(dependency => toRemove.has(dependency)) && previous.includes(candidate.id)) {
+              toRemove.add(candidate.id);
+              expanded = true;
+            }
+          });
+        }
+        setModuleError('');
+        return previous.filter(moduleId => !toRemove.has(moduleId));
+      }
+      const missing = dependenciesFor(id).filter(dependency => !previous.includes(dependency));
+      if (missing.length) {
+        setModuleError(`Sélectionnez d’abord : ${missing.map(dependency => modules.find(item => item.id === dependency)?.name ?? dependency).join(', ')}.`);
+        return previous;
+      }
+      setModuleError('');
+      return [...previous, id];
+    });
+  };
   if (submitted) return <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6"><div className="card-surface w-full max-w-xl rounded-2xl p-8 text-center fade-up"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]"><Check size={25} /></span><p className="mono mt-6 text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Demande envoyée</p><h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">Votre entreprise est en attente de validation.</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Votre entreprise est en attente de validation par l’administration MAXIMUS. Vous pourrez accéder à votre espace dès son activation.</p><button data-testid="button-back-after-signup" onClick={onComplete} className="btn mt-8 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Retour à la connexion</button></div></div>;
-   return <div className="min-h-[100dvh] bg-[hsl(var(--background))]"><header className="flex items-center justify-between border-b border-[hsl(var(--border))] px-6 py-5 lg:px-12"><Brand /><Link data-testid="link-back-login" href="/" className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">Retour à la connexion</Link></header><div className="mx-auto max-w-3xl p-6 py-12 lg:py-20 fade-up"><div className="mb-10"><p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Nouvel espace entreprise</p><h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1><p className="mt-3 text-[hsl(var(--muted-foreground))]">Votre demande sera revue par l’équipe MAXIMUS avant activation.</p></div><div className="mb-10 flex items-center gap-3"><Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} /><div className="h-px flex-1 bg-[hsl(var(--border))]" /><Step n={2} label="Modules & organisation" active={step === 2} done={false} /></div>{step === 1 ? <div className="card-surface rounded-2xl p-6 sm:p-8"><div className="grid gap-5 sm:grid-cols-2"><Field label="Nom de l’entreprise" placeholder="Ex. Teranga Agro" value={name} onChange={setName} testId="input-company-name" /><Field label="Responsable" placeholder="Prénom Nom" value={manager} onChange={setManager} testId="input-company-manager" /><Field label="Email professionnel" placeholder="vous@entreprise.com" value={email} onChange={setEmail} type="email" testId="input-company-email" /><label className="block text-sm font-semibold">Secteur<select data-testid="select-company-sector" value={sector} onChange={e => setSector(e.target.value)} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"><option>Distribution</option><option>Agroalimentaire</option><option>Services</option><option>Commerce</option></select></label><Field label="Mot de passe administrateur" placeholder="Au moins 8 caractères" value={password} onChange={setPassword} type="password" testId="input-company-password" /><Field label="Confirmer le mot de passe" placeholder="Répétez le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" testId="input-company-password-confirm" /></div>{password && passwordConfirm && password !== passwordConfirm && <p className="mt-4 text-xs font-semibold text-[hsl(var(--destructive))]">Les mots de passe ne correspondent pas.</p>}<p className="mt-4 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Ce mot de passe servira à l’administrateur de l’entreprise après validation de votre demande.</p><button disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm} data-testid="button-next-signup" onClick={() => setStep(2)} className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40">Continuer <ChevronRight size={16} /></button></div> : <div className="card-surface rounded-2xl p-6 sm:p-8"><section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4"><h2 className="font-bold">Organisation obligatoire</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez la première unité de votre entreprise. Vous pourrez ensuite construire librement toute la hiérarchie.</p><div className="mt-4 grid gap-4 sm:grid-cols-3"><Field label="Nom de l’unité *" placeholder="Ex. Direction générale" value={orgName} onChange={setOrgName} testId="input-company-org-name" /><Field label="Code *" placeholder="Ex. DG-01" value={orgCode} onChange={setOrgCode} testId="input-company-org-code" /><label className="block text-sm font-semibold">Type<select data-testid="select-company-org-type" value={orgType} onChange={e => setOrgType(e.target.value as OrgNode['type'])} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"><option value="direction">Direction</option><option value="department">Département</option><option value="sector">Secteur</option><option value="service">Service</option></select></label></div></section><h2 className="text-xl font-bold">Les briques utiles dès le premier jour</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Vous pourrez ajuster ces choix avec votre administrateur MAXIMUS.</p><div className="mt-6 grid gap-3 sm:grid-cols-2">{modules.map(mod => <button type="button" data-testid={`button-module-${mod.id}`} key={mod.id} onClick={() => toggle(mod.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(mod.id) && <Check size={13} />}</span><span><strong className="block text-sm">{mod.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{mod.description}</span></span></button>)}</div><div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={!orgName.trim() || !orgCode.trim() || selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector, status: 'EN ATTENTE', requestedModules: selectedModules, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; const orgId = uid('org'); try { const current = loadData(); current.companies.push(newCompany); current.orgNodes.push({ id: orgId, companyId: newCompany.id, name: orgName.trim(), code: orgCode.trim().toUpperCase(), type: orgType, parentId: null, moduleIds: [] }); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div></div>}</div></div>;
+    return <div className="min-h-[100dvh] bg-[hsl(var(--background))]"><header className="flex items-center justify-between border-b border-[hsl(var(--border))] px-6 py-5 lg:px-12"><Brand /><Link data-testid="link-back-login" href="/" className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">Retour à la connexion</Link></header><div className="mx-auto max-w-3xl p-6 py-12 lg:py-20 fade-up"><div className="mb-10"><p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Nouvel espace entreprise</p><h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1><p className="mt-3 text-[hsl(var(--muted-foreground))]">Votre demande sera revue par l’équipe MAXIMUS avant activation.</p></div><div className="mb-10 flex items-center gap-3"><Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} /><div className="h-px flex-1 bg-[hsl(var(--border))]" /><Step n={2} label="Modules & organisation" active={step === 2} done={false} /></div>{step === 1 ? <div className="card-surface rounded-2xl p-6 sm:p-8"><div className="grid gap-5 sm:grid-cols-2"><Field label="Nom de l’entreprise" placeholder="Ex. Teranga Agro" value={name} onChange={setName} testId="input-company-name" /><Field label="Responsable" placeholder="Prénom Nom" value={manager} onChange={setManager} testId="input-company-manager" /><Field label="Email professionnel" placeholder="vous@entreprise.com" value={email} onChange={setEmail} type="email" testId="input-company-email" /><label className="block text-sm font-semibold">Secteur<select data-testid="select-company-sector" value={sector} onChange={e => changeSector(e.target.value)} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal">{data.sectorPresets.map(preset => <option key={preset.id} value={preset.name}>{preset.name}</option>)}</select></label><Field label="Mot de passe administrateur" placeholder="Au moins 8 caractères" value={password} onChange={setPassword} type="password" testId="input-company-password" /><Field label="Confirmer le mot de passe" placeholder="Répétez le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" testId="input-company-password-confirm" /></div>{password && passwordConfirm && password !== passwordConfirm && <p className="mt-4 text-xs font-semibold text-[hsl(var(--destructive))]">Les mots de passe ne correspondent pas.</p>}<p className="mt-4 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Ce mot de passe servira à l’administrateur de l’entreprise après validation de votre demande.</p><button disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm} data-testid="button-next-signup" onClick={() => setStep(2)} className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40">Continuer <ChevronRight size={16} /></button></div> : <div className="card-surface rounded-2xl p-6 sm:p-8"><section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4"><h2 className="font-bold">Organisation obligatoire</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez la première unité de votre entreprise. Vous pourrez ensuite construire librement toute la hiérarchie.</p><div className="mt-4 grid gap-4 sm:grid-cols-3"><Field label="Nom de l’unité *" placeholder="Ex. Direction générale" value={orgName} onChange={setOrgName} testId="input-company-org-name" /><Field label="Code *" placeholder="Ex. DG-01" value={orgCode} onChange={setOrgCode} testId="input-company-org-code" /><label className="block text-sm font-semibold">Type<select data-testid="select-company-org-type" value={orgType} onChange={e => setOrgType(e.target.value as OrgNode['type'])} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"><option value="direction">Direction</option><option value="department">Département</option><option value="sector">Secteur</option><option value="service">Service</option></select></label></div></section><h2 className="text-xl font-bold">Les briques utiles dès le premier jour</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">La sélection proposée correspond au secteur choisi. Vous pouvez l’ajuster avant d’envoyer la demande.</p>{moduleError && <p data-testid="signup-module-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{moduleError}</p>}<div className="mt-6 grid gap-3 sm:grid-cols-2">{modules.map(mod => <button type="button" data-testid={`button-module-${mod.id}`} key={mod.id} onClick={() => toggle(mod.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(mod.id) && <Check size={13} />}</span><span><strong className="block text-sm">{mod.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{mod.description}</span></span></button>)}</div><div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={!orgName.trim() || !orgCode.trim() || selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector, status: 'EN ATTENTE', requestedModules: selectedModules, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; const orgId = uid('org'); try { const current = loadData(); current.companies.push(newCompany); current.orgNodes.push({ id: orgId, companyId: newCompany.id, name: orgName.trim(), code: orgCode.trim().toUpperCase(), type: orgType, parentId: null, moduleIds: [] }); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div></div>}</div></div>;
 }
 
 function Brand({ inverse = false, homeHref }: { inverse?: boolean; homeHref?: string }) { return <Link data-testid="link-brand" href={homeHref ?? (inverse ? '/' : '/maximus/dashboard')} className="inline-flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--accent))] text-sm font-black text-[hsl(var(--foreground))]">M</span><span className={`text-lg font-black tracking-[-.06em] ${inverse ? 'text-[hsl(var(--sidebar-foreground))]' : ''}`}>MAXIMUS<span className="text-[hsl(var(--accent))]">.</span></span></Link>; }
@@ -387,7 +434,11 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
   const [target, setTarget] = useState<ModuleId>('stocks');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [sectorName, setSectorName] = useState('');
+  const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
+  const [sectorError, setSectorError] = useState('');
   const dependencyList = data.dependencies ?? [];
+  const sectorPresets = data.sectorPresets ?? [];
   const targetOptions = modules.filter(module => module.id !== source);
 
   const changeSource = (nextSource: ModuleId) => {
@@ -421,6 +472,61 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
       draft.dependencies = (draft.dependencies ?? []).filter(item => !(item.source === dependency.source && item.target === dependency.target));
     }, 'Dépendance supprimée.');
   };
+  const sectorDependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
+  const toggleSectorModule = (moduleId: ModuleId) => {
+    setSectorModules(previous => {
+      if (previous.includes(moduleId)) {
+        const toRemove = new Set<ModuleId>([moduleId]);
+        let expanded = true;
+        while (expanded) {
+          expanded = false;
+          modules.forEach(candidate => {
+            if (!toRemove.has(candidate.id) && sectorDependenciesFor(candidate.id).some(dependency => toRemove.has(dependency)) && previous.includes(candidate.id)) {
+              toRemove.add(candidate.id);
+              expanded = true;
+            }
+          });
+        }
+        setSectorError('');
+        return previous.filter(id => !toRemove.has(id));
+      }
+      const missing = sectorDependenciesFor(moduleId).filter(id => !previous.includes(id));
+      if (missing.length) {
+        setSectorError(`Sélectionnez d’abord : ${missing.map(id => moduleName(id)).join(', ')}.`);
+        return previous;
+      }
+      setSectorError('');
+      return [...previous, moduleId];
+    });
+  };
+  const createSector = (event: FormEvent) => {
+    event.preventDefault();
+    const normalizedName = sectorName.trim();
+    if (!normalizedName) {
+      setSectorError('Saisissez le nom du secteur.');
+      return;
+    }
+    if (sectorPresets.some(preset => preset.name.toLowerCase() === normalizedName.toLowerCase())) {
+      setSectorError('Ce secteur existe déjà.');
+      return;
+    }
+    if (sectorModules.length === 0) {
+      setSectorError('Sélectionnez au moins un module par défaut.');
+      return;
+    }
+    const preset: SectorPreset = { id: uid('sector'), name: normalizedName, moduleIds: [...sectorModules] };
+    mutate(draft => { draft.sectorPresets = [...(draft.sectorPresets ?? []), preset]; }, 'Secteur et modules par défaut enregistrés.');
+    setSectorName('');
+    setSectorModules([]);
+    setSectorError('');
+  };
+  const deleteSector = (preset: SectorPreset) => {
+    if (data.companies.some(company => company.sector === preset.name)) {
+      setSectorError(`Le secteur « ${preset.name} » est déjà utilisé par une entreprise.`);
+      return;
+    }
+    mutate(draft => { draft.sectorPresets = (draft.sectorPresets ?? []).filter(item => item.id !== preset.id); }, 'Secteur supprimé.');
+  };
 
   return <div className="space-y-5">
     <section className="card-surface rounded-2xl p-6">
@@ -438,6 +544,18 @@ function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: 
       <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Dépendances existantes</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{dependencyList.length} règle{dependencyList.length > 1 ? 's' : ''} configurée{dependencyList.length > 1 ? 's' : ''}</p></div></div>
       {dependencyList.map(dependency => <article data-testid={`card-dependency-${dependency.source}-${dependency.target}`} key={`${dependency.source}-${dependency.target}`} className="card-surface flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Module source</p><strong>{moduleName(dependency.source)}</strong></div></div><ChevronRight className="hidden text-[hsl(var(--muted-foreground))] sm:block" /><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Dépend de</p><strong>{moduleName(dependency.target)}</strong></div><p className="border-t pt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))] sm:ml-auto sm:max-w-xs sm:border-l sm:border-t-0 sm:pl-5">{dependency.reason}</p><button type="button" data-testid={`button-delete-dependency-${dependency.source}-${dependency.target}`} onClick={() => deleteDependency(dependency)} aria-label={`Supprimer la dépendance ${moduleName(dependency.source)} vers ${moduleName(dependency.target)}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}
       {dependencyList.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><GitBranch className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucune dépendance configurée</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez une première règle pour guider la configuration des modules.</p></div>}
+    </section>
+    <section className="card-surface rounded-2xl p-6">
+      <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]"><Building2 size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Profils d’inscription</p><h2 className="mt-2 text-xl font-bold">Secteurs et modules par défaut</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Associez une sélection de modules à chaque secteur. Lors de l’inscription, le choix du secteur préremplit cette sélection, que l’entreprise pourra ensuite ajuster.</p></div></div>
+      <form onSubmit={createSector} className="mt-6 border-t pt-5">
+        <label className="block max-w-md text-sm font-semibold">Nom du secteur<input data-testid="input-sector-name" value={sectorName} onChange={event => setSectorName(event.target.value)} placeholder="Ex. Bâtiment et travaux publics" className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
+        <p className="mt-5 text-sm font-semibold">Modules proposés automatiquement</p>
+        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les dépendances nécessaires doivent être sélectionnées avant un module qui en dépend.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{modules.map(module => <button type="button" data-testid={`button-sector-module-${module.id}`} key={module.id} onClick={() => toggleSectorModule(module.id)} className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${sectorModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${sectorModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{sectorModules.includes(module.id) && <Check size={13} />}</span><span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</span></span></button>)}</div>
+        {sectorError && <p data-testid="sector-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{sectorError}</p>}
+        <button data-testid="button-create-sector" type="submit" className="btn mt-5 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Enregistrer le secteur</button>
+      </form>
+      <div className="mt-7 space-y-3 border-t pt-5"><div className="flex items-center justify-between"><h3 className="font-bold">Secteurs configurés</h3><span className="mono text-xs text-[hsl(var(--muted-foreground))]">{sectorPresets.length}</span></div>{sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><strong>{preset.name}</strong><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)}</span>)}</div></div><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}</div>
     </section>
   </div>;
 }
@@ -776,19 +894,27 @@ function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee, company
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppContent /></WouterRouter></TooltipProvider></QueryClientProvider>; }
 
 function AdminCreateCompanyPage({ data, mutate, onComplete, onCancel }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onComplete: () => void; onCancel: () => void }) {
+  const fallbackPreset: SectorPreset = { id: 'default', name: 'Distribution', moduleIds: ['finance', 'commerce', 'stocks'] };
+  const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
   const [name, setName] = useState('');
   const [manager, setManager] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [sector, setSector] = useState('Distribution');
+  const [sector, setSector] = useState(initialPreset.name);
   const [orgName, setOrgName] = useState('');
   const [orgCode, setOrgCode] = useState('');
   const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
-  const [selectedModules, setSelectedModules] = useState<ModuleId[]>(['finance', 'commerce', 'stocks']);
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [error, setError] = useState('');
   const dependencyList = data.dependencies ?? [];
   const dependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
+  const changeSector = (nextSector: string) => {
+    const preset = data.sectorPresets.find(item => item.name === nextSector);
+    setSector(nextSector);
+    setSelectedModules(preset ? [...preset.moduleIds] : []);
+    setError('');
+  };
 
   const toggle = (id: ModuleId) => {
     setSelectedModules(previous => {
@@ -845,7 +971,7 @@ function AdminCreateCompanyPage({ data, mutate, onComplete, onCancel }: { data: 
         <Field label="Nom de l’entreprise" value={name} onChange={setName} placeholder="Ex. Teranga Agro" testId="input-admin-company-name" />
         <Field label="Responsable" value={manager} onChange={setManager} placeholder="Prénom Nom" testId="input-admin-company-manager" />
         <Field label="Email administrateur" value={email} onChange={setEmail} type="email" placeholder="admin@entreprise.com" testId="input-admin-company-email" />
-        <label className="block text-sm font-semibold">Secteur<select data-testid="select-admin-company-sector" value={sector} onChange={event => setSector(event.target.value)} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"><option>Distribution</option><option>Agroalimentaire</option><option>Services</option><option>Commerce</option></select></label>
+         <label className="block text-sm font-semibold">Secteur<select data-testid="select-admin-company-sector" value={sector} onChange={event => changeSector(event.target.value)} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal">{data.sectorPresets.map(preset => <option key={preset.id} value={preset.name}>{preset.name}</option>)}</select></label>
         <Field label="Mot de passe administrateur" value={password} onChange={setPassword} type="password" placeholder="Au moins 8 caractères" testId="input-admin-company-password" />
         <Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-admin-company-password-confirm" />
       </div>
