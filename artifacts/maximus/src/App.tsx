@@ -12,7 +12,7 @@ import { CompanyOrganizationAdmin } from '@/pages/company-organization';
 
 const queryClient = new QueryClient();
 type Icon = typeof Gauge;
-type Session = 'admin' | 'kora' | `employee:${string}`;
+type Session = 'admin' | 'kora' | `employee:${string}` | `company:${string}`;
 
 const adminNav = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
