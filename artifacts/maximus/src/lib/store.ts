@@ -15,7 +15,7 @@ export type ModuleId =
   | 'documents'
   | 'rapports';
 
-export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; }
+export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; managerRoleId?: string; }
 export interface Module { id: ModuleId; name: string; description: string; features: string[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
@@ -69,7 +69,7 @@ export function seedData(): StoreData {
     organizationVersion: 3,
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
-      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
+      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', adminPassword: 'Kora123!', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
       { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', adminPassword: 'Kora123!', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
     ],
@@ -84,6 +84,7 @@ export function seedData(): StoreData {
       { id: 'kora-role-magasinier', name: 'Magasinier', description: 'Suit les articles, mouvements, fournisseurs et livraisons.', companyId: 'kora', sectorId: 'kora-service-stock', modulePermissions: { stocks: ['voir', 'créer', 'modifier'], achats: ['voir', 'créer'], fournisseurs: ['voir', 'créer', 'modifier'], logistique: ['voir', 'créer', 'modifier'] } },
       { id: 'kora-role-rh', name: 'Gestionnaire RH', description: 'Suit les collaborateurs, présences et éléments de paie.', companyId: 'kora', sectorId: 'kora-service-rh', modulePermissions: { rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer', 'modifier'], paie: ['voir', 'créer'] } },
       { id: 'kora-role-comptable', name: 'Comptable', description: 'Prépare les écritures, paiements et rapports financiers.', companyId: 'kora', sectorId: 'kora-service-finance', modulePermissions: { finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'], rapports: ['voir', 'créer'], documents: ['voir', 'créer'] } },
+      { id: 'kora-role-manager', name: 'Manager entreprise', description: 'Pilote l’ensemble de KORA et supervise les équipes.', companyId: 'kora', sectorId: 'kora-direction', modulePermissions: { commerce: ['voir', 'créer', 'modifier'], ventes: ['voir', 'créer', 'modifier'], achats: ['voir', 'créer', 'modifier'], stocks: ['voir', 'créer', 'modifier'], finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'], rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer', 'modifier'], paie: ['voir', 'créer', 'modifier'], crm: ['voir', 'créer', 'modifier'], fournisseurs: ['voir', 'créer', 'modifier'], logistique: ['voir', 'créer', 'modifier'], documents: ['voir', 'créer', 'modifier'], rapports: ['voir', 'créer', 'modifier'] } },
     ],
     products: [
       { id: 'p-1', sku: 'KOR-CAF-01', name: 'Café Touba 250g', category: 'Épicerie', stock: 184, threshold: 50, price: 3500 },
