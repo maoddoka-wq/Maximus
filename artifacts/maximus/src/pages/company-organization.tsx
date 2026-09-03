@@ -179,6 +179,7 @@ function OverviewTab({ company, data, setTab }: { company: Company, data: StoreD
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
   const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
   const companyEmployees = data.employees.filter((e: Employee) => e.companyId === company.id);
+  const managerRole = companyRoles.find(role => role.id === company.managerRoleId);
   
   const rootNodes = companyNodes.filter((n: OrgNode) => !n.parentId);
 
@@ -188,6 +189,10 @@ function OverviewTab({ company, data, setTab }: { company: Company, data: StoreD
         <MetricCard title="Unités Organisationnelles" value={companyNodes.length} icon={Building2} onClick={() => setTab('structure')} />
         <MetricCard title="Rôles Configurés" value={companyRoles.length} icon={KeyRound} onClick={() => setTab('roles')} />
         <MetricCard title="Employés Actifs" value={companyEmployees.length} icon={Users} onClick={() => setTab('employees')} />
+      </div>
+      <div className="card-surface flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5">
+        <div><p className="text-xs font-semibold uppercase text-[hsl(var(--muted-foreground))]">Responsable de l’entreprise</p><p className="mt-1 text-lg font-bold">{company.manager}</p><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Compte manager · {company.email}</p></div>
+        <div className="rounded-xl bg-[hsl(var(--primary)/.1)] px-4 py-3 text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Rôle affecté</p><p className="mt-1 text-sm font-bold text-[hsl(var(--primary))]">{managerRole?.name || 'Manager entreprise'}</p><p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Accès global</p></div>
       </div>
       
       <div className="card-surface p-6 rounded-2xl">
@@ -513,8 +518,8 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
     setModalOpen(true);
   };
   const deleteRole = (role: Role) => {
-    if (data.employees.some(employee => employee.roleId === role.id)) {
-      window.alert('Impossible de supprimer ce rôle : il est encore affecté à un ou plusieurs employés.');
+    if (data.employees.some(employee => employee.roleId === role.id) || company.managerRoleId === role.id) {
+      window.alert('Impossible de supprimer ce rôle : il est encore affecté à un employé ou au manager de l’entreprise.');
       return;
     }
     mutate((draft: StoreData) => {
@@ -551,6 +556,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
                 </div>
               </div>
               <p className="text-xs text-[hsl(var(--muted-foreground))] mt-3 flex-1">{role.description}</p>
+              {(company.managerRoleId === role.id || data.employees.some(employee => employee.roleId === role.id)) && <div className="mt-3 border-t pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Affectations</p><p className="mt-1 text-xs font-semibold">{company.managerRoleId === role.id ? `Manager : ${company.manager}` : ''}{company.managerRoleId === role.id && data.employees.some(employee => employee.roleId === role.id) ? ' · ' : ''}{data.employees.filter(employee => employee.roleId === role.id).map(employee => `${employee.firstName} ${employee.lastName}`).join(', ')}</p></div>}
               <div className="mt-4 border-t pt-3 flex flex-wrap gap-1.5">
                 {Object.keys(role.modulePermissions).map(modId => (
                   <span key={modId} className="text-[10px] px-1.5 py-0.5 rounded border font-medium">
@@ -564,7 +570,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
         {companyRoles.length === 0 && <div className="col-span-full text-center py-8 text-sm text-[hsl(var(--muted-foreground))]">Aucun rôle configuré.</div>}
       </div>
 
-      {modalOpen && <RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} sectorLocked={Boolean(editingRole && data.employees.some(employee => employee.roleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
+      {modalOpen && <RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} sectorLocked={Boolean(editingRole && (data.employees.some(employee => employee.roleId === editingRole.id) || company.managerRoleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
         mutate((d: StoreData) => {
           if (editingRole) {
             const idx = d.roles.findIndex((r: Role) => r.id === editingRole.id);

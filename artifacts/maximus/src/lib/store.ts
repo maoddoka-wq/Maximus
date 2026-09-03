@@ -172,7 +172,7 @@ export function loadData(): StoreData {
     const rawCompanies = (parsed.catalogVersion ?? 1) < 2
       ? parsed.companies.map(company => company.id === 'kora' ? { ...company, requestedModules: initial.companies[0].requestedModules, allowedModules: initial.companies[0].allowedModules, refusedModules: [] } : company)
       : parsed.companies;
-    const companies = rawCompanies.map(company => ({ ...company, adminPassword: company.adminPassword ?? 'Kora123!' }));
+    const companies = rawCompanies.map(company => ({ ...company, adminPassword: company.adminPassword ?? 'Kora123!', managerRoleId: company.managerRoleId ?? (company.id === 'kora' ? 'kora-role-manager' : undefined) }));
     const removeGeneratedHierarchy = (parsed.organizationVersion ?? 1) < 3;
     const generatedNodeIds = new Set(['org-1', 'org-2', 'org-3', 'org-4', 'org-5', 'org-6', 'org-7']);
     const generatedRoleIds = new Set(['role-admin', 'role-compta', 'role-manager', 'role-magasinier', 'role-rh', 'role-logistique', 'role-vendeur']);
@@ -186,7 +186,8 @@ export function loadData(): StoreData {
         parentId: removeGeneratedHierarchy && node.parentId && generatedNodeIds.has(node.parentId) ? null : node.parentId,
         moduleIds: node.moduleIds || [],
       })) as OrgNode[];
-    const roles = (parsed.roles?.length ? parsed.roles : initial.roles)
+    const roleSource = parsed.roles?.length ? parsed.roles : initial.roles;
+    const roles = [...initial.roles.filter(initialRole => !roleSource.some(role => role.id === initialRole.id)), ...roleSource]
       .filter(role => !removeGeneratedHierarchy || !generatedRoleIds.has(role.id))
       .map(role => ({
         ...role,
