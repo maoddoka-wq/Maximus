@@ -34,7 +34,7 @@ const koraNav = [
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
   { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
-  { href: '/kora/stocks', label: 'Stocks', icon: Boxes, module: 'stocks' },
+  { href: '/kora/stocks', label: 'Gestion de stock', icon: Boxes, module: 'stocks' },
   { href: '/kora/finance', label: 'Finance', icon: WalletCards, module: 'finance' },
   { href: '/kora/comptabilite', label: 'Comptabilité', icon: FileBarChart, module: 'comptabilite' },
   { href: '/kora/rh', label: 'Ressources humaines', icon: UserRoundCog, module: 'rh' },
@@ -64,7 +64,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Une structure souple qui suit la réalité de vos équipes.' },
   '/kora/employes': { kicker: 'Espace KORA', title: 'Employés', description: 'Les personnes qui font avancer KORA chaque jour.' },
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
-  '/kora/stocks': { kicker: 'Espace KORA', title: 'Stocks', description: 'Les niveaux et mouvements de vos produits.' },
+  '/kora/stocks': { kicker: 'Espace KORA', title: 'Gestion de stock', description: 'Pilotez vos articles, entrées, sorties et inventaires.' },
   '/kora/finance': { kicker: 'Espace KORA', title: 'Finance', description: 'Une lecture simple des encaissements et de la trésorerie.' },
   '/kora/commerce': { kicker: 'Espace KORA', title: 'Gestion commerciale', description: 'Clients, commandes et activité commerciale en temps réel.' },
   '/kora/ventes': { kicker: 'Espace KORA', title: 'Ventes', description: 'Devis, ventes et validation des opérations clients.' },
@@ -532,7 +532,7 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
   const [query, setQuery] = useState('');
   const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
     sales: { label: 'Ventes', description: 'Chiffre d’affaires et commandes clients.', headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'], rows: data.sales.map(item => [item.reference, item.client, money(item.amount), item.status, item.date]) },
-    stock: { label: 'Stocks', description: 'Valorisation et niveaux des produits.', headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'], rows: data.products.map(item => [item.name, item.sku, item.category, String(item.stock), money(item.stock * item.price)]) },
+    stock: { label: 'Gestion de stock', description: 'Valorisation et niveaux des produits.', headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'], rows: data.products.map(item => [item.name, item.sku, item.category, String(item.stock), money(item.stock * item.price)]) },
     finance: { label: 'Finance', description: 'Paiements et encaissements enregistrés.', headers: ['Référence', 'Facture', 'Montant', 'Statut', 'Date'], rows: data.payments.map(item => [item.reference, item.invoice, money(item.amount), item.status, item.date]) },
     activity: { label: 'Activité', description: 'Traçabilité des actions réalisées.', headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'], rows: data.activities.map(item => [item.user, item.action, item.module, item.object, item.date]) },
   };

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Truck, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
 import { stockApi, type StockBootstrap, type StockInventory, type StockMovement, type StockMovementType, type StockProduct, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
@@ -8,12 +8,15 @@ const movementLabels: StockMovementType[] = ['ENTRÉE', 'SORTIE', 'VENTE', 'ACHA
 const movementOut = new Set<StockMovementType>(['SORTIE', 'VENTE', 'AJUSTEMENT-', 'PERTE', 'RETOUR FOURNISSEUR']);
 const tabs = [
   ['dashboard', 'Tableau de bord', Boxes],
-  ['products', 'Produits', Package],
-  ['warehouses', 'Entrepôts', Warehouse],
-  ['movements', 'Mouvements', ArrowLeftRight],
-  ['inventory', 'Inventaires', ClipboardCheck],
-  ['suppliers', 'Fournisseurs', Truck],
+  ['products', 'Articles', Package],
+  ['entries', 'Entrées de stock', ArrowDownToLine],
+  ['exits', 'Sorties de stock', ArrowUpFromLine],
+  ['requests', 'Demandes', ClipboardCheck],
+  ['inventory', 'Inventaire', ClipboardCheck],
   ['reports', 'Rapports', FileBarChart],
+  ['references', 'Référentiels', Warehouse],
+  ['users', 'Utilisateurs', Users],
+  ['settings', 'Paramètres', Settings],
 ] as const;
 
 type Tab = typeof tabs[number][0];
@@ -47,21 +50,26 @@ export default function StockModulePage() {
   };
 
   if (loading) return <div className="card-surface flex min-h-80 items-center justify-center rounded-2xl"><RefreshCw className="animate-spin text-[hsl(var(--primary))]" size={22} /></div>;
-  if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">Le module Stocks est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-white">Réessayer</button></div>;
+  if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
 
   return <div className="space-y-5">
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
-    <div className="flex items-center justify-between gap-3 overflow-x-auto border-b border-[hsl(var(--border))] pb-2">
-      <div className="flex min-w-max gap-1">{tabs.map(([id, label, Icon]) => <button key={id} onClick={() => setTab(id)} className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-white' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={15} />{label}</button>)}</div>
-      <button title="Actualiser" onClick={() => void load(true)} className="rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2">
+        <nav aria-label="Menu gestion de stock" className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">{tabs.map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={15} />{label}</button>)}</nav>
+        <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
+      </div>
+      {tab === 'dashboard' && <StockDashboard data={data} onTab={setTab} />}
+      {tab === 'products' && <ProductsPanel data={data} run={run} />}
+      {tab === 'entries' && <MovementsPanel data={data} run={run} />}
+      {tab === 'exits' && <MovementsPanel data={data} run={run} />}
+      {tab === 'requests' && <StockRequestsPanel data={data} />}
+      {tab === 'inventory' && <InventoryPanel data={data} run={run} />}
+      {tab === 'reports' && <ReportsPanel data={data} />}
+      {tab === 'references' && <ReferencesPanel data={data} run={run} />}
+      {tab === 'users' && <StockUsersPanel />}
+      {tab === 'settings' && <StockSettingsPanel />}
     </div>
-    {tab === 'dashboard' && <StockDashboard data={data} onTab={setTab} />}
-    {tab === 'products' && <ProductsPanel data={data} run={run} />}
-    {tab === 'warehouses' && <WarehousesPanel data={data} run={run} />}
-    {tab === 'movements' && <MovementsPanel data={data} run={run} />}
-    {tab === 'inventory' && <InventoryPanel data={data} run={run} />}
-    {tab === 'suppliers' && <SuppliersPanel data={data} run={run} />}
-    {tab === 'reports' && <ReportsPanel data={data} />}
     {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-semibold text-white shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
   </div>;
 }
@@ -82,11 +90,41 @@ function StockDashboard({ data, onTab }: { data: StockBootstrap; onTab: (tab: Ta
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Stock total" value={total.toLocaleString('fr-FR')} detail={`${products.length} références actives`} icon={Boxes} accent /><Metric label="Valeur du stock" value={money(value)} detail="au prix d’achat" icon={WalletIcon} /><Metric label="Produits en rupture" value={String(out.length).padStart(2, '0')} detail="stock nul ou négatif bloqué" icon={AlertTriangle} warning /><Metric label="Produits sous seuil" value={String(low.length).padStart(2, '0')} detail="réapprovisionnement à prévoir" icon={Package} /></div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Entrées" value={entries.toLocaleString('fr-FR')} detail="unités enregistrées" icon={ArrowDownToLine} /><Metric label="Sorties" value={sorties.toLocaleString('fr-FR')} detail="unités sorties" icon={ArrowUpFromLine} /><Metric label="Transferts" value={String(transfers)} detail="mouvements inter-entrepôts" icon={ArrowLeftRight} /><Metric label="Pertes" value={losses.toLocaleString('fr-FR')} detail="unités déclarées" icon={AlertTriangle} warning /></div>
     <div className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
-      <Panel title="Derniers mouvements" action={<button onClick={() => onTab('movements')} className="text-xs font-bold text-[hsl(var(--primary))]">Tout voir <ChevronRight className="inline" size={14} /></button>}><MovementTable data={data} movements={data.movements.slice(0, 6)} /></Panel>
+       <Panel title="Derniers mouvements" action={<button onClick={() => onTab('entries')} className="text-xs font-bold text-[hsl(var(--primary))]">Tout voir <ChevronRight className="inline" size={14} /></button>}><MovementTable data={data} movements={data.movements.slice(0, 6)} /></Panel>
       <Panel title="Alertes opérationnelles" action={<button onClick={() => onTab('reports')} className="text-xs font-bold text-[hsl(var(--primary))]">Rapports</button>}><div className="space-y-3">{alerts.length === 0 && <Empty text="Aucune alerte active." />}{alerts.slice(0, 7).map((alert, index) => <div key={`${alert.product}-${alert.label}-${index}`} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${alert.tone === 'danger' ? 'bg-[hsl(var(--destructive))]' : alert.tone === 'warning' ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--primary))]'}`} /><div><p className="text-sm font-bold">{alert.label}</p><p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">{alert.product}</p></div></div>)}</div></Panel>
     </div>
     <Panel title="Stock par entrepôt"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.warehouses.filter(warehouse => !warehouse.archived).map(warehouse => { const quantity = data.balances.filter(balance => balance.warehouseId === warehouse.id).reduce((sum, balance) => sum + balance.quantity, 0); return <div key={warehouse.id} className="rounded-xl border p-4"><div className="flex items-center justify-between"><p className="font-bold">{warehouse.name}</p><Warehouse size={17} className="text-[hsl(var(--primary))]" /></div><p className="mt-3 text-2xl font-bold">{quantity.toLocaleString('fr-FR')}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{warehouse.manager || 'Responsable non défini'}</p></div>; })}</div></Panel>
   </div>;
+}
+
+function StockRequestsPanel({ data }: { data: StockBootstrap }) {
+  type Request = { id: string; productId: string; warehouseId: string; quantity: number; reason: string; createdAt: string; status: 'BROUILLON' | 'EN ATTENTE' };
+  const [requests, setRequests] = useState<Request[]>(() => { try { return JSON.parse(localStorage.getItem('maximus-stock-requests') ?? '[]') as Request[]; } catch { return []; } });
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ productId: data.products.find(product => !product.archived)?.id ?? '', warehouseId: data.warehouses.find(warehouse => !warehouse.archived)?.id ?? '', quantity: 1, reason: '' });
+  useEffect(() => { localStorage.setItem('maximus-stock-requests', JSON.stringify(requests)); }, [requests]);
+  const submit = () => { if (!form.productId || !form.warehouseId || form.quantity < 1 || !form.reason.trim()) return; setRequests(current => [...current, { ...form, id: `dem-${Date.now()}`, reason: form.reason.trim(), createdAt: new Date().toISOString(), status: 'EN ATTENTE' }]); setModal(false); setForm(current => ({ ...current, quantity: 1, reason: '' })); };
+  return <div className="space-y-5"><Panel title="Demandes de réapprovisionnement" action={<Button primary onClick={() => setModal(true)}><Plus size={15} />Nouvelle demande</Button>}><p className="mb-5 text-sm text-[hsl(var(--muted-foreground))]">Créez une demande lorsqu’un article atteint son seuil ou qu’un besoin d’approvisionnement est identifié.</p>{requests.length === 0 ? <Empty text="Aucune demande enregistrée. Créez votre première demande de réapprovisionnement." /> : <DataTable headers={['Article', 'Entrepôt', 'Quantité', 'Motif', 'Date', 'Statut']} rows={requests.map(request => [data.products.find(product => product.id === request.productId)?.name ?? 'Article supprimé', data.warehouses.find(warehouse => warehouse.id === request.warehouseId)?.name ?? 'Entrepôt supprimé', request.quantity, request.reason, dateLabel(request.createdAt), <StatusPill value={request.status} />])} />}</Panel>{modal && <Modal title="Nouvelle demande de réapprovisionnement" onClose={() => setModal(false)}><Select label="Article" value={form.productId} onChange={value => setForm(current => ({ ...current, productId: value }))} options={data.products.filter(product => !product.archived).map(product => [product.id, `${product.name} (${product.sku})`])} /><Select label="Entrepôt" value={form.warehouseId} onChange={value => setForm(current => ({ ...current, warehouseId: value }))} options={data.warehouses.filter(warehouse => !warehouse.archived).map(warehouse => [warehouse.id, warehouse.name])} /><Input label="Quantité demandée" type="number" value={String(form.quantity)} onChange={value => setForm(current => ({ ...current, quantity: Number(value) }))} /><Input label="Motif" value={form.reason} onChange={value => setForm(current => ({ ...current, reason: value }))} placeholder="Seuil atteint, commande client..." /><div className="mt-6 flex justify-end"><Button primary disabled={!form.productId || !form.warehouseId || form.quantity < 1 || !form.reason.trim()} onClick={submit}>Enregistrer la demande</Button></div></Modal>}</div>;
+}
+
+function ReferencesPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  return <div className="space-y-5"><div><p className="text-sm text-[hsl(var(--muted-foreground))]">Les référentiels regroupent les entrepôts, emplacements et fournisseurs utilisés par la gestion de stock.</p></div><WarehousesPanel data={data} run={run} /><SuppliersPanel data={data} run={run} /></div>;
+}
+
+function StockUsersPanel() {
+  return <div className="space-y-5"><Panel title="Utilisateurs de la gestion de stock"><div className="grid gap-4 md:grid-cols-3"><div className="rounded-xl border p-4"><UserRound className="text-[hsl(var(--primary))]" size={19} /><p className="mt-4 font-bold">Administrateur KORA</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Accès complet à la gestion de stock.</p></div><div className="rounded-xl border p-4"><Users className="text-[hsl(var(--primary))]" size={19} /><p className="mt-4 font-bold">Équipe opérationnelle</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Accès selon le rôle et l’unité de rattachement.</p></div><div className="rounded-xl border border-dashed p-4"><Plus className="text-[hsl(var(--muted-foreground))]" size={19} /><p className="mt-4 font-bold">Ajouter un utilisateur</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Créez les comptes depuis Organisation & accès.</p></div></div></Panel></div>;
+}
+
+function StockSettingsPanel() {
+  const [notifications, setNotifications] = useState(() => localStorage.getItem('maximus-stock-notifications') !== 'false');
+  const [confirmSensitive, setConfirmSensitive] = useState(() => localStorage.getItem('maximus-stock-confirm-sensitive') !== 'false');
+  const [saved, setSaved] = useState(false);
+  const save = () => { localStorage.setItem('maximus-stock-notifications', String(notifications)); localStorage.setItem('maximus-stock-confirm-sensitive', String(confirmSensitive)); setSaved(true); window.setTimeout(() => setSaved(false), 2400); };
+  return <Panel title="Paramètres de la gestion de stock"><div className="max-w-2xl space-y-5"><SettingToggle title="Alertes de seuil" text="Afficher les alertes lorsque les articles passent sous leur stock minimum." checked={notifications} onChange={setNotifications} /><SettingToggle title="Confirmation des opérations sensibles" text="Demander une confirmation avant les sorties, pertes, transferts et ajustements." checked={confirmSensitive} onChange={setConfirmSensitive} /><div className="pt-2"><Button primary onClick={save}>{saved ? 'Paramètres enregistrés' : 'Enregistrer'}</Button></div></div></Panel>;
+}
+
+function SettingToggle({ title, text, checked, onChange }: { title: string; text: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return <div className="flex items-center justify-between gap-4 border-b pb-5 last:border-0"><div><p className="text-sm font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p></div><button role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`h-6 w-11 shrink-0 rounded-full p-1 transition ${checked ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))]'}`}><span className={`block h-4 w-4 rounded-full bg-white transition ${checked ? 'translate-x-5' : ''}`} /></button></div>;
 }
 
 function ProductsPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
