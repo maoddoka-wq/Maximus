@@ -156,14 +156,14 @@ function AppContent() {
        ? { kicker: currentCompany.name, title: `Le rythme de ${currentCompany.name}, en un regard.`, description: `${currentCompany.sector} · ${currentCompany.country}` }
        : { ...baseMeta, kicker: currentCompany.name }
      : baseMeta;
-    const fixedModuleWorkspace = isAdmin && location === '/maximus/modules';
+     const fixedWorkspace = true;
    const companyInitials = currentCompany?.name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   return (
-      <div className={`app-shell flex min-h-[100dvh] ${fixedModuleWorkspace ? 'h-[100dvh] overflow-hidden' : ''}`}>
-        <Sidebar session={session} location={location} allowed={allowed} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} fixedHeight={fixedModuleWorkspace} />
-        <main className={`min-w-0 flex-1 ${fixedModuleWorkspace ? 'flex min-h-0 flex-col overflow-hidden' : ''}`}>
+      <div className={`app-shell flex min-h-[100dvh] ${fixedWorkspace ? 'h-[100dvh] overflow-hidden' : ''}`}>
+        <Sidebar session={session} location={location} allowed={allowed} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} fixedHeight={fixedWorkspace} />
+        <main className={`min-w-0 flex-1 ${fixedWorkspace ? 'flex min-h-0 flex-col overflow-hidden' : ''}`}>
            <Topbar title={currentMeta.title} isAdmin={isAdmin} showProfile={session === 'kora' || session.startsWith('company:')} onLogout={logout} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/dashboard'} accountLabel={isAdmin ? 'AD' : employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyInitials} accountPhoto={!isAdmin && !employee ? currentCompany?.profilePhoto : undefined} accountEmail={isAdmin ? 'admin@maximus.demo' : employee?.email ?? currentCompany?.email ?? 'admin@kora.demo'} />
-          <div className={`page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 ${fixedModuleWorkspace ? 'min-h-0 flex-1 overflow-y-auto' : ''}`}>
+          <div className={`page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8 ${fixedWorkspace ? 'min-h-0 flex-1 overflow-y-auto' : ''}`}>
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
             {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} companyId={companyId} employee={employee} hasPermission={hasPermission} />}
