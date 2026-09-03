@@ -3,6 +3,18 @@
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
 
+[data-stock-can-create="false"] [data-stock-write="true"],
+[data-stock-can-modify="false"] button[title*="Modifier"],
+[data-stock-can-modify="false"] button[title*="Archiver"],
+[data-stock-can-modify="false"] button[title*="Supprimer"],
+[data-stock-can-modify="false"] button[aria-label*="Modifier"],
+[data-stock-can-modify="false"] button[aria-label*="Archiver"],
+[data-stock-can-modify="false"] button[aria-label*="Supprimer"],
+[data-stock-can-modify="false"] button[class*="bg-[hsl(var(--primary))]"],
+[data-stock-can-modify="false"] button[class*="text-[hsl(var(--destructive))]"] {
+  display: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

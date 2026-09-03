@@ -371,9 +371,9 @@ function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: 
           </div>
           <div className="flex items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] shrink-0">
             <span>{node.moduleIds?.length || 0} modules</span>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-              <button onClick={() => onEdit(node)} className="p-1.5 hover:bg-[hsl(var(--muted))] rounded text-[hsl(var(--foreground))]"><Settings size={14} /></button>
-              <button onClick={() => onDelete(node.id)} className="p-1.5 hover:bg-[hsl(var(--destructive)/.2)] rounded text-[hsl(var(--destructive))]"><Trash2 size={14} /></button>
+            <div className="flex items-center gap-1">
+              <button data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={() => onEdit(node)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
+              <button data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
             </div>
           </div>
         </div>
@@ -551,8 +551,8 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => handleEdit(role)} className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"><Settings size={14} /></button>
-                  <button onClick={() => deleteRole(role)} className="p-1.5 rounded hover:bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]"><Trash2 size={14} /></button>
+                  <button data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={() => handleEdit(role)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
+                  <button data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={() => deleteRole(role)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
                 </div>
               </div>
               <p className="text-xs text-[hsl(var(--muted-foreground))] mt-3 flex-1">{role.description}</p>
@@ -737,11 +737,11 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => { setEditingEmployee(emp); setModalOpen(true); }} className="p-1.5 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
-                        <Settings size={15} />
+                      <button data-testid={`button-edit-org-employee-${emp.id}`} aria-label={`Modifier le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { setEditingEmployee(emp); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">
+                        <Settings size={13} /><span>Modifier</span>
                       </button>
-                      <button onClick={() => mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.')} className="p-1.5 rounded hover:bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]">
-                        <Trash2 size={15} />
+                      <button data-testid={`button-delete-org-employee-${emp.id}`} aria-label={`Supprimer le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { if (window.confirm(`Supprimer le compte de ${emp.firstName} ${emp.lastName} ?`)) mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.'); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]">
+                        <Trash2 size={13} /><span>Supprimer</span>
                       </button>
                     </div>
                   </td>
