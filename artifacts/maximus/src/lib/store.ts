@@ -36,7 +36,7 @@ export interface CrmOpportunity { id: string; client: string; contact: string; s
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; removedModules?: ModuleId[]; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
@@ -183,6 +183,7 @@ export function loadData(): StoreData {
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       moduleOverrides: parsed.moduleOverrides ?? {},
+      removedModules: parsed.removedModules ?? [],
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
       accountingEntries: parsed.accountingEntries ?? initial.accountingEntries,
       payrollSlips: parsed.payrollSlips ?? initial.payrollSlips,
