@@ -179,7 +179,8 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
   const [loginHelp, setLoginHelp] = useState(false);
   const demoAccounts = [
     { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
-    ...employees.filter(account => account.status === 'ACTIF').map(account => ({ id: account.id, label: `${account.firstName} ${account.lastName} · ${account.position}`, email: account.email, password: account.loginPassword ?? 'Kora123!' })),
+    { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
+    ...employees.filter(account => account.status === 'ACTIF' && account.email.toLowerCase() !== 'admin@kora.demo').map(account => ({ id: account.id, label: `${account.firstName} ${account.lastName} · ${account.position}`, email: account.email, password: account.loginPassword ?? 'Kora123!' })),
   ];
   const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
     setEmail(account.email);
