@@ -176,7 +176,7 @@ export function loadData(): StoreData {
     const generatedNodeIds = new Set(['org-1', 'org-2', 'org-3', 'org-4', 'org-5', 'org-6', 'org-7']);
     const generatedRoleIds = new Set(['role-admin', 'role-compta', 'role-manager', 'role-magasinier', 'role-rh', 'role-logistique', 'role-vendeur']);
     const generatedEmployeeIds = new Set(['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6', 'emp-7', 'emp-8']);
-    const orgNodes = (parsed.orgNodes ?? [])
+    const orgNodes = (parsed.orgNodes?.length ? parsed.orgNodes : initial.orgNodes)
       .filter(node => !removeGeneratedHierarchy || !generatedNodeIds.has(node.id))
       .map(node => ({
         ...node,
@@ -185,7 +185,7 @@ export function loadData(): StoreData {
         parentId: removeGeneratedHierarchy && node.parentId && generatedNodeIds.has(node.parentId) ? null : node.parentId,
         moduleIds: node.moduleIds || [],
       })) as OrgNode[];
-    const roles = (parsed.roles ?? [])
+    const roles = (parsed.roles?.length ? parsed.roles : initial.roles)
       .filter(role => !removeGeneratedHierarchy || !generatedRoleIds.has(role.id))
       .map(role => ({
         ...role,
@@ -221,8 +221,8 @@ export function loadData(): StoreData {
           loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!',
           isSectorAdmin: false,
           companyId: employee.companyId || 'kora',
-          sectorId: generatedSector ? undefined : employee.sectorId,
-          roleId: generatedRole ? undefined : employee.roleId,
+           sectorId: generatedSector ? undefined : employee.sectorId ?? seeded?.sectorId,
+           roleId: generatedRole ? undefined : employee.roleId ?? seeded?.roleId,
           department: generatedSector ? '' : employee.department,
           subDepartment: generatedSector ? '' : employee.subDepartment,
           role: generatedRole ? 'Non affecté' : employee.role,
