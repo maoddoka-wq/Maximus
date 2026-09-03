@@ -656,9 +656,11 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
             const idx = d.employees.findIndex((e: Employee) => e.id === editingEmployee.id);
             if (idx !== -1) d.employees[idx] = { ...d.employees[idx], ...normalized };
           } else {
-            d.employees.push({ id: uid('emp'), companyId: company.id, status: 'ACTIF', loginPassword: 'Kora123!', department: '', subDepartment: '', ...normalized } as Employee);
+         d.employees.push({ id: uid('emp'), companyId: company.id, status: 'ACTIF', department: '', subDepartment: '', ...normalized } as Employee);
           }
-        }, editingEmployee ? 'Employé mis à jour.' : 'Employé ajouté.');
+         }, editingEmployee
+           ? (empData.loginPassword ? 'Employé mis à jour et mot de passe actualisé.' : 'Employé mis à jour.')
+           : 'Employé ajouté. Utilisez son email et son mot de passe initial pour la connexion.');
         setModalOpen(false);
       }} />}
     </div>
@@ -674,7 +676,9 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
     phone: initialData?.phone || '',
     position: initialData?.position || '',
     sectorId: initialData?.sectorId || (allNodes.length > 0 ? allNodes[0].id : ''),
-    roleId: initialData?.roleId || ''
+    roleId: initialData?.roleId || '',
+    password: '',
+    passwordConfirm: ''
   });
 
   const getCompatibleRoles = () => {
@@ -707,7 +711,21 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
       setError('Cette adresse email est déjà utilisée dans l’entreprise.');
       return;
     }
-    onSave({ ...formData, firstName: formData.firstName.trim(), lastName: formData.lastName.trim(), email, position: formData.position.trim(), role: roleObj.name });
+    const password = formData.password.trim();
+    if (!initialData && password.length < 8) {
+      setError('Définissez un mot de passe initial d’au moins 8 caractères.');
+      return;
+    }
+    if (password && password.length < 8) {
+      setError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (password !== formData.passwordConfirm) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    const { password: _password, passwordConfirm: _passwordConfirm, ...employeeData } = formData;
+    onSave({ ...employeeData, firstName: formData.firstName.trim(), lastName: formData.lastName.trim(), email, position: formData.position.trim(), role: roleObj.name, ...(password ? { loginPassword: password } : {}) });
   };
 
   return (
@@ -721,6 +739,11 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
         <Field label="Email *" type="email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} />
         <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} />
       </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label={initialData ? 'Nouveau mot de passe' : 'Mot de passe initial *'} type="password" value={formData.password} onChange={(v: string) => setFormData({...formData, password: v})} placeholder={initialData ? 'Laisser vide pour conserver' : 'Au moins 8 caractères'} testId="input-employee-password" />
+        <Field label={initialData ? 'Confirmer le nouveau mot de passe' : 'Confirmer le mot de passe *'} type="password" value={formData.passwordConfirm} onChange={(v: string) => setFormData({...formData, passwordConfirm: v})} placeholder="Répétez le mot de passe" testId="input-employee-password-confirm" />
+      </div>
+      <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le compte se connecte depuis « Espace KORA » avec cet email et ce mot de passe. Le mot de passe n’est pas affiché dans la liste des employés.</p>
       <Field label="Titre du poste" value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} placeholder="Ex: Développeur Senior" />
       
       <div className="border-t pt-4 mt-4 grid grid-cols-2 gap-4">
