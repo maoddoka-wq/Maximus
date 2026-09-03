@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Bell, Building2, Check, ChevronDown, ChevronRight, CircleHelp, CreditCard, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, X, Boxes, UserRoundCog } from 'lucide-react';
+import { Bell, Building2, Check, ChevronDown, ChevronRight, CircleHelp, CreditCard, Edit3, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, X, Boxes, UserRoundCog } from 'lucide-react';
 import { Link, useLocation, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -92,9 +92,10 @@ function AppContent() {
     if (message) setToast(message);
   };
   const notify = (message: string) => setToast(message);
-  const login = (space: 'admin' | 'kora', email: string) => {
+  const login = (space: 'admin' | 'kora', email: string, password: string) => {
     if (space === 'kora') {
-      const company = data.companies.find(item => item.email.toLowerCase() === email.trim().toLowerCase() && item.status === 'ACTIF' && item.adminPassword);
+      const normalizedEmail = email.trim().toLowerCase();
+      const company = data.companies.find(item => item.email.toLowerCase() === normalizedEmail && item.status === 'ACTIF' && item.adminPassword === password);
       if (company) {
         const companySession: Session = `company:${company.id}`;
         setSession(companySession);
@@ -102,9 +103,9 @@ function AppContent() {
         setLocation('/kora/dashboard');
         return;
       }
-      const employee = data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
+      const employee = data.employees.find(e => e.email.toLowerCase() === normalizedEmail && e.status === 'ACTIF' && (e.loginPassword ?? 'Kora123!') === password);
       if (employee) {
-        const employeeSession: Session = `employee:${employee.id}`;
+    const employeeSession: Session = `employee:${employee.id}`;
         setSession(employeeSession);
         localStorage.setItem('maximus-session', employeeSession);
         setLocation('/kora/dashboard');
@@ -171,7 +172,7 @@ function AppContent() {
   );
 }
 
-function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', email: string) => void; employees: StoreData['employees'] }) {
+function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', email: string, password: string) => void; employees: StoreData['employees'] }) {
   const [space, setSpace] = useState<'admin' | 'kora'>('admin');
   const [email, setEmail] = useState(space === 'admin' ? 'admin@maximus.demo' : 'admin@kora.demo');
   const [password, setPassword] = useState(space === 'admin' ? 'Admin123!' : 'Kora123!');
@@ -190,7 +191,7 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
       <div className="mb-10 lg:hidden"><Brand /></div>
       <div className="mb-8"><p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Accès sécurisé</p><h2 className="text-3xl font-bold tracking-[-.04em]">Bienvenue dans MAXIMUS</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Choisissez votre espace de travail pour commencer.</p></div>
       <div className="mb-7 grid grid-cols-2 gap-2 rounded-xl bg-[hsl(var(--muted))] p-1"><button data-testid="button-space-admin" onClick={() => setSpace('admin')} className={`rounded-lg px-3 py-3 text-sm font-semibold transition ${space === 'admin' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}`}>Administration</button><button data-testid="button-space-kora" onClick={() => setSpace('kora')} className={`rounded-lg px-3 py-3 text-sm font-semibold transition ${space === 'kora' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}`}>Espace KORA</button></div>
-      <form onSubmit={e => { e.preventDefault(); const normalizedEmail = email.trim().toLowerCase(); const employee = employees.find(item => item.email.toLowerCase() === normalizedEmail); const validAdmin = normalizedEmail === 'admin@kora.demo' && password === 'Kora123!'; const validEmployee = Boolean(employee && employee.status === 'ACTIF' && password === (employee.loginPassword ?? 'Kora123!')); const validEmail = space === 'admin' ? normalizedEmail === 'admin@maximus.demo' : validAdmin || validEmployee; const validPassword = space === 'admin' ? password === 'Admin123!' : validAdmin || validEmployee; if (!validEmail || !validPassword) { setError(space === 'admin' ? 'Utilisez admin@maximus.demo et Admin123!.' : 'Utilisez l’adresse email et le mot de passe initial remis par l’administration KORA.'); return; } setError(''); onLogin(space, email); }} className="space-y-5">
+      <form onSubmit={e => { e.preventDefault(); const normalizedEmail = email.trim().toLowerCase(); const employee = employees.find(item => item.email.toLowerCase() === normalizedEmail); const validAdmin = normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!'; const validEmployee = Boolean(employee && employee.status === 'ACTIF' && password === (employee.loginPassword ?? 'Kora123!')); const validEmail = space === 'admin' ? normalizedEmail === 'admin@maximus.demo' : validEmployee; const validPassword = space === 'admin' ? password === 'Admin123!' : validEmployee; if (!validEmail || !validPassword) { setError(space === 'admin' ? 'Utilisez admin@maximus.demo et Admin123!.' : 'Utilisez l’adresse email et le mot de passe initial remis par l’administration KORA.'); return; } setError(''); onLogin(space, email, password); }} className="space-y-5">
         <Field label="Adresse email" value={email} onChange={setEmail} type="email" testId="input-login-email" />
         <Field label="Mot de passe" value={password} onChange={setPassword} type="password" testId="input-login-password" />
         <div className="flex justify-end"><button type="button" data-testid="button-forgot-password" onClick={() => setLoginHelp(value => !value)} className="text-xs font-semibold text-[hsl(var(--primary))]">Aide à la connexion</button></div>
@@ -507,7 +508,7 @@ function EmployeesPage({ data, mutate, companyAdmin, sectorAdminDepartment }: { 
         d.employees.push({ id: uid('emp'), ...form, email: form.email.trim().toLowerCase(), subDepartment: '', status: 'ACTIF', isSectorAdmin: companyAdmin && form.isSectorAdmin });
       }
     }, modal !== 'new' && modal ? 'Compte employé modifié.' : companyAdmin && form.isSectorAdmin ? 'Administrateur de secteur créé avec ses identifiants.' : 'Compte employé créé avec ses identifiants.');
-    setModal(false);
+    setModal(null);
     resetForm();
   };
   return <div className="space-y-5">

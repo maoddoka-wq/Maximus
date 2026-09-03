@@ -68,9 +68,9 @@ export function seedData(): StoreData {
     organizationVersion: 3,
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
-      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
-      { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
-      { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
+      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
+      { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', adminPassword: 'Kora123!', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
+      { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', adminPassword: 'Kora123!', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
     ],
     employees: [],
     roles: [],
@@ -148,9 +148,10 @@ export function loadData(): StoreData {
     const { preferences: _legacyPreferences, dependencies: _legacyDependencies, ...storedData } = parsed as StoreData & { preferences?: unknown; dependencies?: unknown };
     const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
     const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
-    const companies = (parsed.catalogVersion ?? 1) < 2
+    const rawCompanies = (parsed.catalogVersion ?? 1) < 2
       ? parsed.companies.map(company => company.id === 'kora' ? { ...company, requestedModules: initial.companies[0].requestedModules, allowedModules: initial.companies[0].allowedModules, refusedModules: [] } : company)
       : parsed.companies;
+    const companies = rawCompanies.map(company => ({ ...company, adminPassword: company.adminPassword ?? 'Kora123!' }));
     const removeGeneratedHierarchy = (parsed.organizationVersion ?? 1) < 3;
     const generatedNodeIds = new Set(['org-1', 'org-2', 'org-3', 'org-4', 'org-5', 'org-6', 'org-7']);
     const generatedRoleIds = new Set(['role-admin', 'role-compta', 'role-manager', 'role-magasinier', 'role-rh', 'role-logistique', 'role-vendeur']);
