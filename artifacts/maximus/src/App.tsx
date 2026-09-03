@@ -31,6 +31,7 @@ const adminNav = [
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
   { href: '/kora/organisation', label: 'Organisation de l’entreprise', icon: GitBranch, module: null, adminOnly: true },
+  { href: '/kora/profil', label: 'Mon profil', icon: UserRoundCog, module: null, companyAdminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
   { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
@@ -62,6 +63,8 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/parametres': { kicker: 'Compte', title: 'Paramètres', description: 'Préférences de démonstration et sécurité.' },
   '/kora/dashboard': { kicker: 'KORA Distribution', title: 'Le rythme de KORA, en un regard.', description: 'Mardi 18 juin 2024 · Dakar, Sénégal' },
   '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Une structure souple qui suit la réalité de vos équipes.' },
+  '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
+  '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
   '/kora/employes': { kicker: 'Espace KORA', title: 'Employés', description: 'Les personnes qui font avancer KORA chaque jour.' },
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
   '/kora/stocks': { kicker: 'Espace KORA', title: 'Gestion de stock', description: 'Pilotez vos articles, entrées, sorties et inventaires.' },
@@ -162,7 +165,7 @@ function AppContent() {
     <div className="app-shell flex min-h-[100dvh]">
        <Sidebar session={session} location={location} allowed={allowed} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} />
       <main className="min-w-0 flex-1">
-          <Topbar title={currentMeta.title} isAdmin={isAdmin} onLogout={logout} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/dashboard'} accountLabel={isAdmin ? 'AD' : employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyInitials} accountEmail={isAdmin ? 'admin@maximus.demo' : employee?.email ?? currentCompany?.email ?? 'admin@kora.demo'} />
+           <Topbar title={currentMeta.title} isAdmin={isAdmin} showProfile={session === 'kora' || session.startsWith('company:')} onLogout={logout} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/dashboard'} accountLabel={isAdmin ? 'AD' : employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyInitials} accountEmail={isAdmin ? 'admin@maximus.demo' : employee?.email ?? currentCompany?.email ?? 'admin@kora.demo'} />
         <div className="page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
@@ -222,15 +225,15 @@ function Field({ label, value, onChange, placeholder, type = 'text', testId }: {
 
 function Sidebar({ session, location, allowed, canManagePeople, onLogout, employee, companyName, mobileOpen, onClose, collapsed, onToggleCollapse }: { session: Session; location: string; allowed: ModuleId[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void }) {
   const isAdmin = session === 'admin';
-  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || session === 'kora') && (item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople)));
+  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || session === 'kora') && (!item.companyAdminOnly || canManagePeople) && (item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople)));
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const compact = collapsed && !mobileOpen;
   return <><button aria-label="Fermer le menu" data-testid="button-close-mobile-menu" onClick={onClose} className={`fixed inset-0 z-40 bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm md:hidden ${mobileOpen ? 'block' : 'hidden'}`} /><aside className={`sidebar shrink-0 flex-col transition-[width] duration-200 md:relative md:flex ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}><div className={`flex items-center px-4 py-6 ${compact ? 'justify-center' : 'justify-between'}`}>{!compact && <Brand inverse homeHref={isAdmin ? '/maximus/dashboard' : '/kora/dashboard'} />}<button aria-label={compact ? 'Déployer le menu' : 'Rétracter le menu'} title={compact ? 'Déployer le menu' : 'Rétracter le menu'} data-testid="button-toggle-sidebar" onClick={onToggleCollapse} className="hidden rounded-lg p-2 text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:block">{compact ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><button aria-label="Fermer le menu" data-testid="button-close-mobile-menu-inner" onClick={onClose} className="rounded-lg p-2 text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:hidden"><X size={18} /></button></div><div className={`mx-3 mb-5 rounded-xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent))] ${compact ? 'p-2' : 'mx-4 p-3'}`}><p className={`mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)] ${compact ? 'hidden' : ''}`}>{isAdmin ? 'Administration' : employee ? 'Accès employé' : 'Espace entreprise'}</p><div className={`mt-2 flex items-center gap-2 ${compact ? 'justify-center' : ''}`}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.18)] text-xs font-bold text-[hsl(var(--accent))]">{isAdmin ? 'MX' : initials}</span><div className={compact ? 'hidden' : ''}><p className="text-sm font-bold">{isAdmin ? 'MAXIMUS' : companyName ?? 'KORA Distribution'}</p><p className="text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">{isAdmin ? 'Centre de contrôle' : employee?.role ?? 'Dakar, Sénégal'}</p></div></div></div><nav className="flex-1 space-y-1 px-3">{nav.map(item => <Link data-testid={`link-nav-${item.href.split('/').pop()}`} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={`nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${location === item.href ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`}><item.icon size={17} strokeWidth={location === item.href ? 2.5 : 1.8} />{!compact && item.label}</Link>)}</nav><div className={`border-t border-[hsl(var(--sidebar-border))] pt-4 ${compact ? 'm-3' : 'm-4'}`}><button data-testid="button-logout" title={compact ? 'Se déconnecter' : undefined} onClick={onLogout} className={`nav-item flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[hsl(var(--sidebar-foreground)/.64)] ${compact ? 'justify-center' : ''}`}><LogIn size={17} className="rotate-180" />{!compact && 'Se déconnecter'}</button></div></aside></>;
 }
 
-function Topbar({ title, isAdmin, onLogout, onNavigate, onToggleMenu, notificationPath, accountLabel, accountEmail }: { title: string; isAdmin: boolean; onLogout: () => void; onNavigate: (path: string) => void; onToggleMenu: () => void; notificationPath: string; accountLabel: string; accountEmail: string }) {
+function Topbar({ title, isAdmin, showProfile, onLogout, onNavigate, onToggleMenu, notificationPath, accountLabel, accountEmail }: { title: string; isAdmin: boolean; showProfile: boolean; onLogout: () => void; onNavigate: (path: string) => void; onToggleMenu: () => void; notificationPath: string; accountLabel: string; accountEmail: string }) {
   const [open, setOpen] = useState(false); const [search, setSearch] = useState('');
-  return <header className="flex h-[76px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.75)] px-4 backdrop-blur sm:px-8"><div className="flex items-center gap-3"><button data-testid="button-mobile-menu" aria-label="Ouvrir le menu" onClick={onToggleMenu} className="rounded-lg p-2 md:hidden"><Menu size={19} /></button><div className="hidden text-sm font-bold sm:block">{title}</div></div><div className="flex items-center gap-2 sm:gap-4">{isAdmin && <div className="relative hidden lg:block"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" /><input data-testid="input-global-search" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && search.trim()) { sessionStorage.setItem('maximus-company-search', search.trim()); onNavigate('/maximus/entreprises'); } }} placeholder="Rechercher une entreprise..." className="w-56 rounded-lg border border-transparent bg-[hsl(var(--muted))] py-2.5 pl-9 pr-3 text-xs outline-none focus:border-[hsl(var(--primary))]" /></div>}<button data-testid="button-help" onClick={() => window.alert('Besoin d’aide ? Explorez les vues depuis la navigation de votre espace.')} className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><CircleHelp size={19} /></button><button data-testid="button-header-notifications" onClick={() => onNavigate(notificationPath)} className="relative rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Bell size={19} /><i className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" /></button><button data-testid="button-account-menu" onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-[hsl(var(--muted))]"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--primary))] text-xs font-bold text-[hsl(var(--primary-foreground))]">{accountLabel}</span><ChevronDown size={14} className="text-[hsl(var(--muted-foreground))]" /></button>{open && <div className="absolute right-5 top-16 z-40 w-56 rounded-xl border bg-[hsl(var(--card))] p-2 shadow-xl"><p className="truncate px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">{accountEmail}</p><button data-testid="button-menu-logout" onClick={onLogout} className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-[hsl(var(--muted))]">Se déconnecter</button></div>}</div></header>;
+  return <header className="flex h-[76px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.75)] px-4 backdrop-blur sm:px-8"><div className="flex items-center gap-3"><button data-testid="button-mobile-menu" aria-label="Ouvrir le menu" onClick={onToggleMenu} className="rounded-lg p-2 md:hidden"><Menu size={19} /></button><div className="hidden text-sm font-bold sm:block">{title}</div></div><div className="flex items-center gap-2 sm:gap-4">{isAdmin && <div className="relative hidden lg:block"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" /><input data-testid="input-global-search" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && search.trim()) { sessionStorage.setItem('maximus-company-search', search.trim()); onNavigate('/maximus/entreprises'); } }} placeholder="Rechercher une entreprise..." className="w-56 rounded-lg border border-transparent bg-[hsl(var(--muted))] py-2.5 pl-9 pr-3 text-xs outline-none focus:border-[hsl(var(--primary))]" /></div>}<button data-testid="button-help" onClick={() => window.alert('Besoin d’aide ? Explorez les vues depuis la navigation de votre espace.')} className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><CircleHelp size={19} /></button><button data-testid="button-header-notifications" onClick={() => onNavigate(notificationPath)} className="relative rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Bell size={19} /><i className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" /></button><button data-testid="button-account-menu" onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-[hsl(var(--muted))]"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--primary))] text-xs font-bold text-[hsl(var(--primary-foreground))]">{accountLabel}</span><ChevronDown size={14} className="text-[hsl(var(--muted-foreground))]" /></button>{open && <div className="absolute right-5 top-16 z-40 w-56 rounded-xl border bg-[hsl(var(--card))] p-2 shadow-xl"><p className="truncate px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">{accountEmail}</p>{showProfile && <button data-testid="button-menu-profile" onClick={() => { onNavigate('/kora/profil'); setOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-[hsl(var(--muted))]">Mon profil</button>}<button data-testid="button-menu-logout" onClick={onLogout} className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-[hsl(var(--muted))]">Se déconnecter</button></div>}</div></header>;
 }
 function PageHeader({ kicker, title, description, location }: { kicker: string; title: string; description: string; location: string }) { return <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mono mb-2 text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">{kicker}</p><h1 data-testid="text-page-title" className="text-3xl font-bold tracking-[-.05em] sm:text-4xl">{title}</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{description}</p></div>{location !== '/maximus/dashboard' && location !== '/kora/dashboard' && <div className="mono hidden text-[10px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))] sm:block">Mis à jour à l’instant</div>}</div>; }
 
@@ -262,11 +265,89 @@ function OrganizationAdminPage({ data, mutate, onNavigate }: { data: StoreData; 
   if (!company) return <EmptyState title="Entreprise introuvable" text="Créez ou activez d’abord une entreprise." action={() => onNavigate('/maximus/entreprises')} />;
   return <div className="space-y-5"><label className="card-surface block rounded-xl p-4 text-sm font-semibold">Entreprise administrée<select data-testid="select-organization-company" value={companyId} onChange={event => setCompanyId(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">{data.companies.map(item => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}</select></label><CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /></div>;
 }
+function CompanyProfilePage({ company, data, mutate }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
+  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'>;
+  const [form, setForm] = useState<ProfileForm>({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector });
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [error, setError] = useState('');
+  const setField = (field: keyof ProfileForm) => (value: string) => setForm(current => ({ ...current, [field]: value }));
+
+  useEffect(() => {
+    setForm({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector });
+    setNewPassword('');
+    setPasswordConfirm('');
+    setError('');
+  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector]);
+
+  const save = () => {
+    const name = form.name.trim();
+    const manager = form.manager.trim();
+    const email = form.email.trim().toLowerCase();
+    const password = newPassword.trim();
+    if (!name || !manager || !email) {
+      setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Saisissez une adresse email valide.');
+      return;
+    }
+    if (data.companies.some(item => item.id !== company.id && item.email.toLowerCase() === email)) {
+      setError('Une autre entreprise utilise déjà cette adresse email.');
+      return;
+    }
+    if (password && password.length < 8) {
+      setError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    mutate(draft => {
+      const target = draft.companies.find(item => item.id === company.id);
+      if (target) {
+        target.name = name;
+        target.manager = manager;
+        target.email = email;
+        target.phone = form.phone.trim();
+        target.country = form.country.trim();
+        target.sector = form.sector.trim();
+        if (password) target.adminPassword = password;
+      }
+    }, password ? 'Profil et mot de passe mis à jour.' : 'Profil entreprise mis à jour.');
+    setNewPassword('');
+    setPasswordConfirm('');
+  };
+
+  return <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+    <section className="card-surface rounded-2xl p-6">
+      <div className="mb-7"><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Profil entreprise</p><h2 className="mt-2 text-2xl font-bold">{company.name}</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Ces informations sont utilisées dans votre espace et lors de votre connexion.</p></div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Nom de l’entreprise *" value={form.name} onChange={setField('name')} testId="input-profile-company-name" />
+        <Field label="Responsable *" value={form.manager} onChange={setField('manager')} testId="input-profile-manager" />
+        <Field label="Email administrateur *" value={form.email} onChange={setField('email')} type="email" testId="input-profile-email" />
+        <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" />
+        <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" />
+        <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" />
+      </div>
+      <div className="mt-7 border-t pt-6"><h3 className="font-bold">Modifier le mot de passe</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez ces champs vides pour conserver le mot de passe actuel.</p><div className="mt-4 grid gap-5 sm:grid-cols-2"><Field label="Nouveau mot de passe" value={newPassword} onChange={setNewPassword} type="password" placeholder="Au moins 8 caractères" testId="input-profile-password" /><Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-profile-password-confirm" /></div></div>
+      {error && <p data-testid="profile-error" className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+      <div className="mt-7 flex justify-end"><button data-testid="button-save-profile" onClick={save} className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Enregistrer le profil</button></div>
+    </section>
+    <section className="card-surface h-fit rounded-2xl p-6"><h2 className="font-bold">Accès de votre espace</h2><div className="mt-5 space-y-4 text-sm"><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Statut</p><p className="mt-1 font-bold">{company.status}</p></div><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Connexion</p><p className="mt-1 leading-6">Utilisez l’email administrateur et votre mot de passe depuis « Espace KORA ».</p></div><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Modules autorisés</p><p className="mt-1 font-bold">{company.allowedModules.length} module(s)</p></div></div></section>
+  </div>;
+}
 function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, companyId, employee, hasPermission }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; companyId: string; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean }) {
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[location];
   if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
   if (location === '/kora/dashboard') return <KoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
+  if (location === '/kora/profil') {
+    const company = data.companies.find(item => item.id === companyId);
+    return companyAdmin && company ? <CompanyProfilePage company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onNavigate('/kora/dashboard')} />;
+  }
   if (location === '/kora/organisation') {
     const company = data.companies.find(item => item.id === companyId);
     return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="La structure de l’entreprise est gérée depuis le compte administrateur KORA." action={() => onNavigate('/kora/dashboard')} />;
