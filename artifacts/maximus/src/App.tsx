@@ -98,6 +98,14 @@ function AppContent() {
   const notify = (message: string) => setToast(message);
   const login = (space: 'admin' | 'kora', email: string) => {
     if (space === 'kora') {
+      const company = data.companies.find(item => item.email.toLowerCase() === email.trim().toLowerCase() && item.status === 'ACTIF' && item.adminPassword);
+      if (company) {
+        const companySession: Session = `company:${company.id}`;
+        setSession(companySession);
+        localStorage.setItem('maximus-session', companySession);
+        setLocation('/kora/dashboard');
+        return;
+      }
       const employee = data.employees.find(e => e.email.toLowerCase() === email.trim().toLowerCase());
       if (employee) {
         const employeeSession: Session = `employee:${employee.id}`;
@@ -115,14 +123,16 @@ function AppContent() {
   const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
 
   if (location === '/inscription') return <Signup onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
-  if (location === '/' || !session) return <Login onLogin={login} employees={data.employees} />;
+  const loginEmployees = [...data.employees, ...data.companies.filter(company => company.status === 'ACTIF' && company.adminPassword).map(company => ({ id: `company-admin:${company.id}`, firstName: company.manager.split(' ')[0] ?? company.name, lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur', email: company.email, phone: company.phone, position: 'Administrateur', department: '', subDepartment: '', role: 'Administrateur entreprise', status: 'ACTIF' as const, loginPassword: company.adminPassword, companyId: company.id }))];
+  if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
   const employeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
   const employee = employeeId ? data.employees.find(e => e.id === employeeId) ?? null : null;
+  const companyId = session === 'kora' ? 'kora' : session.startsWith('company:') ? session.slice('company:'.length) : employee?.companyId ?? 'kora';
   const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
-  const companyAllowed = (data.companies.find(c => c.id === 'kora')?.allowedModules ?? []).filter(isModuleActive);
+  const companyAllowed = (data.companies.find(c => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) : null;
   const employeeAncestry = new Set<string>();
   let ancestryNode = employeeNode;
@@ -138,7 +148,7 @@ function AppContent() {
       ? companyAllowed.filter(moduleId => unitModules.has(moduleId) && employeeRole.modulePermissions[moduleId]?.includes('voir'))
       : [];
   const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || Boolean(roleFitsEmployee && unitModules.has(moduleId) && employeeRole?.modulePermissions[moduleId]?.includes(permission));
-  const canManagePeople = session === 'kora';
+   const canManagePeople = session === 'kora' || session.startsWith('company:');
   const currentMeta = pageMeta[location] ?? pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard'];
   return (
     <div className="app-shell flex min-h-[100dvh]">
@@ -148,7 +158,7 @@ function AppContent() {
         <div className="page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora'} employee={employee} hasPermission={hasPermission} />}
+            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} companyId={companyId} employee={employee} hasPermission={hasPermission} />}
           </ErrorBoundary>
         </div>
       </main>
@@ -239,16 +249,16 @@ function OrganizationAdminPage({ data, mutate, onNavigate }: { data: StoreData; 
   if (!company) return <EmptyState title="Entreprise introuvable" text="Créez ou activez d’abord une entreprise." action={() => onNavigate('/maximus/entreprises')} />;
   return <div className="space-y-5"><label className="card-surface block rounded-xl p-4 text-sm font-semibold">Entreprise administrée<select data-testid="select-organization-company" value={companyId} onChange={event => setCompanyId(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">{data.companies.map(item => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}</select></label><CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /></div>;
 }
-function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, employee, hasPermission }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean }) {
+function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, companyId, employee, hasPermission }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; companyId: string; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean }) {
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[location];
   if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
   if (location === '/kora/dashboard') return <KoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
   if (location === '/kora/organisation') {
-    const company = data.companies.find(item => item.id === 'kora');
+    const company = data.companies.find(item => item.id === companyId);
     return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="La structure de l’entreprise est gérée depuis le compte administrateur KORA." action={() => onNavigate('/kora/dashboard')} />;
   }
-  if (location === '/kora/stocks') return <StockModulePage companyUsers={data.employees.filter(employee => employee.companyId === 'kora')} companyServices={data.orgNodes.filter(node => node.companyId === 'kora' && node.type === 'service')} />;
+  if (location === '/kora/stocks') return <StockModulePage companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} />;
   if (location === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
   if (location === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
   if (location === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;
