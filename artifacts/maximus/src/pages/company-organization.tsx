@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Building2, Users, KeyRound, LayoutGrid, ChevronDown, Plus, 
-  Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight
+  Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight, UserRound
 } from 'lucide-react';
 import { Company, StoreData, OrgNode, Role, Employee, modules as allModules, uid, type ModuleId } from '../lib/store';
 
@@ -40,14 +40,15 @@ function Field({ label, value, onChange, type = 'text', testId, placeholder = ''
   );
 }
 
-export function CompanyOrganizationAdmin({ company, data, mutate }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
-  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees'>('overview');
+export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = 'overview' }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; initialTab?: 'overview' | 'structure' | 'roles' | 'employees' | 'profile' }) {
+  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees' | 'profile'>(initialTab);
 
   const tabs = [
     { id: 'overview', label: "Vue d'ensemble" },
     { id: 'structure', label: 'Structure & Unités' },
     { id: 'roles', label: 'Rôles & Permissions' },
     { id: 'employees', label: 'Comptes Employés' },
+    { id: 'profile', label: 'Mon profil' },
   ] as const;
 
   return (
@@ -68,8 +69,109 @@ export function CompanyOrganizationAdmin({ company, data, mutate }: { company: C
       {tab === 'structure' && <StructureTab company={company} data={data} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={data} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={data} mutate={mutate} />}
+      {tab === 'profile' && <CompanyProfileSection company={company} data={data} mutate={mutate} />}
     </div>
   );
+}
+
+export function CompanyProfileSection({ company, data, mutate }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
+  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & { profilePhoto: string };
+  const [form, setForm] = useState<ProfileForm>({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '' });
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [error, setError] = useState('');
+  const setField = (field: keyof ProfileForm) => (value: string) => setForm(current => ({ ...current, [field]: value }));
+
+  useEffect(() => {
+    setForm({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '' });
+    setNewPassword('');
+    setPasswordConfirm('');
+    setError('');
+  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector, company.profilePhoto]);
+
+  const handlePhoto = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Sélectionnez un fichier image.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('La photo doit faire 2 Mo maximum.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setForm(current => ({ ...current, profilePhoto: reader.result as string }));
+        setError('');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const save = () => {
+    const name = form.name.trim();
+    const manager = form.manager.trim();
+    const email = form.email.trim().toLowerCase();
+    const password = newPassword.trim();
+    if (!name || !manager || !email) {
+      setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Saisissez une adresse email valide.');
+      return;
+    }
+    if (data.companies.some(item => item.id !== company.id && item.email.toLowerCase() === email)) {
+      setError('Une autre entreprise utilise déjà cette adresse email.');
+      return;
+    }
+    if (password && password.length < 8) {
+      setError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    mutate(draft => {
+      const target = draft.companies.find(item => item.id === company.id);
+      if (target) {
+        target.name = name;
+        target.manager = manager;
+        target.email = email;
+        target.phone = form.phone.trim();
+        target.country = form.country.trim();
+        target.sector = form.sector.trim();
+        target.profilePhoto = form.profilePhoto;
+        if (password) target.adminPassword = password;
+      }
+    }, password ? 'Profil, photo et mot de passe mis à jour.' : 'Profil et photo mis à jour.');
+    setNewPassword('');
+    setPasswordConfirm('');
+  };
+
+  return <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr] fade-up">
+    <section className="card-surface rounded-2xl p-6">
+      <div className="mb-7"><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Profil entreprise</p><h2 className="mt-2 text-2xl font-bold">{company.name}</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Mettez à jour les informations, la photo et les accès de votre entreprise.</p></div>
+      <div className="mb-7 flex flex-wrap items-center gap-5 rounded-xl border border-dashed p-4">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--primary)/.1)] text-xl font-black text-[hsl(var(--primary))]">{form.profilePhoto ? <img src={form.profilePhoto} alt={`Photo de profil de ${form.name}`} className="h-full w-full object-cover" /> : company.name.slice(0, 2).toUpperCase()}</div>
+        <div className="min-w-[220px] flex-1"><h3 className="font-bold">Photo de profil</h3><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">PNG, JPG ou WebP · 2 Mo maximum. Elle sera affichée dans votre espace entreprise.</p><div className="mt-3 flex flex-wrap gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><UserRound size={14} />Choisir une photo<input data-testid="input-profile-photo" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => handlePhoto(event.target.files?.[0])} /></label>{form.profilePhoto && <button type="button" data-testid="button-remove-profile-photo" onClick={() => setForm(current => ({ ...current, profilePhoto: '' }))} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]">Supprimer</button>}</div></div>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Nom de l’entreprise *" value={form.name} onChange={setField('name')} testId="input-profile-company-name" />
+        <Field label="Responsable *" value={form.manager} onChange={setField('manager')} testId="input-profile-manager" />
+        <Field label="Email administrateur *" value={form.email} onChange={setField('email')} type="email" testId="input-profile-email" />
+        <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" />
+        <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" />
+        <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" />
+      </div>
+      <div className="mt-7 border-t pt-6"><h3 className="font-bold">Modifier le mot de passe</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez ces champs vides pour conserver le mot de passe actuel.</p><div className="mt-4 grid gap-5 sm:grid-cols-2"><Field label="Nouveau mot de passe" value={newPassword} onChange={setNewPassword} type="password" placeholder="Au moins 8 caractères" testId="input-profile-password" /><Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-profile-password-confirm" /></div></div>
+      {error && <p data-testid="profile-error" className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+      <div className="mt-7 flex justify-end"><button data-testid="button-save-profile" onClick={save} className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Enregistrer le profil</button></div>
+    </section>
+    <section className="card-surface h-fit rounded-2xl p-6"><h2 className="font-bold">Accès de votre espace</h2><div className="mt-5 space-y-4 text-sm"><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Statut</p><p className="mt-1 font-bold">{company.status}</p></div><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Connexion</p><p className="mt-1 leading-6">Utilisez l’email administrateur et votre mot de passe depuis « Espace KORA ».</p></div><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Modules autorisés</p><p className="mt-1 font-bold">{company.allowedModules.length} module(s)</p></div></div></section>
+  </div>;
 }
 
 // 1. OVERVIEW TAB
