@@ -619,14 +619,15 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void }) {
   const [selectedId, setSelectedId] = useState<ModuleId | null>(null);
   const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
+  const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [testMode, setTestMode] = useState(false);
   const [tests, setTests] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
-  const moduleDefinitions = modules.map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
-  const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const moduleDefinitions = modules.filter(module => !data.removedModules?.includes(module.id)).map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
+  const statusOf = (moduleId: ModuleId): ModuleAvailability => data.removedModules?.includes(moduleId) ? 'INACTIF' : data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const selected = selectedId ? moduleDefinitions.find(module => module.id === selectedId) ?? null : null;
   const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
   const categoryOf = (moduleId: ModuleId) => {
@@ -661,9 +662,9 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   };
 
   const removeModule = (module: (typeof modules)[number]) => {
-    if (!window.confirm(`Supprimer le module « ${module.name} » ? Il sera désactivé pour tous les espaces et retiré des accès configurés.`)) return;
     mutate(draft => {
       draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [module.id]: 'INACTIF' };
+      draft.removedModules = [...new Set([...(draft.removedModules ?? []), module.id])];
       draft.companies.forEach(company => {
         company.allowedModules = company.allowedModules.filter(id => id !== module.id);
       });
@@ -671,6 +672,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
       draft.orgNodes = draft.orgNodes.map(node => ({ ...node, moduleIds: node.moduleIds?.filter(id => id !== module.id) }));
     }, `${module.name} a été supprimé et désactivé.`);
     if (selectedId === module.id) setSelectedId(null);
+    setDeletingModule(null);
   };
 
   const toggleModule = (moduleId: ModuleId) => {
@@ -704,7 +706,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
             <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={21} /></span>
             <StatusBadge status={status} />
           </div>
-           <div className="mt-6 flex flex-wrap items-start justify-between gap-3"><h2 className="text-2xl font-bold">{selected.name}</h2><div className="flex gap-1"><button data-testid={`button-edit-module-${selected.id}`} title="Modifier le module" onClick={() => openEdit(selected)} className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={15} /></button><button data-testid={`button-delete-module-${selected.id}`} title="Supprimer le module" onClick={() => removeModule(selected)} className="rounded-lg border p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={15} /></button></div></div>
+           <div className="mt-6 flex flex-wrap items-start justify-between gap-3"><h2 className="text-2xl font-bold">{selected.name}</h2><div className="flex gap-1"><button data-testid={`button-edit-module-${selected.id}`} title="Modifier le module" onClick={() => openEdit(selected)} className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={15} /></button><button data-testid={`button-delete-module-${selected.id}`} title="Supprimer le module" onClick={() => setDeletingModule(selected)} className="rounded-lg border p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={15} /></button></div></div>
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
           <div className="mt-6 space-y-3 border-t pt-5 text-sm">
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
@@ -778,12 +780,13 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
              <span className="mt-4 line-clamp-2 text-sm font-bold leading-5">{module.name}</span>
              <span className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</span>
            </button>
-           <div className="mt-3 flex justify-center gap-1 border-t pt-3"><button type="button" data-testid={`button-edit-module-${module.id}`} title="Modifier le module" onClick={() => openEdit(module)} className="rounded-lg p-2 text-xs hover:bg-[hsl(var(--muted))]"><Edit3 size={14} /></button><button type="button" data-testid={`button-delete-module-${module.id}`} title="Supprimer le module" onClick={() => removeModule(module)} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={14} /></button></div>
+            <div className="mt-3 flex justify-center gap-1 border-t pt-3"><button type="button" data-testid={`button-edit-module-${module.id}`} title="Modifier le module" onClick={() => openEdit(module)} className="rounded-lg p-2 text-xs hover:bg-[hsl(var(--muted))]"><Edit3 size={14} /></button><button type="button" data-testid={`button-delete-module-${module.id}`} title="Supprimer le module" onClick={() => setDeletingModule(module)} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={14} /></button></div>
          </article>;
       })}
       {visibleModules.length === 0 && <div className="card-surface col-span-full rounded-2xl p-10 text-center"><Package className="mx-auto text-[hsl(var(--muted-foreground))]" size={28} /><h2 className="mt-4 font-bold">Aucune application trouvée</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Modifiez votre recherche ou réinitialisez les filtres.</p><button type="button" onClick={() => { setQuery(''); setCategory('Toutes'); setStatusFilter('TOUTES'); }} className="mt-4 text-xs font-bold text-[hsl(var(--primary))]">Réinitialiser les filtres</button></div>}
-    </div>
-   </div>;
+     </div>
+     {deletingModule && <Modal title="Confirmer la suppression" onClose={() => setDeletingModule(null)}><p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">Voulez-vous vraiment supprimer le module <strong className="text-[hsl(var(--foreground))]">{deletingModule.name}</strong> ? Il sera retiré du catalogue et désactivé pour tous les espaces.</p><div className="mt-6 flex justify-end gap-2"><button type="button" data-testid="button-cancel-delete-module" onClick={() => setDeletingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" data-testid="button-confirm-delete-module" onClick={() => removeModule(deletingModule)} className="rounded-lg bg-[hsl(var(--destructive))] px-4 py-2.5 text-xs font-bold text-white">Supprimer le module</button></div></Modal>}
+    </div>;
 }
 
 function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof modules)[number]; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
