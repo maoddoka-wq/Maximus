@@ -676,14 +676,17 @@ function AdminCreateCompanyPage({ mutate, onComplete, onCancel }: { mutate: (fn:
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState('Distribution');
+  const [orgName, setOrgName] = useState('');
+  const [orgCode, setOrgCode] = useState('');
+  const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>(['finance', 'commerce', 'stocks']);
   const [error, setError] = useState('');
 
   const toggle = (id: ModuleId) => setSelectedModules(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]);
   const save = () => {
     const normalizedEmail = email.trim().toLowerCase();
-    if (!name.trim() || !manager.trim() || !normalizedEmail || password.length < 8 || password !== passwordConfirm) {
-      setError('Complétez tous les champs obligatoires et vérifiez le mot de passe.');
+    if (!name.trim() || !manager.trim() || !normalizedEmail || password.length < 8 || password !== passwordConfirm || !orgName.trim() || !orgCode.trim()) {
+      setError('Complétez l’entreprise, sa première unité organisationnelle et vérifiez le mot de passe.');
       return;
     }
     if (selectedModules.length === 0) {
@@ -695,7 +698,9 @@ function AdminCreateCompanyPage({ mutate, onComplete, onCancel }: { mutate: (fn:
       return;
     }
     mutate(draft => {
-      draft.companies.push({ id: uid('company'), name: name.trim(), manager: manager.trim(), email: normalizedEmail, adminPassword: password, phone: '', country: 'Sénégal', sector, status: 'ACTIF', requestedModules: [...selectedModules], allowedModules: [...selectedModules], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) });
+      const companyId = uid('company');
+      draft.companies.push({ id: companyId, name: name.trim(), manager: manager.trim(), email: normalizedEmail, adminPassword: password, phone: '', country: 'Sénégal', sector, status: 'ACTIF', requestedModules: [...selectedModules], allowedModules: [...selectedModules], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) });
+      draft.orgNodes.push({ id: uid('org'), companyId, name: orgName.trim(), code: orgCode.trim().toUpperCase(), type: orgType, parentId: null, moduleIds: [] });
     }, 'Entreprise créée et activée.');
     onComplete();
   };
@@ -711,7 +716,8 @@ function AdminCreateCompanyPage({ mutate, onComplete, onCancel }: { mutate: (fn:
         <Field label="Mot de passe administrateur" value={password} onChange={setPassword} type="password" placeholder="Au moins 8 caractères" testId="input-admin-company-password" />
         <Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-admin-company-password-confirm" />
       </div>
-      <div className="mt-8 border-t pt-6"><h3 className="font-bold">Modules autorisés</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ces modules seront accessibles dès la première connexion.</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{modules.map(module => <button type="button" data-testid={`button-admin-module-${module.id}`} key={module.id} onClick={() => toggle(module.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(module.id) && <Check size={13} />}</span><span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{module.description}</span></span></button>)}</div></div>
+       <div className="mt-8 border-t pt-6"><h3 className="font-bold">Organisation obligatoire</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez la première unité de l’entreprise. La hiérarchie pourra ensuite être étendue librement.</p><div className="mt-4 grid gap-5 sm:grid-cols-3"><Field label="Nom de l’unité *" value={orgName} onChange={setOrgName} placeholder="Ex. Direction générale" testId="input-admin-org-name" /><Field label="Code *" value={orgCode} onChange={setOrgCode} placeholder="Ex. DG-01" testId="input-admin-org-code" /><label className="block text-sm font-semibold">Type<select data-testid="select-admin-org-type" value={orgType} onChange={event => setOrgType(event.target.value as OrgNode['type'])} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"><option value="direction">Direction</option><option value="department">Département</option><option value="sector">Secteur</option><option value="service">Service</option></select></label></div></div>
+       <div className="mt-8 border-t pt-6"><h3 className="font-bold">Modules autorisés</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ces modules seront accessibles dès la première connexion.</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{modules.map(module => <button type="button" data-testid={`button-admin-module-${module.id}`} key={module.id} onClick={() => toggle(module.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(module.id) && <Check size={13} />}</span><span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{module.description}</span></span></button>)}</div></div>
       {error && <p data-testid="admin-create-error" className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
        <div className="mt-8 flex justify-end gap-3"><button data-testid="button-cancel-admin-company" onClick={onCancel} className="rounded-lg border px-5 py-3 text-sm font-bold">Annuler</button><button data-testid="button-save-admin-company" onClick={save} className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Créer l’entreprise</button></div>
     </section>

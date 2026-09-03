@@ -1,6 +1,6 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
-import { stockApi, type StockBootstrap, type StockInventory, type StockMovement, type StockMovementType, type StockProduct, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
+import { createStockApi, type StockApi, type StockBootstrap, type StockInventory, type StockMovement, type StockMovementType, type StockProduct, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
 const dateLabel = (value: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -28,18 +28,25 @@ type MovementForm = { productId: string; warehouseId: string; destinationWarehou
 const blankProduct: ProductForm = { name: '', category: 'Divers', subcategory: '', brand: '', sku: '', barcode: '', imageUrl: '', unit: 'unité', purchasePrice: 0, salePrice: 0, minStock: 0, maxStock: 0, supplierId: null, description: '' };
 const blankWarehouse: WarehouseForm = { name: '', manager: '', address: '' };
 const blankSupplier: SupplierForm = { name: '', contactName: '', email: '', phone: '', address: '', notes: '' };
+const StockApiContext = createContext<StockApi | null>(null);
+const useStockApi = () => {
+  const api = useContext(StockApiContext);
+  if (!api) throw new Error('Le contexte de gestion de stock est indisponible.');
+  return api;
+};
 
-export default function StockModulePage({ companyUsers = [], companyServices = [] }: { companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[] }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [] }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[] }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const api = createStockApi(companyId);
 
   const load = async (silent = false) => {
     if (silent) setRefreshing(true); else setLoading(true);
-    try { setData(await stockApi.bootstrap()); setError(''); }
+    try { setData(await api.bootstrap()); setError(''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger le module Stocks.'); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -52,7 +59,7 @@ export default function StockModulePage({ companyUsers = [], companyServices = [
   if (loading) return <div className="card-surface flex min-h-80 items-center justify-center rounded-2xl"><RefreshCw className="animate-spin text-[hsl(var(--primary))]" size={22} /></div>;
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
 
-  return <div className="space-y-5">
+  return <StockApiContext.Provider value={api}><div className="space-y-5">
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2">
@@ -71,7 +78,7 @@ export default function StockModulePage({ companyUsers = [], companyServices = [
       {tab === 'settings' && <StockSettingsPanel />}
     </div>
     {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-semibold text-white shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
-  </div>;
+  </div></StockApiContext.Provider>;
 }
 
 function StockDashboard({ data, onTab }: { data: StockBootstrap; onTab: (tab: Tab) => void }) {

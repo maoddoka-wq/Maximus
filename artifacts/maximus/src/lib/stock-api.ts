@@ -47,20 +47,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
 
-export const stockApi = {
-  bootstrap: () => request<StockBootstrap>('/stock/bootstrap?companyId=kora'),
-  createProduct: (body: Omit<StockProduct, 'id' | 'companyId' | 'archived'>) => request<StockProduct>('/stock/products', json({ ...body, companyId: 'kora' })),
-  updateProduct: (id: string, body: Partial<StockProduct>) => request<StockProduct>(`/stock/products/${id}`, { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
-  archiveProduct: (id: string) => request<StockProduct>(`/stock/products/${id}`, { method: 'DELETE' }),
-  createWarehouse: (body: { name: string; manager: string; address: string }) => request<StockWarehouse>('/stock/warehouses', json({ ...body, companyId: 'kora' })),
-  updateWarehouse: (id: string, body: Partial<StockWarehouse>) => request<StockWarehouse>(`/stock/warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
-  archiveWarehouse: (id: string) => request<StockWarehouse>(`/stock/warehouses/${id}`, { method: 'DELETE' }),
-  createLocation: (warehouseId: string, name: string) => request<StockLocation>(`/stock/warehouses/${warehouseId}/locations`, json({ companyId: 'kora', name })),
-  createSupplier: (body: Omit<StockSupplier, 'id' | 'companyId' | 'archived'>) => request<StockSupplier>('/stock/suppliers', json({ ...body, companyId: 'kora' })),
-  updateSupplier: (id: string, body: Partial<StockSupplier>) => request<StockSupplier>(`/stock/suppliers/${id}`, { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
-  createMovement: (body: { productId: string; supplierId?: string | null; warehouseId: string; destinationWarehouseId?: string | null; locationId?: string | null; requesterService?: string | null; beneficiary?: string | null; type: StockMovementType; quantity: number; purchasePrice?: number; reason: string; movementDate?: string; userName: string; reference: string; comment: string }) => request<StockMovement>('/stock/movements', json({ ...body, companyId: 'kora' })),
-  createRequest: (body: { productId: string; warehouseId: string; quantity: number; reason: string; createdBy: string }) => request<StockRequest>('/stock/requests', json({ ...body, companyId: 'kora' })),
-  updateRequestStatus: (id: string, status: StockRequest['status']) => request<StockRequest>(`/stock/requests/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }), headers: { 'Content-Type': 'application/json' } }),
-  createInventory: (body: { warehouseId: string; notes: string; lines: { productId: string; actualQuantity: number }[]; createdBy: string }) => request<StockInventory>('/stock/inventories', json({ ...body, companyId: 'kora' })),
-  validateInventory: (id: string) => request<StockInventory>(`/stock/inventories/${id}/validate`, { method: 'POST', body: JSON.stringify({}) }),
+export type StockApi = ReturnType<typeof createStockApi>;
+
+export const createStockApi = (companyId: string) => {
+  const withCompany = (path: string) => `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
+  return {
+    bootstrap: () => request<StockBootstrap>(withCompany('/stock/bootstrap')),
+    createProduct: (body: Omit<StockProduct, 'id' | 'companyId' | 'archived'>) => request<StockProduct>('/stock/products', json({ ...body, companyId })),
+    updateProduct: (id: string, body: Partial<StockProduct>) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+    archiveProduct: (id: string) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'DELETE' }),
+    createWarehouse: (body: { name: string; manager: string; address: string }) => request<StockWarehouse>('/stock/warehouses', json({ ...body, companyId })),
+    updateWarehouse: (id: string, body: Partial<StockWarehouse>) => request<StockWarehouse>(withCompany(`/stock/warehouses/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+    archiveWarehouse: (id: string) => request<StockWarehouse>(withCompany(`/stock/warehouses/${id}`), { method: 'DELETE' }),
+    createLocation: (warehouseId: string, name: string) => request<StockLocation>(`/stock/warehouses/${warehouseId}/locations`, json({ companyId, name })),
+    createSupplier: (body: Omit<StockSupplier, 'id' | 'companyId' | 'archived'>) => request<StockSupplier>('/stock/suppliers', json({ ...body, companyId })),
+    updateSupplier: (id: string, body: Partial<StockSupplier>) => request<StockSupplier>(withCompany(`/stock/suppliers/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+    createMovement: (body: { productId: string; supplierId?: string | null; warehouseId: string; destinationWarehouseId?: string | null; locationId?: string | null; requesterService?: string | null; beneficiary?: string | null; type: StockMovementType; quantity: number; purchasePrice?: number; reason: string; movementDate?: string; userName: string; reference: string; comment: string }) => request<StockMovement>('/stock/movements', json({ ...body, companyId })),
+    createRequest: (body: { productId: string; warehouseId: string; quantity: number; reason: string; createdBy: string }) => request<StockRequest>('/stock/requests', json({ ...body, companyId })),
+    updateRequestStatus: (id: string, status: StockRequest['status']) => request<StockRequest>(withCompany(`/stock/requests/${id}/status`), { method: 'PATCH', body: JSON.stringify({ status }), headers: { 'Content-Type': 'application/json' } }),
+    createInventory: (body: { warehouseId: string; notes: string; lines: { productId: string; actualQuantity: number }[]; createdBy: string }) => request<StockInventory>('/stock/inventories', json({ ...body, companyId })),
+    validateInventory: (id: string) => request<StockInventory>(withCompany(`/stock/inventories/${id}/validate`), { method: 'POST', body: JSON.stringify({}) }),
+  };
 };
+
+export const stockApi = createStockApi('kora');
