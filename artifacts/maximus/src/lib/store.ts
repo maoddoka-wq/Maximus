@@ -66,7 +66,7 @@ export const sectorPresets: SectorPreset[] = [
 export function seedData(): StoreData {
   return {
     catalogVersion: 2,
-    organizationVersion: 3,
+    organizationVersion: 4,
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
@@ -174,10 +174,14 @@ export function loadData(): StoreData {
       : parsed.companies;
     const companies = rawCompanies.map(company => ({ ...company, adminPassword: company.adminPassword ?? 'Kora123!', managerRoleId: company.managerRoleId ?? (company.id === 'kora' ? 'kora-role-manager' : undefined) }));
     const removeGeneratedHierarchy = (parsed.organizationVersion ?? 1) < 3;
+    const seedDemoOrganization = (parsed.organizationVersion ?? 1) < 4;
     const generatedNodeIds = new Set(['org-1', 'org-2', 'org-3', 'org-4', 'org-5', 'org-6', 'org-7']);
     const generatedRoleIds = new Set(['role-admin', 'role-compta', 'role-manager', 'role-magasinier', 'role-rh', 'role-logistique', 'role-vendeur']);
     const generatedEmployeeIds = new Set(['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6', 'emp-7', 'emp-8']);
-    const orgNodes = (parsed.orgNodes?.length ? parsed.orgNodes : initial.orgNodes)
+    const nodeSource = parsed.orgNodes?.length
+      ? (seedDemoOrganization ? [...initial.orgNodes.filter(initialNode => !parsed.orgNodes.some(node => node.id === initialNode.id)), ...parsed.orgNodes] : parsed.orgNodes)
+      : initial.orgNodes;
+    const orgNodes = nodeSource
       .filter(node => !removeGeneratedHierarchy || !generatedNodeIds.has(node.id))
       .map(node => ({
         ...node,
@@ -186,8 +190,11 @@ export function loadData(): StoreData {
         parentId: removeGeneratedHierarchy && node.parentId && generatedNodeIds.has(node.parentId) ? null : node.parentId,
         moduleIds: node.moduleIds || [],
       })) as OrgNode[];
-    const roleSource = parsed.roles?.length ? parsed.roles : initial.roles;
-    const roles = [...initial.roles.filter(initialRole => !roleSource.some(role => role.id === initialRole.id)), ...roleSource]
+    const savedRoleSource = parsed.roles?.length ? parsed.roles : initial.roles;
+    const roleSource = seedDemoOrganization
+      ? [...initial.roles.filter(initialRole => !savedRoleSource.some(role => role.id === initialRole.id)), ...savedRoleSource]
+      : savedRoleSource;
+    const roles = roleSource
       .filter(role => !removeGeneratedHierarchy || !generatedRoleIds.has(role.id))
       .map(role => ({
         ...role,
@@ -200,7 +207,7 @@ export function loadData(): StoreData {
       ...initial,
       ...storedData,
       catalogVersion: 2,
-      organizationVersion: 3,
+       organizationVersion: 4,
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
