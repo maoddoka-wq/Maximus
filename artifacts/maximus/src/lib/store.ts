@@ -19,7 +19,6 @@ export interface Company { id: string; name: string; manager: string; email: str
 export interface Module { id: ModuleId; name: string; description: string; features: string[]; status: 'ACTIF' | 'BETA'; dependencies: ModuleId[]; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
-export interface WorkspacePreferences { operationalNotifications: boolean; twoFactorAuthentication: boolean; displayCurrency: boolean; }
 export interface Dependency { source: ModuleId; target: ModuleId; reason: string; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
@@ -36,7 +35,7 @@ export interface CrmOpportunity { id: string; client: string; contact: string; s
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; moduleStatuses?: ModuleStatusMap; preferences?: WorkspacePreferences; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; dependencies: Dependency[]; moduleStatuses?: ModuleStatusMap; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
@@ -72,7 +71,7 @@ export function seedData(): StoreData {
   return {
     catalogVersion: 2,
     organizationVersion: 3,
-    preferences: { operationalNotifications: true, twoFactorAuthentication: false, displayCurrency: true },
+    dependencies: dependencies.map(dependency => ({ ...dependency })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
@@ -151,6 +150,7 @@ export function loadData(): StoreData {
     if (!saved) return seedData();
     const parsed = JSON.parse(saved) as StoreData;
     const initial = seedData();
+    const { preferences: _legacyPreferences, ...storedData } = parsed as StoreData & { preferences?: unknown };
     const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
     const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
     const companies = (parsed.catalogVersion ?? 1) < 2
@@ -179,14 +179,10 @@ export function loadData(): StoreData {
 
     return {
       ...initial,
-      ...parsed,
+      ...storedData,
       catalogVersion: 2,
       organizationVersion: 3,
-      preferences: {
-        operationalNotifications: parsed.preferences?.operationalNotifications ?? initial.preferences!.operationalNotifications,
-        twoFactorAuthentication: parsed.preferences?.twoFactorAuthentication ?? initial.preferences!.twoFactorAuthentication,
-        displayCurrency: parsed.preferences?.displayCurrency ?? initial.preferences!.displayCurrency,
-      },
+      dependencies: parsed.dependencies ?? initial.dependencies,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,

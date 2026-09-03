@@ -1,11 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Bell, Building2, Check, ChevronDown, ChevronRight, CircleHelp, CreditCard, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, X, Boxes, UserRoundCog } from 'lucide-react';
 import { Link, useLocation, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { dependencies, loadData, modules, money, saveData, shortMoney, uid, type Company, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type StoreData, type WorkspacePreferences } from '@/lib/store';
+import { loadData, modules, money, saveData, shortMoney, uid, type Company, type Dependency, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
@@ -24,7 +24,6 @@ const adminNav = [
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
   { href: '/maximus/notifications', label: 'Notifications', icon: Bell },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
-  { href: '/maximus/parametres', label: 'Paramètres', icon: Settings },
 ];
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
@@ -55,7 +54,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/abonnements': { kicker: 'Compte', title: 'Abonnements', description: 'Une lecture claire de vos espaces et de leur statut.' },
   '/maximus/notifications': { kicker: 'Centre de contrôle', title: 'Notifications', description: 'Les signaux utiles, sans bruit.' },
   '/maximus/journal': { kicker: 'Traçabilité', title: 'Journal d’activité', description: 'Chaque action importante, horodatée et attribuée.' },
-  '/maximus/parametres': { kicker: 'Compte', title: 'Paramètres', description: 'Préférences de démonstration et sécurité.' },
   '/kora/dashboard': { kicker: 'KORA Distribution', title: 'Le rythme de KORA, en un regard.', description: 'Mardi 18 juin 2024 · Dakar, Sénégal' },
   '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Une structure souple qui suit la réalité de vos équipes.' },
   '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
@@ -120,7 +118,7 @@ function AppContent() {
   const logout = () => { setSession(null); localStorage.removeItem('maximus-session'); setLocation('/'); };
   const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
 
-  if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} onCancel={() => setLocation('/maximus/entreprises')} /> : <Signup onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
+  if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage data={data} mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} onCancel={() => setLocation('/maximus/entreprises')} /> : <Signup onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
   const loginEmployees = [...data.employees, ...data.companies.filter(company => company.status === 'ACTIF' && company.adminPassword).map(company => ({ id: `company-admin:${company.id}`, firstName: company.manager.split(' ')[0] ?? company.name, lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur', email: company.email, phone: company.phone, position: 'Administrateur', department: '', subDepartment: '', role: 'Administrateur entreprise', status: 'ACTIF' as const, loginPassword: company.adminPassword, companyId: company.id }))];
   if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
@@ -239,16 +237,15 @@ function AdminRouter({ location, data, mutate, notify, onNavigate }: { location:
   if (companyDetailMatch) {
     const companyId = decodeURIComponent(companyDetailMatch[1]);
     const company = data.companies.find(item => item.id === companyId);
-    return company ? <CompanyModulesDetail company={company} mutate={mutate} onBack={() => onNavigate('/maximus/entreprises')} /> : <EmptyState title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onNavigate('/maximus/entreprises')} />;
+     return company ? <CompanyModulesDetail company={company} data={data} mutate={mutate} onBack={() => onNavigate('/maximus/entreprises')} /> : <EmptyState title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onNavigate('/maximus/entreprises')} />;
   }
   if (location === '/maximus/entreprises') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={false} />;
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
   if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
-  if (location === '/maximus/dependances') return <DependenciesPage />;
+  if (location === '/maximus/dependances') return <DependenciesPage data={data} mutate={mutate} />;
   if (location === '/maximus/abonnements') return <SubscriptionsPage data={data} />;
   if (location === '/maximus/notifications') return <NotificationsPage data={data} mutate={mutate} />;
   if (location === '/maximus/journal') return <JournalPage data={data} />;
-  if (location === '/maximus/parametres') return <SettingsPage data={data} mutate={mutate} onReset={() => { localStorage.removeItem('maximus-data-v1'); window.location.reload(); }} />;
   return <EmptyState title="Cette vue n’existe pas encore" text="Revenez au cockpit pour poursuivre." action={() => onNavigate('/maximus/dashboard')} />;
 }
 
@@ -385,14 +382,70 @@ function RequestsPage({ data, mutate, onNavigate }: { data: StoreData; mutate: (
   return <div className="space-y-4">{requests.length === 0 ? <EmptyState title="Aucune demande en attente" text="Toutes les demandes ont été traitées." action={() => onNavigate('/maximus/entreprises')} /> : requests.map(c => <section data-testid={`card-request-${c.id}`} key={c.id} className="card-surface rounded-2xl p-5 sm:p-6"><div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center"><div className="flex gap-4"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--accent)/.24)] font-black">{c.name.slice(0, 2).toUpperCase()}</span><div><h2 className="font-bold">{c.name}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{c.manager} · {c.email} · {c.country}</p><div className="mt-3 flex flex-wrap gap-2">{c.requestedModules.map(x => <span key={x} className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[10px] font-bold">{modules.find(m => m.id === x)?.name}</span>)}</div></div></div><div className="flex gap-2"><ActionButton testId={`button-refuse-request-${c.id}`} icon={X} onClick={() => mutate(d => { const x = d.companies.find(y => y.id === c.id); if (x) x.status = 'REFUSÉ'; }, 'Demande refusée.')}>Refuser</ActionButton><ActionButton primary testId={`button-approve-request-${c.id}`} icon={Check} onClick={() => mutate(d => { const x = d.companies.find(y => y.id === c.id); if (x) { x.status = 'ACTIF'; x.allowedModules = [...x.requestedModules]; } }, 'Entreprise activée.')}>Autoriser l’espace</ActionButton></div></div></section>)}</div>;
 }
 function ModulesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) { return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map((m, i) => { const active = (data.moduleStatuses?.[m.id] ?? m.status) !== 'INACTIF'; return <section data-testid={`card-module-${m.id}`} key={m.id} className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(i + 1, 3)}`}><div className="flex items-start justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={19} /></span><StatusBadge status={active ? m.status : 'INACTIF'} /></div><h2 className="mt-5 text-lg font-bold">{m.name}</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{m.description}</p><div className="mt-5 space-y-2 border-t pt-4">{m.features.map(f => <div key={f} className="flex items-center gap-2 text-xs"><Check size={14} className="text-[hsl(var(--primary))]" />{f}</div>)}</div><button data-testid={`button-toggle-module-${m.id}`} onClick={() => mutate(draft => { draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [m.id]: active ? 'INACTIF' : m.status }; }, active ? `${m.name} désactivé.` : `${m.name} activé.`)} className="mt-5 text-xs font-bold text-[hsl(var(--primary))]">{active ? 'Désactiver' : 'Activer'} <ChevronRight className="inline" size={14} /></button></section>; })}</div>; }
-function DependenciesPage() { return <div className="space-y-4">{dependencies.map(dep => <section data-testid={`card-dependency-${dep.source}-${dep.target}`} key={dep.source} className="card-surface flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Module source</p><strong>{modules.find(m => m.id === dep.source)?.name}</strong></div></div><ChevronRight className="hidden text-[hsl(var(--muted-foreground))] sm:block" /><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Dépend de</p><strong>{modules.find(m => m.id === dep.target)?.name}</strong></div><p className="border-t pt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))] sm:ml-auto sm:max-w-xs sm:border-l sm:border-t-0 sm:pl-5">{dep.reason}</p></section>)}</div>; }
+function DependenciesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
+  const [source, setSource] = useState<ModuleId>('commerce');
+  const [target, setTarget] = useState<ModuleId>('stocks');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const dependencyList = data.dependencies ?? [];
+  const targetOptions = modules.filter(module => module.id !== source);
+
+  const changeSource = (nextSource: ModuleId) => {
+    setSource(nextSource);
+    if (target === nextSource) setTarget(modules.find(module => module.id !== nextSource)?.id ?? 'commerce');
+  };
+
+  const moduleName = (id: ModuleId) => modules.find(module => module.id === id)?.name ?? id;
+  const createDependency = (event: FormEvent) => {
+    event.preventDefault();
+    const normalizedReason = reason.trim();
+    if (source === target) {
+      setError('Un module ne peut pas dépendre de lui-même.');
+      return;
+    }
+    if (!normalizedReason) {
+      setError('Ajoutez une explication pour cette dépendance.');
+      return;
+    }
+    if (dependencyList.some(dependency => dependency.source === source && dependency.target === target)) {
+      setError('Cette dépendance existe déjà.');
+      return;
+    }
+    const dependency: Dependency = { source, target, reason: normalizedReason };
+    mutate(draft => { draft.dependencies = [...(draft.dependencies ?? []), dependency]; }, 'Dépendance enregistrée.');
+    setReason('');
+    setError('');
+  };
+  const deleteDependency = (dependency: Dependency) => {
+    mutate(draft => {
+      draft.dependencies = (draft.dependencies ?? []).filter(item => !(item.source === dependency.source && item.target === dependency.target));
+    }, 'Dépendance supprimée.');
+  };
+
+  return <div className="space-y-5">
+    <section className="card-surface rounded-2xl p-6">
+      <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Configuration du catalogue</p><h2 className="mt-2 text-xl font-bold">Ajouter une dépendance</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Définissez les modules qui doivent être disponibles ensemble. Cette règle s’appliquera à l’activation du catalogue et aux espaces des entreprises.</p></div></div>
+      <form onSubmit={createDependency} className="mt-6 grid gap-4 border-t pt-5 lg:grid-cols-[1fr_auto_1fr] lg:items-end">
+        <label className="block text-sm font-semibold">Module source<select data-testid="select-dependency-source" value={source} onChange={event => changeSource(event.target.value as ModuleId)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal">{modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
+        <ChevronRight className="hidden text-[hsl(var(--muted-foreground))] lg:block" />
+        <label className="block text-sm font-semibold">Dépend de<select data-testid="select-dependency-target" value={target} onChange={event => setTarget(event.target.value as ModuleId)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal">{targetOptions.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
+        <label className="block text-sm font-semibold lg:col-span-3">Explication<textarea data-testid="input-dependency-reason" value={reason} onChange={event => setReason(event.target.value)} placeholder="Ex. Les commandes utilisent le référentiel des fournisseurs." rows={3} className="mt-2 w-full resize-y rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
+        {error && <p data-testid="dependency-error" className="text-xs font-semibold text-[hsl(var(--destructive))] lg:col-span-3">{error}</p>}
+        <div className="lg:col-span-3"><button data-testid="button-create-dependency" type="submit" className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Enregistrer la dépendance</button></div>
+      </form>
+    </section>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Dépendances existantes</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{dependencyList.length} règle{dependencyList.length > 1 ? 's' : ''} configurée{dependencyList.length > 1 ? 's' : ''}</p></div></div>
+      {dependencyList.map(dependency => <article data-testid={`card-dependency-${dependency.source}-${dependency.target}`} key={`${dependency.source}-${dependency.target}`} className="card-surface flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><GitBranch size={19} /></span><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Module source</p><strong>{moduleName(dependency.source)}</strong></div></div><ChevronRight className="hidden text-[hsl(var(--muted-foreground))] sm:block" /><div><p className="text-xs text-[hsl(var(--muted-foreground))]">Dépend de</p><strong>{moduleName(dependency.target)}</strong></div><p className="border-t pt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))] sm:ml-auto sm:max-w-xs sm:border-l sm:border-t-0 sm:pl-5">{dependency.reason}</p><button type="button" data-testid={`button-delete-dependency-${dependency.source}-${dependency.target}`} onClick={() => deleteDependency(dependency)} aria-label={`Supprimer la dépendance ${moduleName(dependency.source)} vers ${moduleName(dependency.target)}`} className="self-start rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] sm:self-center"><Trash2 size={16} /></button></article>)}
+      {dependencyList.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><GitBranch className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucune dépendance configurée</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez une première règle pour guider la configuration des modules.</p></div>}
+    </section>
+  </div>;
+}
 function SimpleAdminPage({ type, data, onNavigate }: { type: 'users'; data: StoreData; onNavigate: (path: string) => void }) { return <section className="card-surface overflow-hidden rounded-2xl"><div className="border-b p-5"><Toolbar search={''} setSearch={() => {}}><ActionButton primary testId="button-add-user" onClick={() => onNavigate('/maximus/entreprises/organisation')}>Gérer les comptes employés</ActionButton></Toolbar></div><DataTable headers={['Utilisateur', 'Espace', 'Dernière activité', 'Statut']} rows={[['admin@maximus.demo', 'Administration MAXIMUS', 'Aujourd’hui, 10:22', <StatusBadge status="ACTIF" />], ...data.employees.map(e => [`${e.firstName} ${e.lastName}`, data.companies.find(company => company.id === e.companyId)?.name ?? 'Entreprise', 'Compte actif', <StatusBadge status={e.status} />])]} /></section>; }
 function RolesPage({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) { if (data.roles.length === 0) return <EmptyState title="Aucun rôle configuré" text="Créez les rôles depuis l’organisation de l’entreprise concernée." action={() => onNavigate('/maximus/entreprises/organisation')} />; return <div className="grid gap-4 lg:grid-cols-3">{data.roles.map(role => <section key={role.id} data-testid={`card-role-${role.id}`} className="card-surface rounded-2xl p-5"><div className="flex items-start justify-between"><span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><KeyRound size={18} /></span><button data-testid={`button-edit-role-${role.id}`} title="Modifier dans l’organisation" onClick={() => onNavigate('/maximus/entreprises/organisation')} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><SlidersHorizontal size={16} /></button></div><h2 className="mt-5 font-bold">{role.name}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{role.description}</p><div className="mt-5 space-y-2">{Object.keys(role.modulePermissions).map(key => <div key={key} className="flex items-center justify-between text-xs"><span>{modules.find(m => m.id === key)?.name ?? key}</span><span className="text-[hsl(var(--muted-foreground))]">{role.modulePermissions[key].join(' · ')}</span></div>)}</div></section>)}</div>; }
 function SubscriptionsPage({ data }: { data: StoreData }) { return <div className="grid gap-4 md:grid-cols-3">{data.companies.map(c => <section className="card-surface rounded-2xl p-5" key={c.id}><div className="flex items-center justify-between"><span className="font-bold">{c.name}</span><StatusBadge status={c.status} /></div><p className="mt-6 text-3xl font-bold">Sur mesure</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Facturation mensuelle · {c.allowedModules.length} modules</p><div className="mt-5 h-1.5 rounded-full bg-[hsl(var(--muted))]"><div className="h-full rounded-full bg-[hsl(var(--primary))]" style={{ width: `${Math.max(12, c.allowedModules.length * 20)}%` }} /></div></section>)}</div>; }
 function NotificationsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) { return <div className="space-y-3">{data.notifications.map(n => <section data-testid={`notification-${n.id}`} key={n.id} className={`card-surface flex items-start gap-4 rounded-2xl p-5 ${!n.read ? 'border-l-4 border-l-[hsl(var(--accent))]' : ''}`}><span className="rounded-xl bg-[hsl(var(--muted))] p-3"><Bell size={17} /></span><div className="flex-1"><div className="flex justify-between gap-3"><h2 className="font-bold">{n.title}</h2><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{n.date}</span></div><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{n.text}</p>{!n.read && <button data-testid={`button-read-notification-${n.id}`} onClick={() => mutate(d => { const x = d.notifications.find(y => y.id === n.id); if (x) x.read = true; }, 'Notification marquée comme lue.')} className="mt-3 text-xs font-bold text-[hsl(var(--primary))]">Marquer comme lue</button>}</div></section>)}</div>; }
 function JournalPage({ data }: { data: StoreData }) { const [search, setSearch] = useState(''); const rows = data.activities.filter(a => `${a.user} ${a.action} ${a.object}`.toLowerCase().includes(search.toLowerCase())); return <section className="card-surface overflow-hidden rounded-2xl"><div className="border-b p-5"><Toolbar search={search} setSearch={setSearch}><button data-testid="button-filter-journal" onClick={() => setSearch(search ? '' : 'finance')} className="flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><SlidersHorizontal size={14} />{search ? 'Réinitialiser' : 'Filtrer Finance'}</button></Toolbar></div><DataTable headers={['Utilisateur', 'Action', 'Module', 'Objet', 'Date', 'État']} rows={rows.map(a => [a.user, a.action, a.module, a.object, a.date, <StatusBadge status={a.status} />])} /></section>; }
-function SettingsPage({ data, mutate, onReset }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onReset: () => void }) { const defaults: WorkspacePreferences = { operationalNotifications: true, twoFactorAuthentication: false, displayCurrency: true }; const [preferences, setPreferences] = useState<WorkspacePreferences>({ ...defaults, ...(data.preferences ?? {}) }); const setPreference = (key: keyof WorkspacePreferences, value: boolean) => setPreferences(current => ({ ...current, [key]: value })); return <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><section className="card-surface rounded-2xl p-6"><h2 className="font-bold">Préférences de l’espace</h2><div className="mt-6 space-y-5"><SettingRow title="Notifications opérationnelles" text="Recevoir les alertes importantes par email" checked={preferences.operationalNotifications} onChange={value => setPreference('operationalNotifications', value)} /><SettingRow title="Validation en deux étapes" text="Renforcer la sécurité des comptes administrateurs" checked={preferences.twoFactorAuthentication} onChange={value => setPreference('twoFactorAuthentication', value)} /><SettingRow title="Format monétaire" text="Les montants sont affichés en FCFA" checked={preferences.displayCurrency} onChange={value => setPreference('displayCurrency', value)} /></div><button data-testid="button-save-settings" onClick={() => mutate(draft => { draft.preferences = preferences; }, 'Préférences enregistrées.')} className="btn mt-7 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Enregistrer</button></section><section className="card-surface rounded-2xl p-6"><h2 className="font-bold">Données locales de démonstration</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Réinitialisez les entreprises, employés et activités enregistrés dans ce navigateur. Les données Stocks conservées sur le serveur ne sont pas supprimées.</p><button data-testid="button-reset-demo" onClick={onReset} className="btn mt-6 flex items-center gap-2 rounded-lg border border-[hsl(var(--destructive)/.35)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--destructive))]"><RefreshCw size={15} />Réinitialiser les données locales</button></section></div>; }
-function SettingRow({ title, text, checked, onChange }: { title: string; text: string; checked: boolean; onChange: (value: boolean) => void }) { return <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-bold">{title}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{text}</p></div><button role="switch" aria-checked={checked} data-testid={`button-toggle-${title}`} onClick={() => onChange(!checked)} className={`h-6 w-11 rounded-full p-1 transition ${checked ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))]'}`}><span className={`block h-4 w-4 rounded-full bg-white transition ${checked ? 'translate-x-5' : ''}`} /></button></div>; }
 
 function OrganisationPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) { const [modal, setModal] = useState<OrgNode | 'new' | null>(null); const [name, setName] = useState(''); const [parent, setParent] = useState<string | null>(null); const roots = data.orgNodes.filter(n => !n.parentId); const open = (node: OrgNode | 'new') => { setModal(node); setName(node === 'new' ? '' : node.name); setParent(node === 'new' ? null : node.parentId); }; return <div className="grid gap-6 lg:grid-cols-[1fr_320px]"><section className="card-surface rounded-2xl p-5 sm:p-6"><div className="mb-6 flex items-center justify-between"><div><h2 className="font-bold">Arborescence</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Déployez vos équipes à la profondeur qui vous convient.</p></div><ActionButton primary testId="button-add-org-node" onClick={() => open('new')}>Ajouter un nœud</ActionButton></div><div className="space-y-2">{roots.map(node => <OrgTree key={node.id} node={node} nodes={data.orgNodes} onEdit={open} onDelete={id => mutate(d => { d.orgNodes = d.orgNodes.filter(n => n.id !== id && n.parentId !== id); }, 'Nœud supprimé.')} />)}</div></section><section className="card-surface grid-lines rounded-2xl p-5"><GitBranch size={19} className="text-[hsl(var(--primary))]" /><h2 className="mt-5 font-bold">Une structure vivante</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Direction, département, service ou équipe : chaque nœud peut accueillir ses propres enfants.</p><div className="mt-6 border-t pt-4"><p className="mono text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Total nœuds</p><p className="mt-1 text-2xl font-bold">{data.orgNodes.length}</p></div></section>{modal && <Modal title={modal === 'new' ? 'Nouveau nœud' : 'Modifier le nœud'} onClose={() => setModal(null)}><div className="space-y-4"><Field label="Nom" value={name} onChange={setName} testId="input-org-name" /><label className="block text-sm font-semibold">Parent<select data-testid="select-org-parent" value={parent ?? ''} onChange={e => setParent(e.target.value || null)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="">Racine</option>{data.orgNodes.filter(n => modal === 'new' || n.id !== (modal as OrgNode).id).map(n => <option key={n.id} value={n.id}>{n.name}</option>)}</select></label><div className="flex justify-end gap-2"><button data-testid="button-cancel-org" onClick={() => setModal(null)} className="rounded-lg border px-4 py-2 text-sm font-bold">Annuler</button><ActionButton primary testId="button-save-org" onClick={() => { if (!name) return; mutate(d => { if (modal === 'new') d.orgNodes.push({ id: uid('org'), name, type: 'service', parentId: parent }); else { const x = d.orgNodes.find(n => n.id === (modal as OrgNode).id); if (x) { x.name = name; x.parentId = parent; } } }, 'Organisation mise à jour.'); setModal(null); }}>Enregistrer</ActionButton></div></div></Modal>}</div>; }
 function OrgTree({ node, nodes, onEdit, onDelete, depth = 0 }: { node: OrgNode; nodes: OrgNode[]; onEdit: (n: OrgNode) => void; onDelete: (id: string) => void; depth?: number }) { const [expanded, setExpanded] = useState(true); const children = nodes.filter(n => n.parentId === node.id); return <div style={{ marginLeft: depth * 22 }}><div className="group flex items-center gap-2 rounded-lg px-2 py-2.5 hover:bg-[hsl(var(--muted)/.6)]"><button data-testid={`button-expand-org-${node.id}`} onClick={() => setExpanded(!expanded)} className="text-[hsl(var(--muted-foreground))]">{children.length ? <ChevronDown size={15} className={expanded ? '' : '-rotate-90'} /> : <span className="block w-[15px]" />}</button><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><Building2 size={14} /></span><span className="flex-1 text-sm font-bold">{node.name}<small className="ml-2 text-[10px] font-normal text-[hsl(var(--muted-foreground))]">{node.type}</small></span><button data-testid={`button-edit-org-${node.id}`} onClick={() => onEdit(node)} className="invisible rounded p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] group-hover:visible"><Settings size={14} /></button><button data-testid={`button-delete-org-${node.id}`} onClick={() => onDelete(node.id)} className="invisible rounded p-1.5 text-[hsl(var(--destructive))] group-hover:visible"><Trash2 size={14} /></button></div>{expanded && children.map(child => <OrgTree key={child.id} node={child} nodes={nodes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />)}</div>; }
@@ -459,12 +512,14 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 
 function ManageableModulesPage({ data, mutate, notify }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void }) {
   const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const dependencyList = data.dependencies ?? [];
+  const dependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
   const toggleModule = (moduleId: ModuleId) => {
     const module = modules.find(item => item.id === moduleId);
     if (!module) return;
     const isActive = statusOf(moduleId) !== 'INACTIF';
-    const activeDependents = modules.filter(item => item.dependencies.includes(moduleId) && statusOf(item.id) !== 'INACTIF');
-    const inactiveDependencies = module.dependencies.filter(id => statusOf(id) === 'INACTIF');
+    const activeDependents = modules.filter(item => dependencyList.some(dependency => dependency.source === item.id && dependency.target === moduleId) && statusOf(item.id) !== 'INACTIF');
+    const inactiveDependencies = dependenciesFor(moduleId).filter(id => statusOf(id) === 'INACTIF');
     if (!isActive && inactiveDependencies.length > 0) {
       notify(`Activez d’abord : ${inactiveDependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}.`);
       return;
@@ -486,7 +541,8 @@ function ManageableModulesPage({ data, mutate, notify }: { data: StoreData; muta
   return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map((module, index) => {
     const status = statusOf(module.id);
     const isActive = status !== 'INACTIF';
-    const activeDependents = modules.filter(item => item.dependencies.includes(module.id) && statusOf(item.id) !== 'INACTIF');
+    const moduleDependencies = dependenciesFor(module.id);
+    const activeDependents = modules.filter(item => dependencyList.some(dependency => dependency.source === item.id && dependency.target === module.id) && statusOf(item.id) !== 'INACTIF');
     return <section data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-70'}`}>
       <div className="flex items-start justify-between">
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={19} /></span>
@@ -495,7 +551,7 @@ function ManageableModulesPage({ data, mutate, notify }: { data: StoreData; muta
       <h2 className="mt-5 text-lg font-bold">{module.name}</h2>
       <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{module.description}</p>
       <div className="mt-5 space-y-2 border-t pt-4">{module.features.map(feature => <div key={feature} className="flex items-center gap-2 text-xs"><Check size={14} className="text-[hsl(var(--primary))]" />{feature}</div>)}</div>
-      {module.dependencies.length > 0 && <p className="mt-4 text-[11px] text-[hsl(var(--muted-foreground))]">Nécessite : {module.dependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
+       {moduleDependencies.length > 0 && <p className="mt-4 text-[11px] text-[hsl(var(--muted-foreground))]">Nécessite : {moduleDependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
       {activeDependents.length > 0 && <p className="mt-2 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
       <button data-testid={`button-toggle-module-${module.id}`} onClick={() => toggleModule(module.id)} className={`mt-5 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
         {isActive ? 'Désactiver' : 'Activer'} <ChevronRight size={14} />
@@ -511,6 +567,8 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
+  const dependencyList = data.dependencies ?? [];
+  const dependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
   const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const selected = selectedId ? modules.find(module => module.id === selectedId) ?? null : null;
   const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
@@ -534,8 +592,8 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     const module = modules.find(item => item.id === moduleId);
     if (!module) return;
     const isActive = statusOf(moduleId) !== 'INACTIF';
-    const activeDependents = modules.filter(item => item.dependencies.includes(moduleId) && statusOf(item.id) !== 'INACTIF');
-    const inactiveDependencies = module.dependencies.filter(id => statusOf(id) === 'INACTIF');
+    const activeDependents = modules.filter(item => dependencyList.some(dependency => dependency.source === item.id && dependency.target === moduleId) && statusOf(item.id) !== 'INACTIF');
+    const inactiveDependencies = dependenciesFor(moduleId).filter(id => statusOf(id) === 'INACTIF');
     if (!isActive && inactiveDependencies.length > 0) {
       notify(`Activez d’abord : ${inactiveDependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}.`);
       return;
@@ -563,7 +621,8 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   if (selected) {
     const status = statusOf(selected.id);
     const isActive = status !== 'INACTIF';
-    const activeDependents = modules.filter(item => item.dependencies.includes(selected.id) && statusOf(item.id) !== 'INACTIF');
+    const moduleDependencies = dependenciesFor(selected.id);
+    const activeDependents = modules.filter(item => dependencyList.some(dependency => dependency.source === item.id && dependency.target === selected.id) && statusOf(item.id) !== 'INACTIF');
     return <div className="space-y-5">
       <button data-testid="button-back-modules" onClick={() => setSelectedId(null)} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au catalogue</button>
       <div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
@@ -576,8 +635,8 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
           <div className="mt-6 space-y-3 border-t pt-5 text-sm">
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
-            <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Dépendances</span><strong>{selected.dependencies.length || 'Aucune'}</strong></div>
-            {selected.dependencies.length > 0 && <p className="text-xs text-[hsl(var(--muted-foreground))]">Nécessite : {selected.dependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
+             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Dépendances</span><strong>{moduleDependencies.length || 'Aucune'}</strong></div>
+             {moduleDependencies.length > 0 && <p className="text-xs text-[hsl(var(--muted-foreground))]">Nécessite : {moduleDependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
             <button data-testid={`button-detail-toggle-module-${selected.id}`} onClick={() => toggleModule(selected.id)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
@@ -716,7 +775,7 @@ function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee, company
 
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppContent /></WouterRouter></TooltipProvider></QueryClientProvider>; }
 
-function AdminCreateCompanyPage({ mutate, onComplete, onCancel }: { mutate: (fn: (d: StoreData) => void, msg?: string) => void; onComplete: () => void; onCancel: () => void }) {
+function AdminCreateCompanyPage({ data, mutate, onComplete, onCancel }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onComplete: () => void; onCancel: () => void }) {
   const [name, setName] = useState('');
   const [manager, setManager] = useState('');
   const [email, setEmail] = useState('');
@@ -728,8 +787,35 @@ function AdminCreateCompanyPage({ mutate, onComplete, onCancel }: { mutate: (fn:
   const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>(['finance', 'commerce', 'stocks']);
   const [error, setError] = useState('');
+  const dependencyList = data.dependencies ?? [];
+  const dependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
 
-  const toggle = (id: ModuleId) => setSelectedModules(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]);
+  const toggle = (id: ModuleId) => {
+    setSelectedModules(previous => {
+      if (previous.includes(id)) {
+        const toRemove = new Set<ModuleId>([id]);
+        let expanded = true;
+        while (expanded) {
+          expanded = false;
+          modules.forEach(candidate => {
+            if (!toRemove.has(candidate.id) && dependenciesFor(candidate.id).some(dependency => toRemove.has(dependency)) && previous.includes(candidate.id)) {
+              toRemove.add(candidate.id);
+              expanded = true;
+            }
+          });
+        }
+        setError('');
+        return previous.filter(moduleId => !toRemove.has(moduleId));
+      }
+      const missing = dependenciesFor(id).filter(dependency => !previous.includes(dependency));
+      if (missing.length) {
+        setError(`Sélectionnez d’abord : ${missing.map(dependency => modules.find(item => item.id === dependency)?.name ?? dependency).join(', ')}.`);
+        return previous;
+      }
+      setError('');
+      return [...previous, id];
+    });
+  };
   const save = () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!name.trim() || !manager.trim() || !normalizedEmail || password.length < 8 || password !== passwordConfirm || !orgName.trim() || !orgCode.trim()) {
@@ -771,9 +857,11 @@ function AdminCreateCompanyPage({ mutate, onComplete, onCancel }: { mutate: (fn:
   </div>;
 }
 
-function CompanyModulesDetail({ company, mutate, onBack }: { company: Company; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
+function CompanyModulesDetail({ company, data, mutate, onBack }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
   const [active, setActive] = useState<ModuleId[]>(company.allowedModules);
   const [warning, setWarning] = useState('');
+  const dependencyList = data.dependencies ?? [];
+  const dependenciesFor = (moduleId: ModuleId) => dependencyList.filter(dependency => dependency.source === moduleId).map(dependency => dependency.target);
 
   useEffect(() => {
     setActive(company.allowedModules);
@@ -789,7 +877,7 @@ function CompanyModulesDetail({ company, mutate, onBack }: { company: Company; m
         while (expanded) {
           expanded = false;
           modules.forEach(candidate => {
-            if (!toRemove.has(candidate.id) && candidate.dependencies.some(dependency => toRemove.has(dependency)) && previous.includes(candidate.id)) {
+            if (!toRemove.has(candidate.id) && dependenciesFor(candidate.id).some(dependency => toRemove.has(dependency)) && previous.includes(candidate.id)) {
               toRemove.add(candidate.id);
               expanded = true;
             }
@@ -798,7 +886,7 @@ function CompanyModulesDetail({ company, mutate, onBack }: { company: Company; m
         setWarning('');
         return previous.filter(moduleId => !toRemove.has(moduleId));
       }
-      const missing = module?.dependencies.filter(dependency => !previous.includes(dependency)) ?? [];
+      const missing = module ? dependenciesFor(module.id).filter(dependency => !previous.includes(dependency)) : [];
       if (missing.length) {
         setWarning(`Autorisez d’abord : ${missing.map(dependency => modules.find(item => item.id === dependency)?.name ?? dependency).join(', ')}.`);
         return previous;
