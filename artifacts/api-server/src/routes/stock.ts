@@ -93,6 +93,7 @@ const requestInput = z.object({
 
 const idOf = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 const jsonError = (res: Parameters<IRouter["get"]>[1] extends never ? never : any, status: number, message: string) => res.status(status).json({ error: message });
+const companyIdOf = (req: any) => typeof req.query.companyId === "string" ? req.query.companyId : typeof req.body?.companyId === "string" ? req.body.companyId : COMPANY_ID;
 
 async function ensureSeed() {
   const [existing] = await db.select({ id: stockProductsTable.id }).from(stockProductsTable).where(eq(stockProductsTable.companyId, COMPANY_ID)).limit(1);
@@ -172,13 +173,14 @@ router.post("/stock/products", async (req, res): Promise<void> => {
 router.patch("/stock/products/:id", async (req, res): Promise<void> => {
   const parsed = productInput.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const [product] = await db.update(stockProductsTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(stockProductsTable.id, req.params.id)).returning();
+  const { companyId: _companyId, ...changes } = parsed.data;
+  const [product] = await db.update(stockProductsTable).set({ ...changes, updatedAt: new Date() }).where(and(eq(stockProductsTable.id, req.params.id), eq(stockProductsTable.companyId, companyIdOf(req)))).returning();
   if (!product) { res.status(404).json({ error: "Produit introuvable" }); return; }
   res.json(product);
 });
 
 router.delete("/stock/products/:id", async (req, res): Promise<void> => {
-  const [product] = await db.update(stockProductsTable).set({ archived: true, updatedAt: new Date() }).where(eq(stockProductsTable.id, req.params.id)).returning();
+  const [product] = await db.update(stockProductsTable).set({ archived: true, updatedAt: new Date() }).where(and(eq(stockProductsTable.id, req.params.id), eq(stockProductsTable.companyId, companyIdOf(req)))).returning();
   if (!product) { res.status(404).json({ error: "Produit introuvable" }); return; }
   res.json(product);
 });
@@ -194,7 +196,8 @@ router.post("/stock/suppliers", async (req, res): Promise<void> => {
 router.patch("/stock/suppliers/:id", async (req, res): Promise<void> => {
   const parsed = supplierInput.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const [supplier] = await db.update(stockSuppliersTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(stockSuppliersTable.id, req.params.id)).returning();
+  const { companyId: _companyId, ...changes } = parsed.data;
+  const [supplier] = await db.update(stockSuppliersTable).set({ ...changes, updatedAt: new Date() }).where(and(eq(stockSuppliersTable.id, req.params.id), eq(stockSuppliersTable.companyId, companyIdOf(req)))).returning();
   if (!supplier) { res.status(404).json({ error: "Fournisseur introuvable" }); return; }
   res.json(supplier);
 });
@@ -210,13 +213,14 @@ router.post("/stock/warehouses", async (req, res): Promise<void> => {
 router.patch("/stock/warehouses/:id", async (req, res): Promise<void> => {
   const parsed = warehouseInput.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const [warehouse] = await db.update(stockWarehousesTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(stockWarehousesTable.id, req.params.id)).returning();
+  const { companyId: _companyId, ...changes } = parsed.data;
+  const [warehouse] = await db.update(stockWarehousesTable).set({ ...changes, updatedAt: new Date() }).where(and(eq(stockWarehousesTable.id, req.params.id), eq(stockWarehousesTable.companyId, companyIdOf(req)))).returning();
   if (!warehouse) { res.status(404).json({ error: "Entrepôt introuvable" }); return; }
   res.json(warehouse);
 });
 
 router.delete("/stock/warehouses/:id", async (req, res): Promise<void> => {
-  const [warehouse] = await db.update(stockWarehousesTable).set({ archived: true, updatedAt: new Date() }).where(eq(stockWarehousesTable.id, req.params.id)).returning();
+  const [warehouse] = await db.update(stockWarehousesTable).set({ archived: true, updatedAt: new Date() }).where(and(eq(stockWarehousesTable.id, req.params.id), eq(stockWarehousesTable.companyId, companyIdOf(req)))).returning();
   if (!warehouse) { res.status(404).json({ error: "Entrepôt introuvable" }); return; }
   res.json(warehouse);
 });
@@ -224,6 +228,8 @@ router.delete("/stock/warehouses/:id", async (req, res): Promise<void> => {
 router.post("/stock/warehouses/:warehouseId/locations", async (req, res): Promise<void> => {
   const parsed = z.object({ companyId: z.string().default(COMPANY_ID), name: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+  const [warehouse] = await db.select({ id: stockWarehousesTable.id }).from(stockWarehousesTable).where(and(eq(stockWarehousesTable.id, req.params.warehouseId), eq(stockWarehousesTable.companyId, parsed.data.companyId))).limit(1);
+  if (!warehouse) { res.status(404).json({ error: "Entrepôt introuvable" }); return; }
   const location = { id: idOf("location"), companyId: parsed.data.companyId, warehouseId: req.params.warehouseId, name: parsed.data.name, archived: false, createdAt: new Date() };
   await db.insert(stockLocationsTable).values(location);
   res.status(201).json(location);
@@ -237,6 +243,12 @@ router.post("/stock/movements", async (req, res): Promise<void> => {
     const movement = await db.transaction(async tx => {
       const [product] = await tx.select().from(stockProductsTable).where(and(eq(stockProductsTable.id, input.productId), eq(stockProductsTable.companyId, input.companyId))).limit(1);
       if (!product || product.archived) throw new Error("PRODUCT_NOT_FOUND");
+      const [warehouse] = await tx.select({ id: stockWarehousesTable.id }).from(stockWarehousesTable).where(and(eq(stockWarehousesTable.id, input.warehouseId), eq(stockWarehousesTable.companyId, input.companyId))).limit(1);
+      if (!warehouse) throw new Error("WAREHOUSE_NOT_FOUND");
+      if (input.destinationWarehouseId) {
+        const [destination] = await tx.select({ id: stockWarehousesTable.id }).from(stockWarehousesTable).where(and(eq(stockWarehousesTable.id, input.destinationWarehouseId), eq(stockWarehousesTable.companyId, input.companyId))).limit(1);
+        if (!destination) throw new Error("WAREHOUSE_NOT_FOUND");
+      }
       const signedOut = ["SORTIE", "VENTE", "AJUSTEMENT-", "PERTE", "RETOUR FOURNISSEUR"].includes(input.type);
       const isTransfer = input.type === "TRANSFERT";
       if (isTransfer && !input.destinationWarehouseId) throw new Error("DESTINATION_REQUIRED");
@@ -270,7 +282,7 @@ router.post("/stock/requests", async (req, res): Promise<void> => {
 router.patch("/stock/requests/:id/status", async (req, res): Promise<void> => {
   const parsed = z.object({ status: z.enum(["EN ATTENTE", "APPROUVÉE", "REJETÉE"]) }).safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const [request] = await db.update(stockRequestsTable).set({ status: parsed.data.status, updatedAt: new Date() }).where(and(eq(stockRequestsTable.id, req.params.id), eq(stockRequestsTable.companyId, COMPANY_ID))).returning();
+   const [request] = await db.update(stockRequestsTable).set({ status: parsed.data.status, updatedAt: new Date() }).where(and(eq(stockRequestsTable.id, req.params.id), eq(stockRequestsTable.companyId, companyIdOf(req)))).returning();
   if (!request) { res.status(404).json({ error: "Demande introuvable" }); return; }
   res.json(request);
 });
@@ -281,6 +293,8 @@ router.post("/stock/inventories", async (req, res): Promise<void> => {
   const input = parsed.data;
   const inventory = await db.transaction(async tx => {
     const id = idOf("inventory");
+    const [warehouse] = await tx.select({ id: stockWarehousesTable.id }).from(stockWarehousesTable).where(and(eq(stockWarehousesTable.id, input.warehouseId), eq(stockWarehousesTable.companyId, input.companyId))).limit(1);
+    if (!warehouse) throw new Error("WAREHOUSE_NOT_FOUND");
     const [created] = await tx.insert(stockInventoriesTable).values({ id, companyId: input.companyId, warehouseId: input.warehouseId, notes: input.notes, createdBy: input.createdBy }).returning();
     const products = await tx.select().from(stockProductsTable).where(eq(stockProductsTable.companyId, input.companyId));
     for (const line of input.lines) {
@@ -300,6 +314,8 @@ router.post("/stock/inventories/:id/validate", async (req, res): Promise<void> =
     const inventory = await db.transaction(async tx => {
       const [current] = await tx.select().from(stockInventoriesTable).where(eq(stockInventoriesTable.id, req.params.id)).limit(1);
       if (!current) throw new Error("INVENTORY_NOT_FOUND");
+      const requestedCompanyId = companyIdOf(req);
+      if (requestedCompanyId !== current.companyId) throw new Error("INVENTORY_NOT_FOUND");
       if (current.status === "VALIDÉ") return current;
       const lines = await tx.select().from(stockInventoryLinesTable).where(eq(stockInventoryLinesTable.inventoryId, current.id));
       for (const line of lines) {
