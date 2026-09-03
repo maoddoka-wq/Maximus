@@ -16,10 +16,9 @@ export type ModuleId =
   | 'rapports';
 
 export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; }
-export interface Module { id: ModuleId; name: string; description: string; features: string[]; status: 'ACTIF' | 'BETA'; dependencies: ModuleId[]; }
+export interface Module { id: ModuleId; name: string; description: string; features: string[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
-export interface Dependency { source: ModuleId; target: ModuleId; reason: string; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
@@ -36,36 +35,25 @@ export interface CrmOpportunity { id: string; client: string; contact: string; s
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; dependencies: Dependency[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
 export const modules: Module[] = [
-  { id: 'commerce', name: 'Gestion commerciale', description: 'Ventes, clients et performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], status: 'ACTIF', dependencies: ['stocks'] },
-  { id: 'ventes', name: 'Ventes', description: 'Devis, commandes, factures et paiements clients.', features: ['Devis', 'Commandes', 'Facturation'], status: 'ACTIF', dependencies: ['stocks'] },
-  { id: 'achats', name: 'Achats', description: 'Demandes, commandes et suivi des achats.', features: ['Demandes d’achat', 'Commandes fournisseurs', 'Réceptions'], status: 'ACTIF', dependencies: ['fournisseurs'] },
-  { id: 'stocks', name: 'Gestion de stock', description: 'Articles, entrées, sorties et niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], status: 'ACTIF', dependencies: [] },
-  { id: 'finance', name: 'Finance', description: 'Trésorerie, paiements et pilotage financier.', features: ['Suivi des paiements', 'Trésorerie', 'Rapports financiers'], status: 'ACTIF', dependencies: [] },
-  { id: 'comptabilite', name: 'Comptabilité', description: 'Écritures, rapprochements et clôture comptable.', features: ['Plan comptable', 'Journaux', 'Rapprochement'], status: 'ACTIF', dependencies: ['finance'] },
-  { id: 'rh', name: 'Ressources humaines', description: 'Collaborateurs, rôles et organisation.', features: ['Employés', 'Rôles', 'Organisation'], status: 'ACTIF', dependencies: [] },
-  { id: 'presences', name: 'Présences', description: 'Présences et suivi quotidien des équipes.', features: ['Pointage', 'Historique', 'Rapports'], status: 'ACTIF', dependencies: ['rh'] },
-  { id: 'paie', name: 'Paie', description: 'Préparation et suivi des bulletins de salaire.', features: ['Périodes de paie', 'Bulletins', 'Déclarations'], status: 'ACTIF', dependencies: ['rh', 'presences'] },
-  { id: 'crm', name: 'CRM / Clients', description: 'Fiches clients, opportunités et relances.', features: ['Fiches clients', 'Opportunités', 'Relances'], status: 'ACTIF', dependencies: ['commerce'] },
-  { id: 'fournisseurs', name: 'Fournisseurs', description: 'Référentiel et relations fournisseurs.', features: ['Référentiel', 'Évaluation', 'Historique'], status: 'ACTIF', dependencies: [] },
-  { id: 'logistique', name: 'Logistique', description: 'Entrepôts, livraisons et transport.', features: ['Entrepôts', 'Livraisons', 'Transport'], status: 'ACTIF', dependencies: ['stocks'] },
-  { id: 'documents', name: 'Documents', description: 'Classement et circulation des documents métier.', features: ['Classement', 'Partage', 'Versions'], status: 'ACTIF', dependencies: [] },
-  { id: 'rapports', name: 'Rapports', description: 'Synthèses et indicateurs pour décider plus vite.', features: ['Rapports métier', 'Filtres', 'Exports'], status: 'ACTIF', dependencies: [] },
-];
-export const dependencies: Dependency[] = [
-  { source: 'commerce', target: 'stocks', reason: 'Les ventes décrémentent automatiquement les stocks.' },
-  { source: 'ventes', target: 'stocks', reason: 'Une vente validée réserve et décrémente les quantités disponibles.' },
-  { source: 'achats', target: 'fournisseurs', reason: 'Chaque commande d’achat doit être rattachée à un fournisseur.' },
-  { source: 'comptabilite', target: 'finance', reason: 'Les écritures comptables s’appuient sur les flux financiers.' },
-  { source: 'presences', target: 'rh', reason: 'Les présences sont rattachées aux employés actifs.' },
-  { source: 'paie', target: 'rh', reason: 'La paie utilise les contrats et les données collaborateurs.' },
-  { source: 'paie', target: 'presences', reason: 'Les absences et présences alimentent les variables de paie.' },
-  { source: 'crm', target: 'commerce', reason: 'Le CRM partage le référentiel client avec le commerce.' },
-  { source: 'logistique', target: 'stocks', reason: 'Les livraisons et transferts utilisent les stocks.' },
+  { id: 'commerce', name: 'Gestion commerciale', description: 'Ventes, clients et performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], status: 'ACTIF' },
+  { id: 'ventes', name: 'Ventes', description: 'Devis, commandes, factures et paiements clients.', features: ['Devis', 'Commandes', 'Facturation'], status: 'ACTIF' },
+  { id: 'achats', name: 'Achats', description: 'Demandes, commandes et suivi des achats.', features: ['Demandes d’achat', 'Commandes fournisseurs', 'Réceptions'], status: 'ACTIF' },
+  { id: 'stocks', name: 'Gestion de stock', description: 'Articles, entrées, sorties et niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], status: 'ACTIF' },
+  { id: 'finance', name: 'Finance', description: 'Trésorerie, paiements et pilotage financier.', features: ['Suivi des paiements', 'Trésorerie', 'Rapports financiers'], status: 'ACTIF' },
+  { id: 'comptabilite', name: 'Comptabilité', description: 'Écritures, rapprochements et clôture comptable.', features: ['Plan comptable', 'Journaux', 'Rapprochement'], status: 'ACTIF' },
+  { id: 'rh', name: 'Ressources humaines', description: 'Collaborateurs, rôles et organisation.', features: ['Employés', 'Rôles', 'Organisation'], status: 'ACTIF' },
+  { id: 'presences', name: 'Présences', description: 'Présences et suivi quotidien des équipes.', features: ['Pointage', 'Historique', 'Rapports'], status: 'ACTIF' },
+  { id: 'paie', name: 'Paie', description: 'Préparation et suivi des bulletins de salaire.', features: ['Périodes de paie', 'Bulletins', 'Déclarations'], status: 'ACTIF' },
+  { id: 'crm', name: 'CRM / Clients', description: 'Fiches clients, opportunités et relances.', features: ['Fiches clients', 'Opportunités', 'Relances'], status: 'ACTIF' },
+  { id: 'fournisseurs', name: 'Fournisseurs', description: 'Référentiel et relations fournisseurs.', features: ['Référentiel', 'Évaluation', 'Historique'], status: 'ACTIF' },
+  { id: 'logistique', name: 'Logistique', description: 'Entrepôts, livraisons et transport.', features: ['Entrepôts', 'Livraisons', 'Transport'], status: 'ACTIF' },
+  { id: 'documents', name: 'Documents', description: 'Classement et circulation des documents métier.', features: ['Classement', 'Partage', 'Versions'], status: 'ACTIF' },
+  { id: 'rapports', name: 'Rapports', description: 'Synthèses et indicateurs pour décider plus vite.', features: ['Rapports métier', 'Filtres', 'Exports'], status: 'ACTIF' },
 ];
 export const sectorPresets: SectorPreset[] = [
   { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'] },
@@ -78,7 +66,6 @@ export function seedData(): StoreData {
   return {
     catalogVersion: 2,
     organizationVersion: 3,
-    dependencies: dependencies.map(dependency => ({ ...dependency })),
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
@@ -158,7 +145,7 @@ export function loadData(): StoreData {
     if (!saved) return seedData();
     const parsed = JSON.parse(saved) as StoreData;
     const initial = seedData();
-    const { preferences: _legacyPreferences, ...storedData } = parsed as StoreData & { preferences?: unknown };
+    const { preferences: _legacyPreferences, dependencies: _legacyDependencies, ...storedData } = parsed as StoreData & { preferences?: unknown; dependencies?: unknown };
     const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
     const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
     const companies = (parsed.catalogVersion ?? 1) < 2
@@ -190,7 +177,6 @@ export function loadData(): StoreData {
       ...storedData,
       catalogVersion: 2,
       organizationVersion: 3,
-      dependencies: parsed.dependencies ?? initial.dependencies,
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
