@@ -142,12 +142,12 @@ function AppContent() {
   }
   const roleFitsEmployee = Boolean(employeeRole?.sectorId && employeeAncestry.has(employeeRole.sectorId) && employeeRole.companyId === employee?.companyId);
   const unitModules = new Set(employeeNode?.moduleIds ?? []);
-  const allowed = session === 'kora'
+  const allowed = (session === 'kora' || session.startsWith('company:'))
     ? companyAllowed
     : employeeRole && roleFitsEmployee
       ? companyAllowed.filter(moduleId => unitModules.has(moduleId) && employeeRole.modulePermissions[moduleId]?.includes('voir'))
       : [];
-  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || Boolean(roleFitsEmployee && unitModules.has(moduleId) && employeeRole?.modulePermissions[moduleId]?.includes(permission));
+  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || session.startsWith('company:') || Boolean(roleFitsEmployee && unitModules.has(moduleId) && employeeRole?.modulePermissions[moduleId]?.includes(permission));
    const canManagePeople = session === 'kora' || session.startsWith('company:');
   const currentMeta = pageMeta[location] ?? pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard'];
   return (
