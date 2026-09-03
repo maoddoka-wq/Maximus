@@ -639,24 +639,17 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
       <p className="text-sm font-semibold">{visibleModules.length} application{visibleModules.length > 1 ? 's' : ''} affichée{visibleModules.length > 1 ? 's' : ''}</p>
       <p className="text-xs text-[hsl(var(--muted-foreground))]">Cliquez sur une application pour voir ses détails et la tester.</p>
     </div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {visibleModules.map((module, index) => {
         const status = statusOf(module.id);
         const isActive = status !== 'INACTIF';
-        const activeDependents = modules.filter(item => item.dependencies.includes(module.id) && statusOf(item.id) !== 'INACTIF');
         const ModuleIcon: Icon = categoryOf(module.id) === 'Commerce' ? ShoppingCart : categoryOf(module.id) === 'Finance' ? WalletCards : categoryOf(module.id) === 'Ressources humaines' ? Users : Boxes;
-        return <section data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface flex min-h-[290px] flex-col rounded-2xl p-5 fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-70'}`}>
-          <div className="flex items-start justify-between gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><ModuleIcon size={19} /></span><StatusBadge status={status} /></div>
-          <p className="mono mt-4 text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</p>
-          <h2 className="mt-1 text-lg font-bold">{module.name}</h2>
-          <p className="mt-2 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
-          <div className="mt-4 flex flex-wrap gap-1.5">{module.features.map(feature => <span key={feature} className="rounded-full bg-[hsl(var(--muted)/.7)] px-2.5 py-1 text-[10px] font-semibold">{feature}</span>)}</div>
-          <div className="mt-auto pt-5">
-            {module.dependencies.length > 0 && <p className="mb-3 text-[11px] text-[hsl(var(--muted-foreground))]">Dépend de : {module.dependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
-            {activeDependents.length > 0 && <p className="mb-3 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
-            <div className="flex items-center justify-between gap-3 border-t pt-4"><button data-testid={`button-open-module-${module.id}`} onClick={() => setSelectedId(module.id)} className="inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Voir l’application <ChevronRight size={14} /></button><button data-testid={`button-toggle-module-${module.id}`} onClick={() => toggleModule(module.id)} className={`rounded-lg px-3 py-2 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{isActive ? 'Désactiver' : 'Activer'}</button></div>
-          </div>
-        </section>;
+        return <button type="button" data-testid={`button-open-module-${module.id}`} key={module.id} onClick={() => setSelectedId(module.id)} aria-label={`Ouvrir l’application ${module.name}`} className={`card-surface group relative flex min-h-[150px] flex-col items-center justify-center rounded-2xl p-4 text-center transition hover:-translate-y-1 hover:border-[hsl(var(--primary)/.45)] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-65'}`}>
+          <span className={`absolute right-3 top-3 h-2 w-2 rounded-full ${isActive ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.45)]'}`} title={isActive ? 'Application active' : 'Application inactive'} />
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))] transition group-hover:scale-105"><ModuleIcon size={25} /></span>
+          <span className="mt-4 line-clamp-2 text-sm font-bold leading-5">{module.name}</span>
+          <span className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</span>
+        </button>;
       })}
       {visibleModules.length === 0 && <div className="card-surface col-span-full rounded-2xl p-10 text-center"><Package className="mx-auto text-[hsl(var(--muted-foreground))]" size={28} /><h2 className="mt-4 font-bold">Aucune application trouvée</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Modifiez votre recherche ou réinitialisez les filtres.</p><button type="button" onClick={() => { setQuery(''); setCategory('Toutes'); setStatusFilter('TOUTES'); }} className="mt-4 text-xs font-bold text-[hsl(var(--primary))]">Réinitialiser les filtres</button></div>}
     </div>
