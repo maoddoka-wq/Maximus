@@ -90,6 +90,7 @@ function AppContent() {
   useEffect(() => saveData(data), [data]);
   useEffect(() => { localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { if (!toast) return undefined; const timer = window.setTimeout(() => setToast(''), 3000); return () => window.clearTimeout(timer); }, [toast]);
+  useEffect(() => { const syncData = () => setData(loadData()); window.addEventListener('storage', syncData); return () => window.removeEventListener('storage', syncData); }, []);
 
   const mutate = (fn: (draft: StoreData) => void, message?: string) => {
     setData(prev => { const next = structuredClone(prev) as StoreData; fn(next); return next; });
@@ -122,7 +123,7 @@ function AppContent() {
   const logout = () => { setSession(null); localStorage.removeItem('maximus-session'); setLocation('/'); };
   const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
 
-  if (location === '/inscription') return <Signup onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
+  if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} /> : <Signup onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
   const loginEmployees = [...data.employees, ...data.companies.filter(company => company.status === 'ACTIF' && company.adminPassword).map(company => ({ id: `company-admin:${company.id}`, firstName: company.manager.split(' ')[0] ?? company.name, lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur', email: company.email, phone: company.phone, position: 'Administrateur', department: '', subDepartment: '', role: 'Administrateur entreprise', status: 'ACTIF' as const, loginPassword: company.adminPassword, companyId: company.id }))];
   if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
@@ -576,6 +577,55 @@ function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee }: { dat
 }
 
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppContent /></WouterRouter></TooltipProvider></QueryClientProvider>; }
+
+function AdminCreateCompanyPage({ mutate, onComplete }: { mutate: (fn: (d: StoreData) => void, msg?: string) => void; onComplete: () => void }) {
+  const [name, setName] = useState('');
+  const [manager, setManager] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [sector, setSector] = useState('Distribution');
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>(['finance', 'commerce', 'stocks']);
+  const [error, setError] = useState('');
+
+  const toggle = (id: ModuleId) => setSelectedModules(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id]);
+  const save = () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!name.trim() || !manager.trim() || !normalizedEmail || password.length < 8 || password !== passwordConfirm) {
+      setError('Complétez tous les champs obligatoires et vérifiez le mot de passe.');
+      return;
+    }
+    if (selectedModules.length === 0) {
+      setError('Sélectionnez au moins un module.');
+      return;
+    }
+    if (loadData().companies.some(company => company.email.toLowerCase() === normalizedEmail)) {
+      setError('Une entreprise utilise déjà cette adresse email.');
+      return;
+    }
+    mutate(draft => {
+      draft.companies.push({ id: uid('company'), name: name.trim(), manager: manager.trim(), email: normalizedEmail, adminPassword: password, phone: '', country: 'Sénégal', sector, status: 'ACTIF', requestedModules: [...selectedModules], allowedModules: [...selectedModules], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) });
+    }, 'Entreprise créée et activée.');
+    onComplete();
+  };
+
+  return <div className="mx-auto max-w-3xl">
+    <section className="card-surface rounded-2xl p-6 sm:p-8">
+      <div className="mb-8"><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Création administrative</p><h2 className="mt-3 text-2xl font-bold">Nouvelle entreprise</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Cette entreprise sera active immédiatement et ne passera pas par les demandes en attente.</p></div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Nom de l’entreprise" value={name} onChange={setName} placeholder="Ex. Teranga Agro" testId="input-admin-company-name" />
+        <Field label="Responsable" value={manager} onChange={setManager} placeholder="Prénom Nom" testId="input-admin-company-manager" />
+        <Field label="Email administrateur" value={email} onChange={setEmail} type="email" placeholder="admin@entreprise.com" testId="input-admin-company-email" />
+        <label className="block text-sm font-semibold">Secteur<select data-testid="select-admin-company-sector" value={sector} onChange={event => setSector(event.target.value)} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"><option>Distribution</option><option>Agroalimentaire</option><option>Services</option><option>Commerce</option></select></label>
+        <Field label="Mot de passe administrateur" value={password} onChange={setPassword} type="password" placeholder="Au moins 8 caractères" testId="input-admin-company-password" />
+        <Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-admin-company-password-confirm" />
+      </div>
+      <div className="mt-8 border-t pt-6"><h3 className="font-bold">Modules autorisés</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ces modules seront accessibles dès la première connexion.</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{modules.map(module => <button type="button" data-testid={`button-admin-module-${module.id}`} key={module.id} onClick={() => toggle(module.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(module.id) && <Check size={13} />}</span><span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{module.description}</span></span></button>)}</div></div>
+      {error && <p data-testid="admin-create-error" className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+      <div className="mt-8 flex justify-end gap-3"><button data-testid="button-cancel-admin-company" onClick={() => onComplete()} className="rounded-lg border px-5 py-3 text-sm font-bold">Annuler</button><button data-testid="button-save-admin-company" onClick={save} className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Créer l’entreprise</button></div>
+    </section>
+  </div>;
+}
 
 function CompanyModulesDetail({ company, mutate, onBack }: { company: Company; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
   const [active, setActive] = useState<ModuleId[]>(company.allowedModules);
