@@ -187,7 +187,7 @@ function AdminRouter({ location, data, mutate, notify, onNavigate }: { location:
   if (location === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
   if (location === '/maximus/entreprises' || location === '/maximus/entreprises/kora') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={location.endsWith('/kora')} />;
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  if (location === '/maximus/modules') return <ManageableModulesPage data={data} mutate={mutate} notify={notify} />;
+  if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
   if (location === '/maximus/dependances') return <DependenciesPage />;
   if (location === '/maximus/utilisateurs') return <SimpleAdminPage type="users" data={data} />;
   if (location === '/maximus/roles') return <RolesPage data={data} mutate={mutate} />;
@@ -328,6 +328,124 @@ function ManageableModulesPage({ data, mutate, notify }: { data: StoreData; muta
       </button>
     </section>;
   })}</div>;
+}
+
+function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void }) {
+  const [selectedId, setSelectedId] = useState<ModuleId | null>(null);
+  const [testMode, setTestMode] = useState(false);
+  const [tests, setTests] = useState<Record<string, boolean>>({});
+  const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const selected = selectedId ? modules.find(module => module.id === selectedId) ?? null : null;
+
+  const toggleModule = (moduleId: ModuleId) => {
+    const module = modules.find(item => item.id === moduleId);
+    if (!module) return;
+    const isActive = statusOf(moduleId) !== 'INACTIF';
+    const activeDependents = modules.filter(item => item.dependencies.includes(moduleId) && statusOf(item.id) !== 'INACTIF');
+    const inactiveDependencies = module.dependencies.filter(id => statusOf(id) === 'INACTIF');
+    if (!isActive && inactiveDependencies.length > 0) {
+      notify(`Activez d’abord : ${inactiveDependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}.`);
+      return;
+    }
+    if (isActive && activeDependents.length > 0) {
+      notify(`Désactivez d’abord : ${activeDependents.map(item => item.name).join(', ')}.`);
+      return;
+    }
+    mutate(draft => {
+      draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [moduleId]: isActive ? 'INACTIF' : 'ACTIF' };
+      if (isActive) draft.companies.forEach(company => { company.allowedModules = company.allowedModules.filter(id => id !== moduleId); });
+    }, isActive ? `${module.name} a été désactivé pour tous les espaces.` : `${module.name} est maintenant actif.`);
+  };
+
+  const runFeatureTest = (moduleId: ModuleId, feature: string) => {
+    const key = `${moduleId}:${feature}`;
+    setTests(previous => ({ ...previous, [key]: true }));
+    notify(`Test réussi : ${feature}.`);
+  };
+
+  if (selected && testMode) {
+    return <ModuleTestWorkbench module={selected} data={data} mutate={mutate} onBack={() => setTestMode(false)} />;
+  }
+
+  if (selected) {
+    const status = statusOf(selected.id);
+    const isActive = status !== 'INACTIF';
+    const activeDependents = modules.filter(item => item.dependencies.includes(selected.id) && statusOf(item.id) !== 'INACTIF');
+    return <div className="space-y-5">
+      <button data-testid="button-back-modules" onClick={() => setSelectedId(null)} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au catalogue</button>
+      <div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
+        <section className="card-surface rounded-2xl p-6">
+          <div className="flex items-start justify-between gap-4">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={21} /></span>
+            <StatusBadge status={status} />
+          </div>
+          <h2 className="mt-6 text-2xl font-bold">{selected.name}</h2>
+          <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
+          <div className="mt-6 space-y-3 border-t pt-5 text-sm">
+            <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
+            <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Dépendances</span><strong>{selected.dependencies.length || 'Aucune'}</strong></div>
+            {selected.dependencies.length > 0 && <p className="text-xs text-[hsl(var(--muted-foreground))]">Nécessite : {selected.dependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
+          </div>
+          <div className="mt-7 flex flex-wrap gap-2">
+            <button data-testid={`button-detail-toggle-module-${selected.id}`} onClick={() => toggleModule(selected.id)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
+              {isActive ? 'Désactiver le module' : 'Activer le module'} <ChevronRight size={14} />
+            </button>
+            <button data-testid={`button-open-live-test-${selected.id}`} onClick={() => setTestMode(true)} className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.35)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary))]">
+              Ouvrir l’espace de test <ChevronRight size={14} />
+            </button>
+          </div>
+          {activeDependents.length > 0 && <p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
+        </section>
+        <section className="card-surface rounded-2xl p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Banc de test</p><h2 className="mt-2 text-xl font-bold">Tester les fonctionnalités</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Lancez chaque scénario depuis l’administration avant de l’autoriser pour un espace.</p></div>
+            <Check size={19} className="text-[hsl(var(--primary))]" />
+          </div>
+          <div className="mt-6 space-y-3">{selected.features.map(feature => {
+            const tested = tests[`${selected.id}:${feature}`];
+            return <div data-testid={`row-feature-${selected.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} key={feature} className="flex items-center justify-between gap-4 rounded-xl border p-4">
+              <div className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${tested ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{tested ? <Check size={15} /> : <LayoutGrid size={15} />}</span><span className="text-sm font-semibold">{feature}</span></div>
+              <button data-testid={`button-test-feature-${selected.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} onClick={() => runFeatureTest(selected.id, feature)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${tested ? 'border border-[hsl(var(--primary)/.3)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{tested ? 'Test réussi' : 'Tester'}</button>
+            </div>;
+          })}</div>
+        </section>
+      </div>
+    </div>;
+  }
+
+  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map((module, index) => {
+    const status = statusOf(module.id);
+    const isActive = status !== 'INACTIF';
+    const activeDependents = modules.filter(item => item.dependencies.includes(module.id) && statusOf(item.id) !== 'INACTIF');
+    return <section data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-70'}`}>
+      <div className="flex items-start justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={19} /></span><StatusBadge status={status} /></div>
+      <h2 className="mt-5 text-lg font-bold">{module.name}</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{module.description}</p>
+      <div className="mt-5 space-y-2 border-t pt-4">{module.features.map(feature => <div key={feature} className="flex items-center gap-2 text-xs"><Check size={14} className="text-[hsl(var(--primary))]" />{feature}</div>)}</div>
+      <div className="mt-5 flex items-center justify-between gap-3"><button data-testid={`button-open-module-${module.id}`} onClick={() => setSelectedId(module.id)} className="inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Ouvrir le module <ChevronRight size={14} /></button><button data-testid={`button-toggle-module-${module.id}`} onClick={() => toggleModule(module.id)} className={`rounded-lg px-3 py-2 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{isActive ? 'Désactiver' : 'Activer'}</button></div>
+      {activeDependents.length > 0 && <p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
+    </section>;
+  })}</div>;
+}
+
+function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof modules)[number]; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
+  const liveModule = ['stocks', 'commerce', 'ventes', 'finance', 'rh', 'presences'].includes(module.id);
+  return <div data-testid="module-workbench" className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <button data-testid="button-back-live-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
+      <span className="rounded-full bg-[hsl(var(--accent)/.2)] px-3 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))]">MODE TEST ADMINISTRATION</span>
+    </div>
+    <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-5">
+      <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Espace de test</p>
+      <h1 className="mt-2 text-2xl font-bold">{module.name}</h1>
+      <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Les actions effectuées ici utilisent les mêmes écrans et données que l’espace entreprise. Elles servent à valider le module avant son activation.</p>
+    </section>
+    {module.id === 'stocks' && <StockModulePage />}
+    {(module.id === 'commerce' || module.id === 'ventes') && <CommercePage data={data} mutate={mutate} />}
+    {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
+    {module.id === 'rh' && <EmployeesPage data={data} mutate={mutate} companyAdmin sectorAdminDepartment={undefined} />}
+    {module.id === 'presences' && <PresencesPage data={data} />}
+    {!liveModule && <section className="card-surface rounded-2xl p-6"><h2 className="text-lg font-bold">Fonctionnalités disponibles</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Ce module est référencé dans le catalogue. Son écran métier n’est pas encore connecté à l’administration.</p><div className="mt-5 grid gap-3 sm:grid-cols-2">{module.features.map(feature => <div data-testid={`test-placeholder-${module.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} key={feature} className="rounded-xl border p-4 text-sm font-semibold">{feature}<span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">En préparation</span></div>)}</div></section>}
+  </div>;
 }
 
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppContent /></WouterRouter></TooltipProvider></QueryClientProvider>; }
