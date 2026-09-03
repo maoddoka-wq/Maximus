@@ -30,6 +30,7 @@ const adminNav = [
 ];
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
+  { href: '/kora/organisation', label: 'Organisation de l’entreprise', icon: GitBranch, module: null, adminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
   { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
@@ -199,7 +200,7 @@ function Field({ label, value, onChange, placeholder, type = 'text', testId }: {
 
 function Sidebar({ session, location, allowed, canManagePeople, onLogout, employee, mobileOpen, onClose }: { session: Session; location: string; allowed: ModuleId[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; mobileOpen: boolean; onClose: () => void }) {
   const isAdmin = session === 'admin';
-  const nav = isAdmin ? adminNav : koraNav.filter(item => item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople));
+  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || session === 'kora') && (item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople)));
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : 'KD';
   return <><button aria-label="Fermer le menu" data-testid="button-close-mobile-menu" onClick={onClose} className={`fixed inset-0 z-40 bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm md:hidden ${mobileOpen ? 'block' : 'hidden'}`} /><aside className={`sidebar shrink-0 flex-col md:relative md:flex md:w-64 ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}><div className="flex items-center justify-between px-6 py-6"><Brand inverse homeHref={isAdmin ? '/maximus/dashboard' : '/kora/dashboard'} /><button aria-label="Fermer le menu" data-testid="button-close-mobile-menu-inner" onClick={onClose} className="rounded-lg p-2 text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:hidden"><X size={18} /></button></div><div className="mx-4 mb-5 rounded-xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent))] p-3"><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)]">{isAdmin ? 'Administration' : employee ? 'Accès employé' : 'Espace entreprise'}</p><div className="mt-2 flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.18)] text-xs font-bold text-[hsl(var(--accent))]">{isAdmin ? 'MX' : initials}</span><div><p className="text-sm font-bold">{isAdmin ? 'MAXIMUS' : 'KORA Distribution'}</p><p className="text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">{isAdmin ? 'Centre de contrôle' : employee?.role ?? 'Dakar, Sénégal'}</p></div></div></div><nav className="flex-1 space-y-1 px-3">{nav.map(item => <Link data-testid={`link-nav-${item.href.split('/').pop()}`} onClick={onClose} key={item.href} href={item.href} className={`nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${location === item.href ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`}><item.icon size={17} strokeWidth={location === item.href ? 2.5 : 1.8} />{item.label}</Link>)}</nav><div className="m-4 border-t border-[hsl(var(--sidebar-border))] pt-4"><button data-testid="button-logout" onClick={onLogout} className="nav-item flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[hsl(var(--sidebar-foreground)/.64)]"><LogIn size={17} className="rotate-180" />Se déconnecter</button></div></aside></>;
 }
@@ -237,6 +238,10 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   const requiredModule = routeModules[location];
   if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
   if (location === '/kora/dashboard') return <KoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
+  if (location === '/kora/organisation') {
+    const company = data.companies.find(item => item.id === 'kora');
+    return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="La structure de l’entreprise est gérée depuis le compte administrateur KORA." action={() => onNavigate('/kora/dashboard')} />;
+  }
   if (location === '/kora/stocks') return <StockModulePage />;
   if (location === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
   if (location === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
