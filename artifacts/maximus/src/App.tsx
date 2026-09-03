@@ -219,7 +219,8 @@ function PageHeader({ kicker, title, description, location }: { kicker: string; 
 function AdminRouter({ location, data, mutate, notify, onNavigate }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void; onNavigate: (path: string) => void }) {
   if (location === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
   if (location === '/maximus/entreprises/organisation') return <OrganizationAdminPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  if (location === '/maximus/entreprises' || location === '/maximus/entreprises/kora') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={location.endsWith('/kora')} />;
+  if (location === '/maximus/entreprises/kora') { const company = data.companies.find(item => item.id === 'kora'); return company ? <CompanyModulesDetail company={company} mutate={mutate} onBack={() => onNavigate('/maximus/entreprises')} /> : <EmptyState title="Entreprise introuvable" text="L’espace KORA est introuvable." action={() => onNavigate('/maximus/entreprises')} />; }
+  if (location === '/maximus/entreprises') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={false} />;
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
   if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
   if (location === '/maximus/dependances') return <DependenciesPage />;
