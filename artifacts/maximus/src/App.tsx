@@ -247,7 +247,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
     const company = data.companies.find(item => item.id === 'kora');
     return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="La structure de l’entreprise est gérée depuis le compte administrateur KORA." action={() => onNavigate('/kora/dashboard')} />;
   }
-  if (location === '/kora/stocks') return <StockModulePage />;
+  if (location === '/kora/stocks') return <StockModulePage companyUsers={data.employees.filter(employee => employee.companyId === 'kora')} companyServices={data.orgNodes.filter(node => node.companyId === 'kora' && node.type === 'service')} />;
   if (location === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
   if (location === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
   if (location === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;

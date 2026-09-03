@@ -10,6 +10,7 @@ import {
   stockLocationsTable,
   stockMovementsTable,
   stockProductsTable,
+  stockRequestsTable,
   stockSuppliersTable,
   stockWarehousesTable,
 } from "@workspace/db";
@@ -57,9 +58,12 @@ const supplierInput = z.object({
 const movementInput = z.object({
   companyId: z.string().default(COMPANY_ID),
   productId: z.string().min(1),
+  supplierId: z.string().nullable().optional(),
   warehouseId: z.string().min(1),
   destinationWarehouseId: z.string().nullable().optional(),
   locationId: z.string().nullable().optional(),
+  requesterService: z.string().nullable().optional(),
+  beneficiary: z.string().nullable().optional(),
   type: z.enum(movementTypes),
   quantity: z.coerce.number().int().positive(),
   purchasePrice: z.coerce.number().int().nonnegative().default(0),
@@ -75,6 +79,15 @@ const inventoryInput = z.object({
   warehouseId: z.string().min(1),
   notes: z.string().default(""),
   lines: z.array(z.object({ productId: z.string(), actualQuantity: z.coerce.number().int().nonnegative() })).min(1),
+  createdBy: z.string().default("Utilisateur MAXIMUS"),
+});
+
+const requestInput = z.object({
+  companyId: z.string().default(COMPANY_ID),
+  productId: z.string().min(1),
+  warehouseId: z.string().min(1),
+  quantity: z.coerce.number().int().positive(),
+  reason: z.string().min(1),
   createdBy: z.string().default("Utilisateur MAXIMUS"),
 });
 
@@ -113,17 +126,18 @@ async function ensureSeed() {
 }
 
 async function getBootstrap(companyId: string) {
-  const [products, warehouses, locations, suppliers, balances, movements, inventories] = await Promise.all([
+  const [products, warehouses, locations, suppliers, balances, movements, requests, inventories] = await Promise.all([
     db.select().from(stockProductsTable).where(eq(stockProductsTable.companyId, companyId)).orderBy(asc(stockProductsTable.name)),
     db.select().from(stockWarehousesTable).where(eq(stockWarehousesTable.companyId, companyId)).orderBy(asc(stockWarehousesTable.name)),
     db.select().from(stockLocationsTable).where(eq(stockLocationsTable.companyId, companyId)).orderBy(asc(stockLocationsTable.name)),
     db.select().from(stockSuppliersTable).where(eq(stockSuppliersTable.companyId, companyId)).orderBy(asc(stockSuppliersTable.name)),
     db.select().from(stockBalancesTable).where(eq(stockBalancesTable.companyId, companyId)),
     db.select().from(stockMovementsTable).where(eq(stockMovementsTable.companyId, companyId)).orderBy(desc(stockMovementsTable.movementDate)).limit(250),
+    db.select().from(stockRequestsTable).where(eq(stockRequestsTable.companyId, companyId)).orderBy(desc(stockRequestsTable.createdAt)),
     db.select().from(stockInventoriesTable).where(eq(stockInventoriesTable.companyId, companyId)).orderBy(desc(stockInventoriesTable.inventoryDate)),
   ]);
   const inventoryLines = inventories.length ? await db.select().from(stockInventoryLinesTable).where(sql`${stockInventoryLinesTable.inventoryId} in (${sql.join(inventories.map(i => sql`${i.id}`), sql`, `)})`) : [];
-  return { products, warehouses, locations, suppliers, balances, movements, inventories, inventoryLines };
+  return { products, warehouses, locations, suppliers, balances, movements, requests, inventories, inventoryLines };
 }
 
 async function updateBalance(tx: any, companyId: string, productId: string, warehouseId: string, locationId: string | null | undefined, delta: number) {
@@ -243,6 +257,22 @@ router.post("/stock/movements", async (req, res): Promise<void> => {
     const status = message === "STOCK_INSUFFICIENT" ? 409 : 400;
     res.status(status).json({ error: message === "STOCK_INSUFFICIENT" ? "Stock insuffisant : le stock négatif est interdit." : message });
   }
+});
+
+router.post("/stock/requests", async (req, res): Promise<void> => {
+  const parsed = requestInput.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+  const request = { id: idOf("stock-request"), ...parsed.data, status: "EN ATTENTE", createdAt: new Date(), updatedAt: new Date() };
+  await db.insert(stockRequestsTable).values(request);
+  res.status(201).json(request);
+});
+
+router.patch("/stock/requests/:id/status", async (req, res): Promise<void> => {
+  const parsed = z.object({ status: z.enum(["EN ATTENTE", "APPROUVÉE", "REJETÉE"]) }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+  const [request] = await db.update(stockRequestsTable).set({ status: parsed.data.status, updatedAt: new Date() }).where(and(eq(stockRequestsTable.id, req.params.id), eq(stockRequestsTable.companyId, COMPANY_ID))).returning();
+  if (!request) { res.status(404).json({ error: "Demande introuvable" }); return; }
+  res.json(request);
 });
 
 router.post("/stock/inventories", async (req, res): Promise<void> => {

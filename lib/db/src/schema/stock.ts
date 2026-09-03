@@ -63,6 +63,7 @@ export const stockBalancesTable = pgTable("stock_balances", {
   id: id("id"),
   companyId: text("company_id").notNull(),
   productId: text("product_id").notNull(),
+  supplierId: text("supplier_id"),
   warehouseId: text("warehouse_id").notNull(),
   locationId: text("location_id"),
   quantity: integer("quantity").notNull().default(0),
@@ -73,9 +74,12 @@ export const stockMovementsTable = pgTable("stock_movements", {
   id: id("id"),
   companyId: text("company_id").notNull(),
   productId: text("product_id").notNull(),
+  supplierId: text("supplier_id"),
   warehouseId: text("warehouse_id").notNull(),
   destinationWarehouseId: text("destination_warehouse_id"),
   locationId: text("location_id"),
+  requesterService: text("requester_service"),
+  beneficiary: text("beneficiary"),
   type: text("type").notNull(),
   quantity: integer("quantity").notNull(),
   purchasePrice: integer("purchase_price").notNull().default(0),
@@ -86,6 +90,19 @@ export const stockMovementsTable = pgTable("stock_movements", {
   comment: text("comment").notNull().default(""),
   status: text("status").notNull().default("VALIDÉ"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const stockRequestsTable = pgTable("stock_requests", {
+  id: id("id"),
+  companyId: text("company_id").notNull(),
+  productId: text("product_id").notNull(),
+  warehouseId: text("warehouse_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  reason: text("reason").notNull().default(""),
+  status: text("status").notNull().default("EN ATTENTE"),
+  createdBy: text("created_by").notNull().default("Utilisateur MAXIMUS"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const stockInventoriesTable = pgTable("stock_inventories", {
@@ -125,3 +142,4 @@ export const insertStockWarehouseSchema = createInsertSchema(stockWarehousesTabl
 export const insertStockLocationSchema = createInsertSchema(stockLocationsTable);
 export const insertStockSupplierSchema = createInsertSchema(stockSuppliersTable);
 export const insertStockMovementSchema = createInsertSchema(stockMovementsTable);
+export const insertStockRequestSchema = createInsertSchema(stockRequestsTable);
