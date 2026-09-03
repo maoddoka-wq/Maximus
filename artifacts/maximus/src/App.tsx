@@ -21,7 +21,6 @@ const adminNav = [
   { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
   { href: '/maximus/dependances', label: 'Dépendances', icon: GitBranch },
-  { href: '/maximus/utilisateurs', label: 'Utilisateurs', icon: Users },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
   { href: '/maximus/notifications', label: 'Notifications', icon: Bell },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
@@ -53,7 +52,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/demandes': { kicker: 'Administration', title: 'Demandes en attente', description: 'Traitez les demandes d’ouverture reçues récemment.' },
   '/maximus/modules': { kicker: 'Configuration', title: 'Catalogue des modules', description: 'Les briques métier disponibles dans MAXIMUS.' },
   '/maximus/dependances': { kicker: 'Configuration', title: 'Dépendances', description: 'Gardez une configuration cohérente entre modules.' },
-  '/maximus/utilisateurs': { kicker: 'Accès', title: 'Utilisateurs', description: 'Les comptes qui administrent vos espaces.' },
   '/maximus/abonnements': { kicker: 'Compte', title: 'Abonnements', description: 'Une lecture claire de vos espaces et de leur statut.' },
   '/maximus/notifications': { kicker: 'Centre de contrôle', title: 'Notifications', description: 'Les signaux utiles, sans bruit.' },
   '/maximus/journal': { kicker: 'Traçabilité', title: 'Journal d’activité', description: 'Chaque action importante, horodatée et attribuée.' },
@@ -247,7 +245,6 @@ function AdminRouter({ location, data, mutate, notify, onNavigate }: { location:
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
   if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
   if (location === '/maximus/dependances') return <DependenciesPage />;
-  if (location === '/maximus/utilisateurs') return <SimpleAdminPage type="users" data={data} onNavigate={onNavigate} />;
   if (location === '/maximus/abonnements') return <SubscriptionsPage data={data} />;
   if (location === '/maximus/notifications') return <NotificationsPage data={data} mutate={mutate} />;
   if (location === '/maximus/journal') return <JournalPage data={data} />;
