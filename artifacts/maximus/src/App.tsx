@@ -92,29 +92,29 @@ function AppContent() {
     if (message) setToast(message);
   };
   const notify = (message: string) => setToast(message);
-  const login = (space: 'admin' | 'kora', email: string, password: string) => {
-    if (space === 'kora') {
-      const normalizedEmail = email.trim().toLowerCase();
-      const company = data.companies.find(item => item.email.toLowerCase() === normalizedEmail && item.status === 'ACTIF' && item.adminPassword === password);
-      if (company) {
-        const companySession: Session = `company:${company.id}`;
-        setSession(companySession);
-        localStorage.setItem('maximus-session', companySession);
-        setLocation('/kora/dashboard');
-        return;
-      }
-      const employee = data.employees.find(e => e.email.toLowerCase() === normalizedEmail && e.status === 'ACTIF' && (e.loginPassword ?? 'Kora123!') === password);
-      if (employee) {
-    const employeeSession: Session = `employee:${employee.id}`;
-        setSession(employeeSession);
-        localStorage.setItem('maximus-session', employeeSession);
-        setLocation('/kora/dashboard');
-        return;
-      }
+  const login = (_space: 'admin' | 'kora', email: string, password: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!') {
+      setSession('admin');
+      localStorage.setItem('maximus-session', 'admin');
+      setLocation('/maximus/dashboard');
+      return;
     }
-    setSession(space);
-    localStorage.setItem('maximus-session', space);
-    setLocation(space === 'admin' ? '/maximus/dashboard' : '/kora/dashboard');
+    const company = data.companies.find(item => item.email.toLowerCase() === normalizedEmail && item.status === 'ACTIF' && item.adminPassword === password);
+    if (company) {
+      const companySession: Session = `company:${company.id}`;
+      setSession(companySession);
+      localStorage.setItem('maximus-session', companySession);
+      setLocation('/kora/dashboard');
+      return;
+    }
+    const employee = data.employees.find(e => e.email.toLowerCase() === normalizedEmail && e.status === 'ACTIF' && (e.loginPassword ?? 'Kora123!') === password);
+    if (employee) {
+      const employeeSession: Session = `employee:${employee.id}`;
+      setSession(employeeSession);
+      localStorage.setItem('maximus-session', employeeSession);
+      setLocation('/kora/dashboard');
+    }
   };
   const logout = () => { setSession(null); localStorage.removeItem('maximus-session'); setLocation('/'); };
   const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
@@ -173,12 +173,10 @@ function AppContent() {
 }
 
 function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', email: string, password: string) => void; employees: StoreData['employees'] }) {
-  const [space, setSpace] = useState<'admin' | 'kora'>('admin');
-  const [email, setEmail] = useState(space === 'admin' ? 'admin@maximus.demo' : 'admin@kora.demo');
-  const [password, setPassword] = useState(space === 'admin' ? 'Admin123!' : 'Kora123!');
+  const [email, setEmail] = useState('admin@kora.demo');
+  const [password, setPassword] = useState('Kora123!');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
-  useEffect(() => { setEmail(space === 'admin' ? 'admin@maximus.demo' : 'admin@kora.demo'); setPassword(space === 'admin' ? 'Admin123!' : 'Kora123!'); }, [space]);
   return <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
     <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between">
       <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
@@ -189,18 +187,17 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
     </section>
     <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12"><div className="w-full max-w-md fade-up">
       <div className="mb-10 lg:hidden"><Brand /></div>
-      <div className="mb-8"><p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Accès sécurisé</p><h2 className="text-3xl font-bold tracking-[-.04em]">Bienvenue dans MAXIMUS</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Choisissez votre espace de travail pour commencer.</p></div>
-      <div className="mb-7 grid grid-cols-2 gap-2 rounded-xl bg-[hsl(var(--muted))] p-1"><button data-testid="button-space-admin" onClick={() => setSpace('admin')} className={`rounded-lg px-3 py-3 text-sm font-semibold transition ${space === 'admin' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}`}>Administration</button><button data-testid="button-space-kora" onClick={() => setSpace('kora')} className={`rounded-lg px-3 py-3 text-sm font-semibold transition ${space === 'kora' ? 'bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}`}>Espace KORA</button></div>
-      <form onSubmit={e => { e.preventDefault(); const normalizedEmail = email.trim().toLowerCase(); const employee = employees.find(item => item.email.toLowerCase() === normalizedEmail); const validAdmin = normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!'; const validEmployee = Boolean(employee && employee.status === 'ACTIF' && password === (employee.loginPassword ?? 'Kora123!')); const validEmail = space === 'admin' ? normalizedEmail === 'admin@maximus.demo' : validEmployee; const validPassword = space === 'admin' ? password === 'Admin123!' : validEmployee; if (!validEmail || !validPassword) { setError(space === 'admin' ? 'Utilisez admin@maximus.demo et Admin123!.' : 'Utilisez l’adresse email et le mot de passe initial remis par l’administration KORA.'); return; } setError(''); onLogin(space, email, password); }} className="space-y-5">
+       <div className="mb-8"><p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Accès sécurisé</p><h2 className="text-3xl font-bold tracking-[-.04em]">Bienvenue dans MAXIMUS</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Tous les comptes utilisent la même connexion. MAXIMUS ouvre automatiquement le bon espace.</p></div>
+       <form onSubmit={e => { e.preventDefault(); const normalizedEmail = email.trim().toLowerCase(); const account = employees.find(item => item.email.toLowerCase() === normalizedEmail && item.status === 'ACTIF' && password === (item.loginPassword ?? 'Kora123!')); const validAdmin = normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!'; if (!validAdmin && !account) { setError('Email ou mot de passe incorrect. Vérifiez que le compte est actif et que le mot de passe est correct.'); return; } setError(''); onLogin(validAdmin ? 'admin' : 'kora', email, password); }} className="space-y-5">
         <Field label="Adresse email" value={email} onChange={setEmail} type="email" testId="input-login-email" />
         <Field label="Mot de passe" value={password} onChange={setPassword} type="password" testId="input-login-password" />
         <div className="flex justify-end"><button type="button" data-testid="button-forgot-password" onClick={() => setLoginHelp(value => !value)} className="text-xs font-semibold text-[hsl(var(--primary))]">Aide à la connexion</button></div>
-         {loginHelp && <p className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour un compte employé, utilisez l’email et le mot de passe initial fournis par l’administrateur de votre entreprise. Pour un compte administrateur, contactez l’équipe MAXIMUS.</p>}
+          {loginHelp && <p className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Utilisez l’email et le mot de passe du compte. Le manager KORA, les employés et l’administration MAXIMUS se connectent tous depuis ce même formulaire.</p>}
          {error && <p data-testid="login-error" className="rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
          <button data-testid="button-login" className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)]" type="submit"><LogIn size={17} />Se connecter</button>
       </form>
       <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">Pas encore d’espace ? <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">Créer une entreprise</Link></div>
-      <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4 text-xs text-[hsl(var(--muted-foreground))]"><span className="font-bold text-[hsl(var(--foreground))]">Démo préremplie</span><br />Utilisez les identifiants affichés pour explorer les deux espaces.</div>
+       <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4 text-xs text-[hsl(var(--muted-foreground))]"><span className="font-bold text-[hsl(var(--foreground))]">Démo préremplie</span><br />Email : <strong>admin@kora.demo</strong><br />Mot de passe : <strong>Kora123!</strong></div>
     </div></section>
   </div>;
 }
