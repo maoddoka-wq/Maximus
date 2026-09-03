@@ -177,6 +177,16 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
   const [password, setPassword] = useState('Kora123!');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
+  const demoAccounts = [
+    { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
+    ...employees.filter(account => account.status === 'ACTIF').map(account => ({ id: account.id, label: `${account.firstName} ${account.lastName} · ${account.position}`, email: account.email, password: account.loginPassword ?? 'Kora123!' })),
+  ];
+  const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError('');
+    onLogin(account.id === 'maximus-admin' ? 'admin' : 'kora', account.email, account.password);
+  };
   return <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
     <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between">
       <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
@@ -197,7 +207,7 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
          <button data-testid="button-login" className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)]" type="submit"><LogIn size={17} />Se connecter</button>
       </form>
       <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">Pas encore d’espace ? <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">Créer une entreprise</Link></div>
-       <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4 text-xs text-[hsl(var(--muted-foreground))]"><span className="font-bold text-[hsl(var(--foreground))]">Démo préremplie</span><br />Email : <strong>admin@kora.demo</strong><br />Mot de passe : <strong>Kora123!</strong></div>
+       <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4"><span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Cliquez sur un compte pour vous connecter directement.</p><div className="mt-3 grid gap-2">{demoAccounts.map(account => <button type="button" data-testid={`button-demo-account-${account.id}`} key={account.id} onClick={() => selectDemoAccount(account)} className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}><span className="block text-xs font-bold">{account.label}</span><span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span></button>)}</div></div>
     </div></section>
   </div>;
 }

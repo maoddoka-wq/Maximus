@@ -73,7 +73,11 @@ export function seedData(): StoreData {
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', adminPassword: 'Kora123!', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
       { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', adminPassword: 'Kora123!', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
     ],
-    employees: [],
+    employees: [
+      { id: 'demo-emp-awa', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa.ndiaye@kora.demo', phone: '+221 77 640 28 91', position: 'Gestionnaire commerciale', department: 'Commerce', subDepartment: 'Ventes', role: 'Vendeuse', status: 'ACTIF', loginPassword: 'AwaKora2026!', companyId: 'kora' },
+      { id: 'demo-emp-ibrahima', firstName: 'Ibrahima', lastName: 'Kane', email: 'ibrahima.kane@kora.demo', phone: '+221 76 512 44 08', position: 'Responsable magasin', department: 'Logistique', subDepartment: 'Stock', role: 'Magasinier', status: 'ACTIF', loginPassword: 'IbrahimaKora2026!', companyId: 'kora' },
+      { id: 'demo-emp-ndeye', firstName: 'Ndeye', lastName: 'Sarr', email: 'ndeye.sarr@kora.demo', phone: '+221 78 304 19 62', position: 'Assistante RH', department: 'Ressources humaines', subDepartment: 'Administration du personnel', role: 'Gestionnaire RH', status: 'ACTIF', loginPassword: 'NdeyeKora2026!', companyId: 'kora' },
+    ],
     roles: [],
     products: [
       { id: 'p-1', sku: 'KOR-CAF-01', name: 'Café Touba 250g', category: 'Épicerie', stock: 184, threshold: 50, price: 3500 },
@@ -174,6 +178,7 @@ export function loadData(): StoreData {
         sectorId: removeGeneratedHierarchy && role.sectorId && generatedNodeIds.has(role.sectorId) ? undefined : role.sectorId,
       })) as Role[];
 
+    const rawEmployees = parsed.employees?.length ? parsed.employees : initial.employees;
     return {
       ...initial,
       ...storedData,
@@ -192,7 +197,7 @@ export function loadData(): StoreData {
       deliveries: parsed.deliveries ?? initial.deliveries,
       businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
       orgNodes,
-      employees: parsed.employees.filter(employee => !removeGeneratedHierarchy || !generatedEmployeeIds.has(employee.id)).map(employee => {
+       employees: rawEmployees.filter(employee => !removeGeneratedHierarchy || !generatedEmployeeIds.has(employee.id)).map(employee => {
         const seeded = seededByEmail.get(employee.email);
         const generatedSector = Boolean(removeGeneratedHierarchy && employee.sectorId && generatedNodeIds.has(employee.sectorId));
         const generatedRole = Boolean(removeGeneratedHierarchy && employee.roleId && generatedRoleIds.has(employee.roleId));
