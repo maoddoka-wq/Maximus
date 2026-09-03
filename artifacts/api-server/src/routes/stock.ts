@@ -202,6 +202,12 @@ router.patch("/stock/suppliers/:id", async (req, res): Promise<void> => {
   res.json(supplier);
 });
 
+router.delete("/stock/suppliers/:id", async (req, res): Promise<void> => {
+  const [supplier] = await db.update(stockSuppliersTable).set({ archived: true, updatedAt: new Date() }).where(and(eq(stockSuppliersTable.id, req.params.id), eq(stockSuppliersTable.companyId, companyIdOf(req)))).returning();
+  if (!supplier) { res.status(404).json({ error: "Fournisseur introuvable" }); return; }
+  res.json(supplier);
+});
+
 router.post("/stock/warehouses", async (req, res): Promise<void> => {
   const parsed = warehouseInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
@@ -233,6 +239,20 @@ router.post("/stock/warehouses/:warehouseId/locations", async (req, res): Promis
   const location = { id: idOf("location"), companyId: parsed.data.companyId, warehouseId: req.params.warehouseId, name: parsed.data.name, archived: false, createdAt: new Date() };
   await db.insert(stockLocationsTable).values(location);
   res.status(201).json(location);
+});
+
+router.patch("/stock/locations/:id", async (req, res): Promise<void> => {
+  const parsed = z.object({ name: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+  const [location] = await db.update(stockLocationsTable).set({ name: parsed.data.name }).where(and(eq(stockLocationsTable.id, req.params.id), eq(stockLocationsTable.companyId, companyIdOf(req)))).returning();
+  if (!location) { res.status(404).json({ error: "Emplacement introuvable" }); return; }
+  res.json(location);
+});
+
+router.delete("/stock/locations/:id", async (req, res): Promise<void> => {
+  const [location] = await db.update(stockLocationsTable).set({ archived: true }).where(and(eq(stockLocationsTable.id, req.params.id), eq(stockLocationsTable.companyId, companyIdOf(req)))).returning();
+  if (!location) { res.status(404).json({ error: "Emplacement introuvable" }); return; }
+  res.json(location);
 });
 
 router.post("/stock/movements", async (req, res): Promise<void> => {
@@ -284,6 +304,25 @@ router.patch("/stock/requests/:id/status", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
    const [request] = await db.update(stockRequestsTable).set({ status: parsed.data.status, updatedAt: new Date() }).where(and(eq(stockRequestsTable.id, req.params.id), eq(stockRequestsTable.companyId, companyIdOf(req)))).returning();
   if (!request) { res.status(404).json({ error: "Demande introuvable" }); return; }
+  res.json(request);
+});
+
+router.patch("/stock/requests/:id", async (req, res): Promise<void> => {
+  const parsed = z.object({
+    productId: z.string().min(1),
+    warehouseId: z.string().min(1),
+    quantity: z.coerce.number().int().positive(),
+    reason: z.string().min(1),
+  }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+  const [request] = await db.update(stockRequestsTable).set({ ...parsed.data, updatedAt: new Date() }).where(and(eq(stockRequestsTable.id, req.params.id), eq(stockRequestsTable.companyId, companyIdOf(req)), eq(stockRequestsTable.status, "EN ATTENTE"))).returning();
+  if (!request) { res.status(404).json({ error: "Demande introuvable ou déjà traitée" }); return; }
+  res.json(request);
+});
+
+router.delete("/stock/requests/:id", async (req, res): Promise<void> => {
+  const [request] = await db.delete(stockRequestsTable).where(and(eq(stockRequestsTable.id, req.params.id), eq(stockRequestsTable.companyId, companyIdOf(req)), eq(stockRequestsTable.status, "EN ATTENTE"))).returning();
+  if (!request) { res.status(404).json({ error: "Demande introuvable ou déjà traitée" }); return; }
   res.json(request);
 });
 
