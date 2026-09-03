@@ -54,7 +54,7 @@ export function CompanyOrganizationAdmin({ company, data, mutate }: { company: C
     <div className="space-y-6">
       <div className="card-surface p-6 rounded-2xl">
         <h1 className="text-xl font-bold">Modèle d'Accès & Organisation : {company.name}</h1>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Gérez la chaîne d'héritage : Secteur → Rôle → Employé.</p>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Construisez librement votre hiérarchie : Unité → Modules → Rôle → Employé.</p>
         <div className="mt-6 flex gap-2 overflow-x-auto">
           {tabs.map(item => (
             <button key={item.id} data-testid={`tab-${item.id}`} onClick={() => setTab(item.id)} className={`shrink-0 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}>
@@ -94,7 +94,7 @@ function OverviewTab({ company, data, setTab }: { company: Company, data: StoreD
           {rootNodes.map((root: OrgNode) => (
             <OverviewTreeNode key={root.id} node={root} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} depth={0} />
           ))}
-          {rootNodes.length === 0 && <p className="text-sm text-[hsl(var(--muted-foreground))]">Aucune structure définie.</p>}
+          {rootNodes.length === 0 && <div className="rounded-xl border border-dashed p-8 text-center"><GitBranch className="mx-auto text-[hsl(var(--primary))]" size={28} /><h3 className="mt-4 font-bold">Votre organisation est vide</h3><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">Commencez par créer la première unité de votre entreprise. Aucun secteur, département ou service n’est imposé par MAXIMUS.</p><button data-testid="button-start-organization" onClick={() => setTab('structure')} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Créer ma première unité</button></div>}
         </div>
       </div>
     </div>
@@ -283,7 +283,7 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     code: initialData?.code || '',
-    type: (initialData?.type || 'sector') as OrgNode['type'],
+    type: (initialData?.type || 'direction') as OrgNode['type'],
     parentId: initialData?.parentId || '',
     email: initialData?.email || '',
     phone: initialData?.phone || '',
@@ -292,8 +292,7 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
     managerEmployeeId: initialData?.managerEmployeeId || ''
   });
 
-  const validParentType = formData.type === 'sector' ? 'direction' : formData.type === 'service' ? 'sector' : null;
-  const parentOptions = allNodes.filter(node => node.id !== initialData?.id && validParentType && node.type === validParentType);
+  const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
   const parentNode = allNodes.find(n => n.id === formData.parentId);
   
   const availableModules = parentNode 
@@ -325,14 +324,6 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
       setError('Ce code d’unité est déjà utilisé dans l’entreprise.');
       return;
     }
-    if ((formData.type === 'direction' && formData.parentId) || (formData.type !== 'direction' && !formData.parentId)) {
-      setError(formData.type === 'direction' ? 'Une direction doit être une unité racine.' : 'Un secteur ou service doit être rattaché à une unité parente compatible.');
-      return;
-    }
-    if (formData.parentId && !parentOptions.some(node => node.id === formData.parentId)) {
-      setError('La relation hiérarchique doit respecter Direction → Secteur → Service.');
-      return;
-    }
     if (formData.parentId && isCyclic(formData.parentId)) {
       setError('Cette unité ne peut pas être placée sous l’un de ses descendants.');
       return;
@@ -346,13 +337,14 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <div className="grid grid-cols-2 gap-4">
         <Field label="Nom de l'unité *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} testId="input-org-name" />
-        <Field label="Code" value={formData.code} onChange={(v: string) => setFormData({...formData, code: v})} placeholder="Ex: DAF" />
+        <Field label="Code" value={formData.code} onChange={(v: string) => setFormData({...formData, code: v})} placeholder="Ex: UNITE-01" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <label className="block text-sm font-semibold">
           Type *
-          <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as OrgNode['type'], parentId: ''})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+          <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as OrgNode['type']})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
             <option value="direction">Direction</option>
+            <option value="department">Département</option>
             <option value="sector">Secteur</option>
             <option value="service">Service</option>
           </select>
@@ -433,10 +425,11 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-bold text-lg">Rôles et Permissions</h2>
-          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Définissez les niveaux d'accès par secteur.</p>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Définissez les niveaux d’accès pour chaque unité créée par l’entreprise.</p>
         </div>
-        <ActionButton primary onClick={() => { setEditingRole(null); setModalOpen(true); }} testId="btn-create-role">Créer un rôle</ActionButton>
+        <ActionButton primary disabled={companyNodes.length === 0} onClick={() => { setEditingRole(null); setModalOpen(true); }} testId="btn-create-role">Créer un rôle</ActionButton>
       </div>
+      {companyNodes.length === 0 && <p className="mb-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord au moins une unité dans l’onglet Structure & Unités.</p>}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {companyRoles.map((role: Role) => {
@@ -447,7 +440,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
                 <div>
                   <h3 className="font-bold">{role.name}</h3>
                   <span className="inline-flex items-center gap-1.5 mt-1 text-[10px] uppercase font-bold text-[hsl(var(--muted-foreground))] px-2 py-0.5 rounded-full bg-[hsl(var(--muted))]">
-                    <Building2 size={10} /> {sector?.name || 'Secteur Inconnu'}
+                    <Building2 size={10} /> {sector?.name || 'Unité non affectée'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -535,11 +528,11 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
       <Field label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} />
       
       <label className="block text-sm font-semibold mt-4">
-        Secteur d'appartenance *
+        Unité d’appartenance *
         <select disabled={sectorLocked} value={formData.sectorId} onChange={e => handleSectorChange(e.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
           {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
         </select>
-        {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son secteur.</span>}
+        {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son unité.</span>}
       </label>
 
       <div className="border-t pt-4 mt-4">
@@ -594,17 +587,17 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
           <h2 className="font-bold text-lg">Comptes Employés</h2>
           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Assignez les collaborateurs à une unité et un rôle.</p>
         </div>
-        <ActionButton primary onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
+        <ActionButton primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
+      {(companyNodes.length === 0 || companyRoles.length === 0) && <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure puis au moins un rôle avant d’ajouter un compte employé.</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm min-w-[800px]">
           <thead className="bg-[hsl(var(--muted)/.5)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
             <tr>
               <th className="px-6 py-3 font-bold">Employé</th>
-              <th className="px-6 py-3 font-bold">Unité (Secteur)</th>
+              <th className="px-6 py-3 font-bold">Unité</th>
               <th className="px-6 py-3 font-bold">Rôle Assigné</th>
-              <th className="px-6 py-3 font-bold">Admin</th>
               <th className="px-6 py-3 font-bold text-right">Actions</th>
             </tr>
           </thead>
@@ -634,15 +627,6 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
                   <td className="px-6 py-4 font-medium text-xs">
                     {role?.name || 'Non assigné'}
                   </td>
-                  <td className="px-6 py-4">
-                    {emp.isSectorAdmin ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] px-2 py-1 rounded-full">
-                        <ShieldCheck size={12} /> Oui
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-[hsl(var(--muted-foreground))] px-2 py-1">Non</span>
-                    )}
-                  </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       <button onClick={() => { setEditingEmployee(emp); setModalOpen(true); }} className="p-1.5 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
@@ -657,7 +641,7 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
               )
             })}
             {companyEmployees.length === 0 && (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun employé dans cette entreprise.</td></tr>
+              <tr><td colSpan={4} className="px-6 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun employé dans cette entreprise.</td></tr>
             )}
           </tbody>
         </table>
@@ -690,8 +674,7 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
     phone: initialData?.phone || '',
     position: initialData?.position || '',
     sectorId: initialData?.sectorId || (allNodes.length > 0 ? allNodes[0].id : ''),
-    roleId: initialData?.roleId || '',
-    isSectorAdmin: initialData?.isSectorAdmin || false
+    roleId: initialData?.roleId || ''
   });
 
   const getCompatibleRoles = () => {
@@ -742,7 +725,7 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
       
       <div className="border-t pt-4 mt-4 grid grid-cols-2 gap-4">
         <label className="block text-sm font-semibold">
-          Unité (Secteur) *
+          Unité *
           <select value={formData.sectorId} onChange={e => setFormData({...formData, sectorId: e.target.value, roleId: ''})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
             {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
           </select>
@@ -754,17 +737,7 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
             <option value="">Sélectionner un rôle...</option>
             {compatibleRoles.map((r: Role) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
-          <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1">Rôles du secteur et de ses parents.</p>
-        </label>
-      </div>
-
-      <div className="border-t pt-4 mt-2">
-        <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-[hsl(var(--muted)/.3)] transition">
-          <input type="checkbox" className="mt-1" checked={formData.isSectorAdmin} onChange={e => setFormData({...formData, isSectorAdmin: e.target.checked})} />
-          <div>
-            <p className="text-sm font-bold">Administrateur de secteur</p>
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">Peut gérer les employés et la structure interne de ce secteur.</p>
-          </div>
+          <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1">Rôles de l’unité sélectionnée et de ses unités parentes.</p>
         </label>
       </div>
 

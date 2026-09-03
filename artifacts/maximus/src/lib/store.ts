@@ -70,31 +70,14 @@ export const dependencies: Dependency[] = [
 export function seedData(): StoreData {
   return {
     catalogVersion: 2,
-    organizationVersion: 2,
+    organizationVersion: 3,
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
       { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
     ],
-    employees: [
-      { id: 'emp-1', companyId: 'kora', sectorId: 'org-1', roleId: 'role-admin', firstName: 'Aminata', lastName: 'Diop', email: 'aminata@kora.demo', phone: '+221 77 501 22 18', position: 'Directrice générale', department: 'Direction', subDepartment: '', role: 'Administratrice', status: 'ACTIF', loginPassword: 'Kora123!' },
-      { id: 'emp-2', companyId: 'kora', sectorId: 'org-2', roleId: 'role-compta', firstName: 'Mamadou', lastName: 'Ba', email: 'mamadou@kora.demo', phone: '+221 76 888 41 90', position: 'Responsable finance', department: 'Finance', subDepartment: 'Trésorerie', role: 'Comptable', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-3', companyId: 'kora', sectorId: 'org-4', roleId: 'role-manager', firstName: 'Ndeye', lastName: 'Sarr', email: 'ndeye@kora.demo', phone: '+221 70 329 70 12', position: 'Responsable opérations', department: 'Opérations', subDepartment: 'Logistique', role: 'Manager', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-4', companyId: 'kora', sectorId: 'org-6', roleId: 'role-vendeur', firstName: 'Ibrahima', lastName: 'Kane', email: 'ibrahima@kora.demo', phone: '+221 78 110 32 41', position: 'Vendeur senior', department: 'Commerce', subDepartment: 'Boutique Dakar', role: 'Vendeur', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-5', companyId: 'kora', sectorId: 'org-3', roleId: 'role-compta', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa@kora.demo', phone: '+221 77 246 08 11', position: 'Assistante comptable', department: 'Finance', subDepartment: 'Comptabilité', role: 'Comptable', status: 'ACTIF', loginPassword: 'Kora123!' },
-      { id: 'emp-6', companyId: 'kora', sectorId: 'org-5', roleId: 'role-magasinier', firstName: 'Moussa', lastName: 'Faye', email: 'moussa@kora.demo', phone: '+221 76 401 55 72', position: 'Magasinier', department: 'Opérations', subDepartment: 'Entrepôt principal', role: 'Magasinier', status: 'ACTIF', loginPassword: 'Kora123!' },
-      { id: 'emp-7', companyId: 'kora', sectorId: 'org-7', roleId: 'role-rh', firstName: 'Coumba', lastName: 'Sow', email: 'coumba@kora.demo', phone: '+221 70 612 40 29', position: 'Responsable RH', department: 'RH', subDepartment: 'Administration du personnel', role: 'Responsable RH', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-8', companyId: 'kora', sectorId: 'org-4', roleId: 'role-logistique', firstName: 'Lamine', lastName: 'Diallo', email: 'lamine@kora.demo', phone: '+221 78 903 21 10', position: 'Responsable logistique', department: 'Opérations', subDepartment: 'Transport', role: 'Responsable logistique', status: 'ACTIF', loginPassword: 'Kora123!' },
-    ],
-    roles: [
-      { id: 'role-admin', companyId: 'kora', sectorId: 'org-1', name: 'Administratrice', description: 'Accès complet à l’espace KORA.', modulePermissions: Object.fromEntries(modules.map(module => [module.id, ['voir', 'créer', 'modifier']])) },
-      { id: 'role-compta', companyId: 'kora', sectorId: 'org-2', name: 'Comptable', description: 'Pilotage des flux financiers.', modulePermissions: { finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'] } },
-      { id: 'role-manager', companyId: 'kora', sectorId: 'org-6', name: 'Manager', description: 'Opérations et équipes commerciales.', modulePermissions: { commerce: ['voir', 'créer'], crm: ['voir', 'modifier'] } },
-      { id: 'role-magasinier', companyId: 'kora', sectorId: 'org-4', name: 'Magasinier', description: 'Gestion quotidienne des stocks.', modulePermissions: { stocks: ['voir', 'créer', 'modifier'] } },
-      { id: 'role-rh', companyId: 'kora', sectorId: 'org-7', name: 'Responsable RH', description: 'Organisation, employés et présences.', modulePermissions: { rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer'] } },
-      { id: 'role-logistique', companyId: 'kora', sectorId: 'org-4', name: 'Responsable logistique', description: 'Stocks, opérations et acheminement.', modulePermissions: { stocks: ['voir', 'modifier'], logistique: ['voir', 'créer'] } },
-      { id: 'role-vendeur', companyId: 'kora', sectorId: 'org-6', name: 'Vendeur', description: 'Saisie et suivi des ventes autorisées.', modulePermissions: { commerce: ['voir', 'créer'], ventes: ['voir'] } },
-    ],
+    employees: [],
+    roles: [],
     products: [
       { id: 'p-1', sku: 'KOR-CAF-01', name: 'Café Touba 250g', category: 'Épicerie', stock: 184, threshold: 50, price: 3500 },
       { id: 'p-2', sku: 'KOR-HUI-02', name: 'Huile d’arachide 1L', category: 'Épicerie', stock: 38, threshold: 45, price: 2200 },
@@ -123,15 +106,7 @@ export function seedData(): StoreData {
       { id: 'a-3', user: 'Ndeye Sarr', action: 'a enregistré une entrée', module: 'Stocks', object: 'Café Touba 250g', date: 'Hier, 16:18', status: 'ACTIF' },
       { id: 'a-4', user: 'Aminata Diop', action: 'a modifié un rôle', module: 'RH', object: 'Manager', date: 'Hier, 08:49', status: 'ACTIF' },
     ],
-    orgNodes: [
-      { id: 'org-1', companyId: 'kora', code: 'DG', name: 'Direction générale', type: 'direction', parentId: null, moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], managerEmployeeId: 'emp-1' },
-      { id: 'org-2', companyId: 'kora', code: 'DAF', name: 'DAF', type: 'sector', parentId: 'org-1', moduleIds: ['finance', 'comptabilite', 'rapports'], managerEmployeeId: 'emp-2' },
-      { id: 'org-3', companyId: 'kora', code: 'COMPTA', name: 'Comptabilité', type: 'service', parentId: 'org-2', moduleIds: ['comptabilite'] },
-      { id: 'org-4', companyId: 'kora', code: 'OPS', name: 'Opérations', type: 'sector', parentId: 'org-1', moduleIds: ['stocks', 'fournisseurs', 'logistique', 'achats'], managerEmployeeId: 'emp-3' },
-      { id: 'org-5', companyId: 'kora', code: 'LOG', name: 'Logistique', type: 'service', parentId: 'org-4', moduleIds: ['logistique', 'stocks'] },
-      { id: 'org-6', companyId: 'kora', code: 'COM', name: 'Commerce', type: 'sector', parentId: 'org-1', moduleIds: ['commerce', 'ventes', 'crm'], managerEmployeeId: 'emp-4' },
-      { id: 'org-7', companyId: 'kora', code: 'RH', name: 'RH et Ressources générales', type: 'sector', parentId: 'org-1', moduleIds: ['rh', 'presences', 'paie'], managerEmployeeId: 'emp-7' },
-    ],
+    orgNodes: [],
     notifications: [
       { id: 'n-1', title: 'Stock à surveiller', text: 'Huile d’arachide 1L est sous son seuil de sécurité.', read: false, date: 'Il y a 18 min' },
       { id: 'n-2', title: 'Paiement confirmé', text: 'Le paiement PAY-09281 a été enregistré.', read: false, date: 'Il y a 24 min' },
@@ -179,42 +154,32 @@ export function loadData(): StoreData {
     const companies = (parsed.catalogVersion ?? 1) < 2
       ? parsed.companies.map(company => company.id === 'kora' ? { ...company, requestedModules: initial.companies[0].requestedModules, allowedModules: initial.companies[0].allowedModules, refusedModules: [] } : company)
       : parsed.companies;
-    const initialNodeByName = new Map(initial.orgNodes.map(node => [node.name.toLowerCase(), node]));
-    initialNodeByName.set('finance', initial.orgNodes.find(node => node.code === 'DAF')!);
-    const organizationIsLegacy = (parsed.organizationVersion ?? 1) < 2;
-    const legacyIdMap = new Map((parsed.orgNodes ?? []).map(node => [node.id, initialNodeByName.get(node.name.toLowerCase())?.id ?? `legacy-${node.id}`]));
-    const migratedSeedNodes = initial.orgNodes.map(seed => {
-      const legacy = (parsed.orgNodes ?? []).find(node => legacyIdMap.get(node.id) === seed.id);
-      return legacy ? { ...seed, email: legacy.email || seed.email, phone: legacy.phone || seed.phone, location: legacy.location || seed.location, managerEmployeeId: legacy.managerEmployeeId || seed.managerEmployeeId, moduleIds: legacy.moduleIds?.length ? legacy.moduleIds : seed.moduleIds } : seed;
-    });
-    const legacyCustomNodes = (parsed.orgNodes ?? []).filter(node => !initialNodeByName.has(node.name.toLowerCase())).map(node => ({
-      ...node,
-      id: `legacy-${node.id}`,
-      companyId: node.companyId || 'kora',
-      code: node.code || node.name.substring(0, 3).toUpperCase(),
-      type: node.type === 'department' ? 'sector' as const : node.type,
-      parentId: node.parentId ? legacyIdMap.get(node.parentId) ?? null : null,
-      moduleIds: node.moduleIds || [],
-    }));
-    const orgNodes = organizationIsLegacy
-      ? [...migratedSeedNodes, ...legacyCustomNodes]
-      : (parsed.orgNodes ?? initial.orgNodes).map(node => ({ ...node, companyId: node.companyId || 'kora', code: node.code || node.name.substring(0, 3).toUpperCase(), type: node.type === 'department' ? 'sector' : node.type, moduleIds: node.moduleIds || [] })) as OrgNode[];
-
-    const roles = (parsed.catalogVersion ?? 1) < 2
-      ? parsed.roles.map(role => role.id === 'role-admin' ? { ...role, modulePermissions: initial.roles.find(item => item.id === 'role-admin')?.modulePermissions ?? role.modulePermissions } : role)
-      : parsed.roles;
-
-    const mappedRoles = roles.map(role => ({
-      ...role,
-      companyId: role.companyId || 'kora',
-      sectorId: (organizationIsLegacy && role.sectorId ? legacyIdMap.get(role.sectorId) : role.sectorId) || initial.roles.find(seed => seed.id === role.id || seed.name === role.name)?.sectorId || 'org-1'
-    })) as Role[];
+    const removeGeneratedHierarchy = (parsed.organizationVersion ?? 1) < 3;
+    const generatedNodeIds = new Set(['org-1', 'org-2', 'org-3', 'org-4', 'org-5', 'org-6', 'org-7']);
+    const generatedRoleIds = new Set(['role-admin', 'role-compta', 'role-manager', 'role-magasinier', 'role-rh', 'role-logistique', 'role-vendeur']);
+    const generatedEmployeeIds = new Set(['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6', 'emp-7', 'emp-8']);
+    const orgNodes = (parsed.orgNodes ?? [])
+      .filter(node => !removeGeneratedHierarchy || !generatedNodeIds.has(node.id))
+      .map(node => ({
+        ...node,
+        companyId: node.companyId || 'kora',
+        code: node.code || node.name.substring(0, 3).toUpperCase(),
+        parentId: removeGeneratedHierarchy && node.parentId && generatedNodeIds.has(node.parentId) ? null : node.parentId,
+        moduleIds: node.moduleIds || [],
+      })) as OrgNode[];
+    const roles = (parsed.roles ?? [])
+      .filter(role => !removeGeneratedHierarchy || !generatedRoleIds.has(role.id))
+      .map(role => ({
+        ...role,
+        companyId: role.companyId || 'kora',
+        sectorId: removeGeneratedHierarchy && role.sectorId && generatedNodeIds.has(role.sectorId) ? undefined : role.sectorId,
+      })) as Role[];
 
     return {
       ...initial,
       ...parsed,
       catalogVersion: 2,
-      organizationVersion: 2,
+      organizationVersion: 3,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
@@ -225,18 +190,23 @@ export function loadData(): StoreData {
       deliveries: parsed.deliveries ?? initial.deliveries,
       businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
       orgNodes,
-      employees: parsed.employees.map(employee => {
+      employees: parsed.employees.filter(employee => !removeGeneratedHierarchy || !generatedEmployeeIds.has(employee.id)).map(employee => {
         const seeded = seededByEmail.get(employee.email);
+        const generatedSector = Boolean(removeGeneratedHierarchy && employee.sectorId && generatedNodeIds.has(employee.sectorId));
+        const generatedRole = Boolean(removeGeneratedHierarchy && employee.roleId && generatedRoleIds.has(employee.roleId));
         return {
           ...employee,
           loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!',
-          isSectorAdmin: employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false,
-          companyId: (employee as any).companyId || 'kora',
-          sectorId: (organizationIsLegacy && employee.sectorId ? legacyIdMap.get(employee.sectorId) : employee.sectorId) || seeded?.sectorId || 'org-1',
-          roleId: (employee as any).roleId || seeded?.roleId || 'role-vendeur'
+          isSectorAdmin: false,
+          companyId: employee.companyId || 'kora',
+          sectorId: generatedSector ? undefined : employee.sectorId,
+          roleId: generatedRole ? undefined : employee.roleId,
+          department: generatedSector ? '' : employee.department,
+          subDepartment: generatedSector ? '' : employee.subDepartment,
+          role: generatedRole ? 'Non affecté' : employee.role,
         };
       }),
-      roles: [...initial.roles.filter(role => !mappedRoles.some(existing => existing.id === role.id)), ...mappedRoles],
+      roles,
     };
   } catch { return seedData(); }
 }
