@@ -1,0 +1,777 @@
+import React, { useState } from 'react';
+import { 
+  Building2, Users, KeyRound, LayoutGrid, ChevronDown, Plus, 
+  Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight
+} from 'lucide-react';
+import { Company, StoreData, OrgNode, Role, Employee, modules as allModules, uid, type ModuleId } from '../lib/store';
+
+// Helper UI components matching Maximus style
+function ActionButton({ children, onClick, primary = false, testId, icon: ButtonIcon = Plus, disabled = false, className = '' }: any) { 
+  return (
+    <button disabled={disabled} data-testid={testId} onClick={onClick} className={`btn flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+      <ButtonIcon size={15} />
+      {children}
+    </button>
+  ); 
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-6 shadow-2xl animate-in zoom-in-95">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-bold">{title}</h2>
+          <button onClick={onClose} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', testId, placeholder = '' }: any) {
+  return (
+    <label className="block text-sm font-semibold">
+      {label}
+      <input data-testid={testId} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--primary))]" />
+    </label>
+  );
+}
+
+export function CompanyOrganizationAdmin({ company, data, mutate }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
+  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees'>('overview');
+
+  const tabs = [
+    { id: 'overview', label: "Vue d'ensemble" },
+    { id: 'structure', label: 'Structure & Unités' },
+    { id: 'roles', label: 'Rôles & Permissions' },
+    { id: 'employees', label: 'Comptes Employés' },
+  ] as const;
+
+  return (
+    <div className="space-y-6">
+      <div className="card-surface p-6 rounded-2xl">
+        <h1 className="text-xl font-bold">Modèle d'Accès & Organisation : {company.name}</h1>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Gérez la chaîne d'héritage : Secteur → Rôle → Employé.</p>
+        <div className="mt-6 flex gap-2 overflow-x-auto">
+          {tabs.map(item => (
+            <button key={item.id} data-testid={`tab-${item.id}`} onClick={() => setTab(item.id)} className={`shrink-0 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'overview' && <OverviewTab company={company} data={data} setTab={setTab} />}
+      {tab === 'structure' && <StructureTab company={company} data={data} mutate={mutate} />}
+      {tab === 'roles' && <RolesTab company={company} data={data} mutate={mutate} />}
+      {tab === 'employees' && <EmployeesTab company={company} data={data} mutate={mutate} />}
+    </div>
+  );
+}
+
+// 1. OVERVIEW TAB
+function OverviewTab({ company, data, setTab }: { company: Company, data: StoreData, setTab: (t: any) => void }) {
+  const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
+  const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
+  const companyEmployees = data.employees.filter((e: Employee) => e.companyId === company.id);
+  
+  const rootNodes = companyNodes.filter((n: OrgNode) => !n.parentId);
+
+  return (
+    <div className="space-y-6 fade-up">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <MetricCard title="Unités Organisationnelles" value={companyNodes.length} icon={Building2} onClick={() => setTab('structure')} />
+        <MetricCard title="Rôles Configurés" value={companyRoles.length} icon={KeyRound} onClick={() => setTab('roles')} />
+        <MetricCard title="Employés Actifs" value={companyEmployees.length} icon={Users} onClick={() => setTab('employees')} />
+      </div>
+      
+      <div className="card-surface p-6 rounded-2xl">
+        <h2 className="font-bold text-lg mb-6">Chaîne d'héritage</h2>
+        <div className="space-y-4">
+          {rootNodes.map((root: OrgNode) => (
+            <OverviewTreeNode key={root.id} node={root} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} depth={0} />
+          ))}
+          {rootNodes.length === 0 && <p className="text-sm text-[hsl(var(--muted-foreground))]">Aucune structure définie.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ title, value, icon: Icon, onClick }: any) {
+  return (
+    <button onClick={onClick} className="card-surface p-5 rounded-2xl flex items-center justify-between text-left hover:border-[hsl(var(--primary)/.4)] transition">
+      <div>
+        <p className="text-xs text-[hsl(var(--muted-foreground))] font-semibold uppercase">{title}</p>
+        <p className="text-2xl font-bold mt-1">{value}</p>
+      </div>
+      <div className="p-3 bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))] rounded-xl">
+        <Icon size={20} />
+      </div>
+    </button>
+  );
+}
+
+function OverviewTreeNode({ node, allNodes, allRoles, allEmployees, depth }: { node: OrgNode, allNodes: OrgNode[], allRoles: Role[], allEmployees: Employee[], depth: number }) {
+  const children = allNodes.filter((n: OrgNode) => n.parentId === node.id);
+  const roles = allRoles.filter((r: Role) => r.sectorId === node.id);
+  const employees = allEmployees.filter((e: Employee) => e.sectorId === node.id);
+
+  return (
+    <div className="relative">
+      <div className="flex flex-col md:flex-row md:items-center gap-4 py-3 border-b border-[hsl(var(--border)/.5)]" style={{ marginLeft: `${depth * 24}px` }}>
+        <div className="flex items-center gap-3 w-64 shrink-0">
+          <span className="p-1.5 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"><GitBranch size={14} /></span>
+          <div>
+            <p className="text-sm font-bold">{node.name}</p>
+            <p className="text-[10px] text-[hsl(var(--muted-foreground))] uppercase tracking-wide">{node.type} {node.code ? `· ${node.code}` : ''}</p>
+          </div>
+        </div>
+        
+        <div className="flex-1 flex flex-wrap gap-4 text-xs items-center text-[hsl(var(--muted-foreground))]">
+          <div className="flex items-center gap-1.5">
+            <LayoutGrid size={13} /> {node.moduleIds?.length || 0} modules
+          </div>
+          <ArrowRight size={12} className="opacity-40" />
+          <div className="flex items-center gap-1.5">
+            <KeyRound size={13} /> {roles.length} rôles
+          </div>
+          <ArrowRight size={12} className="opacity-40" />
+          <div className="flex items-center gap-1.5 text-[hsl(var(--foreground))] font-semibold">
+            <Users size={13} /> {employees.length} employés
+          </div>
+        </div>
+      </div>
+      
+      {children.map((child: OrgNode) => (
+        <OverviewTreeNode key={child.id} node={child} allNodes={allNodes} allRoles={allRoles} allEmployees={allEmployees} depth={depth + 1} />
+      ))}
+    </div>
+  );
+}
+
+// 2. STRUCTURE TAB
+function StructureTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
+  const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingNode, setEditingNode] = useState<OrgNode | null>(null);
+
+  const handleEdit = (node: OrgNode) => {
+    setEditingNode(node);
+    setModalOpen(true);
+  };
+
+  const handleCreate = () => {
+    setEditingNode(null);
+    setModalOpen(true);
+  };
+
+  const roots = companyNodes.filter((n: OrgNode) => !n.parentId);
+  const deleteNode = (id: string) => {
+    const ids = new Set([id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      companyNodes.forEach(node => {
+        if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
+          ids.add(node.id);
+          changed = true;
+        }
+      });
+    }
+    const assigned = data.employees.some(employee => employee.sectorId && ids.has(employee.sectorId))
+      || data.roles.some(role => role.sectorId && ids.has(role.sectorId));
+    if (assigned) {
+      window.alert('Impossible de supprimer cette unité : des rôles ou employés y sont encore affectés.');
+      return;
+    }
+    mutate((draft: StoreData) => {
+      draft.orgNodes = draft.orgNodes.filter(node => !ids.has(node.id));
+    }, 'Unité et sous-unités supprimées.');
+  };
+
+  return (
+    <div className="card-surface p-6 rounded-2xl fade-up">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-bold text-lg">Unités Organisationnelles</h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Gérez la hiérarchie de l'entreprise et les modules assignés.</p>
+        </div>
+        <ActionButton primary onClick={handleCreate} testId="btn-create-org">Créer une unité</ActionButton>
+      </div>
+
+      <div className="space-y-1">
+        {roots.map((root: OrgNode) => (
+          <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} onEdit={handleEdit} onDelete={deleteNode} depth={0} />
+        ))}
+        {roots.length === 0 && <div className="text-center py-10 text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
+      </div>
+
+      {modalOpen && <StructureFormModal company={company} initialData={editingNode} allNodes={companyNodes} employees={data.employees.filter((e: Employee) => e.companyId === company.id)} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
+        mutate((d: StoreData) => {
+          if (editingNode) {
+            const index = d.orgNodes.findIndex((n: OrgNode) => n.id === editingNode.id);
+            if (index !== -1) d.orgNodes[index] = { ...d.orgNodes[index], ...nodeData };
+          } else {
+            d.orgNodes.push({ id: uid('org'), companyId: company.id, ...nodeData });
+          }
+          const nodes = d.orgNodes.filter(node => node.companyId === company.id);
+          const byId = new Map(nodes.map(node => [node.id, node]));
+          let changed = true;
+          while (changed) {
+            changed = false;
+            nodes.forEach(node => {
+              const parent = node.parentId ? byId.get(node.parentId) : null;
+              if (!parent) return;
+              const allowed = new Set(parent.moduleIds ?? []);
+              const next = (node.moduleIds ?? []).filter(moduleId => allowed.has(moduleId));
+              if (next.length !== (node.moduleIds ?? []).length) {
+                node.moduleIds = next;
+                changed = true;
+              }
+            });
+          }
+          d.roles.filter(role => role.companyId === company.id).forEach(role => {
+            const allowed = new Set(byId.get(role.sectorId ?? '')?.moduleIds ?? []);
+            role.modulePermissions = Object.fromEntries(Object.entries(role.modulePermissions).filter(([moduleId]) => allowed.has(moduleId as ModuleId)));
+          });
+        }, editingNode ? 'Unité mise à jour.' : 'Unité créée.');
+        setModalOpen(false);
+      }} />}
+    </div>
+  );
+}
+
+function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: OrgNode, allNodes: OrgNode[], onEdit: (n: OrgNode) => void, onDelete: (id: string) => void, depth: number }) {
+  const children = allNodes.filter((n: OrgNode) => n.parentId === node.id);
+  const [expanded, setExpanded] = useState(true);
+  
+  return (
+    <div>
+      <div className="group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-[hsl(var(--muted)/.4)] transition" style={{ marginLeft: `${depth * 20}px` }}>
+        <button onClick={() => setExpanded(!expanded)} className="text-[hsl(var(--muted-foreground))] w-5 flex justify-center">
+          {children.length > 0 && <ChevronDown size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />}
+        </button>
+        <span className="p-1.5 rounded bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Building2 size={14} /></span>
+        <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between min-w-0 gap-2">
+          <div className="flex items-center gap-2 truncate">
+            <span className="font-bold text-sm truncate">{node.name}</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold text-[hsl(var(--muted-foreground))]">{node.type}</span>
+            {node.code && <span className="text-[10px] mono text-[hsl(var(--muted-foreground))]">{node.code}</span>}
+          </div>
+          <div className="flex items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] shrink-0">
+            <span>{node.moduleIds?.length || 0} modules</span>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+              <button onClick={() => onEdit(node)} className="p-1.5 hover:bg-[hsl(var(--muted))] rounded text-[hsl(var(--foreground))]"><Settings size={14} /></button>
+              <button onClick={() => onDelete(node.id)} className="p-1.5 hover:bg-[hsl(var(--destructive)/.2)] rounded text-[hsl(var(--destructive))]"><Trash2 size={14} /></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {expanded && children.map((child: OrgNode) => (
+        <StructureNodeItem key={child.id} node={child} allNodes={allNodes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />
+      ))}
+    </div>
+  );
+}
+
+function StructureFormModal({ company, initialData, allNodes, employees, onClose, onSave }: { company: Company, initialData: OrgNode | null, allNodes: OrgNode[], employees: Employee[], onClose: () => void, onSave: (d: any) => void }) {
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    name: initialData?.name || '',
+    code: initialData?.code || '',
+    type: (initialData?.type || 'sector') as OrgNode['type'],
+    parentId: initialData?.parentId || '',
+    email: initialData?.email || '',
+    phone: initialData?.phone || '',
+    location: initialData?.location || '',
+    moduleIds: initialData?.moduleIds || [],
+    managerEmployeeId: initialData?.managerEmployeeId || ''
+  });
+
+  const validParentType = formData.type === 'sector' ? 'direction' : formData.type === 'service' ? 'sector' : null;
+  const parentOptions = allNodes.filter(node => node.id !== initialData?.id && validParentType && node.type === validParentType);
+  const parentNode = allNodes.find(n => n.id === formData.parentId);
+  
+  const availableModules = parentNode 
+    ? allModules.filter(m => parentNode.moduleIds?.includes(m.id))
+    : allModules.filter(m => company.allowedModules.includes(m.id));
+
+  const toggleModule = (id: ModuleId) => {
+    setFormData(prev => ({
+      ...prev,
+      moduleIds: (prev.moduleIds || []).includes(id) ? (prev.moduleIds || []).filter(x => x !== id) : [...(prev.moduleIds || []), id]
+    }));
+  };
+
+  const isCyclic = (parentId: string) => {
+    let current = allNodes.find(n => n.id === parentId);
+    while (current) {
+      if (current.id === initialData?.id) return true;
+      current = allNodes.find(n => n.id === current?.parentId);
+    }
+    return false;
+  };
+
+  const handleSave = () => {
+    if (!formData.name.trim() || !formData.code.trim() || !formData.type) {
+      setError('Le nom et le code de l’unité sont obligatoires.');
+      return;
+    }
+    if (allNodes.some(node => node.id !== initialData?.id && node.code?.trim().toLowerCase() === formData.code.trim().toLowerCase())) {
+      setError('Ce code d’unité est déjà utilisé dans l’entreprise.');
+      return;
+    }
+    if ((formData.type === 'direction' && formData.parentId) || (formData.type !== 'direction' && !formData.parentId)) {
+      setError(formData.type === 'direction' ? 'Une direction doit être une unité racine.' : 'Un secteur ou service doit être rattaché à une unité parente compatible.');
+      return;
+    }
+    if (formData.parentId && !parentOptions.some(node => node.id === formData.parentId)) {
+      setError('La relation hiérarchique doit respecter Direction → Secteur → Service.');
+      return;
+    }
+    if (formData.parentId && isCyclic(formData.parentId)) {
+      setError('Cette unité ne peut pas être placée sous l’un de ses descendants.');
+      return;
+    }
+    const cleanedModules = (formData.moduleIds || []).filter(id => availableModules.some(m => m.id === id));
+    onSave({ ...formData, name: formData.name.trim(), code: formData.code.trim().toUpperCase(), parentId: formData.parentId || null, moduleIds: cleanedModules });
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Nom de l'unité *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} testId="input-org-name" />
+        <Field label="Code" value={formData.code} onChange={(v: string) => setFormData({...formData, code: v})} placeholder="Ex: DAF" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="block text-sm font-semibold">
+          Type *
+          <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as OrgNode['type'], parentId: ''})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+            <option value="direction">Direction</option>
+            <option value="sector">Secteur</option>
+            <option value="service">Service</option>
+          </select>
+        </label>
+        <label className="block text-sm font-semibold">
+          Unité Parente
+          <select value={formData.parentId} onChange={e => setFormData({...formData, parentId: e.target.value})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+            <option value="">Aucune (Racine)</option>
+            {parentOptions.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
+          </select>
+        </label>
+      </div>
+      
+      <div className="border-t pt-4 mt-2">
+        <label className="block text-sm font-semibold mb-3">Modules Assignés</label>
+        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+          {availableModules.map(m => (
+            <label key={m.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${(formData.moduleIds || []).includes(m.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.05)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
+              <input type="checkbox" className="hidden" checked={(formData.moduleIds || []).includes(m.id)} onChange={() => toggleModule(m.id)} />
+              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${(formData.moduleIds || []).includes(m.id) ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] text-white' : 'border-[hsl(var(--muted-foreground)/.3)]'}`}>
+                {(formData.moduleIds || []).includes(m.id) && <Check size={12} />}
+              </div>
+              <span className="text-xs font-medium">{m.name}</span>
+            </label>
+          ))}
+          {availableModules.length === 0 && <span className="text-xs text-[hsl(var(--muted-foreground))]">Aucun module disponible de l'unité parente.</span>}
+        </div>
+      </div>
+
+      <div className="border-t pt-4 mt-2">
+        <label className="block text-sm font-semibold mb-3">Manager & Contacts</label>
+        <div className="grid grid-cols-2 gap-4">
+          <label className="block text-sm font-semibold">
+            Manager de l'unité
+            <select value={formData.managerEmployeeId} onChange={e => setFormData({...formData, managerEmployeeId: e.target.value})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+              <option value="">Sélectionner un employé...</option>
+              {employees.map((e: Employee) => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+            </select>
+          </label>
+          <Field label="Email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} />
+          <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} />
+          <Field label="Localisation" value={formData.location} onChange={(v: string) => setFormData({...formData, location: v})} />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <button onClick={onClose} className="px-4 py-2 text-sm font-bold border rounded-lg hover:bg-[hsl(var(--muted))]">Annuler</button>
+        <ActionButton primary onClick={handleSave} disabled={!formData.name} testId="btn-save-org">Enregistrer</ActionButton>
+      </div>
+    </div>
+  );
+}
+
+// 3. ROLES TAB
+function RolesTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
+  const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
+  const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
+  
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+
+  const handleEdit = (role: Role) => {
+    setEditingRole(role);
+    setModalOpen(true);
+  };
+  const deleteRole = (role: Role) => {
+    if (data.employees.some(employee => employee.roleId === role.id)) {
+      window.alert('Impossible de supprimer ce rôle : il est encore affecté à un ou plusieurs employés.');
+      return;
+    }
+    mutate((draft: StoreData) => {
+      draft.roles = draft.roles.filter(item => item.id !== role.id);
+    }, 'Rôle supprimé.');
+  };
+
+  return (
+    <div className="card-surface p-6 rounded-2xl fade-up">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-bold text-lg">Rôles et Permissions</h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Définissez les niveaux d'accès par secteur.</p>
+        </div>
+        <ActionButton primary onClick={() => { setEditingRole(null); setModalOpen(true); }} testId="btn-create-role">Créer un rôle</ActionButton>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {companyRoles.map((role: Role) => {
+          const sector = companyNodes.find(n => n.id === role.sectorId);
+          return (
+            <div key={role.id} className="border rounded-xl p-4 flex flex-col hover:border-[hsl(var(--primary)/.3)] transition">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-bold">{role.name}</h3>
+                  <span className="inline-flex items-center gap-1.5 mt-1 text-[10px] uppercase font-bold text-[hsl(var(--muted-foreground))] px-2 py-0.5 rounded-full bg-[hsl(var(--muted))]">
+                    <Building2 size={10} /> {sector?.name || 'Secteur Inconnu'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => handleEdit(role)} className="p-1.5 rounded hover:bg-[hsl(var(--muted))]"><Settings size={14} /></button>
+                  <button onClick={() => deleteRole(role)} className="p-1.5 rounded hover:bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]"><Trash2 size={14} /></button>
+                </div>
+              </div>
+              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-3 flex-1">{role.description}</p>
+              <div className="mt-4 border-t pt-3 flex flex-wrap gap-1.5">
+                {Object.keys(role.modulePermissions).map(modId => (
+                  <span key={modId} className="text-[10px] px-1.5 py-0.5 rounded border font-medium">
+                    {allModules.find(m => m.id === modId)?.name || modId}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {companyRoles.length === 0 && <div className="col-span-full text-center py-8 text-sm text-[hsl(var(--muted-foreground))]">Aucun rôle configuré.</div>}
+      </div>
+
+      {modalOpen && <RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} sectorLocked={Boolean(editingRole && data.employees.some(employee => employee.roleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
+        mutate((d: StoreData) => {
+          if (editingRole) {
+            const idx = d.roles.findIndex((r: Role) => r.id === editingRole.id);
+            if (idx !== -1) d.roles[idx] = { ...d.roles[idx], ...roleData };
+            d.employees.filter(employee => employee.roleId === editingRole.id).forEach(employee => { employee.role = roleData.name; });
+          } else {
+            d.roles.push({ id: uid('role'), companyId: company.id, ...roleData });
+          }
+        }, editingRole ? 'Rôle mis à jour.' : 'Rôle créé.');
+        setModalOpen(false);
+      }} />}
+    </div>
+  );
+}
+
+function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked, onClose, onSave }: { company: Company, initialData: Role | null, allNodes: OrgNode[], allRoles: Role[], sectorLocked: boolean, onClose: () => void, onSave: (d: any) => void }) {
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    name: initialData?.name || '',
+    description: initialData?.description || '',
+    sectorId: initialData?.sectorId || (allNodes.length > 0 ? allNodes[0].id : ''),
+    modulePermissions: initialData?.modulePermissions || {} as Record<string, string[]>
+  });
+
+  const selectedSector = allNodes.find(n => n.id === formData.sectorId);
+  const availableModules = selectedSector ? allModules.filter(m => (selectedSector.moduleIds || []).includes(m.id)) : [];
+
+  const togglePermission = (modId: string, perm: 'voir' | 'créer' | 'modifier') => {
+    setFormData(prev => {
+      const perms = prev.modulePermissions[modId] || [];
+      const newPerms = perms.includes(perm) ? perms.filter((p: string) => p !== perm) : [...perms, perm];
+      
+      const newModulePermissions = { ...prev.modulePermissions };
+      if (newPerms.length === 0) {
+        delete newModulePermissions[modId];
+      } else {
+        newModulePermissions[modId] = newPerms;
+      }
+      return { ...prev, modulePermissions: newModulePermissions };
+    });
+  };
+
+  const handleSectorChange = (sectorId: string) => {
+    setFormData(prev => ({ ...prev, sectorId, modulePermissions: {} }));
+  };
+  const handleSave = () => {
+    const name = formData.name.trim();
+    if (!name || !formData.sectorId) {
+      setError('Le nom et le secteur du rôle sont obligatoires.');
+      return;
+    }
+    if (allRoles.some(role => role.id !== initialData?.id && role.sectorId === formData.sectorId && role.name.trim().toLowerCase() === name.toLowerCase())) {
+      setError('Un rôle portant ce nom existe déjà dans ce secteur.');
+      return;
+    }
+    onSave({ ...formData, name });
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+      <Field label="Nom du rôle *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} />
+      <Field label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} />
+      
+      <label className="block text-sm font-semibold mt-4">
+        Secteur d'appartenance *
+        <select disabled={sectorLocked} value={formData.sectorId} onChange={e => handleSectorChange(e.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
+          {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
+        </select>
+        {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son secteur.</span>}
+      </label>
+
+      <div className="border-t pt-4 mt-4">
+        <label className="block text-sm font-semibold mb-3">Permissions par module</label>
+        <p className="text-[10px] text-[hsl(var(--muted-foreground))] mb-3">Seuls les modules assignés au secteur sélectionné sont disponibles.</p>
+        
+        <div className="space-y-2 max-h-60 overflow-y-auto">
+          {availableModules.map(m => {
+            const perms = formData.modulePermissions[m.id] || [];
+            return (
+              <div key={m.id} className="p-3 border rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">{m.name}</p>
+                  <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{m.description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(['voir', 'créer', 'modifier'] as const).map(p => (
+                    <label key={p} className={`text-[10px] font-bold px-2 py-1 rounded cursor-pointer transition ${perms.includes(p) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted-foreground)/.2)]'}`}>
+                      <input type="checkbox" className="hidden" checked={perms.includes(p)} onChange={() => togglePermission(m.id, p)} />
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {availableModules.length === 0 && <div className="text-sm text-[hsl(var(--muted-foreground))] italic">Aucun module disponible pour ce secteur.</div>}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <button onClick={onClose} className="px-4 py-2 text-sm font-bold border rounded-lg hover:bg-[hsl(var(--muted))]">Annuler</button>
+        <ActionButton primary onClick={handleSave} disabled={!formData.name || !formData.sectorId}>Enregistrer</ActionButton>
+      </div>
+    </div>
+  );
+}
+
+// 4. EMPLOYEES TAB
+function EmployeesTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
+  const companyEmployees = data.employees.filter((e: Employee) => e.companyId === company.id);
+  const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
+  const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
+  
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
+  return (
+    <div className="card-surface rounded-2xl overflow-hidden fade-up">
+      <div className="p-6 border-b flex items-center justify-between">
+        <div>
+          <h2 className="font-bold text-lg">Comptes Employés</h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Assignez les collaborateurs à une unité et un rôle.</p>
+        </div>
+        <ActionButton primary onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[800px]">
+          <thead className="bg-[hsl(var(--muted)/.5)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+            <tr>
+              <th className="px-6 py-3 font-bold">Employé</th>
+              <th className="px-6 py-3 font-bold">Unité (Secteur)</th>
+              <th className="px-6 py-3 font-bold">Rôle Assigné</th>
+              <th className="px-6 py-3 font-bold">Admin</th>
+              <th className="px-6 py-3 font-bold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {companyEmployees.map((emp: Employee) => {
+              const sector = companyNodes.find(n => n.id === emp.sectorId);
+              const role = companyRoles.find(r => r.id === emp.roleId);
+              return (
+                <tr key={emp.id} className="hover:bg-[hsl(var(--muted)/.3)] transition">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] font-black text-xs text-[hsl(var(--foreground))]">
+                        {emp.firstName[0]}{emp.lastName[0]}
+                      </span>
+                      <div>
+                        <p className="font-bold">{emp.firstName} {emp.lastName}</p>
+                        <p className="text-xs text-[hsl(var(--muted-foreground))]">{emp.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                      <Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />
+                      {sector?.name || 'Non assigné'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-medium text-xs">
+                    {role?.name || 'Non assigné'}
+                  </td>
+                  <td className="px-6 py-4">
+                    {emp.isSectorAdmin ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] px-2 py-1 rounded-full">
+                        <ShieldCheck size={12} /> Oui
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[hsl(var(--muted-foreground))] px-2 py-1">Non</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => { setEditingEmployee(emp); setModalOpen(true); }} className="p-1.5 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+                        <Settings size={15} />
+                      </button>
+                      <button onClick={() => mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.')} className="p-1.5 rounded hover:bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+            {companyEmployees.length === 0 && (
+              <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun employé dans cette entreprise.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {modalOpen && <EmployeeFormModal company={company} initialData={editingEmployee} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} onClose={() => setModalOpen(false)} onSave={(empData: any) => {
+        mutate((d: StoreData) => {
+          const sector = d.orgNodes.find(node => node.id === empData.sectorId);
+          const parent = sector?.parentId ? d.orgNodes.find(node => node.id === sector.parentId) : null;
+          const normalized = { ...empData, email: empData.email.trim().toLowerCase(), department: sector?.name ?? '', subDepartment: parent?.name ?? '' };
+          if (editingEmployee) {
+            const idx = d.employees.findIndex((e: Employee) => e.id === editingEmployee.id);
+            if (idx !== -1) d.employees[idx] = { ...d.employees[idx], ...normalized };
+          } else {
+            d.employees.push({ id: uid('emp'), companyId: company.id, status: 'ACTIF', loginPassword: 'Kora123!', department: '', subDepartment: '', ...normalized } as Employee);
+          }
+        }, editingEmployee ? 'Employé mis à jour.' : 'Employé ajouté.');
+        setModalOpen(false);
+      }} />}
+    </div>
+  );
+}
+
+function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmployees, onClose, onSave }: { company: Company, initialData: Employee | null, allNodes: OrgNode[], allRoles: Role[], allEmployees: Employee[], onClose: () => void, onSave: (d: any) => void }) {
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    firstName: initialData?.firstName || '',
+    lastName: initialData?.lastName || '',
+    email: initialData?.email || '',
+    phone: initialData?.phone || '',
+    position: initialData?.position || '',
+    sectorId: initialData?.sectorId || (allNodes.length > 0 ? allNodes[0].id : ''),
+    roleId: initialData?.roleId || '',
+    isSectorAdmin: initialData?.isSectorAdmin || false
+  });
+
+  const getCompatibleRoles = () => {
+    let compatibleIds = new Set<string>();
+    let currentSectorId: string | null | undefined = formData.sectorId;
+    
+    while (currentSectorId) {
+      const rolesInSector = allRoles.filter((r: Role) => r.sectorId === currentSectorId);
+      rolesInSector.forEach((r: Role) => compatibleIds.add(r.id));
+      const sector = allNodes.find((n: OrgNode) => n.id === currentSectorId);
+      currentSectorId = sector?.parentId;
+    }
+    
+    return allRoles.filter((r: Role) => compatibleIds.has(r.id));
+  };
+
+  const compatibleRoles = getCompatibleRoles();
+  const handleSave = () => {
+    const email = formData.email.trim().toLowerCase();
+    const roleObj = compatibleRoles.find(role => role.id === formData.roleId);
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !email || !formData.position.trim() || !formData.sectorId || !roleObj) {
+      setError('Prénom, nom, email, poste, secteur et rôle compatible sont obligatoires.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Saisissez une adresse email valide.');
+      return;
+    }
+    if (allEmployees.some(employee => employee.id !== initialData?.id && employee.email.trim().toLowerCase() === email)) {
+      setError('Cette adresse email est déjà utilisée dans l’entreprise.');
+      return;
+    }
+    onSave({ ...formData, firstName: formData.firstName.trim(), lastName: formData.lastName.trim(), email, position: formData.position.trim(), role: roleObj.name });
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Prénom *" value={formData.firstName} onChange={(v: string) => setFormData({...formData, firstName: v})} />
+        <Field label="Nom *" value={formData.lastName} onChange={(v: string) => setFormData({...formData, lastName: v})} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Email *" type="email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} />
+        <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} />
+      </div>
+      <Field label="Titre du poste" value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} placeholder="Ex: Développeur Senior" />
+      
+      <div className="border-t pt-4 mt-4 grid grid-cols-2 gap-4">
+        <label className="block text-sm font-semibold">
+          Unité (Secteur) *
+          <select value={formData.sectorId} onChange={e => setFormData({...formData, sectorId: e.target.value, roleId: ''})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+            {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
+          </select>
+        </label>
+        
+        <label className="block text-sm font-semibold">
+          Rôle Assigné *
+          <select value={formData.roleId} onChange={e => setFormData({...formData, roleId: e.target.value})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+            <option value="">Sélectionner un rôle...</option>
+            {compatibleRoles.map((r: Role) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1">Rôles du secteur et de ses parents.</p>
+        </label>
+      </div>
+
+      <div className="border-t pt-4 mt-2">
+        <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-[hsl(var(--muted)/.3)] transition">
+          <input type="checkbox" className="mt-1" checked={formData.isSectorAdmin} onChange={e => setFormData({...formData, isSectorAdmin: e.target.checked})} />
+          <div>
+            <p className="text-sm font-bold">Administrateur de secteur</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Peut gérer les employés et la structure interne de ce secteur.</p>
+          </div>
+        </label>
+      </div>
+
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <button onClick={onClose} className="px-4 py-2 text-sm font-bold border rounded-lg hover:bg-[hsl(var(--muted))]">Annuler</button>
+        <ActionButton primary onClick={handleSave} disabled={!formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>Enregistrer</ActionButton>
+      </div>
+    </div>
+  );
+}

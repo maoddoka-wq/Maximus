@@ -20,14 +20,14 @@ export interface Module { id: ModuleId; name: string; description: string; featu
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
 export interface Dependency { source: ModuleId; target: ModuleId; reason: string; }
-export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; }
-export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; }
+export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
+export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; }
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; }
 export interface Payment { id: string; reference: string; invoice: string; amount: number; status: Status; date: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; }
-export interface OrgNode { id: string; name: string; type: 'direction' | 'department' | 'service'; parentId: string | null; }
+export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: 'direction' | 'sector' | 'service' | 'department'; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; managerEmployeeId?: string; }
 export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; }
 export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; }
 export interface PayrollSlip { id: string; reference: string; employee: string; period: string; gross: number; net: number; status: Status; }
@@ -36,7 +36,7 @@ export interface SupplierRecord { id: string; name: string; contact: string; pho
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
 export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; moduleStatuses?: ModuleStatusMap; }
-export interface StoreData { catalogVersion?: number; }
+export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
 export const modules: Module[] = [
@@ -70,29 +70,30 @@ export const dependencies: Dependency[] = [
 export function seedData(): StoreData {
   return {
     catalogVersion: 2,
+    organizationVersion: 2,
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
       { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
     ],
     employees: [
-      { id: 'emp-1', firstName: 'Aminata', lastName: 'Diop', email: 'aminata@kora.demo', phone: '+221 77 501 22 18', position: 'Directrice générale', department: 'Direction', subDepartment: '', role: 'Administratrice', status: 'ACTIF', loginPassword: 'Kora123!' },
-      { id: 'emp-2', firstName: 'Mamadou', lastName: 'Ba', email: 'mamadou@kora.demo', phone: '+221 76 888 41 90', position: 'Responsable finance', department: 'Finance', subDepartment: 'Trésorerie', role: 'Comptable', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-3', firstName: 'Ndeye', lastName: 'Sarr', email: 'ndeye@kora.demo', phone: '+221 70 329 70 12', position: 'Responsable opérations', department: 'Opérations', subDepartment: 'Logistique', role: 'Manager', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-4', firstName: 'Ibrahima', lastName: 'Kane', email: 'ibrahima@kora.demo', phone: '+221 78 110 32 41', position: 'Vendeur senior', department: 'Commerce', subDepartment: 'Boutique Dakar', role: 'Vendeur', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-5', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa@kora.demo', phone: '+221 77 246 08 11', position: 'Assistante comptable', department: 'Finance', subDepartment: 'Comptabilité', role: 'Comptable', status: 'ACTIF', loginPassword: 'Kora123!' },
-      { id: 'emp-6', firstName: 'Moussa', lastName: 'Faye', email: 'moussa@kora.demo', phone: '+221 76 401 55 72', position: 'Magasinier', department: 'Opérations', subDepartment: 'Entrepôt principal', role: 'Magasinier', status: 'ACTIF', loginPassword: 'Kora123!' },
-      { id: 'emp-7', firstName: 'Coumba', lastName: 'Sow', email: 'coumba@kora.demo', phone: '+221 70 612 40 29', position: 'Responsable RH', department: 'RH', subDepartment: 'Administration du personnel', role: 'Responsable RH', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
-      { id: 'emp-8', firstName: 'Lamine', lastName: 'Diallo', email: 'lamine@kora.demo', phone: '+221 78 903 21 10', position: 'Responsable logistique', department: 'Opérations', subDepartment: 'Transport', role: 'Responsable logistique', status: 'ACTIF', loginPassword: 'Kora123!' },
+      { id: 'emp-1', companyId: 'kora', sectorId: 'org-1', roleId: 'role-admin', firstName: 'Aminata', lastName: 'Diop', email: 'aminata@kora.demo', phone: '+221 77 501 22 18', position: 'Directrice générale', department: 'Direction', subDepartment: '', role: 'Administratrice', status: 'ACTIF', loginPassword: 'Kora123!' },
+      { id: 'emp-2', companyId: 'kora', sectorId: 'org-2', roleId: 'role-compta', firstName: 'Mamadou', lastName: 'Ba', email: 'mamadou@kora.demo', phone: '+221 76 888 41 90', position: 'Responsable finance', department: 'Finance', subDepartment: 'Trésorerie', role: 'Comptable', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
+      { id: 'emp-3', companyId: 'kora', sectorId: 'org-4', roleId: 'role-manager', firstName: 'Ndeye', lastName: 'Sarr', email: 'ndeye@kora.demo', phone: '+221 70 329 70 12', position: 'Responsable opérations', department: 'Opérations', subDepartment: 'Logistique', role: 'Manager', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
+      { id: 'emp-4', companyId: 'kora', sectorId: 'org-6', roleId: 'role-vendeur', firstName: 'Ibrahima', lastName: 'Kane', email: 'ibrahima@kora.demo', phone: '+221 78 110 32 41', position: 'Vendeur senior', department: 'Commerce', subDepartment: 'Boutique Dakar', role: 'Vendeur', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
+      { id: 'emp-5', companyId: 'kora', sectorId: 'org-3', roleId: 'role-compta', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa@kora.demo', phone: '+221 77 246 08 11', position: 'Assistante comptable', department: 'Finance', subDepartment: 'Comptabilité', role: 'Comptable', status: 'ACTIF', loginPassword: 'Kora123!' },
+      { id: 'emp-6', companyId: 'kora', sectorId: 'org-5', roleId: 'role-magasinier', firstName: 'Moussa', lastName: 'Faye', email: 'moussa@kora.demo', phone: '+221 76 401 55 72', position: 'Magasinier', department: 'Opérations', subDepartment: 'Entrepôt principal', role: 'Magasinier', status: 'ACTIF', loginPassword: 'Kora123!' },
+      { id: 'emp-7', companyId: 'kora', sectorId: 'org-7', roleId: 'role-rh', firstName: 'Coumba', lastName: 'Sow', email: 'coumba@kora.demo', phone: '+221 70 612 40 29', position: 'Responsable RH', department: 'RH', subDepartment: 'Administration du personnel', role: 'Responsable RH', status: 'ACTIF', loginPassword: 'Kora123!', isSectorAdmin: true },
+      { id: 'emp-8', companyId: 'kora', sectorId: 'org-4', roleId: 'role-logistique', firstName: 'Lamine', lastName: 'Diallo', email: 'lamine@kora.demo', phone: '+221 78 903 21 10', position: 'Responsable logistique', department: 'Opérations', subDepartment: 'Transport', role: 'Responsable logistique', status: 'ACTIF', loginPassword: 'Kora123!' },
     ],
     roles: [
-      { id: 'role-admin', name: 'Administratrice', description: 'Accès complet à l’espace KORA.', modulePermissions: Object.fromEntries(modules.map(module => [module.id, ['voir', 'créer', 'modifier']])) },
-      { id: 'role-compta', name: 'Comptable', description: 'Pilotage des flux financiers.', modulePermissions: { finance: ['voir', 'créer', 'modifier'] } },
-      { id: 'role-manager', name: 'Manager', description: 'Opérations et équipes.', modulePermissions: { commerce: ['voir', 'créer'], stocks: ['voir', 'modifier'], rh: ['voir'] } },
-      { id: 'role-magasinier', name: 'Magasinier', description: 'Gestion quotidienne des stocks.', modulePermissions: { stocks: ['voir', 'créer', 'modifier'] } },
-      { id: 'role-rh', name: 'Responsable RH', description: 'Organisation, employés et présences.', modulePermissions: { rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer'] } },
-      { id: 'role-logistique', name: 'Responsable logistique', description: 'Stocks, opérations et acheminement.', modulePermissions: { stocks: ['voir', 'modifier'], commerce: ['voir'] } },
-      { id: 'role-vendeur', name: 'Vendeur', description: 'Saisie et suivi des ventes autorisées.', modulePermissions: { commerce: ['voir', 'créer'], stocks: ['voir'] } },
+      { id: 'role-admin', companyId: 'kora', sectorId: 'org-1', name: 'Administratrice', description: 'Accès complet à l’espace KORA.', modulePermissions: Object.fromEntries(modules.map(module => [module.id, ['voir', 'créer', 'modifier']])) },
+      { id: 'role-compta', companyId: 'kora', sectorId: 'org-2', name: 'Comptable', description: 'Pilotage des flux financiers.', modulePermissions: { finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'] } },
+      { id: 'role-manager', companyId: 'kora', sectorId: 'org-6', name: 'Manager', description: 'Opérations et équipes commerciales.', modulePermissions: { commerce: ['voir', 'créer'], crm: ['voir', 'modifier'] } },
+      { id: 'role-magasinier', companyId: 'kora', sectorId: 'org-4', name: 'Magasinier', description: 'Gestion quotidienne des stocks.', modulePermissions: { stocks: ['voir', 'créer', 'modifier'] } },
+      { id: 'role-rh', companyId: 'kora', sectorId: 'org-7', name: 'Responsable RH', description: 'Organisation, employés et présences.', modulePermissions: { rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer'] } },
+      { id: 'role-logistique', companyId: 'kora', sectorId: 'org-4', name: 'Responsable logistique', description: 'Stocks, opérations et acheminement.', modulePermissions: { stocks: ['voir', 'modifier'], logistique: ['voir', 'créer'] } },
+      { id: 'role-vendeur', companyId: 'kora', sectorId: 'org-6', name: 'Vendeur', description: 'Saisie et suivi des ventes autorisées.', modulePermissions: { commerce: ['voir', 'créer'], ventes: ['voir'] } },
     ],
     products: [
       { id: 'p-1', sku: 'KOR-CAF-01', name: 'Café Touba 250g', category: 'Épicerie', stock: 184, threshold: 50, price: 3500 },
@@ -123,12 +124,13 @@ export function seedData(): StoreData {
       { id: 'a-4', user: 'Aminata Diop', action: 'a modifié un rôle', module: 'RH', object: 'Manager', date: 'Hier, 08:49', status: 'ACTIF' },
     ],
     orgNodes: [
-      { id: 'org-1', name: 'Direction générale', type: 'direction', parentId: null },
-      { id: 'org-2', name: 'Opérations', type: 'department', parentId: 'org-1' },
-      { id: 'org-3', name: 'Logistique', type: 'service', parentId: 'org-2' },
-      { id: 'org-4', name: 'Commerce', type: 'department', parentId: 'org-1' },
-      { id: 'org-5', name: 'Boutique Dakar', type: 'service', parentId: 'org-4' },
-      { id: 'org-6', name: 'Finance', type: 'department', parentId: 'org-1' },
+      { id: 'org-1', companyId: 'kora', code: 'DG', name: 'Direction générale', type: 'direction', parentId: null, moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], managerEmployeeId: 'emp-1' },
+      { id: 'org-2', companyId: 'kora', code: 'DAF', name: 'DAF', type: 'sector', parentId: 'org-1', moduleIds: ['finance', 'comptabilite', 'rapports'], managerEmployeeId: 'emp-2' },
+      { id: 'org-3', companyId: 'kora', code: 'COMPTA', name: 'Comptabilité', type: 'service', parentId: 'org-2', moduleIds: ['comptabilite'] },
+      { id: 'org-4', companyId: 'kora', code: 'OPS', name: 'Opérations', type: 'sector', parentId: 'org-1', moduleIds: ['stocks', 'fournisseurs', 'logistique', 'achats'], managerEmployeeId: 'emp-3' },
+      { id: 'org-5', companyId: 'kora', code: 'LOG', name: 'Logistique', type: 'service', parentId: 'org-4', moduleIds: ['logistique', 'stocks'] },
+      { id: 'org-6', companyId: 'kora', code: 'COM', name: 'Commerce', type: 'sector', parentId: 'org-1', moduleIds: ['commerce', 'ventes', 'crm'], managerEmployeeId: 'emp-4' },
+      { id: 'org-7', companyId: 'kora', code: 'RH', name: 'RH et Ressources générales', type: 'sector', parentId: 'org-1', moduleIds: ['rh', 'presences', 'paie'], managerEmployeeId: 'emp-7' },
     ],
     notifications: [
       { id: 'n-1', title: 'Stock à surveiller', text: 'Huile d’arachide 1L est sous son seuil de sécurité.', read: false, date: 'Il y a 18 min' },
@@ -177,13 +179,42 @@ export function loadData(): StoreData {
     const companies = (parsed.catalogVersion ?? 1) < 2
       ? parsed.companies.map(company => company.id === 'kora' ? { ...company, requestedModules: initial.companies[0].requestedModules, allowedModules: initial.companies[0].allowedModules, refusedModules: [] } : company)
       : parsed.companies;
+    const initialNodeByName = new Map(initial.orgNodes.map(node => [node.name.toLowerCase(), node]));
+    initialNodeByName.set('finance', initial.orgNodes.find(node => node.code === 'DAF')!);
+    const organizationIsLegacy = (parsed.organizationVersion ?? 1) < 2;
+    const legacyIdMap = new Map((parsed.orgNodes ?? []).map(node => [node.id, initialNodeByName.get(node.name.toLowerCase())?.id ?? `legacy-${node.id}`]));
+    const migratedSeedNodes = initial.orgNodes.map(seed => {
+      const legacy = (parsed.orgNodes ?? []).find(node => legacyIdMap.get(node.id) === seed.id);
+      return legacy ? { ...seed, email: legacy.email || seed.email, phone: legacy.phone || seed.phone, location: legacy.location || seed.location, managerEmployeeId: legacy.managerEmployeeId || seed.managerEmployeeId, moduleIds: legacy.moduleIds?.length ? legacy.moduleIds : seed.moduleIds } : seed;
+    });
+    const legacyCustomNodes = (parsed.orgNodes ?? []).filter(node => !initialNodeByName.has(node.name.toLowerCase())).map(node => ({
+      ...node,
+      id: `legacy-${node.id}`,
+      companyId: node.companyId || 'kora',
+      code: node.code || node.name.substring(0, 3).toUpperCase(),
+      type: node.type === 'department' ? 'sector' as const : node.type,
+      parentId: node.parentId ? legacyIdMap.get(node.parentId) ?? null : null,
+      moduleIds: node.moduleIds || [],
+    }));
+    const orgNodes = organizationIsLegacy
+      ? [...migratedSeedNodes, ...legacyCustomNodes]
+      : (parsed.orgNodes ?? initial.orgNodes).map(node => ({ ...node, companyId: node.companyId || 'kora', code: node.code || node.name.substring(0, 3).toUpperCase(), type: node.type === 'department' ? 'sector' : node.type, moduleIds: node.moduleIds || [] })) as OrgNode[];
+
     const roles = (parsed.catalogVersion ?? 1) < 2
       ? parsed.roles.map(role => role.id === 'role-admin' ? { ...role, modulePermissions: initial.roles.find(item => item.id === 'role-admin')?.modulePermissions ?? role.modulePermissions } : role)
       : parsed.roles;
+
+    const mappedRoles = roles.map(role => ({
+      ...role,
+      companyId: role.companyId || 'kora',
+      sectorId: (organizationIsLegacy && role.sectorId ? legacyIdMap.get(role.sectorId) : role.sectorId) || initial.roles.find(seed => seed.id === role.id || seed.name === role.name)?.sectorId || 'org-1'
+    })) as Role[];
+
     return {
       ...initial,
       ...parsed,
       catalogVersion: 2,
+      organizationVersion: 2,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
@@ -193,11 +224,19 @@ export function loadData(): StoreData {
       supplierRecords: parsed.supplierRecords ?? initial.supplierRecords,
       deliveries: parsed.deliveries ?? initial.deliveries,
       businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
+      orgNodes,
       employees: parsed.employees.map(employee => {
         const seeded = seededByEmail.get(employee.email);
-        return { ...employee, loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!', isSectorAdmin: employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false };
+        return {
+          ...employee,
+          loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!',
+          isSectorAdmin: employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false,
+          companyId: (employee as any).companyId || 'kora',
+          sectorId: (organizationIsLegacy && employee.sectorId ? legacyIdMap.get(employee.sectorId) : employee.sectorId) || seeded?.sectorId || 'org-1',
+          roleId: (employee as any).roleId || seeded?.roleId || 'role-vendeur'
+        };
       }),
-      roles: [...initial.roles.filter(role => !roles.some(existing => existing.id === role.id)), ...roles],
+      roles: [...initial.roles.filter(role => !mappedRoles.some(existing => existing.id === role.id)), ...mappedRoles],
     };
   } catch { return seedData(); }
 }

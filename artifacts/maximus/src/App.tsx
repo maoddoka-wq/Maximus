@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { dependencies, loadData, modules, money, saveData, shortMoney, uid, type Company, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
+import { CompanyOrganizationAdmin } from '@/pages/company-organization';
 
 const queryClient = new QueryClient();
 type Icon = typeof Gauge;
@@ -16,6 +17,7 @@ type Session = 'admin' | 'kora' | `employee:${string}`;
 const adminNav = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
   { href: '/maximus/entreprises', label: 'Entreprises', icon: Building2 },
+  { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
   { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
   { href: '/maximus/dependances', label: 'Dépendances', icon: GitBranch },
@@ -47,6 +49,7 @@ const koraNav = [
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': { kicker: 'Cockpit MAXIMUS', title: 'Bonjour, équipe MAXIMUS.', description: 'Voici ce qui mérite votre attention aujourd’hui.' },
   '/maximus/entreprises': { kicker: 'Administration', title: 'Entreprises', description: 'Pilotez les espaces clients et leurs accès modules.' },
+  '/maximus/entreprises/organisation': { kicker: 'Administration des entreprises', title: 'Organisation & accès', description: 'Structurez les secteurs, leurs modules, les rôles et les comptes employés.' },
   '/maximus/demandes': { kicker: 'Administration', title: 'Demandes en attente', description: 'Traitez les demandes d’ouverture reçues récemment.' },
   '/maximus/modules': { kicker: 'Configuration', title: 'Catalogue des modules', description: 'Les briques métier disponibles dans MAXIMUS.' },
   '/maximus/dependances': { kicker: 'Configuration', title: 'Dépendances', description: 'Gardez une configuration cohérente entre modules.' },
@@ -113,16 +116,25 @@ function AppContent() {
   const isAdmin = session === 'admin';
   const employeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
   const employee = employeeId ? data.employees.find(e => e.id === employeeId) ?? null : null;
-  const employeeRole = employee ? data.roles.find(r => r.name === employee.role) : null;
+  const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
   const companyAllowed = (data.companies.find(c => c.id === 'kora')?.allowedModules ?? []).filter(isModuleActive);
+  const employeeNode = employee?.sectorId ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) : null;
+  const employeeAncestry = new Set<string>();
+  let ancestryNode = employeeNode;
+  while (ancestryNode) {
+    employeeAncestry.add(ancestryNode.id);
+    ancestryNode = ancestryNode.parentId ? data.orgNodes.find(node => node.id === ancestryNode?.parentId) : undefined;
+  }
+  const roleFitsEmployee = Boolean(employeeRole?.sectorId && employeeAncestry.has(employeeRole.sectorId) && employeeRole.companyId === employee?.companyId);
+  const unitModules = new Set(employeeNode?.moduleIds ?? []);
   const allowed = session === 'kora'
     ? companyAllowed
-    : employeeRole
-      ? companyAllowed.filter(moduleId => employeeRole.modulePermissions[moduleId]?.includes('voir'))
+    : employeeRole && roleFitsEmployee
+      ? companyAllowed.filter(moduleId => unitModules.has(moduleId) && employeeRole.modulePermissions[moduleId]?.includes('voir'))
       : [];
-  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || Boolean(employeeRole?.modulePermissions[moduleId]?.includes(permission));
+  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || Boolean(roleFitsEmployee && unitModules.has(moduleId) && employeeRole?.modulePermissions[moduleId]?.includes(permission));
   const canManagePeople = session === 'kora' || Boolean(employee?.isSectorAdmin);
   const currentMeta = pageMeta[location] ?? pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard'];
   return (
@@ -200,6 +212,7 @@ function PageHeader({ kicker, title, description, location }: { kicker: string; 
 
 function AdminRouter({ location, data, mutate, notify, onNavigate }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void; onNavigate: (path: string) => void }) {
   if (location === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
+  if (location === '/maximus/entreprises/organisation') return <OrganizationAdminPage data={data} mutate={mutate} onNavigate={onNavigate} />;
   if (location === '/maximus/entreprises' || location === '/maximus/entreprises/kora') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={location.endsWith('/kora')} />;
   if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
   if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
@@ -211,6 +224,13 @@ function AdminRouter({ location, data, mutate, notify, onNavigate }: { location:
   if (location === '/maximus/journal') return <JournalPage data={data} />;
   if (location === '/maximus/parametres') return <SettingsPage onReset={() => { localStorage.removeItem('maximus-data-v1'); window.location.reload(); }} />;
   return <EmptyState title="Cette vue n’existe pas encore" text="Revenez au cockpit pour poursuivre." action={() => onNavigate('/maximus/dashboard')} />;
+}
+
+function OrganizationAdminPage({ data, mutate, onNavigate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void }) {
+  const [companyId, setCompanyId] = useState(data.companies.find(company => company.status === 'ACTIF')?.id ?? data.companies[0]?.id ?? '');
+  const company = data.companies.find(item => item.id === companyId);
+  if (!company) return <EmptyState title="Entreprise introuvable" text="Créez ou activez d’abord une entreprise." action={() => onNavigate('/maximus/entreprises')} />;
+  return <div className="space-y-5"><label className="card-surface block rounded-xl p-4 text-sm font-semibold">Entreprise administrée<select data-testid="select-organization-company" value={companyId} onChange={event => setCompanyId(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">{data.companies.map(item => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}</select></label><CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /></div>;
 }
 function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, employee, hasPermission }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean }) {
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
