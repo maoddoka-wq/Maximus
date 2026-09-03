@@ -64,7 +64,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/kora/dashboard': { kicker: 'KORA Distribution', title: 'Le rythme de KORA, en un regard.', description: 'Mardi 18 juin 2024 · Dakar, Sénégal' },
   '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Une structure souple qui suit la réalité de vos équipes.' },
   '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
-  '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
   '/kora/employes': { kicker: 'Espace KORA', title: 'Employés', description: 'Les personnes qui font avancer KORA chaque jour.' },
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
   '/kora/stocks': { kicker: 'Espace KORA', title: 'Gestion de stock', description: 'Pilotez vos articles, entrées, sorties et inventaires.' },
@@ -352,7 +351,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
     const company = data.companies.find(item => item.id === companyId);
     return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="La structure de l’entreprise est gérée depuis le compte administrateur KORA." action={() => onNavigate('/kora/dashboard')} />;
   }
-  if (location === '/kora/stocks') return <StockModulePage companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} />;
+   if (location === '/kora/stocks') return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} />;
   if (location === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
   if (location === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
   if (location === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;
@@ -621,7 +620,7 @@ function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof
       <h1 className="mt-2 text-2xl font-bold">{module.name}</h1>
       <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Les actions effectuées ici utilisent les mêmes écrans et données que l’espace entreprise. Elles servent à valider le module avant son activation.</p>
     </section>
-    {module.id === 'stocks' && <StockModulePage />}
+     {module.id === 'stocks' && <StockModulePage companyId="kora" />}
     {(module.id === 'commerce' || module.id === 'ventes') && <CommercePage data={data} mutate={mutate} />}
     {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
     {module.id === 'rh' && koraCompany && <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />}
