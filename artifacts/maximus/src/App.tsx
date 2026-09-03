@@ -511,8 +511,27 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [selectedId, setSelectedId] = useState<ModuleId | null>(null);
   const [testMode, setTestMode] = useState(false);
   const [tests, setTests] = useState<Record<string, boolean>>({});
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('Toutes');
+  const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
   const statusOf = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const selected = selectedId ? modules.find(module => module.id === selectedId) ?? null : null;
+  const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
+  const categoryOf = (moduleId: ModuleId) => {
+    if (['commerce', 'ventes', 'achats', 'crm', 'fournisseurs', 'logistique'].includes(moduleId)) return 'Commerce';
+    if (['finance', 'comptabilite', 'rapports'].includes(moduleId)) return 'Finance';
+    if (['rh', 'presences', 'paie'].includes(moduleId)) return 'Ressources humaines';
+    return 'Opérations';
+  };
+  const visibleModules = modules.filter(module => {
+    const matchesQuery = `${module.name} ${module.description} ${module.features.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase());
+    const matchesCategory = category === 'Toutes' || categoryOf(module.id) === category;
+    const isActive = statusOf(module.id) !== 'INACTIF';
+    const matchesStatus = statusFilter === 'TOUTES' || (statusFilter === 'ACTIFS' ? isActive : !isActive);
+    return matchesQuery && matchesCategory && matchesStatus;
+  });
+  const activeCount = modules.filter(module => statusOf(module.id) !== 'INACTIF').length;
+  const betaCount = modules.filter(module => statusOf(module.id) === 'BETA').length;
 
   const toggleModule = (moduleId: ModuleId) => {
     const module = modules.find(item => item.id === moduleId);
@@ -590,18 +609,58 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     </div>;
   }
 
-  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map((module, index) => {
-    const status = statusOf(module.id);
-    const isActive = status !== 'INACTIF';
-    const activeDependents = modules.filter(item => item.dependencies.includes(module.id) && statusOf(item.id) !== 'INACTIF');
-    return <section data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-70'}`}>
-      <div className="flex items-start justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={19} /></span><StatusBadge status={status} /></div>
-      <h2 className="mt-5 text-lg font-bold">{module.name}</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{module.description}</p>
-      <div className="mt-5 space-y-2 border-t pt-4">{module.features.map(feature => <div key={feature} className="flex items-center gap-2 text-xs"><Check size={14} className="text-[hsl(var(--primary))]" />{feature}</div>)}</div>
-      <div className="mt-5 flex items-center justify-between gap-3"><button data-testid={`button-open-module-${module.id}`} onClick={() => setSelectedId(module.id)} className="inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Ouvrir le module <ChevronRight size={14} /></button><button data-testid={`button-toggle-module-${module.id}`} onClick={() => toggleModule(module.id)} className={`rounded-lg px-3 py-2 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{isActive ? 'Désactiver' : 'Activer'}</button></div>
-      {activeDependents.length > 0 && <p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
-    </section>;
-  })}</div>;
+  return <div className="space-y-5">
+    <section className="card-surface rounded-2xl p-5 sm:p-6">
+      <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+        <div>
+          <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Catalogue d’applications</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Vos applications métier</h2>
+          <p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Chaque module est une application indépendante. Activez uniquement celles dont vos espaces ont besoin.</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <div className="rounded-xl bg-[hsl(var(--muted)/.65)] px-4 py-3"><p className="mono text-[10px] uppercase text-[hsl(var(--muted-foreground))]">Actives</p><p className="mt-1 text-xl font-bold">{activeCount}<span className="ml-1 text-xs font-normal text-[hsl(var(--muted-foreground))]">/ {modules.length}</span></p></div>
+          <div className="rounded-xl bg-[hsl(var(--muted)/.65)] px-4 py-3"><p className="mono text-[10px] uppercase text-[hsl(var(--muted-foreground))]">Bêta</p><p className="mt-1 text-xl font-bold">{betaCount}</p></div>
+        </div>
+      </div>
+      <div className="mt-6 flex flex-col gap-3 border-t pt-5 xl:flex-row xl:items-center">
+        <label className="relative block flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} />
+          <input data-testid="input-search-modules" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une application..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" />
+        </label>
+        <div className="flex shrink-0 rounded-xl bg-[hsl(var(--muted)/.65)] p-1">
+          {(['TOUTES', 'ACTIFS', 'INACTIFS'] as const).map(filter => <button type="button" data-testid={`button-filter-modules-${filter.toLowerCase()}`} key={filter} onClick={() => setStatusFilter(filter)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${statusFilter === filter ? 'bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}`}>{filter === 'TOUTES' ? 'Toutes' : filter === 'ACTIFS' ? 'Actives' : 'Inactives'}</button>)}
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {categories.map(item => <button type="button" data-testid={`button-category-modules-${item.toLowerCase().replace(/\s+/g, '-')}`} key={item} onClick={() => setCategory(item)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${category === item ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]' : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)]'}`}>{item}</button>)}
+      </div>
+    </section>
+    <div className="flex items-center justify-between gap-3 px-1">
+      <p className="text-sm font-semibold">{visibleModules.length} application{visibleModules.length > 1 ? 's' : ''} affichée{visibleModules.length > 1 ? 's' : ''}</p>
+      <p className="text-xs text-[hsl(var(--muted-foreground))]">Cliquez sur une application pour voir ses détails et la tester.</p>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {visibleModules.map((module, index) => {
+        const status = statusOf(module.id);
+        const isActive = status !== 'INACTIF';
+        const activeDependents = modules.filter(item => item.dependencies.includes(module.id) && statusOf(item.id) !== 'INACTIF');
+        const ModuleIcon: Icon = categoryOf(module.id) === 'Commerce' ? ShoppingCart : categoryOf(module.id) === 'Finance' ? WalletCards : categoryOf(module.id) === 'Ressources humaines' ? Users : Boxes;
+        return <section data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface flex min-h-[290px] flex-col rounded-2xl p-5 fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-70'}`}>
+          <div className="flex items-start justify-between gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><ModuleIcon size={19} /></span><StatusBadge status={status} /></div>
+          <p className="mono mt-4 text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</p>
+          <h2 className="mt-1 text-lg font-bold">{module.name}</h2>
+          <p className="mt-2 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
+          <div className="mt-4 flex flex-wrap gap-1.5">{module.features.map(feature => <span key={feature} className="rounded-full bg-[hsl(var(--muted)/.7)] px-2.5 py-1 text-[10px] font-semibold">{feature}</span>)}</div>
+          <div className="mt-auto pt-5">
+            {module.dependencies.length > 0 && <p className="mb-3 text-[11px] text-[hsl(var(--muted-foreground))]">Dépend de : {module.dependencies.map(id => modules.find(item => item.id === id)?.name ?? id).join(', ')}</p>}
+            {activeDependents.length > 0 && <p className="mb-3 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">Utilisé par : {activeDependents.map(item => item.name).join(', ')}</p>}
+            <div className="flex items-center justify-between gap-3 border-t pt-4"><button data-testid={`button-open-module-${module.id}`} onClick={() => setSelectedId(module.id)} className="inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Voir l’application <ChevronRight size={14} /></button><button data-testid={`button-toggle-module-${module.id}`} onClick={() => toggleModule(module.id)} className={`rounded-lg px-3 py-2 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{isActive ? 'Désactiver' : 'Activer'}</button></div>
+          </div>
+        </section>;
+      })}
+      {visibleModules.length === 0 && <div className="card-surface col-span-full rounded-2xl p-10 text-center"><Package className="mx-auto text-[hsl(var(--muted-foreground))]" size={28} /><h2 className="mt-4 font-bold">Aucune application trouvée</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Modifiez votre recherche ou réinitialisez les filtres.</p><button type="button" onClick={() => { setQuery(''); setCategory('Toutes'); setStatusFilter('TOUTES'); }} className="mt-4 text-xs font-bold text-[hsl(var(--primary))]">Réinitialiser les filtres</button></div>}
+    </div>
+  </div>;
 }
 
 function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof modules)[number]; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
