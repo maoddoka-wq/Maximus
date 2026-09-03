@@ -238,13 +238,60 @@ function Brand({ inverse = false, homeHref }: { inverse?: boolean; homeHref?: st
 function Step({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) { return <div className={`flex items-center gap-2 text-sm font-bold ${active || done ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${done ? 'bg-[hsl(var(--primary))] text-white' : active ? 'bg-[hsl(var(--accent))]' : 'border border-[hsl(var(--border))]'}`}>{done ? <Check size={14} /> : n}</span><span className="mobile-hide">{label}</span></div>; }
 function Field({ label, value, onChange, placeholder, type = 'text', testId }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; testId: string }) { return <label className="block text-sm font-semibold">{label}<input data-testid={testId} type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal transition focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label>; }
 
-function Sidebar({ session, location, allowed, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse, fixedHeight }: { session: Session; location: string; allowed: ModuleId[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; companyPhoto?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void; fixedHeight?: boolean }) {
+function LegacySidebar({ session, location, allowed, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse, fixedHeight }: { session: Session; location: string; allowed: ModuleId[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; companyPhoto?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void; fixedHeight?: boolean }) {
   const isAdmin = session === 'admin';
   const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || session === 'kora' || session.startsWith('company:')) && (item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople)));
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const compact = collapsed && !mobileOpen;
   const profileImage = !isAdmin && !employee ? companyPhoto : undefined;
   return <><button aria-label="Fermer le menu" data-testid="button-close-mobile-menu" onClick={onClose} className={`fixed inset-0 z-40 bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm md:hidden ${mobileOpen ? 'block' : 'hidden'}`} /><aside className={`sidebar shrink-0 flex-col overscroll-contain overflow-y-auto transition-[width] duration-200 md:relative md:flex md:h-[100dvh] ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}><div className={`flex items-center ${compact ? 'gap-1 px-2' : 'justify-between px-4'} py-6`}>{isAdmin ? <div className={`flex min-w-0 items-center ${compact ? 'gap-1' : 'gap-3'}`}><span className={`flex shrink-0 items-center justify-center overflow-hidden bg-[hsl(var(--accent)/.18)] font-bold text-[hsl(var(--accent))] ${compact ? 'h-8 w-8 rounded-lg text-[10px]' : 'h-12 w-12 rounded-xl text-sm'}`}>MX</span>{!compact && <div className="min-w-0"><p className="truncate text-sm font-bold">MAXIMUS</p><p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">Centre de contrôle</p></div>}</div> : <div className={`flex min-w-0 items-center ${compact ? 'gap-1' : 'gap-3'}`}><span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[hsl(var(--accent)/.18)] font-bold text-[hsl(var(--accent))] ${compact ? 'h-8 w-8 rounded-lg text-[10px]' : 'h-12 w-12 text-sm'}`}>{profileImage ? <img src={profileImage} alt={`Logo de ${companyName ?? 'l’entreprise'}`} className="h-full w-full object-cover" /> : initials}</span>{!compact && <div className="min-w-0"><p className="truncate text-sm font-bold">{companyName ?? 'KORA Distribution'}</p><p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">{employee ? employee.role : 'Espace entreprise'}</p></div>}</div>}<button aria-label={compact ? 'Déployer le menu' : 'Rétracter le menu'} title={compact ? 'Déployer le menu' : 'Rétracter le menu'} data-testid="button-toggle-sidebar" onClick={onToggleCollapse} className={`hidden rounded-lg text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:block ${compact ? 'p-1' : 'p-2'}`}>{compact ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={18} />}</button><button aria-label="Fermer le menu" data-testid="button-close-mobile-menu-inner" onClick={onClose} className="rounded-lg p-2 text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:hidden"><X size={18} /></button></div><nav className={`${isAdmin ? 'flex-none' : 'min-h-0 flex-1'} space-y-1 overflow-hidden px-3`}>{nav.map(item => <Link data-testid={`link-nav-${item.href.split('/').pop()}`} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={`nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${location === item.href ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`}><item.icon size={17} strokeWidth={location === item.href ? 2.5 : 1.8} />{!compact && item.label}</Link>)}</nav><div className={`border-t border-[hsl(var(--sidebar-border))] pt-4 ${compact ? 'm-3' : 'm-4'}`}><button data-testid="button-logout" title={compact ? 'Se déconnecter' : undefined} onClick={onLogout} className={`nav-item flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[hsl(var(--sidebar-foreground)/.64)] ${compact ? 'justify-center' : ''}`}><LogIn size={17} className="rotate-180" />{!compact && 'Se déconnecter'}</button><div className="mt-4 flex justify-center"><span className="text-sm font-black tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">MAXIMUS<span className="text-[hsl(var(--accent))]">.</span></span></div></div></aside></>;
+}
+
+type SidebarProps = {
+  session: Session;
+  location: string;
+  allowed: ModuleId[];
+  canManagePeople: boolean;
+  onLogout: () => void;
+  employee: StoreData['employees'][number] | null;
+  companyName?: string;
+  companyPhoto?: string;
+  mobileOpen: boolean;
+  onClose: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+};
+
+function Sidebar({ session, location, allowed, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse }: SidebarProps) {
+  const isAdmin = session === 'admin';
+  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || session === 'kora' || session.startsWith('company:')) && (item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople)));
+  const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
+  const compact = collapsed && !mobileOpen;
+  const profileImage = !isAdmin && !employee ? companyPhoto : undefined;
+
+  return <>
+    <button aria-label="Fermer le menu" data-testid="button-close-mobile-menu" onClick={onClose} className={`fixed inset-0 z-40 bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm md:hidden ${mobileOpen ? 'block' : 'hidden'}`} />
+    <aside className={`sidebar shrink-0 flex-col overflow-hidden transition-[width] duration-200 md:relative md:flex md:h-[100dvh] ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}>
+      <div className={`flex shrink-0 items-center ${compact ? 'gap-1 px-2' : 'justify-between px-4'} py-6`}>
+        {isAdmin ? <div className={`flex min-w-0 items-center ${compact ? 'gap-1' : 'gap-3'}`}>
+          <span className={`flex shrink-0 items-center justify-center overflow-hidden bg-[hsl(var(--accent)/.18)] font-bold text-[hsl(var(--accent))] ${compact ? 'h-8 w-8 rounded-lg text-[10px]' : 'h-12 w-12 rounded-xl text-sm'}`}>MX</span>
+          {!compact && <div className="min-w-0"><p className="truncate text-sm font-bold">MAXIMUS</p><p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">Centre de contrôle</p></div>}
+        </div> : <div className={`flex min-w-0 items-center ${compact ? 'gap-1' : 'gap-3'}`}>
+          <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[hsl(var(--accent)/.18)] font-bold text-[hsl(var(--accent))] ${compact ? 'h-8 w-8 rounded-lg text-[10px]' : 'h-12 w-12 text-sm'}`}>{profileImage ? <img src={profileImage} alt={`Logo de ${companyName ?? 'l’entreprise'}`} className="h-full w-full object-cover" /> : initials}</span>
+          {!compact && <div className="min-w-0"><p className="truncate text-sm font-bold">{companyName ?? 'KORA Distribution'}</p><p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">{employee ? employee.role : 'Espace entreprise'}</p></div>}
+        </div>}
+        <button aria-label={compact ? 'Déployer le menu' : 'Rétracter le menu'} title={compact ? 'Déployer le menu' : 'Rétracter le menu'} data-testid="button-toggle-sidebar" onClick={onToggleCollapse} className={`hidden rounded-lg text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:block ${compact ? 'p-1' : 'p-2'}`}>{compact ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={18} />}</button>
+        <button aria-label="Fermer le menu" data-testid="button-close-mobile-menu-inner" onClick={onClose} className="rounded-lg p-2 text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:hidden"><X size={18} /></button>
+      </div>
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3">
+        {nav.map(item => <Link data-testid={`link-nav-${item.href.split('/').pop()}`} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={`nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${location === item.href ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`}><item.icon size={17} strokeWidth={location === item.href ? 2.5 : 1.8} />{!compact && item.label}</Link>)}
+        <button data-testid="button-logout" title={compact ? 'Se déconnecter' : undefined} onClick={onLogout} className={`nav-item flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[hsl(var(--sidebar-foreground)/.64)] ${compact ? 'justify-center' : ''}`}><LogIn size={17} className="rotate-180" />{!compact && 'Se déconnecter'}</button>
+      </nav>
+      <div className={`shrink-0 border-t border-[hsl(var(--sidebar-border))] pt-4 ${compact ? 'm-3' : 'm-4'}`}>
+        <div className="mt-4 flex justify-start"><span className="text-sm font-black tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">MAXIMUS<span className="text-[hsl(var(--accent))]">.</span></span></div>
+      </div>
+    </aside>
+  </>;
 }
 
 function Topbar({ title, isAdmin, onNavigate, onToggleMenu, notificationPath }: { title: string; isAdmin: boolean; onNavigate: (path: string) => void; onToggleMenu: () => void; notificationPath: string }) {
