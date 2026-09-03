@@ -566,4 +566,94 @@ function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee }: { dat
 }
 
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppContent /></WouterRouter></TooltipProvider></QueryClientProvider>; }
+
+function CompanyModulesDetail({ company, mutate, onBack }: { company: Company; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
+  const [active, setActive] = useState<ModuleId[]>(company.allowedModules);
+  const [warning, setWarning] = useState('');
+
+  useEffect(() => {
+    setActive(company.allowedModules);
+    setWarning('');
+  }, [company.id, company.allowedModules.join('|')]);
+
+  const toggle = (id: ModuleId) => {
+    const module = modules.find(item => item.id === id);
+    setActive(previous => {
+      if (previous.includes(id)) {
+        const toRemove = new Set<ModuleId>([id]);
+        let expanded = true;
+        while (expanded) {
+          expanded = false;
+          modules.forEach(candidate => {
+            if (!toRemove.has(candidate.id) && candidate.dependencies.some(dependency => toRemove.has(dependency)) && previous.includes(candidate.id)) {
+              toRemove.add(candidate.id);
+              expanded = true;
+            }
+          });
+        }
+        setWarning('');
+        return previous.filter(moduleId => !toRemove.has(moduleId));
+      }
+      const missing = module?.dependencies.filter(dependency => !previous.includes(dependency)) ?? [];
+      if (missing.length) {
+        setWarning(`Autorisez d’abord : ${missing.map(dependency => modules.find(item => item.id === dependency)?.name ?? dependency).join(', ')}.`);
+        return previous;
+      }
+      setWarning('');
+      return [...previous, id];
+    });
+  };
+
+  const save = () => {
+    mutate(draft => {
+      const target = draft.companies.find(item => item.id === company.id);
+      if (target) {
+        target.allowedModules = [...active];
+        target.refusedModules = target.requestedModules.filter(moduleId => !active.includes(moduleId));
+      }
+    }, 'Configuration enregistrée.');
+  };
+
+  return <div className="space-y-5">
+    <button data-testid="button-back-companies" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour aux entreprises</button>
+    <div className="card-surface rounded-2xl p-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row">
+        <div className="flex gap-4">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary))] text-lg font-black text-[hsl(var(--primary-foreground))]">{company.name.slice(0, 2).toUpperCase()}</span>
+          <div>
+            <h2 className="text-2xl font-bold">{company.name}</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{company.sector} · {company.country}</p>
+            <div className="mt-3"><StatusBadge status={company.status} /></div>
+          </div>
+        </div>
+        <ActionButton testId="button-suspend-company" icon={company.status === 'SUSPENDU' ? RefreshCw : ShieldCheck} onClick={() => mutate(draft => {
+          const target = draft.companies.find(item => item.id === company.id);
+          if (target) target.status = target.status === 'SUSPENDU' ? 'ACTIF' : 'SUSPENDU';
+        }, company.status === 'SUSPENDU' ? 'Entreprise réactivée.' : 'Entreprise suspendue.')}>{company.status === 'SUSPENDU' ? 'Réactiver' : 'Suspendre'}</ActionButton>
+      </div>
+      <div className="mt-8 grid gap-4 border-t pt-5 text-sm sm:grid-cols-3">
+        <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Responsable</p><p className="mt-1 font-bold">{company.manager}</p></div>
+        <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Email</p><p className="mt-1 font-bold">{company.email}</p></div>
+        <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Modules actifs</p><p className="mt-1 font-bold">{active.length} / {modules.length}</p></div>
+      </div>
+    </div>
+    <section className="card-surface rounded-2xl p-6">
+      <div className="flex items-center justify-between">
+        <div><h2 className="font-bold">Modules autorisés</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajustez le périmètre de l’espace.</p></div>
+        <span className="mono text-xs text-[hsl(var(--muted-foreground))]">{active.length} / {modules.length}</span>
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {modules.map(module => {
+          const isAllowed = active.includes(module.id);
+          return <button data-testid={`button-toggle-company-module-${module.id}`} aria-pressed={isAllowed} key={module.id} onClick={() => toggle(module.id)} className={`flex items-center justify-between rounded-xl border p-4 text-left ${isAllowed ? 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)] opacity-65'}`}>
+            <div className="flex items-center gap-3"><span className="rounded-lg bg-[hsl(var(--muted))] p-2"><LayoutGrid size={16} /></span><div><strong className="text-sm">{module.name}</strong><p className="text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</p></div></div>
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${isAllowed ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white' : ''}`}>{isAllowed && <Check size={13} />}</span>
+          </button>;
+        })}
+      </div>
+      {warning && <p className="mt-4 text-xs font-semibold text-[hsl(var(--destructive))]">{warning}</p>}
+      <div className="mt-6 flex justify-end"><ActionButton primary testId="button-save-company-modules" onClick={save}>Enregistrer la configuration</ActionButton></div>
+    </section>
+  </div>;
+}
 export default App;
