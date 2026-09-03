@@ -31,7 +31,6 @@ const adminNav = [
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
   { href: '/kora/organisation', label: 'Organisation de l’entreprise', icon: GitBranch, module: null, adminOnly: true },
-  { href: '/kora/profil', label: 'Mon profil', icon: UserRoundCog, module: null, companyAdminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
   { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
@@ -345,7 +344,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   if (location === '/kora/dashboard') return <KoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
   if (location === '/kora/profil') {
     const company = data.companies.find(item => item.id === companyId);
-    return companyAdmin && company ? <CompanyProfilePage company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onNavigate('/kora/dashboard')} />;
+    return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="profile" /> : <EmptyState title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onNavigate('/kora/dashboard')} />;
   }
   if (location === '/kora/organisation') {
     const company = data.companies.find(item => item.id === companyId);
@@ -357,7 +356,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   if (location === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;
   if (location === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
   if (location === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
-  if (location === '/kora/rh') return <HumanResourcesWorkspace data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} />;
+  if (location === '/kora/rh') return <HumanResourcesWorkspace data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} companyId={companyId} />;
   if (location === '/kora/presences') return <PresencesPage data={data} />;
   if (location === '/kora/paie') return <OperationalModulePage moduleId="paie" data={data} mutate={mutate} canCreate={hasPermission('paie', 'créer')} canModify={hasPermission('paie', 'modifier')} />;
   if (location === '/kora/crm') return <OperationalModulePage moduleId="crm" data={data} mutate={mutate} canCreate={hasPermission('crm', 'créer')} canModify={hasPermission('crm', 'modifier')} />;
@@ -662,8 +661,8 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
   </div>;
 }
 
-function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; companyAdmin: boolean; employee: StoreData['employees'][number] | null }) {
-  const company = data.companies.find(item => item.id === 'kora');
+function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee, companyId }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; companyAdmin: boolean; employee: StoreData['employees'][number] | null; companyId: string }) {
+  const company = data.companies.find(item => item.id === companyId);
   if (companyAdmin && company) return <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} />;
   return <RHPage data={data} />;
 }
