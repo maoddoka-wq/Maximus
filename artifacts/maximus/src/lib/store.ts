@@ -28,7 +28,15 @@ export interface Sale { id: string; reference: string; client: string; amount: n
 export interface Payment { id: string; reference: string; invoice: string; amount: number; status: Status; date: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; }
 export interface OrgNode { id: string; name: string; type: 'direction' | 'department' | 'service'; parentId: string | null; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; moduleStatuses?: ModuleStatusMap; }
+export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; }
+export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; }
+export interface PayrollSlip { id: string; reference: string; employee: string; period: string; gross: number; net: number; status: Status; }
+export interface CrmOpportunity { id: string; client: string; contact: string; subject: string; amount: number; nextAction: string; status: Status; }
+export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
+export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
+export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; moduleStatuses?: ModuleStatusMap; }
+export interface StoreData { catalogVersion?: number; }
 
 const today = new Date().toISOString();
 export const modules: Module[] = [
@@ -61,8 +69,9 @@ export const dependencies: Dependency[] = [
 
 export function seedData(): StoreData {
   return {
+    catalogVersion: 2,
     companies: [
-      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['finance', 'commerce', 'stocks', 'rh', 'presences'], allowedModules: ['finance', 'commerce', 'stocks', 'rh', 'presences'], refusedModules: [], createdAt: '2024-04-12' },
+      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
       { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
     ],
@@ -77,7 +86,7 @@ export function seedData(): StoreData {
       { id: 'emp-8', firstName: 'Lamine', lastName: 'Diallo', email: 'lamine@kora.demo', phone: '+221 78 903 21 10', position: 'Responsable logistique', department: 'Opérations', subDepartment: 'Transport', role: 'Responsable logistique', status: 'ACTIF', loginPassword: 'Kora123!' },
     ],
     roles: [
-      { id: 'role-admin', name: 'Administratrice', description: 'Accès complet à l’espace KORA.', modulePermissions: { finance: ['voir', 'créer', 'modifier'], commerce: ['voir', 'créer', 'modifier'], stocks: ['voir', 'créer', 'modifier'], rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer'] } },
+      { id: 'role-admin', name: 'Administratrice', description: 'Accès complet à l’espace KORA.', modulePermissions: Object.fromEntries(modules.map(module => [module.id, ['voir', 'créer', 'modifier']])) },
       { id: 'role-compta', name: 'Comptable', description: 'Pilotage des flux financiers.', modulePermissions: { finance: ['voir', 'créer', 'modifier'] } },
       { id: 'role-manager', name: 'Manager', description: 'Opérations et équipes.', modulePermissions: { commerce: ['voir', 'créer'], stocks: ['voir', 'modifier'], rh: ['voir'] } },
       { id: 'role-magasinier', name: 'Magasinier', description: 'Gestion quotidienne des stocks.', modulePermissions: { stocks: ['voir', 'créer', 'modifier'] } },
@@ -126,6 +135,34 @@ export function seedData(): StoreData {
       { id: 'n-2', title: 'Paiement confirmé', text: 'Le paiement PAY-09281 a été enregistré.', read: false, date: 'Il y a 24 min' },
       { id: 'n-3', title: 'Rapport disponible', text: 'Votre rapport hebdomadaire est prêt.', read: true, date: 'Hier' },
     ],
+    purchaseOrders: [
+      { id: 'po-1', reference: 'BC-2406-041', supplier: 'SENARIZ SA', subject: 'Riz local 5 kg · réassort', amount: 612000, date: '18 juin 2024', status: 'VALIDÉ' },
+      { id: 'po-2', reference: 'BC-2406-038', supplier: 'Huilerie du Saloum', subject: 'Huile d’arachide 1 L', amount: 385000, date: '17 juin 2024', status: 'EN ATTENTE' },
+    ],
+    accountingEntries: [
+      { id: 'acc-1', reference: 'OD-240618-12', journal: 'Banque', label: 'Encaissement FAC-2406-18', debit: 186500, credit: 186500, date: '18 juin 2024', status: 'VALIDÉ' },
+      { id: 'acc-2', reference: 'AC-240617-08', journal: 'Achats', label: 'Facture Huilerie du Saloum', debit: 385000, credit: 385000, date: '17 juin 2024', status: 'BROUILLON' },
+    ],
+    payrollSlips: [
+      { id: 'payroll-1', reference: 'PAIE-2024-05-001', employee: 'Mamadou Ba', period: 'Mai 2024', gross: 485000, net: 398250, status: 'VALIDÉ' },
+      { id: 'payroll-2', reference: 'PAIE-2024-06-002', employee: 'Awa Ndiaye', period: 'Juin 2024', gross: 350000, net: 289500, status: 'BROUILLON' },
+    ],
+    crmOpportunities: [
+      { id: 'crm-1', client: 'Boutique Keur Gui', contact: 'Khadim Gueye', subject: 'Référencement gamme bien-être', amount: 275000, nextAction: 'Relance le 20 juin', status: 'EN ATTENTE' },
+      { id: 'crm-2', client: 'Maison Baobab', contact: 'Marième Ba', subject: 'Commande Ramadan', amount: 420000, nextAction: 'Proposition envoyée', status: 'ACTIF' },
+    ],
+    supplierRecords: [
+      { id: 'sup-1', name: 'SENARIZ SA', contact: 'Cheikh Seck', phone: '+221 33 821 40 22', category: 'Épicerie', score: 92, status: 'ACTIF' },
+      { id: 'sup-2', name: 'Huilerie du Saloum', contact: 'Aïssatou Diouf', phone: '+221 77 456 19 88', category: 'Épicerie', score: 84, status: 'ACTIF' },
+    ],
+    deliveries: [
+      { id: 'del-1', reference: 'LIV-240618-07', recipient: 'Boutique Keur Gui', destination: 'Médina, Dakar', driver: 'Lamine Diallo', date: '18 juin · 14:30', status: 'CONFIRMÉ' },
+      { id: 'del-2', reference: 'LIV-240618-08', recipient: 'Marché Tilène', destination: 'Tilène, Dakar', driver: 'Ousmane Ndiaye', date: '18 juin · 16:00', status: 'EN ATTENTE' },
+    ],
+    businessDocuments: [
+      { id: 'doc-1', name: 'Contrat SENARIZ 2024.pdf', category: 'Contrats', owner: 'Mamadou Ba', updatedAt: '18 juin 2024', version: 2, status: 'VALIDÉ' },
+      { id: 'doc-2', name: 'Procédure réception entrepôt.pdf', category: 'Procédures', owner: 'Ndeye Sarr', updatedAt: '16 juin 2024', version: 1, status: 'ACTIF' },
+    ],
   };
 }
 
@@ -137,15 +174,30 @@ export function loadData(): StoreData {
     const initial = seedData();
     const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
     const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
+    const companies = (parsed.catalogVersion ?? 1) < 2
+      ? parsed.companies.map(company => company.id === 'kora' ? { ...company, requestedModules: initial.companies[0].requestedModules, allowedModules: initial.companies[0].allowedModules, refusedModules: [] } : company)
+      : parsed.companies;
+    const roles = (parsed.catalogVersion ?? 1) < 2
+      ? parsed.roles.map(role => role.id === 'role-admin' ? { ...role, modulePermissions: initial.roles.find(item => item.id === 'role-admin')?.modulePermissions ?? role.modulePermissions } : role)
+      : parsed.roles;
     return {
       ...initial,
       ...parsed,
+      catalogVersion: 2,
+      companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
+      purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
+      accountingEntries: parsed.accountingEntries ?? initial.accountingEntries,
+      payrollSlips: parsed.payrollSlips ?? initial.payrollSlips,
+      crmOpportunities: parsed.crmOpportunities ?? initial.crmOpportunities,
+      supplierRecords: parsed.supplierRecords ?? initial.supplierRecords,
+      deliveries: parsed.deliveries ?? initial.deliveries,
+      businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
       employees: parsed.employees.map(employee => {
         const seeded = seededByEmail.get(employee.email);
         return { ...employee, loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!', isSectorAdmin: employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false };
       }),
-      roles: [...initial.roles.filter(role => !parsed.roles.some(existing => existing.id === role.id)), ...parsed.roles],
+      roles: [...initial.roles.filter(role => !roles.some(existing => existing.id === role.id)), ...roles],
     };
   } catch { return seedData(); }
 }

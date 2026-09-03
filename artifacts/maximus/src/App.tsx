@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { dependencies, loadData, modules, money, saveData, shortMoney, uid, type Company, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
+import { OperationalModulePage } from '@/pages/operational-modules';
 
 const queryClient = new QueryClient();
 type Icon = typeof Gauge;
@@ -27,15 +28,20 @@ const adminNav = [
 ];
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: 'rh' },
-  { href: '/kora/employes', label: 'Employés', icon: Users, module: 'rh' },
-  { href: '/kora/roles', label: 'Rôles', icon: ShieldCheck, module: 'rh' },
+  { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
+  { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
+  { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
   { href: '/kora/stocks', label: 'Stocks', icon: Boxes, module: 'stocks' },
   { href: '/kora/finance', label: 'Finance', icon: WalletCards, module: 'finance' },
-  { href: '/kora/commerce', label: 'Commerce', icon: ShoppingCart, module: 'commerce' },
-  { href: '/kora/rh', label: 'RH', icon: UserRoundCog, module: 'rh' },
+  { href: '/kora/comptabilite', label: 'Comptabilité', icon: FileBarChart, module: 'comptabilite' },
+  { href: '/kora/rh', label: 'Ressources humaines', icon: UserRoundCog, module: 'rh' },
   { href: '/kora/presences', label: 'Présences', icon: FileClock, module: 'presences' },
-  { href: '/kora/rapports', label: 'Rapports', icon: FileBarChart, module: null },
+  { href: '/kora/paie', label: 'Paie', icon: CreditCard, module: 'paie' },
+  { href: '/kora/crm', label: 'CRM / Clients', icon: Users, module: 'crm' },
+  { href: '/kora/fournisseurs', label: 'Fournisseurs', icon: Store, module: 'fournisseurs' },
+  { href: '/kora/logistique', label: 'Logistique', icon: Package, module: 'logistique' },
+  { href: '/kora/documents', label: 'Documents', icon: FolderKanban, module: 'documents' },
+  { href: '/kora/rapports', label: 'Rapports', icon: FileBarChart, module: 'rapports' },
 ];
 
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
@@ -56,9 +62,17 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
   '/kora/stocks': { kicker: 'Espace KORA', title: 'Stocks', description: 'Les niveaux et mouvements de vos produits.' },
   '/kora/finance': { kicker: 'Espace KORA', title: 'Finance', description: 'Une lecture simple des encaissements et de la trésorerie.' },
-  '/kora/commerce': { kicker: 'Espace KORA', title: 'Commerce', description: 'Ventes et activité commerciale en temps réel.' },
-  '/kora/rh': { kicker: 'Espace KORA', title: 'Ressources humaines', description: 'La vue équipe et les rôles de chacun.' },
+  '/kora/commerce': { kicker: 'Espace KORA', title: 'Gestion commerciale', description: 'Clients, commandes et activité commerciale en temps réel.' },
+  '/kora/ventes': { kicker: 'Espace KORA', title: 'Ventes', description: 'Devis, ventes et validation des opérations clients.' },
+  '/kora/achats': { kicker: 'Espace KORA', title: 'Achats', description: 'Demandes, commandes fournisseurs et réceptions.' },
+  '/kora/comptabilite': { kicker: 'Espace KORA', title: 'Comptabilité', description: 'Écritures, journaux et rapprochements comptables.' },
+  '/kora/rh': { kicker: 'Espace KORA', title: 'Ressources humaines', description: 'Organisation, employés, rôles et permissions.' },
   '/kora/presences': { kicker: 'Espace KORA', title: 'Présences', description: 'Le suivi quotidien de vos équipes.' },
+  '/kora/paie': { kicker: 'Espace KORA', title: 'Paie', description: 'Périodes, bulletins et validation des salaires.' },
+  '/kora/crm': { kicker: 'Espace KORA', title: 'CRM / Clients', description: 'Fiches clients, opportunités et relances.' },
+  '/kora/fournisseurs': { kicker: 'Espace KORA', title: 'Fournisseurs', description: 'Référentiel, évaluation et suivi des partenaires.' },
+  '/kora/logistique': { kicker: 'Espace KORA', title: 'Logistique', description: 'Entrepôts, livraisons et acheminement.' },
+  '/kora/documents': { kicker: 'Espace KORA', title: 'Documents', description: 'Classement, partage et suivi des versions.' },
   '/kora/rapports': { kicker: 'Espace KORA', title: 'Rapports', description: 'Des synthèses actionnables pour décider plus vite.' },
 };
 
@@ -108,6 +122,7 @@ function AppContent() {
     : employeeRole
       ? companyAllowed.filter(moduleId => employeeRole.modulePermissions[moduleId]?.includes('voir'))
       : [];
+  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || Boolean(employeeRole?.modulePermissions[moduleId]?.includes(permission));
   const canManagePeople = session === 'kora' || Boolean(employee?.isSectorAdmin);
   const currentMeta = pageMeta[location] ?? pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard'];
   return (
@@ -118,7 +133,7 @@ function AppContent() {
         <div className="page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora'} employee={employee} />}
+            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora'} employee={employee} hasPermission={hasPermission} />}
           </ErrorBoundary>
         </div>
       </main>
@@ -197,20 +212,25 @@ function AdminRouter({ location, data, mutate, notify, onNavigate }: { location:
   if (location === '/maximus/parametres') return <SettingsPage onReset={() => { localStorage.removeItem('maximus-data-v1'); window.location.reload(); }} />;
   return <EmptyState title="Cette vue n’existe pas encore" text="Revenez au cockpit pour poursuivre." action={() => onNavigate('/maximus/dashboard')} />;
 }
-function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, employee }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; employee: StoreData['employees'][number] | null }) {
-  const routeModules: Record<string, ModuleId> = { '/kora/organisation': 'rh', '/kora/employes': 'rh', '/kora/roles': 'rh', '/kora/rh': 'rh', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/commerce': 'commerce', '/kora/presences': 'presences' };
+function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, employee, hasPermission }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean }) {
+  const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[location];
   if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
   if (location === '/kora/dashboard') return <KoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
-  if (location === '/kora/organisation') return <OrganisationPage data={data} mutate={mutate} />;
-  if (location === '/kora/employes') return <EmployeesPage data={data} mutate={mutate} companyAdmin={companyAdmin} sectorAdminDepartment={companyAdmin ? undefined : employee?.department} />;
-  if (location === '/kora/roles') return <KoraRolesPage data={data} mutate={mutate} />;
   if (location === '/kora/stocks') return <StockModulePage />;
   if (location === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
   if (location === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
-  if (location === '/kora/rh') return <RHPage data={data} />;
+  if (location === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;
+  if (location === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
+  if (location === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
+  if (location === '/kora/rh') return <HumanResourcesWorkspace data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} />;
   if (location === '/kora/presences') return <PresencesPage data={data} />;
-  if (location === '/kora/rapports') return <ReportsPage data={data} />;
+  if (location === '/kora/paie') return <OperationalModulePage moduleId="paie" data={data} mutate={mutate} canCreate={hasPermission('paie', 'créer')} canModify={hasPermission('paie', 'modifier')} />;
+  if (location === '/kora/crm') return <OperationalModulePage moduleId="crm" data={data} mutate={mutate} canCreate={hasPermission('crm', 'créer')} canModify={hasPermission('crm', 'modifier')} />;
+  if (location === '/kora/fournisseurs') return <OperationalModulePage moduleId="fournisseurs" data={data} mutate={mutate} canCreate={hasPermission('fournisseurs', 'créer')} canModify={hasPermission('fournisseurs', 'modifier')} />;
+  if (location === '/kora/logistique') return <OperationalModulePage moduleId="logistique" data={data} mutate={mutate} canCreate={hasPermission('logistique', 'créer')} canModify={hasPermission('logistique', 'modifier')} />;
+  if (location === '/kora/documents') return <OperationalModulePage moduleId="documents" data={data} mutate={mutate} canCreate={hasPermission('documents', 'créer')} canModify={hasPermission('documents', 'modifier')} />;
+  if (location === '/kora/rapports') return <OperationalReportsPage data={data} />;
   return <EmptyState title="Module non autorisé" text={`Cette vue n’est pas disponible pour KORA (${allowed.length} modules autorisés).`} action={() => onNavigate('/kora/dashboard')} />;
 }
 
@@ -428,7 +448,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
 }
 
 function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof modules)[number]; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
-  const liveModule = ['stocks', 'commerce', 'ventes', 'finance', 'rh', 'presences'].includes(module.id);
+  const operationalModules: ModuleId[] = ['achats', 'comptabilite', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents'];
   return <div data-testid="module-workbench" className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button data-testid="button-back-live-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
@@ -444,7 +464,57 @@ function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof
     {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
     {module.id === 'rh' && <EmployeesPage data={data} mutate={mutate} companyAdmin sectorAdminDepartment={undefined} />}
     {module.id === 'presences' && <PresencesPage data={data} />}
-    {!liveModule && <section className="card-surface rounded-2xl p-6"><h2 className="text-lg font-bold">Fonctionnalités disponibles</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Ce module est référencé dans le catalogue. Son écran métier n’est pas encore connecté à l’administration.</p><div className="mt-5 grid gap-3 sm:grid-cols-2">{module.features.map(feature => <div data-testid={`test-placeholder-${module.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} key={feature} className="rounded-xl border p-4 text-sm font-semibold">{feature}<span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">En préparation</span></div>)}</div></section>}
+    {operationalModules.includes(module.id) && <OperationalModulePage moduleId={module.id} data={data} mutate={mutate} />}
+    {module.id === 'rapports' && <OperationalReportsPage data={data} />}
+  </div>;
+}
+
+function OperationalReportsPage({ data }: { data: StoreData }) {
+  type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
+  const [report, setReport] = useState<ReportId>('sales');
+  const [query, setQuery] = useState('');
+  const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
+    sales: { label: 'Ventes', description: 'Chiffre d’affaires et commandes clients.', headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'], rows: data.sales.map(item => [item.reference, item.client, money(item.amount), item.status, item.date]) },
+    stock: { label: 'Stocks', description: 'Valorisation et niveaux des produits.', headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'], rows: data.products.map(item => [item.name, item.sku, item.category, String(item.stock), money(item.stock * item.price)]) },
+    finance: { label: 'Finance', description: 'Paiements et encaissements enregistrés.', headers: ['Référence', 'Facture', 'Montant', 'Statut', 'Date'], rows: data.payments.map(item => [item.reference, item.invoice, money(item.amount), item.status, item.date]) },
+    activity: { label: 'Activité', description: 'Traçabilité des actions réalisées.', headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'], rows: data.activities.map(item => [item.user, item.action, item.module, item.object, item.date]) },
+  };
+  const active = definitions[report];
+  const rows = active.rows.filter(row => row.join(' ').toLowerCase().includes(query.toLowerCase()));
+  const exportCsv = () => {
+    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const csv = [active.headers, ...rows].map(row => row.map(escape).join(';')).join('\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rapport-${report}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return <div className="space-y-5">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{(Object.entries(definitions) as [ReportId, typeof active][]).map(([id, item]) => <button key={id} onClick={() => setReport(id)} className={`card-surface rounded-2xl p-5 text-left transition ${report === id ? 'ring-2 ring-[hsl(var(--primary))]' : 'hover:-translate-y-0.5'}`}><FileBarChart size={18} className="text-[hsl(var(--primary))]" /><p className="mt-4 font-bold">{item.label}</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{item.description}</p></button>)}</div>
+    <section className="card-surface overflow-hidden rounded-2xl">
+      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="font-bold">Rapport {active.label}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{rows.length} lignes calculées depuis les données de l’entreprise.</p></div><div className="flex gap-2"><button onClick={() => window.print()} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Imprimer</button><button onClick={exportCsv} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Exporter CSV</button></div></div>
+      <div className="p-5"><label className="relative block max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Filtrer le rapport..." className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-[hsl(var(--muted)/.55)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]"><tr>{active.headers.map(header => <th key={header} className="px-4 py-3">{header}</th>)}</tr></thead><tbody className="divide-y">{rows.map((row, index) => <tr key={`${report}-${index}`} className="hover:bg-[hsl(var(--muted)/.35)]">{row.map((cell, cellIndex) => <td key={`${cellIndex}-${cell}`} className="px-4 py-3">{cell}</td>)}</tr>)}{rows.length === 0 && <tr><td colSpan={active.headers.length} className="px-4 py-12 text-center text-[hsl(var(--muted-foreground))]">Aucune donnée pour ce filtre.</td></tr>}</tbody></table></div>
+    </section>
+  </div>;
+}
+
+function HumanResourcesWorkspace({ data, mutate, companyAdmin, employee }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; companyAdmin: boolean; employee: StoreData['employees'][number] | null }) {
+  const [tab, setTab] = useState<'overview' | 'organisation' | 'employees' | 'roles'>('overview');
+  const tabs: { id: typeof tab; label: string }[] = [
+    { id: 'overview', label: 'Vue RH' },
+    { id: 'organisation', label: 'Organisation' },
+    { id: 'employees', label: 'Employés' },
+    { id: 'roles', label: 'Rôles & permissions' },
+  ];
+  return <div className="space-y-5">
+    <div className="card-surface flex gap-1 overflow-x-auto rounded-xl p-1.5">{tabs.map(item => <button data-testid={`button-rh-tab-${item.id}`} key={item.id} onClick={() => setTab(item.id)} className={`shrink-0 rounded-lg px-4 py-2.5 text-xs font-bold ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}>{item.label}</button>)}</div>
+    {tab === 'overview' && <RHPage data={data} />}
+    {tab === 'organisation' && <OrganisationPage data={data} mutate={mutate} />}
+    {tab === 'employees' && <EmployeesPage data={data} mutate={mutate} companyAdmin={companyAdmin} sectorAdminDepartment={companyAdmin ? undefined : employee?.department} />}
+    {tab === 'roles' && <KoraRolesPage data={data} mutate={mutate} />}
   </div>;
 }
 
