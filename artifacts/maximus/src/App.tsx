@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
-import { getVisibleNotifications, loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
+import { getConfiguredModules, getVisibleNotifications, loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
 import CommerceModulePage from '@/pages/commerce-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
@@ -233,7 +233,8 @@ function AppContent() {
   const companyId = activeCompanyId ?? 'kora';
   const currentCompany = activeCompany;
   const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
-  const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const configuredModules = getConfiguredModules(data);
+  const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? configuredModules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
   const companyAllowed = (data.companies.find(c => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) : null;
@@ -324,7 +325,7 @@ function AppContent() {
       })()
     : undefined;
   const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 ? allowed.flatMap(moduleId => {
-    const module = modules.find(item => item.id === moduleId);
+    const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];
     let items: SidebarFeature[] = [];
     if (moduleId === 'commerce') {
