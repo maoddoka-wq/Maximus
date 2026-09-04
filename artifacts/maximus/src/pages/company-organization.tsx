@@ -262,7 +262,7 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
          </div>
          <div className="mt-4 flex flex-wrap items-center gap-2">
            <span className="mr-1 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Palettes</span>
-           {companyThemePresets.map(preset => <button key={preset.name} type="button" onClick={() => setForm(current => ({ ...current, primaryColor: preset.primaryColor, accentColor: preset.accentColor }))} className="inline-flex items-center gap-2 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:border-[hsl(var(--primary))]">
+           {companyThemePresets.map(preset => <button key={preset.name} type="button" onClick={() => setForm(current => ({ ...current, primaryColor: preset.primaryColor, accentColor: preset.accentColor, sidebarColor: preset.sidebarColor }))} className="inline-flex items-center gap-2 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:border-[hsl(var(--primary))]">
              <span className="flex gap-0.5"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.primaryColor }} /><span className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.accentColor }} /></span>{preset.name}
            </button>)}
          </div>
