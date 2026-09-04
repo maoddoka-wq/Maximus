@@ -97,6 +97,8 @@ export function ControlCenterPage({
     moduleId: 'stocks' as ModuleId,
     dueDate: '',
   });
+  const [targetCompanyId, setTargetCompanyId] = useState(companyId ?? data.companies.find(company => company.status === 'ACTIF')?.id ?? '');
+  const [assigneeEmployeeId, setAssigneeEmployeeId] = useState('');
   const canCreateTask = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
   const isWithinSectorScope = (taskSectorId?: string) => {
     if (!sectorManager || !scopeNodeId || !taskSectorId) return false;
@@ -126,6 +128,12 @@ export function ControlCenterPage({
   const scopeTaskIds = new Set(accessibleTasks.map(task => task.id));
   const visibleEvents = data.domainEvents.filter(event => isAdmin || event.companyId === companyId && (canSeeAll || scopeTaskIds.has(event.entityId ?? '')));
   const visibleAudit = data.auditEntries.filter(entry => isAdmin || entry.companyId === companyId && (canSeeAll || scopeTaskIds.has(entry.entityId ?? '')));
+  const assignableEmployees = useMemo(() => data.employees.filter(employee => {
+    if (employee.companyId !== targetCompanyId) return false;
+    if (!sectorManager) return true;
+    return isWithinSectorScope(employee.sectorId);
+  }), [data.employees, sectorManager, targetCompanyId, scopeNodeId]);
+  const selectedAssignee = assignableEmployees.find(employee => employee.id === assigneeEmployeeId);
   const pendingCount = scopeTasks.filter(task => task.status === 'À FAIRE' || task.status === 'EN COURS').length;
   const approvalCount = scopeTasks.filter(task => task.requiresApproval && task.status === 'À FAIRE').length;
   const criticalCount = scopeTasks.filter(task => task.priority === 'CRITIQUE' && task.status !== 'TERMINÉ' && task.status !== 'VALIDÉ').length;
@@ -179,7 +187,8 @@ export function ControlCenterPage({
   };
 
   const createTask = () => {
-    if (!canCreateTask || !newTask.title.trim()) return;
+    const destinationCompanyId = isAdmin ? targetCompanyId : companyId;
+    if (!canCreateTask || !newTask.title.trim() || !destinationCompanyId || !selectedAssignee) return;
     mutate(draft => {
       const id = uid('task');
       const now = new Date().toISOString();
@@ -187,9 +196,11 @@ export function ControlCenterPage({
         id,
         title: newTask.title.trim(),
         description: newTask.description.trim() || 'Tâche créée depuis le centre de contrôle.',
-        companyId: isAdmin ? undefined : companyId,
-        sectorId: sectorManager ? scopeNodeId : undefined,
+        companyId: destinationCompanyId,
+        sectorId: selectedAssignee.sectorId ?? (sectorManager ? scopeNodeId : undefined),
         moduleId: newTask.moduleId,
+        assigneeEmployeeId: selectedAssignee.id,
+        assigneeName: `${selectedAssignee.firstName} ${selectedAssignee.lastName}`,
         createdBy: actorName,
         status: 'À FAIRE',
         priority: newTask.priority,
@@ -223,8 +234,18 @@ export function ControlCenterPage({
         entityId: task.id,
         createdAt: now,
       });
+      addNotification(draft, {
+        title: 'Nouvelle tâche affectée',
+        text: task.title,
+        companyId: task.companyId,
+        audience: 'company',
+        module: task.moduleId,
+        severity: task.priority === 'CRITIQUE' || task.priority === 'HAUTE' ? 'warning' : 'info',
+        href: '/kora/controle',
+      });
     }, 'La tâche a été créée et ajoutée au circuit de contrôle.');
     setNewTask({ title: '', description: '', priority: 'NORMALE', moduleId: 'stocks', dueDate: '' });
+    setAssigneeEmployeeId('');
     setShowCreate(false);
   };
 
@@ -321,6 +342,8 @@ export function ControlCenterPage({
           <div className="card-surface w-full max-w-lg rounded-2xl border p-6 shadow-2xl">
             <div className="mb-5 flex items-start justify-between"><div><h3 className="text-lg font-bold">Créer une tâche de coordination</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">La création sera enregistrée dans les événements et l’audit.</p></div><button type="button" onClick={() => setShowCreate(false)} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]"><XCircle size={19} /></button></div>
             <div className="space-y-4">
+              {isAdmin && <label className="block text-sm font-semibold">Entreprise cible<select value={targetCompanyId} onChange={event => { setTargetCompanyId(event.target.value); setAssigneeEmployeeId(''); }} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="">Sélectionner une entreprise</option>{data.companies.filter(company => company.status === 'ACTIF').map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
+              <label className="block text-sm font-semibold">Affecter à un employé<select value={assigneeEmployeeId} onChange={event => setAssigneeEmployeeId(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="">Sélectionner un employé</option>{assignableEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName} · {employee.position}</option>)}</select><span className="mt-1 block text-[10px] font-normal text-[hsl(var(--muted-foreground))]">L’employé affecté retrouvera cette tâche dans son espace.</span></label>
               <label className="block text-sm font-semibold">Titre<input autoFocus value={newTask.title} onChange={event => setNewTask(current => ({ ...current, title: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm" placeholder="Ex. Valider la demande d’achat" /></label>
               <label className="block text-sm font-semibold">Description<textarea value={newTask.description} onChange={event => setNewTask(current => ({ ...current, description: event.target.value }))} className="mt-2 min-h-24 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm" placeholder="Décrivez la décision ou l’action attendue." /></label>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -328,7 +351,7 @@ export function ControlCenterPage({
                 <label className="block text-sm font-semibold">Priorité<select value={newTask.priority} onChange={event => setNewTask(current => ({ ...current, priority: event.target.value as ControlTaskPriority }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">{priorities.map(priority => <option key={priority} value={priority}>{priority}</option>)}</select></label>
               </div>
               <label className="block text-sm font-semibold">Échéance<input value={newTask.dueDate} onChange={event => setNewTask(current => ({ ...current, dueDate: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm" placeholder="Ex. Demain ou 25 juin" /></label>
-              <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" disabled={!newTask.title.trim()} onClick={createTask} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowRight size={15} /> Créer et tracer</button></div>
+              <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" disabled={!newTask.title.trim() || !targetCompanyId || !selectedAssignee} onClick={createTask} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowRight size={15} /> Créer et tracer</button></div>
             </div>
           </div>
         </div>
