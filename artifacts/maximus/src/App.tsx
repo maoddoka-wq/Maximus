@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ArrowDownToLine, ArrowUpFromLine, Bell, Boxes, Building2, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, CreditCard, Edit3, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, Warehouse, X, UserRoundCog } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Bell, Boxes, Building2, CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, CreditCard, Edit3, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, History, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, Warehouse, X, UserRoundCog } from 'lucide-react';
 import { Link, useLocation, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -203,6 +203,19 @@ function AppContent() {
           label: submodule.name,
           icon: submodule.id === 'dashboard' ? Gauge : submodule.id === 'products' ? Package : submodule.id === 'entries' ? ArrowDownToLine : submodule.id === 'exits' ? ArrowUpFromLine : submodule.id === 'requests' || submodule.id === 'inventory' ? ClipboardCheck : submodule.id === 'reports' ? FileBarChart : submodule.id === 'settings' ? Settings : Warehouse,
         }));
+    }
+    if (singleModuleId === 'presences') {
+      const presenceFeatures: Record<string, { tab: string; icon: Icon }> = {
+        'Pointage': { tab: 'clock', icon: FileClock },
+        'Historique': { tab: 'history', icon: History },
+        'Rapports': { tab: 'reports', icon: FileBarChart },
+      };
+      return module.features
+        .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(singleModuleId, feature)]?.includes('voir') || hasPresencePermission('view'))
+        .map(feature => {
+          const mapped = presenceFeatures[feature];
+          return { href: `/kora/presences?tab=${mapped?.tab ?? 'dashboard'}`, label: feature, icon: mapped?.icon ?? CalendarDays };
+        });
     }
     const detailedFeatures = module.features
       .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(singleModuleId, feature)]?.includes('voir'))

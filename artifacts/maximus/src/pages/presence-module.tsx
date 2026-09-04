@@ -70,7 +70,9 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
   useEffect(() => { void refresh(); }, [api]);
   useEffect(() => {
-    const requested = new URLSearchParams(location.split('?')[1] ?? '').get('tab') as Tab | null;
+    const params = new URLSearchParams(location.split('?')[1] ?? '');
+    const featureTabs: Record<string, Tab> = { pointage: 'clock', historique: 'history', rapports: 'reports' };
+    const requested = (params.get('tab') ?? featureTabs[params.get('feature') ?? '']) as Tab | undefined;
     if (requested && tabs.some(([id]) => id === requested)) setTab(requested);
   }, [location]);
   const actor = personName(currentEmployee ?? undefined);
