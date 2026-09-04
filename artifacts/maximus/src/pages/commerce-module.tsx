@@ -55,7 +55,6 @@ const tabs = [
   { id: 'invoices', label: 'Factures & reçus', icon: FileCheck2, group: 'Finance' },
   { id: 'returns', label: 'Retours & avoirs', icon: ArrowUpRight, group: 'Finance' },
   { id: 'reports', label: 'Rapports', icon: FileBarChart, group: 'Pilotage' },
-  { id: 'notifications', label: 'Notifications', icon: Bell, group: 'Pilotage' },
   { id: 'activity', label: 'Journal d’activité', icon: History, group: 'Pilotage' },
   { id: 'team', label: 'Équipe & droits', icon: Users, group: 'Pilotage' },
   { id: 'settings', label: 'Paramètres', icon: Settings, group: 'Pilotage' },
@@ -217,7 +216,7 @@ export default function CommerceModulePage({
         {visibleTabs.map(item => {
           const ItemIcon = item.icon;
           const isActive = tab === item.id;
-          return <button key={item.id} type="button" data-testid={`commerce-tab-${item.id}`} onClick={() => navigateTab(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${isActive ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><ItemIcon size={16} />{item.label}{item.id === 'notifications' && unread > 0 && <span className="rounded-full bg-[hsl(var(--destructive))] px-1.5 py-0.5 text-[9px] text-white">{unread}</span>}</button>;
+          return <button key={item.id} type="button" data-testid={`commerce-tab-${item.id}`} onClick={() => navigateTab(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${isActive ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><ItemIcon size={16} />{item.label}</button>;
         })}
       </nav>
     </section>
@@ -234,7 +233,6 @@ export default function CommerceModulePage({
      {tab === 'invoices' && <InvoicesPageComplete data={data} query={query} onToast={setToast} />}
      {tab === 'returns' && <ReturnsPageComplete data={data} state={state} query={query} canCreate={canCreate} canModify={canModify} mutate={mutate} onUpdate={updateState} />}
     {tab === 'reports' && <ReportsPage data={data} state={state} />}
-    {tab === 'notifications' && <NotificationsPage data={data} mutate={mutate} query={query} companyId={companyId} />}
     {tab === 'activity' && <ActivityPage data={data} query={query} />}
     {tab === 'team' && <TeamPage data={data} query={query} canModify={canModify} onToast={setToast} onNavigate={onNavigate} />}
     {tab === 'settings' && <SettingsPage state={state} canModify={canModify} onUpdate={updateState} />}

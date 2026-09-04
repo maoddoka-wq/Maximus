@@ -41,12 +41,10 @@ const adminNav = [
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
   { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
-  { href: '/maximus/notifications', label: 'Notifications', icon: Bell },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
 ];
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/kora/notifications', label: 'Notifications', icon: Bell, module: null },
   { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
@@ -667,7 +665,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
    if (routePath === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
    if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
-      return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds as ('dashboard' | 'sales' | 'products' | 'clients' | 'suppliers' | 'purchases' | 'expenses' | 'cash' | 'credit' | 'invoices' | 'returns' | 'reports' | 'notifications' | 'activity' | 'team' | 'settings')[] | undefined} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
+      return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds as ('dashboard' | 'sales' | 'products' | 'clients' | 'suppliers' | 'purchases' | 'expenses' | 'cash' | 'credit' | 'invoices' | 'returns' | 'reports' | 'activity' | 'team' | 'settings')[] | undefined} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
    }
    if (routePath === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
    if (routePath === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
