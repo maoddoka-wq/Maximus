@@ -10,6 +10,7 @@ import {
   type OrgNode,
   type StoreData,
 } from '@/lib/store';
+import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -182,6 +183,9 @@ function StructureFormModal({
     phone: initialData?.phone || '',
     location: initialData?.location || '',
     moduleIds: initialData?.moduleIds ? [...initialData.moduleIds] : [],
+    moduleFeatures: Object.fromEntries(
+      Object.entries(initialData?.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+    ) as Partial<Record<ModuleId, string[]>>,
   });
   const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
 
@@ -207,7 +211,22 @@ function StructureFormModal({
       setError('Cette unité ne peut pas être placée sous l’un de ses descendants.');
       return;
     }
-    onSave({ ...formData, name: formData.name.trim(), code: formData.code.trim().toUpperCase(), parentId: formData.parentId || null });
+    const moduleFeatures = Object.fromEntries(
+      formData.moduleIds.map(moduleId => {
+        const module = availableModules.find(item => item.id === moduleId);
+        const allowedFeatureIds = module
+          ? [...getEffectiveModuleFeatureIds(module, formData.moduleFeatures[moduleId])]
+          : [];
+        return [moduleId, allowedFeatureIds];
+      }),
+    ) as Partial<Record<ModuleId, string[]>>;
+    onSave({
+      ...formData,
+      name: formData.name.trim(),
+      code: formData.code.trim().toUpperCase(),
+      parentId: formData.parentId || null,
+      moduleFeatures,
+    });
   };
 
   return (
@@ -240,10 +259,59 @@ function StructureFormModal({
         {availableModules.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {availableModules.map(module => {
             const enabled = formData.moduleIds.includes(module.id);
-            return <label key={module.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${enabled ? 'border-[hsl(var(--primary)/.5)] bg-[hsl(var(--primary)/.06)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
-              <input data-testid={`checkbox-org-module-${module.id}`} type="checkbox" checked={enabled} onChange={() => setFormData(current => ({ ...current, moduleIds: enabled ? current.moduleIds.filter(id => id !== module.id) : [...current.moduleIds, module.id] }))} className="mt-0.5 accent-[hsl(var(--primary))]" />
-              <span><strong className="block text-xs">{module.name}</strong><small className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{module.description}</small></span>
-            </label>;
+            const featureOptions = getModuleFeatureOptions(module);
+            const selectedFeatureIds = getEffectiveModuleFeatureIds(module, formData.moduleFeatures[module.id]);
+            return <div key={module.id} className={`rounded-lg border p-3 transition ${enabled ? 'border-[hsl(var(--primary)/.5)] bg-[hsl(var(--primary)/.06)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  data-testid={`checkbox-org-module-${module.id}`}
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={() => setFormData(current => {
+                    const nextModuleFeatures = { ...current.moduleFeatures };
+                    if (enabled) {
+                      delete nextModuleFeatures[module.id];
+                    } else {
+                      nextModuleFeatures[module.id] = featureOptions.map(feature => feature.id);
+                    }
+                    return {
+                      ...current,
+                      moduleIds: enabled ? current.moduleIds.filter(id => id !== module.id) : [...current.moduleIds, module.id],
+                      moduleFeatures: nextModuleFeatures,
+                    };
+                  })}
+                  className="mt-0.5 accent-[hsl(var(--primary))]"
+                />
+                <span><strong className="block text-xs">{module.name}</strong><small className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{module.description}</small></span>
+              </label>
+              {enabled && <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités autorisées</p>
+                  <span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span>
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {featureOptions.map(feature => (
+                    <label key={feature.id} className="flex cursor-pointer items-start gap-2 rounded-md border bg-[hsl(var(--card)/.7)] px-2.5 py-2 text-[10px] hover:bg-[hsl(var(--card))]">
+                      <input
+                        data-testid={`checkbox-org-feature-${module.id}-${feature.id}`}
+                        type="checkbox"
+                        checked={selectedFeatureIds.has(feature.id)}
+                        onChange={() => setFormData(current => {
+                          const selected = new Set(current.moduleFeatures[module.id] ?? featureOptions.map(item => item.id));
+                          if (selected.has(feature.id)) selected.delete(feature.id);
+                          else selected.add(feature.id);
+                          const nextModuleFeatures = { ...current.moduleFeatures, [module.id]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
+                          return { ...current, moduleFeatures: nextModuleFeatures };
+                        })}
+                        className="mt-0.5 accent-[hsl(var(--primary))]"
+                      />
+                      <span>{feature.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">Les prérequis des fonctionnalités sélectionnées sont ajoutés automatiquement en visibilité.</p>
+              </div>}
+            </div>;
           })}
         </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.</p>}
       </div>

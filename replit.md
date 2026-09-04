@@ -94,11 +94,25 @@ Une dépendance signifie qu’un module requiert un autre module pour être coh�
 - Une dépendance circulaire doit être refusée explicitement.
 - Une dépendance technique facultative ne doit pas être traitée comme une permission utilisateur.
 
+### Dépendances entre fonctionnalités
+
+Les fonctionnalités d’un même module peuvent aussi avoir des prérequis. Elles utilisent des identifiants stables, indépendants du libellé affiché :
+
+- les modules génériques déclarent `featureDependencies` dans leur entrée de catalogue ;
+- Commerce déclare ses dépendances d’onglets dans `commerce-permissions.ts` ;
+- Gestion de stock déclare ses dépendances de sous-rubriques dans `stockSubmoduleDependencies` ;
+- `resolveFeatureDependencies()` résout toute la chaîne de prérequis et se protège contre les cycles.
+
+- Lorsqu’une sous-fonctionnalité est activée, ses prérequis sont activés automatiquement en `voir` uniquement.
+- Cette cascade ne donne jamais automatiquement `créer`, `modifier` ou une permission métier au prérequis.
+- Les prérequis activés automatiquement doivent être visibles dans l’éditeur de rôle afin que l’administrateur comprenne la configuration produite.
+- Si un rôle ancien contient une configuration incohérente, l’enregistrement doit la normaliser en rétablissant les prérequis en `voir`.
+
 ### Checklist pour ajouter un nouveau module
 
 1. Ajouter un identifiant stable dans `ModuleId`.
 2. Ajouter une entrée complète dans `modules` avec nom, description, fonctionnalités et statut.
-3. Définir les dépendances éventuelles dans le contrat du catalogue ; ne pas les coder en dur dans un composant.
+3. Définir les dépendances éventuelles du module et de ses fonctionnalités dans le contrat du catalogue ; ne pas les coder en dur dans un composant.
 4. Ajouter l’entrée d’administration et la configuration de statut si le module doit être activable ou désactivable.
 5. Ajouter l’entrée de navigation KORA avec son `module`.
 6. Créer l’écran du module et le brancher au registre de `App.tsx` et à `app-routes.tsx`.
@@ -107,7 +121,7 @@ Une dépendance signifie qu’un module requiert un autre module pour être coh�
 9. Ajouter le module à l’éditeur de rôles via `getConfiguredModules()` ; ne pas créer une liste parallèle.
 10. Définir les droits d’action par sous-fonctionnalité, avec `voir` au niveau module uniquement.
 11. Filtrer la navigation et protéger les routes directes avec les mêmes règles de permission.
-12. Ajouter ou mettre à jour les tests de permissions, de dépendances et de routage.
+12. Ajouter ou mettre à jour les tests de permissions, de dépendances de fonctionnalités et de routage.
 13. Vérifier les états vide, chargement, accès refusé et module retiré.
 14. Vérifier qu’un rôle existant et un employé existant ne gagnent pas de droits par défaut après l’ajout.
 

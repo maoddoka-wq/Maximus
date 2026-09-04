@@ -9,11 +9,14 @@ import {
   roleHasPermission,
 } from './employee-permissions';
 import {
+  commerceTabDependencies,
   commerceTabPermissionKey,
   hasCommerceTabPermission,
   hasDetailedCommercePermissions,
 } from './commerce-permissions';
 import { parseQueryTab } from './query-tab';
+import { resolveFeatureDependencies } from './permission-keys';
+import { stockSubmoduleDependencies } from './store';
 import type { Employee, ModuleId, OrgNode, Role } from './store';
 
 const employee: Employee = {
@@ -178,6 +181,44 @@ test('respecte les sous-permissions explicites Présences', () => {
   assert.equal(
     employeeHasPresencePermission(presenceRole, presenceNode, 'create', canPermission),
     false,
+  );
+});
+
+test('résout les prérequis d’une fonctionnalité en cascade', () => {
+  assert.deepEqual(
+    resolveFeatureDependencies(commerceTabDependencies, 'reports'),
+    ['clients', 'products', 'sales'],
+  );
+  assert.deepEqual(
+    resolveFeatureDependencies(stockSubmoduleDependencies, 'entries'),
+    ['products'],
+  );
+});
+
+test('rend les prérequis visibles dans les permissions effectives', () => {
+  const commerceRole = role({
+    commerce: ['voir'],
+    [commerceTabPermissionKey('sales')]: ['voir'],
+  });
+  const commerceTabs = getCommerceTabIds(commerceRole, true, () => true) ?? [];
+  assert.equal(commerceTabs.includes('sales'), true);
+  assert.equal(commerceTabs.includes('clients'), true);
+  assert.equal(commerceTabs.includes('products'), true);
+
+  const stockRole = role({
+    stocks: ['voir'],
+    'stocks:entries': ['créer'],
+  });
+  const stockPermissions = getStockPermissions(stockRole, true) ?? {};
+  assert.equal(stockPermissions.entries?.includes('créer'), true);
+  assert.equal(stockPermissions.entries?.includes('voir'), true);
+  assert.equal(stockPermissions.products?.includes('voir'), true);
+});
+
+test('ignore un cycle de dépendances sans boucler', () => {
+  assert.deepEqual(
+    resolveFeatureDependencies({ a: ['b'], b: ['a'] }, 'a'),
+    ['b'],
   );
 });
 

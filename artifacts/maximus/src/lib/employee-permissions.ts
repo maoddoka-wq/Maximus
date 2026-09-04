@@ -1,12 +1,14 @@
 import type { Employee, ModuleId, OrgNode, Role } from './store';
 import {
+  commerceTabDependencies,
   commerceTabDefinitions,
   commerceTabPermissionKeys,
   hasCommerceTabPermission,
   hasDetailedCommercePermissions,
   type CommerceTabId,
 } from './commerce-permissions';
-import { stockSubmodules } from './store';
+import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from './permission-keys';
+import { stockSubmoduleDependencies, stockSubmodules, type Module } from './store';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
@@ -90,13 +92,25 @@ export function getStockPermissions(role: Role | null | undefined, roleFitsEmplo
     .filter(([, permissions]) => permissions);
   const rootPermissions = role.modulePermissions.stocks;
 
-  return Object.fromEntries(
+  const permissions = Object.fromEntries(
     detailed.length > 0
       ? detailed
       : stockSubmodules
         .map(submodule => [submodule.id, rootPermissions] as const)
         .filter(([, permissions]) => permissions),
   ) as Record<string, string[]>;
+
+  if (detailed.length === 0) return permissions;
+
+  stockSubmodules.forEach(submodule => {
+    if (!(permissions[submodule.id] ?? []).length) return;
+    permissions[submodule.id] = [...new Set(['voir', ...permissions[submodule.id]])];
+    resolveFeatureDependencies(stockSubmoduleDependencies, submodule.id).forEach(dependencyId => {
+      permissions[dependencyId] = [...new Set([...(permissions[dependencyId] || []), 'voir'])];
+    });
+  });
+
+  return permissions;
 }
 
 export function getCommerceTabIds(
@@ -142,5 +156,26 @@ export function getCommerceTabIds(
     }
   }
 
+  [...allowedTabIds].forEach(tabId => {
+    resolveFeatureDependencies(commerceTabDependencies, tabId)
+      .forEach(dependencyId => allowedTabIds.add(dependencyId as CommerceTabId));
+  });
+
   return [...allowedTabIds];
+}
+
+export function getFeatureIdsWithDependencies(
+  role: Role | null | undefined,
+  module: Module,
+) {
+  if (!role) return new Set<string>();
+  const enabledFeatureIds = module.features
+    .map(featureSlug)
+    .filter(featureId => (role.modulePermissions[permissionFeatureKey(module.id, featureId)] ?? []).length > 0);
+  const effectiveFeatureIds = new Set(enabledFeatureIds);
+  enabledFeatureIds.forEach(featureId => {
+    resolveFeatureDependencies(module.featureDependencies ?? {}, featureId)
+      .forEach(dependencyId => effectiveFeatureIds.add(dependencyId));
+  });
+  return effectiveFeatureIds;
 }

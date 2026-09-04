@@ -18,6 +18,13 @@ export const commerceTabDefinitions = [
 
 export type CommerceTabId = (typeof commerceTabDefinitions)[number]['id'];
 
+export const commerceTabDependencies: Partial<Record<CommerceTabId, CommerceTabId[]>> = {
+  sales: ['clients', 'products'],
+  purchases: ['suppliers', 'products'],
+  returns: ['sales'],
+  reports: ['sales'],
+};
+
 const commerceTabLegacyKeys: Partial<Record<CommerceTabId, string[]>> = {
   dashboard: ['commerce:menu:chiffre-d-affaires'],
   sales: [

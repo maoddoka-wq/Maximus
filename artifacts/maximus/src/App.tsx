@@ -18,6 +18,7 @@ import {
   employeeRoleMatchesUnit,
   getCommerceTabIds,
   getEmployeeAncestry,
+  getFeatureIdsWithDependencies,
   getStockPermissions,
   roleHasPermission,
   type PresencePermission,
@@ -224,8 +225,9 @@ function AppContent() {
         'Historique': { tab: 'history', icon: History },
         'Rapports': { tab: 'reports', icon: FileBarChart },
       };
+      const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
-        .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(moduleId, feature)]?.includes('voir') || hasPresencePermission('view'))
+        .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || hasPresencePermission('view'))
         .map(feature => {
           const mapped = presenceFeatures[feature];
           return { href: `/kora/presences?tab=${mapped?.tab ?? 'dashboard'}`, label: feature, icon: mapped?.icon ?? CalendarDays };
@@ -234,8 +236,9 @@ function AppContent() {
       const featurePermissionKeys = module.features.map(feature => permissionFeatureKey(moduleId, feature));
       const hasDetailedFeaturePermissions = featurePermissionKeys.some(key => key in (employeeRole?.modulePermissions ?? {}));
       const canViewModule = employeeRole?.modulePermissions[moduleId]?.includes('voir');
+      const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
-        .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(moduleId, feature)]?.includes('voir') || (canViewModule && !hasDetailedFeaturePermissions))
+        .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || (canViewModule && !hasDetailedFeaturePermissions))
         .map(feature => ({ href: `/kora/${moduleId}?feature=${featureSlug(feature)}`, label: feature, icon: moduleId === 'ventes' ? ShoppingCart : moduleId === 'finance' ? WalletCards : moduleId === 'rh' ? UserRoundCog : LayoutGrid }));
     }
     return [{ label: module.name, items: items.length ? items : [{ href: `/kora/${moduleId}`, label: module.name, icon: LayoutGrid }] }];
