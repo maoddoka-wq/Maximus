@@ -222,8 +222,11 @@ function AppContent() {
           return { href: `/kora/presences?tab=${mapped?.tab ?? 'dashboard'}`, label: feature, icon: mapped?.icon ?? CalendarDays };
         });
     } else {
+      const featurePermissionKeys = module.features.map(feature => permissionFeatureKey(moduleId, feature));
+      const hasDetailedFeaturePermissions = featurePermissionKeys.some(key => key in (employeeRole?.modulePermissions ?? {}));
+      const canViewModule = employeeRole?.modulePermissions[moduleId]?.includes('voir');
       items = module.features
-        .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(moduleId, feature)]?.includes('voir'))
+        .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(moduleId, feature)]?.includes('voir') || (canViewModule && !hasDetailedFeaturePermissions))
         .map(feature => ({ href: `/kora/${moduleId}?feature=${featureSlug(feature)}`, label: feature, icon: moduleId === 'commerce' || moduleId === 'ventes' ? ShoppingCart : moduleId === 'finance' ? WalletCards : moduleId === 'rh' ? UserRoundCog : LayoutGrid }));
     }
     return [{ label: module.name, items: items.length ? items : [{ href: `/kora/${moduleId}`, label: module.name, icon: LayoutGrid }] }];
