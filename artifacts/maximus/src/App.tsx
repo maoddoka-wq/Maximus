@@ -46,15 +46,6 @@ const koraNav: NavItem[] = [
 ];
 const stockSubmenu: { id: StockTab; label: string }[] = [
   { id: 'dashboard', label: 'Tableau de bord' },
-  { id: 'products', label: 'Articles' },
-  { id: 'entries', label: 'Entrées de stock' },
-  { id: 'exits', label: 'Sorties de stock' },
-  { id: 'requests', label: 'Demandes' },
-  { id: 'inventory', label: 'Inventaire' },
-  { id: 'reports', label: 'Rapports' },
-  { id: 'references', label: 'Référentiels' },
-  { id: 'users', label: 'Utilisateurs' },
-  { id: 'settings', label: 'Paramètres' },
 ];
 
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
