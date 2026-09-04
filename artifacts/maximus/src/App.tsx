@@ -131,7 +131,7 @@ function shiftHslLightness(hsl: string, amount: number) {
   return `${match[1]} ${match[2]}% ${Math.max(5, Math.min(95, Number(match[3]) + amount))}%`;
 }
 
-function companyThemeVariables(company: Company | undefined) {
+function companyThemeVariables(company: Company | undefined): Record<string, string> {
   if (!company) return {};
   const primary = hexColorPattern.test(company.primaryColor ?? '') ? company.primaryColor! : null;
   const accent = hexColorPattern.test(company.accentColor ?? '') ? company.accentColor! : primary;
@@ -193,6 +193,12 @@ function AppContent() {
       : sessionEmployee?.companyId;
   const activeCompany = data.companies.find(company => company.id === activeCompanyId);
   const activeCompanyTheme = companyThemeVariables(activeCompany);
+  const activeNavStyle: CSSProperties | undefined = activeCompany
+    ? {
+        backgroundColor: `hsl(${activeCompanyTheme['--sidebar-primary']})`,
+        color: `hsl(${activeCompanyTheme['--sidebar-primary-foreground']})`,
+      }
+    : undefined;
   useEffect(() => {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
@@ -392,7 +398,7 @@ function AppContent() {
   const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(notification => !notification.read).length;
   return (
       <div className="app-shell flex h-[100dvh] min-h-0 overflow-hidden" style={activeCompanyTheme as CSSProperties}>
-         <Sidebar session={session} location={location} allowed={allowed} sidebarFeatureGroups={sidebarFeatureGroups} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} />
+          <Sidebar session={session} location={location} allowed={allowed} sidebarFeatureGroups={sidebarFeatureGroups} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} activeNavStyle={activeNavStyle} />
         <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
            <Topbar title={currentMeta.title} isAdmin={isAdmin} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/notifications'} unreadCount={unreadNotifications} onHelp={() => { void alert({ title: 'Aide MAXIMUS', description: 'Explorez les vues depuis la navigation de votre espace.', confirmLabel: 'Compris' }); }} />
           <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
@@ -483,7 +489,7 @@ function Brand({ inverse = false, homeHref }: { inverse?: boolean; homeHref?: st
 function Step({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) { return <div className={`flex items-center gap-2 text-sm font-bold ${active || done ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${done ? 'bg-[hsl(var(--primary))] text-white' : active ? 'bg-[hsl(var(--accent))]' : 'border border-[hsl(var(--border))]'}`}>{done ? <Check size={14} /> : n}</span><span className="mobile-hide">{label}</span></div>; }
 function Field({ label, value, onChange, placeholder, type = 'text', testId, help }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; testId: string; help?: string }) { const explanation = help ?? `Saisissez ${label.toLowerCase().replace(' *', '')}.`; const autoComplete = testId.includes('login-email') ? 'email' : testId.includes('login-password') ? 'current-password' : type === 'password' ? 'new-password' : undefined; return <label className="block text-sm font-semibold">{label}<input data-testid={testId} autoComplete={autoComplete} type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal transition focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /><span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{explanation}</span></label>; }
 
-function Sidebar({ session, location, allowed, sidebarFeatureGroups, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse, fixedHeight }: { session: Session; location: string; allowed: ModuleId[]; sidebarFeatureGroups?: SidebarFeatureGroup[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; companyPhoto?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void; fixedHeight?: boolean }) {
+function Sidebar({ session, location, allowed, sidebarFeatureGroups, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse, fixedHeight, activeNavStyle }: { session: Session; location: string; allowed: ModuleId[]; sidebarFeatureGroups?: SidebarFeatureGroup[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; companyPhoto?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void; fixedHeight?: boolean; activeNavStyle?: CSSProperties }) {
   const isAdmin = session === 'admin';
   const companyAdmin = session === 'kora' || session.startsWith('company:');
   const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.peopleAdminOnly || companyAdmin || canManagePeople) && (item.module === null || allowed.includes(item.module as ModuleId)));
@@ -493,7 +499,7 @@ function Sidebar({ session, location, allowed, sidebarFeatureGroups, canManagePe
     const className = `nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${active(item.href) ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`;
     const content = <><item.icon size={17} strokeWidth={active(item.href) ? 2.5 : 1.8} />{!compact && item.label}</>;
     const testId = `link-nav-${item.href.split('/').pop()?.split('?')[0]}`;
-    return <Link data-testid={testId} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={className}>{content}</Link>;
+    return <Link data-testid={testId} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={className} style={active(item.href) ? activeNavStyle : undefined}>{content}</Link>;
   };
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const compact = collapsed && !mobileOpen;
