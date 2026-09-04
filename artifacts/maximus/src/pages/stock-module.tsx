@@ -19,7 +19,8 @@ const tabs = [
   ['settings', 'Paramètres', Settings],
 ] as const;
 
-type Tab = typeof tabs[number][0];
+export type StockTab = typeof tabs[number][0];
+type Tab = StockTab;
 type ProductForm = Omit<StockProduct, 'id' | 'companyId' | 'archived'>;
 type WarehouseForm = Pick<StockWarehouse, 'name' | 'manager' | 'address'>;
 type SupplierForm = Pick<StockSupplier, 'name' | 'contactName' | 'email' | 'phone' | 'address' | 'notes'>;
@@ -35,9 +36,9 @@ const useStockApi = () => {
   return api;
 };
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, initialTab = 'dashboard' }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; initialTab?: StockTab }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -51,6 +52,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     finally { setLoading(false); setRefreshing(false); }
   };
   useEffect(() => { void load(); }, []);
+  useEffect(() => { setTab(initialTab); }, [initialTab]);
   const run = async (action: () => Promise<unknown>, success: string) => {
     try { await action(); await load(true); setToast(success); window.setTimeout(() => setToast(''), 3200); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Opération impossible.'); }

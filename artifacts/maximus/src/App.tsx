@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { loadData, modules, money, saveData, shortMoney, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
-import StockModulePage from '@/pages/stock-module';
+import StockModulePage, { type StockTab } from '@/pages/stock-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
 
@@ -42,6 +42,18 @@ const koraNav = [
   { href: '/kora/logistique', label: 'Logistique', icon: Package, module: 'logistique' },
   { href: '/kora/documents', label: 'Documents', icon: FolderKanban, module: 'documents' },
   { href: '/kora/rapports', label: 'Rapports', icon: FileBarChart, module: 'rapports' },
+];
+const stockSubmenu: { id: StockTab; label: string }[] = [
+  { id: 'dashboard', label: 'Tableau de bord' },
+  { id: 'products', label: 'Articles' },
+  { id: 'entries', label: 'Entrées de stock' },
+  { id: 'exits', label: 'Sorties de stock' },
+  { id: 'requests', label: 'Demandes' },
+  { id: 'inventory', label: 'Inventaire' },
+  { id: 'reports', label: 'Rapports' },
+  { id: 'references', label: 'Référentiels' },
+  { id: 'users', label: 'Utilisateurs' },
+  { id: 'settings', label: 'Paramètres' },
 ];
 
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
