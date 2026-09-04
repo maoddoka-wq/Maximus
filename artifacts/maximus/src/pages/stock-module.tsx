@@ -56,7 +56,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Opération impossible.'); }
   };
 
-  if (loading) return <div className="card-surface flex min-h-80 items-center justify-center rounded-2xl"><RefreshCw className="animate-spin text-[hsl(var(--primary))]" size={22} /></div>;
+  if (loading) return <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-44 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-3"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-52 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>;
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
 
   const visibleTabs = tabs.filter(([id]) => !stockPermissions || stockPermissions[id]?.includes('voir'));
@@ -71,7 +71,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2">
-        <nav aria-label="Menu gestion de stock" className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1">{tabs.filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id)).map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={17} />{label}</button>)}</nav>
+        <nav aria-label="Menu gestion de stock" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1">{tabs.filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id)).map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={17} />{label}</button>)}</nav>
         <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
       </div>
       <div data-stock-can-create={currentCanCreate} data-stock-can-modify={currentCanModify}>
