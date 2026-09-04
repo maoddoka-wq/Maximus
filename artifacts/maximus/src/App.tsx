@@ -164,6 +164,7 @@ function AppContent() {
     if (permission === 'create') return hasPermission('presences', 'créer');
     return hasPermission('presences', 'modifier');
   };
+  const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
   const presenceEmployees = data.employees.filter(item => item.companyId === companyId).filter(item => {
     if (!sectorManager || !employeeNode?.id) return true;
     let node = data.orgNodes.find(candidate => candidate.id === item.sectorId && candidate.companyId === companyId);
@@ -176,7 +177,6 @@ function AppContent() {
   const stockPermissions = employeeRole && roleFitsEmployee
     ? Object.fromEntries(stockSubmodules.map(submodule => [submodule.id, employeeRole.modulePermissions[`stocks:${submodule.id}`]]).filter(([, permissions]) => permissions)) as Record<string, string[]>
     : undefined;
-   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
    const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
    const baseMeta = pageMeta[location] ?? (location.startsWith('/maximus/entreprises/') ? { kicker: 'Administration', title: 'Détail entreprise', description: 'Consultez et ajustez l’espace client sélectionné.' } : pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard']);
    const currentMeta = !isAdmin && currentCompany
