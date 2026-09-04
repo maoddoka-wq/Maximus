@@ -80,8 +80,8 @@
   --sidebar-border: 218 18% 23%;
   --sidebar-primary: 43 91% 50%;
   --sidebar-primary-foreground: 218 28% 13%;
-  --sidebar-active: 218 24% 20%;
-  --sidebar-active-foreground: 43 32% 93%;
+  --sidebar-active: 43 91% 50%;
+  --sidebar-active-foreground: 218 28% 13%;
   --sidebar-accent: 218 24% 20%;
   --sidebar-accent-foreground: 43 32% 93%;
   --app-font-sans: 'DM Sans', sans-serif;
@@ -116,8 +116,8 @@
   --sidebar-border: 218 24% 16%;
   --sidebar-primary: 37 88% 55%;
   --sidebar-primary-foreground: 222 31% 16%;
-  --sidebar-active: 218 24% 14%;
-  --sidebar-active-foreground: 43 32% 93%;
+  --sidebar-active: 37 88% 55%;
+  --sidebar-active-foreground: 222 31% 16%;
   --sidebar-accent: 218 24% 14%;
   --sidebar-accent-foreground: 43 32% 93%;
 }

@@ -75,7 +75,9 @@ export function companyThemeVariables(company: Company | undefined): CompanyThem
   const sidebarColor = hexColorPattern.test(company.sidebarColor ?? '') ? company.sidebarColor! : '#161d27';
   const sidebarHsl = hexToHsl(sidebarColor);
   const sidebarForeground = themeForeground(sidebarColor);
-  const sidebarActive = shiftHslLightness(sidebarHsl, 8);
+  const sidebarActive = hexToHsl(primaryColor);
+  const sidebarActiveForeground = themeForeground(primaryColor);
+  const sidebarAccent = shiftHslLightness(sidebarHsl, 8);
 
   return {
     '--primary': hexToHsl(primaryColor),
@@ -89,8 +91,8 @@ export function companyThemeVariables(company: Company | undefined): CompanyThem
     '--sidebar-primary': hexToHsl(primaryColor),
     '--sidebar-primary-foreground': themeForeground(primaryColor),
     '--sidebar-active': sidebarActive,
-    '--sidebar-active-foreground': sidebarForeground,
-    '--sidebar-accent': sidebarActive,
+    '--sidebar-active-foreground': sidebarActiveForeground,
+    '--sidebar-accent': sidebarAccent,
     '--sidebar-accent-foreground': sidebarForeground,
   };
 }
