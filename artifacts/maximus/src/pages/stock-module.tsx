@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { useSearch } from 'wouter';
 import { createStockApi, type StockApi, type StockBootstrap, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
@@ -21,6 +21,7 @@ const tabs = [
 ] as const;
 
 type Tab = typeof tabs[number][0];
+const requestedStockTab = (value: string) => new URLSearchParams(value).get('tab') as Tab | null;
 type ProductForm = Omit<StockProduct, 'id' | 'companyId' | 'archived'>;
 type WarehouseForm = Pick<StockWarehouse, 'name' | 'manager' | 'address'>;
 type SupplierForm = Pick<StockSupplier, 'name' | 'contactName' | 'email' | 'phone' | 'address' | 'notes'>;
@@ -41,7 +42,8 @@ const useStockAccess = () => useContext(StockAccessContext);
 export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useState<Tab>('dashboard');
-  const [location] = useLocation();
+  const [search] = useSearch();
+  const [requestedTab, setRequestedTab] = useState<Tab | null>(() => requestedStockTab(search));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -65,7 +67,17 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
       setTab(tabs.find(([id]) => stockPermissions[id]?.includes('voir'))?.[0] ?? 'dashboard');
     }
   }, [data, stockPermissions, tab]);
-  const requestedTab = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : location.split('?')[1] ?? '').get('tab') as Tab | null;
+  useEffect(() => {
+    const syncRequestedTab = () => setRequestedTab(requestedStockTab(window.location.search));
+    window.addEventListener('pushState', syncRequestedTab);
+    window.addEventListener('replaceState', syncRequestedTab);
+    window.addEventListener('popstate', syncRequestedTab);
+    return () => {
+      window.removeEventListener('pushState', syncRequestedTab);
+      window.removeEventListener('replaceState', syncRequestedTab);
+      window.removeEventListener('popstate', syncRequestedTab);
+    };
+  }, []);
   useEffect(() => {
     if (requestedTab && tabs.some(([id]) => id === requestedTab) && (!stockPermissions || stockPermissions[requestedTab]?.includes('voir'))) setTab(requestedTab);
   }, [requestedTab, stockPermissions]);

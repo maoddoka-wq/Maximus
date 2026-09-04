@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArrowDownToLine, ArrowUpFromLine, Bell, Boxes, Building2, CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, CreditCard, Edit3, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, History, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, Warehouse, X, UserRoundCog } from 'lucide-react';
-import { Link, useLocation, Router as WouterRouter } from 'wouter';
+import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -84,7 +84,9 @@ function AppContent() {
   const [toast, setToast] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('maximus-sidebar-collapsed') === 'true');
-  const [location, setLocation] = useLocation();
+  const [pathname, setLocation] = useLocation();
+  const [search] = useSearch();
+  const location = search ? `${pathname}?${search}` : pathname;
   useEffect(() => saveData(data), [data]);
   useEffect(() => { localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { if (!toast) return undefined; const timer = window.setTimeout(() => setToast(''), 3000); return () => window.clearTimeout(timer); }, [toast]);
@@ -334,9 +336,6 @@ function Sidebar({ session, location, allowed, sidebarFeatures, canManagePeople,
     const className = `nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${active(item.href) ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`;
     const content = <><item.icon size={17} strokeWidth={active(item.href) ? 2.5 : 1.8} />{!compact && item.label}</>;
     const testId = `link-nav-${item.href.split('/').pop()?.split('?')[0]}`;
-    if (item.href.includes('?')) {
-      return <a data-testid={testId} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={className}>{content}</a>;
-    }
     return <Link data-testid={testId} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={className}>{content}</Link>;
   };
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
