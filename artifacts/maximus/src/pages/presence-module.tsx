@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X } from 'lucide-react';
-import { useSearch } from 'wouter';
 import { createPresenceApi, type PresenceItem } from '@/lib/presence-api';
+import { useQueryTab } from '@/lib/query-tab';
 import type { Employee, OrgNode } from '@/lib/store';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
 type Tab = 'dashboard' | 'clock' | 'presence' | 'absence' | 'late' | 'schedules' | 'planning' | 'breaks' | 'worked' | 'overtime' | 'missions' | 'leave' | 'holidays' | 'history' | 'reports' | 'settings';
-const requestedPresenceTab = (value: string) => {
-  const params = new URLSearchParams(value);
-  const featureTabs: Record<string, Tab> = { pointage: 'clock', historique: 'history', rapports: 'reports' };
-  return (params.get('tab') ?? featureTabs[params.get('feature') ?? '']) as Tab | undefined;
-};
 const tabs: [Tab, string, typeof Clock3][] = [
   ['dashboard', 'Tableau de bord', CalendarDays], ['clock', 'Pointage', Clock3], ['presence', 'Présences', UserCheck], ['absence', 'Absences', Users],
   ['late', 'Retards', AlertTriangle], ['schedules', 'Horaires', Clock3], ['planning', 'Planning', CalendarDays], ['breaks', 'Pauses', Pause],
@@ -60,9 +55,11 @@ function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { t
 export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, singleModuleNavigation = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; singleModuleNavigation?: boolean }) {
   const api = useMemo(() => createPresenceApi(companyId), [companyId]);
   const [items, setItems] = useState<PresenceItem[]>([]);
-  const [tab, setTab] = useState<Tab>('dashboard');
-  const [search] = useSearch();
-  const [requestedTab, setRequestedTab] = useState<Tab | undefined>(() => requestedPresenceTab(search));
+  const [tab, setTab] = useQueryTab({
+    tabs: tabs.map(([id]) => id),
+    defaultTab: 'dashboard',
+    aliases: { pointage: 'clock', historique: 'history', rapports: 'reports' },
+  });
   const [date, setDate] = useState(today());
   const [period, setPeriod] = useState('day');
   const [sector, setSector] = useState('');
@@ -75,20 +72,6 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [selected, setSelected] = useState<PresenceItem | null>(null);
   const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
   useEffect(() => { void refresh(); }, [api]);
-  useEffect(() => {
-    const syncRequestedTab = () => setRequestedTab(requestedPresenceTab(window.location.search));
-    window.addEventListener('pushState', syncRequestedTab);
-    window.addEventListener('replaceState', syncRequestedTab);
-    window.addEventListener('popstate', syncRequestedTab);
-    return () => {
-      window.removeEventListener('pushState', syncRequestedTab);
-      window.removeEventListener('replaceState', syncRequestedTab);
-      window.removeEventListener('popstate', syncRequestedTab);
-    };
-  }, []);
-  useEffect(() => {
-    if (requestedTab && tabs.some(([id]) => id === requestedTab)) setTab(requestedTab);
-  }, [requestedTab]);
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
   const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
