@@ -235,6 +235,9 @@ export function loadData(): StoreData {
         companyId: 'kora',
         status: 'ACTIF' as const,
         loginPassword: stored?.loginPassword || seed.loginPassword,
+        sectorId: stored?.sectorId || seed.sectorId,
+        roleId: stored?.roleId || seed.roleId,
+        role: stored?.role || seed.role,
       };
     });
     const rawEmployees = [
