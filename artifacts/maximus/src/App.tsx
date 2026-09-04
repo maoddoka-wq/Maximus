@@ -12,6 +12,7 @@ import CommerceModulePage from '@/pages/commerce-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
 import PresenceModulePage from '@/pages/presence-module';
+import { commerceTabDefinitions, hasCommerceTabPermission, hasDetailedCommercePermissions, type CommerceTabId } from '@/lib/commerce-permissions';
 
 const queryClient = new QueryClient();
 type Icon = typeof Gauge;
@@ -289,26 +290,27 @@ function AppContent() {
     : undefined;
   const commerceTabIds = employee && employeeRole && roleFitsEmployee
     ? (() => {
-        const commerceAliases: Record<string, string[]> = {
-          clients: ['clients'],
-          'devis-et-commandes': ['sales'],
-          'chiffre-d-affaires': ['dashboard'],
-          devis: ['sales'],
-          commandes: ['sales'],
-          facturation: ['invoices'],
-        };
-        const allowedTabIds = new Set<string>();
-        for (const [moduleId, featureList] of [['commerce', modules.find(item => item.id === 'commerce')?.features ?? []], ['ventes', modules.find(item => item.id === 'ventes')?.features ?? []]] as const) {
-          const canViewModule = roleHasPermission(moduleId as ModuleId, 'voir');
-          const permissionKeys = featureList.map(feature => permissionFeatureKey(moduleId as ModuleId, feature));
-          const hasDetailedFeaturePermissions = permissionKeys.some(key => key in employeeRole.modulePermissions);
-          if (!canViewModule && !hasDetailedFeaturePermissions) continue;
-          featureList.forEach(feature => {
-            const key = permissionFeatureKey(moduleId as ModuleId, feature);
-            if (employeeRole.modulePermissions[key]?.includes('voir') || (canViewModule && !hasDetailedFeaturePermissions)) {
-              commerceAliases[featureSlug(feature)]?.forEach(tabId => allowedTabIds.add(tabId));
-            }
+        const allowedTabIds = new Set<CommerceTabId>();
+        const permissions = employeeRole.modulePermissions;
+        const canViewCommerce = roleHasPermission('commerce', 'voir');
+        const hasCommerceDetails = hasDetailedCommercePermissions(permissions);
+        if (canViewCommerce) {
+          commerceTabDefinitions.forEach(tab => {
+            if (!hasCommerceDetails || hasCommerceTabPermission(permissions, tab.id)) allowedTabIds.add(tab.id);
           });
+        }
+
+        const canViewVentes = roleHasPermission('ventes', 'voir');
+        const ventesFeatureKeys = ['ventes:menu:devis', 'ventes:menu:commandes', 'ventes:menu:facturation'];
+        const hasVentesDetails = ventesFeatureKeys.some(key => key in permissions);
+        if (canViewVentes) {
+          if (!hasVentesDetails) {
+            allowedTabIds.add('sales');
+            allowedTabIds.add('invoices');
+          } else {
+            if (permissions['ventes:menu:devis']?.includes('voir') || permissions['ventes:menu:commandes']?.includes('voir')) allowedTabIds.add('sales');
+            if (permissions['ventes:menu:facturation']?.includes('voir')) allowedTabIds.add('invoices');
+          }
         }
         return [...allowedTabIds];
       })()
@@ -317,7 +319,28 @@ function AppContent() {
     const module = modules.find(item => item.id === moduleId);
     if (!module) return [];
     let items: SidebarFeature[] = [];
-    if (moduleId === 'stocks') {
+    if (moduleId === 'commerce') {
+      const commerceTabIcons: Record<CommerceTabId, Icon> = {
+        dashboard: Gauge,
+        sales: ShoppingCart,
+        products: Package,
+        clients: Users,
+        suppliers: Store,
+        purchases: Package,
+        expenses: ArrowDownToLine,
+        cash: WalletCards,
+        credit: CreditCard,
+        invoices: FileBarChart,
+        returns: ArrowUpFromLine,
+        reports: FileBarChart,
+        activity: History,
+        team: Users,
+        settings: Settings,
+      };
+      items = commerceTabDefinitions
+        .filter(tab => commerceTabIds?.includes(tab.id))
+        .map(tab => ({ href: `/kora/commerce?tab=${tab.id}`, label: tab.label, icon: commerceTabIcons[tab.id] }));
+    } else if (moduleId === 'stocks') {
       items = stockSubmodules
         .filter(submodule => stockPermissions?.[submodule.id]?.includes('voir'))
         .map(submodule => ({
@@ -343,7 +366,7 @@ function AppContent() {
       const canViewModule = employeeRole?.modulePermissions[moduleId]?.includes('voir');
       items = module.features
         .filter(feature => employeeRole?.modulePermissions[permissionFeatureKey(moduleId, feature)]?.includes('voir') || (canViewModule && !hasDetailedFeaturePermissions))
-        .map(feature => ({ href: `/kora/${moduleId}?feature=${featureSlug(feature)}`, label: feature, icon: moduleId === 'commerce' || moduleId === 'ventes' ? ShoppingCart : moduleId === 'finance' ? WalletCards : moduleId === 'rh' ? UserRoundCog : LayoutGrid }));
+        .map(feature => ({ href: `/kora/${moduleId}?feature=${featureSlug(feature)}`, label: feature, icon: moduleId === 'ventes' ? ShoppingCart : moduleId === 'finance' ? WalletCards : moduleId === 'rh' ? UserRoundCog : LayoutGrid }));
     }
     return [{ label: module.name, items: items.length ? items : [{ href: `/kora/${moduleId}`, label: module.name, icon: LayoutGrid }] }];
   }) : [];

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { commerceTabDefinitions, commerceTabPermissionKey, commerceTabPermissionKeys, type CommerceTabId } from '@/lib/commerce-permissions';
 
 const defaultCompanyTheme = { primaryColor: '#F2B705', accentColor: '#F2B705', sidebarColor: '#161D27' };
 const companyThemePresets = [
@@ -715,9 +716,13 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
   const toggleFeaturePermission = (moduleId: ModuleId, feature: string, perm: 'voir' | 'créer' | 'modifier') => {
     const key = permissionFeatureKey(moduleId, feature);
     setFormData(prev => {
-      const current = prev.modulePermissions[key] || [];
+      const permissionKeys = moduleId === 'commerce'
+        ? commerceTabPermissionKeys(feature as CommerceTabId)
+        : [key];
+      const current = [...new Set(permissionKeys.flatMap(permissionKey => prev.modulePermissions[permissionKey] || []))];
       const next = current.includes(perm) ? current.filter(value => value !== perm) : [...current, perm];
       const modulePermissions = { ...prev.modulePermissions };
+      permissionKeys.forEach(permissionKey => delete modulePermissions[permissionKey]);
       if (next.length) modulePermissions[key] = next;
       else delete modulePermissions[key];
       if (next.length && !modulePermissions[moduleId]?.includes('voir')) {
@@ -792,18 +797,20 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
                     ))}
                   </div>
                 </div>
-                 {m.id !== 'stocks' && m.id !== 'presences' && m.features.length > 0 && <div className="ml-3 rounded-lg border border-dashed p-3">
+                 {m.id !== 'stocks' && m.id !== 'presences' && (m.id === 'commerce' ? commerceTabDefinitions.length > 0 : m.features.length > 0) && <div className="ml-3 rounded-lg border border-dashed p-3">
                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Permissions dans les menus de {m.name}</p>
-                   <p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Ces droits détaillent les menus visibles et les actions possibles dans ce module.</p>
+                   <p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Ces droits détaillent les fonctionnalités visibles et les actions possibles dans ce module.</p>
                    <div className="space-y-2">
-                     {m.features.map(feature => {
-                       const menuKey = permissionFeatureKey(m.id, feature);
-                       const featurePermissions = formData.modulePermissions[menuKey] || [];
+                     {(m.id === 'commerce' ? commerceTabDefinitions : m.features.map(feature => ({ id: feature, label: feature }))).map(feature => {
+                       const menuKey = m.id === 'commerce' ? commerceTabPermissionKey(feature.id as typeof commerceTabDefinitions[number]['id']) : permissionFeatureKey(m.id, feature.id);
+                       const featurePermissions = m.id === 'commerce'
+                         ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => formData.modulePermissions[permissionKey] || []))]
+                         : formData.modulePermissions[menuKey] || [];
                        return <div key={menuKey} className="flex flex-col gap-2 rounded-md bg-[hsl(var(--muted)/.45)] px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between">
-                         <span className="text-[10px] font-semibold">{feature}</span>
+                         <span className="text-[10px] font-semibold">{feature.label}</span>
                          <div className="flex gap-1">
                            {(['voir', 'créer', 'modifier'] as const).map(permission => <label key={permission} className={`cursor-pointer rounded px-1.5 py-1 text-[9px] font-bold ${featurePermissions.includes(permission) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--card))]'}`}>
-                             <input type="checkbox" className="hidden" checked={featurePermissions.includes(permission)} onChange={() => toggleFeaturePermission(m.id, feature, permission)} />
+                             <input type="checkbox" className="hidden" checked={featurePermissions.includes(permission)} onChange={() => toggleFeaturePermission(m.id, feature.id, permission)} />
                              {permission === 'voir' ? 'Voir' : permission === 'créer' ? 'Créer' : 'Modifier'}
                            </label>)}
                          </div>

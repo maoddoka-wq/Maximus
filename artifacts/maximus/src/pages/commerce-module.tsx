@@ -38,27 +38,30 @@ import type { Sale, Status, StoreData } from '@/lib/store';
 import { addNotification, getVisibleNotifications, money, shortMoney, uid } from '@/lib/store';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 
 type Icon = ComponentType<{ size?: number; className?: string }>;
-type Tab = (typeof tabs)[number]['id'];
+type Tab = CommerceTabId;
 
-const tabs = [
-  { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, group: '' },
-  { id: 'sales', label: 'Ventes & caisse', icon: ShoppingCart, group: 'Commerce' },
-  { id: 'products', label: 'Produits & stock', icon: Boxes, group: 'Commerce' },
-  { id: 'clients', label: 'Clients', icon: Users, group: 'Commerce' },
-  { id: 'suppliers', label: 'Fournisseurs', icon: Store, group: 'Commerce' },
-  { id: 'purchases', label: 'Achats', icon: Package, group: 'Finance' },
-  { id: 'expenses', label: 'Dépenses', icon: ArrowDownToLine, group: 'Finance' },
-  { id: 'cash', label: 'Comptes de caisse', icon: WalletCards, group: 'Finance' },
-  { id: 'credit', label: 'Crédit clients', icon: CreditCard, group: 'Finance' },
-  { id: 'invoices', label: 'Factures & reçus', icon: FileCheck2, group: 'Finance' },
-  { id: 'returns', label: 'Retours & avoirs', icon: ArrowUpRight, group: 'Finance' },
-  { id: 'reports', label: 'Rapports', icon: FileBarChart, group: 'Pilotage' },
-  { id: 'activity', label: 'Journal d’activité', icon: History, group: 'Pilotage' },
-  { id: 'team', label: 'Équipe & droits', icon: Users, group: 'Pilotage' },
-  { id: 'settings', label: 'Paramètres', icon: Settings, group: 'Pilotage' },
-] as const;
+const tabIcons = {
+  dashboard: LayoutDashboard,
+  sales: ShoppingCart,
+  products: Boxes,
+  clients: Users,
+  suppliers: Store,
+  purchases: Package,
+  expenses: ArrowDownToLine,
+  cash: WalletCards,
+  credit: CreditCard,
+  invoices: FileCheck2,
+  returns: ArrowUpRight,
+  reports: FileBarChart,
+  activity: History,
+  team: Users,
+  settings: Settings,
+} satisfies Record<CommerceTabId, Icon>;
+
+const tabs = commerceTabDefinitions.map(tab => ({ ...tab, icon: tabIcons[tab.id] }));
 
 const featureTabAliases: Record<string, Tab> = {
   clients: 'clients',
@@ -157,7 +160,9 @@ export default function CommerceModulePage({
   onNavigate?: (path: string) => void;
 }) {
   const [state, setState] = useState<CommerceState>(() => readState(companyId));
-  const availableTabIds = allowedTabs?.length ? tabs.filter(item => allowedTabs.includes(item.id)).map(item => item.id) : tabs.map(item => item.id);
+  const availableTabIds = allowedTabs
+    ? tabs.filter(item => allowedTabs.includes(item.id)).map(item => item.id)
+    : tabs.map(item => item.id);
   const defaultTab = availableTabIds.includes(initialTab) ? initialTab : (availableTabIds[0] ?? 'dashboard');
   const [tab, setTab] = useQueryTab({ tabs: availableTabIds, defaultTab, aliases: featureTabAliases });
   const [query, setQuery] = useState('');
@@ -198,6 +203,10 @@ export default function CommerceModulePage({
   const lowStock = data.products.filter(product => product.stock <= product.threshold);
   const unread = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(notification => !notification.read).length;
   const visibleTabs = tabs.filter(item => availableTabIds.includes(item.id));
+
+  if (allowedTabs && availableTabIds.length === 0) {
+    return <div className="card-surface rounded-2xl p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="commerce-module-empty">Aucune fonctionnalité commerciale n’est autorisée pour ce rôle.</div>;
+  }
 
   return <div className="space-y-5" data-testid="commerce-module">
     {toast && <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-xl bg-[hsl(var(--foreground))] px-4 py-3 text-sm font-bold text-[hsl(var(--background))] shadow-xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
