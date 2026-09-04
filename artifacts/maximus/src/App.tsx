@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArrowDownToLine, ArrowUpFromLine, Bell, Boxes, Building2, CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck, CreditCard, Edit3, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, History, KeyRound, LayoutGrid, LogIn, Package, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, Warehouse, X, UserRoundCog } from 'lucide-react';
 import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
@@ -7,14 +7,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { getConfiguredModules, getVisibleNotifications, loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
-import StockModulePage from '@/pages/stock-module';
-import CommerceModulePage from '@/pages/commerce-module';
-import { OperationalModulePage } from '@/pages/operational-modules';
-import { CompanyOrganizationAdmin } from '@/pages/company-organization';
-import PresenceModulePage from '@/pages/presence-module';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { type Icon, type Session, type SidebarFeature, type SidebarFeatureGroup } from '@/lib/navigation';
+import { AdminRouter, KoraRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import {
@@ -28,6 +24,11 @@ import {
 } from '@/lib/employee-permissions';
 
 const queryClient = new QueryClient();
+const StockModulePage = lazy(() => import('@/pages/stock-module'));
+const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
+const OperationalModulePage = lazy(() => import('@/pages/operational-modules').then(module => ({ default: module.OperationalModulePage })));
+const CompanyOrganizationAdmin = lazy(() => import('@/pages/company-organization').then(module => ({ default: module.CompanyOrganizationAdmin })));
+const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const moduleIcons: Record<ModuleId, Icon> = {
   commerce: ShoppingCart,
   ventes: CreditCard,
@@ -257,9 +258,11 @@ function AppContent() {
            <Topbar title={currentMeta.title} isAdmin={isAdmin} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/notifications'} unreadCount={unreadNotifications} onHelp={() => { void alert({ title: 'Aide MAXIMUS', description: 'Explorez les vues depuis la navigation de votre espace.', confirmLabel: 'Compris' }); }} />
           <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
           <PageHeader {...currentMeta} location={location} />
-          <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} />}
-          </ErrorBoundary>
+           <ErrorBoundary resetKey={location}>
+             <Suspense fallback={<div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>}>
+               {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} screens={{ dashboard: AdminDashboard, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
+             </Suspense>
+           </ErrorBoundary>
         </div>
       </main>
       {toast && <div data-testid="status-toast" className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-semibold text-[hsl(var(--sidebar-foreground))] shadow-2xl fade-up"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
@@ -342,26 +345,6 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
 function Brand({ inverse = false, homeHref }: { inverse?: boolean; homeHref?: string }) { return <Link data-testid="link-brand" href={homeHref ?? (inverse ? '/' : '/maximus/dashboard')} className="inline-flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--accent))] text-sm font-black text-[hsl(var(--foreground))]">M</span><span className={`text-lg font-black tracking-[-.06em] ${inverse ? 'text-[hsl(var(--sidebar-foreground))]' : ''}`}>MAXIMUS<span className="text-[hsl(var(--accent))]">.</span></span></Link>; }
 function Step({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) { return <div className={`flex items-center gap-2 text-sm font-bold ${active || done ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${done ? 'bg-[hsl(var(--primary))] text-white' : active ? 'bg-[hsl(var(--accent))]' : 'border border-[hsl(var(--border))]'}`}>{done ? <Check size={14} /> : n}</span><span className="mobile-hide">{label}</span></div>; }
 function Field({ label, value, onChange, placeholder, type = 'text', testId, help }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; testId: string; help?: string }) { const explanation = help ?? `Saisissez ${label.toLowerCase().replace(' *', '')}.`; const autoComplete = testId.includes('login-email') ? 'email' : testId.includes('login-password') ? 'current-password' : type === 'password' ? 'new-password' : undefined; return <label className="block text-sm font-semibold">{label}<input data-testid={testId} autoComplete={autoComplete} type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal transition focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /><span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{explanation}</span></label>; }
-
-function AdminRouter({ location, data, mutate, notify, onNavigate }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void; onNavigate: (path: string) => void }) {
-  const routePath = location.split('?')[0];
-  if (routePath === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
-  if (routePath === '/maximus/entreprises/organisation') return <OrganizationAdminPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  const companyDetailMatch = routePath.match(/^\/maximus\/entreprises\/([^/]+)$/);
-  if (companyDetailMatch) {
-    const companyId = decodeURIComponent(companyDetailMatch[1]);
-    const company = data.companies.find(item => item.id === companyId);
-     return company ? <CompanyModulesDetail company={company} data={data} mutate={mutate} onBack={() => onNavigate('/maximus/entreprises')} /> : <EmptyState title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onNavigate('/maximus/entreprises')} />;
-  }
-  if (routePath === '/maximus/entreprises') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={false} />;
-  if (routePath === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  if (routePath === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
-  if (routePath === '/maximus/secteurs') return <SectorPresetsPage data={data} mutate={mutate} />;
-  if (routePath === '/maximus/abonnements') return <SubscriptionsPage data={data} />;
-  if (routePath === '/maximus/notifications') return <NotificationsPage data={data} mutate={mutate} context={{ isAdmin: true }} />;
-  if (routePath === '/maximus/journal') return <JournalPage data={data} />;
-  return <EmptyState title="Cette vue n’existe pas encore" text="Revenez au cockpit pour poursuivre." action={() => onNavigate('/maximus/dashboard')} />;
-}
 
 function OrganizationAdminPage({ data, mutate, onNavigate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void }) {
   const [companyId, setCompanyId] = useState(data.companies.find(company => company.status === 'ACTIF')?.id ?? data.companies[0]?.id ?? '');
@@ -498,42 +481,6 @@ function CompanyEditModal({ company, data, mutate, onClose }: { company: Company
     {error && <p role="alert" className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
     <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-company-edit" onClick={save}>Enregistrer les modifications</ActionButton></div>
   </Modal>;
-}
-
-function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, presenceEmployees, hasPermission, hasPresencePermission, stockPermissions, commerceTabIds, singleModuleNavigation }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; presenceEmployees: Employee[]; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; hasPresencePermission: (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => boolean; stockPermissions?: Record<string, string[]>; commerceTabIds?: string[]; singleModuleNavigation?: boolean }) {
-  const routePath = location.split('?')[0];
-  const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
-  const requiredModule = routeModules[routePath];
-  if (requiredModule && !allowed.includes(requiredModule)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
-  if (routePath === '/kora/dashboard') return <RoleAwareKoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
-  if (routePath === '/kora/notifications') return <NotificationsPage data={data} mutate={mutate} context={{ isAdmin: false, companyId }} />;
-  if (routePath === '/kora/profil') {
-    const company = data.companies.find(item => item.id === companyId);
-    return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="profile" /> : <EmptyState title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onNavigate('/kora/dashboard')} />;
-  }
-  if (routePath === '/kora/organisation' || routePath === '/kora/autorisations' || routePath === '/kora/employes' || routePath === '/kora/roles') {
-    const company = data.companies.find(item => item.id === companyId);
-     const initialTab = routePath === '/kora/autorisations' || routePath === '/kora/roles' ? 'roles' : routePath === '/kora/employes' ? 'employees' : 'overview';
-    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab={initialTab} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur." action={() => onNavigate('/kora/dashboard')} />;
-  }
-     if (routePath === '/kora/stocks') {
-     return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} canCreate={hasPermission('stocks', 'créer')} canModify={hasPermission('stocks', 'modifier')} stockPermissions={stockPermissions} singleModuleNavigation={singleModuleNavigation} />;
-  }
-   if (routePath === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
-   if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
-      return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds as ('dashboard' | 'sales' | 'products' | 'clients' | 'suppliers' | 'purchases' | 'expenses' | 'cash' | 'credit' | 'invoices' | 'returns' | 'reports' | 'activity' | 'team' | 'settings')[] | undefined} singleModuleNavigation={singleModuleNavigation} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
-   }
-   if (routePath === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
-   if (routePath === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
-   if (routePath === '/kora/rh') return <HumanResourcesWorkspace data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} companyId={companyId} />;
-   if (routePath === '/kora/presences') return <PresenceModulePage companyId={companyId} employees={presenceEmployees} nodes={data.orgNodes.filter(node => node.companyId === companyId)} currentEmployee={employee} canView={hasPresencePermission('view')} canCreate={hasPresencePermission('create')} canEdit={hasPresencePermission('edit')} canCorrect={hasPresencePermission('correct')} canValidate={hasPresencePermission('validate')} canManage={hasPresencePermission('manage')} canExport={hasPresencePermission('export')} canDelete={hasPresencePermission('delete')} singleModuleNavigation={singleModuleNavigation} />;
-   if (routePath === '/kora/paie') return <OperationalModulePage moduleId="paie" data={data} mutate={mutate} canCreate={hasPermission('paie', 'créer')} canModify={hasPermission('paie', 'modifier')} />;
-   if (routePath === '/kora/crm') return <OperationalModulePage moduleId="crm" data={data} mutate={mutate} canCreate={hasPermission('crm', 'créer')} canModify={hasPermission('crm', 'modifier')} />;
-   if (routePath === '/kora/fournisseurs') return <OperationalModulePage moduleId="fournisseurs" data={data} mutate={mutate} canCreate={hasPermission('fournisseurs', 'créer')} canModify={hasPermission('fournisseurs', 'modifier')} />;
-   if (routePath === '/kora/logistique') return <OperationalModulePage moduleId="logistique" data={data} mutate={mutate} canCreate={hasPermission('logistique', 'créer')} canModify={hasPermission('logistique', 'modifier')} />;
-   if (routePath === '/kora/documents') return <OperationalModulePage moduleId="documents" data={data} mutate={mutate} canCreate={hasPermission('documents', 'créer')} canModify={hasPermission('documents', 'modifier')} />;
-   if (routePath === '/kora/rapports') return <OperationalReportsPage data={data} />;
-  return <EmptyState title="Module non autorisé" text={`Cette vue n’est pas disponible pour KORA (${allowed.length} modules autorisés).`} action={() => onNavigate('/kora/dashboard')} />;
 }
 
 function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
