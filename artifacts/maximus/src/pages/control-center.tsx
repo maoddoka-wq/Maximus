@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  ArrowRight,
   CheckCircle2,
   CircleDot,
   Clock3,
   FileCheck2,
-  Filter,
   ListChecks,
   Plus,
   ShieldAlert,
-  UserRound,
   Workflow,
-  XCircle,
 } from 'lucide-react';
 import {
   addNotification,
-  modules,
   uid,
   type ControlTask,
   type ControlTaskPriority,
@@ -26,36 +21,16 @@ import {
   type StoreData,
 } from '@/lib/store';
 import { controlApi, type ControlActorContext, type ControlBootstrap } from '@/lib/control-api';
+import { ControlCreateTaskDialog, type CreateTaskForm } from '@/components/control-create-task-dialog';
+import { ControlTaskList } from '@/components/control-task-list';
 
 type Mutate = (fn: (draft: StoreData) => void, message?: string) => void;
-
-const taskStatuses: ControlTaskStatus[] = ['À FAIRE', 'EN COURS', 'VALIDÉ', 'REFUSÉ', 'TERMINÉ'];
-const priorities: ControlTaskPriority[] = ['BASSE', 'NORMALE', 'HAUTE', 'CRITIQUE'];
-
-const statusClasses: Record<ControlTaskStatus, string> = {
-  'À FAIRE': 'bg-slate-100 text-slate-700',
-  'EN COURS': 'bg-blue-100 text-blue-700',
-  VALIDÉ: 'bg-emerald-100 text-emerald-700',
-  REFUSÉ: 'bg-rose-100 text-rose-700',
-  TERMINÉ: 'bg-violet-100 text-violet-700',
-};
-
-const priorityClasses: Record<ControlTaskPriority, string> = {
-  BASSE: 'text-slate-500',
-  NORMALE: 'text-blue-600',
-  HAUTE: 'text-amber-600',
-  CRITIQUE: 'text-rose-600',
-};
 
 function formatDate(value: string) {
   if (!value) return '—';
   if (value.includes('Aujourd’hui') || value.includes('Demain') || value.includes('juin')) return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-}
-
-function StatusPill({ status }: { status: ControlTaskStatus }) {
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusClasses[status]}`}>{status}</span>;
 }
 
 function EventIcon({ type }: { type: DomainEventType }) {
