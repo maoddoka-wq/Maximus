@@ -3,7 +3,7 @@ import {
   Building2, Users, KeyRound, LayoutGrid, ChevronDown, Plus, 
   Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight, UserRound
 } from 'lucide-react';
-import { Company, StoreData, OrgNode, Role, Employee, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
+import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
 
 // Helper UI components matching Maximus style
 function ActionButton({ children, onClick, primary = false, testId, icon: ButtonIcon = Plus, disabled = false, className = '' }: any) { 
@@ -814,9 +814,11 @@ function EmployeesTab({ company, data, mutate, allowSectorAdmin = true }: { comp
                       <button type="button" data-testid={`button-edit-org-employee-${emp.id}`} aria-label={`Modifier le compte de ${emp.firstName} ${emp.lastName}`} onClick={event => { event.stopPropagation(); setEditingEmployee(emp); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">
                         <Settings size={13} /><span>Modifier</span>
                       </button>
-                      <button data-testid={`button-delete-org-employee-${emp.id}`} aria-label={`Supprimer le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { if (window.confirm(`Supprimer le compte de ${emp.firstName} ${emp.lastName} ?`)) mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.'); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]">
-                        <Trash2 size={13} /><span>Supprimer</span>
-                      </button>
+                      {demoEmployeeIds.has(emp.id)
+                        ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span>
+                        : <button data-testid={`button-delete-org-employee-${emp.id}`} aria-label={`Supprimer le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { if (window.confirm(`Supprimer le compte de ${emp.firstName} ${emp.lastName} ?`)) mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.'); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]">
+                          <Trash2 size={13} /><span>Supprimer</span>
+                        </button>}
                     </div>
                   </td>
                 </tr>

@@ -23,6 +23,7 @@ export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'nam
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
+export const demoEmployeeIds = new Set(['demo-emp-awa', 'demo-emp-ibrahima', 'demo-emp-ndeye', 'demo-emp-mamadou']);
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; }
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; }
@@ -224,7 +225,22 @@ export function loadData(): StoreData {
           : role.modulePermissions,
       })) as Role[];
 
-    const rawEmployees = parsed.employees?.length ? parsed.employees : initial.employees;
+    const storedEmployees = parsed.employees ?? [];
+    const demoEmployees = initial.employees.map(seed => {
+      const stored = storedEmployees.find(employee => employee.id === seed.id || employee.email === seed.email);
+      return {
+        ...seed,
+        ...stored,
+        id: seed.id,
+        companyId: 'kora',
+        status: 'ACTIF' as const,
+        loginPassword: stored?.loginPassword || seed.loginPassword,
+      };
+    });
+    const rawEmployees = [
+      ...demoEmployees,
+      ...storedEmployees.filter(employee => !demoEmployeeIds.has(employee.id) && !initial.employees.some(seed => seed.email === employee.email)),
+    ];
     return {
       ...initial,
       ...storedData,
