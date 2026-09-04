@@ -1,3 +1,4 @@
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.
 - [Persistance des présences](presence-storage.md) — les workflows Présences sont stockés dans PostgreSQL via des éléments typés, payload extensible et historique.
+- [Parcours Organisation](organization-workflow.md) — construire la hiérarchie, configurer les rôles, puis créer les employés et désigner les managers.
