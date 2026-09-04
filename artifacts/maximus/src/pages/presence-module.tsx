@@ -69,12 +69,14 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [selected, setSelected] = useState<PresenceItem | null>(null);
   const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
   useEffect(() => { void refresh(); }, [api]);
-  useEffect(() => {
-    const params = new URLSearchParams(location.split('?')[1] ?? '');
+  const requestedTab = (() => {
+    const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : location.split('?')[1] ?? '');
     const featureTabs: Record<string, Tab> = { pointage: 'clock', historique: 'history', rapports: 'reports' };
-    const requested = (params.get('tab') ?? featureTabs[params.get('feature') ?? '']) as Tab | undefined;
-    if (requested && tabs.some(([id]) => id === requested)) setTab(requested);
-  }, [location]);
+    return (params.get('tab') ?? featureTabs[params.get('feature') ?? '']) as Tab | undefined;
+  })();
+  useEffect(() => {
+    if (requestedTab && tabs.some(([id]) => id === requestedTab)) setTab(requestedTab);
+  }, [requestedTab]);
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
   const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);

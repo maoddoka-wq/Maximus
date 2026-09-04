@@ -65,10 +65,10 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
       setTab(tabs.find(([id]) => stockPermissions[id]?.includes('voir'))?.[0] ?? 'dashboard');
     }
   }, [data, stockPermissions, tab]);
+  const requestedTab = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : location.split('?')[1] ?? '').get('tab') as Tab | null;
   useEffect(() => {
-    const requested = new URLSearchParams(location.split('?')[1] ?? '').get('tab') as Tab | null;
-    if (requested && tabs.some(([id]) => id === requested) && (!stockPermissions || stockPermissions[requested]?.includes('voir'))) setTab(requested);
-  }, [location, stockPermissions]);
+    if (requestedTab && tabs.some(([id]) => id === requestedTab) && (!stockPermissions || stockPermissions[requestedTab]?.includes('voir'))) setTab(requestedTab);
+  }, [requestedTab, stockPermissions]);
 
   if (loading) return <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-44 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-3"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-52 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>;
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
