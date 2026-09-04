@@ -8,7 +8,7 @@ import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules a
 // Helper UI components matching Maximus style
 function ActionButton({ children, onClick, primary = false, testId, icon: ButtonIcon = Plus, disabled = false, className = '' }: any) { 
   return (
-    <button disabled={disabled} data-testid={testId} onClick={onClick} className={`btn flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+    <button disabled={disabled} data-testid={testId} onClick={onClick} className={`app-action btn flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
       <ButtonIcon size={15} />
       {children}
     </button>
@@ -17,15 +17,15 @@ function ActionButton({ children, onClick, primary = false, testId, icon: Button
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-6 shadow-2xl animate-in zoom-in-95">
-        <div className="mb-5 flex items-center justify-between">
+    <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in">
+      <div className="modal-panel card-surface w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-in zoom-in-95">
+        <div className="modal-header mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]">
             <X size={18} />
           </button>
         </div>
-        {children}
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );
@@ -37,7 +37,7 @@ function Field({ label, value, onChange, type = 'text', testId, placeholder = ''
     <label className="block text-sm font-semibold">
       {label}
       <input data-testid={testId} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--primary))]" />
-      <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{explanation}</span>
+      <span className="field-help mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{explanation}</span>
     </label>
   );
 }
