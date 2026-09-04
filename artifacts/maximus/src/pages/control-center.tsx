@@ -303,45 +303,14 @@ export function ControlCenterPage({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
-        <div className="card-surface rounded-2xl border">
-          <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div><h3 className="text-base font-bold">File de coordination</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les actions qui attendent une décision ou une exécution.</p></div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Filter size={14} className="text-[hsl(var(--muted-foreground))]" />
-              <select aria-label="Filtrer les tâches par statut" value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs">
-                <option value="TOUS">Tous les statuts</option>
-                {taskStatuses.map(status => <option key={status} value={status}>{status}</option>)}
-              </select>
-              <select aria-label="Filtrer les tâches par module" value={moduleFilter} onChange={event => setModuleFilter(event.target.value as typeof moduleFilter)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs">
-                <option value="TOUS">Tous les modules</option>
-                {modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="divide-y">
-            {visibleTasks.length === 0 ? <div className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune tâche dans ce périmètre.</div> : visibleTasks.map(task => (
-              <article key={task.id} className="p-5">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2"><h4 className="font-bold">{task.title}</h4><StatusPill status={task.status} /></div>
-                    <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{task.description}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[hsl(var(--muted-foreground))]">
-                      <span className={`font-bold ${priorityClasses[task.priority]}`}>Priorité {task.priority.toLowerCase()}</span>
-                      <span className="flex items-center gap-1"><UserRound size={13} /> {task.assigneeName || 'À affecter'}</span>
-                      <span>Échéance : {task.dueDate || 'non définie'}</span>
-                      {task.relatedObject && <span className="font-semibold">Réf. {task.relatedObject}</span>}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    {task.status === 'À FAIRE' && <button type="button" onClick={() => updateTask(task.id, task.requiresApproval ? 'VALIDÉ' : 'EN COURS')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">{task.requiresApproval ? 'Valider' : 'Démarrer'}</button>}
-                    {task.status === 'À FAIRE' && task.requiresApproval && <button type="button" onClick={() => updateTask(task.id, 'REFUSÉ')} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700">Refuser</button>}
-                    {task.status === 'EN COURS' && <button type="button" onClick={() => updateTask(task.id, 'TERMINÉ')} className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]">Terminer</button>}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
+        <ControlTaskList
+          tasks={visibleTasks}
+          statusFilter={statusFilter}
+          moduleFilter={moduleFilter}
+          onStatusFilterChange={setStatusFilter}
+          onModuleFilterChange={setModuleFilter}
+          onUpdate={updateTask}
+        />
 
         <div className="space-y-6">
           <div className="card-surface rounded-2xl border">
@@ -363,23 +332,19 @@ export function ControlCenterPage({
       </section>
 
       {showCreate && canCreateTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="card-surface w-full max-w-lg rounded-2xl border p-6 shadow-2xl">
-            <div className="mb-5 flex items-start justify-between"><div><h3 className="text-lg font-bold">Créer une tâche de coordination</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">La création sera enregistrée dans les événements et l’audit.</p></div><button type="button" onClick={() => setShowCreate(false)} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]"><XCircle size={19} /></button></div>
-            <div className="space-y-4">
-              {isAdmin && <label className="block text-sm font-semibold">Entreprise cible<select value={targetCompanyId} onChange={event => { setTargetCompanyId(event.target.value); setAssigneeEmployeeId(''); }} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="">Sélectionner une entreprise</option>{data.companies.filter(company => company.status === 'ACTIF').map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>}
-              <label className="block text-sm font-semibold">Affecter à un employé<select value={assigneeEmployeeId} onChange={event => setAssigneeEmployeeId(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="">Sélectionner un employé</option>{assignableEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName} · {employee.position}</option>)}</select><span className="mt-1 block text-[10px] font-normal text-[hsl(var(--muted-foreground))]">L’employé affecté retrouvera cette tâche dans son espace.</span></label>
-              <label className="block text-sm font-semibold">Titre<input autoFocus value={newTask.title} onChange={event => setNewTask(current => ({ ...current, title: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm" placeholder="Ex. Valider la demande d’achat" /></label>
-              <label className="block text-sm font-semibold">Description<textarea value={newTask.description} onChange={event => setNewTask(current => ({ ...current, description: event.target.value }))} className="mt-2 min-h-24 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm" placeholder="Décrivez la décision ou l’action attendue." /></label>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-sm font-semibold">Module<select value={newTask.moduleId} onChange={event => setNewTask(current => ({ ...current, moduleId: event.target.value as ModuleId }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">{modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}</select></label>
-                <label className="block text-sm font-semibold">Priorité<select value={newTask.priority} onChange={event => setNewTask(current => ({ ...current, priority: event.target.value as ControlTaskPriority }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">{priorities.map(priority => <option key={priority} value={priority}>{priority}</option>)}</select></label>
-              </div>
-              <label className="block text-sm font-semibold">Échéance<input value={newTask.dueDate} onChange={event => setNewTask(current => ({ ...current, dueDate: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm" placeholder="Ex. Demain ou 25 juin" /></label>
-              <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" disabled={!newTask.title.trim() || !targetCompanyId || !selectedAssignee} onClick={createTask} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowRight size={15} /> Créer et tracer</button></div>
-            </div>
-          </div>
-        </div>
+        <ControlCreateTaskDialog
+          isAdmin={isAdmin}
+          companies={data.companies}
+          assignableEmployees={assignableEmployees}
+          targetCompanyId={targetCompanyId}
+          setTargetCompanyId={value => { setTargetCompanyId(value); setAssigneeEmployeeId(''); }}
+          assigneeEmployeeId={assigneeEmployeeId}
+          setAssigneeEmployeeId={setAssigneeEmployeeId}
+          form={newTask}
+          setForm={setNewTask}
+          onClose={() => setShowCreate(false)}
+          onSubmit={createTask}
+        />
       )}
     </div>
   );
