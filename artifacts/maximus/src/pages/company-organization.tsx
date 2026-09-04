@@ -31,11 +31,13 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function Field({ label, value, onChange, type = 'text', testId, placeholder = '' }: any) {
+function Field({ label, value, onChange, type = 'text', testId, placeholder = '', help }: any) {
+  const explanation = help ?? `Saisissez ${String(label).toLowerCase().replace(' *', '')}.`;
   return (
     <label className="block text-sm font-semibold">
       {label}
       <input data-testid={testId} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--primary))]" />
+      <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{explanation}</span>
     </label>
   );
 }
@@ -159,14 +161,14 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
         <div className="min-w-[220px] flex-1"><h3 className="font-bold">Photo de profil</h3><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">PNG, JPG ou WebP · 2 Mo maximum. Elle sera affichée dans votre espace entreprise.</p><div className="mt-3 flex flex-wrap gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><UserRound size={14} />Choisir une photo<input data-testid="input-profile-photo" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => handlePhoto(event.target.files?.[0])} /></label>{form.profilePhoto && <button type="button" data-testid="button-remove-profile-photo" onClick={() => setForm(current => ({ ...current, profilePhoto: '' }))} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]">Supprimer</button>}</div></div>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Nom de l’entreprise *" value={form.name} onChange={setField('name')} testId="input-profile-company-name" />
-        <Field label="Responsable *" value={form.manager} onChange={setField('manager')} testId="input-profile-manager" />
-        <Field label="Email administrateur *" value={form.email} onChange={setField('email')} type="email" testId="input-profile-email" />
-        <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" />
-        <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" />
-        <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" />
+        <Field label="Nom de l’entreprise *" value={form.name} onChange={setField('name')} testId="input-profile-company-name" help="Nom affiché dans MAXIMUS et dans l’espace de travail." />
+        <Field label="Responsable *" value={form.manager} onChange={setField('manager')} testId="input-profile-manager" help="Nom de la personne responsable de l’entreprise." />
+        <Field label="Email administrateur *" value={form.email} onChange={setField('email')} type="email" testId="input-profile-email" help="Adresse utilisée pour la connexion du compte entreprise." />
+        <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" help="Numéro de contact professionnel de l’entreprise." />
+        <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" help="Pays dans lequel l’entreprise exerce principalement." />
+        <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" help="Secteur d’activité utilisé pour contextualiser l’espace." />
       </div>
-      <div className="mt-7 border-t pt-6"><h3 className="font-bold">Modifier le mot de passe</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez ces champs vides pour conserver le mot de passe actuel.</p><div className="mt-4 grid gap-5 sm:grid-cols-2"><Field label="Nouveau mot de passe" value={newPassword} onChange={setNewPassword} type="password" placeholder="Au moins 8 caractères" testId="input-profile-password" /><Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-profile-password-confirm" /></div></div>
+      <div className="mt-7 border-t pt-6"><h3 className="font-bold">Modifier le mot de passe</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez ces champs vides pour conserver le mot de passe actuel.</p><div className="mt-4 grid gap-5 sm:grid-cols-2"><Field label="Nouveau mot de passe" value={newPassword} onChange={setNewPassword} type="password" placeholder="Au moins 8 caractères" testId="input-profile-password" help="Utilisez au moins 8 caractères. Laissez vide pour conserver le mot de passe actuel." /><Field label="Confirmer le mot de passe" value={passwordConfirm} onChange={setPasswordConfirm} type="password" placeholder="Répétez le mot de passe" testId="input-profile-password-confirm" help="Saisissez exactement le même mot de passe pour confirmer le changement." /></div></div>
       {error && <p data-testid="profile-error" className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <div className="mt-7 flex justify-end"><button data-testid="button-save-profile" onClick={save} className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Enregistrer le profil</button></div>
     </section>
@@ -443,8 +445,8 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Nom de l'unité *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} testId="input-org-name" />
-        <Field label="Code" value={formData.code} onChange={(v: string) => setFormData({...formData, code: v})} placeholder="Ex: UNITE-01" />
+        <Field label="Nom de l'unité *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} testId="input-org-name" help="Nom lisible de la direction, du département, du secteur ou du service." />
+        <Field label="Code" value={formData.code} onChange={(v: string) => setFormData({...formData, code: v})} placeholder="Ex: UNITE-01" help="Identifiant court utilisé pour retrouver rapidement cette unité." />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <label className="block text-sm font-semibold">
@@ -455,6 +457,7 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
             <option value="sector">Secteur</option>
             <option value="service">Service</option>
           </select>
+          <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Définit le niveau de l’unité dans votre organisation.</span>
         </label>
         <label className="block text-sm font-semibold">
           Unité Parente
@@ -462,11 +465,13 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
             <option value="">Aucune (Racine)</option>
             {parentOptions.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
           </select>
+          <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">L’unité parente permet de construire la hiérarchie.</span>
         </label>
       </div>
       
       <div className="border-t pt-4 mt-2">
         <label className="block text-sm font-semibold mb-3">Modules Assignés</label>
+        <p className="mb-3 text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Cochez les modules accessibles aux rôles de cette unité.</p>
         <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
           {availableModules.map(m => (
             <label key={m.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${(formData.moduleIds || []).includes(m.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.05)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
@@ -490,10 +495,11 @@ function StructureFormModal({ company, initialData, allNodes, employees, onClose
               <option value="">Sélectionner un employé...</option>
               {employees.map((e: Employee) => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
             </select>
+            <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Employé responsable du suivi de cette unité.</span>
           </label>
-          <Field label="Email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} />
-          <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} />
-          <Field label="Localisation" value={formData.location} onChange={(v: string) => setFormData({...formData, location: v})} />
+          <Field label="Email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} help="Adresse de contact de l’unité, si elle en possède une." />
+          <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} help="Numéro de contact de l’unité." />
+          <Field label="Localisation" value={formData.location} onChange={(v: string) => setFormData({...formData, location: v})} help="Adresse ou emplacement physique de l’unité." />
         </div>
       </div>
 
@@ -632,14 +638,15 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
   return (
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
-      <Field label="Nom du rôle *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} />
-      <Field label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} />
+      <Field label="Nom du rôle *" value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} help="Nom affiché lors de l’affectation d’un rôle à un employé." />
+      <Field label="Description" value={formData.description} onChange={(v: string) => setFormData({...formData, description: v})} help="Expliquez les responsabilités principales associées à ce rôle." />
       
       <label className="block text-sm font-semibold mt-4">
         Unité d’appartenance *
         <select disabled={sectorLocked} value={formData.sectorId} onChange={e => handleSectorChange(e.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
           {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
         </select>
+        <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Le rôle héritera des modules disponibles dans cette unité et ses unités parentes.</span>
         {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son unité.</span>}
       </label>
 
@@ -840,19 +847,19 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Prénom *" value={formData.firstName} onChange={(v: string) => setFormData({...formData, firstName: v})} />
-        <Field label="Nom *" value={formData.lastName} onChange={(v: string) => setFormData({...formData, lastName: v})} />
+        <Field label="Prénom *" value={formData.firstName} onChange={(v: string) => setFormData({...formData, firstName: v})} help="Prénom utilisé dans les listes et l’historique des actions." />
+        <Field label="Nom *" value={formData.lastName} onChange={(v: string) => setFormData({...formData, lastName: v})} help="Nom de famille de l’employé." />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Email *" type="email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} />
-        <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} />
+        <Field label="Email *" type="email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} help="Adresse utilisée par l’employé pour se connecter à son espace." />
+        <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} help="Numéro de contact professionnel de l’employé." />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Field label={initialData ? 'Nouveau mot de passe' : 'Mot de passe initial *'} type="password" value={formData.password} onChange={(v: string) => setFormData({...formData, password: v})} placeholder={initialData ? 'Laisser vide pour conserver' : 'Au moins 8 caractères'} testId="input-employee-password" />
-        <Field label={initialData ? 'Confirmer le nouveau mot de passe' : 'Confirmer le mot de passe *'} type="password" value={formData.passwordConfirm} onChange={(v: string) => setFormData({...formData, passwordConfirm: v})} placeholder="Répétez le mot de passe" testId="input-employee-password-confirm" />
+        <Field label={initialData ? 'Nouveau mot de passe' : 'Mot de passe initial *'} type="password" value={formData.password} onChange={(v: string) => setFormData({...formData, password: v})} placeholder={initialData ? 'Laisser vide pour conserver' : 'Au moins 8 caractères'} testId="input-employee-password" help={initialData ? 'Laissez vide pour conserver le mot de passe actuel ; sinon utilisez au moins 8 caractères.' : 'Mot de passe utilisé par l’employé pour sa première connexion.'} />
+        <Field label={initialData ? 'Confirmer le nouveau mot de passe' : 'Confirmer le mot de passe *'} type="password" value={formData.passwordConfirm} onChange={(v: string) => setFormData({...formData, passwordConfirm: v})} placeholder="Répétez le mot de passe" testId="input-employee-password-confirm" help="Saisissez exactement le même mot de passe pour confirmer." />
       </div>
       <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le compte se connecte depuis « Espace KORA » avec cet email et ce mot de passe. Le mot de passe n’est pas affiché dans la liste des employés.</p>
-      <Field label="Titre du poste" value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} placeholder="Ex: Développeur Senior" />
+      <Field label="Titre du poste" value={formData.position} onChange={(v: string) => setFormData({...formData, position: v})} placeholder="Ex: Développeur Senior" help="Intitulé professionnel visible dans les listes, distinct du rôle d’accès." />
       
       <div className="border-t pt-4 mt-4 grid grid-cols-2 gap-4">
         <label className="block text-sm font-semibold">
@@ -860,6 +867,7 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
           <select value={formData.sectorId} onChange={e => setFormData({...formData, sectorId: e.target.value, roleId: ''})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
             {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
           </select>
+          <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Unité de rattachement de l’employé. Elle détermine les rôles compatibles.</span>
         </label>
         
         <label className="block text-sm font-semibold">
