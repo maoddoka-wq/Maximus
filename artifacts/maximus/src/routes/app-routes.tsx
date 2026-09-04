@@ -9,6 +9,7 @@ type Navigate = (path: string) => void;
 
 export type AdminRouteScreens = {
   dashboard: Screen;
+  control: Screen;
   organization: Screen;
   companyDetail: Screen;
   companies: Screen;
@@ -39,6 +40,9 @@ export function AdminRouter({
   const routePath = location.split('?')[0];
   if (routePath === '/maximus/dashboard') {
     return <screens.dashboard data={data} onNavigate={onNavigate} />;
+  }
+  if (routePath === '/maximus/controle') {
+    return <screens.control data={data} mutate={mutate} isAdmin actorName="MAXIMUS" />;
   }
   if (routePath === '/maximus/entreprises/organisation') {
     return <screens.organization data={data} mutate={mutate} onNavigate={onNavigate} />;
@@ -79,6 +83,7 @@ export function AdminRouter({
 
 export type KoraRouteScreens = {
   dashboard: Screen;
+  control: Screen;
   notifications: Screen;
   organization: Screen;
   empty: Screen;
@@ -153,6 +158,9 @@ export function KoraRouter({
   }
   if (routePath === '/kora/dashboard') {
     return <screens.dashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
+  }
+  if (routePath === '/kora/controle') {
+    return <screens.control data={data} mutate={mutate} companyId={companyId} employeeId={employee?.id} actorName={employee ? `${employee.firstName} ${employee.lastName}` : data.companies.find(company => company.id === companyId)?.manager ?? 'Administrateur'} isAdmin={false} companyAdmin={companyAdmin} sectorManager={sectorManager} />;
   }
   if (routePath === '/kora/notifications') {
     return <screens.notifications data={data} mutate={mutate} context={{ isAdmin: false, companyId }} />;

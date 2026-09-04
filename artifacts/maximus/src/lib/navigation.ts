@@ -8,6 +8,7 @@ import {
   Gauge,
   GitBranch,
   LayoutGrid,
+  ListChecks,
   Package,
   ShoppingCart,
   Store,
@@ -32,6 +33,7 @@ export type NavigationItem = {
 
 export const adminNav: NavigationItem[] = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
+  { href: '/maximus/controle', label: 'Contrôle & coordination', icon: ListChecks },
   { href: '/maximus/entreprises', label: 'Entreprises', icon: Building2 },
   { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
   { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },
@@ -43,6 +45,7 @@ export const adminNav: NavigationItem[] = [
 
 export const koraNav: NavigationItem[] = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
+  { href: '/kora/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },

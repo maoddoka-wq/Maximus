@@ -31,6 +31,7 @@ const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const OperationalModulePage = lazy(() => import('@/pages/operational-modules').then(module => ({ default: module.OperationalModulePage })));
 const CompanyOrganizationAdmin = lazy(() => import('@/pages/company-organization').then(module => ({ default: module.CompanyOrganizationAdmin })));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
+const ControlCenterPage = lazy(() => import('@/pages/control-center').then(module => ({ default: module.ControlCenterPage })));
 const moduleIcons: Record<ModuleId, Icon> = {
   commerce: ShoppingCart,
   ventes: CreditCard,
@@ -49,6 +50,7 @@ const moduleIcons: Record<ModuleId, Icon> = {
 };
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': { kicker: 'Cockpit MAXIMUS', title: 'Bonjour, équipe MAXIMUS.', description: 'Voici ce qui mérite votre attention aujourd’hui.' },
+  '/maximus/controle': { kicker: 'Pilotage MAXIMUS', title: 'Contrôle & coordination', description: 'Les décisions, tâches et événements qui structurent les opérations.' },
   '/maximus/entreprises': { kicker: 'Administration', title: 'Entreprises', description: 'Pilotez les espaces clients et leurs accès modules.' },
   '/maximus/entreprises/organisation': { kicker: 'Administration des entreprises', title: 'Organisation & accès', description: 'Structurez les secteurs, leurs modules, les rôles et les comptes employés.' },
   '/maximus/demandes': { kicker: 'Administration', title: 'Demandes en attente', description: 'Traitez les demandes d’ouverture reçues récemment.' },
@@ -58,6 +60,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/notifications': { kicker: 'Centre de contrôle', title: 'Notifications', description: 'Les signaux utiles, sans bruit.' },
   '/maximus/journal': { kicker: 'Traçabilité', title: 'Journal d’activité', description: 'Chaque action importante, horodatée et attribuée.' },
   '/kora/dashboard': { kicker: 'KORA Distribution', title: 'Le rythme de KORA, en un regard.', description: 'Mardi 18 juin 2024 · Dakar, Sénégal' },
+  '/kora/controle': { kicker: 'Espace entreprise', title: 'Contrôle & coordination', description: 'Les décisions, tâches et événements de votre périmètre.' },
   '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Structure, rôles, sous-autorisations, comptes et managers au même endroit.' },
   '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
@@ -264,7 +267,7 @@ function AppContent() {
           <PageHeader {...currentMeta} location={location} />
            <ErrorBoundary resetKey={location}>
              <Suspense fallback={<div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>}>
-               {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} screens={{ dashboard: AdminDashboard, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
+                {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
              </Suspense>
            </ErrorBoundary>
         </div>

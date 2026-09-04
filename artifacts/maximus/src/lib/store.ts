@@ -39,6 +39,50 @@ export interface Delivery { id: string; reference: string; recipient: string; de
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
 export type NotificationAudience = 'all' | 'admin' | 'company';
 export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
+export type ControlTaskStatus = 'À FAIRE' | 'EN COURS' | 'VALIDÉ' | 'REFUSÉ' | 'TERMINÉ';
+export type ControlTaskPriority = 'BASSE' | 'NORMALE' | 'HAUTE' | 'CRITIQUE';
+export type DomainEventType = 'TASK_CREATED' | 'TASK_STATUS_CHANGED' | 'APPROVAL_GRANTED' | 'APPROVAL_REFUSED' | 'SYSTEM';
+export interface ControlTask {
+  id: string;
+  title: string;
+  description: string;
+  companyId?: string;
+  moduleId?: ModuleId;
+  assigneeEmployeeId?: string;
+  assigneeName?: string;
+  createdBy: string;
+  status: ControlTaskStatus;
+  priority: ControlTaskPriority;
+  requiresApproval?: boolean;
+  dueDate?: string;
+  relatedObject?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface DomainEvent {
+  id: string;
+  type: DomainEventType;
+  label: string;
+  summary: string;
+  companyId?: string;
+  moduleId?: ModuleId;
+  actorName: string;
+  entityType: string;
+  entityId?: string;
+  severity: NotificationSeverity;
+  createdAt: string;
+}
+export interface AuditEntry {
+  id: string;
+  action: string;
+  summary: string;
+  companyId?: string;
+  moduleId?: ModuleId;
+  actorName: string;
+  entityType: string;
+  entityId?: string;
+  createdAt: string;
+}
 export interface AppNotification {
   id: string;
   title: string;
@@ -52,7 +96,7 @@ export interface AppNotification {
   href?: string;
 }
 export interface NotificationContext { isAdmin: boolean; companyId?: string; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: AppNotification[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; removedModules?: ModuleId[]; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; controlTasks: ControlTask[]; domainEvents: DomainEvent[]; auditEntries: AuditEntry[]; orgNodes: OrgNode[]; notifications: AppNotification[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; removedModules?: ModuleId[]; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
@@ -165,6 +209,22 @@ export function seedData(): StoreData {
       { id: 'a-2', user: 'Mamadou Ba', action: 'a confirmé un paiement', module: 'Finance', object: 'PAY-09281', date: 'Aujourd’hui, 10:18', status: 'CONFIRMÉ' },
       { id: 'a-3', user: 'Ndeye Sarr', action: 'a enregistré une entrée', module: 'Stocks', object: 'Café Touba 250g', date: 'Hier, 16:18', status: 'ACTIF' },
       { id: 'a-4', user: 'Aminata Diop', action: 'a modifié un rôle', module: 'RH', object: 'Manager', date: 'Hier, 08:49', status: 'ACTIF' },
+    ],
+    controlTasks: [
+      { id: 'task-1', title: 'Valider le réassort d’huile d’arachide', description: 'La demande doit être confirmée avant la création du bon de commande fournisseur.', companyId: 'kora', moduleId: 'achats', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ibrahima Kane', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'BC-2406-038', createdAt: '2024-06-18T08:40:00.000Z', updatedAt: '2024-06-18T08:40:00.000Z' },
+      { id: 'task-2', title: 'Contrôler l’écart d’inventaire', description: 'Comparer le stock théorique et le comptage physique de la boutique Dakar.', companyId: 'kora', moduleId: 'stocks', assigneeEmployeeId: 'demo-emp-ibrahima', assigneeName: 'Ibrahima Kane', createdBy: 'Aminata Diop', status: 'EN COURS', priority: 'CRITIQUE', requiresApproval: false, dueDate: 'Demain', relatedObject: 'INV-2406-02', createdAt: '2024-06-17T15:10:00.000Z', updatedAt: '2024-06-18T09:20:00.000Z' },
+      { id: 'task-3', title: 'Valider la période de paie de juin', description: 'La période est prête pour validation avant génération des bulletins.', companyId: 'kora', moduleId: 'paie', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ndeye Sarr', status: 'À FAIRE', priority: 'NORMALE', requiresApproval: true, dueDate: '20 juin', relatedObject: 'PAIE-2024-06', createdAt: '2024-06-18T07:35:00.000Z', updatedAt: '2024-06-18T07:35:00.000Z' },
+      { id: 'task-4', title: 'Examiner la demande d’ouverture Teranga Agro', description: 'Vérifier les modules demandés et la première unité avant activation.', companyId: 'teranga', moduleId: 'commerce', createdBy: 'MAXIMUS', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'teranga', createdAt: '2024-06-18T06:50:00.000Z', updatedAt: '2024-06-18T06:50:00.000Z' },
+    ],
+    domainEvents: [
+      { id: 'event-1', type: 'TASK_CREATED', label: 'Tâche créée', summary: 'Valider le réassort d’huile d’arachide', companyId: 'kora', moduleId: 'achats', actorName: 'Ibrahima Kane', entityType: 'task', entityId: 'task-1', severity: 'warning', createdAt: '2024-06-18T08:40:00.000Z' },
+      { id: 'event-2', type: 'SYSTEM', label: 'Seuil de stock atteint', summary: 'Huile d’arachide 1L est sous son seuil de sécurité.', companyId: 'kora', moduleId: 'stocks', actorName: 'MAXIMUS', entityType: 'product', entityId: 'p-2', severity: 'warning', createdAt: '2024-06-18T08:20:00.000Z' },
+      { id: 'event-3', type: 'SYSTEM', label: 'Paiement confirmé', summary: 'Le paiement PAY-09281 a été enregistré.', companyId: 'kora', moduleId: 'finance', actorName: 'Mamadou Ba', entityType: 'payment', entityId: 'pay-1', severity: 'success', createdAt: '2024-06-18T10:18:00.000Z' },
+    ],
+    auditEntries: [
+      { id: 'audit-1', action: 'VENTE_VALIDÉE', summary: 'VTE-240618-004 a été validée.', companyId: 'kora', moduleId: 'commerce', actorName: 'Ibrahima Kane', entityType: 'sale', entityId: 's-1', createdAt: '2024-06-18T10:14:00.000Z' },
+      { id: 'audit-2', action: 'PAIEMENT_CONFIRMÉ', summary: 'PAY-09281 a été confirmé.', companyId: 'kora', moduleId: 'finance', actorName: 'Mamadou Ba', entityType: 'payment', entityId: 'pay-1', createdAt: '2024-06-18T10:18:00.000Z' },
+      { id: 'audit-3', action: 'RÔLE_MODIFIÉ', summary: 'Le rôle Manager a été modifié.', companyId: 'kora', moduleId: 'rh', actorName: 'Aminata Diop', entityType: 'role', entityId: 'kora-role-manager', createdAt: '2024-06-17T08:49:00.000Z' },
     ],
     orgNodes: [
       { id: 'kora-direction', companyId: 'kora', code: 'DG', name: 'Direction générale', type: 'direction', parentId: null, moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'] },
@@ -304,6 +364,9 @@ export function loadData(): StoreData {
       supplierRecords: parsed.supplierRecords ?? initial.supplierRecords,
       deliveries: parsed.deliveries ?? initial.deliveries,
       businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
+      controlTasks: parsed.controlTasks ?? initial.controlTasks,
+      domainEvents: parsed.domainEvents ?? initial.domainEvents,
+      auditEntries: parsed.auditEntries ?? initial.auditEntries,
       orgNodes,
        employees: rawEmployees.filter(employee => !removeGeneratedHierarchy || !generatedEmployeeIds.has(employee.id)).map(employee => {
         const seeded = seededByEmail.get(employee.email);
@@ -356,4 +419,47 @@ export function addNotification(draft: StoreData, input: Omit<Partial<AppNotific
     severity: input.severity ?? 'info',
   });
   draft.notifications = draft.notifications.slice(0, 100);
+}
+
+export function recordControlEvent(
+  draft: StoreData,
+  input: {
+    type: DomainEventType;
+    label: string;
+    summary: string;
+    actorName: string;
+    entityType: string;
+    entityId?: string;
+    companyId?: string;
+    moduleId?: ModuleId;
+    severity?: NotificationSeverity;
+  },
+) {
+  const createdAt = new Date().toISOString();
+  draft.domainEvents.unshift({
+    id: uid('event'),
+    type: input.type,
+    label: input.label,
+    summary: input.summary,
+    companyId: input.companyId,
+    moduleId: input.moduleId,
+    actorName: input.actorName,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    severity: input.severity ?? 'info',
+    createdAt,
+  });
+  draft.auditEntries.unshift({
+    id: uid('audit'),
+    action: input.label.toUpperCase().replaceAll(' ', '_'),
+    summary: input.summary,
+    companyId: input.companyId,
+    moduleId: input.moduleId,
+    actorName: input.actorName,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    createdAt,
+  });
+  draft.domainEvents = draft.domainEvents.slice(0, 200);
+  draft.auditEntries = draft.auditEntries.slice(0, 200);
 }

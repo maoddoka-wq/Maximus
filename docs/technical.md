@@ -106,6 +106,27 @@ Les informations suivantes sont conservées dans `localStorage` ou `sessionStora
 
 La synchronisation entre onglets repose sur l’événement navigateur `storage`.
 
+### 4.3 Couche de contrôle et de coordination
+
+Le centre **Contrôle & coordination** est accessible depuis MAXIMUS et depuis les espaces entreprise :
+
+- `/maximus/controle` : vue transverse pour l’administration MAXIMUS ;
+- `/kora/controle` : vue limitée au périmètre de l’entreprise, de l’unité ou de l’employé.
+
+Le store conserve trois flux complémentaires :
+
+- `controlTasks` : actions, validations et décisions attendues ;
+- `domainEvents` : événements métier produits par une opération ;
+- `auditEntries` : journal attribué des changements et validations.
+
+Une validation de tâche met à jour son statut et écrit simultanément un événement, une trace d’audit et une notification. Cette chaîne constitue le premier socle d’un futur moteur de workflows :
+
+```text
+Événement → tâche → approbation → mise à jour → audit → notification
+```
+
+Les tâches sont filtrées par entreprise. Un employé voit les tâches qui lui sont affectées ; un administrateur d’entreprise ou un manager de secteur voit le périmètre qui lui est confié.
+
 ## 5. Modèle d’accès et permissions
 
 La chaîne de contrôle est :
