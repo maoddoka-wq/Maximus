@@ -70,20 +70,6 @@ export function CompanyOrganizationAdmin({
   const organizationNodes = scopedData.orgNodes.filter(
     node => node.companyId === company.id,
   );
-  const organizationRoles = scopedData.roles.filter(
-    role => role.companyId === company.id,
-  );
-  const organizationEmployees = scopedData.employees.filter(
-    employee => employee.companyId === company.id,
-  );
-  const unitsWithoutManager = organizationNodes.filter(
-    node =>
-      !organizationEmployees.some(
-        employee =>
-          employee.id === node.managerEmployeeId &&
-          employee.sectorId === node.id,
-      ),
-  );
   const tabs = ([
     { id: 'overview', label: "Vue d'ensemble" },
     { id: 'structure', label: '1 · Structure & unités' },
