@@ -19,8 +19,7 @@ const tabs = [
   ['settings', 'Paramètres', Settings],
 ] as const;
 
-export type StockTab = typeof tabs[number][0];
-type Tab = StockTab;
+type Tab = typeof tabs[number][0];
 type ProductForm = Omit<StockProduct, 'id' | 'companyId' | 'archived'>;
 type WarehouseForm = Pick<StockWarehouse, 'name' | 'manager' | 'address'>;
 type SupplierForm = Pick<StockSupplier, 'name' | 'contactName' | 'email' | 'phone' | 'address' | 'notes'>;
@@ -36,9 +35,9 @@ const useStockApi = () => {
   return api;
 };
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, initialTab = 'dashboard' }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; initialTab?: StockTab }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -52,7 +51,6 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     finally { setLoading(false); setRefreshing(false); }
   };
   useEffect(() => { void load(); }, []);
-  useEffect(() => { setTab(initialTab); }, [initialTab]);
   const run = async (action: () => Promise<unknown>, success: string) => {
     try { await action(); await load(true); setToast(success); window.setTimeout(() => setToast(''), 3200); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Opération impossible.'); }
@@ -63,15 +61,12 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
 
   return <StockApiContext.Provider value={api}><div className="space-y-5">
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
-    <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
-      <aside className="card-surface rounded-2xl p-3 lg:sticky lg:top-5">
-        <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-2 pb-3">
-          <p className="text-xs font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">Gestion de stock</p>
-          <button title="Actualiser" onClick={() => void load(true)} className="rounded-lg border p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
-        </div>
-        <nav aria-label="Menu gestion de stock" className="mt-3 flex flex-col gap-1">{tabs.map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={15} />{label}</button>)}</nav>
-      </aside>
-      <div data-stock-can-create={canCreate} data-stock-can-modify={canModify} className="min-w-0">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2">
+        <nav aria-label="Menu gestion de stock" className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">{tabs.map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={15} />{label}</button>)}</nav>
+        <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
+      </div>
+      <div data-stock-can-create={canCreate} data-stock-can-modify={canModify}>
       {tab === 'dashboard' && <StockDashboard data={data} onTab={setTab} />}
       {tab === 'products' && <ProductsPanel data={data} run={run} />}
       {tab === 'entries' && <StockEntriesPanel data={data} run={run} />}
