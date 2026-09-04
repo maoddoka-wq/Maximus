@@ -88,4 +88,6 @@ Une permission de rôle ne peut pas réactiver un module refusé par l’entrepr
 ## Documentation projet
 
 - [`docs/technical.md`](./docs/technical.md) : architecture, données, routage, permissions, modules, thème et commandes techniques ;
+- [`docs/technical.docx`](./docs/technical.docx) : version Word éditable de la documentation technique ;
+- [`docs/technical.pdf`](./docs/technical.pdf) : version PDF mise en page de la documentation technique ;
 - [`replit.md`](./replit.md) : décisions détaillées de structure, de permissions, de dépendances et de contribution.
