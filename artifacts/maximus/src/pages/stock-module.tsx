@@ -55,6 +55,12 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     try { await action(); await load(true); setToast(success); window.setTimeout(() => setToast(''), 3200); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Opération impossible.'); }
   };
+  useEffect(() => {
+    if (!data || !stockPermissions) return;
+    if (!tabs.some(([id]) => id === tab && stockPermissions[id]?.includes('voir'))) {
+      setTab(tabs.find(([id]) => stockPermissions[id]?.includes('voir'))?.[0] ?? 'dashboard');
+    }
+  }, [data, stockPermissions, tab]);
 
   if (loading) return <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-44 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-3"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-52 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>;
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
@@ -63,9 +69,6 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   const currentTabPermissions = stockPermissions?.[tab];
   const currentCanCreate = canCreate && (!stockPermissions || currentTabPermissions?.includes('créer'));
   const currentCanModify = canModify && (!stockPermissions || currentTabPermissions?.includes('modifier'));
-  useEffect(() => {
-    if (stockPermissions && !visibleTabs.some(([id]) => id === tab)) setTab(visibleTabs[0]?.[0] ?? 'dashboard');
-  }, [stockPermissions, tab, visibleTabs]);
 
   return <StockApiContext.Provider value={api}><div className="space-y-5">
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
