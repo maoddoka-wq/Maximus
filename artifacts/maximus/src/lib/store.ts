@@ -239,8 +239,8 @@ export function loadData(): StoreData {
           companyId: employee.companyId || 'kora',
            sectorId: generatedSector ? undefined : demoSector?.id ?? employee.sectorId ?? seeded?.sectorId,
            roleId: generatedRole ? undefined : demoRole?.id ?? employee.roleId ?? seeded?.roleId,
-          department: generatedSector ? '' : employee.department || (demoSector?.type === 'service' ? orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.department : seeded?.department),
-          subDepartment: generatedSector ? '' : employee.subDepartment || (demoSector?.parentId ? orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.subDepartment : seeded?.subDepartment),
+          department: generatedSector ? '' : employee.department || (demoSector?.type === 'service' ? (orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.department ?? '') : (seeded?.department ?? '')),
+          subDepartment: generatedSector ? '' : employee.subDepartment || (demoSector?.parentId ? (orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.subDepartment ?? '') : (seeded?.subDepartment ?? '')),
           role: generatedRole ? 'Non affecté' : demoRole?.name ?? employee.role ?? seeded?.role,
         };
       }),
