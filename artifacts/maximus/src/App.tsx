@@ -313,7 +313,7 @@ function AppContent() {
         return [...allowedTabIds];
       })()
     : undefined;
-  const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 && allowed.length <= 2 ? allowed.flatMap(moduleId => {
+  const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 ? allowed.flatMap(moduleId => {
     const module = modules.find(item => item.id === moduleId);
     if (!module) return [];
     let items: SidebarFeature[] = [];
@@ -347,7 +347,7 @@ function AppContent() {
     }
     return [{ label: module.name, items: items.length ? items : [{ href: `/kora/${moduleId}`, label: module.name, icon: LayoutGrid }] }];
   }) : [];
-  const verticalModuleNavigation = Boolean(employee && allowed.length >= 1 && allowed.length <= 2 && sidebarFeatureGroups.length);
+  const verticalModuleNavigation = Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length);
    const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
     const baseMeta = pageMeta[location.split('?')[0]] ?? (location.startsWith('/maximus/entreprises/') ? { kicker: 'Administration', title: 'Détail entreprise', description: 'Consultez et ajustez l’espace client sélectionné.' } : pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard']);
    const currentMeta = !isAdmin && currentCompany
@@ -455,7 +455,7 @@ function Sidebar({ session, location, allowed, sidebarFeatureGroups, canManagePe
   const isAdmin = session === 'admin';
   const companyAdmin = session === 'kora' || session.startsWith('company:');
   const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.peopleAdminOnly || companyAdmin || canManagePeople) && (item.module === null || allowed.includes(item.module as ModuleId)));
-  const verticalModuleMenu = Boolean(employee && !isAdmin && allowed.length >= 1 && allowed.length <= 2 && sidebarFeatureGroups?.length);
+  const verticalModuleMenu = Boolean(employee && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length);
   const active = (href: string) => location === href || location.startsWith(`${href}?`);
   const link = (item: { href: string; label: string; icon: Icon }) => {
     const className = `nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${active(item.href) ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`;
@@ -665,7 +665,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
    if (routePath === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
    if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
-      return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds as ('dashboard' | 'sales' | 'products' | 'clients' | 'suppliers' | 'purchases' | 'expenses' | 'cash' | 'credit' | 'invoices' | 'returns' | 'reports' | 'activity' | 'team' | 'settings')[] | undefined} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
+      return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds as ('dashboard' | 'sales' | 'products' | 'clients' | 'suppliers' | 'purchases' | 'expenses' | 'cash' | 'credit' | 'invoices' | 'returns' | 'reports' | 'activity' | 'team' | 'settings')[] | undefined} singleModuleNavigation={singleModuleNavigation} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
    }
    if (routePath === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
    if (routePath === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
