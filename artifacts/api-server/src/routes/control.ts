@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   controlAuditEntriesTable,
@@ -7,22 +7,44 @@ import {
   controlTasksTable,
   db,
 } from "@workspace/db";
+import {
+  canCreateControlTask,
+  canReadControlScope,
+  canUpdateControlTask,
+  isValidControlActor,
+  type ControlActorContext,
+} from "./control-authorization";
 
 const router: IRouter = Router();
 const taskStatuses = ["À FAIRE", "EN COURS", "VALIDÉ", "REFUSÉ", "TERMINÉ"] as const;
 const taskPriorities = ["BASSE", "NORMALE", "HAUTE", "CRITIQUE"] as const;
-const eventTypes = ["TASK_CREATED", "TASK_STATUS_CHANGED", "APPROVAL_GRANTED", "APPROVAL_REFUSED", "SYSTEM"] as const;
-const severities = ["info", "success", "warning", "error"] as const;
-
 const idOf = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
-const controlQuery = z.object({
+const controlActorRole = z.enum(["maximus_admin", "company_admin", "sector_manager", "employee"]);
+const actorContextSchema = z.object({
+  role: controlActorRole,
+  displayName: z.string().trim().min(1).max(180),
   companyId: z.string().min(1).optional(),
   employeeId: z.string().min(1).optional(),
-  sectorId: z.string().min(1).optional(),
+  sectorIds: z.array(z.string().min(1)).default([]),
+});
+const controlQuery = z.object({
+  companyId: z.string().min(1).optional(),
   scope: z.enum(["admin", "all", "assigned", "sector"]).default("all"),
+  actorRole: controlActorRole,
+  actorName: z.string().trim().min(1).max(180),
+  actorCompanyId: z.string().min(1).optional(),
+  actorEmployeeId: z.string().min(1).optional(),
+  actorSectorIds: z.string().optional(),
 }).refine(value => value.scope === "admin" || Boolean(value.companyId), {
   message: "companyId requis pour ce périmètre",
   path: ["companyId"],
+});
+const actorFromQuery = (query: z.infer<typeof controlQuery>): ControlActorContext => ({
+  role: query.actorRole,
+  displayName: query.actorName,
+  companyId: query.actorCompanyId,
+  employeeId: query.actorEmployeeId,
+  sectorIds: query.actorSectorIds?.split(",").map(value => value.trim()).filter(Boolean) ?? [],
 });
 const taskInput = z.object({
   id: z.string().min(1).optional(),
@@ -38,37 +60,47 @@ const taskInput = z.object({
   requiresApproval: z.boolean().default(false),
   dueDate: z.string().trim().max(80).nullable().optional(),
   relatedObject: z.string().trim().max(180).nullable().optional(),
+  actorContext: actorContextSchema,
 });
 const statusInput = z.object({
   companyId: z.string().min(1),
   status: z.enum(taskStatuses),
-  actorName: z.string().trim().min(1).max(180),
+  actorContext: actorContextSchema,
 });
 
 router.get("/control/bootstrap", async (req, res): Promise<void> => {
   const parsed = controlQuery.safeParse(req.query);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const { companyId, employeeId, sectorId, scope } = parsed.data;
-  const taskFilters = companyId ? [eq(controlTasksTable.companyId, companyId)] : [];
-  if (scope === "assigned" && employeeId) taskFilters.push(eq(controlTasksTable.assigneeEmployeeId, employeeId));
-  if (scope === "sector" && sectorId) taskFilters.push(eq(controlTasksTable.sectorId, sectorId));
-  const [tasks, events, auditEntries] = await Promise.all([
-    taskFilters.length ? db.select().from(controlTasksTable).where(and(...taskFilters)).orderBy(desc(controlTasksTable.updatedAt)) : db.select().from(controlTasksTable).orderBy(desc(controlTasksTable.updatedAt)),
-    companyId ? db.select().from(controlEventsTable).where(eq(controlEventsTable.companyId, companyId)).orderBy(desc(controlEventsTable.createdAt)).limit(200) : db.select().from(controlEventsTable).orderBy(desc(controlEventsTable.createdAt)).limit(200),
-    companyId ? db.select().from(controlAuditEntriesTable).where(eq(controlAuditEntriesTable.companyId, companyId)).orderBy(desc(controlAuditEntriesTable.createdAt)).limit(200) : db.select().from(controlAuditEntriesTable).orderBy(desc(controlAuditEntriesTable.createdAt)).limit(200),
+  const actor = actorFromQuery(parsed.data);
+  if (!isValidControlActor(actor) || !canReadControlScope(actor, parsed.data.companyId)) { res.status(403).json({ error: "Périmètre de contrôle non autorisé." }); return; }
+  const taskFilters = parsed.data.companyId ? [eq(controlTasksTable.companyId, parsed.data.companyId)] : [];
+  if (actor.role === "employee" && actor.employeeId) taskFilters.push(eq(controlTasksTable.assigneeEmployeeId, actor.employeeId));
+  if (actor.role === "sector_manager") taskFilters.push(actor.sectorIds.length ? inArray(controlTasksTable.sectorId, actor.sectorIds) : eq(controlTasksTable.sectorId, "__no_sector__"));
+  const tasks = taskFilters.length
+    ? await db.select().from(controlTasksTable).where(and(...taskFilters)).orderBy(desc(controlTasksTable.updatedAt))
+    : await db.select().from(controlTasksTable).orderBy(desc(controlTasksTable.updatedAt));
+  const taskIds = new Set(tasks.map(task => task.id));
+  const [events, auditEntries] = await Promise.all([
+    parsed.data.companyId ? db.select().from(controlEventsTable).where(eq(controlEventsTable.companyId, parsed.data.companyId)).orderBy(desc(controlEventsTable.createdAt)).limit(200) : db.select().from(controlEventsTable).orderBy(desc(controlEventsTable.createdAt)).limit(200),
+    parsed.data.companyId ? db.select().from(controlAuditEntriesTable).where(eq(controlAuditEntriesTable.companyId, parsed.data.companyId)).orderBy(desc(controlAuditEntriesTable.createdAt)).limit(200) : db.select().from(controlAuditEntriesTable).orderBy(desc(controlAuditEntriesTable.createdAt)).limit(200),
   ]);
-  res.json({ tasks, events, auditEntries });
+  const scopedToTasks = actor.role === "maximus_admin" || actor.role === "company_admin"
+    ? (items: Array<{ entityId: string | null }>) => items
+    : (items: Array<{ entityId: string | null }>) => items.filter(item => item.entityId && taskIds.has(item.entityId));
+  res.json({ tasks, events: scopedToTasks(events), auditEntries: scopedToTasks(auditEntries) });
 });
 
 router.post("/control/tasks", async (req, res): Promise<void> => {
   const parsed = taskInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const { id: requestedId, ...input } = parsed.data;
+  const { id: requestedId, actorContext, ...input } = parsed.data;
+  if (!canCreateControlTask(actorContext, input)) { res.status(403).json({ error: "Création hors périmètre autorisé." }); return; }
   const taskId = requestedId ?? idOf("task");
   const now = new Date();
   const task = {
     id: taskId,
     ...input,
+    createdBy: actorContext.displayName,
     status: "À FAIRE" as const,
     createdAt: now,
     updatedAt: now,
@@ -82,7 +114,7 @@ router.post("/control/tasks", async (req, res): Promise<void> => {
       summary: input.title,
       companyId: input.companyId,
       moduleId: input.moduleId,
-      actorName: input.createdBy,
+      actorName: actorContext.displayName,
       entityType: "task",
       entityId: taskId,
       severity: "info",
@@ -94,7 +126,7 @@ router.post("/control/tasks", async (req, res): Promise<void> => {
       summary: `${input.title} a été créée.`,
       companyId: input.companyId,
       moduleId: input.moduleId,
-      actorName: input.createdBy,
+      actorName: actorContext.displayName,
       entityType: "task",
       entityId: taskId,
       createdAt: now,
@@ -106,18 +138,20 @@ router.post("/control/tasks", async (req, res): Promise<void> => {
 router.patch("/control/tasks/:id/status", async (req, res): Promise<void> => {
   const parsed = statusInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const [before] = await db.select().from(controlTasksTable).where(and(eq(controlTasksTable.id, req.params.id), eq(controlTasksTable.companyId, parsed.data.companyId))).limit(1);
+  const { actorContext, companyId, status } = parsed.data;
+  const [before] = await db.select().from(controlTasksTable).where(eq(controlTasksTable.id, req.params.id)).limit(1);
   if (!before) { res.status(404).json({ error: "Tâche introuvable" }); return; }
-  const granted = parsed.data.status === "VALIDÉ" || parsed.data.status === "TERMINÉ";
-  const refused = parsed.data.status === "REFUSÉ";
+  if (before.companyId !== companyId || !canUpdateControlTask(actorContext, before)) { res.status(403).json({ error: "Modification hors périmètre autorisé." }); return; }
+  const granted = status === "VALIDÉ" || status === "TERMINÉ";
+  const refused = status === "REFUSÉ";
   const type = granted ? "APPROVAL_GRANTED" : refused ? "APPROVAL_REFUSED" : "TASK_STATUS_CHANGED";
   const label = granted ? "Validation accordée" : refused ? "Validation refusée" : "Tâche mise à jour";
   const now = new Date();
-  const summary = `${before.title} · ${before.status} → ${parsed.data.status}`;
+  const summary = `${before.title} · ${before.status} → ${status}`;
   const [task] = await db.transaction(async tx => {
     const updated = await tx.update(controlTasksTable)
-      .set({ status: parsed.data.status, updatedAt: now })
-      .where(and(eq(controlTasksTable.id, before.id), eq(controlTasksTable.companyId, parsed.data.companyId)))
+      .set({ status, updatedAt: now })
+      .where(and(eq(controlTasksTable.id, before.id), eq(controlTasksTable.companyId, companyId)))
       .returning();
     await tx.insert(controlEventsTable).values({
       id: idOf("event"),
@@ -126,7 +160,7 @@ router.patch("/control/tasks/:id/status", async (req, res): Promise<void> => {
       summary,
       companyId: before.companyId,
       moduleId: before.moduleId,
-      actorName: parsed.data.actorName,
+      actorName: actorContext.displayName,
       entityType: "task",
       entityId: before.id,
       severity: refused ? "error" : granted ? "success" : "info",
@@ -134,11 +168,11 @@ router.patch("/control/tasks/:id/status", async (req, res): Promise<void> => {
     });
     await tx.insert(controlAuditEntriesTable).values({
       id: idOf("audit"),
-      action: `TÂCHE_${parsed.data.status.replaceAll(" ", "_")}`,
-      summary: `${before.title} est passée de ${before.status} à ${parsed.data.status}.`,
+      action: `TÂCHE_${status.replaceAll(" ", "_")}`,
+      summary: `${before.title} est passée de ${before.status} à ${status}.`,
       companyId: before.companyId,
       moduleId: before.moduleId,
-      actorName: parsed.data.actorName,
+      actorName: actorContext.displayName,
       entityType: "task",
       entityId: before.id,
       createdAt: now,

@@ -16,8 +16,8 @@ import {
 } from './commerce-permissions';
 import { parseQueryTab } from './query-tab';
 import { resolveFeatureDependencies } from './permission-keys';
-import { stockSubmoduleDependencies } from './store';
-import type { Employee, ModuleId, OrgNode, Role } from './store';
+import { recordControlEvent, stockSubmoduleDependencies } from './store';
+import type { Employee, ModuleId, OrgNode, Role, StoreData } from './store';
 
 const employee: Employee = {
   id: 'employee-1',
@@ -229,4 +229,25 @@ test('lit les onglets et les anciennes URLs sans confondre les paramètres', () 
     'sales',
   );
   assert.equal(parseQueryTab('tab=clients&feature=sales', {}), 'clients');
+});
+
+test('chaque décision de contrôle écrit un événement et un audit liés', () => {
+  const data = { domainEvents: [], auditEntries: [] } as unknown as StoreData;
+  recordControlEvent(data, {
+    type: 'APPROVAL_GRANTED',
+    label: 'Validation accordée',
+    summary: 'La commande BC-1 a été validée.',
+    actorName: 'Awa Ndiaye',
+    entityType: 'purchase_order',
+    entityId: 'BC-1',
+    companyId: 'company-1',
+    moduleId: 'achats',
+    severity: 'success',
+  });
+
+  assert.equal(data.domainEvents.length, 1);
+  assert.equal(data.auditEntries.length, 1);
+  assert.equal(data.domainEvents[0].entityId, 'BC-1');
+  assert.equal(data.auditEntries[0].entityId, 'BC-1');
+  assert.equal(data.domainEvents[0].actorName, 'Awa Ndiaye');
 });

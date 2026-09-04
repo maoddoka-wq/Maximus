@@ -25,7 +25,7 @@ import {
   type ModuleId,
   type StoreData,
 } from '@/lib/store';
-import { controlApi, type ControlBootstrap } from '@/lib/control-api';
+import { controlApi, type ControlActorContext, type ControlBootstrap } from '@/lib/control-api';
 
 type Mutate = (fn: (draft: StoreData) => void, message?: string) => void;
 
@@ -112,24 +112,6 @@ export function ControlCenterPage({
   const [syncVersion, setSyncVersion] = useState(0);
   const canCreateTask = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
   const controlScope = isAdmin ? 'admin' : companyAdmin ? 'all' : sectorManager ? 'all' : 'assigned';
-
-  useEffect(() => {
-    let active = true;
-    setSyncing(true);
-    controlApi.bootstrap({ companyId, employeeId, sectorId: sectorManager ? scopeNodeId : undefined, scope: controlScope })
-      .then(snapshot => { if (active) { setServerSnapshot(snapshot); setSyncError(''); } })
-      .catch(error => { if (active) setSyncError(error instanceof Error ? error.message : 'Mode local actif.'); })
-      .finally(() => { if (active) setSyncing(false); });
-    return () => { active = false; };
-  }, [companyId, controlScope, employeeId, scopeNodeId, sectorManager, syncVersion]);
-
-  const controlTasks = useMemo(() => {
-    const byId = new Map(data.controlTasks.map(task => [task.id, task]));
-    serverSnapshot?.tasks.forEach(task => byId.set(task.id, task));
-    return [...byId.values()];
-  }, [data.controlTasks, serverSnapshot?.tasks]);
-  const controlEvents = useMemo(() => mergeControlRecords(data.domainEvents, serverSnapshot?.events ?? []), [data.domainEvents, serverSnapshot?.events]);
-  const controlAudit = useMemo(() => mergeControlRecords(data.auditEntries, serverSnapshot?.auditEntries ?? []), [data.auditEntries, serverSnapshot?.auditEntries]);
   const isWithinSectorScope = (taskSectorId?: string) => {
     if (!sectorManager || !scopeNodeId || !taskSectorId) return false;
     let node = data.orgNodes.find(candidate => candidate.id === taskSectorId && candidate.companyId === companyId);
@@ -139,6 +121,34 @@ export function ControlCenterPage({
     }
     return false;
   };
+  const actorSectorIds = useMemo(() => sectorManager
+    ? data.orgNodes.filter(node => node.companyId === companyId && isWithinSectorScope(node.id)).map(node => node.id)
+    : [], [companyId, data.orgNodes, scopeNodeId, sectorManager]);
+  const actorContext: ControlActorContext = {
+    role: isAdmin ? 'maximus_admin' : companyAdmin ? 'company_admin' : sectorManager ? 'sector_manager' : 'employee',
+    displayName: actorName,
+    companyId: isAdmin ? undefined : companyId,
+    employeeId,
+    sectorIds: actorSectorIds,
+  };
+
+  useEffect(() => {
+    let active = true;
+    setSyncing(true);
+    controlApi.bootstrap({ companyId: isAdmin ? undefined : companyId, scope: controlScope, actorContext })
+      .then(snapshot => { if (active) { setServerSnapshot(snapshot); setSyncError(''); } })
+      .catch(error => { if (active) setSyncError(error instanceof Error ? error.message : 'Mode local actif.'); })
+      .finally(() => { if (active) setSyncing(false); });
+    return () => { active = false; };
+  }, [companyId, controlScope, employeeId, isAdmin, actorContext.displayName, actorContext.role, actorContext.companyId, actorContext.employeeId, actorContext.sectorIds.join(','), syncVersion]);
+
+  const controlTasks = useMemo(() => {
+    const byId = new Map(data.controlTasks.map(task => [task.id, task]));
+    serverSnapshot?.tasks.forEach(task => byId.set(task.id, task));
+    return [...byId.values()];
+  }, [data.controlTasks, serverSnapshot?.tasks]);
+  const controlEvents = useMemo(() => mergeControlRecords(data.domainEvents, serverSnapshot?.events ?? []), [data.domainEvents, serverSnapshot?.events]);
+  const controlAudit = useMemo(() => mergeControlRecords(data.auditEntries, serverSnapshot?.auditEntries ?? []), [data.auditEntries, serverSnapshot?.auditEntries]);
 
   const accessibleTasks = useMemo(() => controlTasks.filter(task => {
     const inScope = isAdmin || (task.companyId === companyId && (
@@ -216,7 +226,7 @@ export function ControlCenterPage({
       });
     }, 'La tâche et son audit ont été mis à jour.');
     if (persistedTask) {
-      void controlApi.updateTaskStatus(persistedTask, nextStatus, actorName)
+      void controlApi.updateTaskStatus(persistedTask, nextStatus, actorContext)
         .then(() => setSyncVersion(version => version + 1))
         .catch(error => setSyncError(error instanceof Error ? error.message : 'La mise à jour serveur a échoué.'));
     }
@@ -280,7 +290,7 @@ export function ControlCenterPage({
         href: '/kora/controle',
       });
     }, 'La tâche a été créée et ajoutée au circuit de contrôle.');
-    void controlApi.createTask(task)
+    void controlApi.createTask(task, actorContext)
       .then(() => setSyncVersion(version => version + 1))
       .catch(error => setSyncError(error instanceof Error ? error.message : 'La tâche reste enregistrée localement.'));
     setNewTask({ title: '', description: '', priority: 'NORMALE', moduleId: 'stocks', dueDate: '' });

@@ -1,6 +1,6 @@
 # MAXIMUS ERP
 
-MAXIMUS est un prototype web d’ERP SaaS multi-entreprises, conçu en français pour piloter les opérations, les modules métier, l’organisation et les permissions des entreprises.
+MAXIMUS est une application web fonctionnelle d’ERP SaaS multi-entreprises, conçue en français pour piloter les opérations, les modules métier, l’organisation et les permissions des entreprises.
 
 ## Fonctionnalités principales
 
@@ -22,7 +22,7 @@ MAXIMUS est un prototype web d’ERP SaaS multi-entreprises, conçu en français
 - Tailwind CSS ;
 - Express pour le serveur API ;
 - PostgreSQL et Drizzle ORM pour les packages serveur ;
-- PostgreSQL via l’API pour Présences, Stocks et Contrôle & coordination, avec `localStorage` conservé pour l’état de démonstration et le repli du prototype MAXIMUS.
+- PostgreSQL via l’API pour Présences, Stocks et Contrôle & coordination, avec `localStorage` conservé pour les données initiales, certaines fonctions locales et le repli du frontend.
 
 ## Installation
 
@@ -53,6 +53,7 @@ Le serveur API se trouve dans `artifacts/api-server`.
 ```bash
 pnpm run typecheck
 pnpm --filter @workspace/maximus test
+pnpm --filter @workspace/api-server test
 pnpm run build
 ```
 

@@ -1,6 +1,13 @@
 import type { AuditEntry, ControlTask, DomainEvent } from '@/lib/store';
 
 type ControlScope = 'admin' | 'all' | 'assigned' | 'sector';
+export type ControlActorContext = {
+  role: 'maximus_admin' | 'company_admin' | 'sector_manager' | 'employee';
+  displayName: string;
+  companyId?: string;
+  employeeId?: string;
+  sectorIds: string[];
+};
 
 export type ControlBootstrap = {
   tasks: ControlTask[];
@@ -26,18 +33,21 @@ const json = (body: unknown, method = 'POST'): RequestInit => ({
 });
 
 export const controlApi = {
-  bootstrap: (input: { companyId?: string; employeeId?: string; sectorId?: string; scope: ControlScope }) => {
+  bootstrap: (input: { companyId?: string; scope: ControlScope; actorContext: ControlActorContext }) => {
     const query = new URLSearchParams({ scope: input.scope });
     if (input.companyId) query.set('companyId', input.companyId);
-    if (input.employeeId) query.set('employeeId', input.employeeId);
-    if (input.sectorId) query.set('sectorId', input.sectorId);
+    query.set('actorRole', input.actorContext.role);
+    query.set('actorName', input.actorContext.displayName);
+    if (input.actorContext.companyId) query.set('actorCompanyId', input.actorContext.companyId);
+    if (input.actorContext.employeeId) query.set('actorEmployeeId', input.actorContext.employeeId);
+    if (input.actorContext.sectorIds.length) query.set('actorSectorIds', input.actorContext.sectorIds.join(','));
     return request<ControlBootstrap>(`/control/bootstrap?${query.toString()}`);
   },
-  createTask: (input: NewTaskInput) => request<ControlTask>('/control/tasks', json(input)),
-  updateTaskStatus: (task: ControlTask, status: ControlTask['status'], actorName: string) =>
+  createTask: (input: NewTaskInput, actorContext: ControlActorContext) => request<ControlTask>('/control/tasks', json({ ...input, actorContext })),
+  updateTaskStatus: (task: ControlTask, status: ControlTask['status'], actorContext: ControlActorContext) =>
     request<ControlTask>(`/control/tasks/${encodeURIComponent(task.id)}/status`, json({
       companyId: task.companyId,
       status,
-      actorName,
+      actorContext,
     }, 'PATCH')),
 };
