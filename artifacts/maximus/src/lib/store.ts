@@ -72,6 +72,13 @@ export const modules: Module[] = [
   { id: 'documents', name: 'Documents', description: 'Classement et circulation des documents métier.', features: ['Classement', 'Partage', 'Versions'], status: 'ACTIF' },
   { id: 'rapports', name: 'Rapports', description: 'Synthèses et indicateurs pour décider plus vite.', features: ['Rapports métier', 'Filtres', 'Exports'], status: 'ACTIF' },
 ];
+
+export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
+  return modules
+    .filter(module => !data.removedModules?.includes(module.id))
+    .map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
+}
+
 export const stockSubmodules = [
   { id: 'dashboard', name: 'Tableau de bord' },
   { id: 'products', name: 'Articles' },

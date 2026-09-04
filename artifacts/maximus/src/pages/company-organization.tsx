@@ -3,7 +3,7 @@ import {
   Building2, Users, KeyRound, ChevronDown, Plus,
   Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight, UserRound
 } from 'lucide-react';
-import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
+import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, getConfiguredModules, modules as allModules, stockSubmodules, uid, type Module, type ModuleId } from '../lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { commerceTabDefinitions, commerceTabPermissionKey, commerceTabPermissionKeys, type CommerceTabId } from '@/lib/commerce-permissions';
 
@@ -58,9 +58,9 @@ function permissionFeatureKey(moduleId: ModuleId, feature: string) {
   return `${moduleId}:menu:${feature.trim().toLowerCase().replace(/[^a-z0-9à-ÿ]+/gi, '-').replace(/^-|-$/g, '')}`;
 }
 
-function permissionLabel(key: string) {
+function permissionLabel(key: string, moduleDefinitions: Module[] = allModules) {
   const menuMatch = key.match(/^([^:]+):menu:(.+)$/);
-  if (menuMatch) return `${allModules.find(module => module.id === menuMatch[1])?.name ?? menuMatch[1]} · ${menuMatch[2].replace(/-/g, ' ')}`;
+  if (menuMatch) return `${moduleDefinitions.find(module => module.id === menuMatch[1])?.name ?? menuMatch[1]} · ${menuMatch[2].replace(/-/g, ' ')}`;
   if (key.startsWith('stocks:')) return `Gestion de stock · ${stockSubmodules.find(item => item.id === key.slice('stocks:'.length))?.name ?? key.slice('stocks:'.length)}`;
   if (key.startsWith('presence.')) return `Présences · ${key.slice('presence.'.length)}`;
   return allModules.find(module => module.id === key)?.name || key;
@@ -375,7 +375,7 @@ function OverviewTreeNode({ node, allNodes, allRoles, allEmployees, depth }: { n
 function StructureTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
   const { alert } = useAppDialog();
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
-  const availableModules = allModules.filter(module => company.allowedModules.includes(module.id));
+  const availableModules = getConfiguredModules(data).filter(module => company.allowedModules.includes(module.id));
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<OrgNode | null>(null);
 
@@ -486,7 +486,7 @@ function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: 
   );
 }
 
-function StructureFormModal({ initialData, allNodes, availableModules, onClose, onSave }: { initialData: OrgNode | null, allNodes: OrgNode[], availableModules: typeof allModules, onClose: () => void, onSave: (d: any) => void }) {
+function StructureFormModal({ initialData, allNodes, availableModules, onClose, onSave }: { initialData: OrgNode | null, allNodes: OrgNode[], availableModules: Module[], onClose: () => void, onSave: (d: any) => void }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -654,7 +654,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
                  <div className="flex flex-wrap gap-1.5">
                 {Object.keys(role.modulePermissions).map(modId => (
                    <span key={modId} className="text-[10px] px-1.5 py-0.5 rounded border font-medium">
-                     {permissionLabel(modId)}
+                     {permissionLabel(modId, getConfiguredModules(data))}
                   </span>
                 ))}
                  </div>
@@ -665,7 +665,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
         {companyRoles.length === 0 && <div className="col-span-full text-center py-8 text-sm text-[hsl(var(--muted-foreground))]">Aucun rôle configuré.</div>}
       </div>
 
-      {modalOpen && <Modal title={editingRole ? 'Modifier le rôle' : 'Créer un rôle'} onClose={() => setModalOpen(false)}><RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} sectorLocked={Boolean(editingRole && (data.employees.some(employee => employee.roleId === editingRole.id) || company.managerRoleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
+      {modalOpen && <Modal title={editingRole ? 'Modifier le rôle' : 'Créer un rôle'} onClose={() => setModalOpen(false)}><RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} moduleDefinitions={getConfiguredModules(data)} sectorLocked={Boolean(editingRole && (data.employees.some(employee => employee.roleId === editingRole.id) || company.managerRoleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
         mutate((d: StoreData) => {
           if (editingRole) {
             const idx = d.roles.findIndex((r: Role) => r.id === editingRole.id);
@@ -681,7 +681,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
   );
 }
 
-function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked, onClose, onSave }: { company: Company, initialData: Role | null, allNodes: OrgNode[], allRoles: Role[], sectorLocked: boolean, onClose: () => void, onSave: (d: any) => void }) {
+function RoleFormModal({ company, initialData, allNodes, allRoles, moduleDefinitions, sectorLocked, onClose, onSave }: { company: Company, initialData: Role | null, allNodes: OrgNode[], allRoles: Role[], moduleDefinitions: Module[], sectorLocked: boolean, onClose: () => void, onSave: (d: any) => void }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -691,7 +691,7 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
   });
 
   const selectedNode = allNodes.find(node => node.id === formData.sectorId);
-  const companyModules = allModules.filter(module => company.allowedModules.includes(module.id));
+  const companyModules = moduleDefinitions.filter(module => company.allowedModules.includes(module.id));
   const availableModules = companyModules.filter(module => selectedNode?.moduleIds === undefined || selectedNode.moduleIds.includes(module.id));
 
   const togglePermission = (modId: string, perm: 'voir' | 'créer' | 'modifier') => {
