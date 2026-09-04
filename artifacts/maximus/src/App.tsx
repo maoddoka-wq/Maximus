@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
+import CommerceModulePage from '@/pages/commerce-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
 import PresenceModulePage from '@/pages/presence-module';
@@ -622,8 +623,9 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
      return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} canCreate={hasPermission('stocks', 'créer')} canModify={hasPermission('stocks', 'modifier')} stockPermissions={stockPermissions} singleModuleNavigation={singleModuleNavigation} />;
   }
    if (routePath === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
-   if (routePath === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
-   if (routePath === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;
+   if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
+     return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} />;
+   }
    if (routePath === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
    if (routePath === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
    if (routePath === '/kora/rh') return <HumanResourcesWorkspace data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} companyId={companyId} />;
@@ -1123,7 +1125,7 @@ function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof
       <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Les actions effectuées ici utilisent les mêmes écrans et données que l’espace entreprise. Elles servent à valider le module avant son activation.</p>
     </section>
      {module.id === 'stocks' && <StockModulePage companyId="kora" />}
-    {(module.id === 'commerce' || module.id === 'ventes') && <CommercePage data={data} mutate={mutate} />}
+    {(module.id === 'commerce' || module.id === 'ventes') && <CommerceModulePage companyId="kora" data={data} mutate={mutate} initialTab={module.id === 'ventes' ? 'sales' : 'dashboard'} />}
     {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
     {module.id === 'rh' && koraCompany && <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />}
     {module.id === 'presences' && <PresencesPage data={data} />}
