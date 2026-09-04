@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react';
 import type { Company, StoreData } from '@/lib/store';
 import { CompanyProfileSection } from './company-profile-section';
 import { EmployeesTab } from './organization-employees';
-import { OverviewTab } from './organization-overview';
 import { RolesTab } from './organization-roles';
 import { StructureTab } from './organization-structure';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
-type OrganizationTab = 'overview' | 'structure' | 'roles' | 'employees' | 'profile';
+type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile';
 
 export { CompanyProfileSection } from './company-profile-section';
 
@@ -15,7 +14,7 @@ export function CompanyOrganizationAdmin({
   company,
   data,
   mutate,
-  initialTab = 'overview',
+  initialTab = 'structure',
   standalone = false,
   sectorManager = false,
   scopeNodeId,
@@ -60,18 +59,17 @@ export function CompanyOrganizationAdmin({
         }
       : data;
   const [tab, setTab] = useState<OrganizationTab>(
-    sectorManager && initialTab === 'structure' ? 'overview' : initialTab,
+    sectorManager && initialTab === 'structure' ? 'roles' : initialTab,
   );
 
   useEffect(() => {
-    setTab(sectorManager && initialTab === 'structure' ? 'overview' : initialTab);
+    setTab(sectorManager && initialTab === 'structure' ? 'roles' : initialTab);
   }, [initialTab, sectorManager]);
 
   const organizationNodes = scopedData.orgNodes.filter(
     node => node.companyId === company.id,
   );
   const tabs = ([
-    { id: 'overview', label: "Vue d'ensemble" },
     { id: 'structure', label: '1 · Structure & unités' },
     { id: 'roles', label: '2 · Rôles & permissions' },
     { id: 'employees', label: '3 · Comptes & managers' },
@@ -79,7 +77,6 @@ export function CompanyOrganizationAdmin({
   ] as { id: OrganizationTab; label: string }[]).filter(
     item =>
       !sectorManager ||
-      item.id === 'overview' ||
       item.id === 'roles' ||
       item.id === 'employees',
   );
@@ -110,7 +107,6 @@ export function CompanyOrganizationAdmin({
           ))}
         </div>
       </div>
-      {tab === 'overview' && <OverviewTab company={company} data={scopedData} setTab={setTab} />}
       {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}

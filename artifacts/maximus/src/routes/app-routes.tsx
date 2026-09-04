@@ -167,7 +167,7 @@ export function KoraRouter({
   }
   if (routePath === '/kora/organisation' || routePath === '/kora/autorisations' || routePath === '/kora/employes' || routePath === '/kora/roles') {
     const company = data.companies.find(item => item.id === companyId);
-    const initialTab = routePath === '/kora/autorisations' || routePath === '/kora/roles' ? 'roles' : routePath === '/kora/employes' ? 'employees' : 'overview';
+    const initialTab = routePath === '/kora/autorisations' || routePath === '/kora/roles' ? 'roles' : routePath === '/kora/employes' ? 'employees' : 'structure';
     return company && (companyAdmin || sectorManager) ? (
       <screens.organization company={company} data={data} mutate={mutate} initialTab={initialTab} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} />
     ) : (
