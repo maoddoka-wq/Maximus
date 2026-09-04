@@ -95,16 +95,20 @@ export function ControlCenterPage({
     moduleId: 'stocks' as ModuleId,
     dueDate: '',
   });
+  const canCreateTask = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
 
-  const visibleTasks = useMemo(() => data.controlTasks.filter(task => {
+  const accessibleTasks = useMemo(() => data.controlTasks.filter(task => {
     const inScope = isAdmin || (task.companyId === companyId && (canSeeAll || task.assigneeEmployeeId === employeeId));
+    return inScope;
+  }), [canSeeAll, companyId, data.controlTasks, employeeId, isAdmin]);
+  const visibleTasks = useMemo(() => accessibleTasks.filter(task => {
     const matchesStatus = statusFilter === 'TOUS' || task.status === statusFilter;
     const matchesModule = moduleFilter === 'TOUS' || task.moduleId === moduleFilter;
-    return inScope && matchesStatus && matchesModule;
-  }), [canSeeAll, companyId, data.controlTasks, employeeId, isAdmin, moduleFilter, statusFilter]);
+    return matchesStatus && matchesModule;
+  }), [accessibleTasks, moduleFilter, statusFilter]);
 
-  const scopeTasks = useMemo(() => data.controlTasks.filter(task => isAdmin || task.companyId === companyId), [companyId, data.controlTasks, isAdmin]);
-  const scopeTaskIds = new Set(scopeTasks.map(task => task.id));
+  const scopeTasks = accessibleTasks;
+  const scopeTaskIds = new Set(accessibleTasks.map(task => task.id));
   const visibleEvents = data.domainEvents.filter(event => isAdmin || event.companyId === companyId && (canSeeAll || scopeTaskIds.has(event.entityId ?? '')));
   const visibleAudit = data.auditEntries.filter(entry => isAdmin || entry.companyId === companyId && (canSeeAll || scopeTaskIds.has(entry.entityId ?? '')));
   const pendingCount = scopeTasks.filter(task => task.status === 'À FAIRE' || task.status === 'EN COURS').length;
@@ -160,7 +164,7 @@ export function ControlCenterPage({
   };
 
   const createTask = () => {
-    if (!newTask.title.trim()) return;
+    if (!canCreateTask || !newTask.title.trim()) return;
     mutate(draft => {
       const id = uid('task');
       const now = new Date().toISOString();
@@ -217,7 +221,7 @@ export function ControlCenterPage({
             <h2 className="text-2xl font-bold">Tâches, décisions et événements au même endroit.</h2>
             <p className="mt-2 max-w-2xl text-sm text-white/70">Coordonnez les actions qui traversent les modules et conservez une trace de chaque décision.</p>
           </div>
-          <button type="button" onClick={() => setShowCreate(true)} className="flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"><Plus size={16} /> Créer une tâche</button>
+          {canCreateTask && <button type="button" onClick={() => setShowCreate(true)} className="flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"><Plus size={16} /> Créer une tâche</button>}
         </div>
       </section>
 
@@ -296,7 +300,7 @@ export function ControlCenterPage({
         </div>
       </section>
 
-      {showCreate && (
+      {showCreate && canCreateTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="card-surface w-full max-w-lg rounded-2xl border p-6 shadow-2xl">
             <div className="mb-5 flex items-start justify-between"><div><h3 className="text-lg font-bold">Créer une tâche de coordination</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">La création sera enregistrée dans les événements et l’audit.</p></div><button type="button" onClick={() => setShowCreate(false)} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]"><XCircle size={19} /></button></div>

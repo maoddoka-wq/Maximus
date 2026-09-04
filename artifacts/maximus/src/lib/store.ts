@@ -47,6 +47,7 @@ export interface ControlTask {
   title: string;
   description: string;
   companyId?: string;
+  sectorId?: string;
   moduleId?: ModuleId;
   assigneeEmployeeId?: string;
   assigneeName?: string;
@@ -211,9 +212,9 @@ export function seedData(): StoreData {
       { id: 'a-4', user: 'Aminata Diop', action: 'a modifié un rôle', module: 'RH', object: 'Manager', date: 'Hier, 08:49', status: 'ACTIF' },
     ],
     controlTasks: [
-      { id: 'task-1', title: 'Valider le réassort d’huile d’arachide', description: 'La demande doit être confirmée avant la création du bon de commande fournisseur.', companyId: 'kora', moduleId: 'achats', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ibrahima Kane', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'BC-2406-038', createdAt: '2024-06-18T08:40:00.000Z', updatedAt: '2024-06-18T08:40:00.000Z' },
-      { id: 'task-2', title: 'Contrôler l’écart d’inventaire', description: 'Comparer le stock théorique et le comptage physique de la boutique Dakar.', companyId: 'kora', moduleId: 'stocks', assigneeEmployeeId: 'demo-emp-ibrahima', assigneeName: 'Ibrahima Kane', createdBy: 'Aminata Diop', status: 'EN COURS', priority: 'CRITIQUE', requiresApproval: false, dueDate: 'Demain', relatedObject: 'INV-2406-02', createdAt: '2024-06-17T15:10:00.000Z', updatedAt: '2024-06-18T09:20:00.000Z' },
-      { id: 'task-3', title: 'Valider la période de paie de juin', description: 'La période est prête pour validation avant génération des bulletins.', companyId: 'kora', moduleId: 'paie', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ndeye Sarr', status: 'À FAIRE', priority: 'NORMALE', requiresApproval: true, dueDate: '20 juin', relatedObject: 'PAIE-2024-06', createdAt: '2024-06-18T07:35:00.000Z', updatedAt: '2024-06-18T07:35:00.000Z' },
+      { id: 'task-1', title: 'Valider le réassort d’huile d’arachide', description: 'La demande doit être confirmée avant la création du bon de commande fournisseur.', companyId: 'kora', sectorId: 'kora-service-finance', moduleId: 'achats', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ibrahima Kane', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'BC-2406-038', createdAt: '2024-06-18T08:40:00.000Z', updatedAt: '2024-06-18T08:40:00.000Z' },
+      { id: 'task-2', title: 'Contrôler l’écart d’inventaire', description: 'Comparer le stock théorique et le comptage physique de la boutique Dakar.', companyId: 'kora', sectorId: 'kora-service-stock', moduleId: 'stocks', assigneeEmployeeId: 'demo-emp-ibrahima', assigneeName: 'Ibrahima Kane', createdBy: 'Aminata Diop', status: 'EN COURS', priority: 'CRITIQUE', requiresApproval: false, dueDate: 'Demain', relatedObject: 'INV-2406-02', createdAt: '2024-06-17T15:10:00.000Z', updatedAt: '2024-06-18T09:20:00.000Z' },
+      { id: 'task-3', title: 'Valider la période de paie de juin', description: 'La période est prête pour validation avant génération des bulletins.', companyId: 'kora', sectorId: 'kora-service-rh', moduleId: 'paie', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ndeye Sarr', status: 'À FAIRE', priority: 'NORMALE', requiresApproval: true, dueDate: '20 juin', relatedObject: 'PAIE-2024-06', createdAt: '2024-06-18T07:35:00.000Z', updatedAt: '2024-06-18T07:35:00.000Z' },
       { id: 'task-4', title: 'Examiner la demande d’ouverture Teranga Agro', description: 'Vérifier les modules demandés et la première unité avant activation.', companyId: 'teranga', moduleId: 'commerce', createdBy: 'MAXIMUS', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'teranga', createdAt: '2024-06-18T06:50:00.000Z', updatedAt: '2024-06-18T06:50:00.000Z' },
     ],
     domainEvents: [
