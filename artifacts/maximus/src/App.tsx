@@ -80,7 +80,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
 };
 
 const hexColorPattern = /^#[0-9a-f]{6}$/i;
-const themeVariableNames = ['--primary', '--primary-foreground', '--accent', '--accent-foreground', '--ring', '--sidebar-primary', '--sidebar-primary-foreground'];
+const themeVariableNames = ['--primary', '--primary-foreground', '--accent', '--accent-foreground', '--ring', '--sidebar', '--sidebar-foreground', '--sidebar-border', '--sidebar-primary', '--sidebar-primary-foreground', '--sidebar-accent', '--sidebar-accent-foreground'];
 
 function hexToHsl(hex: string) {
   const red = Number.parseInt(hex.slice(1, 3), 16) / 255;
@@ -107,6 +107,12 @@ function themeForeground(hex: string) {
   return luminance > 0.62 ? '218 28% 13%' : '0 0% 100%';
 }
 
+function shiftHslLightness(hsl: string, amount: number) {
+  const match = hsl.match(/^(\d+) (\d+)% (\d+)%$/);
+  if (!match) return hsl;
+  return `${match[1]} ${match[2]}% ${Math.max(5, Math.min(95, Number(match[3]) + amount))}%`;
+}
+
 function applyCompanyTheme(company: Company | undefined) {
   const root = document.documentElement;
   themeVariableNames.forEach(name => root.style.removeProperty(name));
@@ -116,13 +122,21 @@ function applyCompanyTheme(company: Company | undefined) {
   if (!primary && !accent) return;
   const primaryColor = primary ?? '#f2b705';
   const accentColor = accent ?? primaryColor;
+  const sidebarColor = hexColorPattern.test(company.sidebarColor ?? '') ? company.sidebarColor! : '#161d27';
+  const sidebarHsl = hexToHsl(sidebarColor);
+  const sidebarForeground = themeForeground(sidebarColor);
   root.style.setProperty('--primary', hexToHsl(primaryColor));
   root.style.setProperty('--primary-foreground', themeForeground(primaryColor));
   root.style.setProperty('--accent', hexToHsl(accentColor));
   root.style.setProperty('--accent-foreground', themeForeground(accentColor));
   root.style.setProperty('--ring', hexToHsl(primaryColor));
+  root.style.setProperty('--sidebar', sidebarHsl);
+  root.style.setProperty('--sidebar-foreground', sidebarForeground);
+  root.style.setProperty('--sidebar-border', shiftHslLightness(sidebarHsl, 10));
   root.style.setProperty('--sidebar-primary', hexToHsl(primaryColor));
   root.style.setProperty('--sidebar-primary-foreground', themeForeground(primaryColor));
+  root.style.setProperty('--sidebar-accent', shiftHslLightness(sidebarHsl, 8));
+  root.style.setProperty('--sidebar-accent-foreground', sidebarForeground);
 }
 
 function AppContent() {

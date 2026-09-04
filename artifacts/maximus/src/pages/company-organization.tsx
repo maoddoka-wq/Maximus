@@ -5,13 +5,13 @@ import {
 } from 'lucide-react';
 import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
 
-const defaultCompanyTheme = { primaryColor: '#F2B705', accentColor: '#F2B705' };
+const defaultCompanyTheme = { primaryColor: '#F2B705', accentColor: '#F2B705', sidebarColor: '#161D27' };
 const companyThemePresets = [
-  { name: 'MAXIMUS', primaryColor: '#F2B705', accentColor: '#F2B705' },
-  { name: 'Océan', primaryColor: '#0E7490', accentColor: '#06B6D4' },
-  { name: 'Forêt', primaryColor: '#15803D', accentColor: '#84CC16' },
-  { name: 'Prune', primaryColor: '#7E22CE', accentColor: '#DB2777' },
-  { name: 'Terre', primaryColor: '#C2410C', accentColor: '#EA580C' },
+  { name: 'MAXIMUS', primaryColor: '#F2B705', accentColor: '#F2B705', sidebarColor: '#161D27' },
+  { name: 'Océan', primaryColor: '#0E7490', accentColor: '#06B6D4', sidebarColor: '#062A38' },
+  { name: 'Forêt', primaryColor: '#15803D', accentColor: '#84CC16', sidebarColor: '#102A1C' },
+  { name: 'Prune', primaryColor: '#7E22CE', accentColor: '#DB2777', sidebarColor: '#24132D' },
+  { name: 'Terre', primaryColor: '#C2410C', accentColor: '#EA580C', sidebarColor: '#351B12' },
 ];
 const isHexColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
 
@@ -148,19 +148,19 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
 }
 
 export function CompanyProfileSection({ company, data, mutate }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
-  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & { profilePhoto: string; primaryColor: string; accentColor: string };
-  const [form, setForm] = useState<ProfileForm>({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '', primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor, accentColor: company.accentColor ?? defaultCompanyTheme.accentColor });
+  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & { profilePhoto: string; primaryColor: string; accentColor: string; sidebarColor: string };
+  const [form, setForm] = useState<ProfileForm>({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '', primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor, accentColor: company.accentColor ?? defaultCompanyTheme.accentColor, sidebarColor: company.sidebarColor ?? defaultCompanyTheme.sidebarColor });
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
   const setField = (field: keyof ProfileForm) => (value: string) => setForm(current => ({ ...current, [field]: value }));
 
   useEffect(() => {
-    setForm({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '', primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor, accentColor: company.accentColor ?? defaultCompanyTheme.accentColor });
+    setForm({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '', primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor, accentColor: company.accentColor ?? defaultCompanyTheme.accentColor, sidebarColor: company.sidebarColor ?? defaultCompanyTheme.sidebarColor });
     setNewPassword('');
     setPasswordConfirm('');
     setError('');
-  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector, company.profilePhoto, company.primaryColor, company.accentColor]);
+  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector, company.profilePhoto, company.primaryColor, company.accentColor, company.sidebarColor]);
 
   const handlePhoto = (file: File | undefined) => {
     if (!file) return;
@@ -189,6 +189,7 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
     const password = newPassword.trim();
     const primaryColor = form.primaryColor.trim().toUpperCase();
     const accentColor = form.accentColor.trim().toUpperCase();
+    const sidebarColor = form.sidebarColor.trim().toUpperCase();
     if (!name || !manager || !email) {
       setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
       return;
@@ -209,7 +210,7 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
-    if (!isHexColor(primaryColor) || !isHexColor(accentColor)) {
+    if (!isHexColor(primaryColor) || !isHexColor(accentColor) || !isHexColor(sidebarColor)) {
       setError('Les couleurs doivent être au format hexadécimal, par exemple #F2B705.');
       return;
     }
@@ -225,6 +226,7 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
         target.profilePhoto = form.profilePhoto;
         target.primaryColor = primaryColor;
         target.accentColor = accentColor;
+        target.sidebarColor = sidebarColor;
         if (password) target.adminPassword = password;
       }
     }, password ? 'Profil, couleurs, photo et mot de passe mis à jour.' : 'Profil, couleurs et photo mis à jour.');
@@ -242,12 +244,13 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
        <div className="mb-7 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
          <div className="flex flex-wrap items-start justify-between gap-3">
            <div><h3 className="font-bold">Couleurs de votre espace</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Choisissez une couleur principale et une couleur d’accent. Elles seront visibles par tous les comptes de cette entreprise.</p></div>
-           <div className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2 text-right text-[10px] font-bold"><span className="mr-2 inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.primaryColor }} /><span className="inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.accentColor }} /> <span className="ml-1 text-[hsl(var(--muted-foreground))]">Aperçu</span></div>
+           <div className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2 text-right text-[10px] font-bold"><span className="mr-2 inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.primaryColor }} /><span className="mr-2 inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.accentColor }} /><span className="inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.sidebarColor }} /> <span className="ml-1 text-[hsl(var(--muted-foreground))]">Aperçu</span></div>
          </div>
          <div className="mt-4 grid gap-4 sm:grid-cols-2">
            {([
              ['primaryColor', 'Couleur principale', 'Boutons, liens et éléments actifs.'],
              ['accentColor', 'Couleur d’accent', 'Surbrillances et détails secondaires.'],
+             ['sidebarColor', 'Couleur du menu latéral', 'Fond de la barre de navigation et de ses états actifs.'],
            ] as const).map(([field, label, help]) => <label key={field} className="block text-sm font-semibold">
              {label}
              <div className="mt-2 flex items-center gap-2">
