@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Settings, Trash2 } from 'lucide-react';
+import { Building2, Check, KeyRound, Layers3, Settings, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   commerceTabDefinitions,
@@ -22,6 +22,13 @@ import {
 import { ActionButton, Field, Modal, permissionLabel } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
+type Permission = 'voir' | 'créer' | 'modifier';
+
+const permissionLabels: Record<Permission, string> = {
+  voir: 'Voir',
+  créer: 'Créer',
+  modifier: 'Modifier',
+};
 
 export function RolesTab({
   company,
@@ -35,6 +42,7 @@ export function RolesTab({
   const { alert } = useAppDialog();
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
+  const moduleDefinitions = getConfiguredModules(data);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
@@ -63,32 +71,24 @@ export function RolesTab({
         <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0} onClick={() => { setEditingRole(null); setModalOpen(true); }} testId="btn-create-role">Créer un rôle</ActionButton>
       </div>
       {companyNodes.length === 0 && <p className="mb-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord au moins une unité dans l’onglet Structure & Unités.</p>}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-3">
         {companyRoles.map(role => {
           const sector = companyNodes.find(node => node.id === role.sectorId);
           const assignedEmployees = data.employees.filter(employee => employee.roleId === role.id);
           return (
-            <div key={role.id} className="flex flex-col rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold">{role.name}</h3>
-                  <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]"><Building2 size={10} /> {sector?.name || 'Unité non affectée'}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button type="button" data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={() => { setEditingRole(role); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                  <button data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={() => deleteRole(role)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
-                </div>
-              </div>
-              <p className="mt-3 flex-1 text-xs text-[hsl(var(--muted-foreground))]">{role.description}</p>
-              {(company.managerRoleId === role.id || assignedEmployees.length > 0) && <div className="mt-3 border-t pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Affectations</p><p className="mt-1 text-xs font-semibold">{company.managerRoleId === role.id ? `Manager : ${company.manager}` : ''}{company.managerRoleId === role.id && assignedEmployees.length > 0 ? ' · ' : ''}{assignedEmployees.map(employee => `${employee.firstName} ${employee.lastName}`).join(', ')}</p></div>}
-              <div className="mt-4 border-t pt-3">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{Object.keys(role.modulePermissions).length} autorisation{Object.keys(role.modulePermissions).length > 1 ? 's' : ''} configurée{Object.keys(role.modulePermissions).length > 1 ? 's' : ''}</p>
-                <div className="flex flex-wrap gap-1.5">{Object.keys(role.modulePermissions).map(moduleId => <span key={moduleId} className="rounded border px-1.5 py-0.5 text-[10px] font-medium">{permissionLabel(moduleId, getConfiguredModules(data))}</span>)}</div>
-              </div>
-            </div>
+            <RoleCard
+              key={role.id}
+              role={role}
+              sectorName={sector?.name}
+              assignedEmployees={assignedEmployees}
+              managerName={company.managerRoleId === role.id ? company.manager : undefined}
+              moduleDefinitions={moduleDefinitions}
+              onEdit={() => { setEditingRole(role); setModalOpen(true); }}
+              onDelete={() => deleteRole(role)}
+            />
           );
         })}
-        {companyRoles.length === 0 && <div className="col-span-full py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun rôle configuré.</div>}
+        {companyRoles.length === 0 && <div className="rounded-xl border border-dashed px-6 py-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun rôle configuré.</div>}
       </div>
       {modalOpen && <Modal title={editingRole ? 'Modifier le rôle' : 'Créer un rôle'} onClose={() => setModalOpen(false)}>
         <RoleFormModal
@@ -114,6 +114,87 @@ export function RolesTab({
         />
       </Modal>}
     </div>
+  );
+}
+
+function RoleCard({
+  role,
+  sectorName,
+  assignedEmployees,
+  managerName,
+  moduleDefinitions,
+  onEdit,
+  onDelete,
+}: {
+  role: Role;
+  sectorName?: string;
+  assignedEmployees: StoreData['employees'];
+  managerName?: string;
+  moduleDefinitions: Module[];
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const permissionEntries = Object.entries(role.modulePermissions);
+  const moduleCount = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key)).length;
+  const detailCount = permissionEntries.length - moduleCount;
+
+  return (
+    <article className="overflow-hidden rounded-xl border bg-[hsl(var(--card))] transition hover:border-[hsl(var(--primary)/.45)] hover:shadow-sm">
+      <div className="flex flex-col gap-4 border-b bg-[hsl(var(--muted)/.22)] px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-[hsl(var(--primary)/.12)] p-2 text-[hsl(var(--primary))]"><ShieldCheck size={17} /></span>
+            <div className="min-w-0">
+              <h3 className="truncate font-bold">{role.name}</h3>
+              <span className="mt-1 inline-flex items-center gap-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]"><Building2 size={11} /> {sectorName || 'Unité non affectée'}</span>
+            </div>
+          </div>
+          <p className="mt-3 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">{role.description || 'Aucune description renseignée pour ce rôle.'}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Settings size={13} /> Modifier</button>
+          <button type="button" data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /> Supprimer</button>
+        </div>
+      </div>
+      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(220px,.7fr)_minmax(0,1.3fr)]">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg border bg-[hsl(var(--muted)/.18)] p-3">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]"><Layers3 size={12} /> Modules</p>
+              <p className="mt-1 text-lg font-bold">{moduleCount}</p>
+            </div>
+            <div className="rounded-lg border bg-[hsl(var(--muted)/.18)] p-3">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]"><KeyRound size={12} /> Détails</p>
+              <p className="mt-1 text-lg font-bold">{detailCount}</p>
+            </div>
+          </div>
+          {(managerName || assignedEmployees.length > 0) && (
+            <div className="rounded-lg border p-3">
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]"><Users size={12} /> Affectations</p>
+              <p className="mt-1 text-xs font-semibold leading-5">{managerName ? `Manager : ${managerName}` : ''}{managerName && assignedEmployees.length > 0 ? ' · ' : ''}{assignedEmployees.map(employee => `${employee.firstName} ${employee.lastName}`).join(', ') || 'Aucun employé affecté'}</p>
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Droits configurés</p>
+            <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{permissionEntries.length} entrée{permissionEntries.length > 1 ? 's' : ''}</span>
+          </div>
+          {permissionEntries.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {permissionEntries.map(([key, permissions]) => (
+                <span key={key} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--muted)/.25)] px-2.5 py-1.5 text-[10px] font-semibold">
+                  <span>{permissionLabel(key, moduleDefinitions)}</span>
+                  <span className="text-[hsl(var(--muted-foreground))]">· {permissions.map(permission => permissionLabels[permission as Permission] ?? permission).join(', ')}</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed px-3 py-4 text-xs text-[hsl(var(--muted-foreground))]">Aucun droit configuré.</p>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 
