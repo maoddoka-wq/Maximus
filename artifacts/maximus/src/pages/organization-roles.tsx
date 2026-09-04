@@ -9,7 +9,6 @@ import {
   type CommerceTabId,
 } from '@/lib/commerce-permissions';
 import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from '@/lib/permission-keys';
-import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import {
   getConfiguredModules,
   stockSubmoduleDependencies,
@@ -382,7 +381,6 @@ function RoleFormModal({
             <ModulePermissionCard
               key={module.id}
               module={module}
-              allowedFeatureIds={getEffectiveModuleFeatureIds(module, selectedNode?.moduleFeatures?.[module.id])}
               modulePermissions={formData.modulePermissions}
               onTogglePermission={togglePermission}
               onToggleFeature={toggleFeaturePermission}
@@ -453,7 +451,6 @@ function getFeatureDependencyIds(module: Module, feature: string) {
 
 function ModulePermissionCard({
   module,
-  allowedFeatureIds,
   modulePermissions,
   onTogglePermission,
   onToggleFeature,
@@ -461,7 +458,6 @@ function ModulePermissionCard({
   onTogglePresence,
 }: {
   module: Module;
-  allowedFeatureIds: Set<string>;
   modulePermissions: Record<string, string[]>;
   onTogglePermission: (key: string, permission: Permission) => void;
   onToggleFeature: (moduleId: ModuleId, feature: string, permission: Permission) => void;
@@ -469,7 +465,9 @@ function ModulePermissionCard({
   onTogglePresence: (permission: string) => void;
 }) {
   const permissions = modulePermissions[module.id] || [];
-  const features = getModuleFeatureOptions(module);
+  const features = module.id === 'commerce'
+    ? commerceTabDefinitions
+    : module.features.map(feature => ({ id: feature, label: feature }));
 
   return (
     <section className="overflow-hidden rounded-xl border bg-[hsl(var(--card))]">
@@ -490,13 +488,12 @@ function ModulePermissionCard({
         {module.id !== 'stocks' && module.id !== 'presences' && (
           <FeaturePermissionList
             module={module}
-            allowedFeatureIds={allowedFeatureIds}
             features={features}
             modulePermissions={modulePermissions}
             onToggle={onToggleFeature}
           />
         )}
-        {module.id === 'stocks' && <StockPermissionList allowedFeatureIds={allowedFeatureIds} modulePermissions={modulePermissions} onToggle={onToggleStock} />}
+        {module.id === 'stocks' && <StockPermissionList modulePermissions={modulePermissions} onToggle={onToggleStock} />}
         {module.id === 'presences' && <PresencePermissionList modulePermissions={modulePermissions} onToggle={onTogglePresence} />}
       </div>
     </section>
@@ -505,19 +502,15 @@ function ModulePermissionCard({
 
 function FeaturePermissionList({
   module,
-  allowedFeatureIds,
   features,
   modulePermissions,
   onToggle,
 }: {
   module: Module;
-  allowedFeatureIds: Set<string>;
   features: readonly { id: string; label: string }[];
   modulePermissions: Record<string, string[]>;
   onToggle: (moduleId: ModuleId, feature: string, permission: Permission) => void;
 }) {
-  const visibleFeatures = features.filter(feature => allowedFeatureIds.has(module.id === 'commerce' ? feature.id : featureSlug(feature.id)));
-
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -525,10 +518,10 @@ function FeaturePermissionList({
           <h5 className="text-xs font-bold">Sous-fonctionnalités</h5>
           <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Définissez les menus et actions visibles dans ce module.</p>
         </div>
-         <span className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{visibleFeatures.length} élément{visibleFeatures.length > 1 ? 's' : ''}</span>
+         <span className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{features.length} élément{features.length > 1 ? 's' : ''}</span>
       </div>
       <div className="grid gap-2">
-        {visibleFeatures.map(feature => {
+        {features.map(feature => {
           const key = module.id === 'commerce' ? commerceTabPermissionKey(feature.id as CommerceTabId) : permissionFeatureKey(module.id, feature.id);
           const activePermissions = module.id === 'commerce'
             ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => modulePermissions[permissionKey] || []))]
@@ -552,11 +545,9 @@ function FeaturePermissionList({
 
 function StockPermissionList({
   modulePermissions,
-  allowedFeatureIds,
   onToggle,
 }: {
   modulePermissions: Record<string, string[]>;
-  allowedFeatureIds: Set<string>;
   onToggle: (submoduleId: string, permission: Permission) => void;
 }) {
   return (
@@ -566,7 +557,7 @@ function StockPermissionList({
         <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Ces règles précisent les droits de l’employé dans son unité.</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {stockSubmodules.filter(submodule => allowedFeatureIds.has(submodule.id)).map(submodule => {
+        {stockSubmodules.map(submodule => {
           const key = `stocks:${submodule.id}`;
           const dependencyLabels = resolveFeatureDependencies(stockSubmoduleDependencies, submodule.id)
             .map(dependencyId => stockSubmodules.find(candidate => candidate.id === dependencyId)?.name ?? dependencyId);

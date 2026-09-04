@@ -188,8 +188,9 @@ body { min-width: 320px; }
 .metric-accent { position: relative; overflow: hidden; }
 .metric-accent::after { position: absolute; right: -22px; top: -22px; width: 88px; height: 88px; border: 1px solid hsl(var(--primary) / .2); border-radius: 999px; content: ""; }
 .nav-item { transition: background-color .2s ease, color .2s ease, transform .2s ease; }
-.nav-item:hover { background: hsl(var(--sidebar-accent)); transform: translateX(2px); }
+.nav-item:hover { background: hsl(var(--sidebar-primary) / .16); transform: translateX(2px); }
 .nav-item.active { background: hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary-foreground)); }
+.nav-item.active:hover { background: hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary-foreground)); }
 .btn { transition: transform .15s ease, background-color .2s ease, box-shadow .2s ease; }
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: translateY(0); }

@@ -20,7 +20,7 @@ export interface Module { id: ModuleId; name: string; description: string; featu
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
 export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies'>>>>;
-export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; }
+export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; moduleFeatures?: Partial<Record<ModuleId, string[]>>; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
 export const demoEmployeeIds = new Set(['demo-emp-awa', 'demo-emp-ibrahima', 'demo-emp-ndeye', 'demo-emp-mamadou']);
@@ -29,7 +29,7 @@ export interface Movement { id: string; product: string; quantity: number; type:
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; paymentMethod?: string; paidAmount?: number; }
 export interface Payment { id: string; reference: string; invoice: string; amount: number; status: Status; date: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; }
-export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: 'direction' | 'sector' | 'service' | 'department'; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; moduleFeatures?: Partial<Record<ModuleId, string[]>>; managerEmployeeId?: string; }
+export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: 'direction' | 'sector' | 'service' | 'department'; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; managerEmployeeId?: string; }
 export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; productId?: string; quantity?: number; }
 export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; }
 export interface PayrollSlip { id: string; reference: string; employee: string; period: string; gross: number; net: number; status: Status; }
@@ -112,7 +112,13 @@ export function seedData(): StoreData {
   return {
     catalogVersion: 2,
     organizationVersion: 8,
-    sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
+    sectorPresets: sectorPresets.map(preset => ({
+      ...preset,
+      moduleIds: [...preset.moduleIds],
+      moduleFeatures: Object.fromEntries(
+        Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+      ),
+    })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', adminPassword: 'Kora123!', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },

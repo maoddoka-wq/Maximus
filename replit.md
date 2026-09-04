@@ -59,11 +59,10 @@ Un employé peut utiliser une fonctionnalité uniquement si toutes les condition
 1. le module existe dans le catalogue configuré et n’est pas retiré ;
 2. l’entreprise possède le module dans `allowedModules` ;
 3. l’unité de l’employé possède le module dans `moduleIds` ;
-4. lorsque l’unité définit `moduleFeatures`, la sous-fonctionnalité est autorisée par cette liste ;
-5. le rôle appartient à la même entreprise et à l’unité de l’employé ou à l’un de ses ancêtres ;
-6. le rôle possède `voir` sur le module ;
-7. la sous-fonctionnalité possède sa permission `voir` ;
-8. l’action demandée possède sa permission propre (`créer`, `modifier`, ou la permission métier dédiée).
+4. le rôle appartient à la même entreprise et à l’unité de l’employé ou à l’un de ses ancêtres ;
+5. le rôle possède `voir` sur le module ;
+6. la sous-fonctionnalité possède sa permission `voir` ;
+7. l’action demandée possède sa permission propre (`créer`, `modifier`, ou la permission métier dédiée).
 
 Le périmètre le plus restrictif gagne toujours. Une permission de rôle ne peut jamais réactiver un module refusé par l’entreprise ou l’unité.
 
@@ -76,9 +75,9 @@ Le périmètre le plus restrictif gagne toujours. Une permission de rôle ne peu
 - Retirer `voir` du module doit retirer ou neutraliser les droits détaillés qui ne peuvent plus être atteints.
 - Toute nouvelle clé de permission doit être produite par une fonction centrale, pas construite différemment dans chaque écran.
 - Les alias historiques doivent rester uniquement dans une couche de compatibilité ; les nouvelles données utilisent les identifiants canoniques.
-- Une unité peut restreindre les fonctionnalités autorisées par module via `moduleFeatures`. Si cette propriété est absente sur une ancienne unité, toutes les fonctionnalités du module restent compatibles par défaut.
-- La création ou modification d’une unité affiche les fonctionnalités réelles du module, et non seulement son intitulé : onglets Commerce, sous-rubriques Stocks et fonctionnalités des autres modules.
-- Lorsqu’une fonctionnalité est sélectionnée au niveau de l’unité, ses prérequis sont également sélectionnés en visibilité afin de ne pas créer de périmètre incohérent.
+- Les secteurs d’activité administratifs peuvent définir `moduleFeatures` dans `SectorPreset` pour choisir les fonctionnalités proposées avec chaque module lors d’une inscription.
+- La configuration des secteurs affiche les fonctionnalités réelles du module, et non seulement son intitulé : onglets Commerce, sous-rubriques Stocks et fonctionnalités des autres modules.
+- Lorsqu’une fonctionnalité est sélectionnée dans un profil de secteur, ses prérequis sont également sélectionnés en visibilité afin de ne pas créer de périmètre incohérent.
 
 ### Dépendances entre modules
 

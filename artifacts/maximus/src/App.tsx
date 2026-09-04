@@ -13,7 +13,7 @@ import { type Icon, type Session, type SidebarFeature, type SidebarFeatureGroup 
 import { AdminRouter, KoraRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
-import { getEffectiveModuleFeatureIds } from '@/lib/module-features';
+import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import {
   employeeHasPresencePermission,
   employeeRoleMatchesUnit,
@@ -185,24 +185,11 @@ function AppContent() {
     }
     return false;
   });
-  const stockPermissions = (() => {
-    const permissions = getStockPermissions(employeeRole, roleFitsEmployee);
-    const stocksModule = configuredModules.find(module => module.id === 'stocks');
-    if (!permissions || !stocksModule) return permissions;
-    const allowedFeatureIds = getEffectiveModuleFeatureIds(stocksModule, employeeNode?.moduleFeatures?.stocks);
-    return Object.fromEntries(Object.entries(permissions).filter(([featureId]) => allowedFeatureIds.has(featureId)));
-  })();
-  const commerceTabIds = (() => {
-    const tabIds = getCommerceTabIds(employeeRole, roleFitsEmployee, canViewModule);
-    const commerceModule = configuredModules.find(module => module.id === 'commerce');
-    if (!tabIds || !commerceModule) return tabIds;
-    const allowedFeatureIds = getEffectiveModuleFeatureIds(commerceModule, employeeNode?.moduleFeatures?.commerce);
-    return tabIds.filter(tabId => allowedFeatureIds.has(tabId));
-  })();
+  const stockPermissions = getStockPermissions(employeeRole, roleFitsEmployee);
+  const commerceTabIds = getCommerceTabIds(employeeRole, roleFitsEmployee, canViewModule);
   const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 ? allowed.flatMap(moduleId => {
     const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];
-    const allowedFeatureIds = getEffectiveModuleFeatureIds(module, employeeNode?.moduleFeatures?.[moduleId]);
     let items: SidebarFeature[] = [];
     if (moduleId === 'commerce') {
       const commerceTabIcons: Record<CommerceTabId, Icon> = {
@@ -241,7 +228,6 @@ function AppContent() {
       };
       const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
-        .filter(feature => allowedFeatureIds.has(featureSlug(feature)))
         .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || hasPresencePermission('view'))
         .map(feature => {
           const mapped = presenceFeatures[feature];
@@ -253,7 +239,6 @@ function AppContent() {
       const canViewModule = employeeRole?.modulePermissions[moduleId]?.includes('voir');
       const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
-        .filter(feature => allowedFeatureIds.has(featureSlug(feature)))
         .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || (canViewModule && !hasDetailedFeaturePermissions))
         .map(feature => ({ href: `/kora/${moduleId}?feature=${featureSlug(feature)}`, label: feature, icon: moduleId === 'ventes' ? ShoppingCart : moduleId === 'finance' ? WalletCards : moduleId === 'rh' ? UserRoundCog : LayoutGrid }));
     }
@@ -593,15 +578,41 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
   const { confirm } = useAppDialog();
   const [sectorName, setSectorName] = useState('');
   const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
+  const [sectorFeatures, setSectorFeatures] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
   const sectorPresets = data.sectorPresets ?? [];
   const moduleName = (id: ModuleId) => modules.find(module => module.id === id)?.name ?? id;
 
   const toggleSectorModule = (moduleId: ModuleId) => {
+    const module = modules.find(item => item.id === moduleId);
+    if (!module) return;
+    setSectorError('');
     setSectorModules(previous => {
-      setSectorError('');
-      return previous.includes(moduleId) ? previous.filter(id => id !== moduleId) : [...previous, moduleId];
+      const enabled = previous.includes(moduleId);
+      setSectorFeatures(current => {
+        const next = { ...current };
+        if (enabled) delete next[moduleId];
+        else next[moduleId] = getModuleFeatureOptions(module).map(feature => feature.id);
+        return next;
+      });
+      return enabled ? previous.filter(id => id !== moduleId) : [...previous, moduleId];
+    });
+  };
+
+  const toggleSectorFeature = (moduleId: ModuleId, featureId: string) => {
+    const module = modules.find(item => item.id === moduleId);
+    if (!module) return;
+    setSectorError('');
+    setSectorFeatures(current => {
+      const options = getModuleFeatureOptions(module);
+      const selected = new Set(current[moduleId] ?? options.map(feature => feature.id));
+      if (selected.has(featureId)) selected.delete(featureId);
+      else selected.add(featureId);
+      return {
+        ...current,
+        [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])],
+      };
     });
   };
 
@@ -609,6 +620,12 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     setEditingSector(preset ?? null);
     setSectorName(preset?.name ?? '');
     setSectorModules(preset ? [...preset.moduleIds] : []);
+    setSectorFeatures(preset
+      ? Object.fromEntries(preset.moduleIds.map(moduleId => {
+        const module = modules.find(item => item.id === moduleId);
+        return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, preset.moduleFeatures?.[moduleId])] : []];
+      }))
+      : {});
     setSectorError('');
   };
 
@@ -627,10 +644,20 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       setSectorError('Sélectionnez au moins un module par défaut.');
       return;
     }
-    const preset: SectorPreset = { id: editingSector?.id ?? uid('sector'), name: normalizedName, moduleIds: [...sectorModules] };
+    const moduleFeatures = Object.fromEntries(sectorModules.map(moduleId => {
+      const module = modules.find(item => item.id === moduleId);
+      return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, sectorFeatures[moduleId])] : []];
+    })) as Partial<Record<ModuleId, string[]>>;
+    const preset: SectorPreset = {
+      id: editingSector?.id ?? uid('sector'),
+      name: normalizedName,
+      moduleIds: [...sectorModules],
+      moduleFeatures,
+    };
     mutate(draft => { draft.sectorPresets = editingSector ? (draft.sectorPresets ?? []).map(item => item.id === editingSector.id ? preset : item) : [...(draft.sectorPresets ?? []), preset]; }, editingSector ? 'Secteur modifié.' : 'Secteur et modules par défaut enregistrés.');
     setSectorName('');
     setSectorModules([]);
+    setSectorFeatures({});
     setEditingSector(null);
     setSectorError('');
   };
@@ -650,15 +677,37 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       <form onSubmit={createSector} className="mt-6 border-t pt-5">
         <label className="block max-w-md text-sm font-semibold">Nom du secteur<input data-testid="input-sector-name" value={sectorName} onChange={event => setSectorName(event.target.value)} placeholder="Ex. Bâtiment et travaux publics" className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
         <p className="mt-5 text-sm font-semibold">Modules proposés automatiquement</p>
-        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez librement les modules à proposer pour ce secteur.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{modules.map(module => <button type="button" data-testid={`button-sector-module-${module.id}`} key={module.id} onClick={() => toggleSectorModule(module.id)} className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${sectorModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${sectorModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{sectorModules.includes(module.id) && <Check size={13} />}</span><span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</span></span></button>)}</div>
+        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez les modules puis les fonctionnalités proposées par défaut aux entreprises de ce secteur.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {modules.map(module => {
+            const enabled = sectorModules.includes(module.id);
+            const featureOptions = getModuleFeatureOptions(module);
+            const selectedFeatureIds = getEffectiveModuleFeatureIds(module, sectorFeatures[module.id]);
+            return <div key={module.id} className={`rounded-xl border p-3 transition ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}>
+              <button type="button" data-testid={`button-sector-module-${module.id}`} onClick={() => toggleSectorModule(module.id)} className="flex w-full items-start gap-3 text-left">
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{enabled && <Check size={13} />}</span>
+                <span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</span></span>
+              </button>
+              {enabled && <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3">
+                <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span></div>
+                <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+                  {featureOptions.map(feature => <label key={feature.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--card)/.7)]">
+                    <input data-testid={`checkbox-sector-feature-${module.id}-${feature.id}`} type="checkbox" checked={selectedFeatureIds.has(feature.id)} onChange={() => toggleSectorFeature(module.id, feature.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
+                    <span>{feature.label}</span>
+                  </label>)}
+                </div>
+                <p className="mt-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">Les prérequis sont ajoutés automatiquement en visibilité.</p>
+              </div>}
+            </div>;
+          })}
+        </div>
         {sectorError && <p data-testid="sector-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{sectorError}</p>}
          <div className="mt-5 flex flex-wrap gap-2"><button data-testid="button-create-sector" type="submit" className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">{editingSector ? <Edit3 size={15} /> : <Plus size={15} />}{editingSector ? 'Enregistrer les modifications' : 'Enregistrer le secteur'}</button>{editingSector && <button type="button" onClick={() => openSector()} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler la modification</button>}</div>
       </form>
     </section>
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Secteurs configurés</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{sectorPresets.length} secteur{sectorPresets.length > 1 ? 's' : ''} disponible{sectorPresets.length > 1 ? 's' : ''} à l’inscription</p></div></div>
-      {sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="card-surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-start gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><Building2 size={19} /></span><div><strong>{preset.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{preset.moduleIds.length} module{preset.moduleIds.length > 1 ? 's' : ''} proposé{preset.moduleIds.length > 1 ? 's' : ''} automatiquement</p><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)}</span>)}</div></div></div><div className="flex self-start sm:self-center"><button type="button" data-testid={`button-edit-sector-${preset.id}`} onClick={() => openSector(preset)} aria-label={`Modifier le secteur ${preset.name}`} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={16} /></button><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={16} /></button></div></article>)}
+       {sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="card-surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-start gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><Building2 size={19} /></span><div><strong>{preset.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{preset.moduleIds.length} module{preset.moduleIds.length > 1 ? 's' : ''} · {preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0)} fonctionnalité{preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0) > 1 ? 's' : ''} proposée{preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0) > 1 ? 's' : ''}</p><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)} · {preset.moduleFeatures?.[moduleId]?.length ?? 'toutes'}</span>)}</div></div></div><div className="flex self-start sm:self-center"><button type="button" data-testid={`button-edit-sector-${preset.id}`} onClick={() => openSector(preset)} aria-label={`Modifier le secteur ${preset.name}`} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={16} /></button><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={16} /></button></div></article>)}
       {sectorPresets.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><Building2 className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucun secteur configuré</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez un premier secteur pour guider les inscriptions.</p></div>}
     </section>
   </div>;
