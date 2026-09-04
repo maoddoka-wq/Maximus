@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Check, Settings, Trash2 } from 'lucide-react';
+import { Building2, Check, Layers3, Settings, Trash2 } from 'lucide-react';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   commerceTabDefinitions,
