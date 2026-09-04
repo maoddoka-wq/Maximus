@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArrowDownToLine, ArrowUpFromLine, Bell, Boxes, Building2, CalendarDays, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, CreditCard, Edit3, FileBarChart, FileClock, FolderKanban, Gauge, GitBranch, History, KeyRound, LayoutGrid, LogIn, Menu, Package, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Trash2, TrendingUp, UserPlus, Users, WalletCards, Warehouse, X, UserRoundCog } from 'lucide-react';
 import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
@@ -131,10 +131,8 @@ function shiftHslLightness(hsl: string, amount: number) {
   return `${match[1]} ${match[2]}% ${Math.max(5, Math.min(95, Number(match[3]) + amount))}%`;
 }
 
-function applyCompanyTheme(company: Company | undefined) {
-  const root = document.documentElement;
-  themeVariableNames.forEach(name => root.style.removeProperty(name));
-  if (!company) return;
+function companyThemeVariables(company: Company | undefined) {
+  if (!company) return {};
   const primary = hexColorPattern.test(company.primaryColor ?? '') ? company.primaryColor! : null;
   const accent = hexColorPattern.test(company.accentColor ?? '') ? company.accentColor! : primary;
   const primaryColor = primary ?? '#f2b705';
@@ -142,18 +140,28 @@ function applyCompanyTheme(company: Company | undefined) {
   const sidebarColor = hexColorPattern.test(company.sidebarColor ?? '') ? company.sidebarColor! : '#161d27';
   const sidebarHsl = hexToHsl(sidebarColor);
   const sidebarForeground = themeForeground(sidebarColor);
-  root.style.setProperty('--primary', hexToHsl(primaryColor));
-  root.style.setProperty('--primary-foreground', themeForeground(primaryColor));
-  root.style.setProperty('--accent', hexToHsl(accentColor));
-  root.style.setProperty('--accent-foreground', themeForeground(accentColor));
-  root.style.setProperty('--ring', hexToHsl(primaryColor));
-  root.style.setProperty('--sidebar', sidebarHsl);
-  root.style.setProperty('--sidebar-foreground', sidebarForeground);
-  root.style.setProperty('--sidebar-border', shiftHslLightness(sidebarHsl, 10));
-  root.style.setProperty('--sidebar-primary', hexToHsl(primaryColor));
-  root.style.setProperty('--sidebar-primary-foreground', themeForeground(primaryColor));
-  root.style.setProperty('--sidebar-accent', shiftHslLightness(sidebarHsl, 8));
-  root.style.setProperty('--sidebar-accent-foreground', sidebarForeground);
+  return {
+    '--primary': hexToHsl(primaryColor),
+    '--primary-foreground': themeForeground(primaryColor),
+    '--accent': hexToHsl(accentColor),
+    '--accent-foreground': themeForeground(accentColor),
+    '--ring': hexToHsl(primaryColor),
+    '--sidebar': sidebarHsl,
+    '--sidebar-foreground': sidebarForeground,
+    '--sidebar-border': shiftHslLightness(sidebarHsl, 10),
+    '--sidebar-primary': hexToHsl(primaryColor),
+    '--sidebar-primary-foreground': themeForeground(primaryColor),
+    '--sidebar-accent': shiftHslLightness(sidebarHsl, 8),
+    '--sidebar-accent-foreground': sidebarForeground,
+  };
+}
+
+function applyCompanyTheme(company: Company | undefined) {
+  const root = document.documentElement;
+  themeVariableNames.forEach(name => root.style.removeProperty(name));
+  Object.entries(companyThemeVariables(company)).forEach(([name, value]) => {
+    root.style.setProperty(name, value);
+  });
 }
 
 function AppContent() {
@@ -184,6 +192,7 @@ function AppContent() {
       ? session.slice('company:'.length)
       : sessionEmployee?.companyId;
   const activeCompany = data.companies.find(company => company.id === activeCompanyId);
+  const activeCompanyTheme = companyThemeVariables(activeCompany);
   useEffect(() => {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
@@ -381,7 +390,7 @@ function AppContent() {
   const notificationContext = { isAdmin, companyId };
   const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(notification => !notification.read).length;
   return (
-      <div className="app-shell flex h-[100dvh] min-h-0 overflow-hidden">
+      <div className="app-shell flex h-[100dvh] min-h-0 overflow-hidden" style={activeCompanyTheme as CSSProperties}>
          <Sidebar session={session} location={location} allowed={allowed} sidebarFeatureGroups={sidebarFeatureGroups} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} />
         <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
            <Topbar title={currentMeta.title} isAdmin={isAdmin} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/notifications'} unreadCount={unreadNotifications} onHelp={() => { void alert({ title: 'Aide MAXIMUS', description: 'Explorez les vues depuis la navigation de votre espace.', confirmLabel: 'Compris' }); }} />
