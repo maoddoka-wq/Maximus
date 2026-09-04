@@ -138,6 +138,8 @@ body { min-width: 320px; }
 .sidebar > nav { flex: 1 1 0%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sidebar > div:last-child { margin-top: auto; }
 .sidebar > div:last-child > div:last-child { align-self: flex-start; justify-content: flex-start; padding-left: 1rem; font-size: .75rem; line-height: 1rem; }
+.sidebar-section-label { padding: .75rem .75rem .35rem; color: hsl(var(--sidebar-foreground) / .48); font-family: var(--app-font-mono); font-size: .62rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.sidebar-section-label + .nav-item { margin-top: .1rem; }
 .card-surface { background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); border-radius: .9rem; box-shadow: var(--shadow-soft); }
 .card-surface > .border-b { border-color: hsl(var(--border)); }
 .page-pad { padding-top: 1.75rem; padding-bottom: 3.5rem; }
@@ -208,4 +210,5 @@ body { min-width: 320px; }
   .modal-footer > button { width: 100%; justify-content: center; }
   .table-scroll { margin-inline: -1px; }
   .table-scroll table { min-width: 760px; }
+  .sidebar-section-label { padding-top: .9rem; }
 }

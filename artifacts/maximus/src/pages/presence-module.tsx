@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { createPresenceApi, type PresenceItem } from '@/lib/presence-api';
 import type { Employee, OrgNode } from '@/lib/store';
 
@@ -51,10 +52,11 @@ function Panel({ title, children, action }: { title: string; children: React.Rea
 }
 function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { text?: string }) { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }
 
-export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean }) {
+export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, singleModuleNavigation = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; singleModuleNavigation?: boolean }) {
   const api = useMemo(() => createPresenceApi(companyId), [companyId]);
   const [items, setItems] = useState<PresenceItem[]>([]);
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [location] = useLocation();
   const [date, setDate] = useState(today());
   const [period, setPeriod] = useState('day');
   const [sector, setSector] = useState('');
@@ -67,6 +69,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [selected, setSelected] = useState<PresenceItem | null>(null);
   const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
   useEffect(() => { void refresh(); }, [api]);
+  useEffect(() => {
+    const requested = new URLSearchParams(location.split('?')[1] ?? '').get('tab') as Tab | null;
+    if (requested && tabs.some(([id]) => id === requested)) setTab(requested);
+  }, [location]);
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
   const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
@@ -119,7 +125,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   };
   return <div className="space-y-5">
     <div className="card-surface rounded-2xl p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-1 text-2xl font-bold">Le rythme de vos équipes, en clair.</h1><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
-     <nav aria-label="Menu Gestion des Présences" className="module-tabs mt-5 flex gap-1.5 overflow-x-auto border-t pt-4">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold ${tab === id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={16} />{label}</button>)}</nav></div>
+      {!singleModuleNavigation && <nav aria-label="Menu Gestion des Présences" className="module-tabs mt-5 flex gap-1.5 overflow-x-auto border-t pt-4">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold ${tab === id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={16} />{label}</button>)}</nav>}</div>
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">{error}<button onClick={() => setError('')}><X size={16} /></button></div>}
     {loading ? <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-48 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-48 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div> : render()}
     {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrect} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}

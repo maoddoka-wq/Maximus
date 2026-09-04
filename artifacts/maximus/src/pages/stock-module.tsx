@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { createStockApi, type StockApi, type StockBootstrap, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
@@ -37,9 +38,10 @@ const useStockApi = () => {
 };
 const useStockAccess = () => useContext(StockAccessContext);
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]> }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [location] = useLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -63,6 +65,10 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
       setTab(tabs.find(([id]) => stockPermissions[id]?.includes('voir'))?.[0] ?? 'dashboard');
     }
   }, [data, stockPermissions, tab]);
+  useEffect(() => {
+    const requested = new URLSearchParams(location.split('?')[1] ?? '').get('tab') as Tab | null;
+    if (requested && tabs.some(([id]) => id === requested) && (!stockPermissions || stockPermissions[requested]?.includes('voir'))) setTab(requested);
+  }, [location, stockPermissions]);
 
   if (loading) return <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-44 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-3"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-52 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>;
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
@@ -75,8 +81,8 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   return <StockApiContext.Provider value={api}><StockAccessContext.Provider value={{ canCreate: Boolean(currentCanCreate), canModify: Boolean(currentCanModify) }}><div className="space-y-5">
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2">
-        <nav aria-label="Menu gestion de stock" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1">{tabs.filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id)).map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={17} />{label}</button>)}</nav>
+       <div className={`flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 ${singleModuleNavigation ? 'justify-end' : ''}`}>
+         {!singleModuleNavigation && <nav aria-label="Menu gestion de stock" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1">{tabs.filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id)).map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={17} />{label}</button>)}</nav>}
         <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
       </div>
       <div data-stock-can-create={currentCanCreate} data-stock-can-modify={currentCanModify}>
