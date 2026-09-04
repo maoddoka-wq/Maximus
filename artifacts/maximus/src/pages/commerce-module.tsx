@@ -35,7 +35,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Sale, Status, StoreData } from '@/lib/store';
-import { money, shortMoney, uid } from '@/lib/store';
+import { addNotification, getVisibleNotifications, money, shortMoney, uid } from '@/lib/store';
 import { useQueryTab } from '@/lib/query-tab';
 
 type Icon = ComponentType<{ size?: number; className?: string }>;
@@ -181,7 +181,7 @@ export default function CommerceModulePage({
   const validatedSales = data.sales.filter(sale => sale.status === 'VALIDÉ');
   const revenue = validatedSales.reduce((sum, sale) => sum + sale.amount, 0);
   const lowStock = data.products.filter(product => product.stock <= product.threshold);
-  const unread = data.notifications.filter(notification => !notification.read).length;
+  const unread = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(notification => !notification.read).length;
   const visibleTabs = tabs;
 
   return <div className="space-y-5" data-testid="commerce-module">
@@ -209,7 +209,7 @@ export default function CommerceModulePage({
     </section>
     {tab !== 'dashboard' && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative block max-w-xl flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input data-testid="input-commerce-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher dans cet espace..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label><button type="button" onClick={() => setState(readState(companyId))} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold hover:bg-[hsl(var(--muted))]"><RefreshCw size={14} />Actualiser</button></div>}
     {tab === 'dashboard' && <Dashboard data={data} state={state} lowStock={lowStock} revenue={revenue} onTab={navigateTab} />}
-     {tab === 'sales' && <SalesPageFunctional data={data} query={query} mutate={mutate} canCreate={canCreate} canModify={canModify} taxRate={Number(state.settings.taxRate) || 0} />}
+     {tab === 'sales' && <SalesPageFunctional data={data} query={query} mutate={mutate} canCreate={canCreate} canModify={canModify} taxRate={Number(state.settings.taxRate) || 0} companyId={companyId} />}
      {tab === 'products' && <ProductsPageComplete data={data} query={query} mutate={mutate} canCreate={canCreate} canModify={canModify} />}
      {tab === 'clients' && <ClientsPageComplete state={state} query={query} canCreate={canCreate} canModify={canModify} onUpdate={updateState} />}
      {tab === 'suppliers' && <SuppliersPageComplete data={data} query={query} canCreate={canCreate} canModify={canModify} mutate={mutate} />}
@@ -220,7 +220,7 @@ export default function CommerceModulePage({
      {tab === 'invoices' && <InvoicesPageComplete data={data} query={query} onToast={setToast} />}
      {tab === 'returns' && <ReturnsPageComplete data={data} state={state} query={query} canCreate={canCreate} canModify={canModify} mutate={mutate} onUpdate={updateState} />}
     {tab === 'reports' && <ReportsPage data={data} state={state} />}
-    {tab === 'notifications' && <NotificationsPage data={data} mutate={mutate} query={query} />}
+    {tab === 'notifications' && <NotificationsPage data={data} mutate={mutate} query={query} companyId={companyId} />}
     {tab === 'activity' && <ActivityPage data={data} query={query} />}
     {tab === 'team' && <TeamPage data={data} query={query} canModify={canModify} onToast={setToast} onNavigate={onNavigate} />}
     {tab === 'settings' && <SettingsPage state={state} canModify={canModify} onUpdate={updateState} />}
@@ -245,7 +245,7 @@ function Dashboard({ data, state, lowStock, revenue, onTab }: { data: StoreData;
   </div>;
 }
 
-function SalesPageComplete({ data, query, mutate, canCreate, canModify }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; onToast: (message: string) => void }) {
+function SalesPageComplete({ data, query, mutate, canCreate, canModify, companyId }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; companyId: string; onToast?: (message: string) => void }) {
   const [modal, setModal] = useState<Sale | 'new' | null>(null);
   const [client, setClient] = useState('');
   const [amount, setAmount] = useState('');
@@ -298,9 +298,13 @@ function SalesPageComplete({ data, query, mutate, canCreate, canModify }: { data
         if (product) {
           product.stock -= item.quantity;
           draft.movements.unshift({ id: uid('movement'), product: product.name, quantity: item.quantity, type: 'SORTIE', date: 'À l’instant', user: 'Utilisateur actuel', location: 'Boutique principale' });
+          if (product.stock <= product.threshold) {
+            addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/kora/stocks?tab=products' });
+          }
         }
       });
       draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente', module: 'Gestion commerciale', object: sale.reference, date: 'À l’instant', status: 'VALIDÉ' });
+      addNotification(draft, { title: 'Vente validée', text: `La vente ${sale.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/kora/commerce?tab=sales' });
     }, 'Vente validée et stock mis à jour.');
   };
   const remove = (sale: Sale) => {
@@ -439,7 +443,7 @@ function ReturnsPageComplete({ data, state, query, canCreate, canModify, mutate,
   return <div className="space-y-5"><Panel title="Retours & avoirs" description="Centralisez les retours clients et les avoirs fournisseurs avec un contrôle avant confirmation." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouveau retour</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Dossiers" value={String(state.returns.length)} detail="Retours enregistrés" icon={ArrowUpRight} /><Metric label="Montant total" value={money(state.returns.reduce((sum, item) => sum + item.amount, 0))} detail="Avoirs compris" icon={CircleDollarSign} warning /><Metric label="À confirmer" value={String(state.returns.filter(item => item.status === 'BROUILLON').length)} detail="Contrôle requis" icon={ClipboardList} /></div></Panel><Panel title="Historique des retours"><DataTable headers={['Référence', 'Type', 'Partenaire', 'Article', 'Montant', 'Date', 'Statut', 'Actions']} rows={returns.map(item => [<strong key={item.id}>{item.reference}</strong>, item.type, item.partner, item.productId ? `${data.products.find(product => product.id === item.productId)?.name ?? 'Article'} × ${item.quantity ?? 0}` : '—', money(item.amount), item.date, <StatusBadge key={`${item.id}-status`} status={item.status} />, <div className="flex gap-1">{item.status === 'BROUILLON' && canModify && <button type="button" onClick={() => confirm(item)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Confirmer</button>}{item.status === 'BROUILLON' && canModify && <button type="button" onClick={() => remove(item)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div>])} /></Panel>{modal && <Modal title="Nouveau retour ou avoir" onClose={() => setModal(false)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Partenaire" value={form.partner} onChange={value => setForm(current => ({ ...current, partner: value }))} /><Field label="Montant" value={form.amount} onChange={value => setForm(current => ({ ...current, amount: value }))} type="number" /><label className="block text-xs font-bold sm:col-span-2">Type<select value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value as ReturnRecord['type'] }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm font-normal"><option value="RETOUR CLIENT">Retour client</option><option value="AVOIR FOURNISSEUR">Avoir fournisseur</option></select></label><label className="block text-xs font-bold">Article lié<select value={form.productId} onChange={event => setForm(current => ({ ...current, productId: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm font-normal"><option value="">Aucun article lié</option>{data.products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><Field label="Quantité" value={form.quantity} onChange={value => setForm(current => ({ ...current, quantity: value }))} type="number" /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}>Enregistrer le brouillon</Button></div></Modal>}</div>;
 }
 
-function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRate }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; taxRate: number }) {
+function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRate, companyId }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; taxRate: number; companyId: string }) {
   const [modal, setModal] = useState<Sale | 'new' | null>(null);
   const [client, setClient] = useState('');
   const [manualAmount, setManualAmount] = useState('');
@@ -487,10 +491,15 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
       target.status = 'VALIDÉ';
       target.items.forEach(item => {
         const product = draft.products.find(candidate => candidate.id === item.productId);
-        if (product) { product.stock -= item.quantity; draft.movements.unshift({ id: uid('movement'), product: product.name, quantity: item.quantity, type: 'SORTIE', date: 'À l’instant', user: 'Utilisateur actuel', location: 'Boutique principale' }); }
+        if (product) {
+          product.stock -= item.quantity;
+          draft.movements.unshift({ id: uid('movement'), product: product.name, quantity: item.quantity, type: 'SORTIE', date: 'À l’instant', user: 'Utilisateur actuel', location: 'Boutique principale' });
+          if (product.stock <= product.threshold) addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/kora/stocks?tab=products' });
+        }
       });
       if ((target.paidAmount ?? 0) > 0) draft.payments.unshift({ id: uid('payment'), reference: `PAY-${Date.now().toString().slice(-6)}`, invoice: `FAC-${target.reference.replace('VTE-', '')}`, amount: target.paidAmount ?? 0, status: 'CONFIRMÉ', date: 'À l’instant' });
       draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente', module: 'Gestion commerciale', object: target.reference, date: 'À l’instant', status: 'VALIDÉ' });
+      addNotification(draft, { title: 'Vente validée', text: `La vente ${target.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/kora/commerce?tab=sales' });
     }, 'Vente validée, encaissement enregistré et stock mis à jour.');
   };
   const remove = (sale: Sale) => { if (!window.confirm(`Supprimer le brouillon ${sale.reference} ?`)) return; mutate(draft => { draft.sales = draft.sales.filter(item => item.id !== sale.id); }, 'Vente supprimée.'); };
@@ -616,8 +625,8 @@ function ReportsPage({ data, state }: { data: StoreData; state: CommerceState })
   return <div className="space-y-5"><Panel title="Rapports" description="Des indicateurs simples pour décider plus vite." action={<Button primary onClick={exportCsv}><FileDown size={15} />Exporter CSV</Button>}><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Stock valorisé" value={money(data.products.reduce((sum, item) => sum + item.stock * item.price, 0))} detail="Au prix de vente" icon={Boxes} /><Metric label="Dépenses" value={money(state.expenses.reduce((sum, item) => sum + item.amount, 0))} detail="Sorties enregistrées" icon={ArrowDownToLine} warning /><Metric label="Commandes" value={String(data.purchaseOrders.length)} detail="Fournisseurs" icon={ClipboardList} /></div></Panel><div className="grid gap-5 lg:grid-cols-2"><Panel title="Ventes par statut"><DataTable headers={['Statut', 'Nombre', 'Montant']} rows={(['VALIDÉ', 'BROUILLON', 'EN ATTENTE'] as Status[]).map(status => [<StatusBadge key={status} status={status} />, String(data.sales.filter(item => item.status === status).length), money(data.sales.filter(item => item.status === status).reduce((sum, item) => sum + item.amount, 0))])} /></Panel><Panel title="Top produits"><DataTable headers={['Produit', 'Stock', 'Valeur']} rows={data.products.slice().sort((a, b) => b.stock * b.price - a.stock * a.price).slice(0, 5).map(item => [<strong key={item.id}>{item.name}</strong>, String(item.stock), money(item.stock * item.price)])} /></Panel></div></div>;
 }
 
-function NotificationsPage({ data, mutate, query }: { data: StoreData; mutate: (fn: (draft: StoreData) => void, message?: string) => void; query: string }) {
-  const notifications = data.notifications.filter(item => `${item.title} ${item.text}`.toLowerCase().includes(query.toLowerCase()));
+function NotificationsPage({ data, mutate, query, companyId }: { data: StoreData; mutate: (fn: (draft: StoreData) => void, message?: string) => void; query: string; companyId: string }) {
+  const notifications = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(item => `${item.title} ${item.text}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="space-y-5"><Panel title="Notifications" description="Les alertes commerciales et opérationnelles de votre entreprise."><div className="space-y-3">{notifications.map(item => <div key={item.id} className={`flex items-start justify-between gap-4 rounded-xl border p-4 ${item.read ? '' : 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'}`}><div className="flex gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)]"><Bell size={16} /></span><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{item.text}</p><p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">{item.date}</p></div></div>{!item.read && <button type="button" onClick={() => mutate(draft => { const notification = draft.notifications.find(candidate => candidate.id === item.id); if (notification) notification.read = true; }, 'Notification marquée comme lue.')} className="shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold">Marquer lue</button>}</div>)}{notifications.length === 0 && <Empty text="Aucune notification trouvée." />}</div></Panel></div>;
 }
 

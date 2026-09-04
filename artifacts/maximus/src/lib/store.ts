@@ -37,7 +37,22 @@ export interface CrmOpportunity { id: string; client: string; contact: string; s
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; }
 export interface Delivery { id: string; reference: string; recipient: string; destination: string; driver: string; date: string; status: Status; }
 export interface BusinessDocument { id: string; name: string; category: string; owner: string; updatedAt: string; version: number; status: Status; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: { id: string; title: string; text: string; read: boolean; date: string }[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; removedModules?: ModuleId[]; }
+export type NotificationAudience = 'all' | 'admin' | 'company';
+export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
+export interface AppNotification {
+  id: string;
+  title: string;
+  text: string;
+  read: boolean;
+  date: string;
+  audience?: NotificationAudience;
+  companyId?: string;
+  module?: ModuleId;
+  severity?: NotificationSeverity;
+  href?: string;
+}
+export interface NotificationContext { isAdmin: boolean; companyId?: string; }
+export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; orgNodes: OrgNode[]; notifications: AppNotification[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; removedModules?: ModuleId[]; }
 export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
 
 const today = new Date().toISOString();
@@ -139,9 +154,9 @@ export function seedData(): StoreData {
       { id: 'kora-service-rh', companyId: 'kora', code: 'RH', name: 'Service ressources humaines', type: 'service', parentId: 'kora-sector-support', moduleIds: ['rh', 'presences', 'paie'] },
     ],
     notifications: [
-      { id: 'n-1', title: 'Stock à surveiller', text: 'Huile d’arachide 1L est sous son seuil de sécurité.', read: false, date: 'Il y a 18 min' },
-      { id: 'n-2', title: 'Paiement confirmé', text: 'Le paiement PAY-09281 a été enregistré.', read: false, date: 'Il y a 24 min' },
-      { id: 'n-3', title: 'Rapport disponible', text: 'Votre rapport hebdomadaire est prêt.', read: true, date: 'Hier' },
+      { id: 'n-1', title: 'Stock à surveiller', text: 'Huile d’arachide 1L est sous son seuil de sécurité.', read: false, date: 'Il y a 18 min', audience: 'company', companyId: 'kora', module: 'stocks', severity: 'warning', href: '/kora/stocks?tab=products' },
+      { id: 'n-2', title: 'Paiement confirmé', text: 'Le paiement PAY-09281 a été enregistré.', read: false, date: 'Il y a 24 min', audience: 'company', companyId: 'kora', module: 'finance', severity: 'success', href: '/kora/commerce?tab=cash' },
+      { id: 'n-3', title: 'Rapport disponible', text: 'Votre rapport hebdomadaire est prêt.', read: true, date: 'Hier', audience: 'all', module: 'rapports', severity: 'info', href: '/kora/rapports' },
     ],
     purchaseOrders: [
       { id: 'po-1', reference: 'BC-2406-041', supplier: 'SENARIZ SA', subject: 'Riz local 5 kg · réassort', amount: 612000, date: '18 juin 2024', status: 'VALIDÉ' },
@@ -247,6 +262,11 @@ export function loadData(): StoreData {
     return {
       ...initial,
       ...storedData,
+      notifications: (parsed.notifications ?? initial.notifications).map(notification => ({
+        ...notification,
+        audience: notification.audience ?? 'all',
+        severity: notification.severity ?? 'info',
+      })),
       catalogVersion: 2,
        organizationVersion: 7,
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
@@ -292,3 +312,25 @@ export function saveData(data: StoreData) { localStorage.setItem('maximus-data-v
 export function uid(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 export const money = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n) + ' FCFA';
 export const shortMoney = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
+
+export function getVisibleNotifications(notifications: AppNotification[], context: NotificationContext) {
+  return notifications.filter(notification => {
+    if (context.isAdmin) return true;
+    if (notification.audience === 'admin') return false;
+    return !notification.companyId || notification.companyId === context.companyId;
+  });
+}
+
+export function addNotification(draft: StoreData, input: Omit<Partial<AppNotification>, 'read' | 'title' | 'text'> & Pick<AppNotification, 'title' | 'text'>) {
+  draft.notifications.unshift({
+    ...input,
+    id: input.id ?? uid('notification'),
+    title: input.title,
+    text: input.text,
+    read: false,
+    date: input.date ?? 'À l’instant',
+    audience: input.audience ?? 'all',
+    severity: input.severity ?? 'info',
+  });
+  draft.notifications = draft.notifications.slice(0, 100);
+}
