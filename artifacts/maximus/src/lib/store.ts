@@ -56,6 +56,18 @@ export const modules: Module[] = [
   { id: 'documents', name: 'Documents', description: 'Classement et circulation des documents métier.', features: ['Classement', 'Partage', 'Versions'], status: 'ACTIF' },
   { id: 'rapports', name: 'Rapports', description: 'Synthèses et indicateurs pour décider plus vite.', features: ['Rapports métier', 'Filtres', 'Exports'], status: 'ACTIF' },
 ];
+export const stockSubmodules = [
+  { id: 'dashboard', name: 'Tableau de bord' },
+  { id: 'products', name: 'Articles' },
+  { id: 'entries', name: 'Entrées de stock' },
+  { id: 'exits', name: 'Sorties de stock' },
+  { id: 'requests', name: 'Demandes' },
+  { id: 'inventory', name: 'Inventaire' },
+  { id: 'reports', name: 'Rapports' },
+  { id: 'references', name: 'Référentiels' },
+  { id: 'users', name: 'Utilisateurs' },
+  { id: 'settings', name: 'Paramètres' },
+] as const;
 export const sectorPresets: SectorPreset[] = [
   { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'] },
   { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique', 'commerce'] },
@@ -66,7 +78,7 @@ export const sectorPresets: SectorPreset[] = [
 export function seedData(): StoreData {
   return {
     catalogVersion: 2,
-    organizationVersion: 4,
+    organizationVersion: 7,
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
@@ -77,14 +89,15 @@ export function seedData(): StoreData {
       { id: 'demo-emp-awa', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa.ndiaye@kora.demo', phone: '+221 77 640 28 91', position: 'Gestionnaire commerciale', department: 'Commerce', subDepartment: 'Ventes', role: 'Vendeuse', status: 'ACTIF', loginPassword: 'AwaKora2026!', companyId: 'kora', sectorId: 'kora-service-vente', roleId: 'kora-role-vendeur' },
       { id: 'demo-emp-ibrahima', firstName: 'Ibrahima', lastName: 'Kane', email: 'ibrahima.kane@kora.demo', phone: '+221 76 512 44 08', position: 'Responsable magasin', department: 'Opérations', subDepartment: 'Stock & logistique', role: 'Magasinier', status: 'ACTIF', loginPassword: 'IbrahimaKora2026!', companyId: 'kora', sectorId: 'kora-service-stock', roleId: 'kora-role-magasinier' },
       { id: 'demo-emp-ndeye', firstName: 'Ndeye', lastName: 'Sarr', email: 'ndeye.sarr@kora.demo', phone: '+221 78 304 19 62', position: 'Assistante RH', department: 'Ressources humaines', subDepartment: 'Administration du personnel', role: 'Gestionnaire RH', status: 'ACTIF', loginPassword: 'NdeyeKora2026!', companyId: 'kora', sectorId: 'kora-service-rh', roleId: 'kora-role-rh' },
-      { id: 'demo-emp-mamadou', firstName: 'Mamadou', lastName: 'Ba', email: 'mamadou.ba@kora.demo', phone: '+221 76 805 17 44', position: 'Comptable', department: 'Finance', subDepartment: 'Comptabilité', role: 'Comptable', status: 'ACTIF', loginPassword: 'MamadouKora2026!', companyId: 'kora', sectorId: 'kora-service-finance', roleId: 'kora-role-comptable' },
+      { id: 'demo-emp-mamadou', firstName: 'Mamadou', lastName: 'Ba', email: 'mamadou.ba@kora.demo', phone: '+221 76 805 17 44', position: 'Comptable', department: 'Finance', subDepartment: 'Comptabilité', role: 'Comptable', status: 'ACTIF', loginPassword: 'MamadouKora2026!', isSectorAdmin: true, companyId: 'kora', sectorId: 'kora-service-finance', roleId: 'kora-role-comptable' },
     ],
     roles: [
       { id: 'kora-role-vendeur', name: 'Vendeur', description: 'Gère les clients, les devis et les commandes.', companyId: 'kora', sectorId: 'kora-service-vente', modulePermissions: { commerce: ['voir', 'créer', 'modifier'], ventes: ['voir', 'créer', 'modifier'], crm: ['voir', 'créer'] } },
-      { id: 'kora-role-magasinier', name: 'Magasinier', description: 'Suit les articles, mouvements, fournisseurs et livraisons.', companyId: 'kora', sectorId: 'kora-service-stock', modulePermissions: { stocks: ['voir', 'créer', 'modifier'], achats: ['voir', 'créer'], fournisseurs: ['voir', 'créer', 'modifier'], logistique: ['voir', 'créer', 'modifier'] } },
+      { id: 'kora-role-magasinier', name: 'Magasinier', description: 'Consulte toute la gestion de stock et réalise les opérations de son périmètre.', companyId: 'kora', sectorId: 'kora-service-stock', modulePermissions: { stocks: ['voir'], 'stocks:dashboard': ['voir'], 'stocks:products': ['voir', 'créer', 'modifier'], 'stocks:entries': ['voir', 'créer', 'modifier'], 'stocks:exits': ['voir', 'créer', 'modifier'], 'stocks:requests': ['voir', 'créer', 'modifier'], 'stocks:inventory': ['voir', 'modifier'], 'stocks:reports': ['voir'], 'stocks:references': ['voir'], 'stocks:users': ['voir'], 'stocks:settings': ['voir'], achats: ['voir', 'créer'], fournisseurs: ['voir'], logistique: ['voir'] } },
       { id: 'kora-role-rh', name: 'Gestionnaire RH', description: 'Suit les collaborateurs, présences et éléments de paie.', companyId: 'kora', sectorId: 'kora-service-rh', modulePermissions: { rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer', 'modifier'], paie: ['voir', 'créer'] } },
       { id: 'kora-role-comptable', name: 'Comptable', description: 'Prépare les écritures, paiements et rapports financiers.', companyId: 'kora', sectorId: 'kora-service-finance', modulePermissions: { finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'], rapports: ['voir', 'créer'], documents: ['voir', 'créer'] } },
       { id: 'kora-role-manager', name: 'Manager entreprise', description: 'Pilote l’ensemble de KORA et supervise les équipes.', companyId: 'kora', sectorId: 'kora-direction', modulePermissions: { commerce: ['voir', 'créer', 'modifier'], ventes: ['voir', 'créer', 'modifier'], achats: ['voir', 'créer', 'modifier'], stocks: ['voir', 'créer', 'modifier'], finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'], rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer', 'modifier'], paie: ['voir', 'créer', 'modifier'], crm: ['voir', 'créer', 'modifier'], fournisseurs: ['voir', 'créer', 'modifier'], logistique: ['voir', 'créer', 'modifier'], documents: ['voir', 'créer', 'modifier'], rapports: ['voir', 'créer', 'modifier'] } },
+      { id: 'kora-role-visiteur', name: 'Visiteur', description: 'Accès visiteur sans module ni action autorisée.', companyId: 'kora', sectorId: 'kora-direction', modulePermissions: {} },
     ],
     products: [
       { id: 'p-1', sku: 'KOR-CAF-01', name: 'Café Touba 250g', category: 'Épicerie', stock: 184, threshold: 50, price: 3500 },
@@ -195,12 +208,20 @@ export function loadData(): StoreData {
     const roleSource = repairDemoAssignments || seedDemoOrganization
       ? [...initial.roles.filter(initialRole => !savedRoleSource.some(role => role.id === initialRole.id)), ...savedRoleSource]
       : savedRoleSource;
-    const roles = roleSource
+    const legacyMagasinierPermissions = initial.roles.find(role => role.id === 'kora-role-magasinier')?.modulePermissions ?? {};
+    const roles = [...roleSource, ...initial.roles.filter(initialRole => initialRole.id === 'kora-role-visiteur' && !roleSource.some(role => role.id === initialRole.id))]
       .filter(role => !removeGeneratedHierarchy || !generatedRoleIds.has(role.id))
       .map(role => ({
         ...role,
         companyId: role.companyId || 'kora',
         sectorId: removeGeneratedHierarchy && role.sectorId && generatedNodeIds.has(role.sectorId) ? undefined : role.sectorId,
+        modulePermissions: (parsed.organizationVersion ?? 1) < 7 && role.id === 'kora-role-magasinier'
+          ? {
+              ...role.modulePermissions,
+              stocks: JSON.stringify(role.modulePermissions.stocks ?? []) === JSON.stringify(['voir', 'créer', 'modifier']) ? ['voir'] : role.modulePermissions.stocks,
+              ...Object.fromEntries(Object.entries(legacyMagasinierPermissions).filter(([key]) => key.startsWith('stocks:') && !role.modulePermissions[key])),
+            }
+          : role.modulePermissions,
       })) as Role[];
 
     const rawEmployees = parsed.employees?.length ? parsed.employees : initial.employees;
@@ -208,7 +229,7 @@ export function loadData(): StoreData {
       ...initial,
       ...storedData,
       catalogVersion: 2,
-       organizationVersion: 5,
+       organizationVersion: 7,
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
@@ -235,7 +256,7 @@ export function loadData(): StoreData {
         return {
           ...employee,
           loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!',
-          isSectorAdmin: false,
+          isSectorAdmin: (parsed.organizationVersion ?? 1) < 6 && employee.email === 'mamadou.ba@kora.demo' ? true : employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false,
           companyId: employee.companyId || 'kora',
            sectorId: generatedSector ? undefined : demoSector?.id ?? employee.sectorId ?? seeded?.sectorId,
            roleId: generatedRole ? undefined : demoRole?.id ?? employee.roleId ?? seeded?.roleId,

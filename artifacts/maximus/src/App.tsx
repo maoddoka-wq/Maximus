@@ -5,7 +5,7 @@ import { Link, useLocation, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { loadData, modules, money, saveData, shortMoney, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
+import { loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
 import StockModulePage from '@/pages/stock-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
@@ -145,8 +145,19 @@ function AppContent() {
     : employeeRole && roleFitsEmployee
       ? companyAllowed.filter(moduleId => unitModules.has(moduleId) && employeeRole.modulePermissions[moduleId]?.includes('voir'))
       : [];
-  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => session === 'kora' || session.startsWith('company:') || Boolean(roleFitsEmployee && unitModules.has(moduleId) && employeeRole?.modulePermissions[moduleId]?.includes(permission));
-   const canManagePeople = session === 'kora' || session.startsWith('company:');
+  const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
+    if (session === 'kora' || session.startsWith('company:')) return true;
+    if (!roleFitsEmployee || !unitModules.has(moduleId) || !employeeRole) return false;
+    if (employeeRole.modulePermissions[moduleId]?.includes(permission)) return true;
+    return moduleId === 'stocks' && Object.entries(employeeRole.modulePermissions)
+      .filter(([key]) => key.startsWith('stocks:'))
+      .some(([, permissions]) => permissions.includes(permission));
+  };
+  const stockPermissions = employeeRole && roleFitsEmployee
+    ? Object.fromEntries(stockSubmodules.map(submodule => [submodule.id, employeeRole.modulePermissions[`stocks:${submodule.id}`]]).filter(([, permissions]) => permissions)) as Record<string, string[]>
+    : undefined;
+   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
+   const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
    const baseMeta = pageMeta[location] ?? (location.startsWith('/maximus/entreprises/') ? { kicker: 'Administration', title: 'Détail entreprise', description: 'Consultez et ajustez l’espace client sélectionné.' } : pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard']);
    const currentMeta = !isAdmin && currentCompany
      ? location === '/kora/dashboard'
@@ -162,7 +173,7 @@ function AppContent() {
           <div className="page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} companyId={companyId} employee={employee} hasPermission={hasPermission} />}
+            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} hasPermission={hasPermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} />}
           </ErrorBoundary>
         </div>
       </main>
@@ -418,7 +429,7 @@ function CompanyEditModal({ company, data, mutate, onClose }: { company: Company
   </Modal>;
 }
 
-function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, companyId, employee, hasPermission }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; companyId: string; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean }) {
+function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, hasPermission, stockPermissions }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; stockPermissions?: Record<string, string[]> }) {
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[location];
   if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
@@ -429,9 +440,11 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
   if (location === '/kora/organisation') {
     const company = data.companies.find(item => item.id === companyId);
-    return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} /> : <EmptyState title="Accès réservé à l’administrateur" text="La structure de l’entreprise est gérée depuis le compte administrateur KORA." action={() => onNavigate('/kora/dashboard')} />;
+    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise ou le manager de votre unité peut gérer l’organisation." action={() => onNavigate('/kora/dashboard')} />;
   }
-   if (location === '/kora/stocks') return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} canCreate={hasPermission('stocks', 'créer')} canModify={hasPermission('stocks', 'modifier')} />;
+   if (location === '/kora/stocks') {
+    return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} canCreate={hasPermission('stocks', 'créer')} canModify={hasPermission('stocks', 'modifier')} stockPermissions={stockPermissions} />;
+  }
   if (location === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
   if (location === '/kora/commerce') return <CommercePage data={data} mutate={mutate} />;
   if (location === '/kora/ventes') return <CommercePage data={data} mutate={mutate} />;

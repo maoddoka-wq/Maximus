@@ -3,7 +3,7 @@ import {
   Building2, Users, KeyRound, LayoutGrid, ChevronDown, Plus, 
   Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight, UserRound
 } from 'lucide-react';
-import { Company, StoreData, OrgNode, Role, Employee, modules as allModules, uid, type ModuleId } from '../lib/store';
+import { Company, StoreData, OrgNode, Role, Employee, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
 
 // Helper UI components matching Maximus style
 function ActionButton({ children, onClick, primary = false, testId, icon: ButtonIcon = Plus, disabled = false, className = '' }: any) { 
@@ -42,8 +42,27 @@ function Field({ label, value, onChange, type = 'text', testId, placeholder = ''
   );
 }
 
-export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = 'overview' }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; initialTab?: 'overview' | 'structure' | 'roles' | 'employees' | 'profile' }) {
-  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees' | 'profile'>(initialTab);
+export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = 'overview', sectorManager = false, scopeNodeId }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; initialTab?: 'overview' | 'structure' | 'roles' | 'employees' | 'profile'; sectorManager?: boolean; scopeNodeId?: string }) {
+  const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
+  const scopedNodeIds = new Set<string>();
+  if (scopeNodeId) {
+    const pending = [scopeNodeId];
+    while (pending.length) {
+      const nodeId = pending.pop();
+      if (!nodeId || scopedNodeIds.has(nodeId)) continue;
+      scopedNodeIds.add(nodeId);
+      companyNodes.filter(node => node.parentId === nodeId).forEach(node => pending.push(node.id));
+    }
+  }
+  const scopedData = sectorManager && scopeNodeId
+    ? {
+        ...data,
+        orgNodes: data.orgNodes.filter(node => !node.companyId || scopedNodeIds.has(node.id)),
+        roles: data.roles.filter(role => !role.companyId || scopedNodeIds.has(role.sectorId ?? '')),
+        employees: data.employees.filter(employee => !employee.companyId || scopedNodeIds.has(employee.sectorId ?? '')),
+      }
+    : data;
+  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees' | 'profile'>(sectorManager ? 'overview' : initialTab);
 
   const tabs = [
     { id: 'overview', label: "Vue d'ensemble" },
@@ -51,13 +70,13 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
     { id: 'roles', label: 'Rôles & Permissions' },
     { id: 'employees', label: 'Comptes Employés' },
     { id: 'profile', label: 'Mon profil' },
-  ] as const;
+  ].filter(item => !sectorManager || item.id === 'overview' || item.id === 'roles' || item.id === 'employees') as { id: 'overview' | 'structure' | 'roles' | 'employees' | 'profile'; label: string }[];
 
   return (
     <div className="space-y-6">
       <div className="card-surface p-6 rounded-2xl">
-        <h1 className="text-xl font-bold">Modèle d'Accès & Organisation : {company.name}</h1>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Construisez librement votre hiérarchie : Unité → Modules → Rôle → Employé.</p>
+        <h1 className="text-xl font-bold">{sectorManager ? 'Règles d’accès de mon unité' : `Modèle d'Accès & Organisation : ${company.name}`}</h1>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sectorManager ? 'Définissez les modules et actions autorisés aux employés rattachés à votre unité.' : 'Construisez librement votre hiérarchie : Unité → Modules → Rôle → Employé.'}</p>
         <div className="mt-6 flex gap-2 overflow-x-auto">
           {tabs.map(item => (
             <button key={item.id} data-testid={`tab-${item.id}`} onClick={() => setTab(item.id)} className={`shrink-0 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}>
@@ -67,11 +86,11 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
         </div>
       </div>
 
-      {tab === 'overview' && <OverviewTab company={company} data={data} setTab={setTab} />}
-      {tab === 'structure' && <StructureTab company={company} data={data} mutate={mutate} />}
-      {tab === 'roles' && <RolesTab company={company} data={data} mutate={mutate} />}
-      {tab === 'employees' && <EmployeesTab company={company} data={data} mutate={mutate} />}
-      {tab === 'profile' && <CompanyProfileSection company={company} data={data} mutate={mutate} />}
+      {tab === 'overview' && <OverviewTab company={company} data={scopedData} setTab={setTab} />}
+      {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
+      {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
+      {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
+      {tab === 'profile' && !sectorManager && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}
     </div>
   );
 }
@@ -658,19 +677,43 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
           {availableModules.map(m => {
             const perms = formData.modulePermissions[m.id] || [];
             return (
-              <div key={m.id} className="p-3 border rounded-lg flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold">{m.name}</p>
-                  <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{m.description}</p>
+              <div key={m.id} className="space-y-2">
+                <div className="p-3 border rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold">{m.name}</p>
+                    <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{m.description}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(['voir', 'créer', 'modifier'] as const).map(p => (
+                      <label key={p} className={`text-[10px] font-bold px-2 py-1 rounded cursor-pointer transition ${perms.includes(p) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted-foreground)/.2)]'}`}>
+                        <input type="checkbox" className="hidden" checked={perms.includes(p)} onChange={() => togglePermission(m.id, p)} />
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {(['voir', 'créer', 'modifier'] as const).map(p => (
-                    <label key={p} className={`text-[10px] font-bold px-2 py-1 rounded cursor-pointer transition ${perms.includes(p) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted-foreground)/.2)]'}`}>
-                      <input type="checkbox" className="hidden" checked={perms.includes(p)} onChange={() => togglePermission(m.id, p)} />
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </label>
-                  ))}
-                </div>
+                {m.id === 'stocks' && <div className="ml-3 rounded-lg border border-dashed p-3">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Sous-fonctions de Gestion de stock</p>
+                  <p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Ces règles priment sur les droits généraux du module pour les employés de cette unité.</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {stockSubmodules.map(submodule => {
+                      const subKey = `stocks:${submodule.id}`;
+                      const subPerms = formData.modulePermissions[subKey] || [];
+                      return <div key={subKey} className="flex items-center justify-between gap-2 rounded-md bg-[hsl(var(--muted)/.45)] px-2.5 py-2">
+                        <span className="text-[10px] font-semibold">{submodule.name}</span>
+                        <div className="flex gap-1">
+                          {(['voir', 'créer', 'modifier'] as const).map(permission => <label key={permission} className={`cursor-pointer rounded px-1.5 py-1 text-[9px] font-bold ${subPerms.includes(permission) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--card))]'}`}>
+                            <input type="checkbox" className="hidden" checked={subPerms.includes(permission)} onChange={() => {
+                              togglePermission(subKey, permission);
+                              if (!formData.modulePermissions.stocks?.includes('voir')) togglePermission('stocks', 'voir');
+                            }} />
+                            {permission === 'voir' ? 'Voir' : permission === 'créer' ? 'Créer' : 'Modifier'}
+                          </label>)}
+                        </div>
+                      </div>;
+                    })}
+                  </div>
+                </div>}
               </div>
             );
           })}
@@ -687,7 +730,7 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
 }
 
 // 4. EMPLOYEES TAB
-function EmployeesTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
+function EmployeesTab({ company, data, mutate, allowSectorAdmin = true }: { company: Company, data: StoreData, mutate: any; allowSectorAdmin?: boolean }) {
   const companyEmployees = data.employees.filter((e: Employee) => e.companyId === company.id);
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
   const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
@@ -762,7 +805,7 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
         </table>
       </div>
 
-      {modalOpen && <Modal title={editingEmployee ? 'Modifier un employé' : 'Ajouter un employé'} onClose={() => setModalOpen(false)}><EmployeeFormModal company={company} initialData={editingEmployee} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} onClose={() => setModalOpen(false)} onSave={(empData: any) => {
+      {modalOpen && <Modal title={editingEmployee ? 'Modifier un employé' : 'Ajouter un employé'} onClose={() => setModalOpen(false)}><EmployeeFormModal company={company} initialData={editingEmployee} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} allowSectorAdmin={allowSectorAdmin} onClose={() => setModalOpen(false)} onSave={(empData: any) => {
         mutate((d: StoreData) => {
           const sector = d.orgNodes.find(node => node.id === empData.sectorId);
           const parent = sector?.parentId ? d.orgNodes.find(node => node.id === sector.parentId) : null;
@@ -782,7 +825,7 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
   );
 }
 
-function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmployees, onClose, onSave }: { company: Company, initialData: Employee | null, allNodes: OrgNode[], allRoles: Role[], allEmployees: Employee[], onClose: () => void, onSave: (d: any) => void }) {
+function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmployees, allowSectorAdmin = true, onClose, onSave }: { company: Company, initialData: Employee | null, allNodes: OrgNode[], allRoles: Role[], allEmployees: Employee[], allowSectorAdmin?: boolean, onClose: () => void, onSave: (d: any) => void }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     firstName: initialData?.firstName || '',
@@ -792,6 +835,7 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
     position: initialData?.position || '',
     sectorId: initialData?.sectorId || (allNodes.length > 0 ? allNodes[0].id : ''),
     roleId: initialData?.roleId || '',
+    isSectorAdmin: initialData?.isSectorAdmin ?? false,
     password: '',
     passwordConfirm: ''
   });
@@ -879,6 +923,10 @@ function EmployeeFormModal({ company, initialData, allNodes, allRoles, allEmploy
           <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-1">Rôles de l’unité sélectionnée et de ses unités parentes.</p>
         </label>
       </div>
+      {allowSectorAdmin && <label className="mt-4 flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold">
+        <input type="checkbox" checked={formData.isSectorAdmin} onChange={e => setFormData({ ...formData, isSectorAdmin: e.target.checked })} className="mt-0.5" />
+        <span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Autorise ce compte à définir les rôles, permissions et employés de son unité uniquement.</small></span>
+      </label>}
 
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
         <button onClick={onClose} className="px-4 py-2 text-sm font-bold border rounded-lg hover:bg-[hsl(var(--muted))]">Annuler</button>
