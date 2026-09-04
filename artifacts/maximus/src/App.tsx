@@ -12,10 +12,21 @@ import CommerceModulePage from '@/pages/commerce-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
 import PresenceModulePage from '@/pages/presence-module';
-import { commerceTabDefinitions, hasCommerceTabPermission, hasDetailedCommercePermissions, type CommerceTabId } from '@/lib/commerce-permissions';
+import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
+import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
+import { adminNav, koraNav, type Icon, type Session, type SidebarFeature, type SidebarFeatureGroup } from '@/lib/navigation';
+import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
+import {
+  employeeHasPresencePermission,
+  employeeRoleMatchesUnit,
+  getCommerceTabIds,
+  getEmployeeAncestry,
+  getStockPermissions,
+  roleHasPermission,
+  type PresencePermission,
+} from '@/lib/employee-permissions';
 
 const queryClient = new QueryClient();
-type Icon = typeof Gauge;
 const moduleIcons: Record<ModuleId, Icon> = {
   commerce: ShoppingCart,
   ventes: CreditCard,
@@ -32,41 +43,6 @@ const moduleIcons: Record<ModuleId, Icon> = {
   documents: FolderKanban,
   rapports: FileBarChart,
 };
-type Session = 'admin' | 'kora' | `employee:${string}` | `company:${string}`;
-
-const adminNav = [
-  { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
-  { href: '/maximus/entreprises', label: 'Entreprises', icon: Building2 },
-  { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
-  { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },
-  { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
-  { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
-  { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
-  { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
-];
-const koraNav = [
-  { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
-  { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
-  { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
-  { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
-  { href: '/kora/stocks', label: 'Gestion de stock', icon: Boxes, module: 'stocks' },
-  { href: '/kora/finance', label: 'Finance', icon: WalletCards, module: 'finance' },
-  { href: '/kora/comptabilite', label: 'Comptabilité', icon: FileBarChart, module: 'comptabilite' },
-  { href: '/kora/rh', label: 'Ressources humaines', icon: UserRoundCog, module: 'rh' },
-  { href: '/kora/presences', label: 'Présences', icon: FileClock, module: 'presences' },
-  { href: '/kora/paie', label: 'Paie', icon: CreditCard, module: 'paie' },
-  { href: '/kora/crm', label: 'CRM / Clients', icon: Users, module: 'crm' },
-  { href: '/kora/fournisseurs', label: 'Fournisseurs', icon: Store, module: 'fournisseurs' },
-  { href: '/kora/logistique', label: 'Logistique', icon: Package, module: 'logistique' },
-  { href: '/kora/documents', label: 'Documents', icon: FolderKanban, module: 'documents' },
-  { href: '/kora/rapports', label: 'Rapports', icon: FileBarChart, module: 'rapports' },
-];
-type SidebarFeature = { href: string; label: string; icon: Icon };
-type SidebarFeatureGroup = { label: string; items: SidebarFeature[] };
-const featureSlug = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9à-ÿ]+/gi, '-').replace(/^-|-$/g, '');
-const permissionFeatureKey = (moduleId: ModuleId, feature: string) => `${moduleId}:menu:${featureSlug(feature)}`;
-
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': { kicker: 'Cockpit MAXIMUS', title: 'Bonjour, équipe MAXIMUS.', description: 'Voici ce qui mérite votre attention aujourd’hui.' },
   '/maximus/entreprises': { kicker: 'Administration', title: 'Entreprises', description: 'Pilotez les espaces clients et leurs accès modules.' },
@@ -96,73 +72,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/kora/documents': { kicker: 'Espace KORA', title: 'Documents', description: 'Classement, partage et suivi des versions.' },
   '/kora/rapports': { kicker: 'Espace KORA', title: 'Rapports', description: 'Des synthèses actionnables pour décider plus vite.' },
 };
-
-const hexColorPattern = /^#[0-9a-f]{6}$/i;
-const themeVariableNames = ['--primary', '--primary-foreground', '--accent', '--accent-foreground', '--ring', '--sidebar', '--sidebar-foreground', '--sidebar-border', '--sidebar-primary', '--sidebar-primary-foreground', '--sidebar-accent', '--sidebar-accent-foreground'];
-
-function hexToHsl(hex: string) {
-  const red = Number.parseInt(hex.slice(1, 3), 16) / 255;
-  const green = Number.parseInt(hex.slice(3, 5), 16) / 255;
-  const blue = Number.parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(red, green, blue);
-  const min = Math.min(red, green, blue);
-  const lightness = (max + min) / 2;
-  if (max === min) return `0 0% ${Math.round(lightness * 100)}%`;
-  const difference = max - min;
-  const saturation = lightness > 0.5 ? difference / (2 - max - min) : difference / (max + min);
-  let hue = 0;
-  if (max === red) hue = ((green - blue) / difference + (green < blue ? 6 : 0)) / 6;
-  else if (max === green) hue = ((blue - red) / difference + 2) / 6;
-  else hue = ((red - green) / difference + 4) / 6;
-  return `${Math.round(hue * 360)} ${Math.round(saturation * 100)}% ${Math.round(lightness * 100)}%`;
-}
-
-function themeForeground(hex: string) {
-  const red = Number.parseInt(hex.slice(1, 3), 16) / 255;
-  const green = Number.parseInt(hex.slice(3, 5), 16) / 255;
-  const blue = Number.parseInt(hex.slice(5, 7), 16) / 255;
-  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  return luminance > 0.62 ? '218 28% 13%' : '0 0% 100%';
-}
-
-function shiftHslLightness(hsl: string, amount: number) {
-  const match = hsl.match(/^(\d+) (\d+)% (\d+)%$/);
-  if (!match) return hsl;
-  return `${match[1]} ${match[2]}% ${Math.max(5, Math.min(95, Number(match[3]) + amount))}%`;
-}
-
-function companyThemeVariables(company: Company | undefined): Record<string, string> {
-  if (!company) return {};
-  const primary = hexColorPattern.test(company.primaryColor ?? '') ? company.primaryColor! : null;
-  const accent = hexColorPattern.test(company.accentColor ?? '') ? company.accentColor! : primary;
-  const primaryColor = primary ?? '#f2b705';
-  const accentColor = accent ?? primaryColor;
-  const sidebarColor = hexColorPattern.test(company.sidebarColor ?? '') ? company.sidebarColor! : '#161d27';
-  const sidebarHsl = hexToHsl(sidebarColor);
-  const sidebarForeground = themeForeground(sidebarColor);
-  return {
-    '--primary': hexToHsl(primaryColor),
-    '--primary-foreground': themeForeground(primaryColor),
-    '--accent': hexToHsl(accentColor),
-    '--accent-foreground': themeForeground(accentColor),
-    '--ring': hexToHsl(primaryColor),
-    '--sidebar': sidebarHsl,
-    '--sidebar-foreground': sidebarForeground,
-    '--sidebar-border': shiftHslLightness(sidebarHsl, 10),
-    '--sidebar-primary': hexToHsl(primaryColor),
-    '--sidebar-primary-foreground': themeForeground(primaryColor),
-    '--sidebar-accent': shiftHslLightness(sidebarHsl, 8),
-    '--sidebar-accent-foreground': sidebarForeground,
-  };
-}
-
-function applyCompanyTheme(company: Company | undefined) {
-  const root = document.documentElement;
-  themeVariableNames.forEach(name => root.style.removeProperty(name));
-  Object.entries(companyThemeVariables(company)).forEach(([name, value]) => {
-    root.style.setProperty(name, value);
-  });
-}
 
 function AppContent() {
   const { alert, confirm } = useAppDialog();
@@ -244,43 +153,23 @@ function AppContent() {
   const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
   const companyAllowed = (data.companies.find(c => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) : null;
-  const employeeAncestry = new Set<string>();
-  let ancestryNode = employeeNode;
-  while (ancestryNode) {
-    employeeAncestry.add(ancestryNode.id);
-    ancestryNode = ancestryNode.parentId ? data.orgNodes.find(node => node.id === ancestryNode?.parentId) : undefined;
-  }
-  const roleFitsEmployee = Boolean(employeeRole?.sectorId && employeeAncestry.has(employeeRole.sectorId) && employeeRole.companyId === employee?.companyId);
-  const unitAllowsModule = (moduleId: ModuleId) => !employeeNode || employeeNode.moduleIds === undefined || employeeNode.moduleIds.includes(moduleId);
-  const roleHasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
-    if (!employeeRole) return false;
-    if (!unitAllowsModule(moduleId)) return false;
-    if (employeeRole.modulePermissions[moduleId]?.includes(permission)) return true;
-    const detailedPrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:`;
-    return Object.entries(employeeRole.modulePermissions)
-      .filter(([key]) => key.startsWith(detailedPrefix))
-      .some(([, permissions]) => permissions.includes(permission));
-  };
+  const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode ?? null);
+  const roleFitsEmployee = employeeRoleMatchesUnit(employeeRole, employee, employeeAncestry);
+  const canViewModule = (moduleId: ModuleId) => roleHasPermission(employeeRole, employeeNode, moduleId, 'voir');
   const allowed = (session === 'kora' || session.startsWith('company:'))
     ? companyAllowed
     : employeeRole && roleFitsEmployee
-      ? companyAllowed.filter(moduleId => roleHasPermission(moduleId, 'voir'))
+      ? companyAllowed.filter(moduleId => canViewModule(moduleId))
       : [];
   const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
     if (session === 'kora' || session.startsWith('company:')) return true;
     if (!roleFitsEmployee || !employeeRole) return false;
-    return roleHasPermission(moduleId, permission);
+    return roleHasPermission(employeeRole, employeeNode, moduleId, permission);
   };
-  const hasPresencePermission = (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => {
+  const hasPresencePermission = (permission: PresencePermission) => {
     if (session === 'kora' || session.startsWith('company:')) return true;
     if (!roleFitsEmployee || !employeeRole) return false;
-    if (!unitAllowsModule('presences')) return false;
-    const explicit = employeeRole.modulePermissions[`presence.${permission}`];
-    const hasExplicitPresencePermissions = Object.keys(employeeRole.modulePermissions).some(key => key.startsWith('presence.'));
-    if (hasExplicitPresencePermissions) return Boolean(explicit?.length);
-    if (permission === 'view') return hasPermission('presences', 'voir');
-    if (permission === 'create') return hasPermission('presences', 'créer');
-    return hasPermission('presences', 'modifier');
+    return employeeHasPresencePermission(employeeRole, employeeNode, permission, hasPermission);
   };
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
   const presenceEmployees = data.employees.filter(item => item.companyId === companyId).filter(item => {
@@ -292,44 +181,8 @@ function AppContent() {
     }
     return false;
   });
-  const stockPermissions = employeeRole && roleFitsEmployee
-    ? (() => {
-        const detailed = stockSubmodules
-          .map(submodule => [submodule.id, employeeRole.modulePermissions[`stocks:${submodule.id}`]] as const)
-          .filter(([, permissions]) => permissions);
-        const rootPermissions = employeeRole.modulePermissions.stocks;
-        return Object.fromEntries(detailed.length > 0
-          ? detailed
-          : stockSubmodules.map(submodule => [submodule.id, rootPermissions] as const).filter(([, permissions]) => permissions)) as Record<string, string[]>;
-      })()
-    : undefined;
-  const commerceTabIds = employee && employeeRole && roleFitsEmployee
-    ? (() => {
-        const allowedTabIds = new Set<CommerceTabId>();
-        const permissions = employeeRole.modulePermissions;
-        const canViewCommerce = roleHasPermission('commerce', 'voir');
-        const hasCommerceDetails = hasDetailedCommercePermissions(permissions);
-        if (canViewCommerce) {
-          commerceTabDefinitions.forEach(tab => {
-            if (!hasCommerceDetails || hasCommerceTabPermission(permissions, tab.id)) allowedTabIds.add(tab.id);
-          });
-        }
-
-        const canViewVentes = roleHasPermission('ventes', 'voir');
-        const ventesFeatureKeys = ['ventes:menu:devis', 'ventes:menu:commandes', 'ventes:menu:facturation'];
-        const hasVentesDetails = ventesFeatureKeys.some(key => key in permissions);
-        if (canViewVentes) {
-          if (!hasVentesDetails) {
-            allowedTabIds.add('sales');
-            allowedTabIds.add('invoices');
-          } else {
-            if (permissions['ventes:menu:devis']?.includes('voir') || permissions['ventes:menu:commandes']?.includes('voir')) allowedTabIds.add('sales');
-            if (permissions['ventes:menu:facturation']?.includes('voir')) allowedTabIds.add('invoices');
-          }
-        }
-        return [...allowedTabIds];
-      })()
-    : undefined;
+  const stockPermissions = getStockPermissions(employeeRole, roleFitsEmployee);
+  const commerceTabIds = getCommerceTabIds(employeeRole, roleFitsEmployee, canViewModule);
   const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 ? allowed.flatMap(moduleId => {
     const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];

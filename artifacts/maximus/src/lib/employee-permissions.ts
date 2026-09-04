@@ -1,0 +1,146 @@
+import type { Employee, ModuleId, OrgNode, Role } from './store';
+import {
+  commerceTabDefinitions,
+  commerceTabPermissionKeys,
+  hasCommerceTabPermission,
+  hasDetailedCommercePermissions,
+  type CommerceTabId,
+} from './commerce-permissions';
+import { stockSubmodules } from './store';
+
+export type ModulePermission = 'voir' | 'créer' | 'modifier';
+export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
+
+export function getEmployeeAncestry(nodes: OrgNode[], employeeNode: OrgNode | null) {
+  const ancestry = new Set<string>();
+  let currentNode: OrgNode | undefined = employeeNode ?? undefined;
+
+  while (currentNode) {
+    ancestry.add(currentNode.id);
+    currentNode = currentNode.parentId
+      ? nodes.find(node => node.id === currentNode?.parentId)
+      : undefined;
+  }
+
+  return ancestry;
+}
+
+export function employeeRoleMatchesUnit(
+  role: Role | null | undefined,
+  employee: Employee | null,
+  employeeAncestry: Set<string>,
+) {
+  return Boolean(
+    role?.sectorId
+    && employeeAncestry.has(role.sectorId)
+    && role.companyId === employee?.companyId,
+  );
+}
+
+export function unitAllowsModule(employeeNode: OrgNode | null | undefined, moduleId: ModuleId) {
+  return !employeeNode
+    || employeeNode.moduleIds === undefined
+    || employeeNode.moduleIds.includes(moduleId);
+}
+
+export function roleHasPermission(
+  role: Role | null | undefined,
+  employeeNode: OrgNode | null | undefined,
+  moduleId: ModuleId,
+  permission: ModulePermission,
+) {
+  if (!role || !unitAllowsModule(employeeNode, moduleId)) return false;
+
+  if (role.modulePermissions[moduleId]?.includes(permission)) {
+    return true;
+  }
+
+  const detailedPrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:`;
+  return Object.entries(role.modulePermissions)
+    .filter(([key]) => key.startsWith(detailedPrefix))
+    .some(([, permissions]) => permissions.includes(permission));
+}
+
+export function employeeHasPresencePermission(
+  role: Role | null | undefined,
+  employeeNode: OrgNode | null | undefined,
+  permission: PresencePermission,
+  hasPermission: (moduleId: ModuleId, action: ModulePermission) => boolean,
+) {
+  if (!role || !unitAllowsModule(employeeNode, 'presences')) return false;
+
+  const explicitPermission = role.modulePermissions[`presence.${permission}`];
+  const hasExplicitPermissions = Object.keys(role.modulePermissions)
+    .some(key => key.startsWith('presence.'));
+
+  if (hasExplicitPermissions) {
+    return Boolean(explicitPermission?.length);
+  }
+
+  if (permission === 'view') return hasPermission('presences', 'voir');
+  if (permission === 'create') return hasPermission('presences', 'créer');
+  return hasPermission('presences', 'modifier');
+}
+
+export function getStockPermissions(role: Role | null | undefined, roleFitsEmployee: boolean) {
+  if (!role || !roleFitsEmployee) return undefined;
+
+  const detailed = stockSubmodules
+    .map(submodule => [submodule.id, role.modulePermissions[`stocks:${submodule.id}`]] as const)
+    .filter(([, permissions]) => permissions);
+  const rootPermissions = role.modulePermissions.stocks;
+
+  return Object.fromEntries(
+    detailed.length > 0
+      ? detailed
+      : stockSubmodules
+        .map(submodule => [submodule.id, rootPermissions] as const)
+        .filter(([, permissions]) => permissions),
+  ) as Record<string, string[]>;
+}
+
+export function getCommerceTabIds(
+  role: Role | null | undefined,
+  roleFitsEmployee: boolean,
+  canViewModule: (moduleId: ModuleId) => boolean,
+) {
+  if (!role || !roleFitsEmployee) return undefined;
+
+  const allowedTabIds = new Set<CommerceTabId>();
+  const permissions = role.modulePermissions;
+  const canViewCommerce = canViewModule('commerce');
+  const hasCommerceDetails = hasDetailedCommercePermissions(permissions);
+
+  if (canViewCommerce) {
+    commerceTabDefinitions.forEach(tab => {
+      if (!hasCommerceDetails || hasCommerceTabPermission(permissions, tab.id)) {
+        allowedTabIds.add(tab.id);
+      }
+    });
+  }
+
+  const canViewSales = canViewModule('ventes');
+  const salesFeatureKeys = [
+    'ventes:menu:devis',
+    'ventes:menu:commandes',
+    'ventes:menu:facturation',
+  ];
+  const hasSalesDetails = salesFeatureKeys.some(key => key in permissions);
+
+  if (canViewSales) {
+    if (!hasSalesDetails) {
+      allowedTabIds.add('sales');
+      allowedTabIds.add('invoices');
+    } else {
+      if (permissions['ventes:menu:devis']?.includes('voir')
+        || permissions['ventes:menu:commandes']?.includes('voir')) {
+        allowedTabIds.add('sales');
+      }
+      if (permissions['ventes:menu:facturation']?.includes('voir')) {
+        allowedTabIds.add('invoices');
+      }
+    }
+  }
+
+  return [...allowedTabIds];
+}

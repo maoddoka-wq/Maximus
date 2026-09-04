@@ -6,6 +6,7 @@ import {
 import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, getConfiguredModules, modules as allModules, stockSubmodules, uid, type Module, type ModuleId } from '../lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { commerceTabDefinitions, commerceTabPermissionKey, commerceTabPermissionKeys, type CommerceTabId } from '@/lib/commerce-permissions';
+import { permissionFeatureKey } from '@/lib/permission-keys';
 
 const defaultCompanyTheme = { primaryColor: '#F2B705', accentColor: '#F2B705', sidebarColor: '#161D27' };
 const companyThemePresets = [
@@ -52,10 +53,6 @@ function Field({ label, value, onChange, type = 'text', testId, placeholder = ''
       <span className="field-help mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{explanation}</span>
     </label>
   );
-}
-
-function permissionFeatureKey(moduleId: ModuleId, feature: string) {
-  return `${moduleId}:menu:${feature.trim().toLowerCase().replace(/[^a-z0-9à-ÿ]+/gi, '-').replace(/^-|-$/g, '')}`;
 }
 
 function permissionLabel(key: string, moduleDefinitions: Module[] = allModules) {
