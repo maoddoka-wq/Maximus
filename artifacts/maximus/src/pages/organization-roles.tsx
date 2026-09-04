@@ -469,9 +469,7 @@ function ModulePermissionCard({
   onTogglePresence: (permission: string) => void;
 }) {
   const permissions = modulePermissions[module.id] || [];
-  const features = module.id === 'commerce'
-    ? commerceTabDefinitions
-    : module.features.map(feature => ({ id: feature, label: feature }));
+  const features = getModuleFeatureOptions(module);
 
   return (
     <section className="overflow-hidden rounded-xl border bg-[hsl(var(--card))]">

@@ -13,6 +13,7 @@ import { type Icon, type Session, type SidebarFeature, type SidebarFeatureGroup 
 import { AdminRouter, KoraRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
+import { getEffectiveModuleFeatureIds } from '@/lib/module-features';
 import {
   employeeHasPresencePermission,
   employeeRoleMatchesUnit,
@@ -184,11 +185,24 @@ function AppContent() {
     }
     return false;
   });
-  const stockPermissions = getStockPermissions(employeeRole, roleFitsEmployee);
-  const commerceTabIds = getCommerceTabIds(employeeRole, roleFitsEmployee, canViewModule);
+  const stockPermissions = (() => {
+    const permissions = getStockPermissions(employeeRole, roleFitsEmployee);
+    const stocksModule = configuredModules.find(module => module.id === 'stocks');
+    if (!permissions || !stocksModule) return permissions;
+    const allowedFeatureIds = getEffectiveModuleFeatureIds(stocksModule, employeeNode?.moduleFeatures?.stocks);
+    return Object.fromEntries(Object.entries(permissions).filter(([featureId]) => allowedFeatureIds.has(featureId)));
+  })();
+  const commerceTabIds = (() => {
+    const tabIds = getCommerceTabIds(employeeRole, roleFitsEmployee, canViewModule);
+    const commerceModule = configuredModules.find(module => module.id === 'commerce');
+    if (!tabIds || !commerceModule) return tabIds;
+    const allowedFeatureIds = getEffectiveModuleFeatureIds(commerceModule, employeeNode?.moduleFeatures?.commerce);
+    return tabIds.filter(tabId => allowedFeatureIds.has(tabId));
+  })();
   const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 ? allowed.flatMap(moduleId => {
     const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];
+    const allowedFeatureIds = getEffectiveModuleFeatureIds(module, employeeNode?.moduleFeatures?.[moduleId]);
     let items: SidebarFeature[] = [];
     if (moduleId === 'commerce') {
       const commerceTabIcons: Record<CommerceTabId, Icon> = {
@@ -227,6 +241,7 @@ function AppContent() {
       };
       const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
+        .filter(feature => allowedFeatureIds.has(featureSlug(feature)))
         .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || hasPresencePermission('view'))
         .map(feature => {
           const mapped = presenceFeatures[feature];
@@ -238,6 +253,7 @@ function AppContent() {
       const canViewModule = employeeRole?.modulePermissions[moduleId]?.includes('voir');
       const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
+        .filter(feature => allowedFeatureIds.has(featureSlug(feature)))
         .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || (canViewModule && !hasDetailedFeaturePermissions))
         .map(feature => ({ href: `/kora/${moduleId}?feature=${featureSlug(feature)}`, label: feature, icon: moduleId === 'ventes' ? ShoppingCart : moduleId === 'finance' ? WalletCards : moduleId === 'rh' ? UserRoundCog : LayoutGrid }));
     }
