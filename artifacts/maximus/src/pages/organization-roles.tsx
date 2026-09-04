@@ -277,7 +277,7 @@ function RoleFormModal({
       setError('Un rôle portant ce nom existe déjà dans ce secteur.');
       return;
     }
-    const moduleIds = new Set(moduleDefinitions.map(module => module.id));
+    const moduleIds = new Set<string>(moduleDefinitions.map(module => module.id));
     const modulePermissions = Object.fromEntries(
       Object.entries(formData.modulePermissions)
         .map(([key, permissions]) => [
