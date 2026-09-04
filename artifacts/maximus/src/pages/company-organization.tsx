@@ -4,6 +4,7 @@ import {
   Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight, UserRound
 } from 'lucide-react';
 import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
+import { useAppDialog } from '@/components/confirm-dialog';
 
 const defaultCompanyTheme = { primaryColor: '#F2B705', accentColor: '#F2B705', sidebarColor: '#161D27' };
 const companyThemePresets = [
@@ -371,6 +372,7 @@ function OverviewTreeNode({ node, allNodes, allRoles, allEmployees, depth }: { n
 
 // 2. STRUCTURE TAB
 function StructureTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
+  const { alert } = useAppDialog();
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
   const availableModules = allModules.filter(module => company.allowedModules.includes(module.id));
   const [modalOpen, setModalOpen] = useState(false);
@@ -387,7 +389,7 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
   };
 
   const roots = companyNodes.filter((n: OrgNode) => !n.parentId);
-  const deleteNode = (id: string) => {
+  const deleteNode = async (id: string) => {
     const ids = new Set([id]);
     let changed = true;
     while (changed) {
@@ -402,7 +404,7 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
     const assigned = data.employees.some(employee => employee.sectorId && ids.has(employee.sectorId))
       || data.roles.some(role => role.sectorId && ids.has(role.sectorId));
     if (assigned) {
-      window.alert('Impossible de supprimer cette unité : des rôles ou employés y sont encore affectés.');
+      await alert({ title: 'Suppression impossible', description: 'Des rôles ou employés sont encore affectés à cette unité.', confirmLabel: 'Compris', tone: 'danger' });
       return;
     }
     mutate((draft: StoreData) => {
@@ -595,6 +597,7 @@ function StructureFormModal({ initialData, allNodes, availableModules, onClose, 
 
 // 3. ROLES TAB
 function RolesTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
+  const { alert } = useAppDialog();
   const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
   
@@ -605,9 +608,9 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
     setEditingRole(role);
     setModalOpen(true);
   };
-  const deleteRole = (role: Role) => {
+  const deleteRole = async (role: Role) => {
     if (data.employees.some(employee => employee.roleId === role.id) || company.managerRoleId === role.id) {
-      window.alert('Impossible de supprimer ce rôle : il est encore affecté à un employé ou au manager de l’entreprise.');
+      await alert({ title: 'Suppression impossible', description: 'Ce rôle est encore affecté à un employé ou au manager de l’entreprise.', confirmLabel: 'Compris', tone: 'danger' });
       return;
     }
     mutate((draft: StoreData) => {
@@ -860,6 +863,7 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
 
 // 4. EMPLOYEES TAB
 function EmployeesTab({ company, data, mutate, allowSectorAdmin = true }: { company: Company, data: StoreData, mutate: any; allowSectorAdmin?: boolean }) {
+  const { confirm } = useAppDialog();
   const companyEmployees = data.employees.filter((e: Employee) => e.companyId === company.id);
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
   const companyRoles = data.roles.filter((r: Role) => r.companyId === company.id);
@@ -922,7 +926,7 @@ function EmployeesTab({ company, data, mutate, allowSectorAdmin = true }: { comp
                       </button>
                       {demoEmployeeIds.has(emp.id)
                         ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span>
-                        : <button data-testid={`button-delete-org-employee-${emp.id}`} aria-label={`Supprimer le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { if (window.confirm(`Supprimer le compte de ${emp.firstName} ${emp.lastName} ?`)) mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.'); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]">
+                        : <button data-testid={`button-delete-org-employee-${emp.id}`} aria-label={`Supprimer le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => void confirm({ title: 'Supprimer ce compte employé ?', description: `Le compte de ${emp.firstName} ${emp.lastName} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' }).then(ok => { if (ok) mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.'); })} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]">
                           <Trash2 size={13} /><span>Supprimer</span>
                         </button>}
                     </div>
