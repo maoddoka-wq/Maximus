@@ -326,6 +326,7 @@ function OverviewTreeNode({ node, allNodes, allRoles, allEmployees, depth }: { n
 // 2. STRUCTURE TAB
 function StructureTab({ company, data, mutate }: { company: Company, data: StoreData, mutate: any }) {
   const companyNodes = data.orgNodes.filter((n: OrgNode) => n.companyId === company.id);
+  const availableModules = allModules.filter(module => company.allowedModules.includes(module.id));
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<OrgNode | null>(null);
 
@@ -387,7 +388,7 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
         {roots.length === 0 && <div className="text-center py-10 text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
       </div>
 
-        {modalOpen && <Modal title={editingNode ? 'Modifier une unité' : 'Créer une unité'} onClose={() => setModalOpen(false)}><StructureFormModal initialData={editingNode} allNodes={companyNodes} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
+        {modalOpen && <Modal title={editingNode ? 'Modifier une unité' : 'Créer une unité'} onClose={() => setModalOpen(false)}><StructureFormModal initialData={editingNode} allNodes={companyNodes} availableModules={availableModules} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
         mutate((d: StoreData) => {
            const nodeId = editingNode?.id ?? uid('org');
           if (editingNode) {
@@ -421,7 +422,7 @@ function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: 
             {node.code && <span className="text-[10px] mono text-[hsl(var(--muted-foreground))]">{node.code}</span>}
           </div>
             <div className="flex items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] shrink-0">
-              <span>Structure de l’unité</span>
+              <span>{node.moduleIds?.length ?? 0} module(s) autorisé(s)</span>
             <div className="flex items-center gap-1">
               <button type="button" data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={event => { event.stopPropagation(); onEdit(node); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
               <button data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
@@ -436,7 +437,7 @@ function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: 
   );
 }
 
-function StructureFormModal({ initialData, allNodes, onClose, onSave }: { initialData: OrgNode | null, allNodes: OrgNode[], onClose: () => void, onSave: (d: any) => void }) {
+function StructureFormModal({ initialData, allNodes, availableModules, onClose, onSave }: { initialData: OrgNode | null, allNodes: OrgNode[], availableModules: typeof allModules, onClose: () => void, onSave: (d: any) => void }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -445,7 +446,8 @@ function StructureFormModal({ initialData, allNodes, onClose, onSave }: { initia
     parentId: initialData?.parentId || '',
     email: initialData?.email || '',
     phone: initialData?.phone || '',
-    location: initialData?.location || ''
+    location: initialData?.location || '',
+    moduleIds: initialData?.moduleIds ? [...initialData.moduleIds] : []
   });
 
   const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
@@ -474,6 +476,15 @@ function StructureFormModal({ initialData, allNodes, onClose, onSave }: { initia
      onSave({ ...formData, name: formData.name.trim(), code: formData.code.trim().toUpperCase(), parentId: formData.parentId || null });
   };
 
+  const toggleModule = (moduleId: ModuleId) => {
+    setFormData(current => ({
+      ...current,
+      moduleIds: current.moduleIds.includes(moduleId)
+        ? current.moduleIds.filter(id => id !== moduleId)
+        : [...current.moduleIds, moduleId],
+    }));
+  };
+
   return (
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
@@ -500,6 +511,24 @@ function StructureFormModal({ initialData, allNodes, onClose, onSave }: { initia
           </select>
           <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">L’unité parente permet de construire la hiérarchie.</span>
         </label>
+      </div>
+      <div className="mt-2 border-t pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <label className="block text-sm font-semibold">Modules autorisés pour cette unité</label>
+            <p className="mt-1 text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Ces modules pourront ensuite être attribués aux rôles de cette unité.</p>
+          </div>
+          <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">{formData.moduleIds.length} sélectionné(s)</span>
+        </div>
+        {availableModules.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {availableModules.map(module => {
+            const enabled = formData.moduleIds.includes(module.id);
+            return <label key={module.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${enabled ? 'border-[hsl(var(--primary)/.5)] bg-[hsl(var(--primary)/.06)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
+              <input data-testid={`checkbox-org-module-${module.id}`} type="checkbox" checked={enabled} onChange={() => toggleModule(module.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
+              <span><strong className="block text-xs">{module.name}</strong><small className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{module.description}</small></span>
+            </label>;
+          })}
+        </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.</p>}
       </div>
       <div className="border-t pt-4 mt-2">
         <label className="block text-sm font-semibold mb-3">Coordonnées de l’unité</label>
@@ -611,7 +640,9 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
     modulePermissions: initialData?.modulePermissions || {} as Record<string, string[]>
   });
 
-  const availableModules = company.allowedModules.length ? allModules.filter(m => company.allowedModules.includes(m.id)) : allModules;
+  const selectedNode = allNodes.find(node => node.id === formData.sectorId);
+  const companyModules = allModules.filter(module => company.allowedModules.includes(module.id));
+  const availableModules = companyModules.filter(module => selectedNode?.moduleIds === undefined || selectedNode.moduleIds.includes(module.id));
 
   const togglePermission = (modId: string, perm: 'voir' | 'créer' | 'modifier') => {
     setFormData(prev => {
@@ -685,7 +716,7 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
         <select disabled={sectorLocked} value={formData.sectorId} onChange={e => handleSectorChange(e.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
           {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
         </select>
-         <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Les modules affichés sont ceux autorisés pour l’entreprise. Le rôle limite ensuite précisément l’accès de ses employés.</span>
+         <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Seuls les modules autorisés pour cette unité sont proposés. Le rôle limite ensuite précisément l’accès de ses employés.</span>
         {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son unité.</span>}
       </label>
 
@@ -769,7 +800,7 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
               </div>
             );
           })}
-          {availableModules.length === 0 && <div className="text-sm text-[hsl(var(--muted-foreground))] italic">Aucun module disponible pour ce secteur.</div>}
+          {availableModules.length === 0 && <div className="text-sm text-[hsl(var(--muted-foreground))] italic">Aucun module n’est autorisé pour cette unité. Revenez dans Structure & unités pour en sélectionner.</div>}
         </div>
       </div>
 
