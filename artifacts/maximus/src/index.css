@@ -261,6 +261,12 @@ body {
   box-shadow: 10px 0 30px rgba(18, 22, 25, .1);
 }
 
+@media (min-width: 768px) {
+  .sidebar[data-collapsed="true"] {
+    width: 5rem;
+  }
+}
+
 .sidebar > div:first-child {
   min-height: 5.25rem;
   border-bottom: 1px solid hsl(var(--sidebar-border));
