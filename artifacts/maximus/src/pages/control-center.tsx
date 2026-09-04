@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -25,6 +25,7 @@ import {
   type ModuleId,
   type StoreData,
 } from '@/lib/store';
+import { controlApi, type ControlBootstrap } from '@/lib/control-api';
 
 type Mutate = (fn: (draft: StoreData) => void, message?: string) => void;
 
@@ -65,6 +66,12 @@ function EventIcon({ type }: { type: DomainEventType }) {
   return <CircleDot size={16} className="text-slate-500" />;
 }
 
+function mergeControlRecords<T extends { id: string; entityType: string; entityId?: string; summary: string }>(local: T[], remote: T[]) {
+  const records = new Map<string, T>();
+  [...local, ...remote].forEach(record => records.set(`${record.entityType}:${record.entityId ?? ''}:${record.summary}`, record));
+  return [...records.values()];
+}
+
 export function ControlCenterPage({
   data,
   mutate,
@@ -99,7 +106,30 @@ export function ControlCenterPage({
   });
   const [targetCompanyId, setTargetCompanyId] = useState(companyId ?? data.companies.find(company => company.status === 'ACTIF')?.id ?? '');
   const [assigneeEmployeeId, setAssigneeEmployeeId] = useState('');
+  const [serverSnapshot, setServerSnapshot] = useState<ControlBootstrap | null>(null);
+  const [syncError, setSyncError] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncVersion, setSyncVersion] = useState(0);
   const canCreateTask = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
+  const controlScope = isAdmin ? 'admin' : companyAdmin ? 'all' : sectorManager ? 'all' : 'assigned';
+
+  useEffect(() => {
+    let active = true;
+    setSyncing(true);
+    controlApi.bootstrap({ companyId, employeeId, sectorId: sectorManager ? scopeNodeId : undefined, scope: controlScope })
+      .then(snapshot => { if (active) { setServerSnapshot(snapshot); setSyncError(''); } })
+      .catch(error => { if (active) setSyncError(error instanceof Error ? error.message : 'Mode local actif.'); })
+      .finally(() => { if (active) setSyncing(false); });
+    return () => { active = false; };
+  }, [companyId, controlScope, employeeId, scopeNodeId, sectorManager, syncVersion]);
+
+  const controlTasks = useMemo(() => {
+    const byId = new Map(data.controlTasks.map(task => [task.id, task]));
+    serverSnapshot?.tasks.forEach(task => byId.set(task.id, task));
+    return [...byId.values()];
+  }, [data.controlTasks, serverSnapshot?.tasks]);
+  const controlEvents = useMemo(() => mergeControlRecords(data.domainEvents, serverSnapshot?.events ?? []), [data.domainEvents, serverSnapshot?.events]);
+  const controlAudit = useMemo(() => mergeControlRecords(data.auditEntries, serverSnapshot?.auditEntries ?? []), [data.auditEntries, serverSnapshot?.auditEntries]);
   const isWithinSectorScope = (taskSectorId?: string) => {
     if (!sectorManager || !scopeNodeId || !taskSectorId) return false;
     let node = data.orgNodes.find(candidate => candidate.id === taskSectorId && candidate.companyId === companyId);
@@ -110,14 +140,14 @@ export function ControlCenterPage({
     return false;
   };
 
-  const accessibleTasks = useMemo(() => data.controlTasks.filter(task => {
+  const accessibleTasks = useMemo(() => controlTasks.filter(task => {
     const inScope = isAdmin || (task.companyId === companyId && (
       canSeeAll
       || task.assigneeEmployeeId === employeeId
       || isWithinSectorScope(task.sectorId)
     ));
     return inScope;
-  }), [canSeeAll, companyId, data.controlTasks, employeeId, isAdmin, scopeNodeId, sectorManager]);
+  }), [canSeeAll, companyId, controlTasks, employeeId, isAdmin, scopeNodeId, sectorManager]);
   const visibleTasks = useMemo(() => accessibleTasks.filter(task => {
     const matchesStatus = statusFilter === 'TOUS' || task.status === statusFilter;
     const matchesModule = moduleFilter === 'TOUS' || task.moduleId === moduleFilter;
@@ -126,8 +156,8 @@ export function ControlCenterPage({
 
   const scopeTasks = accessibleTasks;
   const scopeTaskIds = new Set(accessibleTasks.map(task => task.id));
-  const visibleEvents = data.domainEvents.filter(event => isAdmin || event.companyId === companyId && (canSeeAll || scopeTaskIds.has(event.entityId ?? '')));
-  const visibleAudit = data.auditEntries.filter(entry => isAdmin || entry.companyId === companyId && (canSeeAll || scopeTaskIds.has(entry.entityId ?? '')));
+  const visibleEvents = controlEvents.filter(event => isAdmin || event.companyId === companyId && (canSeeAll || scopeTaskIds.has(event.entityId ?? '')));
+  const visibleAudit = controlAudit.filter(entry => isAdmin || entry.companyId === companyId && (canSeeAll || scopeTaskIds.has(entry.entityId ?? '')));
   const assignableEmployees = useMemo(() => data.employees.filter(employee => {
     if (employee.companyId !== targetCompanyId) return false;
     if (!sectorManager) return true;
@@ -139,6 +169,7 @@ export function ControlCenterPage({
   const criticalCount = scopeTasks.filter(task => task.priority === 'CRITIQUE' && task.status !== 'TERMINÉ' && task.status !== 'VALIDÉ').length;
 
   const updateTask = (taskId: string, nextStatus: ControlTaskStatus) => {
+    const persistedTask = serverSnapshot?.tasks.find(item => item.id === taskId);
     mutate(draft => {
       const task = draft.controlTasks.find(item => item.id === taskId);
       if (!task) return;
@@ -184,15 +215,19 @@ export function ControlCenterPage({
         href: task.companyId ? '/kora/controle' : '/maximus/controle',
       });
     }, 'La tâche et son audit ont été mis à jour.');
+    if (persistedTask) {
+      void controlApi.updateTaskStatus(persistedTask, nextStatus, actorName)
+        .then(() => setSyncVersion(version => version + 1))
+        .catch(error => setSyncError(error instanceof Error ? error.message : 'La mise à jour serveur a échoué.'));
+    }
   };
 
   const createTask = () => {
     const destinationCompanyId = isAdmin ? targetCompanyId : companyId;
     if (!canCreateTask || !newTask.title.trim() || !destinationCompanyId || !selectedAssignee) return;
-    mutate(draft => {
-      const id = uid('task');
-      const now = new Date().toISOString();
-      const task: ControlTask = {
+    const id = uid('task');
+    const now = new Date().toISOString();
+    const task: ControlTask = {
         id,
         title: newTask.title.trim(),
         description: newTask.description.trim() || 'Tâche créée depuis le centre de contrôle.',
@@ -208,7 +243,8 @@ export function ControlCenterPage({
         dueDate: newTask.dueDate.trim() || undefined,
         createdAt: now,
         updatedAt: now,
-      };
+    };
+    mutate(draft => {
       draft.controlTasks.unshift(task);
       draft.domainEvents.unshift({
         id: uid('event'),
@@ -244,6 +280,9 @@ export function ControlCenterPage({
         href: '/kora/controle',
       });
     }, 'La tâche a été créée et ajoutée au circuit de contrôle.');
+    void controlApi.createTask(task)
+      .then(() => setSyncVersion(version => version + 1))
+      .catch(error => setSyncError(error instanceof Error ? error.message : 'La tâche reste enregistrée localement.'));
     setNewTask({ title: '', description: '', priority: 'NORMALE', moduleId: 'stocks', dueDate: '' });
     setAssigneeEmployeeId('');
     setShowCreate(false);
@@ -257,6 +296,7 @@ export function ControlCenterPage({
             <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--accent))]"><Workflow size={15} /> Couche de contrôle</div>
             <h2 className="text-2xl font-bold">Tâches, décisions et événements au même endroit.</h2>
             <p className="mt-2 max-w-2xl text-sm text-white/70">Coordonnez les actions qui traversent les modules et conservez une trace de chaque décision.</p>
+            <p className="mt-3 text-[11px] font-semibold text-white/55">{syncing ? 'Synchronisation serveur…' : syncError ? syncError : 'Données synchronisées avec le serveur'}</p>
           </div>
           {canCreateTask && <button type="button" onClick={() => setShowCreate(true)} className="flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"><Plus size={16} /> Créer une tâche</button>}
         </div>

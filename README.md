@@ -22,7 +22,7 @@ MAXIMUS est un prototype web d’ERP SaaS multi-entreprises, conçu en français
 - Tailwind CSS ;
 - Express pour le serveur API ;
 - PostgreSQL et Drizzle ORM pour les packages serveur ;
-- `localStorage` pour la persistance du prototype MAXIMUS.
+- PostgreSQL via l’API pour Présences, Stocks et Contrôle & coordination, avec `localStorage` conservé pour l’état de démonstration et le repli du prototype MAXIMUS.
 
 ## Installation
 

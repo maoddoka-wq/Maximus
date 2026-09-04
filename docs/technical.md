@@ -12,7 +12,7 @@ MAXIMUS ERP est une application web React/TypeScript construite dans un monorepo
 - des écrans métier pour Commerce, Stocks, Présences et les modules opérationnels ;
 - une personnalisation visuelle par entreprise.
 
-L’application MAXIMUS est principalement un prototype fonctionnel côté navigateur. Son état de démonstration est conservé dans `localStorage`.
+L’application MAXIMUS conserve encore une partie de son état de démonstration côté navigateur dans `localStorage`. Les workflows Présences, Stocks et désormais Contrôle & coordination disposent aussi d’une persistance PostgreSQL via le serveur API.
 
 ## 2. Structure du monorepo
 
@@ -126,6 +126,14 @@ Une validation de tâche met à jour son statut et écrit simultanément un év�
 ```
 
 Les tâches sont filtrées par entreprise. Un employé voit les tâches qui lui sont affectées ; un administrateur d’entreprise ou un manager de secteur voit le périmètre qui lui est confié.
+
+La couche de contrôle est persistée dans PostgreSQL par les tables suivantes :
+
+- `control_tasks` : tâches, affectations, statuts, priorités et échéances ;
+- `control_events` : événements métier et décisions ;
+- `control_audit_entries` : journal des changements et validations.
+
+Les routes `/api/control/bootstrap`, `/api/control/tasks` et `/api/control/tasks/:id/status` servent respectivement à charger le périmètre courant, créer une tâche et mettre à jour son statut. Le frontend synchronise le serveur tout en conservant un repli local lorsque l’API est momentanément indisponible.
 
 ## 5. Modèle d’accès et permissions
 
@@ -247,6 +255,7 @@ Le frontend Vite réserve le préfixe `/api` au proxy vers le serveur API. Les m
 
 - `src/lib/stock-api.ts` pour les données et opérations Stocks ;
 - `src/lib/presence-api.ts` pour les workflows Présences ;
+- `src/lib/control-api.ts` pour les tâches, événements et audits Contrôle & coordination ;
 - le module Commerce conserve son état local par entreprise lorsqu’il fonctionne en mode prototype.
 
 Les données sensibles ou les secrets ne doivent jamais être ajoutés dans le code ni dans la documentation. Les variables d’environnement sont gérées par l’environnement Replit.

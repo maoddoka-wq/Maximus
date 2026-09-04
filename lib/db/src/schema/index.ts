@@ -19,3 +19,4 @@
 
 export * from "./stock";
 export * from "./presence";
+export * from "./control";
