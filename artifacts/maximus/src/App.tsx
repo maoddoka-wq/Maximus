@@ -289,6 +289,32 @@ function AppContent() {
           : stockSubmodules.map(submodule => [submodule.id, rootPermissions] as const).filter(([, permissions]) => permissions)) as Record<string, string[]>;
       })()
     : undefined;
+  const commerceTabIds = employee && employeeRole && roleFitsEmployee
+    ? (() => {
+        const commerceAliases: Record<string, string[]> = {
+          clients: ['clients'],
+          'devis-et-commandes': ['sales'],
+          'chiffre-d-affaires': ['dashboard'],
+          devis: ['sales'],
+          commandes: ['sales'],
+          facturation: ['invoices'],
+        };
+        const allowedTabIds = new Set<string>();
+        for (const [moduleId, featureList] of [['commerce', modules.find(item => item.id === 'commerce')?.features ?? []], ['ventes', modules.find(item => item.id === 'ventes')?.features ?? []]] as const) {
+          const canViewModule = roleHasPermission(moduleId as ModuleId, 'voir');
+          const permissionKeys = featureList.map(feature => permissionFeatureKey(moduleId as ModuleId, feature));
+          const hasDetailedFeaturePermissions = permissionKeys.some(key => key in employeeRole.modulePermissions);
+          if (!canViewModule && !hasDetailedFeaturePermissions) continue;
+          featureList.forEach(feature => {
+            const key = permissionFeatureKey(moduleId as ModuleId, feature);
+            if (employeeRole.modulePermissions[key]?.includes('voir') || (canViewModule && !hasDetailedFeaturePermissions)) {
+              commerceAliases[featureSlug(feature)]?.forEach(tabId => allowedTabIds.add(tabId));
+            }
+          });
+        }
+        return [...allowedTabIds];
+      })()
+    : undefined;
   const sidebarFeatureGroups: SidebarFeatureGroup[] = employee && allowed.length >= 1 && allowed.length <= 2 ? allowed.flatMap(moduleId => {
     const module = modules.find(item => item.id === moduleId);
     if (!module) return [];
@@ -342,7 +368,7 @@ function AppContent() {
           <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} singleModuleNavigation={verticalModuleNavigation} />}
+            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} />}
           </ErrorBoundary>
         </div>
       </main>
@@ -620,7 +646,7 @@ function CompanyEditModal({ company, data, mutate, onClose }: { company: Company
   </Modal>;
 }
 
-function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, presenceEmployees, hasPermission, hasPresencePermission, stockPermissions, singleModuleNavigation }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; presenceEmployees: Employee[]; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; hasPresencePermission: (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean }) {
+function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, presenceEmployees, hasPermission, hasPresencePermission, stockPermissions, commerceTabIds, singleModuleNavigation }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; presenceEmployees: Employee[]; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; hasPresencePermission: (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => boolean; stockPermissions?: Record<string, string[]>; commerceTabIds?: string[]; singleModuleNavigation?: boolean }) {
   const routePath = location.split('?')[0];
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[routePath];
@@ -633,7 +659,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
   if (routePath === '/kora/organisation' || routePath === '/kora/autorisations' || routePath === '/kora/employes' || routePath === '/kora/roles') {
     const company = data.companies.find(item => item.id === companyId);
-    const initialTab = location === '/kora/autorisations' || location === '/kora/roles' ? 'roles' : location === '/kora/employes' ? 'employees' : 'overview';
+     const initialTab = routePath === '/kora/autorisations' || routePath === '/kora/roles' ? 'roles' : routePath === '/kora/employes' ? 'employees' : 'overview';
     return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab={initialTab} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur." action={() => onNavigate('/kora/dashboard')} />;
   }
      if (routePath === '/kora/stocks') {
@@ -641,7 +667,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
    if (routePath === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
    if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
-     return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
+      return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds as ('dashboard' | 'sales' | 'products' | 'clients' | 'suppliers' | 'purchases' | 'expenses' | 'cash' | 'credit' | 'invoices' | 'returns' | 'reports' | 'notifications' | 'activity' | 'team' | 'settings')[] | undefined} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
    }
    if (routePath === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
    if (routePath === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;

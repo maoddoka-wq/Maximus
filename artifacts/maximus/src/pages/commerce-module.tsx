@@ -61,6 +61,15 @@ const tabs = [
   { id: 'settings', label: 'Paramètres', icon: Settings, group: 'Pilotage' },
 ] as const;
 
+const featureTabAliases: Record<string, Tab> = {
+  clients: 'clients',
+  'devis-et-commandes': 'sales',
+  'chiffre-d-affaires': 'dashboard',
+  devis: 'sales',
+  commandes: 'sales',
+  facturation: 'invoices',
+};
+
 type CommerceClient = { id: string; name: string; phone: string; email: string; address: string; balance: number };
 type Expense = { id: string; label: string; category: string; amount: number; date: string; account: string };
 type CashAccount = { id: string; name: string; balance: number; responsible: string; active: boolean };
@@ -134,6 +143,7 @@ export default function CommerceModulePage({
   canCreate = true,
   canModify = true,
   initialTab = 'dashboard',
+  allowedTabs,
   onNavigate,
 }: {
   companyId: string;
@@ -142,10 +152,13 @@ export default function CommerceModulePage({
   canCreate?: boolean;
   canModify?: boolean;
   initialTab?: Tab;
+  allowedTabs?: readonly Tab[];
   onNavigate?: (path: string) => void;
 }) {
   const [state, setState] = useState<CommerceState>(() => readState(companyId));
-  const [tab, setTab] = useQueryTab({ tabs: tabs.map(item => item.id), defaultTab: initialTab });
+  const availableTabIds = allowedTabs?.length ? tabs.filter(item => allowedTabs.includes(item.id)).map(item => item.id) : tabs.map(item => item.id);
+  const defaultTab = availableTabIds.includes(initialTab) ? initialTab : (availableTabIds[0] ?? 'dashboard');
+  const [tab, setTab] = useQueryTab({ tabs: availableTabIds, defaultTab, aliases: featureTabAliases });
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
 
@@ -183,7 +196,7 @@ export default function CommerceModulePage({
   const revenue = validatedSales.reduce((sum, sale) => sum + sale.amount, 0);
   const lowStock = data.products.filter(product => product.stock <= product.threshold);
   const unread = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(notification => !notification.read).length;
-  const visibleTabs = tabs;
+  const visibleTabs = tabs.filter(item => availableTabIds.includes(item.id));
 
   return <div className="space-y-5" data-testid="commerce-module">
     {toast && <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-xl bg-[hsl(var(--foreground))] px-4 py-3 text-sm font-bold text-[hsl(var(--background))] shadow-xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}

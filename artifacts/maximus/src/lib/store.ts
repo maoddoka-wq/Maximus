@@ -94,7 +94,7 @@ export const sectorPresets: SectorPreset[] = [
 export function seedData(): StoreData {
   return {
     catalogVersion: 2,
-    organizationVersion: 7,
+    organizationVersion: 8,
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
@@ -231,9 +231,9 @@ export function loadData(): StoreData {
         ...role,
         companyId: role.companyId || 'kora',
         sectorId: removeGeneratedHierarchy && role.sectorId && generatedNodeIds.has(role.sectorId) ? undefined : role.sectorId,
-        modulePermissions: (parsed.organizationVersion ?? 1) < 7 && role.id === 'kora-role-magasinier'
+        modulePermissions: role.id === 'kora-role-magasinier' && (parsed.organizationVersion ?? 1) < 8
           ? {
-              ...role.modulePermissions,
+              ...Object.fromEntries(Object.entries(role.modulePermissions).filter(([key]) => key !== 'commerce' && key !== 'ventes' && !key.startsWith('commerce:') && !key.startsWith('ventes:'))),
               stocks: JSON.stringify(role.modulePermissions.stocks ?? []) === JSON.stringify(['voir', 'créer', 'modifier']) ? ['voir'] : role.modulePermissions.stocks,
               ...Object.fromEntries(Object.entries(legacyMagasinierPermissions).filter(([key]) => key.startsWith('stocks:') && !role.modulePermissions[key])),
             }
@@ -268,7 +268,7 @@ export function loadData(): StoreData {
         severity: notification.severity ?? 'info',
       })),
       catalogVersion: 2,
-       organizationVersion: 7,
+       organizationVersion: 8,
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
