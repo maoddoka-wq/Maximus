@@ -144,8 +144,10 @@ function AppContent() {
     ancestryNode = ancestryNode.parentId ? data.orgNodes.find(node => node.id === ancestryNode?.parentId) : undefined;
   }
   const roleFitsEmployee = Boolean(employeeRole?.sectorId && employeeAncestry.has(employeeRole.sectorId) && employeeRole.companyId === employee?.companyId);
+  const unitAllowsModule = (moduleId: ModuleId) => !employeeNode || employeeNode.moduleIds === undefined || employeeNode.moduleIds.includes(moduleId);
   const roleHasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
     if (!employeeRole) return false;
+    if (!unitAllowsModule(moduleId)) return false;
     if (employeeRole.modulePermissions[moduleId]?.includes(permission)) return true;
     const detailedPrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:`;
     return Object.entries(employeeRole.modulePermissions)
@@ -165,6 +167,7 @@ function AppContent() {
   const hasPresencePermission = (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => {
     if (session === 'kora' || session.startsWith('company:')) return true;
     if (!roleFitsEmployee || !employeeRole) return false;
+    if (!unitAllowsModule('presences')) return false;
     const explicit = employeeRole.modulePermissions[`presence.${permission}`];
     const hasExplicitPresencePermissions = Object.keys(employeeRole.modulePermissions).some(key => key.startsWith('presence.'));
     if (hasExplicitPresencePermissions) return Boolean(explicit?.length);
