@@ -5,6 +5,16 @@ import {
 } from 'lucide-react';
 import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
 
+const defaultCompanyTheme = { primaryColor: '#F2B705', accentColor: '#F2B705' };
+const companyThemePresets = [
+  { name: 'MAXIMUS', primaryColor: '#F2B705', accentColor: '#F2B705' },
+  { name: 'Océan', primaryColor: '#0E7490', accentColor: '#06B6D4' },
+  { name: 'Forêt', primaryColor: '#15803D', accentColor: '#84CC16' },
+  { name: 'Prune', primaryColor: '#7E22CE', accentColor: '#DB2777' },
+  { name: 'Terre', primaryColor: '#C2410C', accentColor: '#EA580C' },
+];
+const isHexColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
+
 // Helper UI components matching Maximus style
 function ActionButton({ children, onClick, primary = false, testId, icon: ButtonIcon = Plus, disabled = false, className = '' }: any) { 
   return (
@@ -138,19 +148,19 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
 }
 
 export function CompanyProfileSection({ company, data, mutate }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
-  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & { profilePhoto: string };
-  const [form, setForm] = useState<ProfileForm>({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '' });
+  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & { profilePhoto: string; primaryColor: string; accentColor: string };
+  const [form, setForm] = useState<ProfileForm>({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '', primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor, accentColor: company.accentColor ?? defaultCompanyTheme.accentColor });
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
   const setField = (field: keyof ProfileForm) => (value: string) => setForm(current => ({ ...current, [field]: value }));
 
   useEffect(() => {
-    setForm({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '' });
+    setForm({ name: company.name, manager: company.manager, email: company.email, phone: company.phone, country: company.country, sector: company.sector, profilePhoto: company.profilePhoto ?? '', primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor, accentColor: company.accentColor ?? defaultCompanyTheme.accentColor });
     setNewPassword('');
     setPasswordConfirm('');
     setError('');
-  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector, company.profilePhoto]);
+  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector, company.profilePhoto, company.primaryColor, company.accentColor]);
 
   const handlePhoto = (file: File | undefined) => {
     if (!file) return;
@@ -177,6 +187,8 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
     const manager = form.manager.trim();
     const email = form.email.trim().toLowerCase();
     const password = newPassword.trim();
+    const primaryColor = form.primaryColor.trim().toUpperCase();
+    const accentColor = form.accentColor.trim().toUpperCase();
     if (!name || !manager || !email) {
       setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
       return;
@@ -197,6 +209,10 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
+    if (!isHexColor(primaryColor) || !isHexColor(accentColor)) {
+      setError('Les couleurs doivent être au format hexadécimal, par exemple #F2B705.');
+      return;
+    }
     mutate(draft => {
       const target = draft.companies.find(item => item.id === company.id);
       if (target) {
@@ -207,9 +223,11 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
         target.country = form.country.trim();
         target.sector = form.sector.trim();
         target.profilePhoto = form.profilePhoto;
+        target.primaryColor = primaryColor;
+        target.accentColor = accentColor;
         if (password) target.adminPassword = password;
       }
-    }, password ? 'Profil, photo et mot de passe mis à jour.' : 'Profil et photo mis à jour.');
+    }, password ? 'Profil, couleurs, photo et mot de passe mis à jour.' : 'Profil, couleurs et photo mis à jour.');
     setNewPassword('');
     setPasswordConfirm('');
   };
@@ -221,7 +239,32 @@ export function CompanyProfileSection({ company, data, mutate }: { company: Comp
         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--primary)/.1)] text-xl font-black text-[hsl(var(--primary))]">{form.profilePhoto ? <img src={form.profilePhoto} alt={`Photo de profil de ${form.name}`} className="h-full w-full object-cover" /> : company.name.slice(0, 2).toUpperCase()}</div>
         <div className="min-w-[220px] flex-1"><h3 className="font-bold">Photo de profil</h3><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">PNG, JPG ou WebP · 2 Mo maximum. Elle sera affichée dans votre espace entreprise.</p><div className="mt-3 flex flex-wrap gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><UserRound size={14} />Choisir une photo<input data-testid="input-profile-photo" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => handlePhoto(event.target.files?.[0])} /></label>{form.profilePhoto && <button type="button" data-testid="button-remove-profile-photo" onClick={() => setForm(current => ({ ...current, profilePhoto: '' }))} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]">Supprimer</button>}</div></div>
       </div>
-      <div className="grid gap-5 sm:grid-cols-2">
+       <div className="mb-7 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
+         <div className="flex flex-wrap items-start justify-between gap-3">
+           <div><h3 className="font-bold">Couleurs de votre espace</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Choisissez une couleur principale et une couleur d’accent. Elles seront visibles par tous les comptes de cette entreprise.</p></div>
+           <div className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2 text-right text-[10px] font-bold"><span className="mr-2 inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.primaryColor }} /><span className="inline-block h-3 w-3 rounded-full align-middle" style={{ backgroundColor: form.accentColor }} /> <span className="ml-1 text-[hsl(var(--muted-foreground))]">Aperçu</span></div>
+         </div>
+         <div className="mt-4 grid gap-4 sm:grid-cols-2">
+           {([
+             ['primaryColor', 'Couleur principale', 'Boutons, liens et éléments actifs.'],
+             ['accentColor', 'Couleur d’accent', 'Surbrillances et détails secondaires.'],
+           ] as const).map(([field, label, help]) => <label key={field} className="block text-sm font-semibold">
+             {label}
+             <div className="mt-2 flex items-center gap-2">
+               <input aria-label={label} data-testid={`input-${field}`} type="color" value={isHexColor(form[field]) ? form[field] : defaultCompanyTheme[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value.toUpperCase() }))} className="h-11 w-14 cursor-pointer rounded-lg border bg-[hsl(var(--card))] p-1" />
+               <input aria-label={`${label} hexadécimale`} data-testid={`input-${field}-hex`} value={form[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value }))} className="min-w-0 flex-1 rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 font-mono text-sm uppercase" placeholder="#F2B705" />
+             </div>
+             <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{help}</span>
+           </label>)}
+         </div>
+         <div className="mt-4 flex flex-wrap items-center gap-2">
+           <span className="mr-1 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Palettes</span>
+           {companyThemePresets.map(preset => <button key={preset.name} type="button" onClick={() => setForm(current => ({ ...current, primaryColor: preset.primaryColor, accentColor: preset.accentColor }))} className="inline-flex items-center gap-2 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:border-[hsl(var(--primary))]">
+             <span className="flex gap-0.5"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.primaryColor }} /><span className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.accentColor }} /></span>{preset.name}
+           </button>)}
+         </div>
+       </div>
+       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Nom de l’entreprise *" value={form.name} onChange={setField('name')} testId="input-profile-company-name" help="Nom affiché dans MAXIMUS et dans l’espace de travail." />
         <Field label="Responsable *" value={form.manager} onChange={setField('manager')} testId="input-profile-manager" help="Nom de la personne responsable de l’entreprise." />
         <Field label="Email administrateur *" value={form.email} onChange={setField('email')} type="email" testId="input-profile-email" help="Adresse utilisée pour la connexion du compte entreprise." />
