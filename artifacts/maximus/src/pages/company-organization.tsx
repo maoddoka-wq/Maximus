@@ -637,6 +637,17 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
       return { ...prev, modulePermissions: newModulePermissions };
     });
   };
+  const togglePresencePermission = (permission: string) => {
+    setFormData(prev => {
+      const key = `presence.${permission}`;
+      const current = prev.modulePermissions[key] || [];
+      const next = current.length ? [] : ['autorisé'];
+      const modulePermissions = { ...prev.modulePermissions };
+      if (next.length) modulePermissions[key] = next;
+      else delete modulePermissions[key];
+      return { ...prev, modulePermissions };
+    });
+  };
 
   const handleSectorChange = (sectorId: string) => {
     setFormData(prev => ({ ...prev, sectorId, modulePermissions: {} }));
@@ -711,6 +722,19 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
                           </label>)}
                         </div>
                       </div>;
+                    })}
+                  </div>
+                </div>}
+                {m.id === 'presences' && <div className="ml-3 rounded-lg border border-dashed p-3">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Droits détaillés des présences</p>
+                  <p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Chaque capacité est indépendante et reste limitée à l’unité du rôle.</p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {([['view', 'Consulter'], ['create', 'Créer'], ['edit', 'Modifier'], ['delete', 'Supprimer'], ['correct', 'Corriger'], ['validate', 'Valider'], ['manage', 'Gérer'], ['export', 'Exporter'], ['reports', 'Rapports']] as const).map(([permission, label]) => {
+                      const enabled = Boolean(formData.modulePermissions[`presence.${permission}`]?.length);
+                      return <label key={permission} className={`cursor-pointer rounded px-2 py-1.5 text-[9px] font-bold ${enabled ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--card))]'}`}>
+                        <input type="checkbox" className="hidden" checked={enabled} onChange={() => togglePresencePermission(permission)} />
+                        {label}
+                      </label>;
                     })}
                   </div>
                 </div>}

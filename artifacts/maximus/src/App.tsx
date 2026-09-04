@@ -9,6 +9,7 @@ import { loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, t
 import StockModulePage from '@/pages/stock-module';
 import { OperationalModulePage } from '@/pages/operational-modules';
 import { CompanyOrganizationAdmin } from '@/pages/company-organization';
+import PresenceModulePage from '@/pages/presence-module';
 
 const queryClient = new QueryClient();
 type Icon = typeof Gauge;
@@ -153,6 +154,25 @@ function AppContent() {
       .filter(([key]) => key.startsWith('stocks:'))
       .some(([, permissions]) => permissions.includes(permission));
   };
+  const hasPresencePermission = (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => {
+    if (session === 'kora' || session.startsWith('company:')) return true;
+    if (!roleFitsEmployee || !unitModules.has('presences') || !employeeRole) return false;
+    const explicit = employeeRole.modulePermissions[`presence.${permission}`];
+    const hasExplicitPresencePermissions = Object.keys(employeeRole.modulePermissions).some(key => key.startsWith('presence.'));
+    if (hasExplicitPresencePermissions) return Boolean(explicit?.length);
+    if (permission === 'view') return hasPermission('presences', 'voir');
+    if (permission === 'create') return hasPermission('presences', 'créer');
+    return hasPermission('presences', 'modifier');
+  };
+  const presenceEmployees = data.employees.filter(item => item.companyId === companyId).filter(item => {
+    if (!sectorManager || !employeeNode?.id) return true;
+    let node = data.orgNodes.find(candidate => candidate.id === item.sectorId && candidate.companyId === companyId);
+    while (node) {
+      if (node.id === employeeNode.id) return true;
+      node = node.parentId ? data.orgNodes.find(candidate => candidate.id === node?.parentId && candidate.companyId === companyId) : undefined;
+    }
+    return false;
+  });
   const stockPermissions = employeeRole && roleFitsEmployee
     ? Object.fromEntries(stockSubmodules.map(submodule => [submodule.id, employeeRole.modulePermissions[`stocks:${submodule.id}`]]).filter(([, permissions]) => permissions)) as Record<string, string[]>
     : undefined;
@@ -173,7 +193,7 @@ function AppContent() {
           <div className="page-pad mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <PageHeader {...currentMeta} location={location} />
           <ErrorBoundary resetKey={location}>
-            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} hasPermission={hasPermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} />}
+            {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} /> : <KoraRouter location={location} data={data} mutate={mutate} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} />}
           </ErrorBoundary>
         </div>
       </main>
@@ -429,7 +449,7 @@ function CompanyEditModal({ company, data, mutate, onClose }: { company: Company
   </Modal>;
 }
 
-function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, hasPermission, stockPermissions }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; stockPermissions?: Record<string, string[]> }) {
+function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, presenceEmployees, hasPermission, hasPresencePermission, stockPermissions }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; presenceEmployees: Employee[]; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; hasPresencePermission: (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => boolean; stockPermissions?: Record<string, string[]> }) {
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[location];
   if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
@@ -451,7 +471,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   if (location === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
   if (location === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;
   if (location === '/kora/rh') return <HumanResourcesWorkspace data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} companyId={companyId} />;
-  if (location === '/kora/presences') return <PresencesPage data={data} />;
+  if (location === '/kora/presences') return <PresenceModulePage companyId={companyId} employees={presenceEmployees} nodes={data.orgNodes.filter(node => node.companyId === companyId)} currentEmployee={employee} canView={hasPresencePermission('view')} canCreate={hasPresencePermission('create')} canEdit={hasPresencePermission('edit')} canCorrect={hasPresencePermission('correct')} canValidate={hasPresencePermission('validate')} canManage={hasPresencePermission('manage')} canExport={hasPresencePermission('export')} canDelete={hasPresencePermission('delete')} />;
   if (location === '/kora/paie') return <OperationalModulePage moduleId="paie" data={data} mutate={mutate} canCreate={hasPermission('paie', 'créer')} canModify={hasPermission('paie', 'modifier')} />;
   if (location === '/kora/crm') return <OperationalModulePage moduleId="crm" data={data} mutate={mutate} canCreate={hasPermission('crm', 'créer')} canModify={hasPermission('crm', 'modifier')} />;
   if (location === '/kora/fournisseurs') return <OperationalModulePage moduleId="fournisseurs" data={data} mutate={mutate} canCreate={hasPermission('fournisseurs', 'créer')} canModify={hasPermission('fournisseurs', 'modifier')} />;
@@ -723,7 +743,10 @@ function RHPage({ data }: { data: StoreData }) {
     </div>
   );
 }
-function PresencesPage({ data }: { data: StoreData }) { return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-3"><Metric label="Présents aujourd’hui" value="18" detail="85,7% de l’effectif" icon={Check} accent /><Metric label="En retard" value="02" detail="à 09:30" icon={FileClock} warning /><Metric label="Absents" value="01" detail="absence signalée" icon={Users} /></div><section className="card-surface overflow-hidden rounded-2xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="font-bold">Pointage du mardi 18 juin</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Dernière synchronisation il y a 2 min</p></div><button data-testid="button-refresh-presences" onClick={() => window.location.reload()} className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"><RefreshCw size={15} /></button></div><DataTable headers={['Collaborateur', 'Département', 'Arrivée', 'Départ', 'État']} rows={data.employees.map((e, i) => [`${e.firstName} ${e.lastName}`, e.department, ['08:42', '08:55', '09:31', '08:47'][i] ?? '09:02', '—', <StatusBadge status={i === 2 ? 'EN ATTENTE' : 'ACTIF'} />])} /></section></div>; }
+function PresencesPage({ data }: { data: StoreData }) {
+  const employees = data.employees.filter(employee => employee.companyId === 'kora');
+  return <PresenceModulePage companyId="kora" employees={employees} nodes={data.orgNodes.filter(node => node.companyId === 'kora')} currentEmployee={null} canView canCreate canEdit canCorrect canValidate canManage canExport canDelete />;
+}
 function ReportsPage({ data }: { data: StoreData }) { return <div className="grid gap-4 md:grid-cols-2"><ReportCard title="Synthèse hebdomadaire" text="Ventes, encaissements, stocks et équipe sur les 7 derniers jours." date="Semaine du 12 au 18 juin" /><ReportCard title="État des stocks" text={`${data.products.filter(p => p.stock <= p.threshold).length} références demandent votre attention.`} date="Actualisé aujourd’hui" /><ReportCard title="Performance commerciale" text="Une lecture des ventes validées et du panier moyen." date="Mois de juin 2024" /><ReportCard title="Rapport d’activité" text="L’historique des actions importantes de l’espace KORA." date="Dernières 30 jours" /></div>; }
 function ReportCard({ title, text, date }: { title: string; text: string; date: string }) { return <section data-testid={`card-report-${title}`} className="card-surface rounded-2xl p-5"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><FileBarChart size={19} /></span><h2 className="mt-5 font-bold">{title}</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{text}</p><div className="mt-5 flex items-center justify-between border-t pt-4"><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{date}</span><button data-testid={`button-open-report-${title}`} onClick={() => window.print()} className="text-xs font-bold text-[hsl(var(--primary))]">Consulter <ChevronRight className="inline" size={14} /></button></div></section>; }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [onClose]); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--foreground)/.35)] p-4 backdrop-blur-sm"><div className="card-surface max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 fade-up"><div className="mb-6 flex items-center justify-between"><h2 className="text-xl font-bold">{title}</h2><button data-testid="button-close-modal" onClick={onClose} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div>{children}</div></div>; }
