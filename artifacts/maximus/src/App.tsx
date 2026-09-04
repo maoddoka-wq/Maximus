@@ -137,7 +137,6 @@ function applyCompanyTheme(company: Company | undefined) {
   if (!company) return;
   const primary = hexColorPattern.test(company.primaryColor ?? '') ? company.primaryColor! : null;
   const accent = hexColorPattern.test(company.accentColor ?? '') ? company.accentColor! : primary;
-  if (!primary && !accent) return;
   const primaryColor = primary ?? '#f2b705';
   const accentColor = accent ?? primaryColor;
   const sidebarColor = hexColorPattern.test(company.sidebarColor ?? '') ? company.sidebarColor! : '#161d27';
@@ -188,7 +187,7 @@ function AppContent() {
   useEffect(() => {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
-  }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor]);
+  }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
   const login = (_space: 'admin' | 'kora', email: string, password: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!') {
