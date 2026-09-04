@@ -293,28 +293,225 @@ function RoleFormModal({
         {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son unité.</span>}
       </label>
       <div className="mt-4 border-t pt-4">
-        <label className="mb-3 block text-sm font-semibold">Permissions par module, sous-menu et action</label>
-        <p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Cochez d’abord « Voir » sur un module, puis choisissez ses sous-autorisations. Par exemple, un magasinier peut accéder à Articles et Entrées, tandis qu’un caissier ne voit que son espace de vente.</p>
-        <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-          {availableModules.map(module => {
-            const permissions = formData.modulePermissions[module.id] || [];
-            const features = module.id === 'commerce' ? commerceTabDefinitions : module.features.map(feature => ({ id: feature, label: feature }));
-            return (
-              <div key={module.id} className="space-y-2">
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div><p className="text-sm font-bold">{module.name}</p><p className="text-[10px] text-[hsl(var(--muted-foreground))]">{module.description}</p></div>
-                  <div className="flex items-center gap-2">{(['voir', 'créer', 'modifier'] as const).map(permission => <label key={permission} className={`cursor-pointer rounded px-2 py-1 text-[10px] font-bold transition ${permissions.includes(permission) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--muted))] hover:bg-[hsl(var(--muted-foreground)/.2)]'}`}><input type="checkbox" className="hidden" checked={permissions.includes(permission)} onChange={() => togglePermission(module.id, permission)} />{permission.charAt(0).toUpperCase() + permission.slice(1)}</label>)}</div>
-                </div>
-                {module.id !== 'stocks' && module.id !== 'presences' && <div className="ml-3 rounded-lg border border-dashed p-3"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Permissions dans les menus de {module.name}</p><p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Ces droits détaillent les fonctionnalités visibles et les actions possibles dans ce module.</p><div className="space-y-2">{features.map(feature => { const menuKey = module.id === 'commerce' ? commerceTabPermissionKey(feature.id as CommerceTabId) : permissionFeatureKey(module.id, feature.id); const featurePermissions = module.id === 'commerce' ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => formData.modulePermissions[permissionKey] || []))] : formData.modulePermissions[menuKey] || []; return <div key={menuKey} className="flex flex-col gap-2 rounded-md bg-[hsl(var(--muted)/.45)] px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"><span className="text-[10px] font-semibold">{feature.label}</span><div className="flex gap-1">{(['voir', 'créer', 'modifier'] as const).map(permission => <label key={permission} className={`cursor-pointer rounded px-1.5 py-1 text-[9px] font-bold ${featurePermissions.includes(permission) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--card))]'}`}><input type="checkbox" className="hidden" checked={featurePermissions.includes(permission)} onChange={() => toggleFeaturePermission(module.id, feature.id, permission)} />{permission === 'voir' ? 'Voir' : permission === 'créer' ? 'Créer' : 'Modifier'}</label>)}</div></div>; })}</div></div>}
-                {module.id === 'stocks' && <div className="ml-3 rounded-lg border border-dashed p-3"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Sous-fonctions de Gestion de stock</p><p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Ces règles priment sur les droits généraux du module pour les employés de cette unité.</p><div className="grid gap-2 sm:grid-cols-2">{stockSubmodules.map(submodule => { const subKey = `stocks:${submodule.id}`; const subPermissions = formData.modulePermissions[subKey] || []; return <div key={subKey} className="flex items-center justify-between gap-2 rounded-md bg-[hsl(var(--muted)/.45)] px-2.5 py-2"><span className="text-[10px] font-semibold">{submodule.name}</span><div className="flex gap-1">{(['voir', 'créer', 'modifier'] as const).map(permission => <label key={permission} className={`cursor-pointer rounded px-1.5 py-1 text-[9px] font-bold ${subPermissions.includes(permission) ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--card))]'}`}><input type="checkbox" className="hidden" checked={subPermissions.includes(permission)} onChange={() => togglePermission(subKey, permission)} />{permission === 'voir' ? 'Voir' : permission === 'créer' ? 'Créer' : 'Modifier'}</label>)}</div></div>; })}</div></div>}
-                {module.id === 'presences' && <div className="ml-3 rounded-lg border border-dashed p-3"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Droits détaillés des présences</p><p className="mb-3 text-[10px] text-[hsl(var(--muted-foreground))]">Chaque capacité est indépendante et reste limitée à l’unité du rôle.</p><div className="grid gap-2 sm:grid-cols-3">{([['view', 'Consulter'], ['create', 'Créer'], ['edit', 'Modifier'], ['delete', 'Supprimer'], ['correct', 'Corriger'], ['validate', 'Valider'], ['manage', 'Gérer'], ['export', 'Exporter'], ['reports', 'Rapports']] as const).map(([permission, label]) => { const enabled = Boolean(formData.modulePermissions[`presence.${permission}`]?.length); return <label key={permission} className={`cursor-pointer rounded px-2 py-1.5 text-[9px] font-bold ${enabled ? 'bg-[hsl(var(--primary))] text-white' : 'bg-[hsl(var(--card))]'}`}><input type="checkbox" className="hidden" checked={enabled} onChange={() => togglePresencePermission(permission)} />{label}</label>; })}</div></div>}
-              </div>
-            );
-          })}
+        <div className="mb-4">
+          <h3 className="text-sm font-bold">Droits d’accès</h3>
+          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Organisez les droits en trois niveaux : accès au module, sous-fonctionnalités et actions autorisées.</p>
+        </div>
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+          {availableModules.map(module => (
+            <ModulePermissionCard
+              key={module.id}
+              module={module}
+              modulePermissions={formData.modulePermissions}
+              onTogglePermission={togglePermission}
+              onToggleFeature={toggleFeaturePermission}
+              onTogglePresence={togglePresencePermission}
+            />
+          ))}
           {availableModules.length === 0 && <div className="text-sm italic text-[hsl(var(--muted-foreground))]">Aucun module n’est autorisé pour cette unité. Revenez dans Structure & unités pour en sélectionner.</div>}
         </div>
       </div>
       <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button><ActionButton primary onClick={handleSave} disabled={!formData.name || !formData.sectorId}>Enregistrer</ActionButton></div>
+    </div>
+  );
+}
+
+function PermissionToggle({
+  permission,
+  active,
+  onClick,
+}: {
+  permission: Permission;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[10px] font-bold transition ${active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)] hover:text-[hsl(var(--foreground))]'}`}
+    >
+      {active && <Check size={11} />}
+      {permissionLabels[permission]}
+    </button>
+  );
+}
+
+function PermissionToggleGroup({
+  permissions,
+  activePermissions,
+  onToggle,
+}: {
+  permissions: Permission[];
+  activePermissions: string[];
+  onToggle: (permission: Permission) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {permissions.map(permission => (
+        <PermissionToggle
+          key={permission}
+          permission={permission}
+          active={activePermissions.includes(permission)}
+          onClick={() => onToggle(permission)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ModulePermissionCard({
+  module,
+  modulePermissions,
+  onTogglePermission,
+  onToggleFeature,
+  onTogglePresence,
+}: {
+  module: Module;
+  modulePermissions: Record<string, string[]>;
+  onTogglePermission: (key: string, permission: Permission) => void;
+  onToggleFeature: (moduleId: ModuleId, feature: string, permission: Permission) => void;
+  onTogglePresence: (permission: string) => void;
+}) {
+  const permissions = modulePermissions[module.id] || [];
+  const features = module.id === 'commerce'
+    ? commerceTabDefinitions
+    : module.features.map(feature => ({ id: feature, label: feature }));
+
+  return (
+    <section className="overflow-hidden rounded-xl border bg-[hsl(var(--card))]">
+      <div className="flex flex-col gap-3 border-b bg-[hsl(var(--muted)/.22)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="rounded-lg bg-[hsl(var(--primary)/.12)] p-2 text-[hsl(var(--primary))]"><Layers3 size={16} /></span>
+          <div className="min-w-0">
+            <h4 className="text-sm font-bold">{module.name}</h4>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
+          </div>
+        </div>
+        <div className="shrink-0">
+          <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
+          <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
+        </div>
+      </div>
+      <div className="space-y-3 p-4">
+        {module.id !== 'stocks' && module.id !== 'presences' && (
+          <FeaturePermissionList
+            module={module}
+            features={features}
+            modulePermissions={modulePermissions}
+            onToggle={onToggleFeature}
+          />
+        )}
+        {module.id === 'stocks' && <StockPermissionList modulePermissions={modulePermissions} onToggle={onTogglePermission} />}
+        {module.id === 'presences' && <PresencePermissionList modulePermissions={modulePermissions} onToggle={onTogglePresence} />}
+      </div>
+    </section>
+  );
+}
+
+function FeaturePermissionList({
+  module,
+  features,
+  modulePermissions,
+  onToggle,
+}: {
+  module: Module;
+  features: readonly { id: string; label: string }[];
+  modulePermissions: Record<string, string[]>;
+  onToggle: (moduleId: ModuleId, feature: string, permission: Permission) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <h5 className="text-xs font-bold">Sous-fonctionnalités</h5>
+          <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Définissez les menus et actions visibles dans ce module.</p>
+        </div>
+        <span className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{features.length} élément{features.length > 1 ? 's' : ''}</span>
+      </div>
+      <div className="grid gap-2">
+        {features.map(feature => {
+          const key = module.id === 'commerce' ? commerceTabPermissionKey(feature.id as CommerceTabId) : permissionFeatureKey(module.id, feature.id);
+          const activePermissions = module.id === 'commerce'
+            ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => modulePermissions[permissionKey] || []))]
+            : modulePermissions[key] || [];
+          return (
+            <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs font-semibold">{feature.label}</span>
+              <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={activePermissions} onToggle={permission => onToggle(module.id, feature.id, permission)} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StockPermissionList({
+  modulePermissions,
+  onToggle,
+}: {
+  modulePermissions: Record<string, string[]>;
+  onToggle: (key: string, permission: Permission) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2">
+        <h5 className="text-xs font-bold">Sous-fonctions de Gestion de stock</h5>
+        <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Ces règles précisent les droits de l’employé dans son unité.</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {stockSubmodules.map(submodule => {
+          const key = `stocks:${submodule.id}`;
+          return (
+            <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3">
+              <span className="text-xs font-semibold">{submodule.name}</span>
+              <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={modulePermissions[key] || []} onToggle={permission => onToggle(key, permission)} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PresencePermissionList({
+  modulePermissions,
+  onToggle,
+}: {
+  modulePermissions: Record<string, string[]>;
+  onToggle: (permission: string) => void;
+}) {
+  const permissions = [
+    ['view', 'Consulter'],
+    ['create', 'Créer'],
+    ['edit', 'Modifier'],
+    ['delete', 'Supprimer'],
+    ['correct', 'Corriger'],
+    ['validate', 'Valider'],
+    ['manage', 'Gérer'],
+    ['export', 'Exporter'],
+    ['reports', 'Rapports'],
+  ] as const;
+
+  return (
+    <div>
+      <div className="mb-2">
+        <h5 className="text-xs font-bold">Droits détaillés des présences</h5>
+        <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Chaque capacité reste limitée à l’unité du rôle.</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {permissions.map(([key, label]) => {
+          const active = Boolean(modulePermissions[`presence.${key}`]?.length);
+          return (
+            <button key={key} type="button" aria-pressed={active} onClick={() => onToggle(key)} className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-xs font-semibold transition ${active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--muted)/.16)] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)]'}`}>
+              {label}
+              {active && <Check size={13} className="text-[hsl(var(--primary))]" />}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
