@@ -79,6 +79,52 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/kora/rapports': { kicker: 'Espace KORA', title: 'Rapports', description: 'Des synthèses actionnables pour décider plus vite.' },
 };
 
+const hexColorPattern = /^#[0-9a-f]{6}$/i;
+const themeVariableNames = ['--primary', '--primary-foreground', '--accent', '--accent-foreground', '--ring', '--sidebar-primary', '--sidebar-primary-foreground'];
+
+function hexToHsl(hex: string) {
+  const red = Number.parseInt(hex.slice(1, 3), 16) / 255;
+  const green = Number.parseInt(hex.slice(3, 5), 16) / 255;
+  const blue = Number.parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  if (max === min) return `0 0% ${Math.round(lightness * 100)}%`;
+  const difference = max - min;
+  const saturation = lightness > 0.5 ? difference / (2 - max - min) : difference / (max + min);
+  let hue = 0;
+  if (max === red) hue = ((green - blue) / difference + (green < blue ? 6 : 0)) / 6;
+  else if (max === green) hue = ((blue - red) / difference + 2) / 6;
+  else hue = ((red - green) / difference + 4) / 6;
+  return `${Math.round(hue * 360)} ${Math.round(saturation * 100)}% ${Math.round(lightness * 100)}%`;
+}
+
+function themeForeground(hex: string) {
+  const red = Number.parseInt(hex.slice(1, 3), 16) / 255;
+  const green = Number.parseInt(hex.slice(3, 5), 16) / 255;
+  const blue = Number.parseInt(hex.slice(5, 7), 16) / 255;
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return luminance > 0.62 ? '218 28% 13%' : '0 0% 100%';
+}
+
+function applyCompanyTheme(company: Company | undefined) {
+  const root = document.documentElement;
+  themeVariableNames.forEach(name => root.style.removeProperty(name));
+  if (!company) return;
+  const primary = hexColorPattern.test(company.primaryColor ?? '') ? company.primaryColor! : null;
+  const accent = hexColorPattern.test(company.accentColor ?? '') ? company.accentColor! : primary;
+  if (!primary && !accent) return;
+  const primaryColor = primary ?? '#f2b705';
+  const accentColor = accent ?? primaryColor;
+  root.style.setProperty('--primary', hexToHsl(primaryColor));
+  root.style.setProperty('--primary-foreground', themeForeground(primaryColor));
+  root.style.setProperty('--accent', hexToHsl(accentColor));
+  root.style.setProperty('--accent-foreground', themeForeground(accentColor));
+  root.style.setProperty('--ring', hexToHsl(primaryColor));
+  root.style.setProperty('--sidebar-primary', hexToHsl(primaryColor));
+  root.style.setProperty('--sidebar-primary-foreground', themeForeground(primaryColor));
+}
+
 function AppContent() {
   const [data, setData] = useState<StoreData>(() => loadData());
   const [session, setSession] = useState<Session | null>(() => (localStorage.getItem('maximus-session') as Session | null));
@@ -98,6 +144,18 @@ function AppContent() {
     if (message) setToast(message);
   };
   const notify = (message: string) => setToast(message);
+  const sessionEmployeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
+  const sessionEmployee = sessionEmployeeId ? data.employees.find(employee => employee.id === sessionEmployeeId) : null;
+  const activeCompanyId = session === 'kora'
+    ? 'kora'
+    : session?.startsWith('company:')
+      ? session.slice('company:'.length)
+      : sessionEmployee?.companyId;
+  const activeCompany = data.companies.find(company => company.id === activeCompanyId);
+  useEffect(() => {
+    applyCompanyTheme(activeCompany);
+    return () => applyCompanyTheme(undefined);
+  }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor]);
   const login = (_space: 'admin' | 'kora', email: string, password: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!') {
@@ -129,10 +187,10 @@ function AppContent() {
   const loginEmployees = [...data.employees, ...data.companies.filter(company => company.status === 'ACTIF' && company.adminPassword).map(company => ({ id: `company-admin:${company.id}`, firstName: company.manager.split(' ')[0] ?? company.name, lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur', email: company.email, phone: company.phone, position: 'Administrateur', department: '', subDepartment: '', role: 'Administrateur entreprise', status: 'ACTIF' as const, loginPassword: company.adminPassword, companyId: company.id }))];
   if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
-  const employeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
+  const employeeId = sessionEmployeeId;
   const employee = employeeId ? data.employees.find(e => e.id === employeeId) ?? null : null;
-  const companyId = session === 'kora' ? 'kora' : session.startsWith('company:') ? session.slice('company:'.length) : employee?.companyId ?? 'kora';
-  const currentCompany = data.companies.find(company => company.id === companyId);
+  const companyId = activeCompanyId ?? 'kora';
+  const currentCompany = activeCompany;
   const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
