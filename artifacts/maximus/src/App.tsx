@@ -108,8 +108,8 @@ function AppContent() {
   const activeCompanyTheme = companyThemeVariables(activeCompany);
   const activeNavStyle: CSSProperties | undefined = activeCompany
     ? {
-        backgroundColor: `hsl(${activeCompanyTheme['--sidebar-primary']})`,
-        color: `hsl(${activeCompanyTheme['--sidebar-primary-foreground']})`,
+        backgroundColor: `hsl(${activeCompanyTheme['--sidebar-active']})`,
+        color: `hsl(${activeCompanyTheme['--sidebar-active-foreground']})`,
       }
     : undefined;
   useEffect(() => {

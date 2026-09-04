@@ -80,6 +80,8 @@
   --sidebar-border: 218 18% 23%;
   --sidebar-primary: 43 91% 50%;
   --sidebar-primary-foreground: 218 28% 13%;
+  --sidebar-active: 218 24% 20%;
+  --sidebar-active-foreground: 43 32% 93%;
   --sidebar-accent: 218 24% 20%;
   --sidebar-accent-foreground: 43 32% 93%;
   --app-font-sans: 'DM Sans', sans-serif;
@@ -114,6 +116,8 @@
   --sidebar-border: 218 24% 16%;
   --sidebar-primary: 37 88% 55%;
   --sidebar-primary-foreground: 222 31% 16%;
+  --sidebar-active: 218 24% 14%;
+  --sidebar-active-foreground: 43 32% 93%;
   --sidebar-accent: 218 24% 14%;
   --sidebar-accent-foreground: 43 32% 93%;
 }
@@ -188,9 +192,9 @@ body { min-width: 320px; }
 .metric-accent { position: relative; overflow: hidden; }
 .metric-accent::after { position: absolute; right: -22px; top: -22px; width: 88px; height: 88px; border: 1px solid hsl(var(--primary) / .2); border-radius: 999px; content: ""; }
 .nav-item { transition: background-color .2s ease, color .2s ease, transform .2s ease; }
-.nav-item:hover { background: hsl(var(--sidebar-primary) / .16); transform: translateX(2px); }
-.nav-item.active { background: hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary-foreground)); }
-.nav-item.active:hover { background: hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary-foreground)); }
+.nav-item:hover { background: hsl(var(--sidebar-active) / .72); transform: translateX(2px); }
+.nav-item.active { background: hsl(var(--sidebar-active)); color: hsl(var(--sidebar-active-foreground)); }
+.nav-item.active:hover { background: hsl(var(--sidebar-active)); color: hsl(var(--sidebar-active-foreground)); }
 .btn { transition: transform .15s ease, background-color .2s ease, box-shadow .2s ease; }
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: translateY(0); }
@@ -289,7 +293,7 @@ body {
 }
 
 .sidebar .nav-item.active {
-  box-shadow: 0 5px 14px hsl(var(--sidebar-primary) / .18);
+  box-shadow: 0 5px 14px hsl(var(--sidebar-active) / .24);
 }
 
 .sidebar-section-label {
