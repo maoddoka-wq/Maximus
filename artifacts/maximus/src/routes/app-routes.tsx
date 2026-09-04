@@ -160,7 +160,7 @@ export function KoraRouter({
     return <screens.dashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
   }
   if (routePath === '/kora/controle') {
-    return <screens.control data={data} mutate={mutate} companyId={companyId} employeeId={employee?.id} actorName={employee ? `${employee.firstName} ${employee.lastName}` : data.companies.find(company => company.id === companyId)?.manager ?? 'Administrateur'} isAdmin={false} companyAdmin={companyAdmin} sectorManager={sectorManager} />;
+    return <screens.control data={data} mutate={mutate} companyId={companyId} employeeId={employee?.id} scopeNodeId={scopeNodeId} actorName={employee ? `${employee.firstName} ${employee.lastName}` : data.companies.find(company => company.id === companyId)?.manager ?? 'Administrateur'} isAdmin={false} companyAdmin={companyAdmin} sectorManager={sectorManager} />;
   }
   if (routePath === '/kora/notifications') {
     return <screens.notifications data={data} mutate={mutate} context={{ isAdmin: false, companyId }} />;

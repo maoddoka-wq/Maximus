@@ -73,6 +73,7 @@ export function ControlCenterPage({
   companyAdmin,
   sectorManager,
   employeeId,
+  scopeNodeId,
   actorName,
 }: {
   data: StoreData;
@@ -82,9 +83,10 @@ export function ControlCenterPage({
   companyAdmin?: boolean;
   sectorManager?: boolean;
   employeeId?: string;
+  scopeNodeId?: string;
   actorName: string;
 }) {
-  const canSeeAll = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
+  const canSeeAll = isAdmin || Boolean(companyAdmin);
   const [statusFilter, setStatusFilter] = useState<'TOUS' | ControlTaskStatus>('TOUS');
   const [moduleFilter, setModuleFilter] = useState<'TOUS' | ModuleId>('TOUS');
   const [showCreate, setShowCreate] = useState(false);
@@ -96,11 +98,24 @@ export function ControlCenterPage({
     dueDate: '',
   });
   const canCreateTask = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
+  const isWithinSectorScope = (taskSectorId?: string) => {
+    if (!sectorManager || !scopeNodeId || !taskSectorId) return false;
+    let node = data.orgNodes.find(candidate => candidate.id === taskSectorId && candidate.companyId === companyId);
+    while (node) {
+      if (node.id === scopeNodeId) return true;
+      node = node.parentId ? data.orgNodes.find(candidate => candidate.id === node?.parentId && candidate.companyId === companyId) : undefined;
+    }
+    return false;
+  };
 
   const accessibleTasks = useMemo(() => data.controlTasks.filter(task => {
-    const inScope = isAdmin || (task.companyId === companyId && (canSeeAll || task.assigneeEmployeeId === employeeId));
+    const inScope = isAdmin || (task.companyId === companyId && (
+      canSeeAll
+      || task.assigneeEmployeeId === employeeId
+      || isWithinSectorScope(task.sectorId)
+    ));
     return inScope;
-  }), [canSeeAll, companyId, data.controlTasks, employeeId, isAdmin]);
+  }), [canSeeAll, companyId, data.controlTasks, employeeId, isAdmin, scopeNodeId, sectorManager]);
   const visibleTasks = useMemo(() => accessibleTasks.filter(task => {
     const matchesStatus = statusFilter === 'TOUS' || task.status === statusFilter;
     const matchesModule = moduleFilter === 'TOUS' || task.moduleId === moduleFilter;
@@ -173,6 +188,7 @@ export function ControlCenterPage({
         title: newTask.title.trim(),
         description: newTask.description.trim() || 'Tâche créée depuis le centre de contrôle.',
         companyId: isAdmin ? undefined : companyId,
+        sectorId: sectorManager ? scopeNodeId : undefined,
         moduleId: newTask.moduleId,
         createdBy: actorName,
         status: 'À FAIRE',
