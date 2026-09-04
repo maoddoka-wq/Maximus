@@ -13,6 +13,22 @@ import PresenceModulePage from '@/pages/presence-module';
 
 const queryClient = new QueryClient();
 type Icon = typeof Gauge;
+const moduleIcons: Record<ModuleId, Icon> = {
+  commerce: ShoppingCart,
+  ventes: CreditCard,
+  achats: Package,
+  stocks: Boxes,
+  finance: WalletCards,
+  comptabilite: FileBarChart,
+  rh: UserRoundCog,
+  presences: FileClock,
+  paie: CreditCard,
+  crm: Users,
+  fournisseurs: Store,
+  logistique: Warehouse,
+  documents: FolderKanban,
+  rapports: FileBarChart,
+};
 type Session = 'admin' | 'kora' | `employee:${string}` | `company:${string}`;
 
 const adminNav = [
@@ -1007,7 +1023,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
       <div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
         <section className="card-surface rounded-2xl p-6">
           <div className="flex items-start justify-between gap-4">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={21} /></span>
+             {(() => { const ModuleIcon = moduleIcons[selected.id] ?? LayoutGrid; return <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><ModuleIcon size={21} /></span>; })()}
             <StatusBadge status={status} />
           </div>
            <div className="mt-6 flex flex-wrap items-start justify-between gap-3"><h2 className="text-2xl font-bold">{selected.name}</h2><div className="flex gap-1"><button data-testid={`button-edit-module-${selected.id}`} title="Modifier le module" onClick={() => openEdit(selected)} className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={15} /></button><button data-testid={`button-delete-module-${selected.id}`} title="Supprimer le module" onClick={() => setDeletingModule(selected)} className="rounded-lg border p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={15} /></button></div></div>
@@ -1076,7 +1092,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
       {visibleModules.map((module, index) => {
         const status = statusOf(module.id);
         const isActive = status !== 'INACTIF';
-        const ModuleIcon: Icon = categoryOf(module.id) === 'Commerce' ? ShoppingCart : categoryOf(module.id) === 'Finance' ? WalletCards : categoryOf(module.id) === 'Ressources humaines' ? Users : Boxes;
+         const ModuleIcon = moduleIcons[module.id] ?? LayoutGrid;
          return <article data-testid={`card-module-${module.id}`} key={module.id} className={`card-surface group relative flex min-h-[180px] flex-col rounded-2xl p-4 text-center transition hover:-translate-y-1 hover:border-[hsl(var(--primary)/.45)] hover:shadow-lg fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-65'}`}>
            <button type="button" data-testid={`button-open-module-${module.id}`} onClick={() => setSelectedId(module.id)} aria-label={`Ouvrir l’application ${module.name}`} className="flex flex-1 flex-col items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))]">
              <span className={`absolute right-3 top-3 h-2 w-2 rounded-full ${isActive ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.45)]'}`} title={isActive ? 'Application active' : 'Application inactive'} />
