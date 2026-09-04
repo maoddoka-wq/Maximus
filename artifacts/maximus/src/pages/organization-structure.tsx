@@ -60,13 +60,14 @@ export function StructureTab({
 
   return (
     <div className="card-surface rounded-2xl p-6 fade-up">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold">Unités Organisationnelles</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez la hiérarchie de l’entreprise. Les rôles, sous-autorisations et managers se configurent dans les étapes suivantes de cette même page.</p>
         </div>
         <ActionButton
           primary
+          className="shrink-0 self-start"
           onClick={() => {
             setEditingNode(null);
             setModalOpen(true);
