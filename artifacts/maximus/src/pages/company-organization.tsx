@@ -93,9 +93,9 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
 
   return (
     <div className="space-y-6">
-      {!standalone && <div className="card-surface p-6 rounded-2xl">
+      <div className="card-surface p-6 rounded-2xl">
         <h1 className="text-xl font-bold">{sectorManager ? 'Règles d’accès de mon unité' : `Modèle d'Accès & Organisation : ${company.name}`}</h1>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sectorManager ? 'Définissez les modules et actions autorisés aux employés rattachés à votre unité.' : 'Construisez librement votre hiérarchie : Unité → Modules → Rôle → Employé.'}</p>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sectorManager ? 'Gérez les rôles, sous-autorisations et comptes de votre unité et de ses descendants.' : 'Construisez la hiérarchie, configurez les rôles et sous-autorisations, puis affectez les comptes et managers.'}</p>
         <div className="mt-6 flex gap-2 overflow-x-auto">
           {tabs.map(item => (
             <button key={item.id} data-testid={`tab-${item.id}`} onClick={() => setTab(item.id)} className={`shrink-0 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}>
@@ -103,8 +103,8 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
             </button>
           ))}
         </div>
-      </div>}
-      {!standalone && !sectorManager && <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.03)] p-5">
+      </div>
+      {!sectorManager && <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.03)] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Parcours recommandé</p>
@@ -128,7 +128,7 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
         </p>}
       </section>}
 
-      {!standalone && tab === 'overview' && <OverviewTab company={company} data={scopedData} setTab={setTab} />}
+      {tab === 'overview' && <OverviewTab company={company} data={scopedData} setTab={setTab} />}
       {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
@@ -368,13 +368,13 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-bold text-lg">Unités Organisationnelles</h2>
-           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Créez la hiérarchie de l’entreprise. Les autorisations se configurent ensuite depuis la page dédiée.</p>
+           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Créez la hiérarchie de l’entreprise. Les rôles, sous-autorisations et managers se configurent dans les étapes suivantes de cette même page.</p>
         </div>
         <ActionButton primary onClick={handleCreate} testId="btn-create-org">Créer une unité</ActionButton>
       </div>
 
         <div className="mb-4 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-          <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez les directions, départements, secteurs et services. Les rôles, les autorisations et les managers sont configurés dans leurs pages respectives après la création de cette structure.
+          <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez les directions, départements, secteurs et services. Les rôles, les sous-autorisations et les managers se configurent ensuite dans les étapes 2 et 3 ci-dessus.
        </div>
         <div className="mb-5 flex items-center justify-between rounded-xl border px-4 py-3 text-xs">
           <span><strong>{companyNodes.length}</strong> unité(s) créée(s)</span>
@@ -544,8 +544,8 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
     <div className="card-surface p-6 rounded-2xl fade-up">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="font-bold text-lg">Rôles et Permissions</h2>
-         <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Étape 2 · Retrouvez les unités créées à l’étape 1, créez leurs rôles et configurez les modules, menus et actions autorisés.</p>
+          <h2 className="font-bold text-lg">Rôles & sous-autorisations</h2>
+         <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Étape 2 · Retrouvez les unités créées à l’étape 1, créez leurs rôles et choisissez précisément les modules, menus et actions visibles par chaque employé.</p>
         </div>
         <ActionButton primary disabled={companyNodes.length === 0} onClick={() => { setEditingRole(null); setModalOpen(true); }} testId="btn-create-role">Créer un rôle</ActionButton>
       </div>
@@ -570,12 +570,15 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
               </div>
               <p className="text-xs text-[hsl(var(--muted-foreground))] mt-3 flex-1">{role.description}</p>
               {(company.managerRoleId === role.id || data.employees.some(employee => employee.roleId === role.id)) && <div className="mt-3 border-t pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Affectations</p><p className="mt-1 text-xs font-semibold">{company.managerRoleId === role.id ? `Manager : ${company.manager}` : ''}{company.managerRoleId === role.id && data.employees.some(employee => employee.roleId === role.id) ? ' · ' : ''}{data.employees.filter(employee => employee.roleId === role.id).map(employee => `${employee.firstName} ${employee.lastName}`).join(', ')}</p></div>}
-               <div className="mt-4 border-t pt-3 flex flex-wrap gap-1.5">
+               <div className="mt-4 border-t pt-3">
+                 <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{Object.keys(role.modulePermissions).length} autorisation{Object.keys(role.modulePermissions).length > 1 ? 's' : ''} configurée{Object.keys(role.modulePermissions).length > 1 ? 's' : ''}</p>
+                 <div className="flex flex-wrap gap-1.5">
                 {Object.keys(role.modulePermissions).map(modId => (
                    <span key={modId} className="text-[10px] px-1.5 py-0.5 rounded border font-medium">
                      {permissionLabel(modId)}
                   </span>
                 ))}
+                 </div>
               </div>
             </div>
           );
@@ -687,10 +690,10 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
       </label>
 
       <div className="border-t pt-4 mt-4">
-         <label className="block text-sm font-semibold mb-3">Permissions par module et par menu</label>
-           <p className="text-[10px] text-[hsl(var(--muted-foreground))] mb-3">La structure est déjà créée. Sélectionnez les modules, puis détaillez les menus et les actions autorisés pour ce rôle.</p>
+            <label className="block text-sm font-semibold mb-3">Permissions par module, sous-menu et action</label>
+            <p className="text-[10px] text-[hsl(var(--muted-foreground))] mb-3">Cochez d’abord « Voir » sur un module, puis choisissez ses sous-autorisations. Par exemple, un magasinier peut accéder à Articles et Entrées, tandis qu’un caissier ne voit que son espace de vente.</p>
         
-        <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
           {availableModules.map(m => {
             const perms = formData.modulePermissions[m.id] || [];
             return (

@@ -28,9 +28,7 @@ const adminNav = [
 ];
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, adminOnly: true, peopleAdminOnly: true },
-  { href: '/kora/autorisations', label: 'Autorisations', icon: ShieldCheck, module: null, peopleAdminOnly: true },
-  { href: '/kora/employes', label: 'Comptes & managers', icon: UserRoundCog, module: null, peopleAdminOnly: true },
+  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
   { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
@@ -58,9 +56,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/notifications': { kicker: 'Centre de contrôle', title: 'Notifications', description: 'Les signaux utiles, sans bruit.' },
   '/maximus/journal': { kicker: 'Traçabilité', title: 'Journal d’activité', description: 'Chaque action importante, horodatée et attribuée.' },
   '/kora/dashboard': { kicker: 'KORA Distribution', title: 'Le rythme de KORA, en un regard.', description: 'Mardi 18 juin 2024 · Dakar, Sénégal' },
-  '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Construisez d’abord la hiérarchie de votre entreprise, sans mélanger les autorisations.' },
-  '/kora/autorisations': { kicker: 'Espace KORA', title: 'Autorisations', description: 'Retrouvez les unités de votre organisation et définissez les accès de chaque rôle.' },
-  '/kora/employes': { kicker: 'Espace KORA', title: 'Comptes & managers', description: 'Créez les comptes, choisissez leur appartenance et désignez les managers.' },
+  '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Structure, rôles, sous-autorisations, comptes et managers au même endroit.' },
   '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
   '/kora/stocks': { kicker: 'Espace KORA', title: 'Gestion de stock', description: 'Pilotez vos articles, entrées, sorties et inventaires.' },
@@ -143,18 +139,23 @@ function AppContent() {
     ancestryNode = ancestryNode.parentId ? data.orgNodes.find(node => node.id === ancestryNode?.parentId) : undefined;
   }
   const roleFitsEmployee = Boolean(employeeRole?.sectorId && employeeAncestry.has(employeeRole.sectorId) && employeeRole.companyId === employee?.companyId);
+  const roleHasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
+    if (!employeeRole) return false;
+    if (employeeRole.modulePermissions[moduleId]?.includes(permission)) return true;
+    const detailedPrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:`;
+    return Object.entries(employeeRole.modulePermissions)
+      .filter(([key]) => key.startsWith(detailedPrefix))
+      .some(([, permissions]) => permissions.includes(permission));
+  };
   const allowed = (session === 'kora' || session.startsWith('company:'))
     ? companyAllowed
     : employeeRole && roleFitsEmployee
-      ? companyAllowed.filter(moduleId => employeeRole.modulePermissions[moduleId]?.includes('voir'))
+      ? companyAllowed.filter(moduleId => roleHasPermission(moduleId, 'voir'))
       : [];
   const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
     if (session === 'kora' || session.startsWith('company:')) return true;
     if (!roleFitsEmployee || !employeeRole) return false;
-    if (employeeRole.modulePermissions[moduleId]?.includes(permission)) return true;
-    return moduleId === 'stocks' && Object.entries(employeeRole.modulePermissions)
-      .filter(([key]) => key.startsWith('stocks:'))
-      .some(([, permissions]) => permissions.includes(permission));
+    return roleHasPermission(moduleId, permission);
   };
   const hasPresencePermission = (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => {
     if (session === 'kora' || session.startsWith('company:')) return true;
@@ -177,7 +178,15 @@ function AppContent() {
     return false;
   });
   const stockPermissions = employeeRole && roleFitsEmployee
-    ? Object.fromEntries(stockSubmodules.map(submodule => [submodule.id, employeeRole.modulePermissions[`stocks:${submodule.id}`]]).filter(([, permissions]) => permissions)) as Record<string, string[]>
+    ? (() => {
+        const detailed = stockSubmodules
+          .map(submodule => [submodule.id, employeeRole.modulePermissions[`stocks:${submodule.id}`]] as const)
+          .filter(([, permissions]) => permissions);
+        const rootPermissions = employeeRole.modulePermissions.stocks;
+        return Object.fromEntries(detailed.length > 0
+          ? detailed
+          : stockSubmodules.map(submodule => [submodule.id, rootPermissions] as const).filter(([, permissions]) => permissions)) as Record<string, string[]>;
+      })()
     : undefined;
    const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
    const baseMeta = pageMeta[location] ?? (location.startsWith('/maximus/entreprises/') ? { kicker: 'Administration', title: 'Détail entreprise', description: 'Consultez et ajustez l’espace client sélectionné.' } : pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard']);
@@ -283,7 +292,7 @@ function Field({ label, value, onChange, placeholder, type = 'text', testId, hel
 function Sidebar({ session, location, allowed, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse, fixedHeight }: { session: Session; location: string; allowed: ModuleId[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; companyPhoto?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void; fixedHeight?: boolean }) {
   const isAdmin = session === 'admin';
   const companyAdmin = session === 'kora' || session.startsWith('company:');
-  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || companyAdmin) && (!item.peopleAdminOnly || companyAdmin || canManagePeople) && (item.module === null || allowed.includes(item.module as ModuleId)));
+  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.peopleAdminOnly || companyAdmin || canManagePeople) && (item.module === null || allowed.includes(item.module as ModuleId)));
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const compact = collapsed && !mobileOpen;
   const profileImage = !isAdmin && !employee ? companyPhoto : undefined;
@@ -455,23 +464,16 @@ function CompanyEditModal({ company, data, mutate, onClose }: { company: Company
 function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeople, companyAdmin, sectorManager, scopeNodeId, companyId, employee, presenceEmployees, hasPermission, hasPresencePermission, stockPermissions }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (path: string) => void; allowed: ModuleId[]; canManagePeople: boolean; companyAdmin: boolean; sectorManager: boolean; scopeNodeId?: string; companyId: string; employee: StoreData['employees'][number] | null; presenceEmployees: Employee[]; hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean; hasPresencePermission: (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => boolean; stockPermissions?: Record<string, string[]> }) {
   const routeModules: Record<string, ModuleId> = { '/kora/commerce': 'commerce', '/kora/ventes': 'ventes', '/kora/achats': 'achats', '/kora/stocks': 'stocks', '/kora/finance': 'finance', '/kora/comptabilite': 'comptabilite', '/kora/rh': 'rh', '/kora/presences': 'presences', '/kora/paie': 'paie', '/kora/crm': 'crm', '/kora/fournisseurs': 'fournisseurs', '/kora/logistique': 'logistique', '/kora/documents': 'documents', '/kora/rapports': 'rapports' };
   const requiredModule = routeModules[location];
-  if (requiredModule && !allowed.includes(requiredModule) && !(location === '/kora/employes' && canManagePeople)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
-  if (location === '/kora/dashboard') return <KoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
+  if (requiredModule && !allowed.includes(requiredModule)) return <EmptyState title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
+  if (location === '/kora/dashboard') return <RoleAwareKoraDashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
   if (location === '/kora/profil') {
     const company = data.companies.find(item => item.id === companyId);
     return companyAdmin && company ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="profile" /> : <EmptyState title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onNavigate('/kora/dashboard')} />;
   }
-  if (location === '/kora/organisation') {
+  if (location === '/kora/organisation' || location === '/kora/autorisations' || location === '/kora/employes' || location === '/kora/roles') {
     const company = data.companies.find(item => item.id === companyId);
-    return company && companyAdmin ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="structure" standalone /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise peut construire la structure organisationnelle." action={() => onNavigate('/kora/dashboard')} />;
-  }
-  if (location === '/kora/autorisations' || location === '/kora/roles') {
-    const company = data.companies.find(item => item.id === companyId);
-    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="roles" standalone sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise ou le manager de votre unité peut configurer les autorisations." action={() => onNavigate('/kora/dashboard')} />;
-  }
-  if (location === '/kora/employes') {
-    const company = data.companies.find(item => item.id === companyId);
-    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="employees" standalone sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise ou le manager de votre unité peut gérer les comptes." action={() => onNavigate('/kora/dashboard')} />;
+    const initialTab = location === '/kora/autorisations' || location === '/kora/roles' ? 'roles' : location === '/kora/employes' ? 'employees' : 'overview';
+    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab={initialTab} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur." action={() => onNavigate('/kora/dashboard')} />;
   }
    if (location === '/kora/stocks') {
     return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} canCreate={hasPermission('stocks', 'créer')} canModify={hasPermission('stocks', 'modifier')} stockPermissions={stockPermissions} />;
@@ -495,6 +497,34 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
 function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
   const pending = data.companies.filter(c => c.status === 'EN ATTENTE').length; return <div className="space-y-6"><div className="grid gap-4 md:grid-cols-3"><Metric label="Entreprises actives" value={String(data.companies.filter(c => c.status === 'ACTIF').length)} detail="+1 ce mois" icon={Building2} accent /><Metric label="Demandes à traiter" value={String(pending).padStart(2, '0')} detail="requiert votre attention" icon={FileClock} /><Metric label="Modules activés" value="05" detail="sur 05 disponibles" icon={LayoutGrid} /></div><div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]"><section className="card-surface overflow-hidden rounded-2xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="font-bold">Activité récente</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les derniers mouvements dans vos espaces</p></div><button data-testid="button-see-journal" onClick={() => onNavigate('/maximus/journal')} className="text-xs font-bold text-[hsl(var(--primary))]">Voir le journal <ChevronRight className="inline" size={14} /></button></div><div className="divide-y">{data.activities.slice(0, 4).map((a, i) => <ActivityRow key={a.id} activity={a} delay={i} />)}</div></section><section className="card-surface rounded-2xl p-5"><div className="flex items-center justify-between"><div><h2 className="font-bold">État des espaces</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui</p></div><button data-testid="button-see-companies" onClick={() => onNavigate('/maximus/entreprises')} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><ChevronRight size={17} /></button></div><div className="mt-5 space-y-4">{data.companies.map(c => <div data-testid={`row-company-status-${c.id}`} key={c.id} className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-xs font-black text-[hsl(var(--primary))]">{c.name.slice(0, 2).toUpperCase()}</span><div><p className="text-sm font-bold">{c.name}</p><p className="text-[11px] text-[hsl(var(--muted-foreground))]">{c.allowedModules.length} modules actifs</p></div></div><StatusBadge status={c.status} /></div>)}</div></section></div><section className="grid-lines rounded-2xl border border-dashed border-[hsl(var(--border))] p-5 sm:p-6"><div className="flex items-start gap-4"><div className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3"><Sparkles size={19} className="text-[hsl(var(--primary))]" /></div><div><h2 className="font-bold">MAXIMUS en bref</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Le centre de contrôle est prêt. Consultez les demandes, ajustez les modules autorisés et gardez une trace de chaque décision.</p></div></div></section></div>;
 }
+function RoleAwareKoraDashboard({ data, onNavigate, allowed }: { data: StoreData; onNavigate: (path: string) => void; allowed: ModuleId[] }) {
+  const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
+  const canStocks = allowed.includes('stocks');
+  const canFinance = allowed.includes('finance') || allowed.includes('comptabilite');
+  const canPresences = allowed.includes('presences');
+  const revenue = data.payments.filter(payment => payment.status === 'CONFIRMÉ').reduce((sum, payment) => sum + payment.amount, 0);
+  const low = data.products.filter(product => product.stock <= product.threshold).length;
+  const cards = [
+    canCommerce ? <Metric key="sales" label="Ventes validées" value={String(data.sales.filter(sale => sale.status === 'VALIDÉ').length)} detail="sur les 30 derniers jours" icon={ShoppingCart} /> : null,
+    canStocks ? <Metric key="stock" label="Produits à surveiller" value={String(low).padStart(2, '0')} detail="seuil de sécurité atteint" icon={Package} warning /> : null,
+    canFinance ? <Metric key="cash" label="Encaissements du mois" value={shortMoney(revenue)} suffix=" FCFA" detail="paiements confirmés" icon={TrendingUp} accent /> : null,
+    canPresences ? <Metric key="presence" label="Présences aujourd’hui" value="18 / 21" detail="85,7% de l’effectif" icon={Users} /> : null,
+  ].filter(Boolean);
+  const primaryPath = canStocks ? '/kora/stocks' : canCommerce ? '/kora/commerce' : canFinance ? '/kora/finance' : canPresences ? '/kora/presences' : '/kora/organisation';
+  const primaryLabel = canStocks ? 'Ouvrir Gestion de stock' : canCommerce ? 'Ouvrir Commerce' : canFinance ? 'Ouvrir Finance' : canPresences ? 'Ouvrir Présences' : 'Voir mon organisation';
+  return <div className="space-y-6">
+    <div className={`grid gap-4 md:grid-cols-2 ${cards.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>{cards.length ? cards : <section className="card-surface rounded-2xl p-6"><h2 className="font-bold">Aucun accès opérationnel</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Votre rôle n’a pas encore reçu de module ou de sous-autorisation.</p></section>}</div>
+    <section className="card-surface rounded-2xl p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div><p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Mon espace de travail</p><h2 className="mt-2 text-xl font-bold">{canStocks ? 'Pilotage du magasin' : canCommerce ? 'Suivi des ventes' : canFinance ? 'Suivi financier' : canPresences ? 'Suivi des équipes' : 'Accès à configurer'}</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Ce tableau de bord est construit à partir des modules et sous-autorisations de votre rôle.</p></div>
+        <button onClick={() => onNavigate(primaryPath)} className="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-white">{primaryLabel}</button>
+      </div>
+    </section>
+    {canCommerce && <section className="card-surface overflow-hidden rounded-2xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="font-bold">Dernières ventes</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Uniquement les données utiles à votre rôle</p></div><button onClick={() => onNavigate('/kora/commerce')} className="text-xs font-bold text-[hsl(var(--primary))]">Tout voir</button></div><DataTable headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']} rows={data.sales.slice(0, 6).map(sale => [sale.reference, sale.client, money(sale.amount), <StatusBadge status={sale.status} />, sale.date])} /></section>}
+    {canStocks && <section className="card-surface rounded-2xl p-6"><div className="flex items-center justify-between"><div><h2 className="font-bold">Alerte magasin</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{low} produit(s) sous le seuil recommandé.</p></div><button onClick={() => onNavigate('/kora/stocks')} className="rounded-lg border px-3 py-2 text-xs font-bold">Voir le stock</button></div></section>}
+  </div>;
+}
+
 function KoraDashboard({ data, onNavigate, allowed }: { data: StoreData; onNavigate: (path: string) => void; allowed: ModuleId[] }) {
   const revenue = data.payments.filter(p => p.status === 'CONFIRMÉ').reduce((a, p) => a + p.amount, 0); const low = data.products.filter(p => p.stock <= p.threshold).length; const canCommerce = allowed.includes('commerce'); const canStocks = allowed.includes('stocks'); const canPresences = allowed.includes('presences');
   return <div className="space-y-6"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Metric label="Encaissements du mois" value={shortMoney(revenue)} suffix=" FCFA" detail="+12,8% vs. mois dernier" icon={TrendingUp} accent />{canCommerce && <Metric label="Ventes validées" value={String(data.sales.filter(s => s.status === 'VALIDÉ').length)} detail="sur les 30 derniers jours" icon={ShoppingCart} />}{canStocks && <Metric label="Produits à surveiller" value={String(low).padStart(2, '0')} detail="seuil de sécurité atteint" icon={Package} warning />}{canPresences && <Metric label="Présences aujourd’hui" value="18 / 21" detail="85,7% de l’effectif" icon={Users} />}</div><div className="grid gap-6 lg:grid-cols-[1.35fr_.65fr]">{canCommerce && <section className="card-surface rounded-2xl p-5 sm:p-6"><div className="flex items-start justify-between"><div><p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Performance commerciale</p><h2 className="mt-2 text-xl font-bold">Les ventes avancent bien.</h2></div><button data-testid="button-open-commerce" onClick={() => onNavigate('/kora/commerce')} className="rounded-lg border px-3 py-2 text-xs font-bold">Ouvrir Commerce</button></div><div className="mt-8 flex h-48 items-end gap-2 sm:gap-4">{[38, 53, 45, 68, 57, 80, 72, 92, 76, 87, 81, 100].map((v, i) => <div key={i} className="flex flex-1 flex-col items-center gap-2"><div className={`w-full rounded-t-md ${i === 11 ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--primary)/.18)]'}`} style={{ height: `${v}%` }} /><span className="mono text-[9px] text-[hsl(var(--muted-foreground))]">{['J','F','M','A','M','J','J','A','S','O','N','D'][i]}</span></div>)}</div></section>}<section className="card-surface rounded-2xl p-5 sm:p-6"><div className="flex items-center justify-between"><div><p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">À surveiller</p><h2 className="mt-2 text-xl font-bold">Signaux du jour</h2></div><Bell size={18} className="text-[hsl(var(--muted-foreground))]" /></div><div className="mt-6 space-y-4">{canStocks && <div className="flex gap-3 border-b pb-4"><span className="h-2 w-2 mt-1.5 rounded-full bg-[hsl(var(--accent))]" /><div><p className="text-sm font-bold">Stock bas</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{low} produits sous leur seuil recommandé.</p><button onClick={() => onNavigate('/kora/stocks')} className="mt-2 text-xs font-bold text-[hsl(var(--primary))]">Voir les stocks</button></div></div>}<div className="flex gap-3"><span className="h-2 w-2 mt-1.5 rounded-full bg-[hsl(var(--primary))]" /><div><p className="text-sm font-bold">Rapport hebdomadaire</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Votre synthèse de la semaine est disponible.</p><button onClick={() => onNavigate('/kora/rapports')} className="mt-2 text-xs font-bold text-[hsl(var(--primary))]">Consulter</button></div></div></div></section></div>{canCommerce && <section className="card-surface overflow-hidden rounded-2xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="font-bold">Dernières ventes</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui et hier</p></div><button onClick={() => onNavigate('/kora/commerce')} className="text-xs font-bold text-[hsl(var(--primary))]">Tout voir</button></div><DataTable headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']} rows={data.sales.map(s => [s.reference, s.client, money(s.amount), <StatusBadge status={s.status} />, s.date])} /></section>}</div>;
