@@ -87,4 +87,5 @@ Une permission de rôle ne peut pas réactiver un module refusé par l’entrepr
 
 ## Documentation projet
 
-Les décisions détaillées de structure, de permissions, de dépendances et de contribution sont documentées dans [`replit.md`](./replit.md).
+- [`docs/technical.md`](./docs/technical.md) : architecture, données, routage, permissions, modules, thème et commandes techniques ;
+- [`replit.md`](./replit.md) : décisions détaillées de structure, de permissions, de dépendances et de contribution.
