@@ -319,7 +319,7 @@ function OverviewTab({ company, data, setTab }: { company: Company, data: StoreD
 
 function MetricCard({ title, value, icon: Icon, onClick }: any) {
   return (
-    <button onClick={onClick} className="card-surface p-5 rounded-2xl flex items-center justify-between text-left hover:border-[hsl(var(--primary)/.4)] transition">
+    <button onClick={onClick} className="metric-card card-surface p-5 rounded-2xl flex items-center justify-between text-left hover:border-[hsl(var(--primary)/.4)] transition">
       <div>
         <p className="text-xs text-[hsl(var(--muted-foreground))] font-semibold uppercase">{title}</p>
         <p className="text-2xl font-bold mt-1">{value}</p>

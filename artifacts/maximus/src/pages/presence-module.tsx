@@ -48,7 +48,7 @@ function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone
   return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${colors[tone]}`}>{children}</span>;
 }
 function Panel({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return <section className="card-surface overflow-hidden rounded-2xl"><div className="section-heading border-b p-5"><h2 className="font-bold">{title}</h2>{action}</div><div className="p-5">{children}</div></section>;
+  return <section className="surface-panel card-surface overflow-hidden rounded-2xl"><div className="section-heading border-b p-5"><h2 className="font-bold">{title}</h2>{action}</div><div className="p-5">{children}</div></section>;
 }
 function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { text?: string }) { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }
 
