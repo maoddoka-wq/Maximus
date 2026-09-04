@@ -330,7 +330,15 @@ function Sidebar({ session, location, allowed, sidebarFeatures, canManagePeople,
   const singleModuleMenu = Boolean(employee && !isAdmin && allowed.length === 1 && sidebarFeatures?.length);
   const active = (href: string) => location === href || location.startsWith(`${href}?`);
   const moduleTitle = singleModuleMenu ? modules.find(module => module.id === allowed[0])?.name : undefined;
-  const link = (item: { href: string; label: string; icon: Icon }) => <Link data-testid={`link-nav-${item.href.split('/').pop()?.split('?')[0]}`} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={`nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${active(item.href) ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`}><item.icon size={17} strokeWidth={active(item.href) ? 2.5 : 1.8} />{!compact && item.label}</Link>;
+  const link = (item: { href: string; label: string; icon: Icon }) => {
+    const className = `nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${active(item.href) ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`;
+    const content = <><item.icon size={17} strokeWidth={active(item.href) ? 2.5 : 1.8} />{!compact && item.label}</>;
+    const testId = `link-nav-${item.href.split('/').pop()?.split('?')[0]}`;
+    if (item.href.includes('?')) {
+      return <a data-testid={testId} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={className}>{content}</a>;
+    }
+    return <Link data-testid={testId} title={compact ? item.label : undefined} onClick={onClose} key={item.href} href={item.href} className={className}>{content}</Link>;
+  };
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const compact = collapsed && !mobileOpen;
   const profileImage = !isAdmin && !employee ? companyPhoto : undefined;
