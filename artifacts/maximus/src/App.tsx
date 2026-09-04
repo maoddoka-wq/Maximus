@@ -634,7 +634,7 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
    if (routePath === '/kora/finance') return <FinancePage data={data} mutate={mutate} />;
    if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
-     return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} />;
+     return <CommerceModulePage companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
    }
    if (routePath === '/kora/achats') return <OperationalModulePage moduleId="achats" data={data} mutate={mutate} canCreate={hasPermission('achats', 'créer')} canModify={hasPermission('achats', 'modifier')} />;
    if (routePath === '/kora/comptabilite') return <OperationalModulePage moduleId="comptabilite" data={data} mutate={mutate} canCreate={hasPermission('comptabilite', 'créer')} canModify={hasPermission('comptabilite', 'modifier')} />;

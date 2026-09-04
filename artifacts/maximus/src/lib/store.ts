@@ -26,11 +26,11 @@ export interface Role { id: string; name: string; description: string; modulePer
 export const demoEmployeeIds = new Set(['demo-emp-awa', 'demo-emp-ibrahima', 'demo-emp-ndeye', 'demo-emp-mamadou']);
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; }
-export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; }
+export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; paymentMethod?: string; paidAmount?: number; }
 export interface Payment { id: string; reference: string; invoice: string; amount: number; status: Status; date: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; }
 export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: 'direction' | 'sector' | 'service' | 'department'; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; managerEmployeeId?: string; }
-export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; }
+export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; productId?: string; quantity?: number; }
 export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; }
 export interface PayrollSlip { id: string; reference: string; employee: string; period: string; gross: number; net: number; status: Status; }
 export interface CrmOpportunity { id: string; client: string; contact: string; subject: string; amount: number; nextAction: string; status: Status; }
