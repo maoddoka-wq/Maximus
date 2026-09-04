@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-6 shadow-2xl animate-in zoom-in-95">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]">
+          <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-[hsl(var(--muted))]">
             <X size={18} />
           </button>
         </div>
@@ -317,7 +317,7 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
         {roots.length === 0 && <div className="text-center py-10 text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
       </div>
 
-      {modalOpen && <StructureFormModal company={company} initialData={editingNode} allNodes={companyNodes} employees={data.employees.filter((e: Employee) => e.companyId === company.id)} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
+      {modalOpen && <Modal title={editingNode ? 'Modifier une unité' : 'Créer une unité'} onClose={() => setModalOpen(false)}><StructureFormModal company={company} initialData={editingNode} allNodes={companyNodes} employees={data.employees.filter((e: Employee) => e.companyId === company.id)} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
         mutate((d: StoreData) => {
           if (editingNode) {
             const index = d.orgNodes.findIndex((n: OrgNode) => n.id === editingNode.id);
@@ -347,7 +347,7 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
           });
         }, editingNode ? 'Unité mise à jour.' : 'Unité créée.');
         setModalOpen(false);
-      }} />}
+      }} /></Modal>}
     </div>
   );
 }
@@ -372,7 +372,7 @@ function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: 
           <div className="flex items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] shrink-0">
             <span>{node.moduleIds?.length || 0} modules</span>
             <div className="flex items-center gap-1">
-              <button data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={() => onEdit(node)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
+              <button type="button" data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={event => { event.stopPropagation(); onEdit(node); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
               <button data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
             </div>
           </div>
@@ -551,7 +551,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={() => handleEdit(role)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
+                  <button type="button" data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={event => { event.stopPropagation(); handleEdit(role); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
                   <button data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={() => deleteRole(role)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
                 </div>
               </div>
@@ -570,7 +570,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
         {companyRoles.length === 0 && <div className="col-span-full text-center py-8 text-sm text-[hsl(var(--muted-foreground))]">Aucun rôle configuré.</div>}
       </div>
 
-      {modalOpen && <RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} sectorLocked={Boolean(editingRole && (data.employees.some(employee => employee.roleId === editingRole.id) || company.managerRoleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
+      {modalOpen && <Modal title={editingRole ? 'Modifier le rôle' : 'Créer un rôle'} onClose={() => setModalOpen(false)}><RoleFormModal company={company} initialData={editingRole} allNodes={companyNodes} allRoles={companyRoles} sectorLocked={Boolean(editingRole && (data.employees.some(employee => employee.roleId === editingRole.id) || company.managerRoleId === editingRole.id))} onClose={() => setModalOpen(false)} onSave={(roleData: any) => {
         mutate((d: StoreData) => {
           if (editingRole) {
             const idx = d.roles.findIndex((r: Role) => r.id === editingRole.id);
@@ -581,7 +581,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
           }
         }, editingRole ? 'Rôle mis à jour.' : 'Rôle créé.');
         setModalOpen(false);
-      }} />}
+      }} /></Modal>}
     </div>
   );
 }
@@ -737,7 +737,7 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button data-testid={`button-edit-org-employee-${emp.id}`} aria-label={`Modifier le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { setEditingEmployee(emp); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">
+                      <button type="button" data-testid={`button-edit-org-employee-${emp.id}`} aria-label={`Modifier le compte de ${emp.firstName} ${emp.lastName}`} onClick={event => { event.stopPropagation(); setEditingEmployee(emp); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">
                         <Settings size={13} /><span>Modifier</span>
                       </button>
                       <button data-testid={`button-delete-org-employee-${emp.id}`} aria-label={`Supprimer le compte de ${emp.firstName} ${emp.lastName}`} onClick={() => { if (window.confirm(`Supprimer le compte de ${emp.firstName} ${emp.lastName} ?`)) mutate((d: StoreData) => { d.employees = d.employees.filter(e => e.id !== emp.id); }, 'Employé supprimé.'); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]">
@@ -755,7 +755,7 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
         </table>
       </div>
 
-      {modalOpen && <EmployeeFormModal company={company} initialData={editingEmployee} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} onClose={() => setModalOpen(false)} onSave={(empData: any) => {
+      {modalOpen && <Modal title={editingEmployee ? 'Modifier un employé' : 'Ajouter un employé'} onClose={() => setModalOpen(false)}><EmployeeFormModal company={company} initialData={editingEmployee} allNodes={companyNodes} allRoles={companyRoles} allEmployees={companyEmployees} onClose={() => setModalOpen(false)} onSave={(empData: any) => {
         mutate((d: StoreData) => {
           const sector = d.orgNodes.find(node => node.id === empData.sectorId);
           const parent = sector?.parentId ? d.orgNodes.find(node => node.id === sector.parentId) : null;
@@ -770,7 +770,7 @@ function EmployeesTab({ company, data, mutate }: { company: Company, data: Store
            ? (empData.loginPassword ? 'Employé mis à jour et mot de passe actualisé.' : 'Employé mis à jour.')
            : 'Employé ajouté. Utilisez son email et son mot de passe initial pour la connexion.');
         setModalOpen(false);
-      }} />}
+      }} /></Modal>}
     </div>
   );
 }

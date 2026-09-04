@@ -191,7 +191,8 @@ export function loadData(): StoreData {
         moduleIds: node.moduleIds || [],
       })) as OrgNode[];
     const savedRoleSource = parsed.roles?.length ? parsed.roles : initial.roles;
-    const roleSource = seedDemoOrganization
+    const repairDemoAssignments = (parsed.organizationVersion ?? 1) < 5;
+    const roleSource = repairDemoAssignments || seedDemoOrganization
       ? [...initial.roles.filter(initialRole => !savedRoleSource.some(role => role.id === initialRole.id)), ...savedRoleSource]
       : savedRoleSource;
     const roles = roleSource
@@ -207,7 +208,7 @@ export function loadData(): StoreData {
       ...initial,
       ...storedData,
       catalogVersion: 2,
-       organizationVersion: 4,
+       organizationVersion: 5,
       sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
@@ -225,16 +226,22 @@ export function loadData(): StoreData {
         const seeded = seededByEmail.get(employee.email);
         const generatedSector = Boolean(removeGeneratedHierarchy && employee.sectorId && generatedNodeIds.has(employee.sectorId));
         const generatedRole = Boolean(removeGeneratedHierarchy && employee.roleId && generatedRoleIds.has(employee.roleId));
+        const demoRole = repairDemoAssignments && seeded?.companyId === 'kora'
+          ? roles.find(role => role.id === (employee.roleId && roles.some(candidate => candidate.id === employee.roleId) ? employee.roleId : seeded.roleId))
+          : undefined;
+        const demoSector = repairDemoAssignments && seeded?.companyId === 'kora'
+          ? orgNodes.find(node => node.id === (employee.sectorId && orgNodes.some(candidate => candidate.id === employee.sectorId) ? employee.sectorId : seeded.sectorId))
+          : undefined;
         return {
           ...employee,
           loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!',
           isSectorAdmin: false,
           companyId: employee.companyId || 'kora',
-           sectorId: generatedSector ? undefined : employee.sectorId ?? seeded?.sectorId,
-           roleId: generatedRole ? undefined : employee.roleId ?? seeded?.roleId,
-          department: generatedSector ? '' : employee.department,
-          subDepartment: generatedSector ? '' : employee.subDepartment,
-          role: generatedRole ? 'Non affecté' : employee.role,
+           sectorId: generatedSector ? undefined : demoSector?.id ?? employee.sectorId ?? seeded?.sectorId,
+           roleId: generatedRole ? undefined : demoRole?.id ?? employee.roleId ?? seeded?.roleId,
+          department: generatedSector ? '' : employee.department || (demoSector?.type === 'service' ? orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.department : seeded?.department),
+          subDepartment: generatedSector ? '' : employee.subDepartment || (demoSector?.parentId ? orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.subDepartment : seeded?.subDepartment),
+          role: generatedRole ? 'Non affecté' : demoRole?.name ?? employee.role ?? seeded?.role,
         };
       }),
       roles,
