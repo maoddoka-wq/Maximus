@@ -28,7 +28,9 @@ const adminNav = [
 ];
 const koraNav = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, adminOnly: true },
+  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, adminOnly: true, peopleAdminOnly: true },
+  { href: '/kora/autorisations', label: 'Autorisations', icon: ShieldCheck, module: null, peopleAdminOnly: true },
+  { href: '/kora/employes', label: 'Comptes & managers', icon: UserRoundCog, module: null, peopleAdminOnly: true },
   { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
   { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
   { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
@@ -56,9 +58,10 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/notifications': { kicker: 'Centre de contrôle', title: 'Notifications', description: 'Les signaux utiles, sans bruit.' },
   '/maximus/journal': { kicker: 'Traçabilité', title: 'Journal d’activité', description: 'Chaque action importante, horodatée et attribuée.' },
   '/kora/dashboard': { kicker: 'KORA Distribution', title: 'Le rythme de KORA, en un regard.', description: 'Mardi 18 juin 2024 · Dakar, Sénégal' },
-  '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Une structure souple qui suit la réalité de vos équipes.' },
+  '/kora/organisation': { kicker: 'Espace KORA', title: 'Organisation', description: 'Construisez d’abord la hiérarchie de votre entreprise, sans mélanger les autorisations.' },
+  '/kora/autorisations': { kicker: 'Espace KORA', title: 'Autorisations', description: 'Retrouvez les unités de votre organisation et définissez les accès de chaque rôle.' },
+  '/kora/employes': { kicker: 'Espace KORA', title: 'Comptes & managers', description: 'Créez les comptes, choisissez leur appartenance et désignez les managers.' },
   '/kora/profil': { kicker: 'Espace entreprise', title: 'Mon profil', description: 'Mettez à jour les informations et les accès de votre entreprise.' },
-  '/kora/employes': { kicker: 'Espace KORA', title: 'Employés', description: 'Les personnes qui font avancer KORA chaque jour.' },
   '/kora/roles': { kicker: 'Espace KORA', title: 'Rôles', description: 'Des accès précis, pour travailler sereinement.' },
   '/kora/stocks': { kicker: 'Espace KORA', title: 'Gestion de stock', description: 'Pilotez vos articles, entrées, sorties et inventaires.' },
   '/kora/finance': { kicker: 'Espace KORA', title: 'Finance', description: 'Une lecture simple des encaissements et de la trésorerie.' },
@@ -140,15 +143,14 @@ function AppContent() {
     ancestryNode = ancestryNode.parentId ? data.orgNodes.find(node => node.id === ancestryNode?.parentId) : undefined;
   }
   const roleFitsEmployee = Boolean(employeeRole?.sectorId && employeeAncestry.has(employeeRole.sectorId) && employeeRole.companyId === employee?.companyId);
-  const unitModules = new Set(employeeNode?.moduleIds ?? []);
   const allowed = (session === 'kora' || session.startsWith('company:'))
     ? companyAllowed
     : employeeRole && roleFitsEmployee
-      ? companyAllowed.filter(moduleId => unitModules.has(moduleId) && employeeRole.modulePermissions[moduleId]?.includes('voir'))
+      ? companyAllowed.filter(moduleId => employeeRole.modulePermissions[moduleId]?.includes('voir'))
       : [];
   const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
     if (session === 'kora' || session.startsWith('company:')) return true;
-    if (!roleFitsEmployee || !unitModules.has(moduleId) || !employeeRole) return false;
+    if (!roleFitsEmployee || !employeeRole) return false;
     if (employeeRole.modulePermissions[moduleId]?.includes(permission)) return true;
     return moduleId === 'stocks' && Object.entries(employeeRole.modulePermissions)
       .filter(([key]) => key.startsWith('stocks:'))
@@ -156,7 +158,7 @@ function AppContent() {
   };
   const hasPresencePermission = (permission: 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports') => {
     if (session === 'kora' || session.startsWith('company:')) return true;
-    if (!roleFitsEmployee || !unitModules.has('presences') || !employeeRole) return false;
+    if (!roleFitsEmployee || !employeeRole) return false;
     const explicit = employeeRole.modulePermissions[`presence.${permission}`];
     const hasExplicitPresencePermissions = Object.keys(employeeRole.modulePermissions).some(key => key.startsWith('presence.'));
     if (hasExplicitPresencePermissions) return Boolean(explicit?.length);
@@ -280,7 +282,8 @@ function Field({ label, value, onChange, placeholder, type = 'text', testId, hel
 
 function Sidebar({ session, location, allowed, canManagePeople, onLogout, employee, companyName, companyPhoto, mobileOpen, onClose, collapsed, onToggleCollapse, fixedHeight }: { session: Session; location: string; allowed: ModuleId[]; canManagePeople: boolean; onLogout: () => void; employee: StoreData['employees'][number] | null; companyName?: string; companyPhoto?: string; mobileOpen: boolean; onClose: () => void; collapsed: boolean; onToggleCollapse: () => void; fixedHeight?: boolean }) {
   const isAdmin = session === 'admin';
-  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || session === 'kora' || session.startsWith('company:')) && (item.module === null || allowed.includes(item.module as ModuleId) || (item.href === '/kora/employes' && canManagePeople)));
+  const companyAdmin = session === 'kora' || session.startsWith('company:');
+  const nav = isAdmin ? adminNav : koraNav.filter(item => (!item.adminOnly || companyAdmin) && (!item.peopleAdminOnly || companyAdmin || canManagePeople) && (item.module === null || allowed.includes(item.module as ModuleId)));
   const initials = employee ? `${employee.firstName[0]}${employee.lastName[0]}` : companyName?.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const compact = collapsed && !mobileOpen;
   const profileImage = !isAdmin && !employee ? companyPhoto : undefined;
@@ -460,7 +463,15 @@ function KoraRouter({ location, data, mutate, onNavigate, allowed, canManagePeop
   }
   if (location === '/kora/organisation') {
     const company = data.companies.find(item => item.id === companyId);
-    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise ou le manager de votre unité peut gérer l’organisation." action={() => onNavigate('/kora/dashboard')} />;
+    return company && companyAdmin ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="structure" standalone /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise peut construire la structure organisationnelle." action={() => onNavigate('/kora/dashboard')} />;
+  }
+  if (location === '/kora/autorisations' || location === '/kora/roles') {
+    const company = data.companies.find(item => item.id === companyId);
+    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="roles" standalone sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise ou le manager de votre unité peut configurer les autorisations." action={() => onNavigate('/kora/dashboard')} />;
+  }
+  if (location === '/kora/employes') {
+    const company = data.companies.find(item => item.id === companyId);
+    return company && (companyAdmin || sectorManager) ? <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} initialTab="employees" standalone sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} /> : <EmptyState title="Accès réservé" text="Seul l’administrateur de l’entreprise ou le manager de votre unité peut gérer les comptes." action={() => onNavigate('/kora/dashboard')} />;
   }
    if (location === '/kora/stocks') {
     return <StockModulePage companyId={companyId} companyUsers={data.employees.filter(employee => employee.companyId === companyId)} companyServices={data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service')} canCreate={hasPermission('stocks', 'créer')} canModify={hasPermission('stocks', 'modifier')} stockPermissions={stockPermissions} />;

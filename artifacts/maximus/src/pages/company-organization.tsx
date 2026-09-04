@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Building2, Users, KeyRound, LayoutGrid, ChevronDown, Plus, 
+  Building2, Users, KeyRound, ChevronDown, Plus,
   Settings, Trash2, Check, X, ShieldCheck, GitBranch, ArrowRight, UserRound
 } from 'lucide-react';
 import { Company, StoreData, OrgNode, Role, Employee, demoEmployeeIds, modules as allModules, stockSubmodules, uid, type ModuleId } from '../lib/store';
@@ -54,7 +54,7 @@ function permissionLabel(key: string) {
   return allModules.find(module => module.id === key)?.name || key;
 }
 
-export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = 'overview', sectorManager = false, scopeNodeId }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; initialTab?: 'overview' | 'structure' | 'roles' | 'employees' | 'profile'; sectorManager?: boolean; scopeNodeId?: string }) {
+export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = 'overview', standalone = false, sectorManager = false, scopeNodeId }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; initialTab?: 'overview' | 'structure' | 'roles' | 'employees' | 'profile'; standalone?: boolean; sectorManager?: boolean; scopeNodeId?: string }) {
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const scopedNodeIds = new Set<string>();
   if (scopeNodeId) {
@@ -74,7 +74,10 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
         employees: data.employees.filter(employee => !employee.companyId || scopedNodeIds.has(employee.sectorId ?? '')),
       }
     : data;
-  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees' | 'profile'>(sectorManager ? 'overview' : initialTab);
+  const [tab, setTab] = useState<'overview' | 'structure' | 'roles' | 'employees' | 'profile'>(sectorManager ? (initialTab === 'structure' ? 'overview' : initialTab) : initialTab);
+  useEffect(() => {
+    setTab(sectorManager && initialTab === 'structure' ? 'overview' : initialTab);
+  }, [initialTab, sectorManager]);
   const organizationNodes = scopedData.orgNodes.filter(node => node.companyId === company.id);
   const organizationRoles = scopedData.roles.filter(role => role.companyId === company.id);
   const organizationEmployees = scopedData.employees.filter(employee => employee.companyId === company.id);
@@ -90,7 +93,7 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
 
   return (
     <div className="space-y-6">
-      <div className="card-surface p-6 rounded-2xl">
+      {!standalone && <div className="card-surface p-6 rounded-2xl">
         <h1 className="text-xl font-bold">{sectorManager ? 'Règles d’accès de mon unité' : `Modèle d'Accès & Organisation : ${company.name}`}</h1>
         <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sectorManager ? 'Définissez les modules et actions autorisés aux employés rattachés à votre unité.' : 'Construisez librement votre hiérarchie : Unité → Modules → Rôle → Employé.'}</p>
         <div className="mt-6 flex gap-2 overflow-x-auto">
@@ -100,8 +103,8 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
             </button>
           ))}
         </div>
-      </div>
-      {!sectorManager && <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.03)] p-5">
+      </div>}
+      {!standalone && !sectorManager && <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.03)] p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Parcours recommandé</p>
@@ -125,7 +128,7 @@ export function CompanyOrganizationAdmin({ company, data, mutate, initialTab = '
         </p>}
       </section>}
 
-      {tab === 'overview' && <OverviewTab company={company} data={scopedData} setTab={setTab} />}
+      {!standalone && tab === 'overview' && <OverviewTab company={company} data={scopedData} setTab={setTab} />}
       {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
@@ -300,7 +303,7 @@ function OverviewTreeNode({ node, allNodes, allRoles, allEmployees, depth }: { n
         
         <div className="flex-1 flex flex-wrap gap-4 text-xs items-center text-[hsl(var(--muted-foreground))]">
           <div className="flex items-center gap-1.5">
-            <LayoutGrid size={13} /> {node.moduleIds?.length || 0} modules
+            <Building2 size={13} /> Unité organisationnelle
           </div>
           <ArrowRight size={12} className="opacity-40" />
           <div className="flex items-center gap-1.5">
@@ -365,66 +368,34 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-bold text-lg">Unités Organisationnelles</h2>
-          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Gérez la hiérarchie de l'entreprise et les modules assignés.</p>
+           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Créez la hiérarchie de l’entreprise. Les autorisations se configurent ensuite depuis la page dédiée.</p>
         </div>
         <ActionButton primary onClick={handleCreate} testId="btn-create-org">Créer une unité</ActionButton>
       </div>
 
-       <div className="mb-4 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-         <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez les directions, départements, secteurs et services, puis choisissez les modules disponibles dans chaque unité. Le manager sera nommé après la création de son compte à l’étape 3.
+        <div className="mb-4 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez les directions, départements, secteurs et services. Les rôles, les autorisations et les managers sont configurés dans leurs pages respectives après la création de cette structure.
        </div>
-       <div className="mb-5 flex items-center justify-between rounded-xl border px-4 py-3 text-xs">
-         <span><strong>{companyNodes.length}</strong> unité(s) créée(s)</span>
-         <span className={companyNodes.filter(node => !node.managerEmployeeId).length ? 'text-[hsl(var(--muted-foreground))]' : 'font-bold text-[hsl(var(--primary))]'}>{companyNodes.filter(node => !node.managerEmployeeId).length} manager(s) à désigner</span>
-       </div>
+        <div className="mb-5 flex items-center justify-between rounded-xl border px-4 py-3 text-xs">
+          <span><strong>{companyNodes.length}</strong> unité(s) créée(s)</span>
+          <span className="text-[hsl(var(--muted-foreground))]">Les managers se désignent depuis Comptes & managers</span>
+        </div>
        <div className="space-y-1">
         {roots.map((root: OrgNode) => (
-           <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} employees={data.employees.filter((e: Employee) => e.companyId === company.id)} onEdit={handleEdit} onDelete={deleteNode} depth={0} />
+            <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} onEdit={handleEdit} onDelete={deleteNode} depth={0} />
         ))}
         {roots.length === 0 && <div className="text-center py-10 text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
       </div>
 
-       {modalOpen && <Modal title={editingNode ? 'Modifier une unité' : 'Créer une unité'} onClose={() => setModalOpen(false)}><StructureFormModal company={company} initialData={editingNode} allNodes={companyNodes} employees={data.employees.filter((e: Employee) => e.companyId === company.id)} roles={data.roles.filter((r: Role) => r.companyId === company.id)} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
+        {modalOpen && <Modal title={editingNode ? 'Modifier une unité' : 'Créer une unité'} onClose={() => setModalOpen(false)}><StructureFormModal initialData={editingNode} allNodes={companyNodes} onClose={() => setModalOpen(false)} onSave={(nodeData: any) => {
         mutate((d: StoreData) => {
            const nodeId = editingNode?.id ?? uid('org');
-           const previousManagerId = editingNode?.managerEmployeeId;
           if (editingNode) {
             const index = d.orgNodes.findIndex((n: OrgNode) => n.id === editingNode.id);
             if (index !== -1) d.orgNodes[index] = { ...d.orgNodes[index], ...nodeData };
           } else {
              d.orgNodes.push({ id: nodeId, companyId: company.id, ...nodeData });
            }
-           d.orgNodes.forEach(node => {
-             if (node.id !== nodeId && node.managerEmployeeId === nodeData.managerEmployeeId && nodeData.managerEmployeeId) node.managerEmployeeId = undefined;
-           });
-           if (previousManagerId && previousManagerId !== nodeData.managerEmployeeId && !d.orgNodes.some(node => node.id !== nodeId && node.managerEmployeeId === previousManagerId)) {
-             const previousManager = d.employees.find(employee => employee.id === previousManagerId);
-             if (previousManager) previousManager.isSectorAdmin = false;
-           }
-           if (nodeData.managerEmployeeId) {
-             const manager = d.employees.find(employee => employee.id === nodeData.managerEmployeeId);
-             if (manager) manager.isSectorAdmin = true;
-          }
-          const nodes = d.orgNodes.filter(node => node.companyId === company.id);
-          const byId = new Map(nodes.map(node => [node.id, node]));
-          let changed = true;
-          while (changed) {
-            changed = false;
-            nodes.forEach(node => {
-              const parent = node.parentId ? byId.get(node.parentId) : null;
-              if (!parent) return;
-              const allowed = new Set(parent.moduleIds ?? []);
-              const next = (node.moduleIds ?? []).filter(moduleId => allowed.has(moduleId));
-              if (next.length !== (node.moduleIds ?? []).length) {
-                node.moduleIds = next;
-                changed = true;
-              }
-            });
-          }
-          d.roles.filter(role => role.companyId === company.id).forEach(role => {
-            const allowed = new Set(byId.get(role.sectorId ?? '')?.moduleIds ?? []);
-            role.modulePermissions = Object.fromEntries(Object.entries(role.modulePermissions).filter(([moduleId]) => allowed.has(moduleId as ModuleId)));
-          });
         }, editingNode ? 'Unité mise à jour.' : 'Unité créée.');
         setModalOpen(false);
       }} /></Modal>}
@@ -432,10 +403,9 @@ function StructureTab({ company, data, mutate }: { company: Company, data: Store
   );
 }
 
-function StructureNodeItem({ node, allNodes, employees, onEdit, onDelete, depth }: { node: OrgNode, allNodes: OrgNode[], employees: Employee[], onEdit: (n: OrgNode) => void, onDelete: (id: string) => void, depth: number }) {
+function StructureNodeItem({ node, allNodes, onEdit, onDelete, depth }: { node: OrgNode, allNodes: OrgNode[], onEdit: (n: OrgNode) => void, onDelete: (id: string) => void, depth: number }) {
   const children = allNodes.filter((n: OrgNode) => n.parentId === node.id);
   const [expanded, setExpanded] = useState(true);
-  const manager = employees.find(employee => employee.id === node.managerEmployeeId && employee.sectorId === node.id);
   
   return (
     <div>
@@ -450,9 +420,8 @@ function StructureNodeItem({ node, allNodes, employees, onEdit, onDelete, depth 
             <span className="text-[9px] px-1.5 py-0.5 rounded border uppercase font-bold text-[hsl(var(--muted-foreground))]">{node.type}</span>
             {node.code && <span className="text-[10px] mono text-[hsl(var(--muted-foreground))]">{node.code}</span>}
           </div>
-           <div className="flex items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] shrink-0">
-            <span>{node.moduleIds?.length || 0} modules</span>
-             <span className={manager ? 'font-semibold text-[hsl(var(--foreground))]' : 'font-semibold text-[hsl(var(--primary))]'}>{manager ? `Manager : ${manager.firstName} ${manager.lastName}` : 'Manager à désigner'}</span>
+            <div className="flex items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] shrink-0">
+              <span>Structure de l’unité</span>
             <div className="flex items-center gap-1">
               <button type="button" data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={event => { event.stopPropagation(); onEdit(node); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
               <button data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
@@ -461,13 +430,13 @@ function StructureNodeItem({ node, allNodes, employees, onEdit, onDelete, depth 
         </div>
       </div>
       {expanded && children.map((child: OrgNode) => (
-         <StructureNodeItem key={child.id} node={child} allNodes={allNodes} employees={employees} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />
+         <StructureNodeItem key={child.id} node={child} allNodes={allNodes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />
       ))}
     </div>
   );
 }
 
-function StructureFormModal({ company, initialData, allNodes, employees, roles, onClose, onSave }: { company: Company, initialData: OrgNode | null, allNodes: OrgNode[], employees: Employee[], roles: Role[], onClose: () => void, onSave: (d: any) => void }) {
+function StructureFormModal({ initialData, allNodes, onClose, onSave }: { initialData: OrgNode | null, allNodes: OrgNode[], onClose: () => void, onSave: (d: any) => void }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -476,31 +445,10 @@ function StructureFormModal({ company, initialData, allNodes, employees, roles, 
     parentId: initialData?.parentId || '',
     email: initialData?.email || '',
     phone: initialData?.phone || '',
-    location: initialData?.location || '',
-    moduleIds: initialData?.moduleIds || [],
-    managerEmployeeId: initialData?.managerEmployeeId || ''
+    location: initialData?.location || ''
   });
 
   const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
-  const parentNode = allNodes.find(n => n.id === formData.parentId);
-  const managerCandidates = initialData
-    ? employees.filter(employee => {
-        const role = roles.find(candidate => candidate.id === employee.roleId);
-        return employee.sectorId === initialData.id && (Boolean(role && Object.keys(role.modulePermissions).length > 0) || employee.id === initialData.managerEmployeeId);
-      })
-    : [];
-  
-  const availableModules = parentNode 
-    ? allModules.filter(m => parentNode.moduleIds?.includes(m.id))
-    : allModules.filter(m => company.allowedModules.includes(m.id));
-
-  const toggleModule = (id: ModuleId) => {
-    setFormData(prev => ({
-      ...prev,
-      moduleIds: (prev.moduleIds || []).includes(id) ? (prev.moduleIds || []).filter(x => x !== id) : [...(prev.moduleIds || []), id]
-    }));
-  };
-
   const isCyclic = (parentId: string) => {
     let current = allNodes.find(n => n.id === parentId);
     while (current) {
@@ -523,8 +471,7 @@ function StructureFormModal({ company, initialData, allNodes, employees, roles, 
       setError('Cette unité ne peut pas être placée sous l’un de ses descendants.');
       return;
     }
-    const cleanedModules = (formData.moduleIds || []).filter(id => availableModules.some(m => m.id === id));
-    onSave({ ...formData, name: formData.name.trim(), code: formData.code.trim().toUpperCase(), parentId: formData.parentId || null, moduleIds: cleanedModules });
+     onSave({ ...formData, name: formData.name.trim(), code: formData.code.trim().toUpperCase(), parentId: formData.parentId || null });
   };
 
   return (
@@ -554,36 +501,9 @@ function StructureFormModal({ company, initialData, allNodes, employees, roles, 
           <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">L’unité parente permet de construire la hiérarchie.</span>
         </label>
       </div>
-      
       <div className="border-t pt-4 mt-2">
-        <label className="block text-sm font-semibold mb-3">Modules Assignés</label>
-        <p className="mb-3 text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Cochez les modules accessibles aux rôles de cette unité.</p>
-        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
-          {availableModules.map(m => (
-            <label key={m.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${(formData.moduleIds || []).includes(m.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.05)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
-              <input type="checkbox" className="hidden" checked={(formData.moduleIds || []).includes(m.id)} onChange={() => toggleModule(m.id)} />
-              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${(formData.moduleIds || []).includes(m.id) ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] text-white' : 'border-[hsl(var(--muted-foreground)/.3)]'}`}>
-                {(formData.moduleIds || []).includes(m.id) && <Check size={12} />}
-              </div>
-              <span className="text-xs font-medium">{m.name}</span>
-            </label>
-          ))}
-          {availableModules.length === 0 && <span className="text-xs text-[hsl(var(--muted-foreground))]">Aucun module disponible de l'unité parente.</span>}
-        </div>
-      </div>
-
-      <div className="border-t pt-4 mt-2">
-        <label className="block text-sm font-semibold mb-3">Manager & Contacts</label>
+        <label className="block text-sm font-semibold mb-3">Coordonnées de l’unité</label>
         <div className="grid grid-cols-2 gap-4">
-          <label className="block text-sm font-semibold">
-            Manager de l'unité
-             <select value={formData.managerEmployeeId} onChange={e => setFormData({...formData, managerEmployeeId: e.target.value})} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
-              <option value="">Sélectionner un employé...</option>
-               {managerCandidates.map((e: Employee) => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
-            </select>
-             <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Désignez ici le titulaire du compte manager après l’avoir créé dans l’étape 3.</span>
-             {managerCandidates.length === 0 && <span className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]">Aucun compte compatible dans cette unité. Créez d’abord l’employé avec un rôle autorisé.</span>}
-          </label>
           <Field label="Email" value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} help="Adresse de contact de l’unité, si elle en possède une." />
           <Field label="Téléphone" value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} help="Numéro de contact de l’unité." />
           <Field label="Localisation" value={formData.location} onChange={(v: string) => setFormData({...formData, location: v})} help="Adresse ou emplacement physique de l’unité." />
@@ -625,7 +545,7 @@ function RolesTab({ company, data, mutate }: { company: Company, data: StoreData
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-bold text-lg">Rôles et Permissions</h2>
-           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Étape 2 · Remplissez la liste des rôles de chaque unité et définissez les modules, menus et actions autorisés.</p>
+         <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">Étape 2 · Retrouvez les unités créées à l’étape 1, créez leurs rôles et configurez les modules, menus et actions autorisés.</p>
         </div>
         <ActionButton primary disabled={companyNodes.length === 0} onClick={() => { setEditingRole(null); setModalOpen(true); }} testId="btn-create-role">Créer un rôle</ActionButton>
       </div>
@@ -688,8 +608,7 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
     modulePermissions: initialData?.modulePermissions || {} as Record<string, string[]>
   });
 
-  const selectedSector = allNodes.find(n => n.id === formData.sectorId);
-  const availableModules = selectedSector ? allModules.filter(m => (selectedSector.moduleIds || []).includes(m.id)) : [];
+  const availableModules = company.allowedModules.length ? allModules.filter(m => company.allowedModules.includes(m.id)) : allModules;
 
   const togglePermission = (modId: string, perm: 'voir' | 'créer' | 'modifier') => {
     setFormData(prev => {
@@ -763,13 +682,13 @@ function RoleFormModal({ company, initialData, allNodes, allRoles, sectorLocked,
         <select disabled={sectorLocked} value={formData.sectorId} onChange={e => handleSectorChange(e.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
           {allNodes.map((n: OrgNode) => <option key={n.id} value={n.id}>{n.name}</option>)}
         </select>
-        <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Le rôle héritera des modules disponibles dans cette unité et ses unités parentes.</span>
+         <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Les modules affichés sont ceux autorisés pour l’entreprise. Le rôle limite ensuite précisément l’accès de ses employés.</span>
         {sectorLocked && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">Réaffectez d’abord les employés utilisant ce rôle pour changer son unité.</span>}
       </label>
 
       <div className="border-t pt-4 mt-4">
          <label className="block text-sm font-semibold mb-3">Permissions par module et par menu</label>
-         <p className="text-[10px] text-[hsl(var(--muted-foreground))] mb-3">Seuls les modules disponibles dans l’unité sélectionnée sont affichés. Les menus détaillés permettent, par exemple, de distinguer les accès de la Comptabilité.</p>
+           <p className="text-[10px] text-[hsl(var(--muted-foreground))] mb-3">La structure est déjà créée. Sélectionnez les modules, puis détaillez les menus et les actions autorisés pour ce rôle.</p>
         
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {availableModules.map(m => {
