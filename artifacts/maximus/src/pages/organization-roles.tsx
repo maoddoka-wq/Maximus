@@ -277,7 +277,16 @@ function RoleFormModal({
       setError('Un rôle portant ce nom existe déjà dans ce secteur.');
       return;
     }
-    onSave({ ...formData, name });
+    const moduleIds = new Set(moduleDefinitions.map(module => module.id));
+    const modulePermissions = Object.fromEntries(
+      Object.entries(formData.modulePermissions)
+        .map(([key, permissions]) => [
+          key,
+          moduleIds.has(key) ? permissions.filter(permission => permission === 'voir') : permissions,
+        ] as const)
+        .filter(([, permissions]) => permissions.length > 0),
+    );
+    onSave({ ...formData, name, modulePermissions });
   };
 
   return (
@@ -295,7 +304,7 @@ function RoleFormModal({
       <div className="mt-4 border-t pt-4">
         <div className="mb-4">
           <h3 className="text-sm font-bold">Droits d’accès</h3>
-          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Organisez les droits en trois niveaux : accès au module, sous-fonctionnalités et actions autorisées.</p>
+          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le module définit la visibilité. Les actions Créer et Modifier se configurent ensuite dans chaque sous-fonctionnalité.</p>
         </div>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           {availableModules.map(module => (
@@ -391,7 +400,7 @@ function ModulePermissionCard({
         </div>
         <div className="shrink-0">
           <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
-          <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
+          <PermissionToggleGroup permissions={['voir']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
         </div>
       </div>
       <div className="space-y-3 p-4">
