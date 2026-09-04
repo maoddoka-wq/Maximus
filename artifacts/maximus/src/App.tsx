@@ -459,21 +459,22 @@ function Topbar({ title, isAdmin, onNavigate, onToggleMenu, notificationPath }: 
 function PageHeader({ kicker, title, description, location }: { kicker: string; title: string; description: string; location: string }) { return <div className="page-header mb-6 flex flex-col justify-between gap-3 border-b border-[hsl(var(--border))] pb-5 sm:flex-row sm:items-end"><div className="min-w-0"><p className="mono mb-1.5 text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">{kicker}</p><h1 data-testid="text-page-title" className="max-w-4xl text-2xl font-bold tracking-[-.04em] sm:text-3xl">{title}</h1><p className="mt-1.5 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{description}</p></div>{location !== '/maximus/dashboard' && location !== '/kora/dashboard' && <div className="mono shrink-0 text-[9px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">Mis à jour à l’instant</div>}</div>; }
 
 function AdminRouter({ location, data, mutate, notify, onNavigate }: { location: string; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; notify: (message: string) => void; onNavigate: (path: string) => void }) {
-  if (location === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
-  if (location === '/maximus/entreprises/organisation') return <OrganizationAdminPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  const companyDetailMatch = location.match(/^\/maximus\/entreprises\/([^/]+)$/);
+  const routePath = location.split('?')[0];
+  if (routePath === '/maximus/dashboard') return <AdminDashboard data={data} onNavigate={onNavigate} />;
+  if (routePath === '/maximus/entreprises/organisation') return <OrganizationAdminPage data={data} mutate={mutate} onNavigate={onNavigate} />;
+  const companyDetailMatch = routePath.match(/^\/maximus\/entreprises\/([^/]+)$/);
   if (companyDetailMatch) {
     const companyId = decodeURIComponent(companyDetailMatch[1]);
     const company = data.companies.find(item => item.id === companyId);
      return company ? <CompanyModulesDetail company={company} data={data} mutate={mutate} onBack={() => onNavigate('/maximus/entreprises')} /> : <EmptyState title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onNavigate('/maximus/entreprises')} />;
   }
-  if (location === '/maximus/entreprises') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={false} />;
-  if (location === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
-  if (location === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
-  if (location === '/maximus/secteurs') return <SectorPresetsPage data={data} mutate={mutate} />;
-  if (location === '/maximus/abonnements') return <SubscriptionsPage data={data} />;
-  if (location === '/maximus/notifications') return <NotificationsPage data={data} mutate={mutate} />;
-  if (location === '/maximus/journal') return <JournalPage data={data} />;
+  if (routePath === '/maximus/entreprises') return <CompaniesPage data={data} mutate={mutate} onNavigate={onNavigate} detail={false} />;
+  if (routePath === '/maximus/demandes') return <RequestsPage data={data} mutate={mutate} onNavigate={onNavigate} />;
+  if (routePath === '/maximus/modules') return <InteractiveModulesPage data={data} mutate={mutate} notify={notify} />;
+  if (routePath === '/maximus/secteurs') return <SectorPresetsPage data={data} mutate={mutate} />;
+  if (routePath === '/maximus/abonnements') return <SubscriptionsPage data={data} />;
+  if (routePath === '/maximus/notifications') return <NotificationsPage data={data} mutate={mutate} />;
+  if (routePath === '/maximus/journal') return <JournalPage data={data} />;
   return <EmptyState title="Cette vue n’existe pas encore" text="Revenez au cockpit pour poursuivre." action={() => onNavigate('/maximus/dashboard')} />;
 }
 
