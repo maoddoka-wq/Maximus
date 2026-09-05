@@ -43,41 +43,7 @@ final class ModuleCatalog
                     'created_at' => now(),
                 ],
             );
-
-            foreach (self::featureDefinitions($definition) as $sortOrder => $feature) {
-                DB::table('maximus_module_features')->updateOrInsert(
-                    [
-                        'module_id' => $definition['id'],
-                        'feature_key' => $feature['key'],
-                    ],
-                    [
-                        'id' => 'module-feature-'.Str::slug($definition['id'].'-'.$feature['key']),
-                        'label' => $feature['label'],
-                        'description' => $feature['description'],
-                        'actions' => json_encode($feature['actions'], JSON_UNESCAPED_UNICODE),
-                        'dependencies' => json_encode($feature['dependencies'], JSON_UNESCAPED_UNICODE),
-                        'status' => 'ACTIF',
-                        'sort_order' => $sortOrder,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                );
-            }
         }
-    }
-
-    public static function featureDefinitions(array $definition): array
-    {
-        return array_map(
-            static fn (string $label): array => [
-                'key' => Str::slug($label),
-                'label' => $label,
-                'description' => '',
-                'actions' => ['voir', 'créer', 'modifier'],
-                'dependencies' => [],
-            ],
-            $definition['features'],
-        );
     }
 
     public static function ensureCompanyAccess(string $companyId, ?array $moduleIds = null, string $status = 'ACTIF'): void
@@ -119,61 +85,14 @@ final class ModuleCatalog
             ->where('company_id', $companyId)
             ->get()
             ->keyBy('module_id');
-        $features = DB::table('maximus_module_features')
-            ->where('status', 'ACTIF')
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('module_id');
 
-        return collect(self::definitions())->map(function (array $definition) use ($access, $features): array {
+        return collect(self::definitions())->map(function (array $definition) use ($access): array {
             $row = $access->get($definition['id']);
-            $featureCatalog = $features->get($definition['id'], collect())->map(
-                static fn ($feature): array => [
-                    'id' => $feature->id,
-                    'key' => $feature->feature_key,
-                    'label' => $feature->label,
-                    'description' => $feature->description,
-                    'actions' => json_decode($feature->actions ?? '[]', true),
-                    'dependencies' => json_decode($feature->dependencies ?? '[]', true),
-                    'status' => $feature->status,
-                ],
-            )->values()->all();
-            $featureIds = $row ? json_decode($row->feature_ids ?? '[]', true) : [];
-            if (!is_array($featureIds) || $featureIds === []) {
-                $featureIds = array_column($featureCatalog, 'key');
-            }
             return [
                 ...$definition,
                 'status' => $row?->status ?? 'INACTIF',
-                'featureIds' => $featureIds,
-                'featureCatalog' => $featureCatalog,
+                'featureIds' => $row ? json_decode($row->feature_ids ?? '[]', true) : [],
                 'configuration' => $row ? json_decode($row->configuration ?? '{}', true) : [],
-            ];
-        })->all();
-    }
-
-    public static function catalog(): array
-    {
-        self::ensureCatalog();
-        $features = DB::table('maximus_module_features')
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('module_id');
-
-        return collect(self::definitions())->map(function (array $definition) use ($features): array {
-            return [
-                ...$definition,
-                'featureCatalog' => $features->get($definition['id'], collect())->map(
-                    static fn ($feature): array => [
-                        'id' => $feature->id,
-                        'key' => $feature->feature_key,
-                        'label' => $feature->label,
-                        'description' => $feature->description,
-                        'actions' => json_decode($feature->actions ?? '[]', true),
-                        'dependencies' => json_decode($feature->dependencies ?? '[]', true),
-                        'status' => $feature->status,
-                    ],
-                )->values()->all(),
             ];
         })->all();
     }

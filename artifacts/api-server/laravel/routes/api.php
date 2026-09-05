@@ -20,10 +20,8 @@ Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): v
 });
 
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
-    Route::get('/catalog', [ModuleController::class, 'catalog']);
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
     Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
-    Route::post('/{moduleId}/features', [ModuleController::class, 'addFeature']);
 });
 
 require __DIR__.'/control.php';
