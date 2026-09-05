@@ -1320,6 +1320,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [editingPackId, setEditingPackId] = useState<string | null>(null);
   const [packForm, setPackForm] = useState({ name: '', description: '', featureIds: [] as string[], featurePermissions: {} as FeaturePermissionMap });
   const [testPack, setTestPack] = useState<ModuleFeaturePack | null>(null);
+  const [testModule, setTestModule] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
@@ -1425,8 +1426,8 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     if (editingPackId === packId) resetPackForm();
   };
 
-  if (selected && testPack) {
-    return <ModulePackTestWorkbench module={selected} pack={testPack} data={data} mutate={mutate} onBack={() => setTestPack(null)} />;
+  if (selected && (testPack || testModule)) {
+    return <ModulePackTestWorkbench module={selected} pack={testPack ?? undefined} data={data} mutate={mutate} onBack={() => { setTestPack(null); setTestModule(false); }} />;
   }
 
   if (selected) {
@@ -1446,6 +1447,9 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
+             <button data-testid={`button-test-module-${selected.id}`} onClick={() => { setTestPack(null); setTestModule(true); }} className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">
+               Tester le module complet <ChevronRight size={14} />
+             </button>
             <button data-testid={`button-detail-toggle-module-${selected.id}`} onClick={() => toggleModule(selected.id)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
               {isActive ? 'Désactiver le module' : 'Activer le module'} <ChevronRight size={14} />
             </button>
@@ -1526,32 +1530,61 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     </div>;
 }
 
-function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { module: (typeof modules)[number]; pack: ModuleFeaturePack; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
+function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { module: (typeof modules)[number]; pack?: ModuleFeaturePack; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
   const operationalModules: ModuleId[] = ['achats', 'comptabilite', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents'];
   const koraCompany = data.companies.find(company => company.id === 'kora');
-  const labels = new Map(getModuleFeatureOptions(module).map(feature => [feature.id, feature.label]));
-  const configuredPermissions = defaultFeaturePermissions(pack.featureIds, pack.featurePermissions);
-  const authorizedFeatures = pack.featureIds.filter(featureId => configuredPermissions[featureId]?.length);
+  const featureOptions = getModuleFeatureOptions(module);
+  const labels = new Map(featureOptions.map(feature => [feature.id, feature.label]));
+  const fullFeatureIds = featureOptions.map(feature => feature.id);
+  const testFeatureIds = pack ? [...getEffectiveModuleFeatureIds(module, pack.featureIds)] : fullFeatureIds;
+  const configuredPermissions = pack
+    ? defaultFeaturePermissions(testFeatureIds, pack.featurePermissions)
+    : defaultFeaturePermissions(fullFeatureIds, Object.fromEntries(fullFeatureIds.map(featureId => [featureId, ['voir', 'créer', 'modifier']])));
+  const authorizedFeatures = testFeatureIds.filter(featureId => configuredPermissions[featureId]?.length);
+  const canCreate = authorizedFeatures.some(featureId => configuredPermissions[featureId]?.includes('créer'));
+  const canModify = authorizedFeatures.some(featureId => configuredPermissions[featureId]?.includes('modifier'));
+  const stockPermissions = Object.fromEntries(authorizedFeatures.map(featureId => [featureId, configuredPermissions[featureId] ?? ['voir']]));
+  const commerceFeatureToTab: Record<string, CommerceTabId> = {
+    clients: 'clients',
+    sales: 'sales',
+    products: 'products',
+    suppliers: 'suppliers',
+    purchases: 'purchases',
+    expenses: 'expenses',
+    cash: 'cash',
+    credit: 'credit',
+    invoices: 'invoices',
+    returns: 'returns',
+    reports: 'reports',
+    activity: 'activity',
+    team: 'team',
+    settings: 'settings',
+    devis: 'sales',
+    commandes: 'sales',
+    facturation: 'invoices',
+  };
+  const allowedCommerceTabs = authorizedFeatures.map(featureId => commerceFeatureToTab[featureId]).filter((tab): tab is CommerceTabId => Boolean(tab));
   return <div data-testid="module-pack-workbench" className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button data-testid="button-back-pack-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
-      <span className="rounded-full bg-[hsl(var(--accent)/.2)] px-3 py-1.5 text-[10px] font-bold">TEST DU PACK MÉTIER</span>
+      <span className="rounded-full bg-[hsl(var(--accent)/.2)] px-3 py-1.5 text-[10px] font-bold">{pack ? 'TEST DU PACK MÉTIER' : 'TEST DU MODULE COMPLET'}</span>
     </div>
     <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-5">
-      <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Pack métier</p>
-      <h1 className="mt-2 text-2xl font-bold">{pack.name}</h1>
-      <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{pack.description || `Testez le parcours du pack ${pack.name}.`}</p>
+      <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">{pack ? 'Pack métier' : 'Module métier'}</p>
+      <h1 className="mt-2 text-2xl font-bold">{pack?.name ?? module.name}</h1>
+      <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{pack?.description || (pack ? `Testez le parcours du pack ${pack.name}.` : `Testez toutes les fonctionnalités du module ${module.name}.`)}</p>
+      <div className="mt-4 rounded-lg bg-[hsl(var(--muted)/.7)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">{pack ? `Ce test ouvre ${authorizedFeatures.length} fonctionnalité(s) du pack avec leurs droits réels.` : `Ce test ouvre les ${authorizedFeatures.length} fonctionnalité(s) du module avec les droits complets.`}</div>
       <div className="mt-5 space-y-2">{authorizedFeatures.map(featureId => <div key={featureId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[hsl(var(--muted))] px-3 py-2"><span className="text-xs font-semibold">{labels.get(featureId) ?? featureId}</span><span className="rounded-full bg-[hsl(var(--background))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{permissionLevelFor(configuredPermissions[featureId]) === 'edit' ? 'Voir, créer et modifier' : permissionLevelFor(configuredPermissions[featureId]) === 'create' ? 'Voir et créer' : 'Voir seulement'}</span></div>)}</div>
     </section>
     <section className="card-surface rounded-2xl p-5">
-      <div className="border-b pb-4"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Aperçu fonctionnel</p><h2 className="mt-2 text-xl font-bold">{module.name} avec le pack « {pack.name} »</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les mêmes écrans que ceux utilisés par une entreprise sont ouverts avec le périmètre de ce pack.</p></div>
+      <div className="border-b pb-4"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Aperçu fonctionnel</p><h2 className="mt-2 text-xl font-bold">{module.name}{pack ? ` avec le pack « ${pack.name} »` : ''}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{pack ? 'Les mêmes écrans que ceux utilisés par une entreprise sont ouverts avec le périmètre et les droits de ce pack.' : 'Le parcours complet du module est ouvert avec toutes ses fonctionnalités.'}</p></div>
       <div className="mt-5">
-        {module.id === 'stocks' && <StockModulePage companyId="kora" />}
-        {(module.id === 'commerce' || module.id === 'ventes') && <CommerceModulePage companyId="kora" data={data} mutate={mutate} initialTab={module.id === 'ventes' ? 'sales' : 'dashboard'} />}
+        {module.id === 'stocks' && <StockModulePage companyId="kora" canCreate={canCreate} canModify={canModify} stockPermissions={stockPermissions} />}
+        {(module.id === 'commerce' || module.id === 'ventes') && <CommerceModulePage companyId="kora" data={data} mutate={mutate} canCreate={canCreate} canModify={canModify} allowedTabs={allowedCommerceTabs} initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')} />}
         {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
         {module.id === 'rh' && koraCompany && <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />}
         {module.id === 'presences' && <PresencesPage data={data} />}
-        {operationalModules.includes(module.id) && <OperationalModulePage moduleId={module.id} data={data} mutate={mutate} />}
+        {operationalModules.includes(module.id) && <OperationalModulePage moduleId={module.id} data={data} mutate={mutate} canCreate={canCreate} canModify={canModify} />}
         {module.id === 'rapports' && <OperationalReportsPage data={data} />}
         {!['stocks', 'commerce', 'ventes', 'finance', 'rh', 'presences', 'rapports', ...operationalModules].includes(module.id) && <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">L’aperçu de ce module sera disponible quand son écran métier sera connecté.</p>}
       </div>
