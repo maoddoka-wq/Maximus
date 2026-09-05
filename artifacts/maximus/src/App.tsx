@@ -28,6 +28,25 @@ import {
   type PresencePermission,
 } from '@/lib/employee-permissions';
 
+type FeaturePermission = 'voir' | 'créer' | 'modifier';
+type FeaturePermissionMap = Partial<Record<string, FeaturePermission[]>>;
+const featurePermissionOptions: { value: string; label: string; permissions: FeaturePermission[] }[] = [
+  { value: 'none', label: 'Non incluse', permissions: [] },
+  { value: 'view', label: 'Voir seulement', permissions: ['voir'] },
+  { value: 'create', label: 'Voir et créer', permissions: ['voir', 'créer'] },
+  { value: 'edit', label: 'Voir, créer et modifier', permissions: ['voir', 'créer', 'modifier'] },
+];
+const permissionLevelFor = (permissions?: string[]) => {
+  if (!permissions?.length) return 'none';
+  if (permissions.includes('modifier')) return 'edit';
+  if (permissions.includes('créer')) return 'create';
+  return 'view';
+};
+const permissionsForLevel = (level: string): FeaturePermission[] =>
+  [...(featurePermissionOptions.find(option => option.value === level)?.permissions ?? [])];
+const defaultFeaturePermissions = (featureIds: Iterable<string>, existing?: FeaturePermissionMap): FeaturePermissionMap =>
+  Object.fromEntries([...featureIds].map(featureId => [featureId, existing?.[featureId]?.length ? [...existing[featureId]!] : ['voir']]));
+
 const queryClient = new QueryClient();
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
@@ -439,6 +458,11 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
     const module = modules.find(item => item.id === moduleId);
     return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])] : []];
   })) as Partial<Record<ModuleId, string[]>>);
+  const [selectedModulePermissions, setSelectedModulePermissions] = useState<Partial<Record<ModuleId, FeaturePermissionMap>>>(() => Object.fromEntries(initialPreset.moduleIds.map(moduleId => {
+    const module = modules.find(item => item.id === moduleId);
+    const featureIds = module ? getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId]) : [];
+    return [moduleId, defaultFeaturePermissions(featureIds)];
+  })) as Partial<Record<ModuleId, FeaturePermissionMap>>);
   const [moduleError, setModuleError] = useState('');
   const configuredModule = (moduleId: ModuleId) => {
     const base = modules.find(item => item.id === moduleId);
@@ -452,9 +476,14 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
     setSelectedModules(nextModules);
     setSelectedModuleFeatures(Object.fromEntries(nextModules.map(moduleId => {
       const module = configuredModule(moduleId);
-      const requested = preset?.moduleFeatures?.[moduleId]?.filter(featureId => module?.featureStatuses?.[featureId] !== 'INACTIF');
+      const requested = preset?.moduleFeatures?.[moduleId];
       return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, requested)] : []];
     })) as Partial<Record<ModuleId, string[]>>);
+    setSelectedModulePermissions(Object.fromEntries(nextModules.map(moduleId => {
+      const module = configuredModule(moduleId);
+      const featureIds = module ? getEffectiveModuleFeatureIds(module, preset?.moduleFeatures?.[moduleId]) : [];
+      return [moduleId, defaultFeaturePermissions(featureIds)];
+    })) as Partial<Record<ModuleId, FeaturePermissionMap>>);
     setModuleError('');
   };
   const applyBusinessProfile = (profile: SectorBusinessProfile) => {
@@ -464,10 +493,17 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
     setSelectedModuleFeatures(Object.fromEntries(entries.map(([moduleId, featureIds]) => {
       const module = configuredModule(moduleId);
       const packFeatures = profile.modulePackIds?.[moduleId]
-        ? (module?.featurePacks ?? []).filter(pack => profile.modulePackIds?.[moduleId]?.includes(pack.id)).flatMap(pack => pack.featureIds).filter(featureId => module?.featureStatuses?.[featureId] !== 'INACTIF')
+        ? (module?.featurePacks ?? []).filter(pack => profile.modulePackIds?.[moduleId]?.includes(pack.id)).flatMap(pack => pack.featureIds)
         : featureIds;
       return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, packFeatures)] : [...packFeatures]];
     })) as Partial<Record<ModuleId, string[]>>);
+    setSelectedModulePermissions(Object.fromEntries(entries.map(([moduleId]) => {
+      const module = configuredModule(moduleId);
+      const selectedPacks = module?.featurePacks?.filter(pack => profile.modulePackIds?.[moduleId]?.includes(pack.id)) ?? [];
+      const featureIds = module ? getEffectiveModuleFeatureIds(module, selectedPacks.length ? selectedPacks.flatMap(pack => pack.featureIds) : profile.moduleFeatures?.[moduleId]) : [];
+      const permissions = selectedPacks.reduce<FeaturePermissionMap>((all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }), {});
+      return [moduleId, defaultFeaturePermissions(featureIds, permissions)];
+    })) as Partial<Record<ModuleId, FeaturePermissionMap>>);
     setModuleError('');
   };
   const toggle = (id: ModuleId) => {
@@ -480,20 +516,27 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
         return next;
       }
       const module = configuredModule(id);
-      const availableFeatures = getModuleFeatureOptions(module ?? modules[0]).map(feature => feature.id).filter(featureId => module?.featureStatuses?.[featureId] !== 'INACTIF');
+      const availableFeatures = getModuleFeatureOptions(module ?? modules[0]).map(feature => feature.id);
+      setSelectedModulePermissions(current => ({ ...current, [id]: defaultFeaturePermissions(availableFeatures) }));
       return { ...current, [id]: module ? [...getEffectiveModuleFeatureIds(module, availableFeatures)] : [] };
     });
+    if (enabled) setSelectedModulePermissions(current => { const next = { ...current }; delete next[id]; return next; });
     setModuleError('');
   };
   const toggleFeature = (moduleId: ModuleId, featureId: string) => {
     const module = configuredModule(moduleId);
     if (!module) return;
-    if (module.featureStatuses?.[featureId] === 'INACTIF') return;
     setSelectedModuleFeatures(current => {
       const options = getModuleFeatureOptions(module);
       const selected = new Set(current[moduleId] ?? options.map(feature => feature.id));
       if (selected.has(featureId)) selected.delete(featureId);
       else selected.add(featureId);
+      setSelectedModulePermissions(permissions => {
+        const next = { ...(permissions[moduleId] ?? {}) };
+        if (selected.has(featureId)) next[featureId] = next[featureId]?.length ? next[featureId] : ['voir'];
+        else delete next[featureId];
+        return { ...permissions, [moduleId]: next };
+      });
       return { ...current, [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
     });
   };
@@ -565,10 +608,10 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
               <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités à activer</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span></div>
               <div className="grid gap-1 sm:grid-cols-2">
                  {featureOptions.map(feature => {
-                   const authorized = mod.featureStatuses?.[feature.id] !== 'INACTIF';
-                   return <label key={feature.id} className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-xs ${authorized ? 'cursor-pointer hover:bg-[hsl(var(--card)/.7)]' : 'opacity-45'}`}>
-                   <input data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`} type="checkbox" checked={selectedFeatureIds.has(feature.id)} onChange={() => toggleFeature(mod.id, feature.id)} disabled={!authorized} className="mt-0.5 accent-[hsl(var(--primary))]" />
-                   <span>{feature.label}{!authorized && <small className="ml-2">(désactivée)</small>}</span>
+                    const included = selectedFeatureIds.has(feature.id);
+                    return <label key={feature.id} className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs cursor-pointer hover:bg-[hsl(var(--card)/.7)]">
+                    <input data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`} type="checkbox" checked={included} onChange={() => toggleFeature(mod.id, feature.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
+                    <span>{feature.label}</span>
                  </label>;
                  })}
               </div>
@@ -576,7 +619,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
             </div>}
           </div>;
         })}</div>
-         <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = configuredModule(moduleId); const authorizedFeatures = selectedModuleFeatures[moduleId]?.filter(featureId => module?.featureStatuses?.[featureId] !== 'INACTIF'); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, authorizedFeatures)] : []]; })) as Partial<Record<ModuleId, string[]>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedBusinessProfileId: selectedBusinessProfileId || undefined, requestedModuleFeatures, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
+          <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = configuredModule(moduleId); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : []]; })) as Partial<Record<ModuleId, string[]>>; const requestedModulePermissions = Object.fromEntries(selectedModules.map(moduleId => [moduleId, defaultFeaturePermissions(requestedModuleFeatures[moduleId] ?? [], selectedModulePermissions[moduleId])])) as Partial<Record<ModuleId, FeaturePermissionMap>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedBusinessProfileId: selectedBusinessProfileId || undefined, requestedModuleFeatures, requestedModulePermissions, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
       </div>}
     </div>
   </div>;
