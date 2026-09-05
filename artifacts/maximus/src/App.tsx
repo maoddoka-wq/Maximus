@@ -30,6 +30,7 @@ import {
 } from '@/lib/employee-permissions';
 
 type FeaturePermissionMap = Partial<Record<string, string[]>>;
+type ModulePackDraft = { name: string; description: string; featureIds: string[]; featurePermissions: FeaturePermissionMap };
 const featurePermissionOptions: { value: string; label: string; permissions: string[] }[] = [
   { value: 'none', label: 'Non incluse', permissions: [] },
   { value: 'view', label: 'Voir seulement', permissions: ['voir'] },
@@ -1204,7 +1205,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [editingPackId, setEditingPackId] = useState<string | null>(null);
-  const [packForm, setPackForm] = useState({ name: '', description: '', featureIds: [] as string[], featurePermissions: {} as FeaturePermissionMap });
+  const [packForm, setPackForm] = useState<ModulePackDraft>({ name: '', description: '', featureIds: [], featurePermissions: {} });
   const [testPack, setTestPack] = useState<ModuleFeaturePack | null>(null);
   const [testModule, setTestModule] = useState(false);
   const [query, setQuery] = useState('');
@@ -1233,16 +1234,43 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const openEdit = (module: (typeof modules)[number]) => {
     setEditingModule(module);
     setModuleForm({ name: module.name, description: module.description, features: module.features.join('\n') });
+    resetPackForm();
   };
 
   const saveModule = () => {
     if (!editingModule || !moduleForm.name.trim() || !moduleForm.description.trim()) return;
     const features = moduleForm.features.split(/[\n,]/).map(feature => feature.trim()).filter(Boolean);
     if (features.length === 0) return;
+    const moduleForPack = { ...editingModule, features };
+    const packFeatureIds = getModuleFeatureOptions(moduleForPack)
+      .map(feature => feature.id)
+      .filter(featureId => packForm.featurePermissions[featureId]?.length);
+    if (packForm.name.trim() && packFeatureIds.length === 0) return;
     mutate(draft => {
-      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: { ...(draft.moduleOverrides?.[editingModule.id] ?? {}), name: moduleForm.name.trim(), description: moduleForm.description.trim(), features } };
-    }, `${moduleForm.name.trim()} a été modifié.`);
+      const currentOverride = draft.moduleOverrides?.[editingModule.id] ?? {};
+      const nextOverride = {
+        ...currentOverride,
+        name: moduleForm.name.trim(),
+        description: moduleForm.description.trim(),
+        features,
+      };
+      if (packForm.name.trim()) {
+        const currentPacks = currentOverride.featurePacks
+          ?? modules.find(module => module.id === editingModule.id)?.featurePacks
+          ?? [];
+        const nextPack: ModuleFeaturePack = {
+          id: uid(`pack-${editingModule.id}`),
+          name: packForm.name.trim(),
+          description: packForm.description.trim(),
+          featureIds: packFeatureIds,
+          featurePermissions: Object.fromEntries(packFeatureIds.map(featureId => [featureId, [...packForm.featurePermissions[featureId]!]])),
+        };
+        nextOverride.featurePacks = [...currentPacks, nextPack];
+      }
+      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: nextOverride };
+    }, packForm.name.trim() ? `${moduleForm.name.trim()} et son pack métier ont été enregistrés.` : `${moduleForm.name.trim()} a été modifié.`);
     setEditingModule(null);
+    resetPackForm();
   };
 
   const removeModule = (module: (typeof modules)[number]) => {
@@ -1361,7 +1389,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
            </div>
         </section>
       </div>
-     {editingModule && <Modal title="Modifier le module" onClose={() => setEditingModule(null)}><div className="space-y-4"><Field label="Nom du module" value={moduleForm.name} onChange={value => setModuleForm(current => ({ ...current, name: value }))} testId="input-module-name" /><Field label="Description" value={moduleForm.description} onChange={value => setModuleForm(current => ({ ...current, description: value }))} testId="input-module-description" /><label className="block text-sm font-semibold">Fonctionnalités<textarea data-testid="input-module-features" value={moduleForm.features} onChange={event => setModuleForm(current => ({ ...current, features: event.target.value }))} placeholder="Une fonctionnalité par ligne" rows={5} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités peuvent être séparées par des lignes ou des virgules.</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-module" onClick={saveModule}>Enregistrer les modifications</ActionButton></div></div></Modal>}
+     {editingModule && <Modal title="Modifier le module" onClose={() => { setEditingModule(null); resetPackForm(); }}><div className="space-y-4"><Field label="Nom du module" value={moduleForm.name} onChange={value => setModuleForm(current => ({ ...current, name: value }))} testId="input-module-name" /><Field label="Description" value={moduleForm.description} onChange={value => setModuleForm(current => ({ ...current, description: value }))} testId="input-module-description" /><label className="block text-sm font-semibold">Fonctionnalités<textarea data-testid="input-module-features" value={moduleForm.features} onChange={event => setModuleForm(current => ({ ...current, features: event.target.value }))} placeholder="Une fonctionnalité par ligne" rows={5} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités peuvent être séparées par des lignes ou des virgules.</p><ModulePackDraftForm module={{ ...editingModule, features: moduleForm.features.split(/[\n,]/).map(feature => feature.trim()).filter(Boolean) }} packForm={packForm} onChange={setPackForm} /><div className="flex justify-end gap-2"><button type="button" onClick={() => { setEditingModule(null); resetPackForm(); }} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-module" onClick={saveModule}>Enregistrer les modifications</ActionButton></div></div></Modal>}
     </div>;
   }
 
@@ -1414,6 +1442,58 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
      </div>
      {deletingModule && <Modal title="Confirmer la suppression" onClose={() => setDeletingModule(null)}><p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">Voulez-vous vraiment supprimer le module <strong className="text-[hsl(var(--foreground))]">{deletingModule.name}</strong> ? Il sera retiré du catalogue et désactivé pour tous les espaces.</p><div className="mt-6 flex justify-end gap-2"><button type="button" data-testid="button-cancel-delete-module" onClick={() => setDeletingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" data-testid="button-confirm-delete-module" onClick={() => removeModule(deletingModule)} className="rounded-lg bg-[hsl(var(--destructive))] px-4 py-2.5 text-xs font-bold text-white">Supprimer le module</button></div></Modal>}
     </div>;
+}
+
+function ModulePackDraftForm({
+  module,
+  packForm,
+  onChange,
+}: {
+  module: (typeof modules)[number];
+  packForm: ModulePackDraft;
+  onChange: (value: ModulePackDraft | ((current: ModulePackDraft) => ModulePackDraft)) => void;
+}) {
+  const featureOptions = getModuleFeatureOptions(module);
+
+  return (
+    <section className="rounded-xl border bg-[hsl(var(--muted)/.18)] p-4">
+      <div>
+        <p className="text-sm font-bold">Pack métier à créer avec le module <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">(optionnel)</span></p>
+        <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Préparez dès maintenant un modèle de rôle réutilisable. Vous pourrez ajouter d’autres packs ensuite depuis le détail du module.</p>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="Nom du pack" value={packForm.name} onChange={(value: string) => onChange(current => ({ ...current, name: value }))} placeholder="Ex. Gestionnaire de stock" testId="input-module-initial-pack-name" />
+        <Field label="Description" value={packForm.description} onChange={(value: string) => onChange(current => ({ ...current, description: value }))} placeholder="À quoi sert ce pack ?" testId="input-module-initial-pack-description" />
+      </div>
+      <p className="mt-4 text-xs font-bold">Droits inclus par fonctionnalité</p>
+      <div className="mt-2 grid gap-1 sm:grid-cols-2">
+        {featureOptions.map(feature => (
+          <label key={feature.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-2 text-xs hover:bg-[hsl(var(--muted))]">
+            <span className="font-medium">{feature.label}</span>
+            <select
+              data-testid={`select-module-initial-pack-permission-${feature.id}`}
+              value={permissionLevelFor(packForm.featurePermissions[feature.id])}
+              onChange={event => {
+                const permissions = permissionsForLevel(event.target.value);
+                onChange(current => {
+                  const featurePermissions = { ...current.featurePermissions };
+                  if (permissions.length) featurePermissions[feature.id] = permissions;
+                  else delete featurePermissions[feature.id];
+                  return { ...current, featureIds: Object.keys(featurePermissions), featurePermissions };
+                });
+              }}
+              className="rounded-md border bg-[hsl(var(--card))] px-2 py-1.5 text-[10px] font-semibold"
+            >
+              <option value="none">Non incluse</option>
+              <option value="view">Voir seulement</option>
+              <option value="create">Voir et créer</option>
+              <option value="edit">Voir, créer et modifier</option>
+            </select>
+          </label>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { module: (typeof modules)[number]; pack?: ModuleFeaturePack; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
