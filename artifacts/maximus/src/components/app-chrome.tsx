@@ -220,17 +220,26 @@ export function Sidebar({
                 </>
               )}
               {sidebarFeatureGroups?.map((group, groupIndex) => (
-                <div key={group.label}>
+                <section
+                  key={group.label}
+                  aria-label={group.label}
+                  className={`${groupIndex > 0 ? 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
+                >
                   {!compact && (
-                    <p
+                    <div
                       data-testid={`module-section-${group.label}`}
-                      className={`sidebar-section-label ${groupIndex > 0 ? 'mt-5' : ''}`}
+                      className="mb-2 flex items-center justify-between rounded-lg border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.55)] px-3 py-2"
                     >
-                      {group.label}
-                    </p>
+                      <span className="text-xs font-bold uppercase tracking-[.08em] text-[hsl(var(--sidebar-foreground)/.85)]">
+                        {group.label}
+                      </span>
+                      <span className="rounded-full bg-[hsl(var(--sidebar-foreground)/.1)] px-1.5 py-0.5 text-[10px] font-bold text-[hsl(var(--sidebar-foreground)/.6)]">
+                        {group.items.length}
+                      </span>
+                    </div>
                   )}
-                  {group.items.map(item => link(item))}
-                </div>
+                  <div className="space-y-1">{group.items.map(item => link(item))}</div>
+                </section>
               ))}
             </>
           ) : (
