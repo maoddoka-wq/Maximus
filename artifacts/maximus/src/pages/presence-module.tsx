@@ -1,18 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
 import { createPresenceApi, type PresenceItem } from '@/lib/presence-api';
+import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { useQueryTab } from '@/lib/query-tab';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
-type Tab = 'dashboard' | 'clock' | 'presence' | 'absence' | 'late' | 'schedules' | 'planning' | 'breaks' | 'worked' | 'overtime' | 'missions' | 'leave' | 'holidays' | 'history' | 'reports' | 'settings';
-const tabs: [Tab, string, typeof Clock3][] = [
-  ['dashboard', 'Tableau de bord', CalendarDays], ['clock', 'Pointage', Clock3], ['presence', 'Présences', UserCheck], ['absence', 'Absences', Users],
-  ['late', 'Retards', AlertTriangle], ['schedules', 'Horaires', Clock3], ['planning', 'Planning', CalendarDays], ['breaks', 'Pauses', Pause],
-  ['worked', 'Heures travaillées', Clock3], ['overtime', 'Heures supplémentaires', ArrowUpFromLine], ['missions', 'Missions', MapPin], ['leave', 'Congés', CalendarDays],
-  ['holidays', 'Jours fériés', CalendarDays], ['history', 'Historique', History], ['reports', 'Rapports', FileBarChart], ['settings', 'Paramètres', Settings],
-];
+type Tab = (typeof presenceFeatureDefinitions)[number]['tab'];
+const presenceTabIcons: Partial<Record<Tab, LucideIcon>> = {
+  dashboard: CalendarDays,
+  clock: Clock3,
+  presence: UserCheck,
+  absence: Users,
+  late: AlertTriangle,
+  schedules: Clock3,
+  planning: CalendarDays,
+  breaks: Pause,
+  worked: Clock3,
+  overtime: ArrowUpFromLine,
+  missions: MapPin,
+  leave: CalendarDays,
+  holidays: CalendarDays,
+  history: History,
+  reports: FileBarChart,
+  settings: Settings,
+};
+const tabs: [Tab, string, LucideIcon][] = presenceFeatureDefinitions.map(feature => [feature.tab, feature.label, presenceTabIcons[feature.tab] ?? CalendarDays]);
 const typeLabel: Record<PresenceItem['type'], string> = { attendance: 'Pointage', absence: 'Absence', schedule: 'Horaire', planning: 'Planning', mission: 'Mission', leave: 'Congé', holiday: 'Jour férié', settings: 'Paramètres', history: 'Historique' };
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (date: string, amount: number) => { const value = new Date(`${date}T12:00:00`); value.setDate(value.getDate() + amount); return value.toISOString().slice(0, 10); };

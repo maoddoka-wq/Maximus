@@ -16,7 +16,10 @@ import {
 } from './commerce-permissions';
 import { parseQueryTab } from './query-tab';
 import { resolveFeatureDependencies } from './permission-keys';
+import { getModuleFeatureOptions } from './module-features';
+import { presenceFeatureDefinitions } from './presence-features';
 import { recordControlEvent, stockSubmoduleDependencies } from './store';
+import { modules } from './store';
 import type { Employee, ModuleId, OrgNode, Role, StoreData } from './store';
 
 const employee: Employee = {
@@ -213,6 +216,16 @@ test('rend les prérequis visibles dans les permissions effectives', () => {
   assert.equal(stockPermissions.entries?.includes('créer'), true);
   assert.equal(stockPermissions.entries?.includes('voir'), true);
   assert.equal(stockPermissions.products?.includes('voir'), true);
+});
+
+test('utilise une définition complète et partagée pour les fonctionnalités Présences', () => {
+  const presenceModule = modules.find(module => module.id === 'presences');
+  assert.ok(presenceModule);
+  assert.deepEqual(
+    getModuleFeatureOptions(presenceModule).map(feature => feature.label),
+    presenceFeatureDefinitions.map(feature => feature.label),
+  );
+  assert.equal(presenceFeatureDefinitions.length, 16);
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {

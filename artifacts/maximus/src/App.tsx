@@ -14,6 +14,7 @@ import { AdminRouter, KoraRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
+import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { loadCompanyModuleAccess, setCompanyModuleAccess } from '@/lib/module-api';
 import {
@@ -323,11 +324,7 @@ function AppContent() {
           icon: submodule.id === 'dashboard' ? Gauge : submodule.id === 'products' ? Package : submodule.id === 'entries' ? ArrowDownToLine : submodule.id === 'exits' ? ArrowUpFromLine : submodule.id === 'requests' || submodule.id === 'inventory' ? ClipboardCheck : submodule.id === 'reports' ? FileBarChart : submodule.id === 'settings' ? Settings : Warehouse,
         }));
     } else if (moduleId === 'presences') {
-      const presenceFeatures: Record<string, { tab: string; icon: Icon }> = {
-        'Pointage': { tab: 'clock', icon: FileClock },
-        'Historique': { tab: 'history', icon: History },
-        'Rapports': { tab: 'reports', icon: FileBarChart },
-      };
+      const presenceFeatures = Object.fromEntries(presenceFeatureDefinitions.map(feature => [feature.label, { tab: feature.tab, icon: CalendarDays }]));
       const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
       items = module.features
         .filter(feature => effectiveFeatureIds.has(featureSlug(feature)) || hasPresencePermission('view'))
