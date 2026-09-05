@@ -2952,6 +2952,7 @@ function SectorPresetsPage({
   const [sectorPackIds, setSectorPackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
+  const [sectorModalOpen, setSectorModalOpen] = useState(false);
   const sectorPresets = data.sectorPresets ?? [];
   const moduleForSector = (id: ModuleId) => {
     const base = modules.find((module) => module.id === id);
@@ -2988,6 +2989,7 @@ function SectorPresetsPage({
   };
 
   const openSector = (preset?: SectorPreset) => {
+    setSectorModalOpen(true);
     setEditingSector(preset ?? null);
     setSectorName(preset?.name ?? '');
     const legacyPackIds = Object.fromEntries(
@@ -3063,6 +3065,16 @@ function SectorPresetsPage({
     setSectorPackIds({});
     setEditingSector(null);
     setSectorError('');
+    setSectorModalOpen(false);
+  };
+
+  const closeSectorModal = () => {
+    setSectorModalOpen(false);
+    setEditingSector(null);
+    setSectorName('');
+    setSectorModules([]);
+    setSectorPackIds({});
+    setSectorError('');
   };
 
   const deleteSector = async (preset: SectorPreset) => {
@@ -3087,22 +3099,39 @@ function SectorPresetsPage({
   return (
     <div className="space-y-5">
       <section className="card-surface rounded-2xl p-6">
-        <div className="flex items-start gap-3">
-          <span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]">
-            <Building2 size={19} />
-          </span>
-          <div>
-            <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
-              Configuration du catalogue
-            </p>
-            <h2 className="mt-2 text-xl font-bold">Configurer un secteur d’activité</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Un secteur sélectionne directement les packs déjà définis dans les modules. Aucun nom de métier ou de pack
-              n’est recréé ici.
-            </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]">
+              <Building2 size={19} />
+            </span>
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
+                Configuration du catalogue
+              </p>
+              <h2 className="mt-2 text-xl font-bold">Configurer un secteur d’activité</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Un secteur sélectionne directement les packs déjà définis dans les modules. Aucun nom de métier ou de pack
+                n’est recréé ici.
+              </p>
+            </div>
           </div>
+          <button
+            type="button"
+            data-testid="button-add-sector"
+            onClick={() => openSector()}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition hover:opacity-90"
+          >
+            <Plus size={15} />
+            Ajouter un secteur d’activité
+          </button>
         </div>
-        <form onSubmit={createSector} className="mt-6 border-t pt-5">
+        {sectorModalOpen && (
+          <Modal
+            title={editingSector ? 'Modifier le secteur d’activité' : 'Ajouter un secteur d’activité'}
+            onClose={closeSectorModal}
+            className="max-h-[88vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
+          >
+            <form onSubmit={createSector} className="space-y-5">
           <label className="block max-w-md text-sm font-semibold">
             Nom du secteur
             <input
@@ -3207,14 +3236,16 @@ function SectorPresetsPage({
             {editingSector && (
               <button
                 type="button"
-                onClick={() => openSector()}
+                onClick={closeSectorModal}
                 className="rounded-lg border px-4 py-2.5 text-xs font-bold"
               >
                 Annuler la modification
               </button>
             )}
           </div>
-        </form>
+            </form>
+          </Modal>
+        )}
       </section>
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
