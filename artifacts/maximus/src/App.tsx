@@ -102,6 +102,14 @@ import {
 } from '@/lib/module-pack';
 
 const queryClient = new QueryClient();
+const defaultDemoAccounts = [
+  { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
+  { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
+  { id: 'demo-emp-awa', label: 'Awa Ndiaye · Gestionnaire commerciale', email: 'awa.ndiaye@kora.demo', password: 'AwaKora2026!' },
+  { id: 'demo-emp-ibrahima', label: 'Ibrahima Kane · Responsable magasin', email: 'ibrahima.kane@kora.demo', password: 'IbrahimaKora2026!' },
+  { id: 'demo-emp-ndeye', label: 'Ndeye Sarr · Assistante RH', email: 'ndeye.sarr@kora.demo', password: 'NdeyeKora2026!' },
+  { id: 'demo-emp-mamadou', label: 'Mamadou Ba · Comptable', email: 'mamadou.ba@kora.demo', password: 'MamadouKora2026!' },
+] as const;
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const OperationalModulePage = lazy(() =>
@@ -320,6 +328,7 @@ function AppContent() {
     return () => window.removeEventListener('storage', syncData);
   }, []);
   useEffect(() => {
+    if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
       .session()
       .then(({ user }) => {
@@ -772,18 +781,25 @@ function Login({
   const [password, setPassword] = useState('Kora123!');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
   const loginWithCredentials = (space: 'admin' | 'kora', nextEmail: string, nextPassword: string) => {
+    if (pendingEmail) return;
     setError('');
-    void onLogin(space, nextEmail, nextPassword).catch((loginError) =>
-      setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'),
-    );
+    setPendingEmail(nextEmail);
+    void onLogin(space, nextEmail, nextPassword)
+      .catch((loginError) => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'))
+      .finally(() => setPendingEmail(''));
   };
   const submitLogin = (space: 'admin' | 'kora') => loginWithCredentials(space, email, password);
   const demoAccounts = [
-    { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
-    { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
+    ...defaultDemoAccounts,
     ...employees
-      .filter((account) => account.status === 'ACTIF' && account.email.toLowerCase() !== 'admin@kora.demo')
+      .filter(
+        (account) =>
+          account.status === 'ACTIF' &&
+          Boolean(account.loginPassword) &&
+          !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
+      )
       .map((account) => ({
         id: account.id,
         label: `${account.firstName} ${account.lastName} · ${account.position}`,
@@ -884,11 +900,12 @@ function Login({
             )}
             <button
               data-testid="button-login"
-              className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)]"
+              disabled={Boolean(pendingEmail)}
+              className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)] disabled:cursor-wait disabled:opacity-70"
               type="submit"
             >
-              <LogIn size={17} />
-              Se connecter
+              <LogIn size={17} className={pendingEmail ? 'animate-pulse' : ''} />
+              {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
           <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
@@ -900,19 +917,26 @@ function Login({
           <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
             <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
             <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
-              Cliquez sur un compte pour vous connecter directement.
+              Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
             </p>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {demoAccounts.map((account) => (
                 <button
                   type="button"
+                  disabled={Boolean(pendingEmail)}
                   data-testid={`button-demo-account-${account.id}`}
                   key={account.id}
                   onClick={() => selectDemoAccount(account)}
-                  className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
+                  className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
                 >
                   <span className="block text-xs font-bold">{account.label}</span>
                   <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
+                  <span
+                    data-testid={`demo-account-password-${account.id}`}
+                    className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
+                  >
+                    Mot de passe : {account.password}
+                  </span>
                 </button>
               ))}
             </div>
