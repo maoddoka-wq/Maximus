@@ -4746,7 +4746,7 @@ function Modal({
   }, [onClose]);
   return (
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm">
-      <div className={`modal-panel card-surface w-full max-w-lg rounded-2xl p-6 fade-up ${className}`}>
+      <div className={`modal-panel card-surface w-full max-w-4xl rounded-2xl p-6 fade-up ${className}`}>
         <div className="modal-header mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold">{title}</h2>
           <button
@@ -4790,7 +4790,12 @@ function InteractiveModulesPage({
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
   notify: (message: string) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<ModuleId | null>(null);
+  const [search] = useSearch();
+  const readSelectedModule = (value: string) => {
+    const requested = new URLSearchParams(value).get('module');
+    return requested && modules.some((module) => module.id === requested) ? (requested as ModuleId) : null;
+  };
+  const [selectedId, setSelectedId] = useState<ModuleId | null>(() => readSelectedModule(search));
   const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
@@ -4805,6 +4810,31 @@ function InteractiveModulesPage({
   const moduleDefinitions = modules
     .filter((module) => !data.removedModules?.includes(module.id))
     .map((module) => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
+  useEffect(() => {
+    setSelectedId(readSelectedModule(search));
+  }, [search]);
+  const selectModule = (moduleId: ModuleId | null, replace = false) => {
+    const url = new URL(window.location.href);
+    if (moduleId) {
+      url.searchParams.set('module', moduleId);
+    } else {
+      url.searchParams.delete('module');
+    }
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    const historyState = {
+      ...(window.history.state ?? {}),
+      maximus: true,
+      maximusIndex:
+        typeof window.history.state?.maximusIndex === 'number'
+          ? window.history.state.maximusIndex + (replace ? 0 : 1)
+          : replace
+            ? 0
+            : 1,
+    };
+    window.history[replace ? 'replaceState' : 'pushState'](historyState, '', nextUrl);
+    window.dispatchEvent(new Event(replace ? 'replaceState' : 'pushState'));
+    setSelectedId(moduleId);
+  };
   const statusOf = (moduleId: ModuleId): ModuleAvailability =>
     data.removedModules?.includes(moduleId)
       ? 'INACTIF'
@@ -4889,7 +4919,7 @@ function InteractiveModulesPage({
         moduleIds: node.moduleIds?.filter((id) => id !== module.id),
       }));
     }, `${module.name} a été supprimé et désactivé.`);
-    if (selectedId === module.id) setSelectedId(null);
+    if (selectedId === module.id) selectModule(null, true);
     setDeletingModule(null);
   };
 
@@ -5006,7 +5036,7 @@ function InteractiveModulesPage({
       <div className="space-y-5">
         <button
           data-testid="button-back-modules"
-          onClick={() => setSelectedId(null)}
+          onClick={() => selectModule(null, true)}
           className="text-xs font-bold text-[hsl(var(--primary))]"
         >
           ← Retour au catalogue
@@ -5401,7 +5431,7 @@ function InteractiveModulesPage({
               <button
                 type="button"
                 data-testid={`button-open-module-${module.id}`}
-                onClick={() => setSelectedId(module.id)}
+                onClick={() => selectModule(module.id)}
                 aria-label={`Ouvrir l’application ${module.name}`}
                 className="flex flex-1 flex-col items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))]"
               >
