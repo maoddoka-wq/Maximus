@@ -13,6 +13,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 
+Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {
+    Route::post('/', [AuthController::class, 'createAccount']);
+    Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
+});
+
 require __DIR__.'/control.php';
 require __DIR__.'/presence.php';
 require __DIR__.'/stock.php';

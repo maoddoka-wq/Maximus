@@ -70,4 +70,42 @@ class MaximusAuthTest extends TestCase
             ->assertJsonPath('user.role', 'maximus_admin')
             ->assertJsonPath('user.displayName', 'Administration MAXIMUS');
     }
+
+    public function test_company_admin_can_provision_an_employee_who_logs_in_immediately(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'provisioning-admin',
+            'email' => 'provisioning@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', 'aabbccddeeff00112233445566778899'),
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/auth/accounts', [
+                'id' => 'employee-created-now',
+                'email' => 'created.now@kora.demo',
+                'displayName' => 'Employé créé',
+                'companyId' => 'kora',
+                'employeeId' => 'employee-created-now',
+                'sectorIds' => ['kora-service-vente'],
+                'role' => 'employee',
+                'password' => 'CreatedNow2026!',
+            ])
+            ->assertCreated()
+            ->assertJson(['ok' => true]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'created.now@kora.demo',
+            'password' => 'CreatedNow2026!',
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.employeeId', 'employee-created-now')
+            ->assertJsonPath('user.role', 'employee');
+    }
 }

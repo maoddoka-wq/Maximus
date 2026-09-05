@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Throwable;
+use App\Support\MaximusDemoProvisioner;
 
 class StockController extends Controller
 {
@@ -17,6 +18,8 @@ class StockController extends Controller
 
     public function bootstrap(Request $request): JsonResponse
     {
+        MaximusDemoProvisioner::ensureStockSeed();
+
         $companyId = $request->query('companyId', self::COMPANY);
         $where = fn (string $table) => DB::table($table)->where('company_id', $companyId);
 
