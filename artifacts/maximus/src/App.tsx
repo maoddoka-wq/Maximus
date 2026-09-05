@@ -454,6 +454,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState('');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
+  const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(() => Object.fromEntries(initialPreset.moduleIds.map(moduleId => {
     const module = modules.find(item => item.id === moduleId);
     return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])] : []];
