@@ -26,7 +26,7 @@ export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'nam
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
-export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
+export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
 export const demoEmployeeIds = new Set(['demo-emp-awa', 'demo-emp-ibrahima', 'demo-emp-ndeye', 'demo-emp-mamadou']);
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; }
