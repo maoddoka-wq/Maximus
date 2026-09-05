@@ -151,7 +151,7 @@ export function CompanyProfileSection({
 
   return (
     <div className="space-y-5 fade-up">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
         <div className="space-y-5">
           <section className="card-surface rounded-2xl p-6">
             <div className="mb-6">
@@ -163,7 +163,7 @@ export function CompanyProfileSection({
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--primary)/.1)] text-xl font-black text-[hsl(var(--primary))]">
                 {form.profilePhoto ? <img src={form.profilePhoto} alt={`Photo de profil de ${form.name}`} className="h-full w-full object-cover" /> : company.name.slice(0, 2).toUpperCase()}
               </div>
-              <div className="min-w-[220px] flex-1">
+              <div className="min-w-0 flex-1 sm:min-w-[220px]">
                 <h3 className="font-bold">Photo de profil</h3>
                 <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">PNG, JPG ou WebP · 2 Mo maximum.</p>
                 <div className="mt-3 flex flex-wrap gap-2">

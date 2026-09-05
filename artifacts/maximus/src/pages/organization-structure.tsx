@@ -61,7 +61,7 @@ export function StructureTab({
   };
 
   return (
-    <div className="card-surface rounded-2xl p-6 fade-up">
+    <div className="card-surface rounded-2xl p-4 fade-up sm:p-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold">Unités Organisationnelles</h2>
@@ -82,9 +82,9 @@ export function StructureTab({
       <div className="mb-4 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
         <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez les directions, départements, secteurs et services. Les rôles, les sous-autorisations et les managers se configurent ensuite dans les étapes 2 et 3 ci-dessus.
       </div>
-      <div className="mb-5 flex items-center justify-between rounded-xl border px-4 py-3 text-xs">
+      <div className="mb-5 flex flex-col gap-1 rounded-xl border px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
         <span><strong>{companyNodes.length}</strong> unité(s) créée(s)</span>
-        <span className="text-[hsl(var(--muted-foreground))]">Les managers se désignent depuis Comptes & managers</span>
+        <span className="text-[hsl(var(--muted-foreground))] sm:text-right">Les managers se désignent depuis Comptes & managers</span>
       </div>
       <div className="overflow-x-auto">
         <div className="space-y-1 sm:min-w-[760px]">
@@ -149,15 +149,15 @@ function StructureNodeItem({
   return (
     <div>
       <div className="group grid w-full grid-cols-1 gap-2 rounded-lg border-b border-[hsl(var(--border)/.7)] px-3 py-2.5 transition hover:bg-[hsl(var(--muted)/.4)] sm:grid-cols-[minmax(0,1fr)_190px_190px] sm:items-center sm:gap-4">
-        <div className="flex min-w-0 items-center gap-3" style={{ paddingLeft: `${depth * 20}px` }}>
+        <div className="flex min-w-0 items-center gap-3" style={{ paddingLeft: `${Math.min(depth * 20, 48)}px` }}>
           <button type="button" aria-label={children.length > 0 ? `${expanded ? 'Réduire' : 'Développer'} ${node.name}` : undefined} onClick={() => setExpanded(value => !value)} className="flex h-5 w-5 shrink-0 items-center justify-center text-[hsl(var(--muted-foreground))]">
             {children.length > 0 && <ChevronDown size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />}
           </button>
           <span className="shrink-0 rounded bg-[hsl(var(--primary)/.1)] p-1.5 text-[hsl(var(--primary))]"><Building2 size={14} /></span>
-          <div className="flex min-w-0 items-center gap-2 truncate">
-            <span className="truncate text-sm font-bold">{node.name}</span>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm font-bold">{node.name}</span>
             <span className="shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase text-[hsl(var(--muted-foreground))]">{node.type}</span>
-            {node.code && <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">{node.code}</span>}
+            {node.code && <span className="mono max-w-[32%] shrink-0 truncate text-[10px] text-[hsl(var(--muted-foreground))]">{node.code}</span>}
           </div>
         </div>
         <div className="flex min-w-0 items-center justify-between gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:justify-end">
@@ -296,7 +296,7 @@ function StructureFormModal({
           })}
         </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.</p>}
       </div>
-      <div className="mt-6 flex justify-end gap-3 border-t pt-4">
+       <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row">
         <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button>
         <ActionButton primary onClick={handleSave} disabled={!formData.name} testId="btn-save-org">Enregistrer</ActionButton>
       </div>

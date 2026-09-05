@@ -49,9 +49,32 @@ export function EmployeesTab({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
+  const deleteEmployee = async (employee: Employee) => {
+    const ok = await confirm({
+      title: 'Supprimer ce compte employé ?',
+      description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`,
+      confirmLabel: 'Supprimer',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await authApi.revokeAccount(employee.id);
+      mutate(draft => {
+        draft.employees = draft.employees.filter(item => item.id !== employee.id);
+      }, 'Employé supprimé.');
+    } catch (error) {
+      await alert({
+        title: 'Suppression impossible',
+        description: error instanceof Error ? error.message : 'La révocation du compte a échoué.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+    }
+  };
+
   return (
-    <div className="card-surface overflow-hidden rounded-2xl fade-up">
-      <div className="flex flex-col gap-4 border-b p-6 sm:flex-row sm:items-start sm:justify-between">
+    <div className="card-surface min-w-0 overflow-hidden rounded-2xl fade-up">
+      <div className="flex flex-col gap-4 border-b p-4 sm:flex-row sm:items-start sm:justify-between sm:p-6">
         <div>
           <h2 className="text-lg font-bold">Comptes Employés</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez le compte, choisissez son appartenance et son rôle. Les permissions viennent du rôle configuré à l’étape 2.</p>
@@ -59,7 +82,45 @@ export function EmployeesTab({
         <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
       {(companyNodes.length === 0 || companyRoles.length === 0) && <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure, configurez les rôles et leurs autorisations, puis ajoutez les comptes employés.</p>}
-      <div className="overflow-x-auto">
+      <div className="space-y-3 p-4 sm:hidden">
+        {companyEmployees.map(employee => {
+          const sector = companyNodes.find(node => node.id === employee.sectorId);
+          const role = companyRoles.find(item => item.id === employee.roleId);
+          return (
+            <article key={employee.id} className="rounded-xl border bg-[hsl(var(--card))] p-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] text-xs font-black text-[hsl(var(--foreground))]">
+                  {employee.firstName[0]}{employee.lastName[0]}
+                </span>
+                <div className="min-w-0">
+                  <p className="break-words font-bold">{employee.firstName} {employee.lastName}</p>
+                  <p className="mt-1 break-all text-xs text-[hsl(var(--muted-foreground))]">{employee.email}</p>
+                </div>
+              </div>
+              <dl className="mt-4 grid grid-cols-1 gap-3 border-t pt-3 text-xs">
+                <div>
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Unité</dt>
+                  <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-medium">
+                    <Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />
+                    {sector?.name || 'Non assigné'}
+                    {employee.isSectorAdmin && <span className="rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Rôle assigné</dt>
+                  <dd className="mt-1 break-words font-medium">{role?.name || 'Non assigné'}</dd>
+                </div>
+              </dl>
+              <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+                <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
+                {demoEmployeeIds.has(employee.id) ? <span className="inline-flex w-full items-center justify-center rounded-lg border border-dashed px-2 py-2 text-center text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
+              </div>
+            </article>
+          );
+        })}
+        {companyEmployees.length === 0 && <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun employé dans cette entreprise.</div>}
+      </div>
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="bg-[hsl(var(--muted)/.5)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
             <tr><th className="px-6 py-3 font-bold">Employé</th><th className="px-6 py-3 font-bold">Unité</th><th className="px-6 py-3 font-bold">Rôle Assigné</th><th className="px-6 py-3 text-right font-bold">Actions</th></tr>
@@ -75,16 +136,7 @@ export function EmployeesTab({
                   <td className="px-6 py-4 text-xs font-medium">{role?.name || 'Non assigné'}</td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2">
                     <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                     {demoEmployeeIds.has(employee.id) ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void (async () => {
-                       const ok = await confirm({ title: 'Supprimer ce compte employé ?', description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' });
-                       if (!ok) return;
-                       try {
-                         await authApi.revokeAccount(employee.id);
-                         mutate(draft => { draft.employees = draft.employees.filter(item => item.id !== employee.id); }, 'Employé supprimé.');
-                       } catch (error) {
-                         await alert({ title: 'Suppression impossible', description: error instanceof Error ? error.message : 'La révocation du compte a échoué.', confirmLabel: 'Compris', tone: 'danger' });
-                       }
-                     })()} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
+                      {demoEmployeeIds.has(employee.id) ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
                   </div></td>
                 </tr>
               );

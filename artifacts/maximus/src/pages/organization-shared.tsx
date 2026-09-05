@@ -56,7 +56,7 @@ export function Modal({
 }) {
   return createPortal(
     <div className="modal-backdrop organization-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in">
-      <div className="organization-modal-panel modal-panel card-surface w-full rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 sm:p-7">
+      <div className="organization-modal-panel modal-panel card-surface w-full min-w-0 rounded-2xl p-4 shadow-2xl animate-in zoom-in-95 sm:p-7">
         <div className="modal-header mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button
@@ -67,7 +67,7 @@ export function Modal({
             <X size={18} />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <div className="modal-body min-w-0 overflow-x-hidden">{children}</div>
       </div>
     </div>,
     document.body,

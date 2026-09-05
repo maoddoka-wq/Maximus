@@ -65,7 +65,7 @@ export function RolesTab({
   };
 
   return (
-    <div className="card-surface rounded-2xl p-6 fade-up">
+    <div className="card-surface rounded-2xl p-4 fade-up sm:p-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold">Rôles & sous-autorisations</h2>
@@ -168,9 +168,9 @@ function RoleCard({
           </div>
           <p className="mt-3 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">{role.description || 'Aucune description renseignée pour ce rôle.'}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button type="button" data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Settings size={13} /> Modifier</button>
-          <button type="button" data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /> Supprimer</button>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <button type="button" data-testid={`button-edit-org-role-${role.id}`} aria-label={`Modifier le rôle ${role.name}`} onClick={onEdit} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))] sm:flex-none"><Settings size={13} /> Modifier</button>
+          <button type="button" data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={onDelete} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)] sm:flex-none"><Trash2 size={13} /> Supprimer</button>
         </div>
       </div>
       <div className="grid gap-3 border-b p-4 sm:grid-cols-3">
@@ -434,7 +434,7 @@ function RoleFormModal({
           {availableModules.length === 0 && <div className="text-sm italic text-[hsl(var(--muted-foreground))]">Aucun module n’est autorisé pour cette unité. Revenez dans Structure & unités pour en sélectionner.</div>}
         </div>
       </div>
-      <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button><ActionButton primary onClick={handleSave} disabled={!formData.name || !formData.sectorId}>Enregistrer</ActionButton></div>
+      <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row"><button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button><ActionButton primary onClick={handleSave} disabled={!formData.name || !formData.sectorId}>Enregistrer</ActionButton></div>
     </div>
   );
 }

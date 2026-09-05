@@ -229,7 +229,7 @@ export function Sidebar({
                 <section
                   key={group.label}
                   aria-label={group.label}
-                  className={`${groupIndex > 0 || employeeAdministrationItems.length > 0 ? 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
+                  className={`${!compact && (groupIndex > 0 || employeeAdministrationItems.length > 0) ? 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
                 >
                   {!compact && (
                     <div
@@ -249,19 +249,23 @@ export function Sidebar({
             <div className="space-y-1">{standardNav}</div>
           ) : (
             <>
-              <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                  Administration
-                </span>
-              </div>
+              {!compact && (
+                <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                    Administration
+                  </span>
+                </div>
+              )}
               <div className="space-y-1">{companyCoreItems.map(item => link(item))}</div>
               {companyModuleItems.length > 0 && (
-                <section className="mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3">
-                  <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                      Modules
-                    </span>
-                  </div>
+                <section className={compact ? '' : 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3'}>
+                  {!compact && (
+                    <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                        Modules
+                      </span>
+                    </div>
+                  )}
                   <div className="space-y-1">{companyModuleItems.map(item => link(item))}</div>
                 </section>
               )}

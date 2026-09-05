@@ -82,8 +82,8 @@ export function CompanyOrganizationAdmin({
   );
 
   return (
-    <div className="space-y-6">
-      <div className="card-surface rounded-2xl p-6">
+    <div className="min-w-0 space-y-6">
+      <div className="card-surface rounded-2xl p-4 sm:p-6">
         <h1 className="text-xl font-bold">
           {sectorManager
             ? 'Règles d’accès de mon unité'
@@ -94,13 +94,13 @@ export function CompanyOrganizationAdmin({
             ? 'Gérez les rôles, sous-autorisations et comptes de votre unité et de ses descendants.'
             : 'Construisez la hiérarchie, configurez les rôles et sous-autorisations, puis affectez les comptes et managers.'}
         </p>
-        <div className="mt-6 flex gap-2 overflow-x-auto">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {tabs.map(item => (
             <button
               key={item.id}
               data-testid={`tab-${item.id}`}
               onClick={() => setTab(item.id)}
-              className={`shrink-0 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}
+              className={`min-w-0 rounded-lg px-2.5 py-2.5 text-left text-[11px] font-bold leading-4 transition sm:px-4 sm:text-xs ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}
             >
               {item.label}
             </button>
