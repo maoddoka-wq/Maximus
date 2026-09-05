@@ -3237,6 +3237,15 @@ function SectorPresetsPage({
           )}
           <div className="mt-5 flex flex-wrap gap-2">
             <button
+              type="button"
+              data-testid="button-test-sector"
+              onClick={testDraftSector}
+              className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.45)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.06)]"
+            >
+              <Gauge size={15} />
+              Tester ce secteur
+            </button>
+            <button
               data-testid="button-create-sector"
               type="submit"
               className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
@@ -3258,6 +3267,130 @@ function SectorPresetsPage({
           </Modal>
         )}
       </section>
+      {testingSector && (
+        <Modal
+          title={`Test en direct · ${testingSector.name}`}
+          onClose={() => setTestingSector(null)}
+          className="max-h-[88vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
+        >
+          {(() => {
+            const moduleRows = testingSector.moduleIds
+              .map((moduleId) => {
+                const module = moduleForSector(moduleId);
+                if (!module) return null;
+                const packIds = testingSector.modulePackIds?.[moduleId] ?? [];
+                const featureIds = getEffectiveModuleFeatureIds(module, testingSector.moduleFeatures?.[moduleId]);
+                const featureLabels = getModuleFeatureOptions(module).filter((feature) => featureIds.has(feature.id));
+                return { module, packIds, featureLabels };
+              })
+              .filter(
+                (
+                  row,
+                ): row is {
+                  module: NonNullable<ReturnType<typeof moduleForSector>>;
+                  packIds: string[];
+                  featureLabels: { id: string; label: string }[];
+                } => Boolean(row),
+              );
+            const packCount = moduleRows.reduce((total, row) => total + row.packIds.length, 0);
+            const featureCount = moduleRows.reduce((total, row) => total + row.featureLabels.length, 0);
+            return (
+              <div className="space-y-5">
+                <div className="rounded-xl bg-[hsl(var(--primary)/.08)] p-4">
+                  <p className="text-xs font-bold text-[hsl(var(--primary))]">Aperçu non destructif</p>
+                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                    Voici les modules, packs et fonctionnalités qui seront proposés à une entreprise rattachée à ce
+                    secteur. Ce test ne modifie pas la configuration.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Modules</p>
+                    <strong className="mt-1 block text-2xl">{moduleRows.length}</strong>
+                  </div>
+                  <div className="rounded-xl border p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Packs</p>
+                    <strong className="mt-1 block text-2xl">{packCount}</strong>
+                  </div>
+                  <div className="rounded-xl border p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                      Fonctionnalités effectives
+                    </p>
+                    <strong className="mt-1 block text-2xl">{featureCount}</strong>
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-xl border">
+                  <div className="border-b bg-[hsl(var(--muted)/.45)] px-4 py-3">
+                    <p className="text-xs font-bold">Périmètre simulé</p>
+                    <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                      Les dépendances nécessaires sont incluses automatiquement dans les fonctionnalités effectives.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[680px] text-left text-xs">
+                      <thead className="bg-[hsl(var(--card))] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                        <tr>
+                          <th className="px-4 py-3 font-bold">Module</th>
+                          <th className="px-4 py-3 font-bold">Packs sélectionnés</th>
+                          <th className="px-4 py-3 font-bold">Fonctionnalités accessibles</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {moduleRows.map(({ module, packIds, featureLabels }) => (
+                          <tr key={module.id} className="align-top transition hover:bg-[hsl(var(--muted)/.3)]">
+                            <td className="px-4 py-4">
+                              <strong>{module.name}</strong>
+                              <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">
+                                {featureLabels.length} fonctionnalité(s) effective(s)
+                              </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {packIds.map((packId) => (
+                                  <span
+                                    key={packId}
+                                    className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-semibold text-[hsl(var(--primary))]"
+                                  >
+                                    {module.featurePacks?.find((pack) => pack.id === packId)?.name ?? packId}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {featureLabels.map((feature) => (
+                                  <span key={feature.id} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px]">
+                                    {feature.label}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {moduleRows.length === 0 && (
+                    <p className="p-6 text-center text-xs text-[hsl(var(--muted-foreground))]">
+                      Aucun module sélectionné pour ce secteur.
+                    </p>
+                  )}
+                </div>
+                <div className="flex justify-end border-t pt-4">
+                  <button
+                    type="button"
+                    data-testid="button-close-sector-test"
+                    onClick={() => setTestingSector(null)}
+                    className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+                  >
+                    Fermer le test
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
           <div>
@@ -3306,6 +3439,15 @@ function SectorPresetsPage({
                 </div>
               </div>
               <div className="flex self-start sm:self-center">
+                <button
+                  type="button"
+                  data-testid={`button-test-sector-${preset.id}`}
+                  onClick={() => setTestingSector(preset)}
+                  aria-label={`Tester le secteur ${preset.name}`}
+                  className="rounded-lg p-2 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
+                >
+                  <Gauge size={16} />
+                </button>
                 <button
                   type="button"
                   data-testid={`button-edit-sector-${preset.id}`}
