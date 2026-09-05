@@ -70,11 +70,13 @@ import {
 } from '@/lib/store';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
-import { type Icon, type Session, type SidebarFeature, type SidebarFeatureGroup } from '@/lib/navigation';
+import { type Icon, type Session, type SidebarFeatureGroup } from '@/lib/navigation';
 import { AdminRouter, KoraRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
+import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
+import { buildSidebarFeatureGroups } from '@/lib/sidebar-navigation';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { loadCompanyModuleAccess, setCompanyModuleAccess } from '@/lib/module-api';
@@ -119,22 +121,6 @@ function sessionFromAuthUser(user: AuthUser): Session {
       ? `company:${user.companyId}`
       : `employee:${user.employeeId}`;
 }
-const moduleIcons: Record<ModuleId, Icon> = {
-  commerce: ShoppingCart,
-  ventes: CreditCard,
-  achats: Package,
-  stocks: Boxes,
-  finance: WalletCards,
-  comptabilite: FileBarChart,
-  rh: UserRoundCog,
-  presences: FileClock,
-  paie: CreditCard,
-  crm: Users,
-  fournisseurs: Store,
-  logistique: Warehouse,
-  documents: FolderKanban,
-  rapports: FileBarChart,
-};
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': {
     kicker: 'Cockpit MAXIMUS',
@@ -301,6 +287,7 @@ const routesWithModuleHeaders = new Set([
   '/kora/autorisations',
   '/kora/employes',
   '/kora/roles',
+  ...modulePaths,
 ]);
 
 function AppContent() {
@@ -597,105 +584,20 @@ function AppContent() {
   );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
     employee && allowed.length >= 1
-      ? allowed.flatMap((moduleId) => {
-          const module = configuredModules.find((item) => item.id === moduleId);
-          if (!module) return [];
-          let items: SidebarFeature[] = [];
-          if (moduleId === 'commerce') {
-            const commerceTabIcons: Record<CommerceTabId, Icon> = {
-              dashboard: Gauge,
-              sales: ShoppingCart,
-              products: Package,
-              clients: Users,
-              suppliers: Store,
-              purchases: Package,
-              expenses: ArrowDownToLine,
-              cash: WalletCards,
-              credit: CreditCard,
-              invoices: FileBarChart,
-              returns: ArrowUpFromLine,
-              reports: FileBarChart,
-              activity: History,
-              team: Users,
-              settings: Settings,
-            };
-            items = commerceTabDefinitions
-              .filter((tab) => commerceTabIds?.includes(tab.id))
-              .map((tab) => ({
-                href: `/kora/commerce?tab=${tab.id}`,
-                label: tab.label,
-                icon: commerceTabIcons[tab.id],
-              }));
-          } else if (moduleId === 'stocks') {
-            items = stockSubmodules
-              .filter((submodule) => stockPermissions?.[submodule.id]?.includes('voir'))
-              .map((submodule) => ({
-                href: `/kora/stocks?tab=${submodule.id}`,
-                label: submodule.name,
-                icon:
-                  submodule.id === 'dashboard'
-                    ? Gauge
-                    : submodule.id === 'products'
-                      ? Package
-                      : submodule.id === 'entries'
-                        ? ArrowDownToLine
-                        : submodule.id === 'exits'
-                          ? ArrowUpFromLine
-                          : submodule.id === 'requests' || submodule.id === 'inventory'
-                            ? ClipboardCheck
-                            : submodule.id === 'reports'
-                              ? FileBarChart
-                              : submodule.id === 'settings'
-                                ? Settings
-                                : Warehouse,
-              }));
-          } else if (moduleId === 'presences') {
-            const presenceFeatures = Object.fromEntries(
-              presenceFeatureDefinitions.map((feature) => [feature.label, { tab: feature.tab, icon: CalendarDays }]),
-            );
-            const selectedFeatureIds = getSelectedFeatureIds(
-              employeeRole,
-              module,
-              employeeNode?.moduleFeatures?.[module.id],
-            );
-            items = module.features
-              .filter((feature) => selectedFeatureIds.has(featureSlug(feature)))
-              .map((feature) => {
-                const mapped = presenceFeatures[feature];
-                return {
-                  href: `/kora/presences?tab=${mapped?.tab ?? 'dashboard'}`,
-                  label: feature,
-                  icon: mapped?.icon ?? CalendarDays,
-                };
-              });
-          } else {
-            const selectedFeatureIds = getSelectedFeatureIds(
-              employeeRole,
-              module,
-              employeeNode?.moduleFeatures?.[module.id],
-            );
-            items = module.features
-              .filter((feature) => selectedFeatureIds.has(featureSlug(feature)))
-              .map((feature) => ({
-                href: `/kora/${moduleId}?feature=${featureSlug(feature)}`,
-                label: feature,
-                icon:
-                  moduleId === 'ventes'
-                    ? ShoppingCart
-                    : moduleId === 'finance'
-                      ? WalletCards
-                      : moduleId === 'rh'
-                        ? UserRoundCog
-                        : LayoutGrid,
-              }));
-          }
-          return items.length ? [{ label: module.name, items }] : [];
+      ? buildSidebarFeatureGroups({
+          allowed,
+          configuredModules,
+          employeeRole,
+          employeeNode: employeeNode ?? null,
+          commerceTabIds,
+          stockPermissions,
         })
       : [];
   const verticalModuleNavigation = Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length);
   const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
   const baseMeta =
     pageMeta[location.split('?')[0]] ??
+    modulePageMeta[location.split('?')[0]] ??
     (location.startsWith('/maximus/entreprises/')
       ? {
           kicker: 'Administration',
@@ -5090,7 +4992,7 @@ function InteractiveModulesPage({
           <section className="card-surface rounded-2xl p-6">
             <div className="flex items-start justify-between gap-4">
               {(() => {
-                const ModuleIcon = moduleIcons[selected.id] ?? LayoutGrid;
+                const ModuleIcon = moduleIconById[selected.id] ?? LayoutGrid;
                 return (
                   <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
                     <ModuleIcon size={21} />
@@ -5432,7 +5334,7 @@ function InteractiveModulesPage({
         {visibleModules.map((module, index) => {
           const status = statusOf(module.id);
           const isActive = status !== 'INACTIF';
-          const ModuleIcon = moduleIcons[module.id] ?? LayoutGrid;
+          const ModuleIcon = moduleIconById[module.id] ?? LayoutGrid;
           return (
             <article
               data-testid={`card-module-${module.id}`}

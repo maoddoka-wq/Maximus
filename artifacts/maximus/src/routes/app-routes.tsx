@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import type { ModuleAvailability, ModuleId, StoreData } from '@/lib/store';
 import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
+import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
 
 type Screen = ComponentType<any>;
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -146,24 +147,9 @@ export function KoraRouter({
   screens: KoraRouteScreens;
 }) {
   const routePath = location.split('?')[0];
-  const routeModules: Partial<Record<string, ModuleId>> = {
-    '/kora/commerce': 'commerce',
-    '/kora/ventes': 'ventes',
-    '/kora/achats': 'achats',
-    '/kora/stocks': 'stocks',
-    '/kora/finance': 'finance',
-    '/kora/comptabilite': 'comptabilite',
-    '/kora/rh': 'rh',
-    '/kora/presences': 'presences',
-    '/kora/paie': 'paie',
-    '/kora/crm': 'crm',
-    '/kora/fournisseurs': 'fournisseurs',
-    '/kora/logistique': 'logistique',
-    '/kora/documents': 'documents',
-    '/kora/rapports': 'rapports',
-  };
-  const requiredModule = routeModules[routePath];
-  const maintenanceModule = routePath === '/kora/controle' ? 'controle' : requiredModule;
+  const requiredModule = moduleIdForPath(routePath);
+  const maintenanceModule: ModuleId | 'controle' | undefined =
+    routePath === '/kora/controle' ? 'controle' : requiredModule;
   if (maintenanceModule && moduleStatuses[maintenanceModule] === 'MAINTENANCE') {
     return <screens.empty title="Module en maintenance" text="Ce module est temporairement indisponible pendant une opération de maintenance. Les autres modules restent accessibles." action={() => onBack('/kora/dashboard')} />;
   }
@@ -205,8 +191,11 @@ export function KoraRouter({
   if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
     return <screens.commerce companyId={companyId} data={data} mutate={mutate} canCreate={hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer')} canModify={hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier')} allowedTabs={commerceTabIds} singleModuleNavigation={singleModuleNavigation} initialTab={routePath === '/kora/ventes' ? 'sales' : 'dashboard'} onNavigate={onNavigate} />;
   }
-  const operationalModule = routeModules[routePath];
-  if (operationalModule && ['achats', 'comptabilite', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents'].includes(operationalModule)) {
+  const operationalModule =
+    requiredModule && moduleDescriptorById[requiredModule].routeKind === 'operational'
+      ? requiredModule
+      : undefined;
+  if (operationalModule) {
     return <screens.operational moduleId={operationalModule} data={data} mutate={mutate} canCreate={hasPermission(operationalModule, 'créer')} canModify={hasPermission(operationalModule, 'modifier')} />;
   }
   if (routePath === '/kora/rh') {

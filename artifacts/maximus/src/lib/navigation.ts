@@ -1,5 +1,4 @@
 import {
-  Boxes,
   Building2,
   CreditCard,
   FileBarChart,
@@ -9,15 +8,10 @@ import {
   GitBranch,
   LayoutGrid,
   ListChecks,
-  Package,
-  ShoppingCart,
-  Store,
-  UserRoundCog,
-  Users,
-  WalletCards,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from './store';
+import { moduleRegistry } from './module-registry';
 
 export type Icon = LucideIcon;
 export type Session = 'admin' | 'kora' | `employee:${string}` | `company:${string}`;
@@ -43,22 +37,18 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
 ];
 
-export const koraNav: NavigationItem[] = [
+const koraCoreNav: NavigationItem[] = [
   { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
   { href: '/kora/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
-  { href: '/kora/commerce', label: 'Gestion commerciale', icon: ShoppingCart, module: 'commerce' },
-  { href: '/kora/ventes', label: 'Ventes', icon: CreditCard, module: 'ventes' },
-  { href: '/kora/achats', label: 'Achats', icon: Store, module: 'achats' },
-  { href: '/kora/stocks', label: 'Gestion de stock', icon: Boxes, module: 'stocks' },
-  { href: '/kora/finance', label: 'Finance', icon: WalletCards, module: 'finance' },
-  { href: '/kora/comptabilite', label: 'Comptabilité', icon: FileBarChart, module: 'comptabilite' },
-  { href: '/kora/rh', label: 'Ressources humaines', icon: UserRoundCog, module: 'rh' },
-  { href: '/kora/presences', label: 'Présences', icon: FileClock, module: 'presences' },
-  { href: '/kora/paie', label: 'Paie', icon: CreditCard, module: 'paie' },
-  { href: '/kora/crm', label: 'CRM / Clients', icon: Users, module: 'crm' },
-  { href: '/kora/fournisseurs', label: 'Fournisseurs', icon: Store, module: 'fournisseurs' },
-  { href: '/kora/logistique', label: 'Logistique', icon: Package, module: 'logistique' },
-  { href: '/kora/documents', label: 'Documents', icon: FolderKanban, module: 'documents' },
-  { href: '/kora/rapports', label: 'Rapports', icon: FileBarChart, module: 'rapports' },
+];
+
+export const koraNav: NavigationItem[] = [
+  ...koraCoreNav,
+  ...moduleRegistry.map(module => ({
+    href: module.path,
+    label: module.name,
+    icon: module.icon,
+    module: module.id,
+  })),
 ];

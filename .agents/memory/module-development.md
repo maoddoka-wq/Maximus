@@ -32,3 +32,9 @@ Feature visibility must use the explicit feature selection, while dependencies r
 **Why:** A dependency granted so an operation can function is not necessarily a capability the company selected or should see in its navigation.
 
 **How to apply:** Preserve dependencies when calculating effective permissions, but pass the pack or unit’s explicit feature ids to tests, navigation, and tab guards; never infer visible pack scope from dependency-expanded role permissions.
+
+Le registre de module doit dériver l’identité métier du catalogue et porter les informations de route, d’icône et de type d’écran ; navigation et routeur ne doivent pas recopier une liste de modules.
+
+**Why:** Un module ajouté dans une seule liste peut apparaître dans le catalogue sans route, ou être routable sans apparaître dans le menu, ce qui crée des écrans inaccessibles et des régressions silencieuses.
+
+**How to apply:** Lorsqu’un module est ajouté, enregistrer son identifiant dans le catalogue et sa configuration d’exécution dans le registre, puis laisser les tests de parité vérifier la route et la navigation.

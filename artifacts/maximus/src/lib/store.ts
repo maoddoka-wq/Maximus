@@ -1,22 +1,9 @@
 import { presenceFeatureDefinitions, presenceFeatureDependencies, presenceFeaturePacks } from './presence-features';
+import type { ModuleId } from './module-ids';
+
+export type { ModuleId } from './module-ids';
 
 export type Status = 'ACTIF' | 'EN ATTENTE' | 'SUSPENDU' | 'REFUSÉ' | 'ARCHIVÉ' | 'BROUILLON' | 'VALIDÉ' | 'CONFIRMÉ';
-export type ModuleId =
-  | 'commerce'
-  | 'ventes'
-  | 'achats'
-  | 'stocks'
-  | 'finance'
-  | 'comptabilite'
-  | 'rh'
-  | 'presences'
-  | 'paie'
-  | 'crm'
-  | 'fournisseurs'
-  | 'logistique'
-  | 'documents'
-  | 'rapports';
-
 export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedModulePackIds?: Partial<Record<ModuleId, string[]>>; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
 export interface ModuleFeaturePack { id: string; name: string; description?: string; featureIds: string[]; featurePermissions?: Partial<Record<string, string[]>>; }
 export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; featurePacks?: ModuleFeaturePack[]; status: 'ACTIF' | 'BETA'; }
