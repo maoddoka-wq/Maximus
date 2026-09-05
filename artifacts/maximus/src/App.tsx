@@ -447,7 +447,6 @@ function AppContent() {
     const testCompanyId = `sector-test-${preset.id}`;
     const testNodeId = `sector-test-node-${preset.id}`;
     const testRoleId = `sector-test-role-${preset.id}`;
-    const testEmployeeId = `sector-test-employee-${preset.id}`;
     const selectedModules = [...new Set(preset.moduleIds)];
     const configuredModules = getConfiguredModules(data);
     const selectedModuleFeatures = Object.fromEntries(
@@ -522,22 +521,6 @@ function AppContent() {
       ),
       moduleFeatures: selectedModuleFeatures,
     };
-    const testEmployee: Employee = {
-      id: testEmployeeId,
-      firstName: 'Utilisateur',
-      lastName: 'test',
-      email: `test.${preset.id}@maximus.local`,
-      phone: '',
-      position: 'Utilisateur de test',
-      department: preset.name,
-      subDepartment: '',
-      role: `Test secteur · ${preset.name}`,
-      status: 'ACTIF',
-      isSectorAdmin: true,
-      companyId: testCompanyId,
-      sectorId: testNodeId,
-      roleId: testRoleId,
-    };
     mutate((draft) => {
       draft.companies = [
         ...draft.companies.filter((company) => !company.id.startsWith('sector-test-')),
@@ -546,10 +529,6 @@ function AppContent() {
       draft.orgNodes = [
         ...draft.orgNodes.filter((node) => !node.companyId?.startsWith('sector-test-')),
         testNode,
-      ];
-      draft.employees = [
-        ...draft.employees.filter((employee) => !employee.companyId?.startsWith('sector-test-')),
-        testEmployee,
       ];
       draft.roles = draft.roles.filter((role) => !role.companyId?.startsWith('sector-test-'));
       synchronizeUnitPackRoles(draft, testCompany, testNode);
@@ -578,7 +557,7 @@ function AppContent() {
       });
     });
     localStorage.setItem('maximus-sector-test-company', testCompanyId);
-    const nextSession = `employee:${testEmployeeId}` as Session;
+    const nextSession = `company:${testCompanyId}` as Session;
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation('/kora/dashboard');
@@ -680,7 +659,11 @@ function AppContent() {
   const rawEmployeeRole = employee
     ? (data.roles.find((r) => r.id === employee.roleId) ?? data.roles.find((r) => r.name === employee.role))
     : null;
-  const employeeRole = restrictRoleToCompany(rawEmployeeRole, activeCompany);
+  const rawSectorTestRole =
+    sectorTestCompanyId && currentCompany?.managerRoleId
+      ? data.roles.find((role) => role.id === currentCompany.managerRoleId) ?? null
+      : null;
+  const employeeRole = restrictRoleToCompany(rawEmployeeRole ?? rawSectorTestRole, activeCompany);
   const configuredModules = getConfiguredModules(data);
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability =>
     serverModuleStatuses?.[moduleId] ??
@@ -691,23 +674,31 @@ function AppContent() {
   const companyAllowed = (data.companies.find((c) => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId
     ? data.orgNodes.find((node) => node.id === employee.sectorId && node.companyId === employee.companyId)
+    : sectorTestCompanyId && employeeRole?.sectorId
+      ? data.orgNodes.find((node) => node.id === employeeRole.sectorId && node.companyId === companyId)
     : null;
   const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode ?? null);
-  const roleFitsEmployee = employeeRoleMatchesUnit(employeeRole, employee, employeeAncestry);
+  const roleFitsEmployee = sectorTestCompanyId
+    ? Boolean(employeeRole && employeeNode && employeeRole.companyId === companyId && employeeRole.sectorId === employeeNode.id)
+    : employeeRoleMatchesUnit(employeeRole, employee, employeeAncestry);
   const canViewModule = (moduleId: ModuleId) => roleHasPermission(employeeRole, employeeNode, moduleId, 'voir');
   const allowed =
-    session === 'kora' || session.startsWith('company:')
+    session === 'kora'
       ? companyAllowed
+      : session.startsWith('company:')
+        ? sectorTestCompanyId && employeeRole && roleFitsEmployee
+          ? companyAllowed.filter((moduleId) => canViewModule(moduleId))
+          : companyAllowed
       : employeeRole && roleFitsEmployee
         ? companyAllowed.filter((moduleId) => canViewModule(moduleId))
         : [];
   const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
-    if (session === 'kora' || session.startsWith('company:')) return true;
+    if (session === 'kora' || (session.startsWith('company:') && !sectorTestCompanyId)) return true;
     if (!roleFitsEmployee || !employeeRole) return false;
     return roleHasPermission(employeeRole, employeeNode, moduleId, permission);
   };
   const hasPresencePermission = (permission: PresencePermission) => {
-    if (session === 'kora' || session.startsWith('company:')) return true;
+    if (session === 'kora' || (session.startsWith('company:') && !sectorTestCompanyId)) return true;
     if (!roleFitsEmployee || !employeeRole) return false;
     return employeeHasPresencePermission(employeeRole, employeeNode, permission, hasPermission);
   };
@@ -761,7 +752,7 @@ function AppContent() {
     selectedCommercialTabIds,
   );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    employee && allowed.length >= 1
+    (employee || sectorTestCompanyId) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
@@ -771,7 +762,7 @@ function AppContent() {
           stockPermissions,
         })
       : [];
-  const verticalModuleNavigation = Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length);
+  const verticalModuleNavigation = Boolean((employee || sectorTestCompanyId) && allowed.length >= 1 && sidebarFeatureGroups.length);
   const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
   const baseMeta =
     pageMeta[location.split('?')[0]] ??
@@ -814,6 +805,7 @@ function AppContent() {
         location={location}
         allowed={allowed}
         sidebarFeatureGroups={sidebarFeatureGroups}
+        featureNavigation={Boolean(sectorTestCompanyId)}
         canManagePeople={canManagePeople}
         onNavigate={navigate}
         onLogout={sectorTestCompanyId ? exitSectorTest : logout}
