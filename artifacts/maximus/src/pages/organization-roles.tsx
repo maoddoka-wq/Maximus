@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Check, KeyRound, Layers3, Settings, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { Building2, Check, ChevronDown, KeyRound, Layers3, Settings, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   commerceTabDefinitions,
@@ -136,9 +136,16 @@ function RoleCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const permissionEntries = Object.entries(role.modulePermissions);
   const moduleCount = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key)).length;
   const detailCount = permissionEntries.length - moduleCount;
+  const assignedCount = assignedEmployees.length + (managerName ? 1 : 0);
+  const moduleLabels = new Map(moduleDefinitions.map(module => [module.id, module.name]));
+  const moduleEntries = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key));
+  const detailEntries = permissionEntries.filter(([key]) => !moduleDefinitions.some(module => module.id === key));
+  const visibleDetailEntries = detailsOpen ? detailEntries : detailEntries.slice(0, 3);
+  const hiddenDetailCount = Math.max(0, detailEntries.length - visibleDetailEntries.length);
 
   return (
     <article className="overflow-hidden rounded-xl border bg-[hsl(var(--card))] transition hover:border-[hsl(var(--primary)/.45)] hover:shadow-sm">
@@ -158,43 +165,72 @@ function RoleCard({
           <button type="button" data-testid={`button-delete-org-role-${role.id}`} aria-label={`Supprimer le rôle ${role.name}`} onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /> Supprimer</button>
         </div>
       </div>
-      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(220px,.7fr)_minmax(0,1.3fr)]">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg border bg-[hsl(var(--muted)/.18)] p-3">
-              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]"><Layers3 size={12} /> Modules</p>
-              <p className="mt-1 text-lg font-bold">{moduleCount}</p>
-            </div>
-            <div className="rounded-lg border bg-[hsl(var(--muted)/.18)] p-3">
-              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]"><KeyRound size={12} /> Détails</p>
-              <p className="mt-1 text-lg font-bold">{detailCount}</p>
-            </div>
+      <div className="grid gap-3 border-b p-4 sm:grid-cols-3">
+        <div className="flex items-center gap-3 rounded-lg border bg-[hsl(var(--muted)/.18)] px-3 py-2.5">
+          <span className="rounded-md bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><Layers3 size={14} /></span>
+          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Modules</p><p className="mt-0.5 text-sm font-bold">{moduleCount}</p></div>
+        </div>
+        <div className="flex items-center gap-3 rounded-lg border bg-[hsl(var(--muted)/.18)] px-3 py-2.5">
+          <span className="rounded-md bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><KeyRound size={14} /></span>
+          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Sous-autorisations</p><p className="mt-0.5 text-sm font-bold">{detailCount}</p></div>
+        </div>
+        <div className="flex items-center gap-3 rounded-lg border bg-[hsl(var(--muted)/.18)] px-3 py-2.5">
+          <span className="rounded-md bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><Users size={14} /></span>
+          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Affectations</p><p className="mt-0.5 text-sm font-bold">{assignedCount}</p></div>
+        </div>
+      </div>
+      {(managerName || assignedEmployees.length > 0) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 text-xs">
+          <span className="flex items-center gap-1.5 font-bold text-[hsl(var(--muted-foreground))]"><Users size={13} /> Affecté à</span>
+          <span className="font-semibold">{managerName ? `Manager : ${managerName}` : `${assignedEmployees.length} employé${assignedEmployees.length > 1 ? 's' : ''}`}</span>
+          {managerName && assignedEmployees.length > 0 && <span className="text-[hsl(var(--muted-foreground))]">+ {assignedEmployees.length} employé{assignedEmployees.length > 1 ? 's' : ''}</span>}
+        </div>
+      )}
+      <div className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès configurés</p>
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{permissionEntries.length ? `${moduleCount} module${moduleCount > 1 ? 's' : ''} · ${detailCount} sous-autorisation${detailCount > 1 ? 's' : ''}` : 'Aucun droit configuré.'}</p>
           </div>
-          {(managerName || assignedEmployees.length > 0) && (
-            <div className="rounded-lg border p-3">
-              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]"><Users size={12} /> Affectations</p>
-              <p className="mt-1 text-xs font-semibold leading-5">{managerName ? `Manager : ${managerName}` : ''}{managerName && assignedEmployees.length > 0 ? ' · ' : ''}{assignedEmployees.map(employee => `${employee.firstName} ${employee.lastName}`).join(', ') || 'Aucun employé affecté'}</p>
-            </div>
+          {permissionEntries.length > 0 && (
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              aria-controls={`role-permissions-${role.id}`}
+              data-testid={`button-toggle-org-role-${role.id}`}
+              onClick={() => setDetailsOpen(open => !open)}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.06)]"
+            >
+              {detailsOpen ? 'Masquer les détails' : 'Voir les détails'}
+              <ChevronDown size={14} className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+            </button>
           )}
         </div>
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Droits configurés</p>
-            <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{permissionEntries.length} entrée{permissionEntries.length > 1 ? 's' : ''}</span>
-          </div>
-          {permissionEntries.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {permissionEntries.map(([key, permissions]) => (
-                <span key={key} className="inline-flex items-center gap-1.5 rounded-lg border bg-[hsl(var(--muted)/.25)] px-2.5 py-1.5 text-[10px] font-semibold">
-                  <span>{permissionLabel(key, moduleDefinitions)}</span>
-                  <span className="text-[hsl(var(--muted-foreground))]">· {permissions.map(permission => permissionLabels[permission as Permission] ?? permission).join(', ')}</span>
+        {permissionEntries.length > 0 && (
+          <div id={`role-permissions-${role.id}`} className="mt-3 space-y-2">
+            {moduleEntries.map(([key, permissions]) => (
+              <div key={key} className="flex flex-wrap items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.2)] px-3 py-2">
+                <span className="text-xs font-bold">{moduleLabels.get(key) ?? key}</span>
+                <span className="flex flex-wrap gap-1.5">
+                  {permissions.map(permission => <span key={permission} className="rounded-full bg-[hsl(var(--card))] px-2 py-1 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{permissionLabels[permission as Permission] ?? permission}</span>)}
                 </span>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-lg border border-dashed px-3 py-4 text-xs text-[hsl(var(--muted-foreground))]">Aucun droit configuré.</p>
-          )}
-        </div>
+              </div>
+            ))}
+            {visibleDetailEntries.map(([key, permissions]) => (
+              <div key={key} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
+                <span className="text-xs font-semibold">{permissionLabel(key, moduleDefinitions)}</span>
+                <span className="flex flex-wrap gap-1.5">
+                  {permissions.map(permission => <span key={permission} className="rounded-full bg-[hsl(var(--muted)/.6)] px-2 py-1 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{permissionLabels[permission as Permission] ?? permission}</span>)}
+                </span>
+              </div>
+            ))}
+            {!detailsOpen && hiddenDetailCount > 0 && (
+              <button type="button" onClick={() => setDetailsOpen(true)} className="w-full rounded-lg border border-dashed px-3 py-2 text-left text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.05)]">
+                + {hiddenDetailCount} autre{hiddenDetailCount > 1 ? 's' : ''} sous-autorisation{hiddenDetailCount > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </article>
   );
