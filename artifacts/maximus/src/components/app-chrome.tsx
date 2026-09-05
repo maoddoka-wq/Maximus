@@ -230,11 +230,8 @@ export function Sidebar({
                       data-testid={`module-section-${group.label}`}
                       className="mb-2 flex items-center justify-between rounded-lg border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.55)] px-3 py-2"
                     >
-                      <span className="text-xs font-bold uppercase tracking-[.08em] text-[hsl(var(--sidebar-foreground)/.85)]">
+                      <span className="text-sm font-semibold tracking-tight text-[hsl(var(--sidebar-foreground)/.9)]">
                         {group.label}
-                      </span>
-                      <span className="rounded-full bg-[hsl(var(--sidebar-foreground)/.1)] px-1.5 py-0.5 text-[10px] font-bold text-[hsl(var(--sidebar-foreground)/.6)]">
-                        {group.items.length}
                       </span>
                     </div>
                   )}
