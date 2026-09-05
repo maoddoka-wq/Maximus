@@ -117,6 +117,7 @@ export function Sidebar({
   const singleModuleItems = nav.filter(
     item => 'module' in item && item.module === null,
   );
+  const employeeAdministrationItems = singleModuleItems.filter(item => item.label !== 'Vue d’ensemble');
 
   return (
     <>
@@ -210,8 +211,7 @@ export function Sidebar({
         >
           {verticalModuleMenu ? (
             <>
-              {singleModuleItems.filter(item => item.label !== 'Vue d’ensemble')
-                .length > 0 && (
+              {employeeAdministrationItems.length > 0 && (
                 <>
                   {!compact && (
                     <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
@@ -221,9 +221,7 @@ export function Sidebar({
                     </div>
                   )}
                   <div className="space-y-1">
-                    {singleModuleItems
-                      .filter(item => item.label !== 'Vue d’ensemble')
-                      .map(item => link(item))}
+                    {employeeAdministrationItems.map(item => link(item))}
                   </div>
                 </>
               )}
@@ -231,7 +229,7 @@ export function Sidebar({
                 <section
                   key={group.label}
                   aria-label={group.label}
-                  className={`${groupIndex > 0 ? 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
+                  className={`${groupIndex > 0 || employeeAdministrationItems.length > 0 ? 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
                 >
                   {!compact && (
                     <div
