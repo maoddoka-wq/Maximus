@@ -33,8 +33,5 @@ export const controlApi = {
   },
   createTask: (input: NewTaskInput) => request<ControlTask>('/control/tasks', json(input)),
   updateTaskStatus: (task: ControlTask, status: ControlTask['status']) =>
-    request<ControlTask>(`/control/tasks/${encodeURIComponent(task.id)}/status`, json({
-      companyId: task.companyId,
-      status,
-    }, 'PATCH')),
+    request<ControlTask>(`/control/tasks/${encodeURIComponent(task.id)}/status`, json({ status }, 'PATCH')),
 };

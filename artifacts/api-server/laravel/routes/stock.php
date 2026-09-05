@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\StockController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['maximus.auth', 'maximus.company'])->prefix('stock')->group(function (): void {
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:stocks'])->prefix('stock')->group(function (): void {
     Route::get('/bootstrap', [StockController::class, 'bootstrap']);
     Route::post('/products', [StockController::class, 'createProduct']);
     Route::patch('/products/{id}', [StockController::class, 'updateProduct']);

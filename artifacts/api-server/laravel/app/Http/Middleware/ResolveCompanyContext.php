@@ -33,9 +33,6 @@ class ResolveCompanyContext
             $companyId = $actorCompany;
         } else {
             $companyId = $requestedCompany ?? $actorCompany;
-            if (!$companyId) {
-                return response()->json(['error' => 'companyId requis.'], 400);
-            }
         }
 
         $request->attributes->set('companyId', $companyId);

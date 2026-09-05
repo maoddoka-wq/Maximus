@@ -13,14 +13,12 @@ use App\Support\MaximusDemoProvisioner;
 
 class StockController extends Controller
 {
-    private const COMPANY = 'kora';
     private const MOVEMENT_TYPES = ['ENTRÉE', 'SORTIE', 'VENTE', 'ACHAT', 'TRANSFERT', 'AJUSTEMENT+', 'AJUSTEMENT-', 'PERTE', 'RETOUR CLIENT', 'RETOUR FOURNISSEUR'];
 
     public function bootstrap(Request $request): JsonResponse
     {
-        MaximusDemoProvisioner::ensureStockSeed();
-
         $companyId = (string) $request->attributes->get('companyId');
+        MaximusDemoProvisioner::ensureStockSeed($companyId);
         $where = fn (string $table) => DB::table($table)->where('company_id', $companyId);
 
         $inventories = $where('stock_inventories')->orderByDesc('inventory_date')->get();
@@ -45,7 +43,7 @@ class StockController extends Controller
     public function createProduct(Request $request): JsonResponse
     {
         $input = $this->productInput($request);
-        $row = array_merge($this->productDefaults(), $this->snake($input));
+        $row = array_merge($this->productDefaults($this->company($request)), $this->snake($input));
         $row['id'] = $this->id('product');
         $row['created_at'] = now();
         $row['updated_at'] = now();
@@ -72,7 +70,7 @@ class StockController extends Controller
     public function createSupplier(Request $request): JsonResponse
     {
         $input = $this->supplierInput($request);
-        $row = array_merge($this->supplierDefaults(), $this->snake($input), ['id' => $this->id('supplier'), 'created_at' => now(), 'updated_at' => now()]);
+        $row = array_merge($this->supplierDefaults($this->company($request)), $this->snake($input), ['id' => $this->id('supplier'), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('stock_suppliers')->insert($row);
         return response()->json($this->supplier((object) $row), 201);
     }
@@ -94,7 +92,7 @@ class StockController extends Controller
     public function createWarehouse(Request $request): JsonResponse
     {
         $input = $this->warehouseInput($request);
-        $row = array_merge($this->warehouseDefaults(), $this->snake($input), ['id' => $this->id('warehouse'), 'created_at' => now(), 'updated_at' => now()]);
+        $row = array_merge($this->warehouseDefaults($this->company($request)), $this->snake($input), ['id' => $this->id('warehouse'), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('stock_warehouses')->insert($row);
         return response()->json($this->warehouse((object) $row), 201);
     }
@@ -115,8 +113,8 @@ class StockController extends Controller
 
     public function createLocation(Request $request, string $warehouseId): JsonResponse
     {
-        $input = $this->validated($request, ['companyId' => ['nullable', 'string'], 'name' => ['required', 'string', 'min:1']]);
-        $company = $input['companyId'] ?? self::COMPANY;
+        $input = $this->validated($request, ['name' => ['required', 'string', 'min:1']]);
+        $company = $this->company($request);
         if (!DB::table('stock_warehouses')->where('id', $warehouseId)->where('company_id', $company)->exists()) {
             return $this->notFound('Entrepôt introuvable');
         }
@@ -145,7 +143,6 @@ class StockController extends Controller
     public function createMovement(Request $request): JsonResponse
     {
         $input = $this->validated($request, [
-            'companyId' => ['nullable', 'string'],
             'productId' => ['required', 'string'],
             'supplierId' => ['nullable', 'string'],
             'warehouseId' => ['required', 'string'],
@@ -162,9 +159,10 @@ class StockController extends Controller
             'reference' => ['nullable', 'string'],
             'comment' => ['nullable', 'string'],
         ]);
-        $input['companyId'] = $input['companyId'] ?? self::COMPANY;
+        $input['companyId'] = $this->company($request);
+        $actorName = $this->actorName($request);
         try {
-            $row = DB::transaction(function () use ($input): array {
+            $row = DB::transaction(function () use ($input, $actorName): array {
                 $product = DB::table('stock_products')->where('id', $input['productId'])->where('company_id', $input['companyId'])->first();
                 if (!$product || $product->archived) throw new \RuntimeException('PRODUCT_NOT_FOUND');
                 if (!DB::table('stock_warehouses')->where('id', $input['warehouseId'])->where('company_id', $input['companyId'])->exists()) throw new \RuntimeException('WAREHOUSE_NOT_FOUND');
@@ -194,7 +192,7 @@ class StockController extends Controller
                     'purchase_price' => 0,
                     'reason' => '',
                     'movement_date' => now(),
-                    'user_name' => 'Utilisateur MAXIMUS',
+                    'user_name' => $actorName,
                     'reference' => '',
                     'comment' => '',
                     'status' => 'VALIDÉ',
@@ -207,7 +205,7 @@ class StockController extends Controller
                     'action' => 'VALIDATION_MOUVEMENT',
                     'entity_type' => 'movement',
                     'entity_id' => $row['id'],
-                    'user_name' => $input['userName'] ?? 'Utilisateur MAXIMUS',
+                    'user_name' => $actorName,
                     'detail' => $input['type'].' de '.$input['quantity'].' unité(s)',
                     'created_at' => now(),
                 ]);
@@ -222,8 +220,8 @@ class StockController extends Controller
 
     public function createRequest(Request $request): JsonResponse
     {
-        $input = $this->validated($request, ['companyId' => ['nullable', 'string'], 'productId' => ['required', 'string'], 'warehouseId' => ['required', 'string'], 'quantity' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'min:1'], 'createdBy' => ['nullable', 'string']]);
-        $row = array_merge(['id' => $this->id('stock-request'), 'company_id' => self::COMPANY, 'status' => 'EN ATTENTE', 'created_by' => 'Utilisateur MAXIMUS', 'created_at' => now(), 'updated_at' => now()], $this->snake($input));
+        $input = $this->validated($request, ['productId' => ['required', 'string'], 'warehouseId' => ['required', 'string'], 'quantity' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'min:1']]);
+        $row = array_merge(['id' => $this->id('stock-request'), 'company_id' => $this->company($request), 'status' => 'EN ATTENTE', 'created_by' => $this->actorName($request), 'created_at' => now(), 'updated_at' => now()], $this->snake($input));
         DB::table('stock_requests')->insert($row);
         return response()->json($this->requestRow((object) $row), 201);
     }
@@ -256,12 +254,13 @@ class StockController extends Controller
 
     public function createInventory(Request $request): JsonResponse
     {
-        $input = $this->validated($request, ['companyId' => ['nullable', 'string'], 'warehouseId' => ['required', 'string'], 'notes' => ['nullable', 'string'], 'lines' => ['required', 'array', 'min:1'], 'lines.*.productId' => ['required', 'string'], 'lines.*.actualQuantity' => ['required', 'integer', 'min:0'], 'createdBy' => ['nullable', 'string']]);
-        $company = $input['companyId'] ?? self::COMPANY;
+        $input = $this->validated($request, ['warehouseId' => ['required', 'string'], 'notes' => ['nullable', 'string'], 'lines' => ['required', 'array', 'min:1'], 'lines.*.productId' => ['required', 'string', 'min:1'], 'lines.*.actualQuantity' => ['required', 'integer', 'min:0']]);
+        $company = $this->company($request);
+        $actorName = $this->actorName($request);
         try {
-            $row = DB::transaction(function () use ($input, $company): array {
+            $row = DB::transaction(function () use ($input, $company, $actorName): array {
                 if (!DB::table('stock_warehouses')->where('id', $input['warehouseId'])->where('company_id', $company)->exists()) throw new \RuntimeException('WAREHOUSE_NOT_FOUND');
-                $inventory = ['id' => $this->id('inventory'), 'company_id' => $company, 'warehouse_id' => $input['warehouseId'], 'status' => 'BROUILLON', 'inventory_date' => now(), 'notes' => $input['notes'] ?? '', 'created_by' => $input['createdBy'] ?? 'Utilisateur MAXIMUS', 'validated_at' => null, 'created_at' => now()];
+                $inventory = ['id' => $this->id('inventory'), 'company_id' => $company, 'warehouse_id' => $input['warehouseId'], 'status' => 'BROUILLON', 'inventory_date' => now(), 'notes' => $input['notes'] ?? '', 'created_by' => $actorName, 'validated_at' => null, 'created_at' => now()];
                 DB::table('stock_inventories')->insert($inventory);
                 foreach ($input['lines'] as $line) {
                     if (!DB::table('stock_products')->where('id', $line['productId'])->where('company_id', $company)->exists()) continue;
@@ -324,20 +323,20 @@ class StockController extends Controller
     {
         $required = $partial ? ['sometimes'] : ['required'];
         return $this->validated($request, [
-            'companyId' => ['nullable', 'string'], 'name' => array_merge($required, ['string', 'min:1']), 'category' => ['nullable', 'string'], 'subcategory' => ['nullable', 'string'], 'brand' => ['nullable', 'string'], 'sku' => array_merge($required, ['string', 'min:1']), 'barcode' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'unit' => ['nullable', 'string'], 'purchasePrice' => ['nullable', 'integer', 'min:0'], 'salePrice' => ['nullable', 'integer', 'min:0'], 'minStock' => ['nullable', 'integer', 'min:0'], 'maxStock' => ['nullable', 'integer', 'min:0'], 'supplierId' => ['nullable', 'string'], 'description' => ['nullable', 'string'],
+            'name' => array_merge($required, ['string', 'min:1']), 'category' => ['nullable', 'string'], 'subcategory' => ['nullable', 'string'], 'brand' => ['nullable', 'string'], 'sku' => array_merge($required, ['string', 'min:1']), 'barcode' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'unit' => ['nullable', 'string'], 'purchasePrice' => ['nullable', 'integer', 'min:0'], 'salePrice' => ['nullable', 'integer', 'min:0'], 'minStock' => ['nullable', 'integer', 'min:0'], 'maxStock' => ['nullable', 'integer', 'min:0'], 'supplierId' => ['nullable', 'string'], 'description' => ['nullable', 'string'],
         ]);
     }
 
     private function supplierInput(Request $request, bool $partial = false): array
     {
         $required = $partial ? ['sometimes'] : ['required'];
-        return $this->validated($request, ['companyId' => ['nullable', 'string'], 'name' => array_merge($required, ['string', 'min:1']), 'contactName' => ['nullable', 'string'], 'email' => ['nullable', 'string'], 'phone' => ['nullable', 'string'], 'address' => ['nullable', 'string'], 'notes' => ['nullable', 'string']]);
+        return $this->validated($request, ['name' => array_merge($required, ['string', 'min:1']), 'contactName' => ['nullable', 'string'], 'email' => ['nullable', 'string'], 'phone' => ['nullable', 'string'], 'address' => ['nullable', 'string'], 'notes' => ['nullable', 'string']]);
     }
 
     private function warehouseInput(Request $request, bool $partial = false): array
     {
         $required = $partial ? ['sometimes'] : ['required'];
-        return $this->validated($request, ['companyId' => ['nullable', 'string'], 'name' => array_merge($required, ['string', 'min:1']), 'manager' => ['nullable', 'string'], 'address' => ['nullable', 'string']]);
+        return $this->validated($request, ['name' => array_merge($required, ['string', 'min:1']), 'manager' => ['nullable', 'string'], 'address' => ['nullable', 'string']]);
     }
 
     private function validated(Request $request, array $rules): array
@@ -354,7 +353,7 @@ class StockController extends Controller
     {
         $result = [];
         foreach ($input as $key => $value) {
-            if ($key === 'companyId') $result['company_id'] = $value ?? self::COMPANY;
+            if ($key === 'companyId') $result['company_id'] = $value;
             elseif ($key === 'createdBy') $result['created_by'] = $value;
             elseif (preg_match('/[A-Z]/', $key)) $result[strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $key))] = $value;
             else $result[$key] = $value;
@@ -381,9 +380,17 @@ class StockController extends Controller
         return response()->json(['error' => $message], 404);
     }
 
-    private function productDefaults(): array { return ['company_id' => self::COMPANY, 'category' => 'Divers', 'subcategory' => '', 'brand' => '', 'barcode' => '', 'image_url' => '', 'unit' => 'unité', 'purchase_price' => 0, 'sale_price' => 0, 'min_stock' => 0, 'max_stock' => 0, 'supplier_id' => null, 'description' => '', 'archived' => false]; }
-    private function supplierDefaults(): array { return ['company_id' => self::COMPANY, 'contact_name' => '', 'email' => '', 'phone' => '', 'address' => '', 'notes' => '', 'archived' => false]; }
-    private function warehouseDefaults(): array { return ['company_id' => self::COMPANY, 'manager' => '', 'address' => '', 'archived' => false]; }
+    private function productDefaults(string $company): array { return ['company_id' => $company, 'category' => 'Divers', 'subcategory' => '', 'brand' => '', 'barcode' => '', 'image_url' => '', 'unit' => 'unité', 'purchase_price' => 0, 'sale_price' => 0, 'min_stock' => 0, 'max_stock' => 0, 'supplier_id' => null, 'description' => '', 'archived' => false]; }
+    private function supplierDefaults(string $company): array { return ['company_id' => $company, 'contact_name' => '', 'email' => '', 'phone' => '', 'address' => '', 'notes' => '', 'archived' => false]; }
+    private function warehouseDefaults(string $company): array { return ['company_id' => $company, 'manager' => '', 'address' => '', 'archived' => false]; }
+
+    private function actorName(Request $request): string
+    {
+        $actor = $request->attributes->get('authActor');
+        return is_array($actor) && is_string($actor['displayName'] ?? null) && $actor['displayName'] !== ''
+            ? $actor['displayName']
+            : 'Utilisateur MAXIMUS';
+    }
 
     private function product(object $r): array { return ['id' => $r->id, 'companyId' => $r->company_id, 'name' => $r->name, 'category' => $r->category, 'subcategory' => $r->subcategory, 'brand' => $r->brand, 'sku' => $r->sku, 'barcode' => $r->barcode, 'imageUrl' => $r->image_url, 'unit' => $r->unit, 'purchasePrice' => $r->purchase_price, 'salePrice' => $r->sale_price, 'minStock' => $r->min_stock, 'maxStock' => $r->max_stock, 'supplierId' => $r->supplier_id, 'description' => $r->description, 'archived' => (bool) $r->archived, 'createdAt' => $this->date($r->created_at), 'updatedAt' => $this->date($r->updated_at)]; }
     private function supplier(object $r): array { return ['id' => $r->id, 'companyId' => $r->company_id, 'name' => $r->name, 'contactName' => $r->contact_name, 'email' => $r->email, 'phone' => $r->phone, 'address' => $r->address, 'notes' => $r->notes, 'archived' => (bool) $r->archived, 'createdAt' => $this->date($r->created_at), 'updatedAt' => $this->date($r->updated_at)]; }

@@ -55,6 +55,9 @@ class StockTest extends TestCase
             'quantity' => 10,
         ]);
         $this->assertDatabaseCount('stock_audit_logs', 1);
+        $this->assertDatabaseHas('stock_audit_logs', [
+            'user_name' => 'Gestionnaire Stock',
+        ]);
     }
 
     public function test_inventory_validation_applies_only_the_difference(): void

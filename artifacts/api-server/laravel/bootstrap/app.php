@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'maximus.auth' => \App\Http\Middleware\AuthenticateMaximus::class,
             'maximus.company' => \App\Http\Middleware\ResolveCompanyContext::class,
+            'maximus.module' => \App\Http\Middleware\EnsureModuleEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

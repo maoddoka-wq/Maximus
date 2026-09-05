@@ -13,8 +13,10 @@ class ProvisionMaximusDemo extends Command
 
     public function handle(): int
     {
+        \App\Support\ModuleCatalog::ensureCatalog();
         MaximusDemoProvisioner::ensureAuthUsers();
-        MaximusDemoProvisioner::ensureStockSeed();
+        \App\Support\ModuleCatalog::ensureCompanyAccess('kora');
+        MaximusDemoProvisioner::ensureStockSeed('kora');
 
         $this->info('Provisionnement MAXIMUS terminé.');
 

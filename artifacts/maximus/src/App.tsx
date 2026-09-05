@@ -15,6 +15,7 @@ import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
+import { loadCompanyModuleAccess, setCompanyModuleAccess } from '@/lib/module-api';
 import {
   employeeHasPresencePermission,
   employeeRoleMatchesUnit,
@@ -118,6 +119,7 @@ function AppContent() {
   const [session, setSession] = useState<Session | null>(() => (localStorage.getItem('maximus-session') as Session | null));
   const [toast, setToast] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('maximus-sidebar-collapsed') === 'true');
   const [pathname, setLocation] = useLocation();
   const [search] = useSearch();
@@ -149,6 +151,18 @@ function AppContent() {
     if (message) setToast(message);
   };
   const notify = (message: string) => setToast(message);
+  const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, enabled: boolean) => {
+    await setCompanyModuleAccess(companyId, moduleId, enabled ? 'ACTIF' : 'INACTIF');
+    mutate(draft => {
+      const company = draft.companies.find(item => item.id === companyId);
+      if (!company) return;
+      company.allowedModules = enabled
+        ? [...new Set([...company.allowedModules, moduleId])]
+        : company.allowedModules.filter(item => item !== moduleId);
+      company.refusedModules = company.requestedModules.filter(item => !company.allowedModules.includes(item));
+    });
+    notify(enabled ? 'Module activé pour cette entreprise.' : 'Module désactivé pour cette entreprise.');
+  };
   const sessionEmployeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
   const sessionEmployee = sessionEmployeeId ? data.employees.find(employee => employee.id === sessionEmployeeId) : null;
   const activeCompanyId = session === 'kora'
@@ -156,6 +170,24 @@ function AppContent() {
     : session?.startsWith('company:')
       ? session.slice('company:'.length)
       : sessionEmployee?.companyId;
+  useEffect(() => {
+    if (!activeCompanyId || session === 'admin' || !session) {
+      setServerModuleStatuses(null);
+      return;
+    }
+
+    let cancelled = false;
+    void loadCompanyModuleAccess(activeCompanyId)
+      .then(access => {
+        if (!cancelled) {
+          setServerModuleStatuses(Object.fromEntries(access.map(module => [module.id, module.status])));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setServerModuleStatuses({});
+      });
+    return () => { cancelled = true; };
+  }, [activeCompanyId, session]);
   const activeCompany = data.companies.find(company => company.id === activeCompanyId);
   const activeCompanyTheme = companyThemeVariables(activeCompany);
   const activeNavStyle: CSSProperties | undefined = activeCompany
@@ -217,7 +249,7 @@ function AppContent() {
   const currentCompany = activeCompany;
   const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
   const configuredModules = getConfiguredModules(data);
-  const moduleStatus = (moduleId: ModuleId): ModuleAvailability => data.moduleStatuses?.[moduleId] ?? configuredModules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
+  const moduleStatus = (moduleId: ModuleId): ModuleAvailability => serverModuleStatuses?.[moduleId] ?? data.moduleStatuses?.[moduleId] ?? configuredModules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
   const companyAllowed = (data.companies.find(c => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) : null;
@@ -330,7 +362,7 @@ function AppContent() {
              {!hidePageHeader && <PageHeader {...currentMeta} location={location} onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/kora/dashboard')} />}
            <ErrorBoundary resetKey={location}>
              <Suspense fallback={<div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>}>
-                 {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} onBack={goBack} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} onBack={goBack} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
+                  {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} onBack={goBack} onModuleAccess={updateCompanyModuleAccess} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} onBack={goBack} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
              </Suspense>
            </ErrorBoundary>
         </div>
@@ -1239,9 +1271,10 @@ function AdminCreateCompanyPage({ data, mutate, onComplete, onCancel }: { data: 
   </div>;
 }
 
-function CompanyModulesDetail({ company, data, mutate, onBack }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
+function CompanyModulesDetail({ company, data, mutate, onModuleAccess, onBack }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onModuleAccess: (companyId: string, moduleId: ModuleId, enabled: boolean) => Promise<void>; onBack: () => void }) {
   const [active, setActive] = useState<ModuleId[]>(company.allowedModules);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setActive(company.allowedModules);
@@ -1251,14 +1284,19 @@ function CompanyModulesDetail({ company, data, mutate, onBack }: { company: Comp
     setActive(previous => previous.includes(id) ? previous.filter(moduleId => moduleId !== id) : [...previous, id]);
   };
 
-  const save = () => {
-    mutate(draft => {
-      const target = draft.companies.find(item => item.id === company.id);
-      if (target) {
-        target.allowedModules = [...active];
-        target.refusedModules = target.requestedModules.filter(moduleId => !active.includes(moduleId));
-      }
-    }, 'Configuration enregistrée.');
+  const save = async () => {
+    setSaving(true);
+    try {
+      const changes = modules
+        .filter(module => active.includes(module.id) !== company.allowedModules.includes(module.id))
+        .map(module => onModuleAccess(company.id, module.id, active.includes(module.id)));
+      await Promise.all(changes);
+    } catch (error) {
+      setActive(company.allowedModules);
+      window.alert(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return <div className="space-y-5">
@@ -1298,7 +1336,7 @@ function CompanyModulesDetail({ company, data, mutate, onBack }: { company: Comp
           </button>;
         })}
       </div>
-      <div className="mt-6 flex justify-end"><ActionButton primary testId="button-save-company-modules" onClick={save}>Enregistrer la configuration</ActionButton></div>
+       <div className="mt-6 flex justify-end"><ActionButton primary testId="button-save-company-modules" onClick={() => { if (!saving) void save(); }}>{saving ? 'Enregistrement…' : 'Enregistrer la configuration'}</ActionButton></div>
     </section>
     {editing && <CompanyEditModal company={company} data={data} mutate={mutate} onClose={() => setEditing(false)} />}
   </div>;

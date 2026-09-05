@@ -22,7 +22,7 @@ class PresenceTest extends TestCase
             'workDate' => '2026-09-05',
             'status' => 'EN ATTENTE',
             'payload' => ['reason' => 'Congé annuel', 'days' => 2],
-            'actor' => 'RH Kora',
+            'actor' => 'Usurpateur côté navigateur',
         ]);
 
         $created

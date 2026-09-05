@@ -87,6 +87,8 @@ class ControlController extends Controller
     {
         $input = $this->validateTask($request);
         $actor = $request->attributes->get('authActor');
+        $input['companyId'] = (string) $request->attributes->get('companyId');
+        $input['createdBy'] = $actor['displayName'];
 
         if (!ControlAuthorization::canCreate($actor, $input)) {
             return response()->json(['error' => 'Création hors périmètre autorisé.'], 403);
@@ -126,10 +128,10 @@ class ControlController extends Controller
     public function updateStatus(Request $request, string $id): JsonResponse
     {
         $input = Validator::make($request->all(), [
-            'companyId' => ['required', 'string', 'min:1'],
             'status' => ['required', 'in:'.implode(',', self::STATUSES)],
         ])->validate();
         $actor = $request->attributes->get('authActor');
+        $companyId = $request->attributes->get('companyId');
         $task = ControlTask::query()->find($id);
 
         if (!$task) {
@@ -137,7 +139,7 @@ class ControlController extends Controller
         }
 
         $before = $this->task($task);
-        if ($task->company_id !== $input['companyId'] || !ControlAuthorization::canUpdate($actor, $before)) {
+        if ($task->company_id !== $companyId || !ControlAuthorization::canUpdate($actor, $before)) {
             return response()->json(['error' => 'Modification hors périmètre autorisé.'], 403);
         }
 
@@ -157,14 +159,12 @@ class ControlController extends Controller
     {
         return Validator::make($request->all(), [
             'id' => ['nullable', 'string', 'min:1'],
-            'companyId' => ['required', 'string', 'min:1'],
             'sectorId' => ['nullable', 'string', 'min:1'],
             'title' => ['required', 'string', 'min:1', 'max:180'],
             'description' => ['required', 'string', 'min:1', 'max:4000'],
             'moduleId' => ['nullable', 'string', 'min:1'],
             'assigneeEmployeeId' => ['nullable', 'string', 'min:1'],
             'assigneeName' => ['nullable', 'string', 'min:1'],
-            'createdBy' => ['required', 'string', 'min:1', 'max:180'],
             'priority' => ['nullable', 'in:'.implode(',', self::PRIORITIES)],
             'requiresApproval' => ['nullable', 'boolean'],
             'dueDate' => ['nullable', 'string', 'max:80'],

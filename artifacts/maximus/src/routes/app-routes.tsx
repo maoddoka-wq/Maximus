@@ -29,6 +29,7 @@ export function AdminRouter({
   notify,
   onNavigate,
   onBack,
+  onModuleAccess,
   screens,
 }: {
   location: string;
@@ -37,6 +38,7 @@ export function AdminRouter({
   notify: (message: string) => void;
   onNavigate: Navigate;
   onBack: (fallback: string) => void;
+  onModuleAccess: (companyId: string, moduleId: ModuleId, enabled: boolean) => Promise<void>;
   screens: AdminRouteScreens;
 }) {
   const routePath = location.split('?')[0];
@@ -54,7 +56,7 @@ export function AdminRouter({
     const companyId = decodeURIComponent(companyDetailMatch[1]);
     const company = data.companies.find(item => item.id === companyId);
     return company ? (
-       <screens.companyDetail company={company} data={data} mutate={mutate} onBack={() => onBack('/maximus/entreprises')} />
+       <screens.companyDetail company={company} data={data} mutate={mutate} onModuleAccess={onModuleAccess} onBack={() => onBack('/maximus/entreprises')} />
     ) : (
       <screens.empty title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onBack('/maximus/entreprises')} />
     );

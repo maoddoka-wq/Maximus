@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ModuleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/healthz', function () {
@@ -16,6 +17,11 @@ Route::prefix('auth')->group(function () {
 Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {
     Route::post('/', [AuthController::class, 'createAccount']);
     Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
+});
+
+Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
+    Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
+    Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
 });
 
 require __DIR__.'/control.php';

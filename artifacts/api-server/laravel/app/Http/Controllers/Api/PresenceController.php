@@ -37,11 +37,15 @@ class PresenceController extends Controller
     public function create(Request $request): JsonResponse
     {
         $input = $this->validateItem($request);
-        $actor = $input['actor'] ?? 'Utilisateur MAXIMUS';
+        $companyId = $this->company($request);
+        if (!$companyId) {
+            return response()->json(['error' => 'Contexte entreprise requis.'], 400);
+        }
+        $actor = $this->actorName($request);
         $now = now();
         $item = PresenceItem::query()->create([
             'id' => 'presence-'.$input['type'].'-'.Str::uuid(),
-            'company_id' => $input['companyId'],
+            'company_id' => $companyId,
             'type' => $input['type'],
             'employee_id' => $input['employeeId'] ?? null,
             'work_date' => $input['workDate'] ?? null,
@@ -55,7 +59,7 @@ class PresenceController extends Controller
             'updated_at' => $now,
         ]);
 
-        $this->writeHistory($input['companyId'], $actor, $input['type'].'.create', [
+        $this->writeHistory($companyId, $actor, $input['type'].'.create', [
             'itemId' => $item->id,
             'newValue' => $input['payload'] ?? [],
             'employeeId' => $input['employeeId'] ?? null,
@@ -75,7 +79,7 @@ class PresenceController extends Controller
             return response()->json(['error' => 'Enregistrement introuvable'], 404);
         }
 
-        $actor = $input['actor'] ?? 'Utilisateur MAXIMUS';
+        $actor = $this->actorName($request);
         $changes = [];
         foreach ([
             'type' => 'type',
@@ -114,7 +118,7 @@ class PresenceController extends Controller
             return response()->json(['error' => 'Enregistrement introuvable'], 404);
         }
 
-        $actor = is_string($request->input('actor')) ? $request->input('actor') : 'Utilisateur MAXIMUS';
+        $actor = $this->actorName($request);
         $item->delete();
         $this->writeHistory($companyId, $actor, $item->type.'.delete', [
             'itemId' => $item->id,
@@ -129,20 +133,22 @@ class PresenceController extends Controller
     public function clock(Request $request): JsonResponse
     {
         $input = Validator::make($request->all(), [
-            'companyId' => ['required', 'string', 'min:1'],
             'employeeId' => ['required', 'string', 'min:1'],
             'workDate' => ['required', 'regex:/^\d{4}-\d{2}-\d{2}$/'],
             'action' => ['required', 'in:arrival,exit,pauseStart,pauseEnd'],
-            'actor' => ['nullable', 'string'],
             'now' => ['nullable', 'date'],
             'expectedStart' => ['nullable', 'regex:/^\d{2}:\d{2}$/'],
             'tolerance' => ['nullable', 'integer', 'min:0'],
         ])->validate();
-        $actor = $input['actor'] ?? 'Utilisateur MAXIMUS';
+        $companyId = $this->company($request);
+        if (!$companyId) {
+            return response()->json(['error' => 'Contexte entreprise requis.'], 400);
+        }
+        $actor = $this->actorName($request);
         $tolerance = $input['tolerance'] ?? 10;
 
         $item = PresenceItem::query()
-            ->where('company_id', $input['companyId'])
+            ->where('company_id', $companyId)
             ->where('type', 'attendance')
             ->where('employee_id', $input['employeeId'])
             ->where('work_date', $input['workDate'])
@@ -190,7 +196,7 @@ class PresenceController extends Controller
         } else {
             $item = PresenceItem::query()->create([
                 'id' => 'presence-attendance-'.Str::uuid(),
-                'company_id' => $input['companyId'],
+                'company_id' => $companyId,
                 'type' => 'attendance',
                 'employee_id' => $input['employeeId'],
                 'work_date' => $input['workDate'],
@@ -204,7 +210,7 @@ class PresenceController extends Controller
             $httpStatus = 201;
         }
 
-        $this->writeHistory($input['companyId'], $actor, 'clock.'.$input['action'], [
+        $this->writeHistory($companyId, $actor, 'clock.'.$input['action'], [
             'itemId' => $item->id,
             'newValue' => [$input['action'] => $clockTime],
             'employeeId' => $input['employeeId'],
@@ -217,7 +223,6 @@ class PresenceController extends Controller
     private function validateItem(Request $request, bool $partial = false): array
     {
         $rules = [
-            'companyId' => [$partial ? 'nullable' : 'required', 'string', 'min:1'],
             'type' => [$partial ? 'nullable' : 'required', 'in:'.implode(',', self::TYPES)],
             'employeeId' => ['nullable', 'string'],
             'workDate' => ['nullable', 'string'],
@@ -235,6 +240,14 @@ class PresenceController extends Controller
     {
         $value = $request->attributes->get('companyId');
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function actorName(Request $request): string
+    {
+        $actor = $request->attributes->get('authActor');
+        return is_array($actor) && is_string($actor['displayName'] ?? null) && $actor['displayName'] !== ''
+            ? $actor['displayName']
+            : 'Utilisateur MAXIMUS';
     }
 
     private function writeHistory(string $companyId, string $actor, string $action, array $payload): void

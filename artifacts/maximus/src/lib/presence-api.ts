@@ -11,9 +11,9 @@ export const createPresenceApi = (companyId: string) => {
   const query = (path: string) => `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
   return {
     bootstrap: () => request<{ items: PresenceItem[] }>(query('/presence/bootstrap')),
-    create: (body: Omit<ItemInput, 'companyId'>) => request<PresenceItem>('/presence/items', json({ ...body, companyId })),
-    update: (id: string, body: Partial<ItemInput>) => request<PresenceItem>(query(`/presence/items/${id}`), { ...json({ ...body, companyId }), method: 'PATCH' }),
-    remove: (id: string, actor: string) => request<{ ok: boolean }>(query(`/presence/items/${id}`), { ...json({ actor, companyId }), method: 'DELETE' }),
-    clock: (body: { employeeId: string; workDate: string; action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd'; actor: string; expectedStart?: string; tolerance?: number }) => request<PresenceItem>(`/presence/clock`, json({ ...body, companyId })),
+    create: (body: Omit<ItemInput, 'companyId'>) => request<PresenceItem>(query('/presence/items'), json(body)),
+    update: (id: string, body: Partial<ItemInput>) => request<PresenceItem>(query(`/presence/items/${id}`), { ...json(body), method: 'PATCH' }),
+    remove: (id: string, actor: string) => request<{ ok: boolean }>(query(`/presence/items/${id}`), { ...json({ actor }), method: 'DELETE' }),
+    clock: (body: { employeeId: string; workDate: string; action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd'; actor: string; expectedStart?: string; tolerance?: number }) => request<PresenceItem>(query('/presence/clock'), json(body)),
   };
 };
