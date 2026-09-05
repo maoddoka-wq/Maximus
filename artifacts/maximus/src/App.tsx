@@ -2953,6 +2953,7 @@ function SectorPresetsPage({
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
+  const [testingSector, setTestingSector] = useState<SectorPreset | null>(null);
   const sectorPresets = data.sectorPresets ?? [];
   const moduleForSector = (id: ModuleId) => {
     const base = modules.find((module) => module.id === id);
@@ -3010,12 +3011,11 @@ function SectorPresetsPage({
     setSectorError('');
   };
 
-  const createSector = (event: FormEvent) => {
-    event.preventDefault();
+  const buildSectorPreset = (): SectorPreset | null => {
     const normalizedName = sectorName.trim();
     if (!normalizedName) {
       setSectorError('Saisissez le nom du secteur.');
-      return;
+      return null;
     }
     if (
       sectorPresets.some(
@@ -3023,18 +3023,18 @@ function SectorPresetsPage({
       )
     ) {
       setSectorError('Ce secteur existe déjà.');
-      return;
+      return null;
     }
     if (sectorModules.length === 0) {
       setSectorError('Sélectionnez au moins un module.');
-      return;
+      return null;
     }
     const selectedPackEntries = sectorModules.map(
       (moduleId) => [moduleId, sectorPackIds[moduleId] ?? []] as [ModuleId, string[]],
     );
     if (selectedPackEntries.some(([, packIds]) => packIds.length === 0)) {
       setSectorError('Sélectionnez au moins un pack dans chaque module choisi.');
-      return;
+      return null;
     }
     const moduleIds = selectedPackEntries.map(([moduleId]) => moduleId);
     const moduleFeatures = Object.fromEntries(
@@ -3045,13 +3045,19 @@ function SectorPresetsPage({
         return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, featureIds)] : featureIds];
       }),
     ) as Partial<Record<ModuleId, string[]>>;
-    const preset: SectorPreset = {
+    return {
       id: editingSector?.id ?? uid('sector'),
       name: normalizedName,
       moduleIds,
       modulePackIds: Object.fromEntries(selectedPackEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])),
       moduleFeatures,
     };
+  };
+
+  const createSector = (event: FormEvent) => {
+    event.preventDefault();
+    const preset = buildSectorPreset();
+    if (!preset) return;
     mutate(
       (draft) => {
         draft.sectorPresets = editingSector
@@ -3066,6 +3072,11 @@ function SectorPresetsPage({
     setEditingSector(null);
     setSectorError('');
     setSectorModalOpen(false);
+  };
+
+  const testDraftSector = () => {
+    const preset = buildSectorPreset();
+    if (preset) setTestingSector(preset);
   };
 
   const closeSectorModal = () => {
