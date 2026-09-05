@@ -101,6 +101,7 @@ import {
   updatePackPermission,
 } from '@/lib/module-pack';
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
+import { useDebouncedPersistence } from '@/hooks/use-persisted-store';
 
 const queryClient = new QueryClient();
 const defaultDemoAccounts = [
@@ -314,7 +315,7 @@ function AppContent() {
   const [pathname, setLocation] = useLocation();
   const [search] = useSearch();
   const location = search ? `${pathname}?${search}` : pathname;
-  useEffect(() => saveData(data), [data]);
+  useDebouncedPersistence(data, saveData);
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
