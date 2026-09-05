@@ -295,6 +295,8 @@ function AppContent() {
        ? { kicker: currentCompany.name, title: `Le rythme de ${currentCompany.name}, en un regard.`, description: `${currentCompany.sector} · ${currentCompany.country}` }
        : { ...baseMeta, kicker: currentCompany.name }
      : baseMeta;
+    const currentPath = location.split('?')[0];
+    const hidePageHeader = (isAdmin && currentPath !== '/maximus/dashboard') || routesWithModuleHeaders.has(currentPath);
    const companyInitials = currentCompany?.name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const notificationContext = { isAdmin, companyId };
   const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(notification => !notification.read).length;
@@ -304,7 +306,7 @@ function AppContent() {
         <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
            <Topbar title={currentMeta.title} isAdmin={isAdmin} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/notifications'} unreadCount={unreadNotifications} onHelp={() => { void alert({ title: 'Aide MAXIMUS', description: 'Explorez les vues depuis la navigation de votre espace.', confirmLabel: 'Compris' }); }} />
           <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
-            {!routesWithModuleHeaders.has(location.split('?')[0]) && <PageHeader {...currentMeta} location={location} />}
+            {!hidePageHeader && <PageHeader {...currentMeta} location={location} />}
            <ErrorBoundary resetKey={location}>
              <Suspense fallback={<div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>}>
                 {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
