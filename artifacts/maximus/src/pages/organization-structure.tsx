@@ -84,16 +84,18 @@ export function StructureTab({
         <span><strong>{companyNodes.length}</strong> unité(s) créée(s)</span>
         <span className="text-[hsl(var(--muted-foreground))]">Les managers se désignent depuis Comptes & managers</span>
       </div>
-      <div className="space-y-1">
-        <div className="mb-1 hidden grid-cols-[minmax(0,1fr)_170px_170px] items-center gap-4 px-3 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))] sm:grid">
-          <span>Unité</span>
-          <span className="text-right">Accès</span>
-          <span className="text-right">Actions</span>
+      <div className="overflow-x-auto">
+        <div className="space-y-1 sm:min-w-[760px]">
+          <div className="mb-1 hidden w-full grid-cols-[minmax(0,1fr)_190px_190px] items-center gap-4 px-3 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))] sm:grid">
+            <span>Unité</span>
+            <span className="text-right">Accès</span>
+            <span className="text-right">Actions</span>
+          </div>
+          {companyNodes.filter(node => !node.parentId).map(root => (
+            <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} onEdit={node => { setEditingNode(node); setModalOpen(true); }} onDelete={deleteNode} depth={0} />
+          ))}
+          {companyNodes.filter(node => !node.parentId).length === 0 && <div className="py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
         </div>
-        {companyNodes.filter(node => !node.parentId).map(root => (
-          <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} onEdit={node => { setEditingNode(node); setModalOpen(true); }} onDelete={deleteNode} depth={0} />
-        ))}
-        {companyNodes.filter(node => !node.parentId).length === 0 && <div className="py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
       </div>
       {modalOpen && (
         <Modal title={editingNode ? 'Modifier une unité' : 'Créer une unité'} onClose={() => setModalOpen(false)}>
@@ -139,7 +141,7 @@ function StructureNodeItem({
 
   return (
     <div>
-      <div className="group grid grid-cols-1 gap-2 rounded-lg border-b border-[hsl(var(--border)/.7)] px-3 py-2.5 transition hover:bg-[hsl(var(--muted)/.4)] sm:grid-cols-[minmax(0,1fr)_170px_170px] sm:items-center sm:gap-4">
+      <div className="group grid w-full grid-cols-1 gap-2 rounded-lg border-b border-[hsl(var(--border)/.7)] px-3 py-2.5 transition hover:bg-[hsl(var(--muted)/.4)] sm:grid-cols-[minmax(0,1fr)_190px_190px] sm:items-center sm:gap-4">
         <div className="flex min-w-0 items-center gap-3" style={{ paddingLeft: `${depth * 20}px` }}>
           <button type="button" aria-label={children.length > 0 ? `${expanded ? 'Réduire' : 'Développer'} ${node.name}` : undefined} onClick={() => setExpanded(value => !value)} className="flex h-5 w-5 shrink-0 items-center justify-center text-[hsl(var(--muted-foreground))]">
             {children.length > 0 && <ChevronDown size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />}
@@ -151,10 +153,10 @@ function StructureNodeItem({
             {node.code && <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">{node.code}</span>}
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:justify-end">
+        <div className="flex min-w-0 items-center justify-between gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:justify-end">
           <span className="text-[11px]">{node.moduleIds?.length ?? 0} module(s) autorisé(s)</span>
         </div>
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex min-w-0 items-center justify-end gap-1">
           <button type="button" data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={event => { event.stopPropagation(); onEdit(node); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
           <button type="button" data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
           </div>
@@ -183,9 +185,6 @@ function StructureFormModal({
     code: initialData?.code || '',
     type: (initialData?.type || 'direction') as OrgNode['type'],
     parentId: initialData?.parentId || '',
-    email: initialData?.email || '',
-    phone: initialData?.phone || '',
-    location: initialData?.location || '',
     moduleIds: initialData?.moduleIds ? [...initialData.moduleIds] : [],
   });
   const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
@@ -256,14 +255,6 @@ function StructureFormModal({
             </label>;
           })}
         </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.</p>}
-      </div>
-      <div className="mt-2 border-t pt-4">
-        <label className="mb-3 block text-sm font-semibold">Coordonnées de l’unité</label>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Email" value={formData.email} onChange={(value: string) => setFormData(current => ({ ...current, email: value }))} help="Adresse de contact de l’unité, si elle en possède une." />
-          <Field label="Téléphone" value={formData.phone} onChange={(value: string) => setFormData(current => ({ ...current, phone: value }))} help="Numéro de contact de l’unité." />
-          <Field label="Localisation" value={formData.location} onChange={(value: string) => setFormData(current => ({ ...current, location: value }))} help="Adresse ou emplacement physique de l’unité." />
-        </div>
       </div>
       <div className="mt-6 flex justify-end gap-3 border-t pt-4">
         <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button>
