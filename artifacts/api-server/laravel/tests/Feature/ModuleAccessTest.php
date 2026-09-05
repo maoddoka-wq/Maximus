@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -97,6 +98,24 @@ class ModuleAccessTest extends TestCase
         $this->asCompanyAdmin()
             ->patchJson('/api/modules/stocks/access', ['status' => 'INACTIF'])
             ->assertForbidden();
+    }
+
+    public function test_presence_catalog_matches_the_current_eight_feature_contract(): void
+    {
+        $presence = collect(ModuleCatalog::definitions())->firstWhere('id', 'presences');
+
+        $this->assertNotNull($presence);
+        $this->assertSame(
+            ['Tableau de bord', 'Pointage', 'Présences', 'Absences', 'Horaires', 'Congés', 'Historique', 'Rapports'],
+            $presence['features'],
+        );
+        $this->assertSame(
+            [
+                'présences' => ['pointage'],
+                'rapports' => ['pointage', 'présences'],
+            ],
+            $presence['feature_dependencies'],
+        );
     }
 
     private function asCompanyAdmin(): self

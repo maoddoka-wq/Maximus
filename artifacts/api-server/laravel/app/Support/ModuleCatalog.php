@@ -21,14 +21,10 @@ final class ModuleCatalog
                 'id' => 'presences',
                 'name' => 'Présences',
                 'description' => 'Présences et suivi quotidien des équipes.',
-                'features' => ['Tableau de bord', 'Pointage', 'Présences', 'Absences', 'Retards', 'Horaires', 'Planning', 'Pauses', 'Heures travaillées', 'Heures supplémentaires', 'Missions', 'Congés', 'Jours fériés', 'Historique', 'Rapports', 'Paramètres'],
+                'features' => ['Tableau de bord', 'Pointage', 'Présences', 'Absences', 'Horaires', 'Congés', 'Historique', 'Rapports'],
                 'feature_dependencies' => [
                     'présences' => ['pointage'],
-                    'retards' => ['pointage'],
-                    'pauses' => ['pointage'],
-                    'heures-travaillées' => ['pointage'],
-                    'heures-supplémentaires' => ['heures-travaillées'],
-                    'rapports' => ['présences', 'heures-travaillées'],
+                    'rapports' => ['pointage', 'présences'],
                 ],
             ],
             ['id' => 'paie', 'name' => 'Paie', 'description' => 'Préparation et suivi des bulletins de salaire.', 'features' => ['Périodes de paie', 'Bulletins', 'Déclarations']],
@@ -64,7 +60,7 @@ final class ModuleCatalog
         self::ensureCatalog();
         $allowed = $moduleIds ?? array_column(self::definitions(), 'id');
         foreach ($allowed as $moduleId) {
-            if (!collect(self::definitions())->contains('id', $moduleId)) {
+            if (! collect(self::definitions())->contains('id', $moduleId)) {
                 continue;
             }
 
@@ -105,6 +101,7 @@ final class ModuleCatalog
 
         return collect(self::definitions())->map(function (array $definition) use ($access): array {
             $row = $access->get($definition['id']);
+
             return [
                 ...$definition,
                 'status' => $row?->status ?? 'INACTIF',
