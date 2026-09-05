@@ -13,3 +13,4 @@
 - [Maintenance individuelle des modules](module-maintenance.md) — le statut MAINTENANCE isole un module pour une entreprise, avec accès technique MAXIMUS conservé.
 - [Navigation navigateur](browser-navigation.md) — les liens internes et le bouton Retour doivent partager l’historique réel, avec un fallback dashboard pour un accès direct.
 - [Performance authentification](password-hashing.md) — les nouveaux hash sont rapides, avec migration transparente des anciens hash scrypt après validation.
+- [Assistant IA métier local](local-maximus-ai.md) — produire un brouillon validable depuis les règles MAXIMUS, sans API de modèle externe ni mutation directe.
