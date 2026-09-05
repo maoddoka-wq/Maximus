@@ -297,7 +297,7 @@ function AppContent() {
        : { ...baseMeta, kicker: currentCompany.name }
      : baseMeta;
     const currentPath = location.split('?')[0];
-    const hidePageHeader = (isAdmin && currentPath !== '/maximus/dashboard') || routesWithModuleHeaders.has(currentPath);
+     const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
    const companyInitials = currentCompany?.name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'KD';
   const notificationContext = { isAdmin, companyId };
   const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(notification => !notification.read).length;
