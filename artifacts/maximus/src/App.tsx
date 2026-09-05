@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
+import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import { getConfiguredModules, getVisibleNotifications, loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleFeaturePack, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
@@ -28,25 +29,15 @@ import {
   roleHasPermission,
   type PresencePermission,
 } from '@/lib/employee-permissions';
-
-type FeaturePermissionMap = Partial<Record<string, string[]>>;
-type ModulePackDraft = { name: string; description: string; featureIds: string[]; featurePermissions: FeaturePermissionMap };
-const featurePermissionOptions: { value: string; label: string; permissions: string[] }[] = [
-  { value: 'none', label: 'Non incluse', permissions: [] },
-  { value: 'view', label: 'Voir seulement', permissions: ['voir'] },
-  { value: 'create', label: 'Voir et créer', permissions: ['voir', 'créer'] },
-  { value: 'edit', label: 'Voir, créer et modifier', permissions: ['voir', 'créer', 'modifier'] },
-];
-const permissionLevelFor = (permissions?: string[]) => {
-  if (!permissions?.length) return 'none';
-  if (permissions.includes('modifier')) return 'edit';
-  if (permissions.includes('créer')) return 'create';
-  return 'view';
-};
-const permissionsForLevel = (level: string): string[] =>
-  [...(featurePermissionOptions.find(option => option.value === level)?.permissions ?? [])];
-const defaultFeaturePermissions = (featureIds: Iterable<string>, existing?: FeaturePermissionMap): FeaturePermissionMap =>
-  Object.fromEntries([...featureIds].map(featureId => [featureId, existing?.[featureId]?.length ? [...existing[featureId]!] : ['voir']]));
+import {
+  buildModulePack,
+  defaultFeaturePermissions,
+  emptyModulePackDraft,
+  permissionLevelFor,
+  type FeaturePermissionMap,
+  type ModulePackDraft,
+  updatePackPermission,
+} from '@/lib/module-pack';
 
 const queryClient = new QueryClient();
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
@@ -1205,7 +1196,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [editingPackId, setEditingPackId] = useState<string | null>(null);
-  const [packForm, setPackForm] = useState<ModulePackDraft>({ name: '', description: '', featureIds: [], featurePermissions: {} });
+  const [packForm, setPackForm] = useState<ModulePackDraft>(() => emptyModulePackDraft());
   const [testPack, setTestPack] = useState<ModuleFeaturePack | null>(null);
   const [testModule, setTestModule] = useState(false);
   const [query, setQuery] = useState('');
@@ -1242,10 +1233,10 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     const features = moduleForm.features.split(/[\n,]/).map(feature => feature.trim()).filter(Boolean);
     if (features.length === 0) return;
     const moduleForPack = { ...editingModule, features };
-    const packFeatureIds = getModuleFeatureOptions(moduleForPack)
-      .map(feature => feature.id)
-      .filter(featureId => packForm.featurePermissions[featureId]?.length);
-    if (packForm.name.trim() && packFeatureIds.length === 0) return;
+    const nextPack = packForm.name.trim()
+      ? buildModulePack(moduleForPack, packForm, uid(`pack-${editingModule.id}`))
+      : null;
+    if (packForm.name.trim() && !nextPack) return;
     mutate(draft => {
       const currentOverride = draft.moduleOverrides?.[editingModule.id] ?? {};
       const nextOverride = {
@@ -1254,17 +1245,10 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
         description: moduleForm.description.trim(),
         features,
       };
-      if (packForm.name.trim()) {
+      if (nextPack) {
         const currentPacks = currentOverride.featurePacks
           ?? modules.find(module => module.id === editingModule.id)?.featurePacks
           ?? [];
-        const nextPack: ModuleFeaturePack = {
-          id: uid(`pack-${editingModule.id}`),
-          name: packForm.name.trim(),
-          description: packForm.description.trim(),
-          featureIds: packFeatureIds,
-          featurePermissions: Object.fromEntries(packFeatureIds.map(featureId => [featureId, [...packForm.featurePermissions[featureId]!]])),
-        };
         nextOverride.featurePacks = [...currentPacks, nextPack];
       }
       draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: nextOverride };
@@ -1299,7 +1283,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
 
   const resetPackForm = () => {
     setEditingPackId(null);
-    setPackForm({ name: '', description: '', featureIds: [], featurePermissions: {} });
+    setPackForm(emptyModulePackDraft());
   };
 
   const openPackEdit = (pack: ModuleFeaturePack) => {
@@ -1309,21 +1293,13 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   };
 
   const setPackFeaturePermission = (featureId: string, level: string) => {
-    const permissions = permissionsForLevel(level);
-    setPackForm(current => {
-      const featurePermissions = { ...current.featurePermissions };
-      if (permissions.length) featurePermissions[featureId] = permissions;
-      else delete featurePermissions[featureId];
-      return { ...current, featureIds: Object.keys(featurePermissions), featurePermissions };
-    });
+    setPackForm(current => updatePackPermission(current, featureId, level));
   };
 
   const savePack = () => {
     if (!selected || !packForm.name.trim() || packForm.featureIds.length === 0) return;
-    const featureIds = getModuleFeatureOptions(selected).map(feature => feature.id).filter(featureId => packForm.featurePermissions[featureId]?.length);
-    const featurePermissions = Object.fromEntries(featureIds.map(featureId => [featureId, [...packForm.featurePermissions[featureId]!]]));
-    const nextPack: ModuleFeaturePack = { id: editingPackId ?? uid(`pack-${selected.id}`), name: packForm.name.trim(), description: packForm.description.trim(), featureIds, featurePermissions };
-    if (nextPack.featureIds.length === 0) return;
+    const nextPack = buildModulePack(selected, packForm, editingPackId ?? uid(`pack-${selected.id}`));
+    if (!nextPack) return;
     mutate(draft => {
       const current = draft.moduleOverrides?.[selected.id]?.featurePacks ?? modules.find(module => module.id === selected.id)?.featurePacks ?? [];
       draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [selected.id]: { ...(draft.moduleOverrides?.[selected.id] ?? {}), featurePacks: editingPackId ? current.map(pack => pack.id === editingPackId ? nextPack : pack) : [...current, nextPack] } };
@@ -1442,58 +1418,6 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
      </div>
      {deletingModule && <Modal title="Confirmer la suppression" onClose={() => setDeletingModule(null)}><p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">Voulez-vous vraiment supprimer le module <strong className="text-[hsl(var(--foreground))]">{deletingModule.name}</strong> ? Il sera retiré du catalogue et désactivé pour tous les espaces.</p><div className="mt-6 flex justify-end gap-2"><button type="button" data-testid="button-cancel-delete-module" onClick={() => setDeletingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" data-testid="button-confirm-delete-module" onClick={() => removeModule(deletingModule)} className="rounded-lg bg-[hsl(var(--destructive))] px-4 py-2.5 text-xs font-bold text-white">Supprimer le module</button></div></Modal>}
     </div>;
-}
-
-function ModulePackDraftForm({
-  module,
-  packForm,
-  onChange,
-}: {
-  module: (typeof modules)[number];
-  packForm: ModulePackDraft;
-  onChange: (value: ModulePackDraft | ((current: ModulePackDraft) => ModulePackDraft)) => void;
-}) {
-  const featureOptions = getModuleFeatureOptions(module);
-
-  return (
-    <section className="rounded-xl border bg-[hsl(var(--muted)/.18)] p-4">
-      <div>
-        <p className="text-sm font-bold">Pack métier à créer avec le module <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">(optionnel)</span></p>
-        <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Préparez dès maintenant un modèle de rôle réutilisable. Vous pourrez ajouter d’autres packs ensuite depuis le détail du module.</p>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field label="Nom du pack" value={packForm.name} onChange={(value: string) => onChange(current => ({ ...current, name: value }))} placeholder="Ex. Gestionnaire de stock" testId="input-module-initial-pack-name" />
-        <Field label="Description" value={packForm.description} onChange={(value: string) => onChange(current => ({ ...current, description: value }))} placeholder="À quoi sert ce pack ?" testId="input-module-initial-pack-description" />
-      </div>
-      <p className="mt-4 text-xs font-bold">Droits inclus par fonctionnalité</p>
-      <div className="mt-2 grid gap-1 sm:grid-cols-2">
-        {featureOptions.map(feature => (
-          <label key={feature.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-2 text-xs hover:bg-[hsl(var(--muted))]">
-            <span className="font-medium">{feature.label}</span>
-            <select
-              data-testid={`select-module-initial-pack-permission-${feature.id}`}
-              value={permissionLevelFor(packForm.featurePermissions[feature.id])}
-              onChange={event => {
-                const permissions = permissionsForLevel(event.target.value);
-                onChange(current => {
-                  const featurePermissions = { ...current.featurePermissions };
-                  if (permissions.length) featurePermissions[feature.id] = permissions;
-                  else delete featurePermissions[feature.id];
-                  return { ...current, featureIds: Object.keys(featurePermissions), featurePermissions };
-                });
-              }}
-              className="rounded-md border bg-[hsl(var(--card))] px-2 py-1.5 text-[10px] font-semibold"
-            >
-              <option value="none">Non incluse</option>
-              <option value="view">Voir seulement</option>
-              <option value="create">Voir et créer</option>
-              <option value="edit">Voir, créer et modifier</option>
-            </select>
-          </label>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { module: (typeof modules)[number]; pack?: ModuleFeaturePack; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
