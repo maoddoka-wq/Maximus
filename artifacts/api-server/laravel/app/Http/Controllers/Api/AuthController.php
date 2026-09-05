@@ -35,6 +35,13 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if (MaximusPassword::needsRehash($user->password_hash)) {
+            $user->update([
+                'password_hash' => MaximusPassword::hash($data['password']),
+                'updated_at' => now(),
+            ]);
+        }
+
         $token = MaximusAuth::issueSession($user);
 
         return response()

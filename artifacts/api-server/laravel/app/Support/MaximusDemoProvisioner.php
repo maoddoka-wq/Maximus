@@ -39,6 +39,7 @@ final class MaximusDemoProvisioner
                 || ($user->sector_ids ?? []) !== $account['sectorIds']
                 || ($user->permissions ?? []) !== $account['permissions']
                 || $user->status !== 'ACTIF'
+                || MaximusPassword::needsRehash($user->password_hash)
                 || ! MaximusPassword::check($account['password'], $user->password_hash);
 
             if (! $needsRepair) {
