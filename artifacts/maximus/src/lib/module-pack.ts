@@ -31,11 +31,20 @@ export const permissionLevelFor = (permissions?: string[]) => {
   return 'view';
 };
 
-export const permissionsForLevel = (level: string): string[] =>
-  [...(featurePermissionOptions.find(option => option.value === level)?.permissions ?? [])];
+export const permissionsForLevel = (level: string): string[] => [
+  ...(featurePermissionOptions.find((option) => option.value === level)?.permissions ?? []),
+];
 
-export const defaultFeaturePermissions = (featureIds: Iterable<string>, existing?: FeaturePermissionMap): FeaturePermissionMap =>
-  Object.fromEntries([...featureIds].map(featureId => [featureId, existing?.[featureId]?.length ? [...existing[featureId]!] : ['voir']]));
+export const defaultFeaturePermissions = (
+  featureIds: Iterable<string>,
+  existing?: FeaturePermissionMap,
+): FeaturePermissionMap =>
+  Object.fromEntries(
+    [...featureIds].map((featureId) => [
+      featureId,
+      existing?.[featureId]?.length ? [...existing[featureId]!] : ['voir'],
+    ]),
+  );
 
 export const updatePackPermission = (draft: ModulePackDraft, featureId: string, level: string): ModulePackDraft => {
   const permissions = permissionsForLevel(level);
@@ -49,8 +58,8 @@ export const updatePackPermission = (draft: ModulePackDraft, featureId: string, 
 
 export const buildModulePack = (module: Module, draft: ModulePackDraft, id: string): ModuleFeaturePack | null => {
   const featureIds = getModuleFeatureOptions(module)
-    .map(feature => feature.id)
-    .filter(featureId => draft.featurePermissions[featureId]?.length);
+    .map((feature) => feature.id)
+    .filter((featureId) => draft.featurePermissions[featureId]?.length);
 
   if (!draft.name.trim() || featureIds.length === 0) return null;
 
@@ -59,6 +68,8 @@ export const buildModulePack = (module: Module, draft: ModulePackDraft, id: stri
     name: draft.name.trim(),
     description: draft.description.trim(),
     featureIds,
-    featurePermissions: Object.fromEntries(featureIds.map(featureId => [featureId, [...draft.featurePermissions[featureId]!]])),
+    featurePermissions: Object.fromEntries(
+      featureIds.map((featureId) => [featureId, [...draft.featurePermissions[featureId]!]]),
+    ),
   };
 };
