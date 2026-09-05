@@ -114,6 +114,7 @@ export function KoraRouter({
   companyId,
   employee,
   presenceEmployees,
+  presenceFeatureIds,
   hasPermission,
   hasPresencePermission,
   stockPermissions,
@@ -135,6 +136,7 @@ export function KoraRouter({
   companyId: string;
   employee: StoreData['employees'][number] | null;
   presenceEmployees: Employee[];
+  presenceFeatureIds?: string[];
   hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean;
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
@@ -211,7 +213,7 @@ export function KoraRouter({
     return <screens.humanResources data={data} mutate={mutate} companyAdmin={companyAdmin} employee={employee} companyId={companyId} />;
   }
   if (routePath === '/kora/presences') {
-    return <screens.presence companyId={companyId} employees={presenceEmployees} nodes={data.orgNodes.filter(node => node.companyId === companyId)} currentEmployee={employee} canView={hasPresencePermission('view')} canCreate={hasPresencePermission('create')} canEdit={hasPresencePermission('edit')} canCorrect={hasPresencePermission('correct')} canValidate={hasPresencePermission('validate')} canManage={hasPresencePermission('manage')} canExport={hasPresencePermission('export')} canDelete={hasPresencePermission('delete')} singleModuleNavigation={singleModuleNavigation} />;
+    return <screens.presence companyId={companyId} employees={presenceEmployees} nodes={data.orgNodes.filter(node => node.companyId === companyId)} currentEmployee={employee} canView={hasPresencePermission('view')} canCreate={hasPresencePermission('create')} canEdit={hasPresencePermission('edit')} canCorrect={hasPresencePermission('correct')} canValidate={hasPresencePermission('validate')} canManage={hasPresencePermission('manage')} canExport={hasPresencePermission('export')} canDelete={hasPresencePermission('delete')} visibleFeatureIds={presenceFeatureIds} singleModuleNavigation={singleModuleNavigation} />;
   }
   if (routePath === '/kora/rapports') {
     return <screens.reports data={data} />;

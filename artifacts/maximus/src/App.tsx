@@ -84,6 +84,7 @@ import {
   getCommerceTabIds,
   getEmployeeAncestry,
   getFeatureIdsWithDependencies,
+  getSelectedFeatureIds,
   getStockPermissions,
   restrictRoleToCompany,
   roleHasPermission,
@@ -546,6 +547,10 @@ function AppContent() {
     if (!roleFitsEmployee || !employeeRole) return false;
     return employeeHasPresencePermission(employeeRole, employeeNode, permission, hasPermission);
   };
+  const presenceModule = configuredModules.find((module) => module.id === 'presences');
+  const selectedPresenceFeatureIds = employeeRole && presenceModule
+    ? [...getSelectedFeatureIds(employeeRole, presenceModule)]
+    : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
   const presenceEmployees = data.employees
     .filter((item) => item.companyId === companyId)
@@ -620,9 +625,9 @@ function AppContent() {
             const presenceFeatures = Object.fromEntries(
               presenceFeatureDefinitions.map((feature) => [feature.label, { tab: feature.tab, icon: CalendarDays }]),
             );
-            const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
+            const selectedFeatureIds = getSelectedFeatureIds(employeeRole, module);
             items = module.features
-              .filter((feature) => effectiveFeatureIds.has(featureSlug(feature)) || hasPresencePermission('view'))
+              .filter((feature) => selectedFeatureIds.has(featureSlug(feature)))
               .map((feature) => {
                 const mapped = presenceFeatures[feature];
                 return {
@@ -792,6 +797,7 @@ function AppContent() {
                   presenceEmployees={presenceEmployees}
                   hasPermission={hasPermission}
                   hasPresencePermission={hasPresencePermission}
+                   presenceFeatureIds={selectedPresenceFeatureIds}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
@@ -4728,7 +4734,7 @@ function RHPage({ data }: { data: StoreData }) {
     </div>
   );
 }
-function PresencesPage({ data }: { data: StoreData }) {
+function PresencesPage({ data, visibleFeatureIds }: { data: StoreData; visibleFeatureIds?: string[] }) {
   const employees = data.employees.filter((employee) => employee.companyId === 'kora');
   return (
     <PresenceModulePage
@@ -4744,6 +4750,7 @@ function PresencesPage({ data }: { data: StoreData }) {
       canManage
       canExport
       canDelete
+      visibleFeatureIds={visibleFeatureIds}
     />
   );
 }
@@ -5526,7 +5533,9 @@ function ModulePackTestWorkbench({
   const koraCompany = data.companies.find((company) => company.id === 'kora');
   const featureOptions = getModuleFeatureOptions(module);
   const fullFeatureIds = featureOptions.map((feature) => feature.id);
-  const testFeatureIds = pack ? [...getEffectiveModuleFeatureIds(module, pack.featureIds)] : fullFeatureIds;
+  const testFeatureIds = pack
+    ? fullFeatureIds.filter((featureId) => pack.featureIds.includes(featureId))
+    : fullFeatureIds;
   const configuredPermissions = pack
     ? defaultFeaturePermissions(testFeatureIds, pack.featurePermissions)
     : defaultFeaturePermissions(
@@ -5611,7 +5620,7 @@ function ModulePackTestWorkbench({
           {module.id === 'rh' && koraCompany && (
             <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />
           )}
-          {module.id === 'presences' && <PresencesPage data={data} />}
+          {module.id === 'presences' && <PresencesPage data={data} visibleFeatureIds={testFeatureIds} />}
           {operationalModules.includes(module.id) && (
             <OperationalModulePage
               moduleId={module.id}

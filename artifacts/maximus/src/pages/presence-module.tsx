@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
 import { createPresenceApi, type PresenceItem } from '@/lib/presence-api';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
+import { featureSlug } from '@/lib/permission-keys';
 import { useQueryTab } from '@/lib/query-tab';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
@@ -59,13 +60,17 @@ function Panel({ title, children, action }: { title: string; children: React.Rea
 }
 function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { text?: string }) { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }
 
-export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, singleModuleNavigation = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; singleModuleNavigation?: boolean }) {
+export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, visibleFeatureIds, singleModuleNavigation = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; singleModuleNavigation?: boolean }) {
   const { confirm } = useAppDialog();
   const api = useMemo(() => createPresenceApi(companyId), [companyId]);
   const [items, setItems] = useState<PresenceItem[]>([]);
+  const visibleFeatures = visibleFeatureIds
+    ? presenceFeatureDefinitions.filter(feature => visibleFeatureIds.includes(featureSlug(feature.label)))
+    : presenceFeatureDefinitions;
+  const tabs: [Tab, string, LucideIcon][] = visibleFeatures.map(feature => [feature.tab, feature.label, presenceTabIcons[feature.tab] ?? CalendarDays]);
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(([id]) => id),
-    defaultTab: 'dashboard',
+    defaultTab: tabs[0]?.[0] ?? 'dashboard',
     aliases: { pointage: 'clock', historique: 'history', rapports: 'reports' },
   });
   const [date, setDate] = useState(today());
@@ -113,6 +118,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const kpis = { active: employees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
   const render = () => {
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
+    if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
     if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(employees.map(employee => meta(employee).unit))]} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
     if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} employees={employees} date={date} setDate={setDate} settings={settings} onClock={clock} />;
     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} onExport={() => exportRows(rows, `presences-${date}.csv`)} onSelect={setSelected} />;
@@ -125,7 +131,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   };
   return <div className="space-y-5">
      <div className="card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
-       {!singleModuleNavigation && <nav aria-label="Menu Gestion des Présences" className="module-tabs mt-7 flex gap-1.5 overflow-x-auto border-t pt-5">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-3.5 text-sm font-bold ${tab === id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={16} />{label}</button>)}</nav>}</div>
+        {!singleModuleNavigation && <nav aria-label="Menu Gestion des Présences" className="module-tabs mt-7 flex gap-1.5 overflow-x-auto border-t pt-5">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-3.5 text-sm font-bold ${tab === id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={16} />{label}</button>)}</nav>}</div>
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">{error}<button onClick={() => setError('')}><X size={16} /></button></div>}
     {loading ? <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-48 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-48 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div> : render()}
     {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrect} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}

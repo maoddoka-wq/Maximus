@@ -223,14 +223,31 @@ export function getFeatureIdsWithDependencies(
   role: Role | null | undefined,
   module: Module,
 ) {
-  if (!role) return new Set<string>();
-  const enabledFeatureIds = module.features
-    .map(featureSlug)
-    .filter(featureId => (role.modulePermissions[permissionFeatureKey(module.id, featureId)] ?? []).length > 0);
+  const enabledFeatureIds = getSelectedFeatureIds(role, module);
   const effectiveFeatureIds = new Set(enabledFeatureIds);
   enabledFeatureIds.forEach(featureId => {
     resolveFeatureDependencies(module.featureDependencies ?? {}, featureId)
       .forEach(dependencyId => effectiveFeatureIds.add(dependencyId));
   });
   return effectiveFeatureIds;
+}
+
+export function getSelectedFeatureIds(
+  role: Role | null | undefined,
+  module: Module,
+) {
+  if (!role) return new Set<string>();
+
+  const featureIds = module.features.map(featureSlug);
+  const permissionKeyFor = (featureId: string) =>
+    module.id === 'presences' ? `presence.${featureId}` : permissionFeatureKey(module.id, featureId);
+  const hasDetailedPermissions = featureIds.some(featureId => permissionKeyFor(featureId) in role.modulePermissions);
+
+  if (!hasDetailedPermissions && role.modulePermissions[module.id]?.includes('voir')) {
+    return new Set(featureIds);
+  }
+
+  return new Set(
+    featureIds.filter(featureId => (role.modulePermissions[permissionKeyFor(featureId)] ?? []).includes('voir')),
+  );
 }

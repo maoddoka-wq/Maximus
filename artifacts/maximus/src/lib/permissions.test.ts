@@ -6,6 +6,7 @@ import {
   getCommerceTabIds,
   getEmployeeAncestry,
   getStockPermissions,
+  getSelectedFeatureIds,
   restrictRoleToCompany,
   roleHasPermission,
 } from './employee-permissions';
@@ -186,6 +187,25 @@ test('respecte les sous-permissions explicites Présences', () => {
     employeeHasPresencePermission(presenceRole, presenceNode, 'create', canPermission),
     false,
   );
+});
+
+test('n’affiche que les fonctionnalités explicitement incluses dans un pack Présences', () => {
+  const presenceModule = modules.find(module => module.id === 'presences');
+  assert.ok(presenceModule);
+  const selected = getSelectedFeatureIds(
+    role({
+      presences: ['voir'],
+      'presence.tableau-de-bord': ['voir'],
+      'presence.présences': ['voir'],
+      'presence.absences': ['voir'],
+      'presence.historique': ['voir'],
+    }),
+    presenceModule,
+  );
+
+  assert.deepEqual([...selected], ['tableau-de-bord', 'présences', 'absences', 'historique']);
+  assert.equal(selected.has('pointage'), false);
+  assert.equal(selected.has('rapports'), false);
 });
 
 test('résout les prérequis d’une fonctionnalité en cascade', () => {
