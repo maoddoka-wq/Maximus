@@ -706,7 +706,7 @@ function AppContent() {
   const selectedPresenceFeatureIds = accessRole && presenceModule
     ? [...getSelectedFeatureIds(accessRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
     : undefined;
-  const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
+  const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
   const presenceEmployees = data.employees
     .filter((item) => item.companyId === companyId)
     .filter((item) => {
