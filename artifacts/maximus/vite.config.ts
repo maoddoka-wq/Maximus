@@ -70,6 +70,21 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // Radix publishes a sourcemap that references TypeScript sources not
+        // included in the installed package. Keep local sourcemap warnings visible.
+        if (warning.code === 'SOURCEMAP_ERROR' && warning.message.includes('tooltip.tsx')) return;
+        warn(warning);
+      },
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'wouter', '@tanstack/react-query'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-radix': ['@radix-ui/react-tooltip'],
+        },
+      },
+    },
   },
   server: {
     port,
