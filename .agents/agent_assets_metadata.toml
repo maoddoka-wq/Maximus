@@ -28,3 +28,17 @@ mtime_ms = 1788557483073
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/b26cf31a-3ec8-403f-9743-fddadf7c2f2b/a53b12e4-6a8f-427f-ab74-6bb0940a6999"
 storage_version_token = "1788557609680457"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "yzi61tbr8cEHw1UFU7ckx"
+uri = "file://artifacts/maximus/public/admin-logo.png"
+type = "image"
+title = "Logo administration MAXIMUS"
+description = "Logo carré bleu nuit et or, intégré au profil de l’administration MAXIMUS."
+logical_id = "29f81bfe-c80d-4e90-acd6-8d97b94c39cb"
+content_hash = "sha256:1decb47bbd602cc5c15d0dc1d075764faf79772e32d763647b90050846806fe0"
+size = 962784
+mtime_ms = 1788572619559
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/29f81bfe-c80d-4e90-acd6-8d97b94c39cb/fadd4dae-563a-47b0-8af2-1bdc2f16295d"
+storage_version_token = "1788572723052065"
+content_type = "image/png"
