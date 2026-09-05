@@ -144,8 +144,6 @@ function RoleCard({
   const moduleLabels = new Map(moduleDefinitions.map(module => [module.id, module.name]));
   const moduleEntries = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key));
   const detailEntries = permissionEntries.filter(([key]) => !moduleDefinitions.some(module => module.id === key));
-  const visibleDetailEntries = detailsOpen ? detailEntries : detailEntries.slice(0, 3);
-  const hiddenDetailCount = Math.max(0, detailEntries.length - visibleDetailEntries.length);
 
   return (
     <article className="overflow-hidden rounded-xl border bg-[hsl(var(--card))] transition hover:border-[hsl(var(--primary)/.45)] hover:shadow-sm">
@@ -206,7 +204,7 @@ function RoleCard({
             </button>
           )}
         </div>
-        {permissionEntries.length > 0 && (
+        {permissionEntries.length > 0 && detailsOpen && (
           <div id={`role-permissions-${role.id}`} className="mt-3 space-y-2">
             {moduleEntries.map(([key, permissions]) => (
               <div key={key} className="flex flex-wrap items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.2)] px-3 py-2">
@@ -216,7 +214,7 @@ function RoleCard({
                 </span>
               </div>
             ))}
-            {visibleDetailEntries.map(([key, permissions]) => (
+            {detailEntries.map(([key, permissions]) => (
               <div key={key} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
                 <span className="text-xs font-semibold">{permissionLabel(key, moduleDefinitions)}</span>
                 <span className="flex flex-wrap gap-1.5">
@@ -224,11 +222,6 @@ function RoleCard({
                 </span>
               </div>
             ))}
-            {!detailsOpen && hiddenDetailCount > 0 && (
-              <button type="button" onClick={() => setDetailsOpen(true)} className="w-full rounded-lg border border-dashed px-3 py-2 text-left text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.05)]">
-                + {hiddenDetailCount} autre{hiddenDetailCount > 1 ? 's' : ''} sous-autorisation{hiddenDetailCount > 1 ? 's' : ''}
-              </button>
-            )}
           </div>
         )}
       </div>
