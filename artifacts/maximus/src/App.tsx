@@ -468,7 +468,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
         <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1>
         <p className="mt-3 text-[hsl(var(--muted-foreground))]">Renseignez votre entreprise et choisissez les outils dont vous avez besoin. L’organisation pourra être construite après l’activation de votre espace.</p>
       </div>
-      <div className="mb-10 flex items-center gap-3"><Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} /><div className="h-px flex-1 bg-[hsl(var(--border))]" /><Step n={2} label="Vos outils" active={step === 2} done={false} /></div>
+      <div className="mb-10 flex items-center gap-3"><Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} /><div className="h-px flex-1 bg-[hsl(var(--border))]" /><Step n={2} label="Fonctionnalités" active={step === 2} done={false} /></div>
       {step === 1 ? <form onSubmit={event => { event.preventDefault(); setStep(2); }} className="card-surface rounded-2xl p-6 sm:p-8">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Nom de l’entreprise" placeholder="Ex. Teranga Agro" value={name} onChange={setName} testId="input-company-name" />
@@ -489,8 +489,8 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
         <button type="submit" disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm} data-testid="button-next-signup" className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40">Continuer <ChevronRight size={16} /></button>
       </form> : <div className="card-surface rounded-2xl p-6 sm:p-8">
         <section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
-          <h2 className="font-bold">Choisissez les outils dont votre entreprise a besoin</h2>
-          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sector ? `La sélection proposée correspond au secteur ${sector}. ` : 'Une sélection de départ vous est proposée. '}Sélectionnez les fonctionnalités à utiliser au démarrage. Vous pourrez modifier vos choix plus tard.</p>
+          <h2 className="font-bold">Choisissez les fonctionnalités dont votre entreprise a besoin</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sector ? `La sélection proposée correspond au secteur ${sector}. ` : 'Une sélection de départ vous est proposée. '}Sélectionnez les fonctionnalités à activer au démarrage. Vous pourrez modifier vos choix plus tard.</p>
         </section>
         {moduleError && <p data-testid="signup-module-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{moduleError}</p>}
         <div className="grid gap-3 sm:grid-cols-2">{modules.map(mod => <button type="button" data-testid={`button-module-${mod.id}`} key={mod.id} onClick={() => toggle(mod.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(mod.id) && <Check size={13} />}</span><span><strong className="block text-sm">{mod.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{mod.description}</span></span></button>)}</div>
