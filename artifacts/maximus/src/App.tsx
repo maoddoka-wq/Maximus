@@ -1043,9 +1043,9 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     <section className="card-surface rounded-2xl p-5 sm:p-6">
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
         <div>
-          <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Catalogue d’applications</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Vos applications métier</h2>
-          <p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Chaque module est une application indépendante. Activez uniquement celles dont vos espaces ont besoin.</p>
+          <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Catalogue des modules</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Vos modules métier</h2>
+          <p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Chaque module est une capacité métier partagée. Activez uniquement celles dont vos entreprises ont besoin.</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <div className="rounded-xl bg-[hsl(var(--muted)/.65)] px-4 py-3"><p className="mono text-[10px] uppercase text-[hsl(var(--muted-foreground))]">Actives</p><p className="mt-1 text-xl font-bold">{activeCount}<span className="ml-1 text-xs font-normal text-[hsl(var(--muted-foreground))]">/ {modules.length}</span></p></div>
