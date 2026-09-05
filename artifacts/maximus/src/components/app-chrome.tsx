@@ -67,6 +67,8 @@ export function Sidebar({
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
           (item.module === null || allowed.includes(item.module as ModuleId)),
       );
+  const companyCoreItems = nav.filter(item => item.module === null);
+  const companyModuleItems = nav.filter(item => item.module !== null);
   const verticalModuleMenu = Boolean(
     employee && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
   );
@@ -212,11 +214,17 @@ export function Sidebar({
                 .length > 0 && (
                 <>
                   {!compact && (
-                    <p className="sidebar-section-label">Administration</p>
+                    <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                        Administration
+                      </span>
+                    </div>
                   )}
-                  {singleModuleItems
-                    .filter(item => item.label !== 'Vue d’ensemble')
-                    .map(item => link(item))}
+                  <div className="space-y-1">
+                    {singleModuleItems
+                      .filter(item => item.label !== 'Vue d’ensemble')
+                      .map(item => link(item))}
+                  </div>
                 </>
               )}
               {sidebarFeatureGroups?.map((group, groupIndex) => (
@@ -239,8 +247,34 @@ export function Sidebar({
                 </section>
               ))}
             </>
+          ) : isAdmin ? (
+            <>
+              <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                  Administration
+                </span>
+              </div>
+              <div className="space-y-1">{standardNav}</div>
+            </>
           ) : (
-            standardNav
+            <>
+              <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                  Organisation
+                </span>
+              </div>
+              <div className="space-y-1">{companyCoreItems.map(item => link(item))}</div>
+              {companyModuleItems.length > 0 && (
+                <section className="mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3">
+                  <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                      Modules
+                    </span>
+                  </div>
+                  <div className="space-y-1">{companyModuleItems.map(item => link(item))}</div>
+                </section>
+              )}
+            </>
           )}
         </nav>
         <div
