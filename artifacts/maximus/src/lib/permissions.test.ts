@@ -230,11 +230,9 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
 
 test('conserve les packs métiers configurés dans un secteur', () => {
   const distribution = sectorPresets.find(preset => preset.id === 'distribution');
-  const stockPack = distribution?.businessProfiles?.find(profile => profile.id === 'distribution-stock');
-  assert.ok(stockPack);
-  assert.equal(stockPack.name, 'Gestion de stock');
-  assert.deepEqual(stockPack.modulePackIds?.stocks, ['stock-gestion']);
-  assert.deepEqual(stockPack.moduleFeatures.stocks, ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports']);
+  assert.ok(distribution);
+  assert.deepEqual(distribution.modulePackIds?.stocks, ['stock-gestion']);
+  assert.deepEqual(distribution.modulePackIds?.commerce, ['commerce-gestion']);
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {

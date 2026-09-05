@@ -24,7 +24,7 @@ export type ModuleAvailability = 'ACTIF' | 'BETA' | 'MAINTENANCE' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
 export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
-export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
+export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
 export const demoEmployeeIds = new Set(['demo-emp-awa', 'demo-emp-ibrahima', 'demo-emp-ndeye', 'demo-emp-mamadou']);
@@ -162,22 +162,7 @@ export const sectorPresets: SectorPreset[] = [
     id: 'distribution',
     name: 'Distribution',
     moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'],
-    businessProfiles: [
-      {
-        id: 'distribution-stock',
-        name: 'Gestion de stock',
-        description: 'Un bloc opérationnel pour consulter les articles et gérer les mouvements de stock.',
-        modulePackIds: { stocks: ['stock-gestion'] },
-        moduleFeatures: { stocks: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
-      },
-      {
-        id: 'distribution-vente',
-        name: 'Vente et encaissement',
-        description: 'Un bloc pour suivre les clients, les ventes et les opérations de caisse.',
-        modulePackIds: { commerce: ['commerce-gestion'] },
-        moduleFeatures: { commerce: ['clients', 'sales'], ventes: ['devis', 'commandes', 'facturation'] },
-      },
-    ],
+    modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] },
   },
   { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique', 'commerce'] },
   { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'finance', 'rh', 'presences', 'documents', 'rapports'] },
@@ -393,10 +378,14 @@ export function loadData(): StoreData {
       })),
       catalogVersion: 2,
        organizationVersion: 8,
-       sectorPresets: (parsed.sectorPresets ?? initial.sectorPresets).map(preset => ({
-         ...preset,
-         businessProfiles: preset.businessProfiles ?? initial.sectorPresets.find(initialPreset => initialPreset.id === preset.id)?.businessProfiles,
-       })),
+       sectorPresets: (parsed.sectorPresets ?? initial.sectorPresets).map(preset => {
+         const legacyProfiles = preset.businessProfiles ?? [];
+         const legacyPackIds = Object.fromEntries(legacyProfiles.flatMap(profile => Object.entries(profile.modulePackIds ?? {}))) as Partial<Record<ModuleId, string[]>>;
+         return {
+           ...preset,
+           modulePackIds: preset.modulePackIds ?? (Object.keys(legacyPackIds).length ? legacyPackIds : initial.sectorPresets.find(initialPreset => initialPreset.id === preset.id)?.modulePackIds),
+         };
+       }),
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       moduleOverrides: parsed.moduleOverrides ?? {},
