@@ -15,11 +15,11 @@ For modules with several screens, keep one canonical feature definition shared b
 
 **How to apply:** Add every user-facing capability to the module feature manifest first, derive the module catalog and navigation from it, and add a regression test that compares the manifest with the selectable feature options.
 
-Each module owns its named business packs; sector presets select those existing module packs directly. The signup flow applies the selected packs as a starting point while keeping the company’s ability to adjust features before submitting its request.
+Each module owns its named business packs; sector presets select those existing module packs directly. A selected pack is a starting role template, not a permanent lock: the company can add or remove features and create independent roles.
 
-**Why:** Pack names and permissions are defined once in the module catalog; adding a sector-level profile name duplicates that vocabulary and creates an unnecessary intermediate concept.
+**Why:** Pack names and permissions are defined once in the module catalog, while real companies need to adapt a template to their organization without duplicating the catalog or being forced into one role.
 
-**How to apply:** Keep the hierarchy explicit as module → module pack → features, then sector → selected module packs; show packs only after their module is selected, persist the selected composition with the signup request, and let the administrator review it before activation.
+**How to apply:** Keep the hierarchy explicit as module → module pack → editable feature selection → company roles; show packs only after their module is selected, persist the selected composition with the signup request or unit, and let administrators review the resulting permissions.
 
 Legacy packs without an explicit feature permission map are interpreted as view-only when they are edited, tested, or copied into an onboarding request.
 

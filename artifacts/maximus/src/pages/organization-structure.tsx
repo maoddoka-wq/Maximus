@@ -10,6 +10,7 @@ import {
   type OrgNode,
   type StoreData,
 } from '@/lib/store';
+import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -187,6 +188,7 @@ function StructureFormModal({
     parentId: initialData?.parentId || '',
     moduleIds: initialData?.moduleIds ? [...initialData.moduleIds] : [],
     modulePackIds: Object.fromEntries(Object.entries(initialData?.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]])) as Partial<Record<ModuleId, string[]>>,
+    moduleFeatures: Object.fromEntries(Object.entries(initialData?.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]])) as Partial<Record<ModuleId, string[]>>,
   });
   const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
 
@@ -256,8 +258,12 @@ function StructureFormModal({
                  <input data-testid={`checkbox-org-module-${module.id}`} type="checkbox" checked={enabled} onChange={() => setFormData(current => {
                    const nextModules = enabled ? current.moduleIds.filter(id => id !== module.id) : [...current.moduleIds, module.id];
                    const nextPackIds = { ...current.modulePackIds };
-                   if (enabled) delete nextPackIds[module.id];
-                   return { ...current, moduleIds: nextModules, modulePackIds: nextPackIds };
+                    const nextFeatures = { ...current.moduleFeatures };
+                    if (enabled) {
+                      delete nextPackIds[module.id];
+                      delete nextFeatures[module.id];
+                    }
+                    return { ...current, moduleIds: nextModules, modulePackIds: nextPackIds, moduleFeatures: nextFeatures };
                  })} className="mt-0.5 accent-[hsl(var(--primary))]" />
                  <span><strong className="block text-xs">{module.name}</strong><small className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{enabled ? 'Sélectionnez les packs de ce module.' : module.description}</small></span>
                </label>
@@ -266,10 +272,20 @@ function StructureFormModal({
                  return <label key={pack.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--card))]"><input data-testid={`checkbox-org-pack-${module.id}-${pack.id}`} type="checkbox" checked={selected} onChange={() => setFormData(current => {
                    const currentIds = current.modulePackIds[module.id] ?? [];
                    const nextIds = currentIds.includes(pack.id) ? currentIds.filter(id => id !== pack.id) : [...currentIds, pack.id];
-                   return { ...current, modulePackIds: { ...current.modulePackIds, [module.id]: nextIds } };
+                    const selectedPacks = packs.filter(candidate => nextIds.includes(candidate.id));
+                    const featureIds = selectedPacks.flatMap(candidate => candidate.featureIds);
+                    return { ...current, modulePackIds: { ...current.modulePackIds, [module.id]: nextIds }, moduleFeatures: { ...current.moduleFeatures, [module.id]: [...getEffectiveModuleFeatureIds(module, featureIds)] } };
                  })} className="mt-0.5 accent-[hsl(var(--primary))]" /><span><strong className="block">{pack.name}</strong><span className="text-[9px] text-[hsl(var(--muted-foreground))]">{pack.featureIds.length} fonctionnalité(s)</span></span></label>;
                })}</div>}
                {enabled && packs.length === 0 && <p className="mt-3 border-t pt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Aucun pack configuré dans ce module.</p>}
+                {enabled && (packs.length === 0 || (formData.modulePackIds[module.id]?.length ?? 0) > 0) && <div className="mt-3 border-t pt-2"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités de l’unité</p><div className="grid gap-1 sm:grid-cols-2">{getModuleFeatureOptions(module).map(feature => {
+                  const selected = (formData.moduleFeatures[module.id] ?? []).includes(feature.id);
+                  return <label key={feature.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--card))]"><input data-testid={`checkbox-org-feature-${module.id}-${feature.id}`} type="checkbox" checked={selected} onChange={() => setFormData(current => {
+                    const currentIds = new Set(current.moduleFeatures[module.id] ?? getModuleFeatureOptions(module).map(item => item.id));
+                    if (currentIds.has(feature.id)) currentIds.delete(feature.id); else currentIds.add(feature.id);
+                    return { ...current, moduleFeatures: { ...current.moduleFeatures, [module.id]: [...getEffectiveModuleFeatureIds(module, [...currentIds])] } };
+                  })} className="mt-0.5 accent-[hsl(var(--primary))]" /><span>{feature.label}</span></label>;
+                })}</div><p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Le pack propose un rôle de départ ; vous pouvez ajouter ou retirer des fonctionnalités.</p></div>}
              </div>;
           })}
         </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.</p>}
