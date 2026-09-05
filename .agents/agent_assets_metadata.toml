@@ -42,3 +42,31 @@ mtime_ms = 1788572619559
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/29f81bfe-c80d-4e90-acd6-8d97b94c39cb/fadd4dae-563a-47b0-8af2-1bdc2f16295d"
 storage_version_token = "1788572723052065"
 content_type = "image/png"
+
+[[outputs]]
+id = "acHfy3Mz8SrKV1wToKUOp"
+uri = "file://artifacts/api-server/MAXIMUS_Dossier_Technique.docx"
+type = "word_document"
+title = "MAXIMUS — Dossier technique Word"
+description = "Dossier technique complet de MAXIMUS au format Microsoft Word : architecture, modules, fonctionnalités, API, données, sécurité, permissions, tests et méthode de développement."
+logical_id = "281dd86a-b57f-41d1-8e30-ce0da7089d2d"
+content_hash = "sha256:51190ef005f742f609d89df4693572403e5dfd633cb30ae2a2cb0892e43d7e8e"
+size = 49260
+mtime_ms = 1788606180416
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/281dd86a-b57f-41d1-8e30-ce0da7089d2d/d30dee42-04cb-4bb1-843d-e88cd41efc28"
+storage_version_token = "1788606200520659"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "wxIfy6BC0iq3-Nvn2DDb5"
+uri = "file://artifacts/api-server/MAXIMUS_Dossier_Technique.pdf"
+type = "pdf"
+title = "MAXIMUS — Dossier technique PDF"
+description = "Version PDF de 13 pages du dossier technique MAXIMUS, prête à être consultée ou partagée."
+logical_id = "aaa2ddab-761e-4117-8200-43f08019af91"
+content_hash = "sha256:dd95b79fd76e448a696deeaba3159198be7566e29466b003c23c5c6a1faa6cc6"
+size = 76372
+mtime_ms = 1788606180502
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/aaa2ddab-761e-4117-8200-43f08019af91/876dab92-8bc1-40b3-91a3-dccc18972e35"
+storage_version_token = "1788606201124198"
+content_type = "application/pdf"
