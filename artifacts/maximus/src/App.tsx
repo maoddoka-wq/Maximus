@@ -91,6 +91,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
 const routesWithModuleHeaders = new Set([
   '/maximus/controle',
   '/kora/controle',
+  '/kora/dashboard',
   '/kora/stocks',
   '/kora/commerce',
   '/kora/ventes',

@@ -214,7 +214,7 @@ export default function CommerceModulePage({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Application commerciale</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Gestion commerciale</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Votre activité commerciale, en clair.</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Ventes, stock, trésorerie et pilotage réunis dans un seul espace opérationnel.</p>
         </div>
         <div className="grid grid-cols-3 gap-2 rounded-xl bg-[hsl(var(--muted)/.55)] p-1.5 text-center">
