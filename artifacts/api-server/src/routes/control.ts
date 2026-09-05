@@ -12,40 +12,20 @@ import {
   canReadControlScope,
   canUpdateControlTask,
   isValidControlActor,
-  type ControlActorContext,
 } from "./control-authorization";
 import { buildTaskCreatedTrace, buildTaskStatusTrace } from "./control-trace";
+import { requireAuth } from "./auth";
 
 const router: IRouter = Router();
 const taskStatuses = ["À FAIRE", "EN COURS", "VALIDÉ", "REFUSÉ", "TERMINÉ"] as const;
 const taskPriorities = ["BASSE", "NORMALE", "HAUTE", "CRITIQUE"] as const;
 const idOf = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
-const controlActorRole = z.enum(["maximus_admin", "company_admin", "sector_manager", "employee"]);
-const actorContextSchema = z.object({
-  role: controlActorRole,
-  displayName: z.string().trim().min(1).max(180),
-  companyId: z.string().min(1).optional(),
-  employeeId: z.string().min(1).optional(),
-  sectorIds: z.array(z.string().min(1)).default([]),
-});
 const controlQuery = z.object({
   companyId: z.string().min(1).optional(),
   scope: z.enum(["admin", "all", "assigned", "sector"]).default("all"),
-  actorRole: controlActorRole,
-  actorName: z.string().trim().min(1).max(180),
-  actorCompanyId: z.string().min(1).optional(),
-  actorEmployeeId: z.string().min(1).optional(),
-  actorSectorIds: z.string().optional(),
 }).refine(value => value.scope === "admin" || Boolean(value.companyId), {
   message: "companyId requis pour ce périmètre",
   path: ["companyId"],
-});
-const actorFromQuery = (query: z.infer<typeof controlQuery>): ControlActorContext => ({
-  role: query.actorRole,
-  displayName: query.actorName,
-  companyId: query.actorCompanyId,
-  employeeId: query.actorEmployeeId,
-  sectorIds: query.actorSectorIds?.split(",").map(value => value.trim()).filter(Boolean) ?? [],
 });
 const taskInput = z.object({
   id: z.string().min(1).optional(),
@@ -61,18 +41,19 @@ const taskInput = z.object({
   requiresApproval: z.boolean().default(false),
   dueDate: z.string().trim().max(80).nullable().optional(),
   relatedObject: z.string().trim().max(180).nullable().optional(),
-  actorContext: actorContextSchema,
 });
 const statusInput = z.object({
   companyId: z.string().min(1),
   status: z.enum(taskStatuses),
-  actorContext: actorContextSchema,
 });
+
+router.use("/control", requireAuth);
 
 router.get("/control/bootstrap", async (req, res): Promise<void> => {
   const parsed = controlQuery.safeParse(req.query);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const actor = actorFromQuery(parsed.data);
+  const actor = req.authActor;
+  if (!actor) { res.status(401).json({ error: "Session MAXIMUS absente ou expirée." }); return; }
   if (!isValidControlActor(actor) || !canReadControlScope(actor, parsed.data.companyId)) { res.status(403).json({ error: "Périmètre de contrôle non autorisé." }); return; }
   const taskFilters = parsed.data.companyId ? [eq(controlTasksTable.companyId, parsed.data.companyId)] : [];
   if (actor.role === "employee" && actor.employeeId) taskFilters.push(eq(controlTasksTable.assigneeEmployeeId, actor.employeeId));
@@ -94,21 +75,23 @@ router.get("/control/bootstrap", async (req, res): Promise<void> => {
 router.post("/control/tasks", async (req, res): Promise<void> => {
   const parsed = taskInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const { id: requestedId, actorContext, ...input } = parsed.data;
-  if (!canCreateControlTask(actorContext, input)) { res.status(403).json({ error: "Création hors périmètre autorisé." }); return; }
+  const actor = req.authActor;
+  if (!actor) { res.status(401).json({ error: "Session MAXIMUS absente ou expirée." }); return; }
+  const { id: requestedId, ...input } = parsed.data;
+  if (!canCreateControlTask(actor, input)) { res.status(403).json({ error: "Création hors périmètre autorisé." }); return; }
   const taskId = requestedId ?? idOf("task");
   const now = new Date();
   const task = {
     id: taskId,
     ...input,
-    createdBy: actorContext.displayName,
+    createdBy: actor.displayName,
     status: "À FAIRE" as const,
     createdAt: now,
     updatedAt: now,
   };
   await db.transaction(async tx => {
     await tx.insert(controlTasksTable).values(task);
-    const trace = buildTaskCreatedTrace(input, taskId, actorContext, now);
+    const trace = buildTaskCreatedTrace(input, taskId, actor, now);
     await tx.insert(controlEventsTable).values(trace.event);
     await tx.insert(controlAuditEntriesTable).values(trace.audit);
   });
@@ -118,12 +101,14 @@ router.post("/control/tasks", async (req, res): Promise<void> => {
 router.patch("/control/tasks/:id/status", async (req, res): Promise<void> => {
   const parsed = statusInput.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
-  const { actorContext, companyId, status } = parsed.data;
+  const actor = req.authActor;
+  if (!actor) { res.status(401).json({ error: "Session MAXIMUS absente ou expirée." }); return; }
+  const { companyId, status } = parsed.data;
   const [before] = await db.select().from(controlTasksTable).where(eq(controlTasksTable.id, req.params.id)).limit(1);
   if (!before) { res.status(404).json({ error: "Tâche introuvable" }); return; }
-  if (before.companyId !== companyId || !canUpdateControlTask(actorContext, before)) { res.status(403).json({ error: "Modification hors périmètre autorisé." }); return; }
+  if (before.companyId !== companyId || !canUpdateControlTask(actor, before)) { res.status(403).json({ error: "Modification hors périmètre autorisé." }); return; }
   const now = new Date();
-  const trace = buildTaskStatusTrace(before, status, actorContext, now);
+  const trace = buildTaskStatusTrace(before, status, actor, now);
   const [task] = await db.transaction(async tx => {
     const updated = await tx.update(controlTasksTable)
       .set({ status, updatedAt: now })

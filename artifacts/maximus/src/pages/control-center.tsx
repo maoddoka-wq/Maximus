@@ -21,7 +21,7 @@ import {
   type ModuleId,
   type StoreData,
 } from '@/lib/store';
-import { controlApi, type ControlActorContext, type ControlBootstrap } from '@/lib/control-api';
+import { controlApi, type ControlBootstrap } from '@/lib/control-api';
 import { ControlCreateTaskDialog, type CreateTaskForm } from '@/components/control-create-task-dialog';
 import { ControlTaskList } from '@/components/control-task-list';
 
@@ -100,23 +100,15 @@ export function ControlCenterPage({
   const actorSectorIds = useMemo(() => sectorManager
     ? data.orgNodes.filter(node => node.companyId === companyId && isWithinSectorScope(node.id)).map(node => node.id)
     : [], [companyId, data.orgNodes, scopeNodeId, sectorManager]);
-  const actorContext: ControlActorContext = {
-    role: isAdmin ? 'maximus_admin' : companyAdmin ? 'company_admin' : sectorManager ? 'sector_manager' : 'employee',
-    displayName: actorName,
-    companyId: isAdmin ? undefined : companyId,
-    employeeId,
-    sectorIds: actorSectorIds,
-  };
-
   useEffect(() => {
     let active = true;
     setSyncing(true);
-    controlApi.bootstrap({ companyId: isAdmin ? undefined : companyId, scope: controlScope, actorContext })
+    controlApi.bootstrap({ companyId: isAdmin ? undefined : companyId, scope: controlScope })
       .then(snapshot => { if (active) { setServerSnapshot(snapshot); setSyncError(''); } })
       .catch(error => { if (active) setSyncError(error instanceof Error ? error.message : 'Mode local actif.'); })
       .finally(() => { if (active) setSyncing(false); });
     return () => { active = false; };
-  }, [companyId, controlScope, employeeId, isAdmin, actorContext.displayName, actorContext.role, actorContext.companyId, actorContext.employeeId, actorContext.sectorIds.join(','), syncVersion]);
+  }, [companyId, controlScope, employeeId, isAdmin, syncVersion]);
 
   const controlTasks = useMemo(() => {
     const byId = new Map(data.controlTasks.map(task => [task.id, task]));
@@ -205,7 +197,7 @@ export function ControlCenterPage({
   const updateTask = (taskId: string, nextStatus: ControlTaskStatus) => {
     const persistedTask = serverSnapshot?.tasks.find(item => item.id === taskId);
     if (persistedTask) {
-      void controlApi.updateTaskStatus(persistedTask, nextStatus, actorContext)
+      void controlApi.updateTaskStatus(persistedTask, nextStatus)
         .then(() => {
           setSyncError('');
           setSyncVersion(version => version + 1);
@@ -241,7 +233,7 @@ export function ControlCenterPage({
         createdAt: now,
         updatedAt: now,
     };
-    void controlApi.createTask(task, actorContext)
+    void controlApi.createTask(task)
       .then(() => {
         setSyncError('');
         setSyncVersion(version => version + 1);

@@ -1,0 +1,161 @@
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { and, eq, gt } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@workspace/db";
+import { authSessionsTable, authUsersTable } from "@workspace/db/schema";
+import type { ControlActorContext, ControlActorRole } from "./control-authorization";
+
+const router: IRouter = Router();
+const sessionCookie = "maximus_session";
+const sessionDurationMs = 1000 * 60 * 60 * 8;
+const loginInput = z.object({
+  email: z.string().trim().email().transform(value => value.toLowerCase()),
+  password: z.string().min(1).max(200),
+});
+
+type AuthUserRecord = typeof authUsersTable.$inferSelect;
+
+const demoAccounts: Array<{
+  id: string;
+  email: string;
+  password: string;
+  displayName: string;
+  role: ControlActorRole;
+  companyId?: string;
+  employeeId?: string;
+  sectorIds: string[];
+}> = [
+  { id: "maximus-admin", email: "admin@maximus.demo", password: "Admin123!", displayName: "Administration MAXIMUS", role: "maximus_admin", sectorIds: [] },
+  { id: "kora-admin", email: "admin@kora.demo", password: "Kora123!", displayName: "Administrateur KORA", role: "company_admin", companyId: "kora", sectorIds: [] },
+  { id: "demo-emp-awa", email: "awa.ndiaye@kora.demo", password: "AwaKora2026!", displayName: "Awa Ndiaye", role: "employee", companyId: "kora", employeeId: "demo-emp-awa", sectorIds: ["kora-service-vente"] },
+  { id: "demo-emp-ibrahima", email: "ibrahima.kane@kora.demo", password: "IbrahimaKora2026!", displayName: "Ibrahima Kane", role: "employee", companyId: "kora", employeeId: "demo-emp-ibrahima", sectorIds: ["kora-service-stock"] },
+  { id: "demo-emp-ndeye", email: "ndeye.sarr@kora.demo", password: "NdeyeKora2026!", displayName: "Ndeye Sarr", role: "employee", companyId: "kora", employeeId: "demo-emp-ndeye", sectorIds: ["kora-service-rh"] },
+  { id: "demo-emp-mamadou", email: "mamadou.ba@kora.demo", password: "MamadouKora2026!", displayName: "Mamadou Ba", role: "sector_manager", companyId: "kora", employeeId: "demo-emp-mamadou", sectorIds: ["kora-service-finance"] },
+];
+
+function passwordHash(password: string, salt = randomBytes(16).toString("hex")) {
+  const derived = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${derived}`;
+}
+
+function passwordMatches(password: string, encoded: string) {
+  const [salt, expected] = encoded.split(":");
+  if (!salt || !expected) return false;
+  const actual = scryptSync(password, salt, 64);
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
+}
+
+function hashSessionToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function parseCookies(request: Request) {
+  return Object.fromEntries((request.headers.cookie ?? "").split(";").map(cookie => {
+    const separator = cookie.indexOf("=");
+    return separator === -1 ? [cookie.trim(), ""] : [cookie.slice(0, separator).trim(), decodeURIComponent(cookie.slice(separator + 1).trim())];
+  }).filter(([name]) => name));
+}
+
+function setSessionCookie(response: Response, token: string, maxAgeMs = sessionDurationMs) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  response.setHeader("Set-Cookie", `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(maxAgeMs / 1000)}${secure}`);
+}
+
+function clearSessionCookie(response: Response) {
+  response.setHeader("Set-Cookie", `${sessionCookie}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`);
+}
+
+export function actorFromAuthUser(user: Pick<AuthUserRecord, "role" | "displayName" | "companyId" | "employeeId" | "sectorIds">): ControlActorContext {
+  return {
+    role: user.role as ControlActorRole,
+    displayName: user.displayName,
+    companyId: user.companyId ?? undefined,
+    employeeId: user.employeeId ?? undefined,
+    sectorIds: Array.isArray(user.sectorIds) ? user.sectorIds : [],
+  };
+}
+
+export async function getAuthenticatedUser(request: Request) {
+  const token = parseCookies(request)[sessionCookie];
+  if (!token) return null;
+  const [session] = await db.select().from(authSessionsTable)
+    .where(and(eq(authSessionsTable.tokenHash, hashSessionToken(token)), gt(authSessionsTable.expiresAt, new Date())))
+    .limit(1);
+  if (!session) return null;
+  const [user] = await db.select().from(authUsersTable).where(and(eq(authUsersTable.id, session.userId), eq(authUsersTable.status, "ACTIF"))).limit(1);
+  return user ?? null;
+}
+
+export async function requireAuth(request: Request, response: Response, next: NextFunction) {
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    response.status(401).json({ error: "Session MAXIMUS absente ou expirée." });
+    return;
+  }
+  request.authUser = user;
+  request.authActor = actorFromAuthUser(user);
+  next();
+}
+
+export async function ensureDemoAuthUsers() {
+  for (const account of demoAccounts) {
+    await db.insert(authUsersTable).values({
+      id: account.id,
+      email: account.email,
+      passwordHash: passwordHash(account.password),
+      displayName: account.displayName,
+      role: account.role,
+      companyId: account.companyId,
+      employeeId: account.employeeId,
+      sectorIds: account.sectorIds,
+      status: "ACTIF",
+    }).onConflictDoNothing({ target: authUsersTable.id });
+  }
+}
+
+router.post("/auth/login", async (request, response): Promise<void> => {
+  const parsed = loginInput.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ error: "Adresse email ou mot de passe invalide." });
+    return;
+  }
+  const [user] = await db.select().from(authUsersTable).where(and(eq(authUsersTable.email, parsed.data.email), eq(authUsersTable.status, "ACTIF"))).limit(1);
+  if (!user || !passwordMatches(parsed.data.password, user.passwordHash)) {
+    response.status(401).json({ error: "Email ou mot de passe incorrect." });
+    return;
+  }
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(authSessionsTable).values({
+    id: randomUUID(),
+    tokenHash: hashSessionToken(token),
+    userId: user.id,
+    expiresAt: new Date(Date.now() + sessionDurationMs),
+  });
+  setSessionCookie(response, token);
+  response.json({ user: actorFromAuthUser(user) });
+});
+
+router.get("/auth/session", async (request, response): Promise<void> => {
+  const user = await getAuthenticatedUser(request);
+  response.json({ user: user ? actorFromAuthUser(user) : null });
+});
+
+router.post("/auth/logout", async (request, response): Promise<void> => {
+  const token = parseCookies(request)[sessionCookie];
+  if (token) await db.delete(authSessionsTable).where(eq(authSessionsTable.tokenHash, hashSessionToken(token)));
+  clearSessionCookie(response);
+  response.status(204).end();
+});
+
+declare global {
+  namespace Express {
+    interface Request {
+      authUser?: AuthUserRecord;
+      authActor?: ControlActorContext;
+    }
+  }
+}
+
+export default router;

@@ -135,7 +135,7 @@ La couche de contrôle est persistée dans PostgreSQL par les tables suivantes :
 
 Les routes `/api/control/bootstrap`, `/api/control/tasks` et `/api/control/tasks/:id/status` servent respectivement à charger le périmètre courant, créer une tâche et mettre à jour son statut. Le frontend synchronise le serveur tout en conservant un repli local lorsque l’API est momentanément indisponible.
 
-Les routes Contrôle exigent aussi un contexte d’acteur comprenant le rôle, l’entreprise, l’employé et les unités de secteur autorisées. Le serveur refuse :
+Les routes Contrôle exigent une session interne MAXIMUS stockée en PostgreSQL. Le serveur résout depuis cette session le rôle, l’entreprise, l’employé et les unités de secteur autorisées. Il refuse :
 
 - une entreprise différente de celle de l’acteur ;
 - une tâche hors des unités du manager de secteur ;
@@ -143,7 +143,7 @@ Les routes Contrôle exigent aussi un contexte d’acteur comprenant le rôle, l
 - une création par un employé standard ;
 - une modification hors périmètre.
 
-Le contexte d’acteur est aujourd’hui alimenté par la session de démonstration du frontend. Une authentification serveur centralisée devra remplacer ce transport déclaratif avant une mise en production multi-utilisateur.
+Les routes `/api/auth/login`, `/api/auth/session` et `/api/auth/logout` gèrent la connexion, la restauration et la révocation de session. Les mots de passe sont hachés avec `scrypt`, les jetons de session sont stockés sous forme de hash et le navigateur ne conserve qu’un cookie `HttpOnly`.
 
 ## 5. Modèle d’accès et permissions
 

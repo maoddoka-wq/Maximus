@@ -22,6 +22,7 @@ MAXIMUS est une application web fonctionnelle d’ERP SaaS multi-entreprises, co
 - Tailwind CSS ;
 - Express pour le serveur API ;
 - PostgreSQL et Drizzle ORM pour les packages serveur ;
+- comptes et sessions internes MAXIMUS stockés côté serveur, avec mots de passe hachés et cookie HttpOnly ;
 - PostgreSQL via l’API pour Présences, Stocks et Contrôle & coordination, avec `localStorage` conservé pour les données initiales, certaines fonctions locales et le repli du frontend.
 
 ## Installation

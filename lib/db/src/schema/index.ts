@@ -20,3 +20,4 @@
 export * from "./stock";
 export * from "./presence";
 export * from "./control";
+export * from "./auth";

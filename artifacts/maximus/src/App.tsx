@@ -14,6 +14,7 @@ import { AdminRouter, KoraRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
+import { authApi, type AuthUser } from '@/lib/auth-api';
 import {
   employeeHasPresencePermission,
   employeeRoleMatchesUnit,
@@ -32,6 +33,13 @@ const OperationalModulePage = lazy(() => import('@/pages/operational-modules').t
 const CompanyOrganizationAdmin = lazy(() => import('@/pages/company-organization').then(module => ({ default: module.CompanyOrganizationAdmin })));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const ControlCenterPage = lazy(() => import('@/pages/control-center').then(module => ({ default: module.ControlCenterPage })));
+function sessionFromAuthUser(user: AuthUser): Session {
+  return user.role === 'maximus_admin'
+    ? 'admin'
+    : user.role === 'company_admin'
+      ? `company:${user.companyId}`
+      : `employee:${user.employeeId}`;
+}
 const moduleIcons: Record<ModuleId, Icon> = {
   commerce: ShoppingCart,
   ventes: CreditCard,
@@ -94,6 +102,23 @@ function AppContent() {
   useEffect(() => { localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { if (!toast) return undefined; const timer = window.setTimeout(() => setToast(''), 3000); return () => window.clearTimeout(timer); }, [toast]);
   useEffect(() => { const syncData = () => setData(loadData()); window.addEventListener('storage', syncData); return () => window.removeEventListener('storage', syncData); }, []);
+  useEffect(() => {
+    void authApi.session()
+      .then(({ user }) => {
+        if (!user) {
+          setSession(null);
+          localStorage.removeItem('maximus-session');
+          return;
+        }
+        const nextSession = sessionFromAuthUser(user);
+        setSession(nextSession);
+        localStorage.setItem('maximus-session', nextSession);
+      })
+      .catch(() => {
+        setSession(null);
+        localStorage.removeItem('maximus-session');
+      });
+  }, []);
 
   const mutate = (fn: (draft: StoreData) => void, message?: string) => {
     setData(prev => { const next = structuredClone(prev) as StoreData; fn(next); return next; });
@@ -119,31 +144,23 @@ function AppContent() {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
-  const login = (_space: 'admin' | 'kora', email: string, password: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!') {
-      setSession('admin');
-      localStorage.setItem('maximus-session', 'admin');
-      setLocation('/maximus/dashboard');
-      return;
-    }
-    const company = data.companies.find(item => item.email.toLowerCase() === normalizedEmail && item.status === 'ACTIF' && item.adminPassword === password);
-    if (company) {
-      const companySession: Session = `company:${company.id}`;
-      setSession(companySession);
-      localStorage.setItem('maximus-session', companySession);
-      setLocation('/kora/dashboard');
-      return;
-    }
-    const employee = data.employees.find(e => e.email.toLowerCase() === normalizedEmail && e.status === 'ACTIF' && (e.loginPassword ?? 'Kora123!') === password);
-    if (employee) {
-      const employeeSession: Session = `employee:${employee.id}`;
-      setSession(employeeSession);
-      localStorage.setItem('maximus-session', employeeSession);
-      setLocation('/kora/dashboard');
-    }
+  const applyAuthenticatedUser = (user: AuthUser) => {
+    const nextSession = sessionFromAuthUser(user);
+    setSession(nextSession);
+    localStorage.setItem('maximus-session', nextSession);
+    setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/kora/dashboard');
   };
-  const logout = () => { setSession(null); localStorage.removeItem('maximus-session'); setLocation('/'); };
+  const login = async (_space: 'admin' | 'kora', email: string, password: string) => {
+    const { user } = await authApi.login(email, password);
+    applyAuthenticatedUser(user);
+  };
+  const logout = () => {
+    void authApi.logout().finally(() => {
+      setSession(null);
+      localStorage.removeItem('maximus-session');
+      setLocation('/');
+    });
+  };
   const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
 
   if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage data={data} mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} onCancel={() => setLocation('/maximus/entreprises')} /> : <Signup data={data} onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
@@ -278,11 +295,15 @@ function AppContent() {
   );
 }
 
-function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', email: string, password: string) => void; employees: StoreData['employees'] }) {
+function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', email: string, password: string) => Promise<void>; employees: StoreData['employees'] }) {
   const [email, setEmail] = useState('admin@kora.demo');
   const [password, setPassword] = useState('Kora123!');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
+  const submitLogin = (space: 'admin' | 'kora') => {
+    setError('');
+    void onLogin(space, email, password).catch(loginError => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'));
+  };
   const demoAccounts = [
     { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
     { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
@@ -292,7 +313,7 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
     setEmail(account.email);
     setPassword(account.password);
     setError('');
-    onLogin(account.id === 'maximus-admin' ? 'admin' : 'kora', account.email, account.password);
+    submitLogin(account.id === 'maximus-admin' ? 'admin' : 'kora');
   };
   return <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
     <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between">
@@ -305,7 +326,7 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
     <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12"><div className="w-full max-w-md fade-up">
       <div className="mb-10 lg:hidden"><Brand /></div>
        <div className="mb-8"><p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Accès sécurisé</p><h2 className="text-3xl font-bold tracking-[-.04em]">Bienvenue dans MAXIMUS</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Tous les comptes utilisent la même connexion. MAXIMUS ouvre automatiquement le bon espace.</p></div>
-       <form onSubmit={e => { e.preventDefault(); const normalizedEmail = email.trim().toLowerCase(); const account = employees.find(item => item.email.toLowerCase() === normalizedEmail && item.status === 'ACTIF' && password === (item.loginPassword ?? 'Kora123!')); const validAdmin = normalizedEmail === 'admin@maximus.demo' && password === 'Admin123!'; if (!validAdmin && !account) { setError('Email ou mot de passe incorrect. Vérifiez que le compte est actif et que le mot de passe est correct.'); return; } setError(''); onLogin(validAdmin ? 'admin' : 'kora', email, password); }} className="space-y-5">
+        <form onSubmit={e => { e.preventDefault(); submitLogin(email.toLowerCase() === 'admin@maximus.demo' ? 'admin' : 'kora'); }} className="space-y-5">
         <Field label="Adresse email" value={email} onChange={setEmail} type="email" testId="input-login-email" help="Adresse du compte MAXIMUS, de l’entreprise ou de l’employé." />
         <Field label="Mot de passe" value={password} onChange={setPassword} type="password" testId="input-login-password" help="Mot de passe associé à l’adresse email saisie." />
         <div className="flex justify-end"><button type="button" data-testid="button-forgot-password" onClick={() => setLoginHelp(value => !value)} className="text-xs font-semibold text-[hsl(var(--primary))]">Aide à la connexion</button></div>
