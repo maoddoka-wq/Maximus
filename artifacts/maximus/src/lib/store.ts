@@ -179,7 +179,7 @@ export const sectorPresets: SectorPreset[] = [
 
 export function seedData(): StoreData {
   return {
-    catalogVersion: 2,
+    catalogVersion: 3,
     organizationVersion: 8,
     sectorPresets: sectorPresets.map(preset => ({
       ...preset,
@@ -313,6 +313,26 @@ export function loadData(): StoreData {
     const parsed = JSON.parse(saved) as StoreData;
     const initial = seedData();
     const { preferences: _legacyPreferences, dependencies: _legacyDependencies, ...storedData } = parsed as StoreData & { preferences?: unknown; dependencies?: unknown };
+    const storedModuleOverrides = parsed.moduleOverrides ?? {};
+    const storedPresenceOverride = storedModuleOverrides.presences;
+    const shouldMigratePresenceCatalog =
+      (parsed.catalogVersion ?? 1) < 3 &&
+      Boolean(
+        storedPresenceOverride &&
+          (storedPresenceOverride.features?.length ?? 0) >= 16 &&
+          (storedPresenceOverride.featurePacks?.length ?? 0) === 0,
+      );
+    const moduleOverrides: ModuleOverrides = shouldMigratePresenceCatalog
+      ? {
+          ...storedModuleOverrides,
+          presences: {
+            ...storedPresenceOverride,
+            features: presenceFeatureDefinitions.map((feature) => feature.label),
+            featureDependencies: presenceFeatureDependencies,
+            featurePacks: presenceFeaturePacks,
+          },
+        }
+      : storedModuleOverrides;
     const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
     const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
     const rawCompanies = (parsed.catalogVersion ?? 1) < 2
@@ -384,7 +404,7 @@ export function loadData(): StoreData {
         audience: notification.audience ?? 'all',
         severity: notification.severity ?? 'info',
       })),
-      catalogVersion: 2,
+       catalogVersion: 3,
        organizationVersion: 8,
        sectorPresets: (parsed.sectorPresets ?? initial.sectorPresets).map(preset => {
          const legacyProfiles = preset.businessProfiles ?? [];
@@ -396,7 +416,7 @@ export function loadData(): StoreData {
        }),
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
-      moduleOverrides: parsed.moduleOverrides ?? {},
+       moduleOverrides,
       removedModules: parsed.removedModules ?? [],
       purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
       accountingEntries: parsed.accountingEntries ?? initial.accountingEntries,
