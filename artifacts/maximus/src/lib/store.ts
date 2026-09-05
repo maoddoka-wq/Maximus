@@ -161,7 +161,7 @@ export const sectorPresets: SectorPreset[] = [
   {
     id: 'distribution',
     name: 'Distribution',
-    moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'],
+     moduleIds: ['commerce', 'stocks'],
     modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] },
   },
   { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique', 'commerce'] },

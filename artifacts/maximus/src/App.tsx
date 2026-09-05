@@ -876,6 +876,7 @@ function ModulesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: Store
 function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
   const { confirm } = useAppDialog();
   const [sectorName, setSectorName] = useState('');
+  const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
   const [sectorPackIds, setSectorPackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
@@ -899,11 +900,29 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     });
   };
 
+  const toggleSectorModule = (moduleId: ModuleId) => {
+    setSectorError('');
+    setSectorModules(current => {
+      if (current.includes(moduleId)) {
+        setSectorPackIds(packIds => {
+          const next = { ...packIds };
+          delete next[moduleId];
+          return next;
+        });
+        return current.filter(id => id !== moduleId);
+      }
+      return [...current, moduleId];
+    });
+  };
+
   const openSector = (preset?: SectorPreset) => {
     setEditingSector(preset ?? null);
     setSectorName(preset?.name ?? '');
     const legacyPackIds = Object.fromEntries((preset?.businessProfiles ?? []).flatMap(profile => Object.entries(profile.modulePackIds ?? {}))) as Partial<Record<ModuleId, string[]>>;
-    setSectorPackIds(Object.fromEntries(Object.entries(preset?.modulePackIds ?? legacyPackIds).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]])));
+    const packIds = preset?.modulePackIds ?? legacyPackIds;
+    const selectedModuleIds = Object.keys(packIds).length ? Object.keys(packIds) as ModuleId[] : (preset ? [...preset.moduleIds] : []);
+    setSectorModules(selectedModuleIds);
+    setSectorPackIds(Object.fromEntries(Object.entries(packIds).map(([moduleId, selectedPackIds]) => [moduleId, [...(selectedPackIds ?? [])]])));
     setSectorError('');
   };
 
@@ -918,9 +937,13 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       setSectorError('Ce secteur existe déjà.');
       return;
     }
-    const selectedPackEntries = Object.entries(sectorPackIds).filter(([, packIds]) => (packIds ?? []).length) as [ModuleId, string[]][];
-    if (selectedPackEntries.length === 0) {
-      setSectorError('Sélectionnez au moins un pack métier.');
+    if (sectorModules.length === 0) {
+      setSectorError('Sélectionnez au moins un module.');
+      return;
+    }
+    const selectedPackEntries = sectorModules.map(moduleId => [moduleId, sectorPackIds[moduleId] ?? []] as [ModuleId, string[]]);
+    if (selectedPackEntries.some(([, packIds]) => packIds.length === 0)) {
+      setSectorError('Sélectionnez au moins un pack dans chaque module choisi.');
       return;
     }
     const moduleIds = selectedPackEntries.map(([moduleId]) => moduleId);
@@ -938,6 +961,7 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     };
     mutate(draft => { draft.sectorPresets = editingSector ? (draft.sectorPresets ?? []).map(item => item.id === editingSector.id ? preset : item) : [...(draft.sectorPresets ?? []), preset]; }, editingSector ? 'Secteur modifié.' : 'Secteur et modules par défaut enregistrés.');
     setSectorName('');
+    setSectorModules([]);
     setSectorPackIds({});
     setEditingSector(null);
     setSectorError('');
@@ -957,18 +981,23 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
        <div className="flex items-start gap-3"><span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]"><Building2 size={19} /></span><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Configuration du catalogue</p><h2 className="mt-2 text-xl font-bold">Configurer un secteur d’activité</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Un secteur sélectionne directement les packs déjà définis dans les modules. Aucun nom de métier ou de pack n’est recréé ici.</p></div></div>
       <form onSubmit={createSector} className="mt-6 border-t pt-5">
         <label className="block max-w-md text-sm font-semibold">Nom du secteur<input data-testid="input-sector-name" value={sectorName} onChange={event => setSectorName(event.target.value)} placeholder="Ex. Bâtiment et travaux publics" className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
-         <p className="mt-5 text-sm font-semibold">Packs métiers proposés à l’inscription</p>
-         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez directement les packs déjà nommés et configurés dans chaque module. Le secteur ne crée aucun nouveau pack.</p>
+         <p className="mt-5 text-sm font-semibold">Modules et packs proposés à l’inscription</p>
+         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez d’abord un module. Ses packs déjà nommés et configurés apparaîtront ensuite.</p>
          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
            {modules.map(baseModule => {
              const module = moduleForSector(baseModule.id) ?? baseModule;
              const packs = module.featurePacks ?? [];
-             return <div key={module.id} className="rounded-xl border p-3">
-               <div className="flex items-start gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><Package size={16} /></span><span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{packs.length} pack(s) configuré(s)</span></span></div>
-               {packs.length === 0 ? <p className="mt-3 text-[10px] text-[hsl(var(--muted-foreground))]">Aucun pack disponible dans ce module.</p> : <div className="mt-3 space-y-1 border-t pt-2">{packs.map(pack => {
+             const selectedModule = sectorModules.includes(module.id);
+             return <div key={module.id} className={`rounded-xl border p-3 transition ${selectedModule ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}>
+               <button type="button" data-testid={`button-sector-module-${module.id}`} onClick={() => toggleSectorModule(module.id)} className="flex w-full items-start gap-3 text-left">
+                 <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selectedModule ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModule && <Check size={13} />}</span>
+                 <span className="min-w-0 flex-1"><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{selectedModule ? 'Sélectionnez ses packs ci-dessous.' : 'Sélectionnez ce module pour afficher ses packs.'}</span></span>
+                 <ChevronDown size={16} className={`mt-1 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform ${selectedModule ? 'rotate-180' : ''}`} />
+               </button>
+               {selectedModule && (packs.length === 0 ? <p className="mt-3 border-t pt-3 text-[10px] text-[hsl(var(--muted-foreground))]">Aucun pack disponible dans ce module.</p> : <div className="mt-3 space-y-1 border-t pt-2">{packs.map(pack => {
                  const selected = sectorPackIds[module.id]?.includes(pack.id) ?? false;
                  return <label key={pack.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--muted))]"><input data-testid={`checkbox-sector-pack-${module.id}-${pack.id}`} type="checkbox" checked={selected} onChange={() => toggleSectorPack(module.id, pack.id)} className="mt-0.5 accent-[hsl(var(--primary))]" /><span><strong className="block">{pack.name}</strong><span className="text-[9px] text-[hsl(var(--muted-foreground))]">{pack.featureIds.length} fonctionnalité(s)</span></span></label>;
-               })}</div>}
+               })}</div>)}
              </div>;
            })}
          </div>
