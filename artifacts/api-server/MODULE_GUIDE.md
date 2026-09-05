@@ -1,8 +1,9 @@
 # Guide de développement des modules MAXIMUS
 
 Ce document est la règle de travail pour ajouter un module métier à MAXIMUS.
-Un module est une capacité métier réutilisable par plusieurs entreprises
-autorisées. Ce n’est pas une application indépendante et ce n’est pas une
+Un module est conçu indépendamment de toute entreprise, comme un outil métier
+complet que différentes entreprises peuvent choisir d’utiliser. Il existe dans
+le catalogue MAXIMUS avant d’être attribué à une entreprise. Ce n’est pas une
 copie spécifique de KORA.
 
 ## 1. Le modèle mental
@@ -18,7 +19,8 @@ MAXIMUS
 └── Prochains modules
 ```
 
-Le code d’un module est commun à toutes les entreprises. L’entreprise ne
+Le code et la définition d’un module sont communs à toutes les entreprises.
+L’entreprise est une utilisatrice du module, pas sa propriétaire. Elle ne
 change que :
 
 - l’activation du module ;
@@ -27,7 +29,8 @@ change que :
 - ses données ;
 - ses couleurs et son identité.
 
-KORA est uniquement l’entreprise de démonstration.
+KORA est uniquement l’entreprise de démonstration. Elle ne doit jamais être
+une condition pour créer, tester ou faire évoluer un module.
 
 ## 2. Règle d’isolation obligatoire
 
