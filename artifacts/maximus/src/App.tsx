@@ -401,12 +401,12 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
     loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'kora', account.email, account.password);
   };
   return <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
-    <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between">
+    <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
       <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
       <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
       <Brand inverse />
-      <div className="relative max-w-xl pb-16"><p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">La gestion d’entreprise, simplement</p><h1 className="text-6xl font-bold leading-[.98] tracking-[-.06em]">Toute votre entreprise.<br /><span className="text-[hsl(var(--accent))]">Au même endroit.</span></h1><p className="mt-8 max-w-md text-lg leading-8 text-[hsl(var(--sidebar-foreground)/.7)]">MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer aujourd’hui et à grandir demain.</p></div>
-      <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">Sénégal · Côte d’Ivoire · UEMOA</p>
+      <div className="relative mt-32 max-w-xl pb-16"><p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">La gestion d’entreprise, simplement</p><h1 className="text-6xl font-bold leading-[.98] tracking-[-.06em]">Toute votre entreprise.<br /><span className="text-[hsl(var(--accent))]">Au même endroit.</span></h1><p className="mt-8 max-w-md text-lg leading-8 text-[hsl(var(--sidebar-foreground)/.7)]">MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer aujourd’hui et à grandir demain.</p></div>
+      <p className="mt-auto mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">Sénégal · Côte d’Ivoire · UEMOA</p>
     </section>
     <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12"><div className="w-full max-w-md fade-up">
       <div className="mb-10 lg:hidden"><Brand /></div>
