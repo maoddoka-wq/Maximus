@@ -172,7 +172,10 @@ export function Sidebar({
               </span>
               {!compact && (
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold">
+                  <p
+                    title={companyName ?? 'KORA Distribution'}
+                    className="break-words text-sm font-bold leading-tight"
+                  >
                     {companyName ?? 'KORA Distribution'}
                   </p>
                   <p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">
