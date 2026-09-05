@@ -15,7 +15,7 @@ import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
-import { loadCompanyModuleAccess, setCompanyModuleAccess } from '@/lib/module-api';
+import { createModuleFeature, loadCompanyModuleAccess, loadModuleCatalog, setCompanyModuleAccess, type ServerModuleFeature } from '@/lib/module-api';
 import {
   employeeHasPresencePermission,
   employeeRoleMatchesUnit,
@@ -188,6 +188,31 @@ function AppContent() {
       });
     return () => { cancelled = true; };
   }, [activeCompanyId, session]);
+  useEffect(() => {
+    if (session !== 'admin') return undefined;
+    let cancelled = false;
+    void loadModuleCatalog()
+      .then(catalog => {
+        if (cancelled) return;
+        setData(previous => {
+          const next = structuredClone(previous) as StoreData;
+          const overrides = { ...(next.moduleOverrides ?? {}) };
+          catalog.forEach(serverModule => {
+            const localModule = modules.find(module => module.id === serverModule.id);
+            if (!localModule) return;
+            const existing = overrides[localModule.id] ?? {};
+            overrides[localModule.id] = {
+              ...existing,
+              features: [...new Set([...(existing.features ?? localModule.features), ...serverModule.featureCatalog.map(feature => feature.label)])],
+            };
+          });
+          next.moduleOverrides = overrides;
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [session]);
   const activeCompany = data.companies.find(company => company.id === activeCompanyId);
   const activeCompanyTheme = companyThemeVariables(activeCompany);
   const activeNavStyle: CSSProperties | undefined = activeCompany
@@ -973,12 +998,28 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [selectedId, setSelectedId] = useState<ModuleId | null>(null);
   const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
+  const [addingFeature, setAddingFeature] = useState(false);
+  const [featureSaving, setFeatureSaving] = useState(false);
+  const [featureError, setFeatureError] = useState('');
+  const [serverFeatures, setServerFeatures] = useState<Record<string, ServerModuleFeature[]>>({});
+  const [featureForm, setFeatureForm] = useState({ key: '', label: '', description: '', actions: ['voir'] });
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [testMode, setTestMode] = useState(false);
   const [tests, setTests] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
+  useEffect(() => {
+    let cancelled = false;
+    void loadModuleCatalog()
+      .then(catalog => {
+        if (!cancelled) setServerFeatures(Object.fromEntries(catalog.map(module => [module.id, module.featureCatalog])));
+      })
+      .catch(error => {
+        if (!cancelled) notify(error instanceof Error ? error.message : 'Le catalogue des fonctionnalités est indisponible.');
+      });
+    return () => { cancelled = true; };
+  }, [notify]);
   const moduleDefinitions = modules.filter(module => !data.removedModules?.includes(module.id)).map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
   const statusOf = (moduleId: ModuleId): ModuleAvailability => data.removedModules?.includes(moduleId) ? 'INACTIF' : data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const selected = selectedId ? moduleDefinitions.find(module => module.id === selectedId) ?? null : null;
@@ -1044,6 +1085,56 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     notify(`Test réussi : ${feature}.`);
   };
 
+  const openAddFeature = () => {
+    setFeatureForm({ key: '', label: '', description: '', actions: ['voir'] });
+    setFeatureError('');
+    setAddingFeature(true);
+  };
+
+  const toggleFeatureAction = (action: string) => {
+    setFeatureForm(current => ({
+      ...current,
+      actions: current.actions.includes(action) ? current.actions.filter(item => item !== action) : [...current.actions, action],
+    }));
+  };
+
+  const saveFeature = async () => {
+    if (!selected) return;
+    const key = featureForm.key.trim().toLowerCase();
+    const label = featureForm.label.trim();
+    if (!/^[a-z][a-z0-9-]{1,79}$/.test(key)) {
+      setFeatureError('L’identifiant doit commencer par une lettre et utiliser uniquement des lettres minuscules, chiffres ou tirets.');
+      return;
+    }
+    if (label.length < 2 || featureForm.actions.length === 0) {
+      setFeatureError('Indiquez un libellé et au moins une action.');
+      return;
+    }
+    setFeatureSaving(true);
+    setFeatureError('');
+    try {
+      const feature = await createModuleFeature(selected.id, {
+        key,
+        label,
+        description: featureForm.description.trim(),
+        actions: featureForm.actions,
+      });
+      setServerFeatures(previous => ({ ...previous, [selected.id]: [...(previous[selected.id] ?? []), feature] }));
+      mutate(draft => {
+        const existing = draft.moduleOverrides?.[selected.id] ?? {};
+        draft.moduleOverrides = {
+          ...(draft.moduleOverrides ?? {}),
+          [selected.id]: { ...existing, features: [...new Set([...(existing.features ?? selected.features), feature.label])] },
+        };
+      }, `La fonctionnalité « ${feature.label} » a été ajoutée au module.`);
+      setAddingFeature(false);
+    } catch (error) {
+      setFeatureError(error instanceof Error ? error.message : 'La fonctionnalité n’a pas pu être ajoutée.');
+    } finally {
+      setFeatureSaving(false);
+    }
+  };
+
   if (selected && testMode) {
     return <ModuleTestWorkbench module={selected} data={data} mutate={mutate} onBack={() => setTestMode(false)} />;
   }
@@ -1051,6 +1142,10 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   if (selected) {
     const status = statusOf(selected.id);
     const isActive = status !== 'INACTIF';
+    const featureCatalog = serverFeatures[selected.id] ?? [];
+    const featureEntries = featureCatalog.length > 0
+      ? featureCatalog
+      : selected.features.map(feature => ({ id: `${selected.id}-${featureSlug(feature)}`, key: featureSlug(feature), label: feature, description: '', actions: ['voir', 'créer', 'modifier'], dependencies: [], status: 'ACTIF' as const }));
     return <div className="space-y-5">
       <button data-testid="button-back-modules" onClick={() => setSelectedId(null)} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au catalogue</button>
       <div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
@@ -1061,7 +1156,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
           </div>
            <div className="mt-6 flex flex-wrap items-start justify-between gap-3"><h2 className="text-2xl font-bold">{selected.name}</h2><div className="flex gap-1"><button data-testid={`button-edit-module-${selected.id}`} title="Modifier le module" onClick={() => openEdit(selected)} className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={15} /></button><button data-testid={`button-delete-module-${selected.id}`} title="Supprimer le module" onClick={() => setDeletingModule(selected)} className="rounded-lg border p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={15} /></button></div></div>
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
-          <div className="mt-6 space-y-3 border-t pt-5 text-sm">
+           <div className="mt-6 space-y-3 border-t pt-5 text-sm">
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
@@ -1073,20 +1168,25 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
             </button>
           </div>
         </section>
-        <section className="card-surface rounded-2xl p-6">
+         <section className="card-surface rounded-2xl p-6">
           <div className="flex items-start justify-between gap-4">
-            <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Banc de test</p><h2 className="mt-2 text-xl font-bold">Tester les fonctionnalités</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Lancez chaque scénario depuis l’administration avant de l’autoriser pour un espace.</p></div>
-            <Check size={19} className="text-[hsl(var(--primary))]" />
+             <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Catalogue du module</p><h2 className="mt-2 text-xl font-bold">Fonctionnalités</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez une capacité métier au module, puis attribuez ses actions aux rôles.</p></div>
+             <button data-testid={`button-add-feature-${selected.id}`} onClick={openAddFeature} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={14} /> Ajouter</button>
           </div>
-          <div className="mt-6 space-y-3">{selected.features.map(feature => {
-            const tested = tests[`${selected.id}:${feature}`];
-            return <div data-testid={`row-feature-${selected.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} key={feature} className="flex items-center justify-between gap-4 rounded-xl border p-4">
-              <div className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${tested ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{tested ? <Check size={15} /> : <LayoutGrid size={15} />}</span><span className="text-sm font-semibold">{feature}</span></div>
-              <button data-testid={`button-test-feature-${selected.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} onClick={() => runFeatureTest(selected.id, feature)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${tested ? 'border border-[hsl(var(--primary)/.3)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{tested ? 'Test réussi' : 'Tester'}</button>
+           <div className="mt-6 space-y-3">{featureEntries.map(feature => {
+             const tested = tests[`${selected.id}:${feature.label}`];
+             const featureSlugId = feature.key.replace(/[^a-z0-9]+/g, '-');
+             return <div data-testid={`row-feature-${selected.id}-${featureSlugId}`} key={feature.id} className="rounded-xl border p-4">
+               <div className="flex items-start justify-between gap-4">
+                 <div className="flex items-start gap-3"><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tested ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{tested ? <Check size={15} /> : <LayoutGrid size={15} />}</span><div><span className="text-sm font-semibold">{feature.label}</span><p className="mono mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{feature.key}</p>{feature.description && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{feature.description}</p>}</div></div>
+                 <button data-testid={`button-test-feature-${selected.id}-${featureSlugId}`} onClick={() => runFeatureTest(selected.id, feature.label)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${tested ? 'border border-[hsl(var(--primary)/.3)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{tested ? 'Test réussi' : 'Tester'}</button>
+               </div>
+               <div className="mt-3 flex flex-wrap gap-1.5 pl-11">{feature.actions.map(action => <span key={action} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{action}</span>)}</div>
             </div>;
           })}</div>
         </section>
      </div>
+      {addingFeature && <Modal title={`Ajouter une fonctionnalité à ${selected.name}`} onClose={() => { if (!featureSaving) setAddingFeature(false); }}><div className="space-y-4"><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Cette fonctionnalité sera ajoutée au catalogue global du module. Son accès métier sera ensuite piloté par les rôles.</p><Field label="Identifiant technique" value={featureForm.key} onChange={value => setFeatureForm(current => ({ ...current, key: value }))} placeholder="ex. exports-avances" testId="input-feature-key" /><Field label="Libellé" value={featureForm.label} onChange={value => setFeatureForm(current => ({ ...current, label: value }))} placeholder="Ex. Exports avancés" testId="input-feature-label" /><Field label="Description" value={featureForm.description} onChange={value => setFeatureForm(current => ({ ...current, description: value }))} placeholder="Ce que cette fonctionnalité permet de faire" testId="input-feature-description" /><div><p className="text-sm font-semibold">Actions autorisées</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{['voir', 'créer', 'modifier', 'supprimer', 'exporter', 'valider'].map(action => <label key={action} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"><input type="checkbox" checked={featureForm.actions.includes(action)} onChange={() => toggleFeatureAction(action)} />{action}</label>)}</div></div>{featureError && <p data-testid="feature-create-error" className="rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{featureError}</p>}<div className="flex justify-end gap-2"><button type="button" onClick={() => setAddingFeature(false)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" data-testid="button-save-feature" onClick={() => void saveFeature()} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">{featureSaving ? 'Ajout…' : 'Ajouter la fonctionnalité'}</button></div></div></Modal>}
      {editingModule && <Modal title="Modifier le module" onClose={() => setEditingModule(null)}><div className="space-y-4"><Field label="Nom du module" value={moduleForm.name} onChange={value => setModuleForm(current => ({ ...current, name: value }))} testId="input-module-name" /><Field label="Description" value={moduleForm.description} onChange={value => setModuleForm(current => ({ ...current, description: value }))} testId="input-module-description" /><label className="block text-sm font-semibold">Fonctionnalités<textarea data-testid="input-module-features" value={moduleForm.features} onChange={event => setModuleForm(current => ({ ...current, features: event.target.value }))} placeholder="Une fonctionnalité par ligne" rows={5} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités peuvent être séparées par des lignes ou des virgules.</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-module" onClick={saveModule}>Enregistrer les modifications</ActionButton></div></div></Modal>}
     </div>;
   }
