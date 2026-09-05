@@ -326,10 +326,11 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
   const [password, setPassword] = useState('Kora123!');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
-  const submitLogin = (space: 'admin' | 'kora') => {
+  const loginWithCredentials = (space: 'admin' | 'kora', nextEmail: string, nextPassword: string) => {
     setError('');
-    void onLogin(space, email, password).catch(loginError => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'));
+    void onLogin(space, nextEmail, nextPassword).catch(loginError => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'));
   };
+  const submitLogin = (space: 'admin' | 'kora') => loginWithCredentials(space, email, password);
   const demoAccounts = [
     { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
     { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
@@ -339,7 +340,7 @@ function Login({ onLogin, employees }: { onLogin: (space: 'admin' | 'kora', emai
     setEmail(account.email);
     setPassword(account.password);
     setError('');
-    submitLogin(account.id === 'maximus-admin' ? 'admin' : 'kora');
+    loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'kora', account.email, account.password);
   };
   return <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
     <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between">

@@ -111,7 +111,8 @@ export async function requireAuth(request: Request, response: Response, next: Ne
 
 export async function ensureDemoAuthUsers() {
   for (const account of demoAccounts) {
-    await db.insert(authUsersTable).values({
+    const now = new Date();
+    const values = {
       id: account.id,
       email: account.email,
       passwordHash: passwordHash(account.password),
@@ -121,7 +122,25 @@ export async function ensureDemoAuthUsers() {
       employeeId: account.employeeId,
       sectorIds: account.sectorIds,
       status: "ACTIF",
-    }).onConflictDoNothing({ target: authUsersTable.id });
+      updatedAt: now,
+    };
+    const [existing] = await db.select().from(authUsersTable).where(eq(authUsersTable.id, account.id)).limit(1);
+    if (existing) {
+      const needsRepair = existing.email !== account.email
+        || existing.displayName !== account.displayName
+        || existing.role !== account.role
+        || existing.companyId !== (account.companyId ?? null)
+        || existing.employeeId !== (account.employeeId ?? null)
+        || JSON.stringify(existing.sectorIds ?? []) !== JSON.stringify(account.sectorIds)
+        || existing.status !== "ACTIF"
+        || !passwordMatches(account.password, existing.passwordHash);
+      if (needsRepair) {
+        await db.update(authUsersTable).set(values).where(eq(authUsersTable.id, account.id));
+        await db.delete(authSessionsTable).where(eq(authSessionsTable.userId, account.id));
+      }
+    } else {
+      await db.insert(authUsersTable).values({ ...values, createdAt: now });
+    }
   }
 }
 

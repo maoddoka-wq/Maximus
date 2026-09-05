@@ -65,6 +65,29 @@ test("connecte un compte PostgreSQL et autorise son périmètre", async () => {
   assert.equal(crossCompany.status, 403);
 });
 
+test("connecte tous les comptes de démonstration", async () => {
+  const demoAccounts = [
+    ["admin@maximus.demo", "Admin123!", "maximus_admin"],
+    ["admin@kora.demo", "Kora123!", "company_admin"],
+    ["awa.ndiaye@kora.demo", "AwaKora2026!", "employee"],
+    ["ibrahima.kane@kora.demo", "IbrahimaKora2026!", "employee"],
+    ["ndeye.sarr@kora.demo", "NdeyeKora2026!", "employee"],
+    ["mamadou.ba@kora.demo", "MamadouKora2026!", "sector_manager"],
+  ] as const;
+
+  for (const [email, password, role] of demoAccounts) {
+    const { response: loginResponse, cookie } = await login(email, password);
+    assert.equal(loginResponse.status, 200, email);
+    assert.ok(cookie, email);
+    const sessionResponse = await fetch(`${baseUrl}/api/auth/session`, {
+      headers: { Cookie: cookie.split(";")[0] },
+    });
+    assert.equal(sessionResponse.status, 200, email);
+    const session = (await sessionResponse.json()) as { user: { role: string } | null };
+    assert.equal(session.user?.role, role, email);
+  }
+});
+
 test("refuse un mauvais mot de passe", async () => {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
