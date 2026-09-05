@@ -402,7 +402,7 @@ function AppContent() {
         : sessionEmployee?.companyId;
   const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
   useEffect(() => {
-    if (!activeCompanyId || session === 'admin' || !session) {
+    if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
       setServerModuleStatuses(null);
       return;
     }
@@ -420,7 +420,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeCompanyId, session]);
+  }, [activeCompanyId, sectorTestCompanyId, session]);
   const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
   const activeCompanyTheme = companyThemeVariables(activeCompany);
   const activeNavStyle: CSSProperties | undefined = activeCompany
