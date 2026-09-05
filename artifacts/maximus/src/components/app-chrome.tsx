@@ -214,7 +214,7 @@ export function Sidebar({
                 .length > 0 && (
                 <>
                   {!compact && (
-                    <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                    <div className="mb-2 flex items-center border-x-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
                       <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
                         Administration
                       </span>
@@ -236,7 +236,7 @@ export function Sidebar({
                   {!compact && (
                     <div
                       data-testid={`module-section-${group.label}`}
-                      className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2"
+                      className="mb-2 flex items-center border-x-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2"
                     >
                       <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
                         {group.label}
@@ -249,7 +249,7 @@ export function Sidebar({
             </>
           ) : isAdmin ? (
             <>
-              <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+              <div className="mb-2 flex items-center border-x-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
                   Administration
                 </span>
@@ -266,7 +266,7 @@ export function Sidebar({
               <div className="space-y-1">{companyCoreItems.map(item => link(item))}</div>
               {companyModuleItems.length > 0 && (
                 <section className="mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3">
-                  <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
+                  <div className="mb-2 flex items-center border-x-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
                       Modules
                     </span>
