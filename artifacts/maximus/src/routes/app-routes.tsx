@@ -35,6 +35,7 @@ export function AdminRouter({
   mutate: Mutate;
   notify: (message: string) => void;
   onNavigate: Navigate;
+  onBack: (fallback: string) => void;
   screens: AdminRouteScreens;
 }) {
   const routePath = location.split('?')[0];
@@ -52,9 +53,9 @@ export function AdminRouter({
     const companyId = decodeURIComponent(companyDetailMatch[1]);
     const company = data.companies.find(item => item.id === companyId);
     return company ? (
-      <screens.companyDetail company={company} data={data} mutate={mutate} onBack={() => onNavigate('/maximus/entreprises')} />
+       <screens.companyDetail company={company} data={data} mutate={mutate} onBack={() => onBack('/maximus/entreprises')} />
     ) : (
-      <screens.empty title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onNavigate('/maximus/entreprises')} />
+      <screens.empty title="Entreprise introuvable" text="L’espace demandé est introuvable." action={() => onBack('/maximus/entreprises')} />
     );
   }
   if (routePath === '/maximus/entreprises') {
@@ -120,6 +121,7 @@ export function KoraRouter({
   data: StoreData;
   mutate: Mutate;
   onNavigate: Navigate;
+  onBack: (fallback: string) => void;
   allowed: ModuleId[];
   canManagePeople: boolean;
   companyAdmin: boolean;
@@ -154,7 +156,7 @@ export function KoraRouter({
   };
   const requiredModule = routeModules[routePath];
   if (requiredModule && !allowed.includes(requiredModule)) {
-    return <screens.empty title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onNavigate('/kora/dashboard')} />;
+    return <screens.empty title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onBack('/kora/dashboard')} />;
   }
   if (routePath === '/kora/dashboard') {
     return <screens.dashboard data={data} onNavigate={onNavigate} allowed={allowed} />;
@@ -170,7 +172,7 @@ export function KoraRouter({
     return companyAdmin && company ? (
       <screens.organization company={company} data={data} mutate={mutate} initialTab="profile" />
     ) : (
-      <screens.empty title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onNavigate('/kora/dashboard')} />
+      <screens.empty title="Accès réservé à l’administrateur" text="Le profil de l’entreprise est géré par son administrateur." action={() => onBack('/kora/dashboard')} />
     );
   }
   if (routePath === '/kora/organisation' || routePath === '/kora/autorisations' || routePath === '/kora/employes' || routePath === '/kora/roles') {
@@ -179,7 +181,7 @@ export function KoraRouter({
     return company && (companyAdmin || sectorManager) ? (
       <screens.organization company={company} data={data} mutate={mutate} initialTab={initialTab} sectorManager={sectorManager && !companyAdmin} scopeNodeId={sectorManager && !companyAdmin ? scopeNodeId : undefined} />
     ) : (
-      <screens.empty title="Accès réservé" text="L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur." action={() => onNavigate('/kora/dashboard')} />
+      <screens.empty title="Accès réservé" text="L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur." action={() => onBack('/kora/dashboard')} />
     );
   }
   if (routePath === '/kora/stocks') {
@@ -204,5 +206,5 @@ export function KoraRouter({
   if (routePath === '/kora/rapports') {
     return <screens.reports data={data} />;
   }
-  return <screens.empty title="Module non autorisé" text={`Cette vue n’est pas disponible pour KORA (${allowed.length} modules autorisés).`} action={() => onNavigate('/kora/dashboard')} />;
+  return <screens.empty title="Module non autorisé" text={`Cette vue n’est pas disponible pour KORA (${allowed.length} modules autorisés).`} action={() => onBack('/kora/dashboard')} />;
 }

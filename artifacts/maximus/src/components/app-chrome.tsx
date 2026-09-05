@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import {
+  ArrowLeft,
   Bell,
   CircleHelp,
   LogIn,
@@ -26,6 +27,7 @@ type SidebarProps = {
   allowed: ModuleId[];
   sidebarFeatureGroups?: SidebarFeatureGroup[];
   canManagePeople: boolean;
+  onNavigate: (path: string) => void;
   onLogout: () => void;
   employee: StoreData['employees'][number] | null;
   companyName?: string;
@@ -44,6 +46,7 @@ export function Sidebar({
   allowed,
   sidebarFeatureGroups,
   canManagePeople,
+  onNavigate,
   onLogout,
   employee,
   companyName,
@@ -85,7 +88,11 @@ export function Sidebar({
       <Link
         data-testid={testId}
         title={compact ? item.label : undefined}
-        onClick={onClose}
+        onClick={event => {
+          event.preventDefault();
+          onNavigate(item.href);
+          onClose();
+        }}
         key={item.href}
         href={item.href}
         className={className}
@@ -362,6 +369,7 @@ type PageHeaderProps = {
   title: string;
   description: string;
   location: string;
+  onBack: () => void;
 };
 
 export function PageHeader({
@@ -369,6 +377,7 @@ export function PageHeader({
   title,
   description,
   location,
+  onBack,
 }: PageHeaderProps) {
   return (
     <div className="page-header mb-6 flex flex-col justify-between gap-3 border-b border-[hsl(var(--border))] pb-5 sm:flex-row sm:items-end">
@@ -386,11 +395,24 @@ export function PageHeader({
           {description}
         </p>
       </div>
-      {location !== '/maximus/dashboard' && location !== '/kora/dashboard' && (
-        <div className="mono shrink-0 text-[9px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">
-          Mis à jour à l’instant
-        </div>
-      )}
+      <div className="flex shrink-0 items-center gap-3">
+        {location !== '/maximus/dashboard' && location !== '/kora/dashboard' && (
+          <button
+            type="button"
+            data-testid="button-page-back"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] px-3 py-2 text-xs font-bold text-[hsl(var(--muted-foreground))] transition hover:border-[hsl(var(--primary)/.45)] hover:text-[hsl(var(--primary))]"
+          >
+            <ArrowLeft size={14} />
+            Retour
+          </button>
+        )}
+        {location !== '/maximus/dashboard' && location !== '/kora/dashboard' && (
+          <div className="mono hidden text-[9px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))] sm:block">
+            Mis à jour à l’instant
+          </div>
+        )}
+      </div>
     </div>
   );
 }

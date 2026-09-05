@@ -185,7 +185,27 @@ function AppContent() {
       setLocation('/');
     });
   };
-  const navigate = (path: string) => { setLocation(path); setMobileOpen(false); };
+  useEffect(() => {
+    const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
+    if (!state?.maximus) {
+      window.history.replaceState({ ...(state ?? {}), maximus: true, maximusIndex: 0 }, '', window.location.href);
+    }
+  }, []);
+  const navigate = (path: string) => {
+    const state = window.history.state as { maximusIndex?: number } | null;
+    const currentIndex = typeof state?.maximusIndex === 'number' ? state.maximusIndex : 0;
+    setLocation(path);
+    window.history.replaceState({ ...(window.history.state ?? {}), maximus: true, maximusIndex: currentIndex + 1 }, '', window.location.href);
+    setMobileOpen(false);
+  };
+  const goBack = (fallback: string) => {
+    const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
+    if (state?.maximus && (state.maximusIndex ?? 0) > 0) {
+      window.history.back();
+      return;
+    }
+    navigate(fallback);
+  };
 
   if (location === '/inscription') return session === 'admin' ? <AdminCreateCompanyPage data={data} mutate={mutate} onComplete={() => { setToast('Entreprise créée et activée.'); setLocation('/maximus/entreprises'); }} onCancel={() => setLocation('/maximus/entreprises')} /> : <Signup data={data} onComplete={() => { setData(loadData()); setToast('Votre demande a bien été envoyée.'); setLocation('/'); }} />;
   const loginEmployees = [...data.employees, ...data.companies.filter(company => company.status === 'ACTIF' && company.adminPassword).map(company => ({ id: `company-admin:${company.id}`, firstName: company.manager.split(' ')[0] ?? company.name, lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur', email: company.email, phone: company.phone, position: 'Administrateur', department: '', subDepartment: '', role: 'Administrateur entreprise', status: 'ACTIF' as const, loginPassword: company.adminPassword, companyId: company.id }))];
@@ -303,14 +323,14 @@ function AppContent() {
   const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(notification => !notification.read).length;
   return (
       <div className="app-shell flex h-[100dvh] min-h-0 overflow-hidden" style={activeCompanyTheme as CSSProperties}>
-          <Sidebar session={session} location={location} allowed={allowed} sidebarFeatureGroups={sidebarFeatureGroups} canManagePeople={canManagePeople} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} adminLogo="/admin-logo.png" mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} activeNavStyle={activeNavStyle} />
+           <Sidebar session={session} location={location} allowed={allowed} sidebarFeatureGroups={sidebarFeatureGroups} canManagePeople={canManagePeople} onNavigate={navigate} onLogout={logout} employee={employee} companyName={currentCompany?.name} companyPhoto={currentCompany?.profilePhoto} adminLogo="/admin-logo.png" mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(value => !value)} activeNavStyle={activeNavStyle} />
         <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
            <Topbar title={currentMeta.title} isAdmin={isAdmin} onNavigate={navigate} onToggleMenu={() => setMobileOpen(true)} notificationPath={isAdmin ? '/maximus/notifications' : '/kora/notifications'} unreadCount={unreadNotifications} onHelp={() => { void alert({ title: 'Aide MAXIMUS', description: 'Explorez les vues depuis la navigation de votre espace.', confirmLabel: 'Compris' }); }} />
           <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
-            {!hidePageHeader && <PageHeader {...currentMeta} location={location} />}
+             {!hidePageHeader && <PageHeader {...currentMeta} location={location} onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/kora/dashboard')} />}
            <ErrorBoundary resetKey={location}>
              <Suspense fallback={<div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>}>
-                {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
+                 {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} onBack={goBack} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} onBack={goBack} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
              </Suspense>
            </ErrorBoundary>
         </div>
