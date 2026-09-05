@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\MaximusDemoProvisioner;
+use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,9 @@ class StockController extends Controller
 
     public function bootstrap(Request $request): JsonResponse
     {
+        if (! $this->allowed($request, 'view')) {
+            return $this->forbidden();
+        }
         $companyId = (string) $request->attributes->get('companyId');
         MaximusDemoProvisioner::ensureStockSeed($companyId);
         $where = fn (string $table) => DB::table($table)->where('company_id', $companyId);
@@ -42,6 +46,9 @@ class StockController extends Controller
 
     public function createProduct(Request $request): JsonResponse
     {
+        if (! $this->allowed($request, 'create', 'products')) {
+            return $this->forbidden();
+        }
         $input = $this->productInput($request);
         $company = $this->company($request);
         if (! empty($input['supplierId']) && ! $this->activeResourceExists('stock_suppliers', $input['supplierId'], $company)) {
@@ -58,6 +65,9 @@ class StockController extends Controller
 
     public function updateProduct(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'products')) {
+            return $this->forbidden();
+        }
         $input = $this->productInput($request, true);
         $row = DB::table('stock_products')->where('id', $id)->where('company_id', $this->company($request))->first();
         if (! $row) {
@@ -76,11 +86,18 @@ class StockController extends Controller
 
     public function archiveProduct(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'delete', 'products')) {
+            return $this->forbidden();
+        }
+
         return $this->archive('stock_products', $id, $this->company($request), 'Produit introuvable');
     }
 
     public function createSupplier(Request $request): JsonResponse
     {
+        if (! $this->allowed($request, 'create', 'references')) {
+            return $this->forbidden();
+        }
         $input = $this->supplierInput($request);
         $row = array_merge($this->supplierDefaults($this->company($request)), $this->snake($input), ['id' => $this->id('supplier'), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('stock_suppliers')->insert($row);
@@ -90,6 +107,9 @@ class StockController extends Controller
 
     public function updateSupplier(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'references')) {
+            return $this->forbidden();
+        }
         $input = $this->supplierInput($request, true);
         $row = DB::table('stock_suppliers')->where('id', $id)->where('company_id', $this->company($request))->first();
         if (! $row) {
@@ -102,11 +122,18 @@ class StockController extends Controller
 
     public function archiveSupplier(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'delete', 'references')) {
+            return $this->forbidden();
+        }
+
         return $this->archive('stock_suppliers', $id, $this->company($request), 'Fournisseur introuvable');
     }
 
     public function createWarehouse(Request $request): JsonResponse
     {
+        if (! $this->allowed($request, 'create', 'references')) {
+            return $this->forbidden();
+        }
         $input = $this->warehouseInput($request);
         $row = array_merge($this->warehouseDefaults($this->company($request)), $this->snake($input), ['id' => $this->id('warehouse'), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('stock_warehouses')->insert($row);
@@ -116,6 +143,9 @@ class StockController extends Controller
 
     public function updateWarehouse(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'references')) {
+            return $this->forbidden();
+        }
         $input = $this->warehouseInput($request, true);
         $row = DB::table('stock_warehouses')->where('id', $id)->where('company_id', $this->company($request))->first();
         if (! $row) {
@@ -128,11 +158,18 @@ class StockController extends Controller
 
     public function archiveWarehouse(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'delete', 'references')) {
+            return $this->forbidden();
+        }
+
         return $this->archive('stock_warehouses', $id, $this->company($request), 'Entrepôt introuvable');
     }
 
     public function createLocation(Request $request, string $warehouseId): JsonResponse
     {
+        if (! $this->allowed($request, 'create', 'references')) {
+            return $this->forbidden();
+        }
         $input = $this->validated($request, ['name' => ['required', 'string', 'min:1']]);
         $company = $this->company($request);
         if (! $this->activeResourceExists('stock_warehouses', $warehouseId, $company)) {
@@ -146,6 +183,9 @@ class StockController extends Controller
 
     public function updateLocation(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'references')) {
+            return $this->forbidden();
+        }
         $input = $this->validated($request, ['name' => ['required', 'string', 'min:1']]);
         $query = DB::table('stock_locations')->where('id', $id)->where('company_id', $this->company($request));
         if (! $query->exists()) {
@@ -158,6 +198,9 @@ class StockController extends Controller
 
     public function archiveLocation(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'delete', 'references')) {
+            return $this->forbidden();
+        }
         $query = DB::table('stock_locations')->where('id', $id)->where('company_id', $this->company($request));
         if (! $query->exists()) {
             return $this->notFound('Emplacement introuvable');
@@ -186,6 +229,13 @@ class StockController extends Controller
             'reference' => ['nullable', 'string'],
             'comment' => ['nullable', 'string'],
         ]);
+        $movementFeature = in_array($input['type'], ['SORTIE', 'VENTE', 'AJUSTEMENT-', 'PERTE', 'RETOUR FOURNISSEUR'], true)
+            ? 'exits'
+            : 'entries';
+        if (! $this->allowed($request, 'create', $movementFeature)
+            || ($input['type'] === 'TRANSFERT' && ! $this->allowed($request, 'create', 'exits'))) {
+            return $this->forbidden();
+        }
         $input['companyId'] = $this->company($request);
         $actorName = $this->actorName($request);
         try {
@@ -266,6 +316,9 @@ class StockController extends Controller
 
     public function createRequest(Request $request): JsonResponse
     {
+        if (! $this->allowed($request, 'create', 'requests')) {
+            return $this->forbidden();
+        }
         $input = $this->validated($request, ['productId' => ['required', 'string'], 'warehouseId' => ['required', 'string'], 'quantity' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'min:1']]);
         $company = $this->company($request);
         if (! $this->activeResourceExists('stock_products', $input['productId'], $company)) {
@@ -282,6 +335,9 @@ class StockController extends Controller
 
     public function updateRequestStatus(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'requests')) {
+            return $this->forbidden();
+        }
         $input = $this->validated($request, ['status' => ['required', 'in:EN ATTENTE,APPROUVÉE,REJETÉE']]);
         $query = DB::table('stock_requests')->where('id', $id)->where('company_id', $this->company($request));
         if (! $query->exists()) {
@@ -294,6 +350,9 @@ class StockController extends Controller
 
     public function updateRequest(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'requests')) {
+            return $this->forbidden();
+        }
         $input = $this->validated($request, ['productId' => ['required', 'string'], 'warehouseId' => ['required', 'string'], 'quantity' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'min:1']]);
         $query = DB::table('stock_requests')->where('id', $id)->where('company_id', $this->company($request))->where('status', 'EN ATTENTE');
         if (! $query->exists()) {
@@ -313,6 +372,9 @@ class StockController extends Controller
 
     public function deleteRequest(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'delete', 'requests')) {
+            return $this->forbidden();
+        }
         $row = DB::table('stock_requests')->where('id', $id)->where('company_id', $this->company($request))->where('status', 'EN ATTENTE')->first();
         if (! $row) {
             return $this->notFound('Demande introuvable ou déjà traitée');
@@ -324,6 +386,9 @@ class StockController extends Controller
 
     public function createInventory(Request $request): JsonResponse
     {
+        if (! $this->allowed($request, 'create', 'inventory')) {
+            return $this->forbidden();
+        }
         $input = $this->validated($request, ['warehouseId' => ['required', 'string'], 'notes' => ['nullable', 'string'], 'lines' => ['required', 'array', 'min:1'], 'lines.*.productId' => ['required', 'string', 'min:1'], 'lines.*.actualQuantity' => ['required', 'integer', 'min:0']]);
         $company = $this->company($request);
         $actorName = $this->actorName($request);
@@ -353,6 +418,9 @@ class StockController extends Controller
 
     public function validateInventory(Request $request, string $id): JsonResponse
     {
+        if (! $this->allowed($request, 'modify', 'inventory')) {
+            return $this->forbidden();
+        }
         try {
             $inventory = DB::transaction(function () use ($request, $id): object {
                 $current = DB::table('stock_inventories')->where('id', $id)->first();
@@ -521,6 +589,18 @@ class StockController extends Controller
         return is_array($actor) && is_string($actor['displayName'] ?? null) && $actor['displayName'] !== ''
             ? $actor['displayName']
             : 'Utilisateur MAXIMUS';
+    }
+
+    private function allowed(Request $request, string $action, ?string $feature = null): bool
+    {
+        $actor = $request->attributes->get('authActor');
+
+        return is_array($actor) && ModuleAuthorization::allows($actor, 'stocks', $action, $feature);
+    }
+
+    private function forbidden(): JsonResponse
+    {
+        return response()->json(['error' => 'Permission Stock insuffisante.'], 403);
     }
 
     private function product(object $r): array

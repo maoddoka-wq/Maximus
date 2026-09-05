@@ -95,6 +95,7 @@ class MaximusAuthTest extends TestCase
                 'employeeId' => 'employee-created-now',
                 'sectorIds' => ['kora-service-vente'],
                 'role' => 'employee',
+                'permissions' => ['presences' => ['voir', 'créer']],
                 'password' => 'CreatedNow2026!',
             ])
             ->assertCreated()
@@ -106,7 +107,8 @@ class MaximusAuthTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('user.employeeId', 'employee-created-now')
-            ->assertJsonPath('user.role', 'employee');
+            ->assertJsonPath('user.role', 'employee')
+            ->assertJsonPath('user.permissions.presences.0', 'voir');
     }
 
     public function test_sector_manager_cannot_provision_an_account_across_sector_boundaries(): void
@@ -133,6 +135,37 @@ class MaximusAuthTest extends TestCase
                 'employeeId' => 'employee-cross-sector',
                 'sectorIds' => ['secteur-a', 'secteur-b'],
                 'role' => 'employee',
+                'password' => 'CreatedNow2026!',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_sector_manager_cannot_grant_permissions_they_do_not_hold(): void
+    {
+        $manager = AuthUser::query()->create([
+            'id' => 'sector-manager-permissions',
+            'email' => 'sector-manager-permissions@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Manager permissions',
+            'role' => 'sector_manager',
+            'company_id' => 'kora',
+            'sector_ids' => ['secteur-a'],
+            'permissions' => ['stocks:products' => ['voir']],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($manager);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/auth/accounts', [
+                'id' => 'employee-permission-escalation',
+                'email' => 'employee-permission-escalation@kora.demo',
+                'displayName' => 'Employé escalade',
+                'companyId' => 'kora',
+                'employeeId' => 'employee-permission-escalation',
+                'sectorIds' => ['secteur-a'],
+                'role' => 'employee',
+                'permissions' => ['stocks:products' => ['voir', 'créer']],
                 'password' => 'CreatedNow2026!',
             ])
             ->assertForbidden();

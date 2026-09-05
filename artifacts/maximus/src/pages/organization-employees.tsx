@@ -104,7 +104,9 @@ export function EmployeesTab({
            onSave={async employeeData => {
              const employeeId = editingEmployee?.id ?? uid('emp');
              const sectorId = employeeData.sectorId;
+             const assignedRole = data.roles.find(role => role.id === employeeData.roleId);
              if (!sectorId) throw new Error('Une unité doit être sélectionnée pour ce compte.');
+             if (!assignedRole) throw new Error('Le rôle sélectionné est introuvable.');
              const sectorIds = employeeData.isSectorAdmin
                ? getSectorDescendantIds(companyNodes, sectorId)
                : [sectorId];
@@ -116,6 +118,7 @@ export function EmployeesTab({
                employeeId,
                sectorIds,
                role: employeeData.isSectorAdmin ? 'sector_manager' : 'employee',
+               permissions: assignedRole.modulePermissions,
                ...(employeeData.loginPassword ? { password: employeeData.loginPassword } : {}),
              });
             mutate(draft => {

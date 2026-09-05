@@ -19,6 +19,7 @@ final class MaximusAuth
             'companyId' => $user->company_id,
             'employeeId' => $user->employee_id,
             'sectorIds' => is_array($user->sector_ids) ? $user->sector_ids : [],
+            'permissions' => is_array($user->permissions) ? $user->permissions : [],
         ];
     }
 
@@ -26,7 +27,7 @@ final class MaximusAuth
     {
         $token = $request->cookie(self::COOKIE);
 
-        if (!$token) {
+        if (! $token) {
             return null;
         }
 
@@ -35,7 +36,7 @@ final class MaximusAuth
             ->where('expires_at', '>', Carbon::now())
             ->first();
 
-        if (!$session) {
+        if (! $session) {
             return null;
         }
 

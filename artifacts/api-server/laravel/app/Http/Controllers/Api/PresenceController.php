@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PresenceItem;
+use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -24,12 +25,17 @@ class PresenceController extends Controller
         if (! $companyId) {
             return response()->json(['error' => 'companyId requis'], 400);
         }
+        $actor = $request->attributes->get('authActor');
+        if (! is_array($actor) || ! ModuleAuthorization::allows($actor, 'presences', 'view')) {
+            return $this->forbidden();
+        }
 
-        $items = PresenceItem::query()
+        $query = PresenceItem::query()
             ->where('company_id', $companyId)
+            ->when(($actor['role'] ?? null) === 'employee', fn ($query) => $query->where('employee_id', $actor['employeeId'] ?? '__no_employee__'))
             ->orderByDesc('updated_at')
-            ->orderBy('work_date')
-            ->get()
+            ->orderBy('work_date');
+        $items = $query->get()
             ->map(fn (PresenceItem $item) => $this->item($item))
             ->values();
 
@@ -42,6 +48,14 @@ class PresenceController extends Controller
         $companyId = $this->company($request);
         if (! $companyId) {
             return response()->json(['error' => 'Contexte entreprise requis.'], 400);
+        }
+        $actorData = $request->attributes->get('authActor');
+        if (! is_array($actorData) || ! ModuleAuthorization::allows($actorData, 'presences', 'create')) {
+            return $this->forbidden();
+        }
+        if (($actorData['role'] ?? null) === 'employee'
+            && ($input['employeeId'] ?? null) !== ($actorData['employeeId'] ?? null)) {
+            return $this->forbidden();
         }
         $actor = $this->actorName($request);
         $now = now();
@@ -83,6 +97,14 @@ class PresenceController extends Controller
 
         if ($item->type === 'history') {
             return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
+        }
+        $actorData = $request->attributes->get('authActor');
+        if (! is_array($actorData)
+            || (($actorData['role'] ?? null) === 'employee' && $item->employee_id !== ($actorData['employeeId'] ?? null))
+            || (! ModuleAuthorization::allows($actorData, 'presences', 'correct')
+                && ! ModuleAuthorization::allows($actorData, 'presences', 'edit')
+                && ! ModuleAuthorization::allows($actorData, 'presences', 'modify'))) {
+            return $this->forbidden();
         }
 
         $actor = $this->actorName($request);
@@ -127,6 +149,13 @@ class PresenceController extends Controller
         if ($item->type === 'history') {
             return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
         }
+        $actorData = $request->attributes->get('authActor');
+        if (! is_array($actorData)
+            || (($actorData['role'] ?? null) === 'employee' && $item->employee_id !== ($actorData['employeeId'] ?? null))
+            || (! ModuleAuthorization::allows($actorData, 'presences', 'delete')
+                && ! ModuleAuthorization::allows($actorData, 'presences', 'manage'))) {
+            return $this->forbidden();
+        }
 
         $actor = $this->actorName($request);
         $item->delete();
@@ -153,6 +182,11 @@ class PresenceController extends Controller
         $companyId = $this->company($request);
         if (! $companyId) {
             return response()->json(['error' => 'Contexte entreprise requis.'], 400);
+        }
+        $actorData = $request->attributes->get('authActor');
+        if (! is_array($actorData)
+            || ! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'])) {
+            return $this->forbidden();
         }
         $actor = $this->actorName($request);
         $tolerance = $input['tolerance'] ?? 10;
@@ -260,6 +294,11 @@ class PresenceController extends Controller
         return is_array($actor) && is_string($actor['displayName'] ?? null) && $actor['displayName'] !== ''
             ? $actor['displayName']
             : 'Utilisateur MAXIMUS';
+    }
+
+    private function forbidden(): JsonResponse
+    {
+        return response()->json(['error' => 'Permission Présences insuffisante.'], 403);
     }
 
     private function writeHistory(string $companyId, string $actor, string $action, array $payload): void

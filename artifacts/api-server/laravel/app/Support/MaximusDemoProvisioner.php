@@ -4,35 +4,44 @@ namespace App\Support;
 
 use App\Models\AuthSession;
 use App\Models\AuthUser;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 final class MaximusDemoProvisioner
 {
     public static function ensureAuthUsers(): void
     {
+        if (! Schema::hasColumn('auth_users', 'permissions')) {
+            Schema::table('auth_users', function (Blueprint $table): void {
+                $table->json('permissions')->default('{}');
+            });
+        }
+
         $accounts = [
-            ['id' => 'maximus-admin', 'email' => 'admin@maximus.demo', 'password' => 'Admin123!', 'displayName' => 'Administration MAXIMUS', 'role' => 'maximus_admin', 'companyId' => null, 'employeeId' => null, 'sectorIds' => []],
-            ['id' => 'kora-admin', 'email' => 'admin@kora.demo', 'password' => 'Kora123!', 'displayName' => 'Administrateur KORA', 'role' => 'company_admin', 'companyId' => 'kora', 'employeeId' => null, 'sectorIds' => []],
-            ['id' => 'demo-emp-awa', 'email' => 'awa.ndiaye@kora.demo', 'password' => 'AwaKora2026!', 'displayName' => 'Awa Ndiaye', 'role' => 'employee', 'companyId' => 'kora', 'employeeId' => 'demo-emp-awa', 'sectorIds' => ['kora-service-vente']],
-            ['id' => 'demo-emp-ibrahima', 'email' => 'ibrahima.kane@kora.demo', 'password' => 'IbrahimaKora2026!', 'displayName' => 'Ibrahima Kane', 'role' => 'employee', 'companyId' => 'kora', 'employeeId' => 'demo-emp-ibrahima', 'sectorIds' => ['kora-service-stock']],
-            ['id' => 'demo-emp-ndeye', 'email' => 'ndeye.sarr@kora.demo', 'password' => 'NdeyeKora2026!', 'displayName' => 'Ndeye Sarr', 'role' => 'employee', 'companyId' => 'kora', 'employeeId' => 'demo-emp-ndeye', 'sectorIds' => ['kora-service-rh']],
-            ['id' => 'demo-emp-mamadou', 'email' => 'mamadou.ba@kora.demo', 'password' => 'MamadouKora2026!', 'displayName' => 'Mamadou Ba', 'role' => 'sector_manager', 'companyId' => 'kora', 'employeeId' => 'demo-emp-mamadou', 'sectorIds' => ['kora-service-finance']],
+            ['id' => 'maximus-admin', 'email' => 'admin@maximus.demo', 'password' => 'Admin123!', 'displayName' => 'Administration MAXIMUS', 'role' => 'maximus_admin', 'companyId' => null, 'employeeId' => null, 'sectorIds' => [], 'permissions' => []],
+            ['id' => 'kora-admin', 'email' => 'admin@kora.demo', 'password' => 'Kora123!', 'displayName' => 'Administrateur KORA', 'role' => 'company_admin', 'companyId' => 'kora', 'employeeId' => null, 'sectorIds' => [], 'permissions' => []],
+            ['id' => 'demo-emp-awa', 'email' => 'awa.ndiaye@kora.demo', 'password' => 'AwaKora2026!', 'displayName' => 'Awa Ndiaye', 'role' => 'employee', 'companyId' => 'kora', 'employeeId' => 'demo-emp-awa', 'sectorIds' => ['kora-service-vente'], 'permissions' => ['commerce' => ['voir']]],
+            ['id' => 'demo-emp-ibrahima', 'email' => 'ibrahima.kane@kora.demo', 'password' => 'IbrahimaKora2026!', 'displayName' => 'Ibrahima Kane', 'role' => 'employee', 'companyId' => 'kora', 'employeeId' => 'demo-emp-ibrahima', 'sectorIds' => ['kora-service-stock'], 'permissions' => ['stocks' => ['voir'], 'stocks:products' => ['voir', 'créer', 'modifier'], 'stocks:entries' => ['voir', 'créer', 'modifier'], 'stocks:exits' => ['voir', 'créer', 'modifier'], 'stocks:requests' => ['voir', 'créer', 'modifier'], 'stocks:inventory' => ['voir', 'modifier'], 'stocks:reports' => ['voir'], 'stocks:references' => ['voir'], 'stocks:users' => ['voir'], 'stocks:settings' => ['voir']]],
+            ['id' => 'demo-emp-ndeye', 'email' => 'ndeye.sarr@kora.demo', 'password' => 'NdeyeKora2026!', 'displayName' => 'Ndeye Sarr', 'role' => 'employee', 'companyId' => 'kora', 'employeeId' => 'demo-emp-ndeye', 'sectorIds' => ['kora-service-rh'], 'permissions' => ['presences' => ['voir', 'créer', 'modifier']]],
+            ['id' => 'demo-emp-mamadou', 'email' => 'mamadou.ba@kora.demo', 'password' => 'MamadouKora2026!', 'displayName' => 'Mamadou Ba', 'role' => 'sector_manager', 'companyId' => 'kora', 'employeeId' => 'demo-emp-mamadou', 'sectorIds' => ['kora-service-finance'], 'permissions' => []],
         ];
 
         foreach ($accounts as $account) {
             $user = AuthUser::query()->find($account['id']);
-            $needsRepair = !$user
+            $needsRepair = ! $user
                 || $user->email !== $account['email']
                 || $user->display_name !== $account['displayName']
                 || $user->role !== $account['role']
                 || $user->company_id !== $account['companyId']
                 || $user->employee_id !== $account['employeeId']
                 || ($user->sector_ids ?? []) !== $account['sectorIds']
+                || ($user->permissions ?? []) !== $account['permissions']
                 || $user->status !== 'ACTIF'
-                || !MaximusPassword::check($account['password'], $user->password_hash);
+                || ! MaximusPassword::check($account['password'], $user->password_hash);
 
-            if (!$needsRepair) {
+            if (! $needsRepair) {
                 continue;
             }
 
@@ -44,6 +53,7 @@ final class MaximusDemoProvisioner
                 'company_id' => $account['companyId'],
                 'employee_id' => $account['employeeId'],
                 'sector_ids' => $account['sectorIds'],
+                'permissions' => $account['permissions'],
                 'status' => 'ACTIF',
                 'updated_at' => now(),
             ];

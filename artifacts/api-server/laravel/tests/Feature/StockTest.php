@@ -177,16 +177,34 @@ class StockTest extends TestCase
         $this->assertDatabaseCount('stock_requests', 0);
     }
 
-    private function asActor(): self
+    public function test_stock_api_enforces_detailed_permissions_for_non_admin_accounts(): void
+    {
+        $request = $this->asActor('employee', ['stocks:products' => ['voir']]);
+
+        $request->getJson('/api/stock/bootstrap?companyId=kora')
+            ->assertOk();
+
+        $request->postJson('/api/stock/products', [
+            'companyId' => 'kora',
+            'name' => 'Produit interdit',
+            'sku' => 'FORBIDDEN-01',
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('stock_products', ['sku' => 'FORBIDDEN-01']);
+    }
+
+    private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([
             'id' => 'stock-admin',
             'email' => 'stock-admin@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Gestionnaire Stock',
-            'role' => 'company_admin',
+            'role' => $role,
             'company_id' => 'kora',
+            'employee_id' => $role === 'employee' ? 'stock-employee' : null,
             'sector_ids' => [],
+            'permissions' => $permissions,
             'status' => 'ACTIF',
         ]);
         $token = MaximusAuth::issueSession($user);

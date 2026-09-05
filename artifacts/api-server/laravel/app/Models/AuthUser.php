@@ -21,6 +21,7 @@ class AuthUser extends Model
         'company_id',
         'employee_id',
         'sector_ids',
+        'permissions',
         'status',
     ];
 
@@ -32,6 +33,7 @@ class AuthUser extends Model
     {
         return [
             'sector_ids' => 'array',
+            'permissions' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

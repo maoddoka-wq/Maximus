@@ -174,16 +174,42 @@ class PresenceTest extends TestCase
         ])->assertForbidden();
     }
 
-    private function asActor(): self
+    public function test_presence_api_enforces_detailed_permissions_and_employee_scope(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', ['presences' => ['voir', 'créer']]);
+
+        $request->getJson('/api/presence/bootstrap?companyId=kora')
+            ->assertOk();
+
+        $request->postJson('/api/presence/clock', [
+            'companyId' => 'kora',
+            'employeeId' => 'another-employee',
+            'workDate' => '2026-09-05',
+            'action' => 'arrival',
+            'now' => '2026-09-05T08:00:00Z',
+        ])->assertForbidden();
+
+        $request->postJson('/api/presence/items', [
+            'companyId' => 'kora',
+            'type' => 'schedule',
+            'employeeId' => 'presence-employee',
+            'status' => 'ACTIF',
+            'payload' => ['shift' => 'matin'],
+        ])->assertCreated();
+    }
+
+    private function asActor(string $role = 'company_admin', string $employeeId = 'presence-admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([
             'id' => 'presence-admin',
             'email' => 'presence-admin@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'RH Kora',
-            'role' => 'company_admin',
+            'role' => $role,
             'company_id' => 'kora',
+            'employee_id' => $role === 'employee' ? $employeeId : null,
             'sector_ids' => [],
+            'permissions' => $permissions,
             'status' => 'ACTIF',
         ]);
         $token = MaximusAuth::issueSession($user);

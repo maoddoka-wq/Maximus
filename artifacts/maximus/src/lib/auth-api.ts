@@ -4,6 +4,7 @@ export type AuthUser = {
   companyId?: string;
   employeeId?: string;
   sectorIds: string[];
+  permissions?: Record<string, string[]>;
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -31,6 +32,7 @@ export const authApi = {
     employeeId: string;
     sectorIds: string[];
     role: 'sector_manager' | 'employee';
+    permissions?: Record<string, string[]>;
     password?: string;
   }) => request<{ ok: true }>('/auth/accounts', {
     method: 'POST',

@@ -14,3 +14,9 @@ The current acceptance target is the MAXIMUS demo environment. Production should
 **Why:** The user wants to prove the complete product behavior in demo before changing production.
 
 **How to apply:** Continue functional validation in demo for now; defer production-specific configuration and deployment changes until demo acceptance.
+
+Le workflow de démonstration provisionne les comptes avant de démarrer le serveur et n’applique pas automatiquement les migrations. Les évolutions de schéma nécessaires au provisionnement doivent donc être idempotentes dans cette commande, en plus de leur migration officielle.
+
+**Why:** Une nouvelle colonne de permissions a bloqué le démarrage alors que les tests, qui exécutent les migrations, passaient correctement.
+
+**How to apply:** Pour toute donnée requise par `ensureAuthUsers` ou un autre provisionneur de démarrage, vérifier/créer la colonne de façon idempotente avant le premier `updateOrCreate`; conserver la migration pour les environnements normaux.

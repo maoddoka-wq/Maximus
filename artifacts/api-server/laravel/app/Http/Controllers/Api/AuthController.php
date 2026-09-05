@@ -64,10 +64,16 @@ class AuthController extends Controller
             'sectorIds.*' => ['string', 'min:1'],
             'role' => ['required', 'in:sector_manager,employee'],
             'password' => ['nullable', 'string', 'min:8', 'max:200'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['array'],
+            'permissions.*.*' => ['string', 'min:1'],
         ]);
         $actor = $request->attributes->get('authActor');
         if (! CompanyAuthorization::canManageAccount($actor, $data['companyId'], $data['sectorIds'])) {
             return response()->json(['error' => 'Provisionnement du compte hors périmètre autorisé.'], 403);
+        }
+        if (! CompanyAuthorization::canAssignPermissions($actor, $data['permissions'] ?? [])) {
+            return response()->json(['error' => 'Permissions du compte hors périmètre autorisé.'], 403);
         }
 
         $existingQuery = AuthUser::query()->where('employee_id', $data['employeeId']);
@@ -86,6 +92,7 @@ class AuthController extends Controller
             'company_id' => $data['companyId'],
             'employee_id' => $data['employeeId'],
             'sector_ids' => $data['sectorIds'],
+            'permissions' => $data['permissions'] ?? [],
             'status' => 'ACTIF',
             'updated_at' => now(),
         ];
