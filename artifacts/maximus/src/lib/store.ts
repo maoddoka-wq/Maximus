@@ -18,11 +18,12 @@ export type ModuleId =
   | 'rapports';
 
 export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
-export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; status: 'ACTIF' | 'BETA'; }
+export interface ModuleFeaturePack { id: string; name: string; description?: string; featureIds: string[]; }
+export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; featurePacks?: ModuleFeaturePack[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'MAINTENANCE' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
-export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies'>>>>;
-export interface SectorBusinessProfile { id: string; name: string; description?: string; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
+export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
+export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
@@ -105,10 +106,17 @@ export interface StoreData { catalogVersion?: number; organizationVersion?: numb
 
 const today = new Date().toISOString();
 export const modules: Module[] = [
-  { id: 'commerce', name: 'Gestion commerciale', description: 'Ventes, clients et performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], status: 'ACTIF' },
+  { id: 'commerce', name: 'Gestion commerciale', description: 'Ventes, clients et performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
+    { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
+    { id: 'commerce-gestion', name: 'Gestion commerciale', description: 'Gérer les ventes, clients et indicateurs.', featureIds: ['clients', 'sales', 'products', 'reports'] },
+  ], status: 'ACTIF' },
   { id: 'ventes', name: 'Ventes', description: 'Devis, commandes, factures et paiements clients.', features: ['Devis', 'Commandes', 'Facturation'], status: 'ACTIF' },
   { id: 'achats', name: 'Achats', description: 'Demandes, commandes et suivi des achats.', features: ['Demandes d’achat', 'Commandes fournisseurs', 'Réceptions'], status: 'ACTIF' },
-  { id: 'stocks', name: 'Gestion de stock', description: 'Articles, entrées, sorties et niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, status: 'ACTIF' },
+  { id: 'stocks', name: 'Gestion de stock', description: 'Articles, entrées, sorties et niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
+    { id: 'stock-consultation', name: 'Consultation du stock', description: 'Consulter les articles et les niveaux de stock.', featureIds: ['dashboard', 'products', 'reports'] },
+    { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
+    { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter l’ensemble des opérations et des paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
+  ], status: 'ACTIF' },
   { id: 'finance', name: 'Finance', description: 'Trésorerie, paiements et pilotage financier.', features: ['Suivi des paiements', 'Trésorerie', 'Rapports financiers'], status: 'ACTIF' },
   { id: 'comptabilite', name: 'Comptabilité', description: 'Écritures, rapprochements et clôture comptable.', features: ['Plan comptable', 'Journaux', 'Rapprochement'], status: 'ACTIF' },
   { id: 'rh', name: 'Ressources humaines', description: 'Collaborateurs, rôles et organisation.', features: ['Employés', 'Rôles', 'Organisation'], status: 'ACTIF' },
@@ -159,12 +167,14 @@ export const sectorPresets: SectorPreset[] = [
         id: 'distribution-stock',
         name: 'Gestion de stock',
         description: 'Un bloc opérationnel pour consulter les articles et gérer les mouvements de stock.',
-        moduleFeatures: { stocks: ['articles', 'entrees-et-sorties', 'alertes-de-seuil'] },
+        modulePackIds: { stocks: ['stock-gestion'] },
+        moduleFeatures: { stocks: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
       },
       {
         id: 'distribution-vente',
         name: 'Vente et encaissement',
         description: 'Un bloc pour suivre les clients, les ventes et les opérations de caisse.',
+        modulePackIds: { commerce: ['commerce-gestion'] },
         moduleFeatures: { commerce: ['clients', 'sales'], ventes: ['devis', 'commandes', 'facturation'] },
       },
     ],
@@ -186,6 +196,9 @@ export function seedData(): StoreData {
       ),
       businessProfiles: (preset.businessProfiles ?? []).map(profile => ({
         ...profile,
+        modulePackIds: Object.fromEntries(
+          Object.entries(profile.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
         moduleFeatures: Object.fromEntries(
           Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
         ),

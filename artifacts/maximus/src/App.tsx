@@ -453,12 +453,15 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
     setModuleError('');
   };
   const applyBusinessProfile = (profile: SectorBusinessProfile) => {
-    const entries = Object.entries(profile.moduleFeatures ?? {}) as [ModuleId, string[]][];
+    const entries = Object.entries(profile.modulePackIds ?? profile.moduleFeatures ?? {}) as [ModuleId, string[]][];
     setSelectedBusinessProfileId(profile.id);
     setSelectedModules(entries.map(([moduleId]) => moduleId));
     setSelectedModuleFeatures(Object.fromEntries(entries.map(([moduleId, featureIds]) => {
       const module = modules.find(item => item.id === moduleId);
-      return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, featureIds)] : [...featureIds]];
+      const packFeatures = profile.modulePackIds?.[moduleId]
+        ? (module?.featurePacks ?? []).filter(pack => profile.modulePackIds?.[moduleId]?.includes(pack.id)).flatMap(pack => pack.featureIds)
+        : featureIds;
+      return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, packFeatures)] : [...packFeatures]];
     })) as Partial<Record<ModuleId, string[]>>);
     setModuleError('');
   };
@@ -830,15 +833,20 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
   const [profileName, setProfileName] = useState('');
   const [profileDescription, setProfileDescription] = useState('');
   const [profileModules, setProfileModules] = useState<ModuleId[]>([]);
+  const [profilePackIds, setProfilePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [profileFeatures, setProfileFeatures] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
   const sectorPresets = data.sectorPresets ?? [];
-  const moduleName = (id: ModuleId) => modules.find(module => module.id === id)?.name ?? id;
+  const moduleForSector = (id: ModuleId) => {
+    const base = modules.find(module => module.id === id);
+    return base ? { ...base, ...(data.moduleOverrides?.[id] ?? {}) } : undefined;
+  };
+  const moduleName = (id: ModuleId) => moduleForSector(id)?.name ?? id;
 
   const toggleSectorModule = (moduleId: ModuleId) => {
-    const module = modules.find(item => item.id === moduleId);
+    const module = moduleForSector(moduleId);
     if (!module) return;
     setSectorError('');
     setSectorModules(previous => {
@@ -854,7 +862,7 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
   };
 
   const toggleSectorFeature = (moduleId: ModuleId, featureId: string) => {
-    const module = modules.find(item => item.id === moduleId);
+    const module = moduleForSector(moduleId);
     if (!module) return;
     setSectorError('');
     setSectorFeatures(current => {
@@ -873,6 +881,7 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     setProfileName('');
     setProfileDescription('');
     setProfileModules([]);
+    setProfilePackIds({});
     setProfileFeatures({});
     setEditingProfileId(null);
   };
@@ -880,25 +889,41 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
   const toggleProfileModule = (moduleId: ModuleId) => {
     const enabled = profileModules.includes(moduleId);
     setProfileModules(previous => enabled ? previous.filter(id => id !== moduleId) : [...previous, moduleId]);
+    if (enabled) {
+      setProfilePackIds(current => {
+        const next = { ...current };
+        delete next[moduleId];
+        return next;
+      });
+    } else {
+      const module = moduleForSector(moduleId);
+      const firstPack = module?.featurePacks?.[0];
+      if (firstPack) {
+        setProfilePackIds(current => ({ ...current, [moduleId]: [firstPack.id] }));
+      }
+    }
     setProfileFeatures(current => {
       if (enabled) {
         const next = { ...current };
         delete next[moduleId];
         return next;
       }
-      const module = modules.find(item => item.id === moduleId);
-      return { ...current, [moduleId]: module ? [...getEffectiveModuleFeatureIds(module)] : [] };
+      const module = moduleForSector(moduleId);
+      const firstPack = module?.featurePacks?.[0];
+      return { ...current, [moduleId]: module ? [...getEffectiveModuleFeatureIds(module, firstPack?.featureIds)] : [] };
     });
   };
 
-  const toggleProfileFeature = (moduleId: ModuleId, featureId: string) => {
-    const module = modules.find(item => item.id === moduleId);
+  const toggleProfilePack = (moduleId: ModuleId, packId: string) => {
+    const module = moduleForSector(moduleId);
     if (!module) return;
-    setProfileFeatures(current => {
-      const selected = new Set(current[moduleId] ?? getModuleFeatureOptions(module).map(feature => feature.id));
-      if (selected.has(featureId)) selected.delete(featureId);
-      else selected.add(featureId);
-      return { ...current, [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
+    setProfilePackIds(current => {
+      const currentIds = current[moduleId] ?? [];
+      const nextIds = currentIds.includes(packId) ? currentIds.filter(id => id !== packId) : [...currentIds, packId];
+      const selectedFeatures = (module.featurePacks ?? []).filter(pack => nextIds.includes(pack.id)).flatMap(pack => pack.featureIds);
+      setProfileFeatures(features => ({ ...features, [moduleId]: [...getEffectiveModuleFeatureIds(module, selectedFeatures)] }));
+      setProfileModules(currentModules => nextIds.length > 0 ? currentModules.includes(moduleId) ? currentModules : [...currentModules, moduleId] : currentModules.filter(id => id !== moduleId));
+      return { ...current, [moduleId]: nextIds };
     });
   };
 
@@ -906,19 +931,21 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     setEditingProfileId(profile.id);
     setProfileName(profile.name);
     setProfileDescription(profile.description ?? '');
-    const moduleIds = Object.keys(profile.moduleFeatures ?? {}) as ModuleId[];
+    const moduleIds = Object.keys(profile.modulePackIds ?? profile.moduleFeatures ?? {}) as ModuleId[];
     setProfileModules(moduleIds);
+    setProfilePackIds(Object.fromEntries(moduleIds.map(moduleId => [moduleId, [...(profile.modulePackIds?.[moduleId] ?? [])]])));
     setProfileFeatures(Object.fromEntries(moduleIds.map(moduleId => [moduleId, [...(profile.moduleFeatures?.[moduleId] ?? [])]])));
   };
 
   const saveBusinessProfile = () => {
     const normalizedName = profileName.trim();
     if (!normalizedName || profileModules.length === 0) return;
-    const moduleFeatures = Object.fromEntries(profileModules.map(moduleId => [moduleId, [...getEffectiveModuleFeatureIds(modules.find(module => module.id === moduleId)!, profileFeatures[moduleId])]])) as Partial<Record<ModuleId, string[]>>;
+    const moduleFeatures = Object.fromEntries(profileModules.map(moduleId => [moduleId, [...getEffectiveModuleFeatureIds(moduleForSector(moduleId)!, profileFeatures[moduleId])]])) as Partial<Record<ModuleId, string[]>>;
     const profile: SectorBusinessProfile = {
       id: editingProfileId ?? uid('business-profile'),
       name: normalizedName,
       description: profileDescription.trim(),
+      modulePackIds: Object.fromEntries(profileModules.map(moduleId => [moduleId, [...(profilePackIds[moduleId] ?? [])]])),
       moduleFeatures,
     };
     setBusinessProfiles(previous => editingProfileId
@@ -938,12 +965,13 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     setSectorModules(preset ? [...preset.moduleIds] : []);
     setSectorFeatures(preset
       ? Object.fromEntries(preset.moduleIds.map(moduleId => {
-        const module = modules.find(item => item.id === moduleId);
+    const module = moduleForSector(moduleId);
         return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, preset.moduleFeatures?.[moduleId])] : []];
       }))
       : {});
     setBusinessProfiles((preset?.businessProfiles ?? []).map(profile => ({
       ...profile,
+      modulePackIds: Object.fromEntries(Object.entries(profile.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]])),
       moduleFeatures: Object.fromEntries(Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]])),
     })));
     resetBusinessProfile();
@@ -966,7 +994,7 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       return;
     }
     const moduleFeatures = Object.fromEntries(sectorModules.map(moduleId => {
-      const module = modules.find(item => item.id === moduleId);
+      const module = moduleForSector(moduleId);
       return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, sectorFeatures[moduleId])] : []];
     })) as Partial<Record<ModuleId, string[]>>;
     const preset: SectorPreset = {
@@ -976,6 +1004,9 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       moduleFeatures,
       businessProfiles: businessProfiles.map(profile => ({
         ...profile,
+        modulePackIds: Object.fromEntries(
+          Object.entries(profile.modulePackIds ?? {}).filter(([moduleId]) => sectorModules.includes(moduleId as ModuleId)).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
         moduleFeatures: Object.fromEntries(
           Object.entries(profile.moduleFeatures ?? {}).filter(([moduleId]) => sectorModules.includes(moduleId as ModuleId)).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
         ),
@@ -1006,27 +1037,17 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       <form onSubmit={createSector} className="mt-6 border-t pt-5">
         <label className="block max-w-md text-sm font-semibold">Nom du secteur<input data-testid="input-sector-name" value={sectorName} onChange={event => setSectorName(event.target.value)} placeholder="Ex. Bâtiment et travaux publics" className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" /></label>
         <p className="mt-5 text-sm font-semibold">Modules proposés automatiquement</p>
-        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez les modules puis les fonctionnalités proposées par défaut aux entreprises de ce secteur.</p>
+         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez les modules disponibles. Les fonctionnalités sont regroupées dans les packs de chaque module.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {modules.map(module => {
+           {modules.map(baseModule => {
+             const module = moduleForSector(baseModule.id) ?? baseModule;
             const enabled = sectorModules.includes(module.id);
-            const featureOptions = getModuleFeatureOptions(module);
-            const selectedFeatureIds = getEffectiveModuleFeatureIds(module, sectorFeatures[module.id]);
             return <div key={module.id} className={`rounded-xl border p-3 transition ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}>
               <button type="button" data-testid={`button-sector-module-${module.id}`} onClick={() => toggleSectorModule(module.id)} className="flex w-full items-start gap-3 text-left">
                 <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{enabled && <Check size={13} />}</span>
                 <span><strong className="block text-sm">{module.name}</strong><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</span></span>
               </button>
-              {enabled && <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3">
-                <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span></div>
-                <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
-                  {featureOptions.map(feature => <label key={feature.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--card)/.7)]">
-                    <input data-testid={`checkbox-sector-feature-${module.id}-${feature.id}`} type="checkbox" checked={selectedFeatureIds.has(feature.id)} onChange={() => toggleSectorFeature(module.id, feature.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
-                    <span>{feature.label}</span>
-                  </label>)}
-                </div>
-                <p className="mt-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">Les prérequis sont ajoutés automatiquement en visibilité.</p>
-              </div>}
+               {enabled && <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">{module.featurePacks?.length ?? 0} pack(s) métier configuré(s)</span></div>}
             </div>;
           })}
         </div>
@@ -1053,19 +1074,20 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
                 </div>)}
               </div>}
             </div>
-            <div>
-              <p className="text-sm font-semibold">Fonctionnalités du pack</p>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez les modules du secteur puis les fonctions incluses dans ce métier.</p>
+             <div>
+               <p className="text-sm font-semibold">Packs des modules</p>
+               <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez les modules puis les packs déjà configurés dans chaque module.</p>
               {sectorModules.length === 0 ? <p className="mt-4 rounded-lg border border-dashed p-4 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez d’abord un module dans la section précédente.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {sectorModules.map(moduleId => {
                   const module = modules.find(item => item.id === moduleId);
                   if (!module) return null;
                   const enabled = profileModules.includes(moduleId);
-                  const options = getModuleFeatureOptions(module);
-                  const selected = new Set(profileFeatures[moduleId] ?? []);
+                   const packs = module.featurePacks ?? [];
+                   const selected = new Set(profilePackIds[moduleId] ?? []);
                   return <div key={moduleId} className={`rounded-lg border p-3 ${enabled ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--card))]' : ''}`}>
-                    <button type="button" onClick={() => toggleProfileModule(moduleId)} className="flex w-full items-center gap-2 text-left text-xs font-bold"><span className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : ''}`}>{enabled && <Check size={11} />}</span>{module.name}</button>
-                    {enabled && <div className="mt-2 space-y-1 border-t pt-2">{options.map(feature => <label key={feature.id} className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={selected.has(feature.id)} onChange={() => toggleProfileFeature(moduleId, feature.id)} className="accent-[hsl(var(--primary))]" />{feature.label}</label>)}</div>}
+                     <button type="button" disabled={packs.length === 0} onClick={() => toggleProfileModule(moduleId)} className="flex w-full items-center gap-2 text-left text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><span className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : ''}`}>{enabled && <Check size={11} />}</span>{module.name}</button>
+                     {packs.length === 0 && <p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Aucun pack configuré dans ce module.</p>}
+                     {enabled && <div className="mt-2 space-y-1 border-t pt-2">{packs.map(pack => <label key={pack.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--muted))]"><input type="checkbox" checked={selected.has(pack.id)} onChange={() => toggleProfilePack(moduleId, pack.id)} className="mt-0.5 accent-[hsl(var(--primary))]" /><span><strong className="block">{pack.name}</strong><span className="text-[9px] text-[hsl(var(--muted-foreground))]">{pack.featureIds.length} fonctionnalité(s)</span></span></label>)}</div>}
                   </div>;
                 })}
               </div>}
@@ -1242,8 +1264,8 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
-  const [testMode, setTestMode] = useState(false);
-  const [tests, setTests] = useState<Record<string, boolean>>({});
+  const [editingPackId, setEditingPackId] = useState<string | null>(null);
+  const [packForm, setPackForm] = useState({ name: '', description: '', featureIds: [] as string[] });
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
@@ -1277,7 +1299,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     const features = moduleForm.features.split(/[\n,]/).map(feature => feature.trim()).filter(Boolean);
     if (features.length === 0) return;
     mutate(draft => {
-      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: { name: moduleForm.name.trim(), description: moduleForm.description.trim(), features } };
+      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: { ...(draft.moduleOverrides?.[editingModule.id] ?? {}), name: moduleForm.name.trim(), description: moduleForm.description.trim(), features } };
     }, `${moduleForm.name.trim()} a été modifié.`);
     setEditingModule(null);
   };
@@ -1306,15 +1328,38 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     }, isActive ? `${module.name} a été désactivé pour tous les espaces.` : `${module.name} est maintenant actif.`);
   };
 
-  const runFeatureTest = (moduleId: ModuleId, feature: string) => {
-    const key = `${moduleId}:${feature}`;
-    setTests(previous => ({ ...previous, [key]: true }));
-    notify(`Test réussi : ${feature}.`);
+  const resetPackForm = () => {
+    setEditingPackId(null);
+    setPackForm({ name: '', description: '', featureIds: [] });
   };
 
-  if (selected && testMode) {
-    return <ModuleTestWorkbench module={selected} data={data} mutate={mutate} onBack={() => setTestMode(false)} />;
-  }
+  const openPackEdit = (pack: { id: string; name: string; description?: string; featureIds: string[] }) => {
+    setEditingPackId(pack.id);
+    setPackForm({ name: pack.name, description: pack.description ?? '', featureIds: [...pack.featureIds] });
+  };
+
+  const togglePackFeature = (featureId: string) => {
+    setPackForm(current => ({ ...current, featureIds: current.featureIds.includes(featureId) ? current.featureIds.filter(id => id !== featureId) : [...current.featureIds, featureId] }));
+  };
+
+  const savePack = () => {
+    if (!selected || !packForm.name.trim() || packForm.featureIds.length === 0) return;
+    const nextPack = { id: editingPackId ?? uid(`pack-${selected.id}`), name: packForm.name.trim(), description: packForm.description.trim(), featureIds: [...packForm.featureIds] };
+    mutate(draft => {
+      const current = draft.moduleOverrides?.[selected.id]?.featurePacks ?? modules.find(module => module.id === selected.id)?.featurePacks ?? [];
+      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [selected.id]: { ...(draft.moduleOverrides?.[selected.id] ?? {}), featurePacks: editingPackId ? current.map(pack => pack.id === editingPackId ? nextPack : pack) : [...current, nextPack] } };
+    }, editingPackId ? 'Pack métier mis à jour.' : 'Pack métier créé.');
+    resetPackForm();
+  };
+
+  const deletePack = (packId: string) => {
+    if (!selected) return;
+    mutate(draft => {
+      const current = draft.moduleOverrides?.[selected.id]?.featurePacks ?? modules.find(module => module.id === selected.id)?.featurePacks ?? [];
+      draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [selected.id]: { ...(draft.moduleOverrides?.[selected.id] ?? {}), featurePacks: current.filter(pack => pack.id !== packId) } };
+    }, 'Pack métier supprimé.');
+    if (editingPackId === packId) resetPackForm();
+  };
 
   if (selected) {
     const status = statusOf(selected.id);
@@ -1336,23 +1381,23 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
             <button data-testid={`button-detail-toggle-module-${selected.id}`} onClick={() => toggleModule(selected.id)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
               {isActive ? 'Désactiver le module' : 'Activer le module'} <ChevronRight size={14} />
             </button>
-            <button data-testid={`button-open-live-test-${selected.id}`} onClick={() => setTestMode(true)} className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.35)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary))]">
-              Ouvrir l’espace de test <ChevronRight size={14} />
-            </button>
           </div>
         </section>
         <section className="card-surface rounded-2xl p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Banc de test</p><h2 className="mt-2 text-xl font-bold">Tester les fonctionnalités</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Lancez chaque scénario depuis l’administration avant de l’autoriser pour un espace.</p></div>
-            <Check size={19} className="text-[hsl(var(--primary))]" />
-          </div>
-          <div className="mt-6 space-y-3">{selected.features.map(feature => {
-            const tested = tests[`${selected.id}:${feature}`];
-            return <div data-testid={`row-feature-${selected.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} key={feature} className="flex items-center justify-between gap-4 rounded-xl border p-4">
-              <div className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${tested ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{tested ? <Check size={15} /> : <LayoutGrid size={15} />}</span><span className="text-sm font-semibold">{feature}</span></div>
-              <button data-testid={`button-test-feature-${selected.id}-${feature.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} onClick={() => runFeatureTest(selected.id, feature)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${tested ? 'border border-[hsl(var(--primary)/.3)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>{tested ? 'Test réussi' : 'Tester'}</button>
-            </div>;
-          })}</div>
+           <div className="flex items-start justify-between gap-4">
+             <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Configuration métier</p><h2 className="mt-2 text-xl font-bold">Packs métiers du module</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Créez des packs réutilisables en regroupant les fonctionnalités de ce module. Les secteurs pourront ensuite les sélectionner.</p></div>
+             <Package size={19} className="text-[hsl(var(--primary))]" />
+           </div>
+           <div className="mt-6 space-y-3">{(selected.featurePacks ?? []).map(pack => <div data-testid={`row-module-pack-${selected.id}-${pack.id}`} key={pack.id} className="rounded-xl border p-4">
+             <div className="flex items-start justify-between gap-4"><div><strong className="text-sm">{pack.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{pack.description || 'Aucune description.'}</p><p className="mt-2 text-[10px] font-semibold text-[hsl(var(--primary))]">{pack.featureIds.length} fonctionnalité(s) incluse(s)</p></div><div className="flex shrink-0 gap-1"><button type="button" data-testid={`button-edit-module-pack-${pack.id}`} onClick={() => openPackEdit(pack)} className="rounded-lg p-2 text-xs font-bold hover:bg-[hsl(var(--muted))]"><Edit3 size={14} /></button><button type="button" data-testid={`button-delete-module-pack-${pack.id}`} onClick={() => deletePack(pack.id)} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={14} /></button></div></div>
+           </div>)}{(selected.featurePacks ?? []).length === 0 && <p className="rounded-xl border border-dashed p-5 text-xs text-[hsl(var(--muted-foreground))]">Aucun pack métier n’est encore configuré pour ce module.</p>}</div>
+           <div className="mt-6 border-t pt-5">
+             <p className="text-sm font-bold">{editingPackId ? 'Modifier le pack' : 'Créer un pack métier'}</p>
+             <div className="mt-3 grid gap-3 sm:grid-cols-2"><Field label="Nom du pack" value={packForm.name} onChange={value => setPackForm(current => ({ ...current, name: value }))} placeholder="Ex. Gestionnaire de stock" testId="input-module-pack-name" /><Field label="Description" value={packForm.description} onChange={value => setPackForm(current => ({ ...current, description: value }))} placeholder="À quoi sert ce pack ?" testId="input-module-pack-description" /></div>
+             <p className="mt-4 text-xs font-bold">Fonctionnalités incluses</p>
+             <div className="mt-2 grid gap-1 sm:grid-cols-2">{getModuleFeatureOptions(selected).map(feature => <label key={feature.id} className="flex items-center gap-2 rounded-md px-2 py-2 text-xs hover:bg-[hsl(var(--muted))]"><input type="checkbox" checked={packForm.featureIds.includes(feature.id)} onChange={() => togglePackFeature(feature.id)} className="accent-[hsl(var(--primary))]" />{feature.label}</label>)}</div>
+             <div className="mt-4 flex gap-2"><button type="button" data-testid="button-save-module-pack" disabled={!packForm.name.trim() || packForm.featureIds.length === 0} onClick={savePack} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-40">{editingPackId ? 'Mettre à jour' : 'Créer le pack'}</button>{editingPackId && <button type="button" onClick={resetPackForm} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button>}</div>
+           </div>
         </section>
       </div>
      {editingModule && <Modal title="Modifier le module" onClose={() => setEditingModule(null)}><div className="space-y-4"><Field label="Nom du module" value={moduleForm.name} onChange={value => setModuleForm(current => ({ ...current, name: value }))} testId="input-module-name" /><Field label="Description" value={moduleForm.description} onChange={value => setModuleForm(current => ({ ...current, description: value }))} testId="input-module-description" /><label className="block text-sm font-semibold">Fonctionnalités<textarea data-testid="input-module-features" value={moduleForm.features} onChange={event => setModuleForm(current => ({ ...current, features: event.target.value }))} placeholder="Une fonctionnalité par ligne" rows={5} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités peuvent être séparées par des lignes ou des virgules.</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-module" onClick={saveModule}>Enregistrer les modifications</ActionButton></div></div></Modal>}
@@ -1408,29 +1453,6 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
      </div>
      {deletingModule && <Modal title="Confirmer la suppression" onClose={() => setDeletingModule(null)}><p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">Voulez-vous vraiment supprimer le module <strong className="text-[hsl(var(--foreground))]">{deletingModule.name}</strong> ? Il sera retiré du catalogue et désactivé pour tous les espaces.</p><div className="mt-6 flex justify-end gap-2"><button type="button" data-testid="button-cancel-delete-module" onClick={() => setDeletingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="button" data-testid="button-confirm-delete-module" onClick={() => removeModule(deletingModule)} className="rounded-lg bg-[hsl(var(--destructive))] px-4 py-2.5 text-xs font-bold text-white">Supprimer le module</button></div></Modal>}
     </div>;
-}
-
-function ModuleTestWorkbench({ module, data, mutate, onBack }: { module: (typeof modules)[number]; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onBack: () => void }) {
-  const operationalModules: ModuleId[] = ['achats', 'comptabilite', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents'];
-  const koraCompany = data.companies.find(company => company.id === 'kora');
-  return <div data-testid="module-workbench" className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <button data-testid="button-back-live-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
-      <span className="rounded-full bg-[hsl(var(--accent)/.2)] px-3 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))]">MODE TEST ADMINISTRATION</span>
-    </div>
-    <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-5">
-      <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Espace de test</p>
-      <h1 className="mt-2 text-2xl font-bold">{module.name}</h1>
-      <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Les actions effectuées ici utilisent les mêmes écrans et données que l’espace entreprise. Elles servent à valider le module avant son activation.</p>
-    </section>
-     {module.id === 'stocks' && <StockModulePage companyId="kora" />}
-    {(module.id === 'commerce' || module.id === 'ventes') && <CommerceModulePage companyId="kora" data={data} mutate={mutate} initialTab={module.id === 'ventes' ? 'sales' : 'dashboard'} />}
-    {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
-    {module.id === 'rh' && koraCompany && <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />}
-    {module.id === 'presences' && <PresencesPage data={data} />}
-    {operationalModules.includes(module.id) && <OperationalModulePage moduleId={module.id} data={data} mutate={mutate} />}
-    {module.id === 'rapports' && <OperationalReportsPage data={data} />}
-  </div>;
 }
 
 function OperationalReportsPage({ data }: { data: StoreData }) {

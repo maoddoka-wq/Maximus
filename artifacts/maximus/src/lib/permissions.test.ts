@@ -233,7 +233,8 @@ test('conserve les packs métiers configurés dans un secteur', () => {
   const stockPack = distribution?.businessProfiles?.find(profile => profile.id === 'distribution-stock');
   assert.ok(stockPack);
   assert.equal(stockPack.name, 'Gestion de stock');
-  assert.deepEqual(stockPack.moduleFeatures.stocks, ['articles', 'entrees-et-sorties', 'alertes-de-seuil']);
+  assert.deepEqual(stockPack.modulePackIds?.stocks, ['stock-gestion']);
+  assert.deepEqual(stockPack.moduleFeatures.stocks, ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports']);
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {

@@ -15,8 +15,8 @@ For modules with several screens, keep one canonical feature definition shared b
 
 **How to apply:** Add every user-facing capability to the module feature manifest first, derive the module catalog and navigation from it, and add a regression test that compares the manifest with the selectable feature options.
 
-Sector presets can contain named business packs that group modules and features for a specific trade or activity. The signup flow should apply a selected pack as a starting point while keeping the company’s ability to add or remove features before submitting its request.
+Each module owns its named business packs; sector presets compose those module packs into a business profile for a trade or activity. The signup flow applies the selected composition as a starting point while keeping the company’s ability to adjust features before submitting its request.
 
-**Why:** A sector-level business pack represents the company’s operating model; it is different from an employee role and should be validated as part of the company’s module request.
+**Why:** Packs describe reusable module capabilities, while the sector only describes which module packs fit the company’s operating model; neither concept is an employee role.
 
-**How to apply:** Keep the hierarchy explicit as sector → business pack → modules → features, persist the selected pack with the signup request, and let the administrator review the resulting feature set before activation.
+**How to apply:** Keep the hierarchy explicit as module → module pack → features, then sector → selected module packs; persist the selected composition with the signup request and let the administrator review it before activation.
