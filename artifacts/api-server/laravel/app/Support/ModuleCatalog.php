@@ -30,6 +30,29 @@ final class ModuleCatalog
                     'heures-supplémentaires' => ['heures-travaillées'],
                     'rapports' => ['présences', 'heures-travaillées'],
                 ],
+                'employee_profiles' => [
+                    [
+                        'id' => 'employee',
+                        'name' => 'Employé',
+                        'description' => 'Consulte ses propres présences et transmet ses demandes courantes.',
+                        'featureIds' => ['pointage', 'présences', 'absences', 'congés', 'historique'],
+                        'defaultActions' => ['voir'],
+                    ],
+                    [
+                        'id' => 'team-manager',
+                        'name' => 'Responsable d’équipe',
+                        'description' => 'Suit son équipe, les retards, les horaires et les absences à valider.',
+                        'featureIds' => ['tableau-de-bord', 'présences', 'absences', 'retards', 'horaires', 'planning', 'pauses', 'heures-travaillées', 'historique', 'rapports'],
+                        'defaultActions' => ['voir', 'créer', 'modifier'],
+                    ],
+                    [
+                        'id' => 'hr-manager',
+                        'name' => 'Gestionnaire RH',
+                        'description' => 'Administre les règles de présence, les congés et les rapports RH.',
+                        'featureIds' => ['tableau-de-bord', 'pointage', 'présences', 'absences', 'retards', 'horaires', 'planning', 'pauses', 'heures-travaillées', 'heures-supplémentaires', 'missions', 'congés', 'jours-fériés', 'historique', 'rapports', 'paramètres'],
+                        'defaultActions' => ['voir', 'créer', 'modifier'],
+                    ],
+                ],
             ],
             ['id' => 'paie', 'name' => 'Paie', 'description' => 'Préparation et suivi des bulletins de salaire.', 'features' => ['Périodes de paie', 'Bulletins', 'Déclarations']],
             ['id' => 'crm', 'name' => 'CRM / Clients', 'description' => 'Fiches clients, opportunités et relances.', 'features' => ['Fiches clients', 'Opportunités', 'Relances']],
@@ -51,6 +74,7 @@ final class ModuleCatalog
                     'description' => $definition['description'],
                     'features' => json_encode($definition['features'], JSON_UNESCAPED_UNICODE),
                     'feature_dependencies' => json_encode($definition['feature_dependencies'] ?? [], JSON_UNESCAPED_UNICODE),
+                    'employee_profiles' => json_encode($definition['employee_profiles'] ?? [], JSON_UNESCAPED_UNICODE),
                     'status' => 'ACTIF',
                     'updated_at' => now(),
                     'created_at' => now(),
@@ -110,6 +134,7 @@ final class ModuleCatalog
                 'status' => $row?->status ?? 'INACTIF',
                 'featureIds' => $row ? json_decode($row->feature_ids ?? '[]', true) : [],
                 'configuration' => $row ? json_decode($row->configuration ?? '{}', true) : [],
+                'employeeProfiles' => $row ? json_decode($row->employee_profiles ?? '[]', true) : ($definition['employee_profiles'] ?? []),
             ];
         })->all();
     }

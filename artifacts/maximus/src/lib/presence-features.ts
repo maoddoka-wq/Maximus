@@ -1,4 +1,5 @@
 import { featureSlug } from './permission-keys';
+import type { ModuleEmployeeProfile } from './module-profiles';
 
 export const presenceFeatureDefinitions = [
   { tab: 'dashboard', label: 'Tableau de bord' },
@@ -29,3 +30,27 @@ export const presenceFeatureDependencies: Partial<Record<string, string[]>> = {
   [id('Heures supplémentaires')]: [id('Heures travaillées')],
   [id('Rapports')]: [id('Présences'), id('Heures travaillées')],
 };
+
+export const presenceEmployeeProfiles: ModuleEmployeeProfile[] = [
+  {
+    id: 'employee',
+    name: 'Employé',
+    description: 'Consulte ses propres présences et transmet ses demandes courantes.',
+    featureIds: ['Pointage', 'Présences', 'Absences', 'Congés', 'Historique'].map(id),
+    defaultActions: ['voir'],
+  },
+  {
+    id: 'team-manager',
+    name: 'Responsable d’équipe',
+    description: 'Suit son équipe, les retards, les horaires et les absences à valider.',
+    featureIds: ['Tableau de bord', 'Présences', 'Absences', 'Retards', 'Horaires', 'Planning', 'Pauses', 'Heures travaillées', 'Historique', 'Rapports'].map(id),
+    defaultActions: ['voir', 'créer', 'modifier'],
+  },
+  {
+    id: 'hr-manager',
+    name: 'Gestionnaire RH',
+    description: 'Administre les règles de présence, les congés et les rapports RH.',
+    featureIds: presenceFeatureDefinitions.map(feature => id(feature.label)),
+    defaultActions: ['voir', 'créer', 'modifier'],
+  },
+];

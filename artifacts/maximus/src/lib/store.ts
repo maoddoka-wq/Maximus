@@ -1,4 +1,5 @@
-import { presenceFeatureDefinitions, presenceFeatureDependencies } from './presence-features';
+import { presenceEmployeeProfiles, presenceFeatureDefinitions, presenceFeatureDependencies } from './presence-features';
+import type { ModuleEmployeeProfile } from './module-profiles';
 
 export type Status = 'ACTIF' | 'EN ATTENTE' | 'SUSPENDU' | 'REFUSÉ' | 'ARCHIVÉ' | 'BROUILLON' | 'VALIDÉ' | 'CONFIRMÉ';
 export type ModuleId =
@@ -18,10 +19,10 @@ export type ModuleId =
   | 'rapports';
 
 export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
-export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; status: 'ACTIF' | 'BETA'; }
+export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; employeeProfiles?: ModuleEmployeeProfile[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'MAINTENANCE' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
-export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies'>>>>;
+export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'employeeProfiles'>>>>;
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; moduleFeatures?: Partial<Record<ModuleId, string[]>>; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; }
@@ -111,7 +112,7 @@ export const modules: Module[] = [
   { id: 'finance', name: 'Finance', description: 'Trésorerie, paiements et pilotage financier.', features: ['Suivi des paiements', 'Trésorerie', 'Rapports financiers'], status: 'ACTIF' },
   { id: 'comptabilite', name: 'Comptabilité', description: 'Écritures, rapprochements et clôture comptable.', features: ['Plan comptable', 'Journaux', 'Rapprochement'], status: 'ACTIF' },
   { id: 'rh', name: 'Ressources humaines', description: 'Collaborateurs, rôles et organisation.', features: ['Employés', 'Rôles', 'Organisation'], status: 'ACTIF' },
-  { id: 'presences', name: 'Présences', description: 'Présences et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, status: 'ACTIF' },
+  { id: 'presences', name: 'Présences', description: 'Présences et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, employeeProfiles: presenceEmployeeProfiles, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Préparation et suivi des bulletins de salaire.', features: ['Périodes de paie', 'Bulletins', 'Déclarations'], status: 'ACTIF' },
   { id: 'crm', name: 'CRM / Clients', description: 'Fiches clients, opportunités et relances.', features: ['Fiches clients', 'Opportunités', 'Relances'], featureDependencies: { opportunites: ['fiches-clients'], relances: ['opportunites'] }, status: 'ACTIF' },
   { id: 'fournisseurs', name: 'Fournisseurs', description: 'Référentiel et relations fournisseurs.', features: ['Référentiel', 'Évaluation', 'Historique'], status: 'ACTIF' },

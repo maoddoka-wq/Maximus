@@ -15,9 +15,9 @@ import {
   hasDetailedCommercePermissions,
 } from './commerce-permissions';
 import { parseQueryTab } from './query-tab';
-import { resolveFeatureDependencies } from './permission-keys';
+import { featureSlug, resolveFeatureDependencies } from './permission-keys';
 import { getModuleFeatureOptions } from './module-features';
-import { presenceFeatureDefinitions } from './presence-features';
+import { presenceEmployeeProfiles, presenceFeatureDefinitions } from './presence-features';
 import { recordControlEvent, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
 import type { Employee, ModuleId, OrgNode, Role, StoreData } from './store';
@@ -226,6 +226,11 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
     presenceFeatureDefinitions.map(feature => feature.label),
   );
   assert.equal(presenceFeatureDefinitions.length, 16);
+  assert.equal(presenceEmployeeProfiles.length, 3);
+  presenceEmployeeProfiles.forEach(profile => {
+    assert.ok(profile.featureIds.length > 0);
+    assert.ok(profile.featureIds.every(featureId => presenceFeatureDefinitions.some(feature => featureSlug(feature.label) === featureId)));
+  });
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {

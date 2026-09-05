@@ -1183,6 +1183,7 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
           <div className="mt-6 space-y-3 border-t pt-5 text-sm">
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
+             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Profils recommandés</span><strong>{selected.employeeProfiles?.length ?? 0}</strong></div>
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
             <button data-testid={`button-detail-toggle-module-${selected.id}`} onClick={() => toggleModule(selected.id)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
@@ -1206,7 +1207,22 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
             </div>;
           })}</div>
         </section>
-     </div>
+      </div>
+      {selected.employeeProfiles && selected.employeeProfiles.length > 0 && <section className="card-surface rounded-2xl p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Modèles de rôles</p><h2 className="mt-2 text-xl font-bold">Profils prêts à proposer</h2><p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Ces profils servent de base à l’administrateur. Ils ne créent aucun rôle ni employé automatiquement.</p></div>
+          <Users size={19} className="text-[hsl(var(--primary))]" />
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">{selected.employeeProfiles.map(profile => {
+          const profileFeatures = profile.featureIds.map(featureId => selected.features.find(feature => featureSlug(feature) === featureId) ?? featureId);
+          return <article key={profile.id} className="rounded-xl border bg-[hsl(var(--muted)/.18)] p-4">
+            <h3 className="font-bold">{profile.name}</h3>
+            <p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{profile.description}</p>
+            <div className="mt-4 flex flex-wrap gap-1.5">{profileFeatures.map(feature => <span key={feature} className="rounded-full bg-[hsl(var(--card))] px-2 py-1 text-[10px] font-semibold">{feature}</span>)}</div>
+            <p className="mt-4 border-t pt-3 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Actions par défaut : {profile.defaultActions.join(' · ')}</p>
+          </article>;
+        })}</div>
+      </section>}
      {editingModule && <Modal title="Modifier le module" onClose={() => setEditingModule(null)}><div className="space-y-4"><Field label="Nom du module" value={moduleForm.name} onChange={value => setModuleForm(current => ({ ...current, name: value }))} testId="input-module-name" /><Field label="Description" value={moduleForm.description} onChange={value => setModuleForm(current => ({ ...current, description: value }))} testId="input-module-description" /><label className="block text-sm font-semibold">Fonctionnalités<textarea data-testid="input-module-features" value={moduleForm.features} onChange={event => setModuleForm(current => ({ ...current, features: event.target.value }))} placeholder="Une fonctionnalité par ligne" rows={5} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités peuvent être séparées par des lignes ou des virgules.</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-module" onClick={saveModule}>Enregistrer les modifications</ActionButton></div></div></Modal>}
     </div>;
   }

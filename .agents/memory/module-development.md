@@ -14,3 +14,9 @@ For modules with several screens, keep one canonical feature definition shared b
 **Why:** A shortened catalog makes companies choose incomplete capabilities during onboarding and causes permissions or navigation to hide real module functions.
 
 **How to apply:** Add every user-facing capability to the module feature manifest first, derive the module catalog and navigation from it, and add a regression test that compares the manifest with the selectable feature options.
+
+Module employee profiles are recommendations, not automatic role or employee creation. The administrator confirms a suggested profile by using it as a starting point and can add or remove its permissions before saving.
+
+**Why:** Automatic creation could add roles that do not match an organization’s structure or grant more access than its administrator intended.
+
+**How to apply:** Store profile templates with the module definition, expose them as optional presets in role creation, and keep the final company role and permission configuration under explicit administrator control.
