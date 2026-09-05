@@ -89,8 +89,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
 };
 
 const routesWithModuleHeaders = new Set([
+  '/kora/stocks',
   '/kora/commerce',
   '/kora/ventes',
+  '/kora/finance',
+  '/kora/rh',
   '/kora/achats',
   '/kora/comptabilite',
   '/kora/paie',
@@ -100,6 +103,10 @@ const routesWithModuleHeaders = new Set([
   '/kora/documents',
   '/kora/presences',
   '/kora/rapports',
+  '/kora/organisation',
+  '/kora/autorisations',
+  '/kora/employes',
+  '/kora/roles',
 ]);
 
 function AppContent() {
