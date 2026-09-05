@@ -14,6 +14,7 @@ import {
   isValidControlActor,
   type ControlActorContext,
 } from "./control-authorization";
+import { buildTaskCreatedTrace, buildTaskStatusTrace } from "./control-trace";
 
 const router: IRouter = Router();
 const taskStatuses = ["À FAIRE", "EN COURS", "VALIDÉ", "REFUSÉ", "TERMINÉ"] as const;
@@ -107,30 +108,9 @@ router.post("/control/tasks", async (req, res): Promise<void> => {
   };
   await db.transaction(async tx => {
     await tx.insert(controlTasksTable).values(task);
-    await tx.insert(controlEventsTable).values({
-      id: idOf("event"),
-      type: "TASK_CREATED",
-      label: "Tâche créée",
-      summary: input.title,
-      companyId: input.companyId,
-      moduleId: input.moduleId,
-      actorName: actorContext.displayName,
-      entityType: "task",
-      entityId: taskId,
-      severity: "info",
-      createdAt: now,
-    });
-    await tx.insert(controlAuditEntriesTable).values({
-      id: idOf("audit"),
-      action: "TÂCHE_CRÉÉE",
-      summary: `${input.title} a été créée.`,
-      companyId: input.companyId,
-      moduleId: input.moduleId,
-      actorName: actorContext.displayName,
-      entityType: "task",
-      entityId: taskId,
-      createdAt: now,
-    });
+    const trace = buildTaskCreatedTrace(input, taskId, actorContext, now);
+    await tx.insert(controlEventsTable).values(trace.event);
+    await tx.insert(controlAuditEntriesTable).values(trace.audit);
   });
   res.status(201).json(task);
 });
@@ -142,41 +122,15 @@ router.patch("/control/tasks/:id/status", async (req, res): Promise<void> => {
   const [before] = await db.select().from(controlTasksTable).where(eq(controlTasksTable.id, req.params.id)).limit(1);
   if (!before) { res.status(404).json({ error: "Tâche introuvable" }); return; }
   if (before.companyId !== companyId || !canUpdateControlTask(actorContext, before)) { res.status(403).json({ error: "Modification hors périmètre autorisé." }); return; }
-  const granted = status === "VALIDÉ" || status === "TERMINÉ";
-  const refused = status === "REFUSÉ";
-  const type = granted ? "APPROVAL_GRANTED" : refused ? "APPROVAL_REFUSED" : "TASK_STATUS_CHANGED";
-  const label = granted ? "Validation accordée" : refused ? "Validation refusée" : "Tâche mise à jour";
   const now = new Date();
-  const summary = `${before.title} · ${before.status} → ${status}`;
+  const trace = buildTaskStatusTrace(before, status, actorContext, now);
   const [task] = await db.transaction(async tx => {
     const updated = await tx.update(controlTasksTable)
       .set({ status, updatedAt: now })
       .where(and(eq(controlTasksTable.id, before.id), eq(controlTasksTable.companyId, companyId)))
       .returning();
-    await tx.insert(controlEventsTable).values({
-      id: idOf("event"),
-      type,
-      label,
-      summary,
-      companyId: before.companyId,
-      moduleId: before.moduleId,
-      actorName: actorContext.displayName,
-      entityType: "task",
-      entityId: before.id,
-      severity: refused ? "error" : granted ? "success" : "info",
-      createdAt: now,
-    });
-    await tx.insert(controlAuditEntriesTable).values({
-      id: idOf("audit"),
-      action: `TÂCHE_${status.replaceAll(" ", "_")}`,
-      summary: `${before.title} est passée de ${before.status} à ${status}.`,
-      companyId: before.companyId,
-      moduleId: before.moduleId,
-      actorName: actorContext.displayName,
-      entityType: "task",
-      entityId: before.id,
-      createdAt: now,
-    });
+    await tx.insert(controlEventsTable).values(trace.event);
+    await tx.insert(controlAuditEntriesTable).values(trace.audit);
     return updated;
   });
   res.json(task);

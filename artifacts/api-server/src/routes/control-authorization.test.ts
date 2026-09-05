@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 // @ts-expect-error Node's native TypeScript runner resolves the .ts test import.
 import { canCreateControlTask, canReadControlScope, canUpdateControlTask, type ControlActorContext } from './control-authorization.ts';
+// @ts-expect-error Node's native TypeScript runner resolves the .ts test import.
+import { buildTaskCreatedTrace, buildTaskStatusTrace } from './control-trace.ts';
 
 const companyAdmin: ControlActorContext = {
   role: 'company_admin',
@@ -56,4 +58,26 @@ test('l’employé ne lit et ne modifie que ses tâches', () => {
 test('aucun acteur ne franchit la frontière d’entreprise', () => {
   assert.equal(canUpdateControlTask(sectorManager, { companyId: 'other-company', sectorId: 'finance' }), false);
   assert.equal(canUpdateControlTask(employee, { companyId: 'other-company', assigneeEmployeeId: 'demo-emp-awa' }), false);
+});
+
+test('la création et le changement de statut produisent une trace cohérente', () => {
+  const now = new Date('2026-09-04T20:00:00.000Z');
+  const created = buildTaskCreatedTrace(
+    { title: 'Contrôler le stock', companyId: 'kora', moduleId: 'stocks' },
+    'task-1',
+    { displayName: 'Awa Ndiaye' },
+    now,
+  );
+  const updated = buildTaskStatusTrace(
+    { id: 'task-1', title: 'Contrôler le stock', companyId: 'kora', moduleId: 'stocks', status: 'À FAIRE' },
+    'VALIDÉ',
+    { displayName: 'Awa Ndiaye' },
+    now,
+  );
+
+  assert.equal(created.event.entityId, created.audit.entityId);
+  assert.equal(created.event.actorName, created.audit.actorName);
+  assert.equal(updated.event.entityId, updated.audit.entityId);
+  assert.equal(updated.event.type, 'APPROVAL_GRANTED');
+  assert.equal(updated.audit.action, 'TÂCHE_VALIDÉ');
 });

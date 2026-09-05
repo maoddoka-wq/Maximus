@@ -9,6 +9,7 @@ import {
   Plus,
   ShieldAlert,
   Workflow,
+  XCircle,
 } from 'lucide-react';
 import {
   addNotification,
@@ -153,8 +154,7 @@ export function ControlCenterPage({
   const approvalCount = scopeTasks.filter(task => task.requiresApproval && task.status === 'À FAIRE').length;
   const criticalCount = scopeTasks.filter(task => task.priority === 'CRITIQUE' && task.status !== 'TERMINÉ' && task.status !== 'VALIDÉ').length;
 
-  const updateTask = (taskId: string, nextStatus: ControlTaskStatus) => {
-    const persistedTask = serverSnapshot?.tasks.find(item => item.id === taskId);
+  const applyLocalTaskStatus = (taskId: string, nextStatus: ControlTaskStatus) => {
     mutate(draft => {
       const task = draft.controlTasks.find(item => item.id === taskId);
       if (!task) return;
@@ -200,11 +200,23 @@ export function ControlCenterPage({
         href: task.companyId ? '/kora/controle' : '/maximus/controle',
       });
     }, 'La tâche et son audit ont été mis à jour.');
+  };
+
+  const updateTask = (taskId: string, nextStatus: ControlTaskStatus) => {
+    const persistedTask = serverSnapshot?.tasks.find(item => item.id === taskId);
     if (persistedTask) {
       void controlApi.updateTaskStatus(persistedTask, nextStatus, actorContext)
-        .then(() => setSyncVersion(version => version + 1))
-        .catch(error => setSyncError(error instanceof Error ? error.message : 'La mise à jour serveur a échoué.'));
+        .then(() => {
+          setSyncError('');
+          setSyncVersion(version => version + 1);
+        })
+        .catch(error => {
+          applyLocalTaskStatus(taskId, nextStatus);
+          setSyncError(error instanceof Error ? `${error.message} Repli local activé.` : 'La mise à jour serveur a échoué. Repli local activé.');
+        });
+      return;
     }
+    applyLocalTaskStatus(taskId, nextStatus);
   };
 
   const createTask = () => {
@@ -229,45 +241,50 @@ export function ControlCenterPage({
         createdAt: now,
         updatedAt: now,
     };
-    mutate(draft => {
-      draft.controlTasks.unshift(task);
-      draft.domainEvents.unshift({
-        id: uid('event'),
-        type: 'TASK_CREATED',
-        label: 'Tâche créée',
-        summary: task.title,
-        companyId: task.companyId,
-        moduleId: task.moduleId,
-        actorName,
-        entityType: 'task',
-        entityId: task.id,
-        severity: 'info',
-        createdAt: now,
-      });
-      draft.auditEntries.unshift({
-        id: uid('audit'),
-        action: 'TÂCHE_CRÉÉE',
-        summary: `${task.title} a été créée.`,
-        companyId: task.companyId,
-        moduleId: task.moduleId,
-        actorName,
-        entityType: 'task',
-        entityId: task.id,
-        createdAt: now,
-      });
-      addNotification(draft, {
-        title: 'Nouvelle tâche affectée',
-        text: task.title,
-        companyId: task.companyId,
-        audience: 'company',
-        module: task.moduleId,
-        severity: task.priority === 'CRITIQUE' || task.priority === 'HAUTE' ? 'warning' : 'info',
-        href: '/kora/controle',
-      });
-    }, 'La tâche a été créée et ajoutée au circuit de contrôle.');
     void controlApi.createTask(task, actorContext)
-      .then(() => setSyncVersion(version => version + 1))
-      .catch(error => setSyncError(error instanceof Error ? error.message : 'La tâche reste enregistrée localement.'));
+      .then(() => {
+        setSyncError('');
+        setSyncVersion(version => version + 1);
+      })
+      .catch(error => {
+        mutate(draft => {
+          draft.controlTasks.unshift(task);
+          draft.domainEvents.unshift({
+            id: uid('event'),
+            type: 'TASK_CREATED',
+            label: 'Tâche créée',
+            summary: task.title,
+            companyId: task.companyId,
+            moduleId: task.moduleId,
+            actorName,
+            entityType: 'task',
+            entityId: task.id,
+            severity: 'info',
+            createdAt: now,
+          });
+          draft.auditEntries.unshift({
+            id: uid('audit'),
+            action: 'TÂCHE_CRÉÉE',
+            summary: `${task.title} a été créée.`,
+            companyId: task.companyId,
+            moduleId: task.moduleId,
+            actorName,
+            entityType: 'task',
+            entityId: task.id,
+            createdAt: now,
+          });
+          addNotification(draft, {
+            title: 'Nouvelle tâche affectée',
+            text: task.title,
+            companyId: task.companyId,
+            audience: 'company',
+            module: task.moduleId,
+            severity: task.priority === 'CRITIQUE' || task.priority === 'HAUTE' ? 'warning' : 'info',
+            href: '/kora/controle',
+          });
+        }, 'La tâche a été créée localement et sera resynchronisée.');
+        setSyncError(error instanceof Error ? `${error.message} Repli local activé.` : 'La tâche reste enregistrée localement.');
+      });
     setNewTask({ title: '', description: '', priority: 'NORMALE', moduleId: 'stocks', dueDate: '' });
     setAssigneeEmployeeId('');
     setShowCreate(false);
