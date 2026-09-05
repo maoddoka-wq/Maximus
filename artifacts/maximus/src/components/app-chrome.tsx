@@ -26,7 +26,6 @@ type SidebarProps = {
   location: string;
   allowed: ModuleId[];
   sidebarFeatureGroups?: SidebarFeatureGroup[];
-  featureNavigation?: boolean;
   canManagePeople: boolean;
   onNavigate: (path: string) => void;
   onLogout: () => void;
@@ -46,7 +45,6 @@ export function Sidebar({
   location,
   allowed,
   sidebarFeatureGroups,
-  featureNavigation = false,
   canManagePeople,
   onNavigate,
   onLogout,
@@ -70,7 +68,7 @@ export function Sidebar({
           (item.module === null || allowed.includes(item.module as ModuleId)),
       );
   const verticalModuleMenu = Boolean(
-    (employee || featureNavigation) && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
+    employee && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
   );
   const compact = collapsed && !mobileOpen;
   const active = (href: string) =>

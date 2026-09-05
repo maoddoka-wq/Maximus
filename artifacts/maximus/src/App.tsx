@@ -752,7 +752,7 @@ function AppContent() {
     selectedCommercialTabIds,
   );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    (employee || sectorTestCompanyId) && allowed.length >= 1
+    employee && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
@@ -762,7 +762,7 @@ function AppContent() {
           stockPermissions,
         })
       : [];
-  const verticalModuleNavigation = Boolean((employee || sectorTestCompanyId) && allowed.length >= 1 && sidebarFeatureGroups.length);
+  const verticalModuleNavigation = Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length);
   const canManagePeople = session === 'kora' || session.startsWith('company:') || sectorManager;
   const baseMeta =
     pageMeta[location.split('?')[0]] ??
@@ -805,7 +805,6 @@ function AppContent() {
         location={location}
         allowed={allowed}
         sidebarFeatureGroups={sidebarFeatureGroups}
-        featureNavigation={Boolean(sectorTestCompanyId)}
         canManagePeople={canManagePeople}
         onNavigate={navigate}
         onLogout={sectorTestCompanyId ? exitSectorTest : logout}
