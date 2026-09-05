@@ -1001,7 +1001,7 @@ function Login({
       <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
         <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
-        <Brand inverse />
+        <Brand inverse large />
         <div className="relative mt-32 max-w-xl pb-16">
           <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">
             La gestion d’entreprise, simplement
@@ -1023,7 +1023,7 @@ function Login({
       <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12">
         <div className="w-full max-w-md fade-up">
           <div className="mb-10 lg:hidden">
-            <Brand />
+            <Brand large />
           </div>
           <div className="mb-8">
             <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
@@ -1687,18 +1687,26 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
   );
 }
 
-function Brand({ inverse = false, homeHref }: { inverse?: boolean; homeHref?: string }) {
+function Brand({
+  inverse = false,
+  homeHref,
+  large = false,
+}: {
+  inverse?: boolean;
+  homeHref?: string;
+  large?: boolean;
+}) {
   return (
     <Link
       data-testid="link-brand"
       href={homeHref ?? (inverse ? '/' : '/maximus/dashboard')}
-      className="inline-flex items-center gap-3"
+      className={`inline-flex items-center ${large ? 'gap-4' : 'gap-3'}`}
     >
-      <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[hsl(var(--accent)/.18)]">
+      <span className={`flex items-center justify-center overflow-hidden bg-[hsl(var(--accent)/.18)] shadow-sm ${large ? 'h-14 w-14 rounded-2xl' : 'h-9 w-9 rounded-xl'}`}>
         <img src="/maximus-mark.svg" alt="Logo MAXIMUS" className="h-full w-full object-cover" />
       </span>
       <span
-        className={`text-lg font-black tracking-[-.06em] ${inverse ? 'text-[hsl(var(--sidebar-foreground))]' : ''}`}
+        className={`${large ? 'text-xl' : 'text-lg'} font-black tracking-[-.06em] ${inverse ? 'text-[hsl(var(--sidebar-foreground))]' : ''}`}
       >
         MAXIMUS<span className="text-[hsl(var(--accent))]">.</span>
       </span>
