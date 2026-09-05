@@ -1,4 +1,4 @@
-import type { Employee, ModuleId, OrgNode, Role } from './store';
+import type { Company, Employee, ModuleId, OrgNode, Role } from './store';
 import {
   commerceTabDependencies,
   commerceTabDefinitions,
@@ -12,6 +12,61 @@ import { stockSubmoduleDependencies, stockSubmodules, type Module } from './stor
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
+
+function permissionModuleId(key: string): ModuleId | null {
+  if (key.startsWith('presence.')) return 'presences';
+  const [moduleId] = key.split(':');
+  return moduleId as ModuleId;
+}
+
+function permissionFeatureId(moduleId: ModuleId, key: string) {
+  if (moduleId === 'presences') return key.replace(/^presence\./, '');
+  const menuMarker = `${moduleId}:menu:`;
+  if (key.startsWith(menuMarker)) return key.slice(menuMarker.length);
+  return key.startsWith(`${moduleId}:`) ? key.slice(moduleId.length + 1) : key;
+}
+
+/**
+ * Company selections are the maximum entitlement. Units and roles can narrow
+ * those permissions, but cannot grant an unrequested module, feature, or action.
+ * Companies without the newer detailed request data keep the legacy behavior.
+ */
+export function restrictRoleToCompany(role: Role | null | undefined, company: Company | null | undefined): Role | null {
+  if (!role || !company) return role ?? null;
+  const requestedFeatures = company.requestedModuleFeatures;
+  const requestedPermissions = company.requestedModulePermissions;
+  if (!requestedFeatures && !requestedPermissions) return role;
+
+  const enabledModules = new Set(company.allowedModules.length ? company.allowedModules : company.requestedModules);
+  const hasFeatureLimit = (moduleId: ModuleId) => Object.prototype.hasOwnProperty.call(requestedFeatures ?? {}, moduleId);
+  const featureIds = (moduleId: ModuleId) => new Set(requestedFeatures?.[moduleId] ?? []);
+  const featurePermissions = (moduleId: ModuleId, featureId: string) =>
+    requestedPermissions?.[moduleId]?.[featureId]
+    ?? requestedPermissions?.[moduleId]?.[featureId.replace(`${moduleId}:menu:`, '')]
+    ?? ['voir'];
+
+  const boundedEntries: [string, string[]][] = [];
+  Object.entries(role.modulePermissions).forEach(([key, permissions]) => {
+    const moduleId = permissionModuleId(key);
+    if (!moduleId || (enabledModules.size > 0 && !enabledModules.has(moduleId))) return;
+    if (!hasFeatureLimit(moduleId)) {
+      boundedEntries.push([key, permissions]);
+      return;
+    }
+    if (key === moduleId) {
+      if (permissions.includes('voir') && featureIds(moduleId).size > 0) boundedEntries.push([key, ['voir']]);
+      return;
+    }
+    const featureId = permissionFeatureId(moduleId, key);
+    if (!featureIds(moduleId).has(featureId)) return;
+    const allowed = new Set(featurePermissions(moduleId, featureId));
+    const filtered = permissions.filter(permission => allowed.has(permission));
+    if (filtered.length) boundedEntries.push([key, filtered]);
+  });
+  const modulePermissions = Object.fromEntries(boundedEntries);
+
+  return { ...role, modulePermissions };
+}
 
 export function getEmployeeAncestry(nodes: OrgNode[], employeeNode: OrgNode | null) {
   const ancestry = new Set<string>();

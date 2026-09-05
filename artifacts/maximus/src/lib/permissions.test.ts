@@ -6,6 +6,7 @@ import {
   getCommerceTabIds,
   getEmployeeAncestry,
   getStockPermissions,
+  restrictRoleToCompany,
   roleHasPermission,
 } from './employee-permissions';
 import {
@@ -20,7 +21,7 @@ import { getModuleFeatureOptions } from './module-features';
 import { presenceFeatureDefinitions } from './presence-features';
 import { recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
-import type { Employee, ModuleId, OrgNode, Role, StoreData } from './store';
+import type { Company, Employee, ModuleId, OrgNode, Role, StoreData } from './store';
 
 const employee: Employee = {
   id: 'employee-1',
@@ -270,4 +271,41 @@ test('chaque décision de contrôle écrit un événement et un audit liés', ()
   assert.equal(data.domainEvents[0].entityId, 'BC-1');
   assert.equal(data.auditEntries[0].entityId, 'BC-1');
   assert.equal(data.domainEvents[0].actorName, 'Awa Ndiaye');
+});
+
+test('plafonne les droits des rôles au choix de l’entreprise', () => {
+  const company: Company = {
+    id: 'company-1',
+    name: 'Entreprise test',
+    manager: 'Admin',
+    email: 'admin@example.test',
+    phone: '',
+    country: 'Sénégal',
+    sector: 'Commerce',
+    status: 'ACTIF',
+    requestedModules: ['commerce'],
+    requestedModuleFeatures: { commerce: ['clients'] },
+    requestedModulePermissions: { commerce: { clients: ['voir'] } },
+    allowedModules: ['commerce'],
+    refusedModules: [],
+    createdAt: '2026-01-01',
+  };
+  const role: Role = {
+    id: 'role-1',
+    name: 'Vendeur',
+    description: '',
+    companyId: company.id,
+    sectorId: 'unit-1',
+    modulePermissions: {
+      commerce: ['voir'],
+      'commerce:menu:clients': ['voir', 'créer'],
+      'commerce:menu:sales': ['voir'],
+      stocks: ['voir'],
+    },
+  };
+
+  assert.deepEqual(restrictRoleToCompany(role, company)?.modulePermissions, {
+    commerce: ['voir'],
+    'commerce:menu:clients': ['voir'],
+  });
 });

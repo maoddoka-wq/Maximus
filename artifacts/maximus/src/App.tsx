@@ -24,6 +24,7 @@ import {
   getEmployeeAncestry,
   getFeatureIdsWithDependencies,
   getStockPermissions,
+  restrictRoleToCompany,
   roleHasPermission,
   type PresencePermission,
 } from '@/lib/employee-permissions';
@@ -272,7 +273,8 @@ function AppContent() {
   const employee = employeeId ? data.employees.find(e => e.id === employeeId) ?? null : null;
   const companyId = activeCompanyId ?? 'kora';
   const currentCompany = activeCompany;
-  const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
+  const rawEmployeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
+  const employeeRole = restrictRoleToCompany(rawEmployeeRole, activeCompany);
   const configuredModules = getConfiguredModules(data);
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability => serverModuleStatuses?.[moduleId] ?? data.moduleStatuses?.[moduleId] ?? configuredModules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => !['INACTIF', 'MAINTENANCE'].includes(moduleStatus(moduleId));

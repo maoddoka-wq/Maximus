@@ -11,16 +11,17 @@ import {
 import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from '@/lib/permission-keys';
 import {
   getConfiguredModules,
+  type Company,
   stockSubmoduleDependencies,
   stockSubmodules,
   uid,
-  type Company,
   type Module,
   type ModuleId,
   type OrgNode,
   type Role,
   type StoreData,
 } from '@/lib/store';
+import { restrictRoleToCompany } from '@/lib/employee-permissions';
 import { ActionButton, Field, Modal, permissionLabel } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -75,12 +76,13 @@ export function RolesTab({
       {companyNodes.length === 0 && <p className="mb-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord au moins une unité dans l’onglet Structure & Unités.</p>}
       <div className="space-y-3">
         {companyRoles.map(role => {
+          const effectiveRole = restrictRoleToCompany(role, company) ?? role;
           const sector = companyNodes.find(node => node.id === role.sectorId);
           const assignedEmployees = data.employees.filter(employee => employee.roleId === role.id);
           return (
             <RoleCard
               key={role.id}
-              role={role}
+              role={effectiveRole}
               sectorName={sector?.name}
               assignedEmployees={assignedEmployees}
               managerName={company.managerRoleId === role.id ? company.manager : undefined}
@@ -253,11 +255,14 @@ function RoleFormModal({
     name: initialData?.name || '',
     description: initialData?.description || '',
     sectorId: initialData?.sectorId || (allNodes[0]?.id ?? ''),
-    modulePermissions: initialData?.modulePermissions || {},
+    modulePermissions: restrictRoleToCompany(initialData, company)?.modulePermissions || {},
   });
   const selectedNode = allNodes.find(node => node.id === formData.sectorId);
   const companyModules = moduleDefinitions.filter(module => company.allowedModules.includes(module.id));
-  const availableModules = companyModules.filter(module => selectedNode?.moduleIds === undefined || selectedNode.moduleIds.includes(module.id));
+  const requestedModuleIds = company.requestedModules.length ? new Set(company.requestedModules) : null;
+  const availableModules = companyModules
+    .filter(module => !requestedModuleIds || requestedModuleIds.has(module.id))
+    .filter(module => selectedNode?.moduleIds === undefined || selectedNode.moduleIds.includes(module.id));
 
   const togglePermission = (moduleId: string, permission: 'voir' | 'créer' | 'modifier') => {
     setFormData(previous => {
@@ -385,7 +390,8 @@ function RoleFormModal({
         ] as const)
         .filter(([, permissions]) => permissions.length > 0),
     );
-    onSave({ ...formData, name, modulePermissions });
+    const boundedRole = restrictRoleToCompany({ id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions }, company);
+    onSave({ ...formData, name, modulePermissions: boundedRole?.modulePermissions ?? {} });
   };
 
   return (
@@ -403,7 +409,7 @@ function RoleFormModal({
       <div className="mt-4 border-t pt-4">
         <div className="mb-4">
           <h3 className="text-sm font-bold">Droits d’accès</h3>
-          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le module définit la visibilité. Les actions Créer et Modifier se configurent ensuite dans chaque sous-fonctionnalité.</p>
+          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le module définit la visibilité. Les actions Créer et Modifier se configurent ensuite dans chaque sous-fonctionnalité. Les droits restent limités aux éléments choisis par l’entreprise.</p>
         </div>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           {availableModules.map(module => (
