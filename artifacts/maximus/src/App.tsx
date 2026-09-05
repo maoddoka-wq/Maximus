@@ -488,9 +488,9 @@ function AppContent() {
     ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
     const testCompany: Company = {
       id: testCompanyId,
-      name: `Test réel · ${preset.name}`,
-      manager: 'Utilisateur de test',
-      email: `test.${preset.id}@maximus.local`,
+      name: preset.name,
+      manager: `Administration ${preset.name}`,
+      email: `admin.${preset.id}@maximus.local`,
       phone: '',
       country: 'Sénégal',
       sector: preset.name,
@@ -549,8 +549,8 @@ function AppContent() {
       });
       draft.roles.push({
         id: testRoleId,
-        name: `Test secteur · ${preset.name}`,
-        description: `Droits temporaires calculés depuis les modules et packs du secteur « ${preset.name} ».`,
+        name: `Administrateur · ${preset.name}`,
+        description: `Droits temporaires de l’entreprise préprogrammée « ${preset.name} », calculés depuis ses modules et packs.`,
         companyId: testCompanyId,
         sectorId: testNodeId,
         modulePermissions,
@@ -659,11 +659,11 @@ function AppContent() {
   const rawEmployeeRole = employee
     ? (data.roles.find((r) => r.id === employee.roleId) ?? data.roles.find((r) => r.name === employee.role))
     : null;
-  const rawSectorTestRole =
+  const rawTestCompanyRole =
     sectorTestCompanyId && currentCompany?.managerRoleId
       ? data.roles.find((role) => role.id === currentCompany.managerRoleId) ?? null
       : null;
-  const employeeRole = restrictRoleToCompany(rawEmployeeRole ?? rawSectorTestRole, activeCompany);
+  const accessRole = restrictRoleToCompany(rawEmployeeRole ?? rawTestCompanyRole, activeCompany);
   const configuredModules = getConfiguredModules(data);
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability =>
     serverModuleStatuses?.[moduleId] ??
@@ -674,37 +674,37 @@ function AppContent() {
   const companyAllowed = (data.companies.find((c) => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId
     ? data.orgNodes.find((node) => node.id === employee.sectorId && node.companyId === employee.companyId)
-    : sectorTestCompanyId && employeeRole?.sectorId
-      ? data.orgNodes.find((node) => node.id === employeeRole.sectorId && node.companyId === companyId)
+    : sectorTestCompanyId && accessRole?.sectorId
+      ? data.orgNodes.find((node) => node.id === accessRole.sectorId && node.companyId === companyId)
     : null;
   const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode ?? null);
-  const roleFitsEmployee = sectorTestCompanyId
-    ? Boolean(employeeRole && employeeNode && employeeRole.companyId === companyId && employeeRole.sectorId === employeeNode.id)
-    : employeeRoleMatchesUnit(employeeRole, employee, employeeAncestry);
-  const canViewModule = (moduleId: ModuleId) => roleHasPermission(employeeRole, employeeNode, moduleId, 'voir');
+  const accessRoleMatchesScope = sectorTestCompanyId
+    ? Boolean(accessRole && employeeNode && accessRole.companyId === companyId && accessRole.sectorId === employeeNode.id)
+    : employeeRoleMatchesUnit(accessRole, employee, employeeAncestry);
+  const canViewModule = (moduleId: ModuleId) => roleHasPermission(accessRole, employeeNode, moduleId, 'voir');
   const allowed =
     session === 'kora'
       ? companyAllowed
       : session.startsWith('company:')
-        ? sectorTestCompanyId && employeeRole && roleFitsEmployee
+        ? sectorTestCompanyId && accessRole && accessRoleMatchesScope
           ? companyAllowed.filter((moduleId) => canViewModule(moduleId))
           : companyAllowed
-      : employeeRole && roleFitsEmployee
+      : accessRole && accessRoleMatchesScope
         ? companyAllowed.filter((moduleId) => canViewModule(moduleId))
         : [];
   const hasPermission = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => {
     if (session === 'kora' || (session.startsWith('company:') && !sectorTestCompanyId)) return true;
-    if (!roleFitsEmployee || !employeeRole) return false;
-    return roleHasPermission(employeeRole, employeeNode, moduleId, permission);
+    if (!accessRoleMatchesScope || !accessRole) return false;
+    return roleHasPermission(accessRole, employeeNode, moduleId, permission);
   };
   const hasPresencePermission = (permission: PresencePermission) => {
     if (session === 'kora' || (session.startsWith('company:') && !sectorTestCompanyId)) return true;
-    if (!roleFitsEmployee || !employeeRole) return false;
-    return employeeHasPresencePermission(employeeRole, employeeNode, permission, hasPermission);
+    if (!accessRoleMatchesScope || !accessRole) return false;
+    return employeeHasPresencePermission(accessRole, employeeNode, permission, hasPermission);
   };
   const presenceModule = configuredModules.find((module) => module.id === 'presences');
-  const selectedPresenceFeatureIds = employeeRole && presenceModule
-    ? [...getSelectedFeatureIds(employeeRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
+  const selectedPresenceFeatureIds = accessRole && presenceModule
+    ? [...getSelectedFeatureIds(accessRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
     : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
   const presenceEmployees = data.employees
@@ -722,15 +722,15 @@ function AppContent() {
     });
   const stockModule = configuredModules.find((module) => module.id === 'stocks');
   const commerceModule = configuredModules.find((module) => module.id === 'commerce');
-  const selectedStockFeatureIds = employeeRole && stockModule
-    ? getSelectedFeatureIds(employeeRole, stockModule, employeeNode?.moduleFeatures?.[stockModule.id])
+  const selectedStockFeatureIds = accessRole && stockModule
+    ? getSelectedFeatureIds(accessRole, stockModule, employeeNode?.moduleFeatures?.[stockModule.id])
     : undefined;
-  const selectedCommerceFeatureIds = employeeRole && commerceModule
-    ? getSelectedFeatureIds(employeeRole, commerceModule, employeeNode?.moduleFeatures?.[commerceModule.id])
+  const selectedCommerceFeatureIds = accessRole && commerceModule
+    ? getSelectedFeatureIds(accessRole, commerceModule, employeeNode?.moduleFeatures?.[commerceModule.id])
     : undefined;
   const salesModule = configuredModules.find((module) => module.id === 'ventes');
-  const selectedSalesFeatureIds = employeeRole && salesModule
-    ? getSelectedFeatureIds(employeeRole, salesModule, employeeNode?.moduleFeatures?.[salesModule.id])
+  const selectedSalesFeatureIds = accessRole && salesModule
+    ? getSelectedFeatureIds(accessRole, salesModule, employeeNode?.moduleFeatures?.[salesModule.id])
     : undefined;
   const selectedCommercialTabIds = selectedCommerceFeatureIds !== undefined || selectedSalesFeatureIds !== undefined
     ? new Set([
@@ -744,10 +744,10 @@ function AppContent() {
         ),
       ])
     : undefined;
-  const stockPermissions = getStockPermissions(employeeRole, roleFitsEmployee, selectedStockFeatureIds);
+  const stockPermissions = getStockPermissions(accessRole, accessRoleMatchesScope, selectedStockFeatureIds);
   const commerceTabIds = getCommerceTabIds(
-    employeeRole,
-    roleFitsEmployee,
+    accessRole,
+    accessRoleMatchesScope,
     canViewModule,
     selectedCommercialTabIds,
   );
@@ -756,7 +756,7 @@ function AppContent() {
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
-          employeeRole,
+          employeeRole: accessRole,
           employeeNode: employeeNode ?? null,
           commerceTabIds,
           stockPermissions,
