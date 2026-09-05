@@ -17,12 +17,12 @@ export type ModuleId =
   | 'documents'
   | 'rapports';
 
-export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
-export interface ModuleFeaturePack { id: string; name: string; description?: string; featureIds: string[]; }
-export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; featurePacks?: ModuleFeaturePack[]; featureStatuses?: Partial<Record<string, ModuleAvailability>>; status: 'ACTIF' | 'BETA'; }
+export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
+export interface ModuleFeaturePack { id: string; name: string; description?: string; featureIds: string[]; featurePermissions?: Partial<Record<string, string[]>>; }
+export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; featurePacks?: ModuleFeaturePack[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'MAINTENANCE' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
-export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks' | 'featureStatuses'>>>>;
+export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
