@@ -479,6 +479,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
       return;
     }
     setSelectedModules(nextModules);
+    setSelectedModulePackIds({});
     setSelectedModuleFeatures(Object.fromEntries(nextModules.map(moduleId => {
       const module = configuredModule(moduleId);
       const requested = preset?.moduleFeatures?.[moduleId];
@@ -495,6 +496,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
     const packEntries = Object.entries(preset.modulePackIds ?? {}).filter(([, packIds]) => (packIds ?? []).length) as [ModuleId, string[]][];
     const entries = packEntries.length ? packEntries : Object.entries(preset.moduleFeatures ?? {}) as [ModuleId, string[]][];
     setSelectedModules(packEntries.length ? packEntries.map(([moduleId]) => moduleId) : [...preset.moduleIds]);
+    setSelectedModulePackIds(Object.fromEntries(packEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])));
     setSelectedModuleFeatures(Object.fromEntries(entries.map(([moduleId, featureIds]) => {
       const module = configuredModule(moduleId);
       const packFeatures = packEntries.length
@@ -518,15 +520,35 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
       if (enabled) {
         const next = { ...current };
         delete next[id];
+        setSelectedModulePackIds(packIds => {
+          const nextPacks = { ...packIds };
+          delete nextPacks[id];
+          return nextPacks;
+        });
         return next;
       }
       const module = configuredModule(id);
+      if (module?.featurePacks?.length) setSelectedModulePackIds(current => ({ ...current, [id]: [] }));
       const availableFeatures = getModuleFeatureOptions(module ?? modules[0]).map(feature => feature.id);
       setSelectedModulePermissions(current => ({ ...current, [id]: defaultFeaturePermissions(availableFeatures) }));
       return { ...current, [id]: module ? [...getEffectiveModuleFeatureIds(module, availableFeatures)] : [] };
     });
     if (enabled) setSelectedModulePermissions(current => { const next = { ...current }; delete next[id]; return next; });
     setModuleError('');
+  };
+  const togglePack = (moduleId: ModuleId, packId: string) => {
+    const module = configuredModule(moduleId);
+    if (!module) return;
+    setSelectedModulePackIds(current => {
+      const nextIds = current[moduleId]?.includes(packId)
+        ? (current[moduleId] ?? []).filter(id => id !== packId)
+        : [...(current[moduleId] ?? []), packId];
+      const selectedPacks = (module.featurePacks ?? []).filter(pack => nextIds.includes(pack.id));
+      const featureIds = selectedPacks.flatMap(pack => pack.featureIds);
+      setSelectedModuleFeatures(features => ({ ...features, [moduleId]: [...getEffectiveModuleFeatureIds(module, featureIds)] }));
+      setSelectedModulePermissions(permissions => ({ ...permissions, [moduleId]: defaultFeaturePermissions(featureIds, selectedPacks.reduce<FeaturePermissionMap>((all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }), {})) }));
+      return { ...current, [moduleId]: nextIds };
+    });
   };
   const toggleFeature = (moduleId: ModuleId, featureId: string) => {
     const module = configuredModule(moduleId);
@@ -607,21 +629,28 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
               <ChevronDown size={16} className={`mt-1 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform ${enabled ? 'rotate-180' : ''}`} />
             </button>
             {enabled && <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3">
-              <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités à activer</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span></div>
-              <div className="grid gap-1 sm:grid-cols-2">
-                 {featureOptions.map(feature => {
-                    const included = selectedFeatureIds.has(feature.id);
-                    return <label key={feature.id} className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs cursor-pointer hover:bg-[hsl(var(--card)/.7)]">
-                    <input data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`} type="checkbox" checked={included} onChange={() => toggleFeature(mod.id, feature.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
-                    <span>{feature.label}</span>
-                 </label>;
-                 })}
-              </div>
+               {(mod.featurePacks?.length ?? 0) > 0 && <div className="mb-3">
+                 <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Packs disponibles</p>
+                 <div className="grid gap-1 sm:grid-cols-2">{mod.featurePacks?.map(pack => {
+                   const selected = selectedModulePackIds[mod.id]?.includes(pack.id) ?? false;
+                   return <label key={pack.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[hsl(var(--card)/.7)]"><input data-testid={`checkbox-signup-pack-${mod.id}-${pack.id}`} type="checkbox" checked={selected} onChange={() => togglePack(mod.id, pack.id)} className="mt-0.5 accent-[hsl(var(--primary))]" /><span><strong className="block">{pack.name}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{pack.description ?? `${pack.featureIds.length} fonctionnalité(s)`}</span></span></label>;
+                 })}</div>
+               </div>}
+               {((mod.featurePacks?.length ?? 0) === 0 || (selectedModulePackIds[mod.id]?.length ?? 0) > 0) && <><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités à activer</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span></div>
+               <div className="grid gap-1 sm:grid-cols-2">
+                  {featureOptions.map(feature => {
+                     const included = selectedFeatureIds.has(feature.id);
+                     return <label key={feature.id} className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs cursor-pointer hover:bg-[hsl(var(--card)/.7)]">
+                     <input data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`} type="checkbox" checked={included} onChange={() => toggleFeature(mod.id, feature.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
+                     <span>{feature.label}</span>
+                  </label>;
+                  })}
+               </div></>}
               <p className="mt-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">Les fonctionnalités nécessaires sont ajoutées automatiquement.</p>
             </div>}
           </div>;
         })}</div>
-          <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = configuredModule(moduleId); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : []]; })) as Partial<Record<ModuleId, string[]>>; const requestedModulePermissions = Object.fromEntries(selectedModules.map(moduleId => [moduleId, defaultFeaturePermissions(requestedModuleFeatures[moduleId] ?? [], selectedModulePermissions[moduleId])])) as Partial<Record<ModuleId, FeaturePermissionMap>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedModuleFeatures, requestedModulePermissions, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
+          <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = configuredModule(moduleId); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : []]; })) as Partial<Record<ModuleId, string[]>>; const requestedModulePermissions = Object.fromEntries(selectedModules.map(moduleId => [moduleId, defaultFeaturePermissions(requestedModuleFeatures[moduleId] ?? [], selectedModulePermissions[moduleId])])) as Partial<Record<ModuleId, FeaturePermissionMap>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedModulePackIds: Object.fromEntries(Object.entries(selectedModulePackIds).filter(([, packIds]) => (packIds ?? []).length)), requestedModuleFeatures, requestedModulePermissions, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
       </div>}
     </div>
   </div>;
