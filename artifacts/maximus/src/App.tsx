@@ -4726,7 +4726,17 @@ function ReportCard({ title, text, date }: { title: string; text: string; date: 
     </section>
   );
 }
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Modal({
+  title,
+  onClose,
+  children,
+  className = '',
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -4736,7 +4746,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   }, [onClose]);
   return (
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm">
-      <div className="modal-panel card-surface w-full max-w-lg rounded-2xl p-6 fade-up">
+      <div className={`modal-panel card-surface w-full max-w-lg rounded-2xl p-6 fade-up ${className}`}>
         <div className="modal-header mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold">{title}</h2>
           <button
@@ -5145,6 +5155,7 @@ function InteractiveModulesPage({
           <Modal
             title={`${editingPackId ? 'Modifier' : 'Ajouter'} un pack de rôle`}
             onClose={closePackDialog}
+            className="max-h-[88vh] w-[min(92vw,960px)] max-w-[960px] overflow-y-auto sm:p-8"
           >
             <div className="space-y-5">
               <div className="rounded-xl bg-[hsl(var(--muted)/.45)] p-4">
@@ -5176,7 +5187,7 @@ function InteractiveModulesPage({
                     Une fonctionnalité non incluse ne sera pas transmise au rôle.
                   </p>
                 </div>
-                <div className="max-h-[min(44vh,420px)] overflow-y-auto">
+                <div className="max-h-[46vh] overflow-y-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 z-10 bg-[hsl(var(--card))] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                       <tr>
