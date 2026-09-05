@@ -4786,6 +4786,7 @@ function InteractiveModulesPage({
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [editingPackId, setEditingPackId] = useState<string | null>(null);
   const [packForm, setPackForm] = useState<ModulePackDraft>(() => emptyModulePackDraft());
+  const [packDialogOpen, setPackDialogOpen] = useState(false);
   const [testPack, setTestPack] = useState<ModuleFeaturePack | null>(null);
   const [testModule, setTestModule] = useState(false);
   const [query, setQuery] = useState('');
@@ -4912,6 +4913,17 @@ function InteractiveModulesPage({
       featureIds: [...pack.featureIds],
       featurePermissions,
     });
+    setPackDialogOpen(true);
+  };
+
+  const openPackCreate = () => {
+    resetPackForm();
+    setPackDialogOpen(true);
+  };
+
+  const closePackDialog = () => {
+    setPackDialogOpen(false);
+    resetPackForm();
   };
 
   const setPackFeaturePermission = (featureId: string, level: string) => {
@@ -4941,6 +4953,7 @@ function InteractiveModulesPage({
       editingPackId ? 'Pack métier mis à jour.' : 'Pack métier créé.',
     );
     resetPackForm();
+    setPackDialogOpen(false);
   };
 
   const deletePack = (packId: string) => {
@@ -5061,7 +5074,18 @@ function InteractiveModulesPage({
                   ensuite les sélectionner.
                 </p>
               </div>
-              <Package size={19} className="text-[hsl(var(--primary))]" />
+              <div className="flex shrink-0 items-center gap-2">
+                <Package size={19} className="text-[hsl(var(--primary))]" />
+                <button
+                  type="button"
+                  data-testid={`button-add-role-pack-${selected.id}`}
+                  onClick={openPackCreate}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition hover:opacity-90"
+                >
+                  <Plus size={14} />
+                  Ajouter un pack de rôle
+                </button>
+              </div>
             </div>
             <div className="mt-6 space-y-3">
               {(selected.featurePacks ?? []).map((pack) => (
@@ -5115,13 +5139,21 @@ function InteractiveModulesPage({
                 </p>
               )}
             </div>
-            <div className="mt-6 border-t pt-5">
-              <p className="text-sm font-bold">{editingPackId ? 'Modifier le pack' : 'Créer un pack métier'}</p>
-              <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                Pour chaque fonctionnalité, choisissez le niveau d’accès inclus dans ce pack. Une fonctionnalité non
-                incluse ne sera pas transmise à l’entreprise.
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          </section>
+        </div>
+        {packDialogOpen && (
+          <Modal
+            title={`${editingPackId ? 'Modifier' : 'Ajouter'} un pack de rôle`}
+            onClose={closePackDialog}
+          >
+            <div className="space-y-5">
+              <div className="rounded-xl bg-[hsl(var(--muted)/.45)] p-4">
+                <p className="text-xs font-bold text-[hsl(var(--primary))]">{selected.name}</p>
+                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Définissez un modèle de rôle réutilisable et choisissez les droits accordés à chaque fonctionnalité.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Field
                   label="Nom du pack"
                   value={packForm.name}
@@ -5137,53 +5169,67 @@ function InteractiveModulesPage({
                   testId="input-module-pack-description"
                 />
               </div>
-              <p className="mt-4 text-xs font-bold">Droits par fonctionnalité</p>
-              <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                {getModuleFeatureOptions(selected).map((feature) => {
-                  return (
-                    <label
-                      key={feature.id}
-                      className="flex items-center justify-between gap-2 rounded-md px-2 py-2 text-xs hover:bg-[hsl(var(--muted))]"
-                    >
-                      <span className="font-medium">{feature.label}</span>
-                      <select
-                        data-testid={`select-pack-permission-${selected.id}-${feature.id}`}
-                        value={permissionLevelFor(packForm.featurePermissions[feature.id])}
-                        onChange={(event) => setPackFeaturePermission(feature.id, event.target.value)}
-                        className="rounded-md border bg-[hsl(var(--card))] px-2 py-1.5 text-[10px] font-semibold"
-                      >
-                        <option value="none">Non incluse</option>
-                        <option value="view">Voir seulement</option>
-                        <option value="create">Voir et créer</option>
-                        <option value="edit">Voir, créer et modifier</option>
-                      </select>
-                    </label>
-                  );
-                })}
+              <div className="overflow-hidden rounded-xl border">
+                <div className="border-b bg-[hsl(var(--muted)/.45)] px-4 py-3">
+                  <p className="text-xs font-bold">Droits par fonctionnalité</p>
+                  <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                    Une fonctionnalité non incluse ne sera pas transmise au rôle.
+                  </p>
+                </div>
+                <div className="max-h-[min(44vh,420px)] overflow-y-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-[hsl(var(--card))] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                      <tr>
+                        <th className="px-4 py-3 font-bold">Fonctionnalité</th>
+                        <th className="px-4 py-3 text-right font-bold">Niveau d’accès</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {getModuleFeatureOptions(selected).map((feature) => (
+                        <tr key={feature.id} className="transition hover:bg-[hsl(var(--muted)/.3)]">
+                          <td className="px-4 py-3">
+                            <span className="font-semibold">{feature.label}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <select
+                              data-testid={`select-pack-permission-${selected.id}-${feature.id}`}
+                              value={permissionLevelFor(packForm.featurePermissions[feature.id])}
+                              onChange={(event) => setPackFeaturePermission(feature.id, event.target.value)}
+                              className="rounded-md border bg-[hsl(var(--card))] px-2 py-2 text-[10px] font-semibold"
+                            >
+                              <option value="none">Non incluse</option>
+                              <option value="view">Voir seulement</option>
+                              <option value="create">Voir et créer</option>
+                              <option value="edit">Voir, créer et modifier</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <button
+                  type="button"
+                  onClick={closePackDialog}
+                  className="rounded-lg border px-4 py-2.5 text-xs font-bold hover:bg-[hsl(var(--muted))]"
+                >
+                  Annuler
+                </button>
                 <button
                   type="button"
                   data-testid="button-save-module-pack"
                   disabled={!packForm.name.trim() || packForm.featureIds.length === 0}
                   onClick={savePack}
-                  className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-40"
+                  className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {editingPackId ? 'Mettre à jour' : 'Créer le pack'}
                 </button>
-                {editingPackId && (
-                  <button
-                    type="button"
-                    onClick={resetPackForm}
-                    className="rounded-lg border px-4 py-2.5 text-xs font-bold"
-                  >
-                    Annuler
-                  </button>
-                )}
               </div>
             </div>
-          </section>
-        </div>
+          </Modal>
+        )}
         {editingModule && (
           <Modal
             title="Modifier le module"
