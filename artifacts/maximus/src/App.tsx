@@ -28,9 +28,8 @@ import {
   type PresencePermission,
 } from '@/lib/employee-permissions';
 
-type FeaturePermission = 'voir' | 'créer' | 'modifier';
-type FeaturePermissionMap = Partial<Record<string, FeaturePermission[]>>;
-const featurePermissionOptions: { value: string; label: string; permissions: FeaturePermission[] }[] = [
+type FeaturePermissionMap = Partial<Record<string, string[]>>;
+const featurePermissionOptions: { value: string; label: string; permissions: string[] }[] = [
   { value: 'none', label: 'Non incluse', permissions: [] },
   { value: 'view', label: 'Voir seulement', permissions: ['voir'] },
   { value: 'create', label: 'Voir et créer', permissions: ['voir', 'créer'] },
@@ -42,7 +41,7 @@ const permissionLevelFor = (permissions?: string[]) => {
   if (permissions.includes('créer')) return 'create';
   return 'view';
 };
-const permissionsForLevel = (level: string): FeaturePermission[] =>
+const permissionsForLevel = (level: string): string[] =>
   [...(featurePermissionOptions.find(option => option.value === level)?.permissions ?? [])];
 const defaultFeaturePermissions = (featureIds: Iterable<string>, existing?: FeaturePermissionMap): FeaturePermissionMap =>
   Object.fromEntries([...featureIds].map(featureId => [featureId, existing?.[featureId]?.length ? [...existing[featureId]!] : ['voir']]));
@@ -974,7 +973,7 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     setProfilePackIds(current => {
       const currentIds = current[moduleId] ?? [];
       const nextIds = currentIds.includes(packId) ? currentIds.filter(id => id !== packId) : [...currentIds, packId];
-      const selectedFeatures = (module.featurePacks ?? []).filter(pack => nextIds.includes(pack.id)).flatMap(pack => pack.featureIds).filter(featureId => module.featureStatuses?.[featureId] !== 'INACTIF');
+      const selectedFeatures = (module.featurePacks ?? []).filter(pack => nextIds.includes(pack.id)).flatMap(pack => pack.featureIds);
       setProfileFeatures(features => ({ ...features, [moduleId]: [...getEffectiveModuleFeatureIds(module, selectedFeatures)] }));
       setProfileModules(currentModules => nextIds.length > 0 ? currentModules.includes(moduleId) ? currentModules : [...currentModules, moduleId] : currentModules.filter(id => id !== moduleId));
       return { ...current, [moduleId]: nextIds };
