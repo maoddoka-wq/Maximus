@@ -13,18 +13,10 @@ const presenceTabIcons: Partial<Record<Tab, LucideIcon>> = {
   clock: Clock3,
   presence: UserCheck,
   absence: Users,
-  late: AlertTriangle,
   schedules: Clock3,
-  planning: CalendarDays,
-  breaks: Pause,
-  worked: Clock3,
-  overtime: ArrowUpFromLine,
-  missions: MapPin,
   leave: CalendarDays,
-  holidays: CalendarDays,
   history: History,
   reports: FileBarChart,
-  settings: Settings,
 };
 const tabs: [Tab, string, LucideIcon][] = presenceFeatureDefinitions.map(feature => [feature.tab, feature.label, presenceTabIcons[feature.tab] ?? CalendarDays]);
 const typeLabel: Record<PresenceItem['type'], string> = { attendance: 'Pointage', absence: 'Absence', schedule: 'Horaire', planning: 'Planning', mission: 'Mission', leave: 'Congé', holiday: 'Jour férié', settings: 'Paramètres', history: 'Historique' };
@@ -125,15 +117,8 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} employees={employees} date={date} setDate={setDate} settings={settings} onClock={clock} />;
     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} onExport={() => exportRows(rows, `presences-${date}.csv`)} onSelect={setSelected} />;
     if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreate} canValidate={canValidate} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
-    if (tab === 'late') return <LatePanel rows={rows} items={items} date={date} />;
     if (tab === 'schedules') return <SchedulesPanel items={items} employees={employees} canCreate={canCreate} canEdit={canEdit} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
-    if (tab === 'planning') return <PlanningPanel items={items} employees={employees} date={date} canCreate={canCreate} onCreate={create} onRemove={canDelete ? remove : undefined} />;
-    if (tab === 'breaks') return <BreaksPanel rows={rows} onClock={clock} />;
-    if (tab === 'worked') return <WorkedPanel rows={rows} settings={settings} />;
-    if (tab === 'overtime') return <OvertimePanel rows={rows} items={items} settings={settings} canValidate={canValidate} onCreate={create} onUpdate={update} />;
-    if (tab === 'missions') return <MissionsPanel items={items} employees={employees} date={date} canCreate={canCreate} onCreate={create} onRemove={canDelete ? remove : undefined} />;
     if (tab === 'leave') return <LeavePanel items={items} employees={employees} date={date} canCreate={canCreate} canValidate={canValidate} onCreate={create} onUpdate={update} />;
-    if (tab === 'holidays') return <HolidaysPanel items={items} date={date} canManage={canManage} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
     if (tab === 'history') return <HistoryPanel items={items} employees={employeeById} />;
     if (tab === 'reports') return <ReportsPanel rows={rows} items={items} canExport={canExport} onExport={() => exportRows(rows, `rapport-presences-${date}.csv`)} />;
     return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManage} onCreate={create} onUpdate={update} />;

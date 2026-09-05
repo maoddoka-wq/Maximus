@@ -18,7 +18,7 @@ import {
 import { parseQueryTab } from './query-tab';
 import { featureSlug, resolveFeatureDependencies } from './permission-keys';
 import { getModuleFeatureOptions } from './module-features';
-import { presenceFeatureDefinitions } from './presence-features';
+import { presenceFeatureDefinitions, presenceFeaturePacks } from './presence-features';
 import { recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
 import type { Company, Employee, ModuleId, OrgNode, Role, StoreData } from './store';
@@ -226,7 +226,15 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
     getModuleFeatureOptions(presenceModule).map(feature => feature.label),
     presenceFeatureDefinitions.map(feature => feature.label),
   );
-  assert.equal(presenceFeatureDefinitions.length, 16);
+  assert.equal(presenceFeatureDefinitions.length, 8);
+  assert.deepEqual(
+    presenceModule.featurePacks?.map((pack) => pack.id),
+    presenceFeaturePacks.map((pack) => pack.id),
+  );
+  assert.deepEqual(
+    presenceModule.featurePacks?.map((pack) => pack.name),
+    ['Consultation des présences', 'Gestionnaire des présences', 'Responsable des présences'],
+  );
 });
 
 test('conserve les packs métiers configurés dans un secteur', () => {
