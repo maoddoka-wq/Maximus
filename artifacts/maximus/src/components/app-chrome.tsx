@@ -233,10 +233,16 @@ export function Sidebar({
             <LogIn size={17} className="rotate-180" />
             {!compact && 'Se déconnecter'}
           </button>
-          <div className="mt-4 flex justify-center">
-            <span className="text-sm font-black tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">
-              MAXIMUS<span className="text-[hsl(var(--accent))]">.</span>
-            </span>
+          <div className={`mt-4 flex ${compact ? 'justify-center' : 'justify-start'}`}>
+            {compact ? (
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.18)] text-[10px] font-black text-[hsl(var(--accent))]">
+                M
+              </span>
+            ) : (
+              <span className="text-sm font-black tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">
+                MAXIMUS<span className="text-[hsl(var(--accent))]">.</span>
+              </span>
+            )}
           </div>
         </div>
       </aside>
