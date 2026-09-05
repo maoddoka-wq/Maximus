@@ -85,6 +85,11 @@ export function StructureTab({
         <span className="text-[hsl(var(--muted-foreground))]">Les managers se désignent depuis Comptes & managers</span>
       </div>
       <div className="space-y-1">
+        <div className="mb-1 hidden grid-cols-[minmax(0,1fr)_170px_170px] items-center gap-4 px-3 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))] sm:grid">
+          <span>Unité</span>
+          <span className="text-right">Accès</span>
+          <span className="text-right">Actions</span>
+        </div>
         {companyNodes.filter(node => !node.parentId).map(root => (
           <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} onEdit={node => { setEditingNode(node); setModalOpen(true); }} onDelete={deleteNode} depth={0} />
         ))}
@@ -134,25 +139,25 @@ function StructureNodeItem({
 
   return (
     <div>
-      <div className="group flex items-center gap-3 rounded-lg px-3 py-2 transition hover:bg-[hsl(var(--muted)/.4)]" style={{ marginLeft: `${depth * 20}px` }}>
-        <button onClick={() => setExpanded(value => !value)} className="flex w-5 justify-center text-[hsl(var(--muted-foreground))]">
-          {children.length > 0 && <ChevronDown size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />}
-        </button>
-        <span className="rounded bg-[hsl(var(--primary)/.1)] p-1.5 text-[hsl(var(--primary))]"><Building2 size={14} /></span>
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 md:flex-row md:items-center">
-          <div className="flex items-center gap-2 truncate">
+      <div className="group grid grid-cols-1 gap-2 rounded-lg border-b border-[hsl(var(--border)/.7)] px-3 py-2.5 transition hover:bg-[hsl(var(--muted)/.4)] sm:grid-cols-[minmax(0,1fr)_170px_170px] sm:items-center sm:gap-4">
+        <div className="flex min-w-0 items-center gap-3" style={{ paddingLeft: `${depth * 20}px` }}>
+          <button type="button" aria-label={children.length > 0 ? `${expanded ? 'Réduire' : 'Développer'} ${node.name}` : undefined} onClick={() => setExpanded(value => !value)} className="flex h-5 w-5 shrink-0 items-center justify-center text-[hsl(var(--muted-foreground))]">
+            {children.length > 0 && <ChevronDown size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />}
+          </button>
+          <span className="shrink-0 rounded bg-[hsl(var(--primary)/.1)] p-1.5 text-[hsl(var(--primary))]"><Building2 size={14} /></span>
+          <div className="flex min-w-0 items-center gap-2 truncate">
             <span className="truncate text-sm font-bold">{node.name}</span>
-            <span className="rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase text-[hsl(var(--muted-foreground))]">{node.type}</span>
-            {node.code && <span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{node.code}</span>}
-          </div>
-          <div className="flex shrink-0 items-center gap-4 text-xs text-[hsl(var(--muted-foreground))]">
-            <span>{node.moduleIds?.length ?? 0} module(s) autorisé(s)</span>
-            <div className="flex items-center gap-1">
-              <button type="button" data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={event => { event.stopPropagation(); onEdit(node); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-              <button data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
-            </div>
+            <span className="shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase text-[hsl(var(--muted-foreground))]">{node.type}</span>
+            {node.code && <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">{node.code}</span>}
           </div>
         </div>
+        <div className="flex items-center justify-between gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:justify-end">
+          <span className="text-[11px]">{node.moduleIds?.length ?? 0} module(s) autorisé(s)</span>
+        </div>
+        <div className="flex items-center justify-end gap-1">
+          <button type="button" data-testid={`button-edit-org-${node.id}`} aria-label={`Modifier ${node.name}`} onClick={event => { event.stopPropagation(); onEdit(node); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
+          <button type="button" data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
+          </div>
       </div>
       {expanded && children.map(child => <StructureNodeItem key={child.id} node={child} allNodes={allNodes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />)}
     </div>
