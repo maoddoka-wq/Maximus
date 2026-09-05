@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Support\MaximusDemoProvisioner;
+use App\Support\ModuleCatalog;
 use Illuminate\Console\Command;
 
 class ProvisionMaximusDemo extends Command
@@ -13,10 +14,13 @@ class ProvisionMaximusDemo extends Command
 
     public function handle(): int
     {
-        \App\Support\ModuleCatalog::ensureCatalog();
+        ModuleCatalog::ensureCatalog();
         MaximusDemoProvisioner::ensureAuthUsers();
-        \App\Support\ModuleCatalog::ensureCompanyAccess('kora');
+        ModuleCatalog::ensureCompanyAccess('kora');
         MaximusDemoProvisioner::ensureStockSeed('kora');
+        MaximusDemoProvisioner::ensureStockWorkflowSeed('kora');
+        MaximusDemoProvisioner::ensureControlSeed('kora');
+        MaximusDemoProvisioner::ensurePresenceSeed('kora');
 
         $this->info('Provisionnement MAXIMUS terminé.');
 
