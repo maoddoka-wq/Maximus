@@ -812,7 +812,7 @@ function AppContent() {
         employee={employee}
         companyName={currentCompany?.name}
         companyPhoto={currentCompany?.profilePhoto}
-        adminLogo="/admin-logo.png"
+        adminLogo="/maximus-mark.svg"
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         collapsed={sidebarCollapsed}
@@ -1695,7 +1695,7 @@ function Brand({ inverse = false, homeHref }: { inverse?: boolean; homeHref?: st
       className="inline-flex items-center gap-3"
     >
       <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[hsl(var(--accent)/.18)]">
-        <img src="/admin-logo.png" alt="Logo MAXIMUS" className="h-full w-full object-cover" />
+        <img src="/maximus-mark.svg" alt="Logo MAXIMUS" className="h-full w-full object-cover" />
       </span>
       <span
         className={`text-lg font-black tracking-[-.06em] ${inverse ? 'text-[hsl(var(--sidebar-foreground))]' : ''}`}
