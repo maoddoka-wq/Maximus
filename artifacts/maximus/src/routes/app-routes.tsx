@@ -28,6 +28,7 @@ export function AdminRouter({
   mutate,
   notify,
   onNavigate,
+  onBack,
   screens,
 }: {
   location: string;
@@ -102,6 +103,7 @@ export function KoraRouter({
   data,
   mutate,
   onNavigate,
+  onBack,
   allowed,
   canManagePeople,
   companyAdmin,
