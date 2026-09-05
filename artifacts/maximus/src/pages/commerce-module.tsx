@@ -144,6 +144,7 @@ export default function CommerceModulePage({
   mutate,
   canCreate = true,
   canModify = true,
+  tabPermissions,
   initialTab = 'dashboard',
   allowedTabs,
   singleModuleNavigation = false,
@@ -154,6 +155,7 @@ export default function CommerceModulePage({
   mutate: (fn: (draft: StoreData) => void, message?: string) => void;
   canCreate?: boolean;
   canModify?: boolean;
+  tabPermissions?: Partial<Record<Tab, string[]>>;
   initialTab?: Tab;
   allowedTabs?: readonly Tab[];
   singleModuleNavigation?: boolean;
@@ -203,6 +205,9 @@ export default function CommerceModulePage({
   const lowStock = data.products.filter(product => product.stock <= product.threshold);
   const unread = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(notification => !notification.read).length;
   const visibleTabs = tabs.filter(item => availableTabIds.includes(item.id));
+  const currentTabPermissions = tabPermissions?.[tab];
+  const currentCanCreate = Boolean(canCreate && (!tabPermissions || currentTabPermissions?.includes('créer')));
+  const currentCanModify = Boolean(canModify && (!tabPermissions || currentTabPermissions?.includes('modifier')));
 
   if (allowedTabs && availableTabIds.length === 0) {
     return <div className="card-surface rounded-2xl p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="commerce-module-empty">Aucune fonctionnalité commerciale n’est autorisée pour ce rôle.</div>;
@@ -233,20 +238,20 @@ export default function CommerceModulePage({
     </section>
     {tab !== 'dashboard' && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative block max-w-xl flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input data-testid="input-commerce-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher dans cet espace..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label><button type="button" onClick={() => setState(readState(companyId))} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold hover:bg-[hsl(var(--muted))]"><RefreshCw size={14} />Actualiser</button></div>}
     {tab === 'dashboard' && <Dashboard data={data} state={state} lowStock={lowStock} revenue={revenue} onTab={navigateTab} />}
-     {tab === 'sales' && <SalesPageFunctional data={data} query={query} mutate={mutate} canCreate={canCreate} canModify={canModify} taxRate={Number(state.settings.taxRate) || 0} companyId={companyId} />}
-     {tab === 'products' && <ProductsPageComplete data={data} query={query} mutate={mutate} canCreate={canCreate} canModify={canModify} />}
-     {tab === 'clients' && <ClientsPageComplete state={state} query={query} canCreate={canCreate} canModify={canModify} onUpdate={updateState} />}
-     {tab === 'suppliers' && <SuppliersPageComplete data={data} query={query} canCreate={canCreate} canModify={canModify} mutate={mutate} />}
-     {tab === 'purchases' && <PurchasesPageComplete data={data} query={query} canCreate={canCreate} canModify={canModify} mutate={mutate} companyId={companyId} />}
-     {tab === 'expenses' && <ExpensesPageComplete state={state} query={query} canCreate={canCreate} canModify={canModify} onUpdate={updateState} />}
-     {tab === 'cash' && <CashPageComplete state={state} query={query} canCreate={canCreate} canModify={canModify} onUpdate={updateState} />}
-     {tab === 'credit' && <CreditPageComplete state={state} query={query} canCreate={canCreate} canModify={canModify} onUpdate={updateState} />}
+     {tab === 'sales' && <SalesPageFunctional data={data} query={query} mutate={mutate} canCreate={currentCanCreate} canModify={currentCanModify} taxRate={Number(state.settings.taxRate) || 0} companyId={companyId} />}
+     {tab === 'products' && <ProductsPageComplete data={data} query={query} mutate={mutate} canCreate={currentCanCreate} canModify={currentCanModify} />}
+     {tab === 'clients' && <ClientsPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
+     {tab === 'suppliers' && <SuppliersPageComplete data={data} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} />}
+     {tab === 'purchases' && <PurchasesPageComplete data={data} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} companyId={companyId} />}
+     {tab === 'expenses' && <ExpensesPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
+     {tab === 'cash' && <CashPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
+     {tab === 'credit' && <CreditPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
      {tab === 'invoices' && <InvoicesPageComplete data={data} query={query} onToast={setToast} />}
-     {tab === 'returns' && <ReturnsPageComplete data={data} state={state} query={query} canCreate={canCreate} canModify={canModify} mutate={mutate} onUpdate={updateState} />}
+     {tab === 'returns' && <ReturnsPageComplete data={data} state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} onUpdate={updateState} />}
     {tab === 'reports' && <ReportsPage data={data} state={state} />}
     {tab === 'activity' && <ActivityPage data={data} query={query} />}
-    {tab === 'team' && <TeamPage data={data} query={query} canModify={canModify} onToast={setToast} onNavigate={onNavigate} />}
-    {tab === 'settings' && <SettingsPage state={state} canModify={canModify} onUpdate={updateState} />}
+    {tab === 'team' && <TeamPage data={data} query={query} canModify={currentCanModify} onToast={setToast} onNavigate={onNavigate} />}
+    {tab === 'settings' && <SettingsPage state={state} canModify={currentCanModify} onUpdate={updateState} />}
   </div>;
 }
 

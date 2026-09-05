@@ -26,10 +26,12 @@ const configs: Config[] = [
   { id: 'documents', key: 'businessDocuments', title: 'Documents métier', description: 'Classez les pièces utiles et contrôlez leur cycle de validation.', noun: 'document', icon: FolderOpen, fields: [{ key: 'name', label: 'Nom du document' }, { key: 'category', label: 'Catégorie', type: 'select', options: ['Contrats', 'Factures', 'Procédures', 'RH'] }, { key: 'owner', label: 'Responsable' }], columns: [{ label: 'Document', value: x => (x as BusinessDocument).name }, { label: 'Catégorie', value: x => (x as BusinessDocument).category }, { label: 'Responsable', value: x => (x as BusinessDocument).owner }, { label: 'Mise à jour', value: x => (x as BusinessDocument).updatedAt }, { label: 'Version', value: x => `v${(x as BusinessDocument).version}` }], search: x => { const v = x as BusinessDocument; return `${v.name} ${v.category} ${v.owner}`; }, create: v => ({ id: uid('doc'), name: v.name, category: v.category, owner: v.owner, updatedAt: 'À l’instant', version: 1, status: 'BROUILLON' }) },
 ];
 
-export function OperationalModulePage({ moduleId, data, mutate, canCreate = true, canModify = true }: { moduleId: ModuleId; data: StoreData; mutate: Mutate; canCreate?: boolean; canModify?: boolean }) {
+export function OperationalModulePage({ moduleId, data, mutate, canCreate = true, canModify = true, featurePermissions }: { moduleId: ModuleId; data: StoreData; mutate: Mutate; canCreate?: boolean; canModify?: boolean; featurePermissions?: Partial<Record<string, string[]>> }) {
   const config = configs.find(item => item.id === moduleId);
   if (!config) return null;
-  return <ModuleScreen config={config} data={data} mutate={mutate} canCreate={canCreate} canModify={canModify} />;
+  const scopedCanCreate = featurePermissions ? Object.values(featurePermissions).some(permissions => permissions?.includes('créer')) : canCreate;
+  const scopedCanModify = featurePermissions ? Object.values(featurePermissions).some(permissions => permissions?.includes('modifier')) : canModify;
+  return <ModuleScreen config={config} data={data} mutate={mutate} canCreate={scopedCanCreate} canModify={scopedCanModify} />;
 }
 
 function ModuleScreen({ config, data, mutate, canCreate, canModify }: { config: Config; data: StoreData; mutate: Mutate; canCreate: boolean; canModify: boolean }) {

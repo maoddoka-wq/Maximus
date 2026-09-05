@@ -1534,7 +1534,6 @@ function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { modul
   const operationalModules: ModuleId[] = ['achats', 'comptabilite', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents'];
   const koraCompany = data.companies.find(company => company.id === 'kora');
   const featureOptions = getModuleFeatureOptions(module);
-  const labels = new Map(featureOptions.map(feature => [feature.id, feature.label]));
   const fullFeatureIds = featureOptions.map(feature => feature.id);
   const testFeatureIds = pack ? [...getEffectiveModuleFeatureIds(module, pack.featureIds)] : fullFeatureIds;
   const configuredPermissions = pack
@@ -1564,6 +1563,11 @@ function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { modul
     facturation: 'invoices',
   };
   const allowedCommerceTabs = authorizedFeatures.map(featureId => commerceFeatureToTab[featureId]).filter((tab): tab is CommerceTabId => Boolean(tab));
+  const commerceTabPermissions = allowedCommerceTabs.reduce<Partial<Record<CommerceTabId, string[]>>>((all, tab) => {
+    const permissions = authorizedFeatures.filter(featureId => commerceFeatureToTab[featureId] === tab).flatMap(featureId => configuredPermissions[featureId] ?? []);
+    all[tab] = [...new Set(permissions)];
+    return all;
+  }, {});
   return <div data-testid="module-pack-workbench" className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button data-testid="button-back-pack-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
@@ -1573,18 +1577,16 @@ function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { modul
       <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">{pack ? 'Pack métier' : 'Module métier'}</p>
       <h1 className="mt-2 text-2xl font-bold">{pack?.name ?? module.name}</h1>
       <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{pack?.description || (pack ? `Testez le parcours du pack ${pack.name}.` : `Testez toutes les fonctionnalités du module ${module.name}.`)}</p>
-      <div className="mt-4 rounded-lg bg-[hsl(var(--muted)/.7)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">{pack ? `Ce test ouvre ${authorizedFeatures.length} fonctionnalité(s) du pack avec leurs droits réels.` : `Ce test ouvre les ${authorizedFeatures.length} fonctionnalité(s) du module avec les droits complets.`}</div>
-      <div className="mt-5 space-y-2">{authorizedFeatures.map(featureId => <div key={featureId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[hsl(var(--muted))] px-3 py-2"><span className="text-xs font-semibold">{labels.get(featureId) ?? featureId}</span><span className="rounded-full bg-[hsl(var(--background))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{permissionLevelFor(configuredPermissions[featureId]) === 'edit' ? 'Voir, créer et modifier' : permissionLevelFor(configuredPermissions[featureId]) === 'create' ? 'Voir et créer' : 'Voir seulement'}</span></div>)}</div>
     </section>
     <section className="card-surface rounded-2xl p-5">
       <div className="border-b pb-4"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Aperçu fonctionnel</p><h2 className="mt-2 text-xl font-bold">{module.name}{pack ? ` avec le pack « ${pack.name} »` : ''}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{pack ? 'Les mêmes écrans que ceux utilisés par une entreprise sont ouverts avec le périmètre et les droits de ce pack.' : 'Le parcours complet du module est ouvert avec toutes ses fonctionnalités.'}</p></div>
       <div className="mt-5">
-        {module.id === 'stocks' && <StockModulePage companyId="kora" canCreate={canCreate} canModify={canModify} stockPermissions={stockPermissions} />}
-        {(module.id === 'commerce' || module.id === 'ventes') && <CommerceModulePage companyId="kora" data={data} mutate={mutate} canCreate={canCreate} canModify={canModify} allowedTabs={allowedCommerceTabs} initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')} />}
+        {module.id === 'stocks' && <StockModulePage companyId="kora" stockPermissions={stockPermissions} />}
+        {(module.id === 'commerce' || module.id === 'ventes') && <CommerceModulePage companyId="kora" data={data} mutate={mutate} tabPermissions={commerceTabPermissions} allowedTabs={allowedCommerceTabs} initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')} />}
         {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
         {module.id === 'rh' && koraCompany && <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />}
         {module.id === 'presences' && <PresencesPage data={data} />}
-        {operationalModules.includes(module.id) && <OperationalModulePage moduleId={module.id} data={data} mutate={mutate} canCreate={canCreate} canModify={canModify} />}
+        {operationalModules.includes(module.id) && <OperationalModulePage moduleId={module.id} data={data} mutate={mutate} featurePermissions={configuredPermissions} />}
         {module.id === 'rapports' && <OperationalReportsPage data={data} />}
         {!['stocks', 'commerce', 'ventes', 'finance', 'rh', 'presences', 'rapports', ...operationalModules].includes(module.id) && <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">L’aperçu de ce module sera disponible quand son écran métier sera connecté.</p>}
       </div>
