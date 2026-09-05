@@ -260,7 +260,7 @@ export function Sidebar({
             <>
               <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                  Organisation
+                  Administration
                 </span>
               </div>
               <div className="space-y-1">{companyCoreItems.map(item => link(item))}</div>
