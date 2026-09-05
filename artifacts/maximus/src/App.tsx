@@ -1319,14 +1319,13 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
   const [editingPackId, setEditingPackId] = useState<string | null>(null);
-  const [packForm, setPackForm] = useState({ name: '', description: '', featureIds: [] as string[] });
+  const [packForm, setPackForm] = useState({ name: '', description: '', featureIds: [] as string[], featurePermissions: {} as FeaturePermissionMap });
   const [testPack, setTestPack] = useState<ModuleFeaturePack | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
   const moduleDefinitions = modules.filter(module => !data.removedModules?.includes(module.id)).map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
   const statusOf = (moduleId: ModuleId): ModuleAvailability => data.removedModules?.includes(moduleId) ? 'INACTIF' : data.moduleStatuses?.[moduleId] ?? modules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
-  const featureStatusOf = (moduleId: ModuleId, featureId: string): ModuleAvailability => data.moduleOverrides?.[moduleId]?.featureStatuses?.[featureId] ?? 'ACTIF';
   const selected = selectedId ? moduleDefinitions.find(module => module.id === selectedId) ?? null : null;
   const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
   const categoryOf = (moduleId: ModuleId) => {
@@ -1384,37 +1383,32 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
     }, isActive ? `${module.name} a été désactivé pour tous les espaces.` : `${module.name} est maintenant actif.`);
   };
 
-  const toggleFeatureAuthorization = (moduleId: ModuleId, featureId: string) => {
-    const nextStatus = featureStatusOf(moduleId, featureId) === 'INACTIF' ? 'ACTIF' : 'INACTIF';
-    mutate(draft => {
-      const override = draft.moduleOverrides?.[moduleId] ?? {};
-      draft.moduleOverrides = {
-        ...(draft.moduleOverrides ?? {}),
-        [moduleId]: {
-          ...override,
-          featureStatuses: { ...(override.featureStatuses ?? {}), [featureId]: nextStatus },
-        },
-      };
-    }, nextStatus === 'ACTIF' ? 'Fonctionnalité autorisée.' : 'Fonctionnalité désactivée.');
-  };
-
   const resetPackForm = () => {
     setEditingPackId(null);
-    setPackForm({ name: '', description: '', featureIds: [] });
+    setPackForm({ name: '', description: '', featureIds: [], featurePermissions: {} });
   };
 
-  const openPackEdit = (pack: { id: string; name: string; description?: string; featureIds: string[] }) => {
+  const openPackEdit = (pack: ModuleFeaturePack) => {
     setEditingPackId(pack.id);
-    setPackForm({ name: pack.name, description: pack.description ?? '', featureIds: [...pack.featureIds] });
+    const featurePermissions = defaultFeaturePermissions(pack.featureIds, pack.featurePermissions);
+    setPackForm({ name: pack.name, description: pack.description ?? '', featureIds: [...pack.featureIds], featurePermissions });
   };
 
-  const togglePackFeature = (featureId: string) => {
-    setPackForm(current => ({ ...current, featureIds: current.featureIds.includes(featureId) ? current.featureIds.filter(id => id !== featureId) : [...current.featureIds, featureId] }));
+  const setPackFeaturePermission = (featureId: string, level: string) => {
+    const permissions = permissionsForLevel(level);
+    setPackForm(current => {
+      const featurePermissions = { ...current.featurePermissions };
+      if (permissions.length) featurePermissions[featureId] = permissions;
+      else delete featurePermissions[featureId];
+      return { ...current, featureIds: Object.keys(featurePermissions), featurePermissions };
+    });
   };
 
   const savePack = () => {
     if (!selected || !packForm.name.trim() || packForm.featureIds.length === 0) return;
-    const nextPack = { id: editingPackId ?? uid(`pack-${selected.id}`), name: packForm.name.trim(), description: packForm.description.trim(), featureIds: packForm.featureIds.filter(featureId => featureStatusOf(selected.id, featureId) !== 'INACTIF') };
+    const featureIds = getModuleFeatureOptions(selected).map(feature => feature.id).filter(featureId => packForm.featurePermissions[featureId]?.length);
+    const featurePermissions = Object.fromEntries(featureIds.map(featureId => [featureId, [...packForm.featurePermissions[featureId]!]]));
+    const nextPack: ModuleFeaturePack = { id: editingPackId ?? uid(`pack-${selected.id}`), name: packForm.name.trim(), description: packForm.description.trim(), featureIds, featurePermissions };
     if (nextPack.featureIds.length === 0) return;
     mutate(draft => {
       const current = draft.moduleOverrides?.[selected.id]?.featurePacks ?? modules.find(module => module.id === selected.id)?.featurePacks ?? [];
@@ -1463,26 +1457,18 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
              <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Configuration métier</p><h2 className="mt-2 text-xl font-bold">Packs métiers du module</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Créez des packs réutilisables en regroupant les fonctionnalités de ce module. Les secteurs pourront ensuite les sélectionner.</p></div>
              <Package size={19} className="text-[hsl(var(--primary))]" />
            </div>
-           <div className="mt-6 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
-             <p className="text-sm font-bold">Autorisation des fonctionnalités</p>
-             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Une fonctionnalité désactivée ne peut pas être proposée dans un pack.</p>
-             <div className="mt-3 space-y-2">{getModuleFeatureOptions(selected).map(feature => {
-               const authorized = featureStatusOf(selected.id, feature.id) !== 'INACTIF';
-               return <div key={feature.id} className="flex items-center justify-between gap-3 rounded-lg border bg-[hsl(var(--card))] px-3 py-2"><span className="text-xs font-semibold">{feature.label}</span><button type="button" data-testid={`button-authorize-feature-${selected.id}-${feature.id}`} onClick={() => toggleFeatureAuthorization(selected.id, feature.id)} className={`rounded-full px-3 py-1.5 text-[10px] font-bold ${authorized ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{authorized ? 'Autorisée' : 'Désactivée'}</button></div>;
-             })}</div>
-           </div>
            <div className="mt-6 space-y-3">{(selected.featurePacks ?? []).map(pack => <div data-testid={`row-module-pack-${selected.id}-${pack.id}`} key={pack.id} className="rounded-xl border p-4">
-             <div className="flex items-start justify-between gap-4"><div><strong className="text-sm">{pack.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{pack.description || 'Aucune description.'}</p><p className="mt-2 text-[10px] font-semibold text-[hsl(var(--primary))]">{pack.featureIds.length} fonctionnalité(s) incluse(s)</p></div><div className="flex shrink-0 gap-1"><button type="button" data-testid={`button-test-module-pack-${pack.id}`} onClick={() => setTestPack(pack)} className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Tester le pack</button><button type="button" data-testid={`button-edit-module-pack-${pack.id}`} onClick={() => openPackEdit(pack)} className="rounded-lg p-2 text-xs font-bold hover:bg-[hsl(var(--muted))]"><Edit3 size={14} /></button><button type="button" data-testid={`button-delete-module-pack-${pack.id}`} onClick={() => deletePack(pack.id)} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={14} /></button></div></div>
+              <div className="flex items-start justify-between gap-4"><div><strong className="text-sm">{pack.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{pack.description || 'Aucune description.'}</p><p className="mt-2 text-[10px] font-semibold text-[hsl(var(--primary))]">{pack.featureIds.length} fonctionnalité(s) avec droits configurés</p></div><div className="flex shrink-0 gap-1"><button type="button" data-testid={`button-test-module-pack-${pack.id}`} onClick={() => setTestPack(pack)} className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Tester le pack</button><button type="button" data-testid={`button-edit-module-pack-${pack.id}`} onClick={() => openPackEdit(pack)} className="rounded-lg p-2 text-xs font-bold hover:bg-[hsl(var(--muted))]"><Edit3 size={14} /></button><button type="button" data-testid={`button-delete-module-pack-${pack.id}`} onClick={() => deletePack(pack.id)} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={14} /></button></div></div>
            </div>)}{(selected.featurePacks ?? []).length === 0 && <p className="rounded-xl border border-dashed p-5 text-xs text-[hsl(var(--muted-foreground))]">Aucun pack métier n’est encore configuré pour ce module.</p>}</div>
            <div className="mt-6 border-t pt-5">
              <p className="text-sm font-bold">{editingPackId ? 'Modifier le pack' : 'Créer un pack métier'}</p>
+              <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour chaque fonctionnalité, choisissez le niveau d’accès inclus dans ce pack. Une fonctionnalité non incluse ne sera pas transmise à l’entreprise.</p>
              <div className="mt-3 grid gap-3 sm:grid-cols-2"><Field label="Nom du pack" value={packForm.name} onChange={value => setPackForm(current => ({ ...current, name: value }))} placeholder="Ex. Gestionnaire de stock" testId="input-module-pack-name" /><Field label="Description" value={packForm.description} onChange={value => setPackForm(current => ({ ...current, description: value }))} placeholder="À quoi sert ce pack ?" testId="input-module-pack-description" /></div>
-             <p className="mt-4 text-xs font-bold">Fonctionnalités incluses</p>
+              <p className="mt-4 text-xs font-bold">Droits par fonctionnalité</p>
               <div className="mt-2 grid gap-1 sm:grid-cols-2">{getModuleFeatureOptions(selected).map(feature => {
-                const authorized = featureStatusOf(selected.id, feature.id) !== 'INACTIF';
-                return <label key={feature.id} className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs ${authorized ? 'hover:bg-[hsl(var(--muted))]' : 'opacity-45'}`}><input type="checkbox" checked={packForm.featureIds.includes(feature.id)} onChange={() => togglePackFeature(feature.id)} disabled={!authorized} className="accent-[hsl(var(--primary))]" />{feature.label}{!authorized && <span className="ml-auto text-[9px]">désactivée</span>}</label>;
+                 return <label key={feature.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-2 text-xs hover:bg-[hsl(var(--muted))]"><span className="font-medium">{feature.label}</span><select data-testid={`select-pack-permission-${selected.id}-${feature.id}`} value={permissionLevelFor(packForm.featurePermissions[feature.id])} onChange={event => setPackFeaturePermission(feature.id, event.target.value)} className="rounded-md border bg-[hsl(var(--card))] px-2 py-1.5 text-[10px] font-semibold"><option value="none">Non incluse</option><option value="view">Voir seulement</option><option value="create">Voir et créer</option><option value="edit">Voir, créer et modifier</option></select></label>;
               })}</div>
-             <div className="mt-4 flex gap-2"><button type="button" data-testid="button-save-module-pack" disabled={!packForm.name.trim() || packForm.featureIds.length === 0} onClick={savePack} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-40">{editingPackId ? 'Mettre à jour' : 'Créer le pack'}</button>{editingPackId && <button type="button" onClick={resetPackForm} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button>}</div>
+              <div className="mt-4 flex gap-2"><button type="button" data-testid="button-save-module-pack" disabled={!packForm.name.trim() || packForm.featureIds.length === 0} onClick={savePack} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-40">{editingPackId ? 'Mettre à jour' : 'Créer le pack'}</button>{editingPackId && <button type="button" onClick={resetPackForm} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button>}</div>
            </div>
         </section>
       </div>
@@ -1545,7 +1531,8 @@ function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { modul
   const operationalModules: ModuleId[] = ['achats', 'comptabilite', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents'];
   const koraCompany = data.companies.find(company => company.id === 'kora');
   const labels = new Map(getModuleFeatureOptions(module).map(feature => [feature.id, feature.label]));
-  const authorizedFeatures = pack.featureIds.filter(featureId => module.featureStatuses?.[featureId] !== 'INACTIF');
+  const configuredPermissions = defaultFeaturePermissions(pack.featureIds, pack.featurePermissions);
+  const authorizedFeatures = pack.featureIds.filter(featureId => configuredPermissions[featureId]?.length);
   return <div data-testid="module-pack-workbench" className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button data-testid="button-back-pack-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
@@ -1555,8 +1542,7 @@ function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { modul
       <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Pack métier</p>
       <h1 className="mt-2 text-2xl font-bold">{pack.name}</h1>
       <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{pack.description || `Testez le parcours du pack ${pack.name}.`}</p>
-      <div className="mt-5 flex flex-wrap gap-2">{authorizedFeatures.map(featureId => <span key={featureId} className="rounded-full bg-[hsl(var(--muted))] px-3 py-1.5 text-xs font-semibold">{labels.get(featureId) ?? featureId}</span>)}</div>
-      {authorizedFeatures.length !== pack.featureIds.length && <p className="mt-4 rounded-lg bg-[hsl(var(--accent)/.1)] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités désactivées ont été retirées de ce test.</p>}
+      <div className="mt-5 space-y-2">{authorizedFeatures.map(featureId => <div key={featureId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[hsl(var(--muted))] px-3 py-2"><span className="text-xs font-semibold">{labels.get(featureId) ?? featureId}</span><span className="rounded-full bg-[hsl(var(--background))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{permissionLevelFor(configuredPermissions[featureId]) === 'edit' ? 'Voir, créer et modifier' : permissionLevelFor(configuredPermissions[featureId]) === 'create' ? 'Voir et créer' : 'Voir seulement'}</span></div>)}</div>
     </section>
     <section className="card-surface rounded-2xl p-5">
       <div className="border-b pb-4"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Aperçu fonctionnel</p><h2 className="mt-2 text-xl font-bold">{module.name} avec le pack « {pack.name} »</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les mêmes écrans que ceux utilisés par une entreprise sont ouverts avec le périmètre de ce pack.</p></div>
