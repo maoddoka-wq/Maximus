@@ -23,4 +23,19 @@ export const authApi = {
   }),
   session: () => request<{ user: AuthUser | null }>('/auth/session'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  provisionAccount: (input: {
+    id: string;
+    email: string;
+    displayName: string;
+    companyId: string;
+    employeeId: string;
+    sectorIds: string[];
+    role: 'sector_manager' | 'employee';
+    password?: string;
+  }) => request<{ ok: true }>('/auth/accounts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }),
+  revokeAccount: (employeeId: string) => request<void>(`/auth/accounts/${encodeURIComponent(employeeId)}`, { method: 'DELETE' }),
 };
