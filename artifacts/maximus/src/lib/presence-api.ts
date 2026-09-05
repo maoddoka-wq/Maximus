@@ -1,6 +1,10 @@
-export type PresenceItemType = 'attendance' | 'absence' | 'schedule' | 'planning' | 'mission' | 'leave' | 'holiday' | 'settings' | 'history';
+// Legacy records may still exist in PostgreSQL, but the Laravel API no longer
+// accepts them for new writes. Keeping them readable lets the history screen
+// render old data while the current catalog stays restricted.
+export type PresenceWriteType = 'attendance' | 'absence' | 'schedule' | 'leave';
+export type PresenceItemType = PresenceWriteType | 'history' | 'planning' | 'mission' | 'holiday' | 'settings';
 export type PresenceItem = { id: string; companyId: string; type: PresenceItemType; employeeId: string | null; workDate: string | null; startDate: string | null; endDate: string | null; status: string; payload: Record<string, any>; createdBy: string; updatedBy: string; createdAt: string; updatedAt: string };
-type ItemInput = Omit<PresenceItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'> & { actor?: string };
+type ItemInput = Omit<PresenceItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'type'> & { type: PresenceWriteType; actor?: string };
 const json = (body: unknown) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, options);

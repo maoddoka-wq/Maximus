@@ -3,8 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
-use App\Models\ControlAuditEntry;
-use App\Models\ControlEvent;
+use App\Models\ControlTask;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,6 +30,7 @@ class ControlTest extends TestCase
 
         $created = $request->postJson('/api/control/tasks', [
             'companyId' => 'kora',
+            'id' => 'client-controlled-id',
             'sectorId' => 'logistique',
             'title' => 'Contrôler la réception',
             'description' => 'Vérifier les quantités avant validation.',
@@ -47,6 +47,7 @@ class ControlTest extends TestCase
             ->assertJsonPath('companyId', 'kora')
             ->assertJsonPath('createdBy', 'Admin Kora')
             ->assertJsonPath('status', 'À FAIRE');
+        $this->assertNotSame('client-controlled-id', $created->json('id'));
 
         $taskId = $created->json('id');
         $this->assertDatabaseCount('control_tasks', 1);
@@ -90,6 +91,20 @@ class ControlTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_unknown_roles_cannot_read_control_data(): void
+    {
+        $request = $this->asActor([
+            'id' => 'unknown-control-role',
+            'email' => 'unknown-control-role@kora.demo',
+            'display_name' => 'Rôle inconnu',
+            'role' => 'legacy_role',
+            'company_id' => 'kora',
+        ]);
+
+        $request->getJson('/api/control/bootstrap?companyId=kora')
+            ->assertForbidden();
+    }
+
     public function test_bootstrap_returns_only_tasks_in_the_actor_scope(): void
     {
         $request = $this->asActor([
@@ -101,7 +116,7 @@ class ControlTest extends TestCase
             'employee_id' => 'employee-1',
         ]);
 
-        \App\Models\ControlTask::query()->create([
+        ControlTask::query()->create([
             'id' => 'task-visible',
             'company_id' => 'kora',
             'title' => 'Visible',
@@ -114,7 +129,7 @@ class ControlTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        \App\Models\ControlTask::query()->create([
+        ControlTask::query()->create([
             'id' => 'task-hidden',
             'company_id' => 'kora',
             'title' => 'Cachée',

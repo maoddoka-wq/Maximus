@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\PresenceItem;
 use App\Models\AuthUser;
+use App\Models\PresenceItem;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -127,6 +127,51 @@ class PresenceTest extends TestCase
         $this->asActor()
             ->getJson('/api/presence/bootstrap?companyId=another-company')
             ->assertForbidden();
+    }
+
+    public function test_presence_rejects_removed_legacy_item_types(): void
+    {
+        $this->asActor()
+            ->postJson('/api/presence/items', [
+                'companyId' => 'kora',
+                'type' => 'planning',
+                'status' => 'ACTIF',
+                'payload' => [],
+            ])
+            ->assertUnprocessable();
+    }
+
+    public function test_presence_history_is_server_managed(): void
+    {
+        $request = $this->asActor();
+
+        $request->postJson('/api/presence/items', [
+            'companyId' => 'kora',
+            'type' => 'history',
+            'status' => 'ACTIF',
+            'payload' => ['action' => 'forged'],
+        ])->assertUnprocessable();
+
+        PresenceItem::query()->create([
+            'id' => 'history-protected',
+            'company_id' => 'kora',
+            'type' => 'history',
+            'status' => 'ACTIF',
+            'payload' => ['action' => 'clock.arrival'],
+            'created_by' => 'Serveur',
+            'updated_by' => 'Serveur',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->patchJson('/api/presence/items/history-protected', [
+            'companyId' => 'kora',
+            'payload' => ['action' => 'forged.update'],
+        ])->assertForbidden();
+
+        $request->deleteJson('/api/presence/items/history-protected', [
+            'companyId' => 'kora',
+        ])->assertForbidden();
     }
 
     private function asActor(): self

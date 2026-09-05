@@ -15,19 +15,19 @@ final class ControlAuthorization
         }
 
         if (($actor['role'] ?? null) === 'employee') {
-            return !empty($actor['employeeId']);
+            return ! empty($actor['employeeId']);
         }
 
         if (($actor['role'] ?? null) === 'sector_manager') {
             return count($actor['sectorIds'] ?? []) > 0;
         }
 
-        return true;
+        return ($actor['role'] ?? null) === 'company_admin';
     }
 
     public static function canRead(array $actor, ?string $companyId = null, ?array $task = null): bool
     {
-        if (!self::isValid($actor)) {
+        if (! self::isValid($actor)) {
             return false;
         }
 
@@ -35,11 +35,11 @@ final class ControlAuthorization
             return true;
         }
 
-        if (!$companyId || empty($actor['companyId']) || $actor['companyId'] !== $companyId) {
+        if (! $companyId || empty($actor['companyId']) || $actor['companyId'] !== $companyId) {
             return false;
         }
 
-        if (!$task) {
+        if (! $task) {
             return true;
         }
 
@@ -49,7 +49,7 @@ final class ControlAuthorization
 
         return match ($actor['role'] ?? null) {
             'company_admin' => true,
-            'sector_manager' => !empty($task['sectorId']) && in_array($task['sectorId'], $actor['sectorIds'] ?? [], true),
+            'sector_manager' => ! empty($task['sectorId']) && in_array($task['sectorId'], $actor['sectorIds'] ?? [], true),
             default => ($task['assigneeEmployeeId'] ?? null) === ($actor['employeeId'] ?? null),
         };
     }
@@ -60,7 +60,7 @@ final class ControlAuthorization
             return true;
         }
 
-        if (!self::canRead($actor, $input['companyId'] ?? null)) {
+        if (! self::canRead($actor, $input['companyId'] ?? null)) {
             return false;
         }
 
@@ -69,7 +69,7 @@ final class ControlAuthorization
         }
 
         return ($actor['role'] ?? null) === 'sector_manager'
-            && !empty($input['sectorId'])
+            && ! empty($input['sectorId'])
             && in_array($input['sectorId'], $actor['sectorIds'] ?? [], true);
     }
 

@@ -136,6 +136,47 @@ class StockTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_inventory_rejects_an_unknown_product_instead_of_silently_dropping_the_line(): void
+    {
+        $request = $this->asActor();
+        DB::table('stock_warehouses')->insert([
+            'id' => 'warehouse-invalid-line',
+            'company_id' => 'kora',
+            'name' => 'Entrepôt de test',
+            'manager' => '',
+            'address' => '',
+            'archived' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->postJson('/api/stock/inventories', [
+            'companyId' => 'kora',
+            'warehouseId' => 'warehouse-invalid-line',
+            'lines' => [['productId' => 'product-from-another-company', 'actualQuantity' => 4]],
+        ])
+            ->assertBadRequest()
+            ->assertJsonPath('error', 'PRODUCT_NOT_FOUND');
+
+        $this->assertDatabaseCount('stock_inventories', 0);
+        $this->assertDatabaseCount('stock_inventory_lines', 0);
+    }
+
+    public function test_stock_request_requires_company_owned_active_references(): void
+    {
+        $this->asActor()
+            ->postJson('/api/stock/requests', [
+                'companyId' => 'kora',
+                'productId' => 'product-from-another-company',
+                'warehouseId' => 'warehouse-from-another-company',
+                'quantity' => 1,
+                'reason' => 'Référence invalide',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('stock_requests', 0);
+    }
+
     private function asActor(): self
     {
         $user = AuthUser::query()->create([

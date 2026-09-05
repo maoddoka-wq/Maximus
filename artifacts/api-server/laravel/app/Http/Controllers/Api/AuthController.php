@@ -5,10 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthSession;
 use App\Models\AuthUser;
+use App\Support\CompanyAuthorization;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -25,7 +29,7 @@ class AuthController extends Controller
             ->where('status', 'ACTIF')
             ->first();
 
-        if (!$user || !MaximusPassword::check($data['password'], $user->password_hash)) {
+        if (! $user || ! MaximusPassword::check($data['password'], $user->password_hash)) {
             return response()->json([
                 'error' => 'Email ou mot de passe incorrect.',
             ], 401);
@@ -62,18 +66,16 @@ class AuthController extends Controller
             'password' => ['nullable', 'string', 'min:8', 'max:200'],
         ]);
         $actor = $request->attributes->get('authActor');
-        $canManage = ($actor['role'] ?? null) === 'maximus_admin'
-            || (($actor['companyId'] ?? null) === $data['companyId']
-                && (($actor['role'] ?? null) === 'company_admin'
-                    || (($actor['role'] ?? null) === 'sector_manager'
-                        && array_intersect($data['sectorIds'], $actor['sectorIds'] ?? []))));
-
-        if (!$canManage) {
+        if (! CompanyAuthorization::canManageAccount($actor, $data['companyId'], $data['sectorIds'])) {
             return response()->json(['error' => 'Provisionnement du compte hors périmètre autorisé.'], 403);
         }
 
-        $existing = AuthUser::query()->where('employee_id', $data['employeeId'])->first();
-        if (!$existing && empty($data['password'])) {
+        $existingQuery = AuthUser::query()->where('employee_id', $data['employeeId']);
+        if (($actor['role'] ?? null) !== 'maximus_admin') {
+            $existingQuery->where('company_id', $data['companyId']);
+        }
+        $existing = $existingQuery->first();
+        if (! $existing && empty($data['password'])) {
             return response()->json(['error' => 'Un mot de passe initial est requis pour ce compte.'], 400);
         }
 
@@ -87,14 +89,14 @@ class AuthController extends Controller
             'status' => 'ACTIF',
             'updated_at' => now(),
         ];
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $values['password_hash'] = MaximusPassword::hash($data['password']);
         }
 
         try {
             if ($existing) {
                 $existing->update($values);
-                if (!empty($data['password'])) {
+                if (! empty($data['password'])) {
                     AuthSession::query()->where('user_id', $existing->id)->delete();
                 }
             } else {
@@ -103,7 +105,7 @@ class AuthController extends Controller
                     'created_at' => now(),
                 ]));
             }
-        } catch (\Illuminate\Database\QueryException $exception) {
+        } catch (QueryException $exception) {
             if (str_contains($exception->getMessage(), 'unique')) {
                 return response()->json(['error' => 'Cette adresse email est déjà utilisée.'], 409);
             }
@@ -113,11 +115,11 @@ class AuthController extends Controller
         return response()->json(['ok' => true], $existing ? 200 : 201);
     }
 
-    public function deleteAccount(Request $request, string $employeeId): \Illuminate\Http\Response|JsonResponse
+    public function deleteAccount(Request $request, string $employeeId): Response|JsonResponse
     {
         $actor = $request->attributes->get('authActor');
         $user = AuthUser::query()->where('employee_id', $employeeId)->first();
-        if (!$user) {
+        if (! $user) {
             return response()->noContent();
         }
 
@@ -126,16 +128,11 @@ class AuthController extends Controller
             'employeeId' => $user->employee_id ?? $employeeId,
             'sectorIds' => $user->sector_ids ?? [],
         ];
-        $canManage = ($actor['role'] ?? null) === 'maximus_admin'
-            || (($actor['companyId'] ?? null) === $target['companyId']
-                && (($actor['role'] ?? null) === 'company_admin'
-                    || (($actor['role'] ?? null) === 'sector_manager'
-                        && array_intersect($target['sectorIds'], $actor['sectorIds'] ?? []))));
-        if (!$canManage) {
+        if (! CompanyAuthorization::canManageAccount($actor, (string) $target['companyId'], $target['sectorIds'])) {
             return response()->json(['error' => 'Révocation du compte hors périmètre autorisé.'], 403);
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($user): void {
+        DB::transaction(function () use ($user): void {
             $user->update(['status' => 'SUSPENDU', 'updated_at' => now()]);
             AuthSession::query()->where('user_id', $user->id)->delete();
         });
@@ -152,7 +149,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function logout(Request $request): \Illuminate\Http\Response
+    public function logout(Request $request): Response
     {
         if ($token = $request->cookie(MaximusAuth::COOKIE)) {
             AuthSession::query()

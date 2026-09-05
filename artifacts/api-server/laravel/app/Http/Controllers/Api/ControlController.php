@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 class ControlController extends Controller
 {
     private const STATUSES = ['À FAIRE', 'EN COURS', 'VALIDÉ', 'REFUSÉ', 'TERMINÉ'];
+
     private const PRIORITIES = ['BASSE', 'NORMALE', 'HAUTE', 'CRITIQUE'];
 
     public function bootstrap(Request $request): JsonResponse
@@ -40,10 +41,10 @@ class ControlController extends Controller
             $companyId = $requestedCompany;
         }
 
-        if ($scope !== 'admin' && !$companyId) {
+        if ($scope !== 'admin' && ! $companyId) {
             return response()->json(['error' => 'companyId requis pour ce périmètre'], 400);
         }
-        if (!ControlAuthorization::canRead($actor, $companyId)) {
+        if (! ControlAuthorization::canRead($actor, $companyId)) {
             return response()->json(['error' => 'Périmètre de contrôle non autorisé.'], 403);
         }
 
@@ -71,7 +72,7 @@ class ControlController extends Controller
         $events = $eventsQuery->get();
         $auditEntries = $auditQuery->get();
 
-        if (!in_array($actor['role'], ['maximus_admin', 'company_admin'], true)) {
+        if (! in_array($actor['role'], ['maximus_admin', 'company_admin'], true)) {
             $events = $events->filter(fn (ControlEvent $event) => $event->entity_id && in_array($event->entity_id, $taskIds, true))->values();
             $auditEntries = $auditEntries->filter(fn (ControlAuditEntry $audit) => $audit->entity_id && in_array($audit->entity_id, $taskIds, true))->values();
         }
@@ -90,11 +91,11 @@ class ControlController extends Controller
         $input['companyId'] = (string) $request->attributes->get('companyId');
         $input['createdBy'] = $actor['displayName'];
 
-        if (!ControlAuthorization::canCreate($actor, $input)) {
+        if (! ControlAuthorization::canCreate($actor, $input)) {
             return response()->json(['error' => 'Création hors périmètre autorisé.'], 403);
         }
 
-        $taskId = $input['id'] ?? 'task-'.Str::uuid();
+        $taskId = 'task-'.Str::uuid();
         $now = now();
         $taskValues = [
             'id' => $taskId,
@@ -134,12 +135,12 @@ class ControlController extends Controller
         $companyId = $request->attributes->get('companyId');
         $task = ControlTask::query()->find($id);
 
-        if (!$task) {
+        if (! $task) {
             return response()->json(['error' => 'Tâche introuvable'], 404);
         }
 
         $before = $this->task($task);
-        if ($task->company_id !== $companyId || !ControlAuthorization::canUpdate($actor, $before)) {
+        if ($task->company_id !== $companyId || ! ControlAuthorization::canUpdate($actor, $before)) {
             return response()->json(['error' => 'Modification hors périmètre autorisé.'], 403);
         }
 
@@ -158,7 +159,6 @@ class ControlController extends Controller
     private function validateTask(Request $request): array
     {
         return Validator::make($request->all(), [
-            'id' => ['nullable', 'string', 'min:1'],
             'sectorId' => ['nullable', 'string', 'min:1'],
             'title' => ['required', 'string', 'min:1', 'max:180'],
             'description' => ['required', 'string', 'min:1', 'max:4000'],

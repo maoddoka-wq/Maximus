@@ -7,19 +7,21 @@ use App\Models\PresenceItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class PresenceController extends Controller
 {
-    private const TYPES = ['attendance', 'absence', 'schedule', 'planning', 'mission', 'leave', 'holiday', 'settings', 'history'];
+    private const TYPES = ['attendance', 'absence', 'schedule', 'leave', 'history'];
+
+    private const WRITABLE_TYPES = ['attendance', 'absence', 'schedule', 'leave'];
+
     private const STATUSES = ['ACTIF', 'EN ATTENTE', 'APPROUVÉE', 'REFUSÉE', 'BROUILLON', 'VALIDÉE', 'ARCHIVÉE'];
 
     public function bootstrap(Request $request): JsonResponse
     {
         $companyId = $this->company($request);
-        if (!$companyId) {
+        if (! $companyId) {
             return response()->json(['error' => 'companyId requis'], 400);
         }
 
@@ -38,7 +40,7 @@ class PresenceController extends Controller
     {
         $input = $this->validateItem($request);
         $companyId = $this->company($request);
-        if (!$companyId) {
+        if (! $companyId) {
             return response()->json(['error' => 'Contexte entreprise requis.'], 400);
         }
         $actor = $this->actorName($request);
@@ -75,8 +77,12 @@ class PresenceController extends Controller
         $companyId = $this->company($request);
         $item = PresenceItem::query()->where('id', $id)->where('company_id', $companyId)->first();
 
-        if (!$item) {
+        if (! $item) {
             return response()->json(['error' => 'Enregistrement introuvable'], 404);
+        }
+
+        if ($item->type === 'history') {
+            return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
         }
 
         $actor = $this->actorName($request);
@@ -114,8 +120,12 @@ class PresenceController extends Controller
     {
         $companyId = $this->company($request);
         $item = PresenceItem::query()->where('id', $id)->where('company_id', $companyId)->first();
-        if (!$item) {
+        if (! $item) {
             return response()->json(['error' => 'Enregistrement introuvable'], 404);
+        }
+
+        if ($item->type === 'history') {
+            return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
         }
 
         $actor = $this->actorName($request);
@@ -141,7 +151,7 @@ class PresenceController extends Controller
             'tolerance' => ['nullable', 'integer', 'min:0'],
         ])->validate();
         $companyId = $this->company($request);
-        if (!$companyId) {
+        if (! $companyId) {
             return response()->json(['error' => 'Contexte entreprise requis.'], 400);
         }
         $actor = $this->actorName($request);
@@ -157,17 +167,17 @@ class PresenceController extends Controller
         $payload = $item?->payload ?? [];
         $clockTime = Carbon::parse($input['now'] ?? now())->format('H:i');
 
-        if ($input['action'] === 'arrival' && !empty($payload['arrival'])) {
+        if ($input['action'] === 'arrival' && ! empty($payload['arrival'])) {
             return response()->json(['error' => 'Arrivée déjà enregistrée pour cette journée.'], 409);
         }
-        if ($input['action'] === 'exit' && (empty($payload['arrival']) || !empty($payload['exit']))) {
-            return response()->json(['error' => !empty($payload['exit']) ? 'Sortie déjà enregistrée pour cette journée.' : 'Pointez d’abord l’arrivée.'], 409);
+        if ($input['action'] === 'exit' && (empty($payload['arrival']) || ! empty($payload['exit']))) {
+            return response()->json(['error' => ! empty($payload['exit']) ? 'Sortie déjà enregistrée pour cette journée.' : 'Pointez d’abord l’arrivée.'], 409);
         }
-        if ($input['action'] === 'pauseStart' && (empty($payload['arrival']) || !empty($payload['exit']) || !empty($payload['pauseStart']))) {
-            return response()->json(['error' => !empty($payload['pauseStart']) ? 'Pause déjà commencée.' : 'Action de pause incohérente.'], 409);
+        if ($input['action'] === 'pauseStart' && (empty($payload['arrival']) || ! empty($payload['exit']) || ! empty($payload['pauseStart']))) {
+            return response()->json(['error' => ! empty($payload['pauseStart']) ? 'Pause déjà commencée.' : 'Action de pause incohérente.'], 409);
         }
-        if ($input['action'] === 'pauseEnd' && (empty($payload['pauseStart']) || !empty($payload['pauseEnd']))) {
-            return response()->json(['error' => !empty($payload['pauseEnd']) ? 'Pause déjà terminée.' : 'Commencez d’abord une pause.'], 409);
+        if ($input['action'] === 'pauseEnd' && (empty($payload['pauseStart']) || ! empty($payload['pauseEnd']))) {
+            return response()->json(['error' => ! empty($payload['pauseEnd']) ? 'Pause déjà terminée.' : 'Commencez d’abord une pause.'], 409);
         }
 
         if ($input['action'] === 'arrival') {
@@ -223,7 +233,7 @@ class PresenceController extends Controller
     private function validateItem(Request $request, bool $partial = false): array
     {
         $rules = [
-            'type' => [$partial ? 'nullable' : 'required', 'in:'.implode(',', self::TYPES)],
+            'type' => [$partial ? 'nullable' : 'required', 'in:'.implode(',', self::WRITABLE_TYPES)],
             'employeeId' => ['nullable', 'string'],
             'workDate' => ['nullable', 'string'],
             'startDate' => ['nullable', 'string'],
@@ -239,12 +249,14 @@ class PresenceController extends Controller
     private function company(Request $request): ?string
     {
         $value = $request->attributes->get('companyId');
+
         return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function actorName(Request $request): string
     {
         $actor = $request->attributes->get('authActor');
+
         return is_array($actor) && is_string($actor['displayName'] ?? null) && $actor['displayName'] !== ''
             ? $actor['displayName']
             : 'Utilisateur MAXIMUS';
@@ -268,6 +280,7 @@ class PresenceController extends Controller
     private function minutes(string $value): int
     {
         [$hours, $minutes] = array_map('intval', explode(':', $value));
+
         return $hours * 60 + $minutes;
     }
 

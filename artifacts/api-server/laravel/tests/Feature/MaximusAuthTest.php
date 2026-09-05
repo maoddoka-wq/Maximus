@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\AuthUser;
 use App\Models\AuthSession;
+use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,5 +107,85 @@ class MaximusAuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('user.employeeId', 'employee-created-now')
             ->assertJsonPath('user.role', 'employee');
+    }
+
+    public function test_sector_manager_cannot_provision_an_account_across_sector_boundaries(): void
+    {
+        $manager = AuthUser::query()->create([
+            'id' => 'sector-manager-boundary',
+            'email' => 'sector-manager-boundary@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => 'kora',
+            'sector_ids' => ['secteur-a'],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($manager);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/auth/accounts', [
+                'id' => 'employee-cross-sector',
+                'email' => 'employee-cross-sector@kora.demo',
+                'displayName' => 'Employé hors périmètre',
+                'companyId' => 'kora',
+                'employeeId' => 'employee-cross-sector',
+                'sectorIds' => ['secteur-a', 'secteur-b'],
+                'role' => 'employee',
+                'password' => 'CreatedNow2026!',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_company_admin_cannot_reassign_an_employee_account_from_another_company(): void
+    {
+        AuthUser::query()->create([
+            'id' => 'existing-other-company',
+            'email' => 'existing-other-company@other.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Employé autre entreprise',
+            'role' => 'employee',
+            'company_id' => 'other-company',
+            'employee_id' => 'shared-employee-id',
+            'sector_ids' => ['other-sector'],
+            'status' => 'ACTIF',
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'company-admin-isolation',
+            'email' => 'company-admin-isolation@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', 'aabbccddeeff00112233445566778899'),
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/auth/accounts', [
+                'id' => 'attempted-cross-company-update',
+                'email' => 'attempted-cross-company-update@kora.demo',
+                'displayName' => 'Compte Kora',
+                'companyId' => 'kora',
+                'employeeId' => 'shared-employee-id',
+                'sectorIds' => ['kora-sector'],
+                'role' => 'employee',
+                'password' => 'CreatedNow2026!',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'existing-other-company',
+            'company_id' => 'other-company',
+            'email' => 'existing-other-company@other.demo',
+        ]);
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'attempted-cross-company-update',
+            'company_id' => 'kora',
+            'employee_id' => 'shared-employee-id',
+        ]);
     }
 }
