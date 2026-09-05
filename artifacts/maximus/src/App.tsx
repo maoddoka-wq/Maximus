@@ -100,6 +100,7 @@ import {
   type ModulePackDraft,
   updatePackPermission,
 } from '@/lib/module-pack';
+import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 
 const queryClient = new QueryClient();
 const defaultDemoAccounts = [
@@ -338,6 +339,18 @@ function AppContent() {
           return;
         }
         const nextSession = sessionFromAuthUser(user);
+        const persistedTestCompanyId = localStorage.getItem('maximus-sector-test-company');
+        if (nextSession === 'admin' && persistedTestCompanyId) {
+          setData((previous) => {
+            const next = structuredClone(previous) as StoreData;
+            next.companies = next.companies.filter((company) => company.id !== persistedTestCompanyId);
+            next.orgNodes = next.orgNodes.filter((node) => node.companyId !== persistedTestCompanyId);
+            next.employees = next.employees.filter((employee) => employee.companyId !== persistedTestCompanyId);
+            next.roles = next.roles.filter((role) => role.companyId !== persistedTestCompanyId);
+            return next;
+          });
+          localStorage.removeItem('maximus-sector-test-company');
+        }
         setSession(nextSession);
         localStorage.setItem('maximus-session', nextSession);
       })
@@ -387,9 +400,7 @@ function AppContent() {
       : session?.startsWith('company:')
         ? session.slice('company:'.length)
         : sessionEmployee?.companyId;
-  const sectorTestCompanyId = session?.startsWith('company:sector-test-')
-    ? session.slice('company:'.length)
-    : null;
+  const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
   useEffect(() => {
     if (!activeCompanyId || session === 'admin' || !session) {
       setServerModuleStatuses(null);
@@ -434,7 +445,48 @@ function AppContent() {
   };
   const startSectorTest = (preset: SectorPreset) => {
     const testCompanyId = `sector-test-${preset.id}`;
+    const testNodeId = `sector-test-node-${preset.id}`;
+    const testRoleId = `sector-test-role-${preset.id}`;
+    const testEmployeeId = `sector-test-employee-${preset.id}`;
     const selectedModules = [...new Set(preset.moduleIds)];
+    const configuredModules = getConfiguredModules(data);
+    const selectedModuleFeatures = Object.fromEntries(
+      selectedModules.map((moduleId) => {
+        const module = configuredModules.find((candidate) => candidate.id === moduleId);
+        const selectedPacks = (module?.featurePacks ?? []).filter((pack) =>
+          preset.modulePackIds?.[moduleId]?.includes(pack.id),
+        );
+        const packFeatureIds = selectedPacks.flatMap((pack) => pack.featureIds);
+        const featureIds = module
+          ? getEffectiveModuleFeatureIds(
+              module,
+              packFeatureIds.length ? packFeatureIds : preset.moduleFeatures?.[moduleId],
+            )
+          : new Set<string>();
+        return [moduleId, [...featureIds]];
+      }),
+    ) as Partial<Record<ModuleId, string[]>>;
+    const selectedModulePermissions = Object.fromEntries(
+      selectedModules.map((moduleId) => {
+        const module = configuredModules.find((candidate) => candidate.id === moduleId);
+        const selectedPacks = (module?.featurePacks ?? []).filter((pack) =>
+          preset.modulePackIds?.[moduleId]?.includes(pack.id),
+        );
+        const packPermissions = selectedPacks.reduce<FeaturePermissionMap>(
+          (permissions, pack) => ({ ...permissions, ...(pack.featurePermissions ?? {}) }),
+          {},
+        );
+        return [
+          moduleId,
+          Object.fromEntries(
+            (selectedModuleFeatures[moduleId] ?? []).map((featureId) => [
+              featureId,
+              [...(packPermissions[featureId] ?? ['voir'])],
+            ]),
+          ),
+        ];
+      }),
+    ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
     const testCompany: Company = {
       id: testCompanyId,
       name: `Test réel · ${preset.name}`,
@@ -449,20 +501,84 @@ function AppContent() {
         Object.entries(preset.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
       ),
       requestedModuleFeatures: Object.fromEntries(
-        Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+        Object.entries(selectedModuleFeatures).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
       ),
+      requestedModulePermissions: selectedModulePermissions,
       allowedModules: selectedModules,
       refusedModules: modules.map((module) => module.id).filter((moduleId) => !selectedModules.includes(moduleId)),
       createdAt: new Date().toISOString().slice(0, 10),
+      managerRoleId: testRoleId,
+    };
+    const testNode: OrgNode = {
+      id: testNodeId,
+      companyId: testCompanyId,
+      code: 'TEST',
+      name: preset.name,
+      type: 'sector',
+      parentId: null,
+      moduleIds: selectedModules,
+      modulePackIds: Object.fromEntries(
+        Object.entries(preset.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+      ),
+      moduleFeatures: selectedModuleFeatures,
+    };
+    const testEmployee: Employee = {
+      id: testEmployeeId,
+      firstName: 'Utilisateur',
+      lastName: 'test',
+      email: `test.${preset.id}@maximus.local`,
+      phone: '',
+      position: 'Utilisateur de test',
+      department: preset.name,
+      subDepartment: '',
+      role: `Test secteur · ${preset.name}`,
+      status: 'ACTIF',
+      isSectorAdmin: true,
+      companyId: testCompanyId,
+      sectorId: testNodeId,
+      roleId: testRoleId,
     };
     mutate((draft) => {
       draft.companies = [
         ...draft.companies.filter((company) => !company.id.startsWith('sector-test-')),
         testCompany,
       ];
+      draft.orgNodes = [
+        ...draft.orgNodes.filter((node) => !node.companyId?.startsWith('sector-test-')),
+        testNode,
+      ];
+      draft.employees = [
+        ...draft.employees.filter((employee) => !employee.companyId?.startsWith('sector-test-')),
+        testEmployee,
+      ];
+      draft.roles = draft.roles.filter((role) => !role.companyId?.startsWith('sector-test-'));
+      synchronizeUnitPackRoles(draft, testCompany, testNode);
+
+      const generatedPackRoles = draft.roles.filter(
+        (role) => role.companyId === testCompanyId && role.sectorId === testNodeId && role.packId,
+      );
+      const modulePermissions = generatedPackRoles.reduce<Record<string, string[]>>((permissions, role) => {
+        Object.entries(role.modulePermissions).forEach(([key, values]) => {
+          permissions[key] = [...new Set([...(permissions[key] ?? []), ...values])];
+        });
+        return permissions;
+      }, {});
+      selectedModules.forEach((moduleId) => {
+        if (!Object.keys(modulePermissions).some((key) => key === moduleId || key.startsWith(`${moduleId}:`) || key.startsWith('presence.'))) {
+          modulePermissions[moduleId] = ['voir'];
+        }
+      });
+      draft.roles.push({
+        id: testRoleId,
+        name: `Test secteur · ${preset.name}`,
+        description: `Droits temporaires calculés depuis les modules et packs du secteur « ${preset.name} ».`,
+        companyId: testCompanyId,
+        sectorId: testNodeId,
+        modulePermissions,
+      });
     });
     localStorage.setItem('maximus-sector-test-company', testCompanyId);
-    const nextSession = `company:${testCompanyId}` as Session;
+    const nextSession = `employee:${testEmployeeId}` as Session;
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation('/kora/dashboard');
@@ -472,6 +588,9 @@ function AppContent() {
     if (!sectorTestCompanyId) return logout();
     mutate((draft) => {
       draft.companies = draft.companies.filter((company) => company.id !== sectorTestCompanyId);
+      draft.orgNodes = draft.orgNodes.filter((node) => node.companyId !== sectorTestCompanyId);
+      draft.employees = draft.employees.filter((employee) => employee.companyId !== sectorTestCompanyId);
+      draft.roles = draft.roles.filter((role) => role.companyId !== sectorTestCompanyId);
     });
     localStorage.removeItem('maximus-sector-test-company');
     setSession('admin');
