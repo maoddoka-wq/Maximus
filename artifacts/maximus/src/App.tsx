@@ -83,7 +83,6 @@ import {
   employeeRoleMatchesUnit,
   getCommerceTabIds,
   getEmployeeAncestry,
-  getFeatureIdsWithDependencies,
   getSelectedFeatureIds,
   getStockPermissions,
   restrictRoleToCompany,
@@ -549,7 +548,7 @@ function AppContent() {
   };
   const presenceModule = configuredModules.find((module) => module.id === 'presences');
   const selectedPresenceFeatureIds = employeeRole && presenceModule
-    ? [...getSelectedFeatureIds(employeeRole, presenceModule)]
+    ? [...getSelectedFeatureIds(employeeRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
     : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && employeeRole && roleFitsEmployee);
   const presenceEmployees = data.employees
@@ -565,8 +564,37 @@ function AppContent() {
       }
       return false;
     });
-  const stockPermissions = getStockPermissions(employeeRole, roleFitsEmployee);
-  const commerceTabIds = getCommerceTabIds(employeeRole, roleFitsEmployee, canViewModule);
+  const stockModule = configuredModules.find((module) => module.id === 'stocks');
+  const commerceModule = configuredModules.find((module) => module.id === 'commerce');
+  const selectedStockFeatureIds = employeeRole && stockModule
+    ? getSelectedFeatureIds(employeeRole, stockModule, employeeNode?.moduleFeatures?.[stockModule.id])
+    : undefined;
+  const selectedCommerceFeatureIds = employeeRole && commerceModule
+    ? getSelectedFeatureIds(employeeRole, commerceModule, employeeNode?.moduleFeatures?.[commerceModule.id])
+    : undefined;
+  const salesModule = configuredModules.find((module) => module.id === 'ventes');
+  const selectedSalesFeatureIds = employeeRole && salesModule
+    ? getSelectedFeatureIds(employeeRole, salesModule, employeeNode?.moduleFeatures?.[salesModule.id])
+    : undefined;
+  const selectedCommercialTabIds = selectedCommerceFeatureIds !== undefined || selectedSalesFeatureIds !== undefined
+    ? new Set([
+        ...(selectedCommerceFeatureIds ?? []),
+        ...[...(selectedSalesFeatureIds ?? [])].flatMap((featureId) =>
+          featureId === 'devis' || featureId === 'commandes'
+            ? ['sales']
+            : featureId === 'facturation'
+              ? ['invoices']
+              : [],
+        ),
+      ])
+    : undefined;
+  const stockPermissions = getStockPermissions(employeeRole, roleFitsEmployee, selectedStockFeatureIds);
+  const commerceTabIds = getCommerceTabIds(
+    employeeRole,
+    roleFitsEmployee,
+    canViewModule,
+    selectedCommercialTabIds,
+  );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
     employee && allowed.length >= 1
       ? allowed.flatMap((moduleId) => {
@@ -625,7 +653,11 @@ function AppContent() {
             const presenceFeatures = Object.fromEntries(
               presenceFeatureDefinitions.map((feature) => [feature.label, { tab: feature.tab, icon: CalendarDays }]),
             );
-            const selectedFeatureIds = getSelectedFeatureIds(employeeRole, module);
+            const selectedFeatureIds = getSelectedFeatureIds(
+              employeeRole,
+              module,
+              employeeNode?.moduleFeatures?.[module.id],
+            );
             items = module.features
               .filter((feature) => selectedFeatureIds.has(featureSlug(feature)))
               .map((feature) => {
@@ -637,17 +669,13 @@ function AppContent() {
                 };
               });
           } else {
-            const featurePermissionKeys = module.features.map((feature) => permissionFeatureKey(moduleId, feature));
-            const hasDetailedFeaturePermissions = featurePermissionKeys.some(
-              (key) => key in (employeeRole?.modulePermissions ?? {}),
+            const selectedFeatureIds = getSelectedFeatureIds(
+              employeeRole,
+              module,
+              employeeNode?.moduleFeatures?.[module.id],
             );
-            const canViewModule = employeeRole?.modulePermissions[moduleId]?.includes('voir');
-            const effectiveFeatureIds = getFeatureIdsWithDependencies(employeeRole, module);
             items = module.features
-              .filter(
-                (feature) =>
-                  effectiveFeatureIds.has(featureSlug(feature)) || (canViewModule && !hasDetailedFeaturePermissions),
-              )
+              .filter((feature) => selectedFeatureIds.has(featureSlug(feature)))
               .map((feature) => ({
                 href: `/kora/${moduleId}?feature=${featureSlug(feature)}`,
                 label: feature,
@@ -661,12 +689,7 @@ function AppContent() {
                         : LayoutGrid,
               }));
           }
-          return [
-            {
-              label: module.name,
-              items: items.length ? items : [{ href: `/kora/${moduleId}`, label: module.name, icon: LayoutGrid }],
-            },
-          ];
+          return items.length ? [{ label: module.name, items }] : [];
         })
       : [];
   const verticalModuleNavigation = Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length);
@@ -797,7 +820,7 @@ function AppContent() {
                   presenceEmployees={presenceEmployees}
                   hasPermission={hasPermission}
                   hasPresencePermission={hasPresencePermission}
-                   presenceFeatureIds={selectedPresenceFeatureIds}
+                  presenceFeatureIds={selectedPresenceFeatureIds}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}

@@ -26,3 +26,9 @@ Legacy packs without an explicit feature permission map are interpreted as view-
 **Why:** The new pack contract must not silently grant create or modify rights to existing data that only recorded a feature list.
 
 **How to apply:** Treat a missing or empty feature permission as `voir` for included features, and persist the explicit permission map on the next save or signup request.
+
+Feature visibility must use the explicit feature selection, while dependencies remain an internal effective-permission concern.
+
+**Why:** A dependency granted so an operation can function is not necessarily a capability the company selected or should see in its navigation.
+
+**How to apply:** Preserve dependencies when calculating effective permissions, but pass the pack or unit’s explicit feature ids to tests, navigation, and tab guards; never infer visible pack scope from dependency-expanded role permissions.

@@ -208,6 +208,27 @@ test('n’affiche que les fonctionnalités explicitement incluses dans un pack P
   assert.equal(selected.has('rapports'), false);
 });
 
+test('ne transforme pas une dépendance technique en fonctionnalité choisie du pack', () => {
+  const presenceModule = modules.find(module => module.id === 'presences');
+  assert.ok(presenceModule);
+  const consultationPack = presenceFeaturePacks.find(pack => pack.id === 'presence-consultation');
+  assert.ok(consultationPack);
+  const generatedRole = role(
+    Object.fromEntries([
+      ...consultationPack.featureIds.map(featureId => [`presence.${featureId}`, ['voir']]),
+      ['presence.pointage', ['voir']],
+      ['presences', ['voir']],
+    ]),
+    { packId: consultationPack.id, packModuleId: 'presences' },
+  );
+
+  assert.deepEqual(
+    [...getSelectedFeatureIds(generatedRole, presenceModule)],
+    consultationPack.featureIds,
+  );
+  assert.equal(getSelectedFeatureIds(generatedRole, presenceModule).has('pointage'), false);
+});
+
 test('résout les prérequis d’une fonctionnalité en cascade', () => {
   assert.deepEqual(
     resolveFeatureDependencies(commerceTabDependencies, 'reports'),

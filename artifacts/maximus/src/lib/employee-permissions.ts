@@ -8,6 +8,7 @@ import {
   type CommerceTabId,
 } from './commerce-permissions';
 import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from './permission-keys';
+import { getModuleFeatureOptions } from './module-features';
 import { stockSubmoduleDependencies, stockSubmodules, type Module } from './store';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
@@ -139,23 +140,37 @@ export function employeeHasPresencePermission(
   return hasPermission('presences', 'modifier');
 }
 
-export function getStockPermissions(role: Role | null | undefined, roleFitsEmployee: boolean) {
+export function getStockPermissions(
+  role: Role | null | undefined,
+  roleFitsEmployee: boolean,
+  selectedFeatureIds?: Iterable<string>,
+) {
   if (!role || !roleFitsEmployee) return undefined;
 
+  const selected = selectedFeatureIds ? new Set(selectedFeatureIds) : undefined;
   const detailed = stockSubmodules
     .map(submodule => [submodule.id, role.modulePermissions[`stocks:${submodule.id}`]] as const)
-    .filter(([, permissions]) => permissions);
+    .filter(([featureId, permissions]) => permissions && (!selected || selected.has(featureId)));
   const rootPermissions = role.modulePermissions.stocks;
 
   const permissions = Object.fromEntries(
     detailed.length > 0
       ? detailed
-      : stockSubmodules
-        .map(submodule => [submodule.id, rootPermissions] as const)
-        .filter(([, permissions]) => permissions),
+      : (selected
+        ? [...selected]
+          .filter(featureId => stockSubmodules.some(submodule => submodule.id === featureId))
+          .map(featureId => [featureId, rootPermissions] as const)
+        : stockSubmodules.map(submodule => [submodule.id, rootPermissions] as const)
+      ).filter(([, permissions]) => permissions),
   ) as Record<string, string[]>;
 
   if (detailed.length === 0) return permissions;
+  if (selected) {
+    Object.keys(permissions).forEach(featureId => {
+      permissions[featureId] = [...new Set(['voir', ...permissions[featureId]])];
+    });
+    return permissions;
+  }
 
   stockSubmodules.forEach(submodule => {
     if (!(permissions[submodule.id] ?? []).length) return;
@@ -172,17 +187,19 @@ export function getCommerceTabIds(
   role: Role | null | undefined,
   roleFitsEmployee: boolean,
   canViewModule: (moduleId: ModuleId) => boolean,
+  selectedFeatureIds?: Iterable<string>,
 ) {
   if (!role || !roleFitsEmployee) return undefined;
 
   const allowedTabIds = new Set<CommerceTabId>();
+  const selected = selectedFeatureIds ? new Set(selectedFeatureIds) : undefined;
   const permissions = role.modulePermissions;
   const canViewCommerce = canViewModule('commerce');
   const hasCommerceDetails = hasDetailedCommercePermissions(permissions);
 
   if (canViewCommerce) {
     commerceTabDefinitions.forEach(tab => {
-      if (!hasCommerceDetails || hasCommerceTabPermission(permissions, tab.id)) {
+      if ((!selected || selected.has(tab.id)) && (!hasCommerceDetails || hasCommerceTabPermission(permissions, tab.id))) {
         allowedTabIds.add(tab.id);
       }
     });
@@ -198,23 +215,25 @@ export function getCommerceTabIds(
 
   if (canViewSales) {
     if (!hasSalesDetails) {
-      allowedTabIds.add('sales');
-      allowedTabIds.add('invoices');
+      if (!selected || selected.has('sales')) allowedTabIds.add('sales');
+      if (!selected || selected.has('invoices')) allowedTabIds.add('invoices');
     } else {
-      if (permissions['ventes:menu:devis']?.includes('voir')
-        || permissions['ventes:menu:commandes']?.includes('voir')) {
+      if ((!selected || selected.has('sales')) && (permissions['ventes:menu:devis']?.includes('voir')
+        || permissions['ventes:menu:commandes']?.includes('voir'))) {
         allowedTabIds.add('sales');
       }
-      if (permissions['ventes:menu:facturation']?.includes('voir')) {
+      if ((!selected || selected.has('invoices')) && permissions['ventes:menu:facturation']?.includes('voir')) {
         allowedTabIds.add('invoices');
       }
     }
   }
 
-  [...allowedTabIds].forEach(tabId => {
-    resolveFeatureDependencies(commerceTabDependencies, tabId)
-      .forEach(dependencyId => allowedTabIds.add(dependencyId as CommerceTabId));
-  });
+  if (!selected) {
+    [...allowedTabIds].forEach(tabId => {
+      resolveFeatureDependencies(commerceTabDependencies, tabId)
+        .forEach(dependencyId => allowedTabIds.add(dependencyId as CommerceTabId));
+    });
+  }
 
   return [...allowedTabIds];
 }
@@ -235,10 +254,21 @@ export function getFeatureIdsWithDependencies(
 export function getSelectedFeatureIds(
   role: Role | null | undefined,
   module: Module,
+  explicitFeatureIds?: Iterable<string>,
 ) {
   if (!role) return new Set<string>();
 
-  const featureIds = module.features.map(featureSlug);
+  const featureIds = getModuleFeatureOptions(module).map(feature => feature.id);
+  const validFeatureIds = new Set(featureIds);
+  if (explicitFeatureIds) {
+    return new Set([...explicitFeatureIds].filter(featureId => validFeatureIds.has(featureId)));
+  }
+  if (role.packId && role.packModuleId === module.id) {
+    const pack = module.featurePacks?.find(candidate => candidate.id === role.packId);
+    if (pack) {
+      return new Set(pack.featureIds.filter(featureId => validFeatureIds.has(featureId)));
+    }
+  }
   const permissionKeyFor = (featureId: string) =>
     module.id === 'presences' ? `presence.${featureId}` : permissionFeatureKey(module.id, featureId);
   const hasDetailedPermissions = featureIds.some(featureId => permissionKeyFor(featureId) in role.modulePermissions);
