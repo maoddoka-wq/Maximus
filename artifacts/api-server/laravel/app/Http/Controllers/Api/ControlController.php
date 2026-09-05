@@ -26,8 +26,19 @@ class ControlController extends Controller
             'scope' => ['nullable', 'in:admin,all,assigned,sector'],
         ])->validate();
         $scope = $query['scope'] ?? 'all';
-        $companyId = $query['companyId'] ?? null;
         $actor = $request->attributes->get('authActor');
+        $requestedCompany = $query['companyId'] ?? null;
+        if ($actor['role'] !== 'maximus_admin') {
+            if (empty($actor['companyId'])) {
+                return response()->json(['error' => 'Aucune entreprise n’est associée à cet acteur.'], 403);
+            }
+            if ($requestedCompany && $requestedCompany !== $actor['companyId']) {
+                return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+            }
+            $companyId = $actor['companyId'];
+        } else {
+            $companyId = $requestedCompany;
+        }
 
         if ($scope !== 'admin' && !$companyId) {
             return response()->json(['error' => 'companyId requis pour ce périmètre'], 400);

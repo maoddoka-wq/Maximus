@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuthUser;
+use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -12,7 +14,8 @@ class StockTest extends TestCase
 
     public function test_stock_catalog_and_movements_preserve_the_json_contract(): void
     {
-        $product = $this->postJson('/api/stock/products', [
+        $request = $this->asActor();
+        $product = $request->postJson('/api/stock/products', [
             'companyId' => 'kora',
             'name' => 'Riz local',
             'sku' => 'KOR-RIZ-01',
@@ -20,7 +23,7 @@ class StockTest extends TestCase
             'salePrice' => 6500,
         ])->assertCreated()->assertJsonPath('sku', 'KOR-RIZ-01');
 
-        $warehouse = $this->postJson('/api/stock/warehouses', [
+        $warehouse = $request->postJson('/api/stock/warehouses', [
             'companyId' => 'kora',
             'name' => 'Entrepôt principal',
         ])->assertCreated();
@@ -34,12 +37,12 @@ class StockTest extends TestCase
             'userName' => 'Gestionnaire Stock',
         ];
 
-        $this->postJson('/api/stock/movements', $movement)
+        $request->postJson('/api/stock/movements', $movement)
             ->assertCreated()
             ->assertJsonPath('type', 'ENTRÉE')
             ->assertJsonPath('quantity', 10);
 
-        $this->postJson('/api/stock/movements', array_merge($movement, [
+        $request->postJson('/api/stock/movements', array_merge($movement, [
             'type' => 'SORTIE',
             'quantity' => 11,
         ]))
@@ -56,6 +59,7 @@ class StockTest extends TestCase
 
     public function test_inventory_validation_applies_only_the_difference(): void
     {
+        $request = $this->asActor();
         DB::table('stock_products')->insert([
             'id' => 'product-1',
             'company_id' => 'kora',
@@ -98,7 +102,7 @@ class StockTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $inventory = $this->postJson('/api/stock/inventories', [
+        $inventory = $request->postJson('/api/stock/inventories', [
             'companyId' => 'kora',
             'warehouseId' => 'warehouse-1',
             'notes' => 'Comptage du matin',
@@ -106,7 +110,7 @@ class StockTest extends TestCase
             'lines' => [['productId' => 'product-1', 'actualQuantity' => 12]],
         ])->assertCreated();
 
-        $this->postJson('/api/stock/inventories/'.$inventory->json('id').'/validate', [
+        $request->postJson('/api/stock/inventories/'.$inventory->json('id').'/validate', [
             'companyId' => 'kora',
         ])->assertOk()->assertJsonPath('status', 'VALIDÉ');
 
@@ -120,5 +124,31 @@ class StockTest extends TestCase
             'type' => 'AJUSTEMENT+',
             'quantity' => 2,
         ]);
+    }
+
+    public function test_stock_rejects_a_company_different_from_the_actor(): void
+    {
+        $this->asActor()
+            ->getJson('/api/stock/bootstrap?companyId=another-company')
+            ->assertForbidden();
+    }
+
+    private function asActor(): self
+    {
+        $user = AuthUser::query()->create([
+            'id' => 'stock-admin',
+            'email' => 'stock-admin@kora.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Gestionnaire Stock',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($user);
+
+        return $this
+            ->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token);
     }
 }

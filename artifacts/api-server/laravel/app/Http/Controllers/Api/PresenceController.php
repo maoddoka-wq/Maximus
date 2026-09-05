@@ -233,7 +233,7 @@ class PresenceController extends Controller
 
     private function company(Request $request): ?string
     {
-        $value = $request->query('companyId', $request->input('companyId'));
+        $value = $request->attributes->get('companyId');
         return is_string($value) && $value !== '' ? $value : null;
     }
 

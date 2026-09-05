@@ -8,3 +8,4 @@
 - [Thème du menu entreprise](company-menu-theme.md) — le fond du menu reste distinct, mais les états actif et survol reprennent la couleur principale de l’entreprise.
 - [Migration Laravel progressive](laravel-migration-boundary.md) — conserver Laravel en parallèle et réversible jusqu’à preuve de parité avec Express et PostgreSQL.
 - [Runtime Laravel PostgreSQL](laravel-runtime.md) — le serveur HTTP doit conserver DB_CONNECTION=pgsql dans le même processus, via le routeur PHP intégré.
+- [Isolation multi-entreprise](tenant-isolation.md) — l’entreprise vient de la session serveur ; un companyId client ne peut jamais changer le périmètre.

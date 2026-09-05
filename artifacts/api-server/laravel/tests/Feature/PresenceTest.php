@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\PresenceItem;
+use App\Models\AuthUser;
+use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,7 +14,8 @@ class PresenceTest extends TestCase
 
     public function test_presence_items_are_persisted_with_a_history_record(): void
     {
-        $created = $this->postJson('/api/presence/items', [
+        $request = $this->asActor();
+        $created = $request->postJson('/api/presence/items', [
             'companyId' => 'kora',
             'type' => 'leave',
             'employeeId' => 'employee-1',
@@ -34,13 +37,14 @@ class PresenceTest extends TestCase
             'created_by' => 'RH Kora',
         ]);
 
-        $this->getJson('/api/presence/bootstrap?companyId=kora')
+        $request->getJson('/api/presence/bootstrap?companyId=kora')
             ->assertOk()
             ->assertJsonCount(2, 'items');
     }
 
     public function test_clocking_enforces_the_daily_sequence_and_records_pause_duration(): void
     {
+        $request = $this->asActor();
         $base = [
             'companyId' => 'kora',
             'employeeId' => 'employee-1',
@@ -48,12 +52,12 @@ class PresenceTest extends TestCase
             'actor' => 'Employé 1',
         ];
 
-        $this->postJson('/api/presence/clock', $base + [
+        $request->postJson('/api/presence/clock', $base + [
             'action' => 'exit',
             'now' => '2026-09-05T08:00:00Z',
         ])->assertStatus(409);
 
-        $arrival = $this->postJson('/api/presence/clock', $base + [
+        $arrival = $request->postJson('/api/presence/clock', $base + [
             'action' => 'arrival',
             'expectedStart' => '08:00',
             'now' => '2026-09-05T08:15:00Z',
@@ -61,18 +65,18 @@ class PresenceTest extends TestCase
         $arrival->assertCreated()->assertJsonPath('payload.arrival', '08:15');
         $this->assertSame(5, $arrival->json('payload.lateMinutes'));
 
-        $this->postJson('/api/presence/clock', $base + [
+        $request->postJson('/api/presence/clock', $base + [
             'action' => 'pauseStart',
             'now' => '2026-09-05T12:00:00Z',
         ])->assertOk()->assertJsonPath('payload.status', 'En pause');
 
-        $pauseEnd = $this->postJson('/api/presence/clock', $base + [
+        $pauseEnd = $request->postJson('/api/presence/clock', $base + [
             'action' => 'pauseEnd',
             'now' => '2026-09-05T12:30:00Z',
         ]);
         $pauseEnd->assertOk()->assertJsonPath('payload.pauseMinutes', 30);
 
-        $this->postJson('/api/presence/clock', $base + [
+        $request->postJson('/api/presence/clock', $base + [
             'action' => 'arrival',
             'now' => '2026-09-05T13:00:00Z',
         ])->assertStatus(409);
@@ -82,6 +86,7 @@ class PresenceTest extends TestCase
 
     public function test_update_and_delete_are_limited_to_the_company_in_the_request(): void
     {
+        $request = $this->asActor();
         $item = PresenceItem::query()->create([
             'id' => 'presence-kora-1',
             'company_id' => 'kora',
@@ -94,12 +99,12 @@ class PresenceTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->patchJson('/api/presence/items/'.$item->id, [
+        $request->patchJson('/api/presence/items/'.$item->id, [
             'companyId' => 'autre-entreprise',
             'payload' => ['shift' => 'soir'],
-        ])->assertNotFound();
+        ])->assertForbidden();
 
-        $this->deleteJson('/api/presence/items/'.$item->id, [
+        $request->deleteJson('/api/presence/items/'.$item->id, [
             'companyId' => 'kora',
             'actor' => 'Admin',
         ])->assertOk()->assertJson(['ok' => true]);
@@ -115,5 +120,31 @@ class PresenceTest extends TestCase
                 'workDate' => null,
             ]),
         ]);
+    }
+
+    public function test_presence_rejects_a_company_different_from_the_actor(): void
+    {
+        $this->asActor()
+            ->getJson('/api/presence/bootstrap?companyId=another-company')
+            ->assertForbidden();
+    }
+
+    private function asActor(): self
+    {
+        $user = AuthUser::query()->create([
+            'id' => 'presence-admin',
+            'email' => 'presence-admin@kora.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'RH Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($user);
+
+        return $this
+            ->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token);
     }
 }

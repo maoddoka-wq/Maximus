@@ -20,7 +20,7 @@ class StockController extends Controller
     {
         MaximusDemoProvisioner::ensureStockSeed();
 
-        $companyId = $request->query('companyId', self::COMPANY);
+        $companyId = (string) $request->attributes->get('companyId');
         $where = fn (string $table) => DB::table($table)->where('company_id', $companyId);
 
         $inventories = $where('stock_inventories')->orderByDesc('inventory_date')->get();
@@ -347,7 +347,7 @@ class StockController extends Controller
 
     private function company(Request $request): string
     {
-        return (string) ($request->query('companyId', $request->input('companyId', self::COMPANY)) ?: self::COMPANY);
+        return (string) $request->attributes->get('companyId');
     }
 
     private function snake(array $input): array

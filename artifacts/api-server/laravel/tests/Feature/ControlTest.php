@@ -134,6 +134,24 @@ class ControlTest extends TestCase
             ->assertJsonPath('tasks.0.id', 'task-visible');
     }
 
+    public function test_company_admin_cannot_read_another_company_or_global_scope(): void
+    {
+        $request = $this->asActor([
+            'id' => 'admin-kora-isolation',
+            'email' => 'admin-isolation@kora.demo',
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+        ]);
+
+        $request->getJson('/api/control/bootstrap?companyId=another-company')
+            ->assertForbidden();
+
+        $request->getJson('/api/control/bootstrap?scope=admin')
+            ->assertOk()
+            ->assertJsonCount(0, 'tasks');
+    }
+
     private function asActor(array $attributes): self
     {
         $user = AuthUser::query()->create(array_merge([
