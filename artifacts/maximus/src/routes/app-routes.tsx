@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ModuleAvailability, ModuleId, StoreData } from '@/lib/store';
+import type { ModuleAvailability, ModuleId, SectorPreset, StoreData } from '@/lib/store';
 import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
 import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
@@ -31,6 +31,7 @@ export function AdminRouter({
   onNavigate,
   onBack,
   onModuleAccess,
+  onTestSector,
   screens,
 }: {
   location: string;
@@ -40,6 +41,7 @@ export function AdminRouter({
   onNavigate: Navigate;
   onBack: (fallback: string) => void;
   onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>;
+  onTestSector: (preset: SectorPreset) => void;
   screens: AdminRouteScreens;
 }) {
   const routePath = location.split('?')[0];
@@ -72,7 +74,7 @@ export function AdminRouter({
     return <screens.modules data={data} mutate={mutate} notify={notify} />;
   }
   if (routePath === '/maximus/secteurs') {
-    return <screens.sectors data={data} mutate={mutate} />;
+    return <screens.sectors data={data} mutate={mutate} onTestSector={onTestSector} />;
   }
   if (routePath === '/maximus/abonnements') {
     return <screens.subscriptions data={data} />;

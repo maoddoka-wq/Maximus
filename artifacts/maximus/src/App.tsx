@@ -387,6 +387,9 @@ function AppContent() {
       : session?.startsWith('company:')
         ? session.slice('company:'.length)
         : sessionEmployee?.companyId;
+  const sectorTestCompanyId = session?.startsWith('company:sector-test-')
+    ? session.slice('company:'.length)
+    : null;
   useEffect(() => {
     if (!activeCompanyId || session === 'admin' || !session) {
       setServerModuleStatuses(null);
@@ -428,6 +431,53 @@ function AppContent() {
   const login = async (_space: 'admin' | 'kora', email: string, password: string) => {
     const { user } = await authApi.login(email, password);
     applyAuthenticatedUser(user);
+  };
+  const startSectorTest = (preset: SectorPreset) => {
+    const testCompanyId = `sector-test-${preset.id}`;
+    const selectedModules = [...new Set(preset.moduleIds)];
+    const testCompany: Company = {
+      id: testCompanyId,
+      name: `Test réel · ${preset.name}`,
+      manager: 'Utilisateur de test',
+      email: `test.${preset.id}@maximus.local`,
+      phone: '',
+      country: 'Sénégal',
+      sector: preset.name,
+      status: 'ACTIF',
+      requestedModules: selectedModules,
+      requestedModulePackIds: Object.fromEntries(
+        Object.entries(preset.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+      ),
+      requestedModuleFeatures: Object.fromEntries(
+        Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+      ),
+      allowedModules: selectedModules,
+      refusedModules: modules.map((module) => module.id).filter((moduleId) => !selectedModules.includes(moduleId)),
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    mutate((draft) => {
+      draft.companies = [
+        ...draft.companies.filter((company) => !company.id.startsWith('sector-test-')),
+        testCompany,
+      ];
+    });
+    localStorage.setItem('maximus-sector-test-company', testCompanyId);
+    const nextSession = `company:${testCompanyId}` as Session;
+    setSession(nextSession);
+    localStorage.setItem('maximus-session', nextSession);
+    setLocation('/kora/dashboard');
+    setToast(`Test réel lancé pour le secteur « ${preset.name} ».`);
+  };
+  const exitSectorTest = () => {
+    if (!sectorTestCompanyId) return logout();
+    mutate((draft) => {
+      draft.companies = draft.companies.filter((company) => company.id !== sectorTestCompanyId);
+    });
+    localStorage.removeItem('maximus-sector-test-company');
+    setSession('admin');
+    localStorage.setItem('maximus-session', 'admin');
+    setLocation('/maximus/secteurs');
+    setToast('Test réel terminé. Retour à la configuration des secteurs.');
   };
   const logout = () => {
     void authApi.logout().finally(() => {
@@ -647,7 +697,7 @@ function AppContent() {
         sidebarFeatureGroups={sidebarFeatureGroups}
         canManagePeople={canManagePeople}
         onNavigate={navigate}
-        onLogout={logout}
+        onLogout={sectorTestCompanyId ? exitSectorTest : logout}
         employee={employee}
         companyName={currentCompany?.name}
         companyPhoto={currentCompany?.profilePhoto}
@@ -675,6 +725,27 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
+          {sectorTestCompanyId && (
+            <div
+              data-testid="sector-test-banner"
+              className="mb-5 flex flex-col gap-3 rounded-xl border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.08)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <strong className="block text-xs text-[hsl(var(--primary))]">Test réel de secteur en cours</strong>
+                <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">
+                  Vous êtes dans l’espace entreprise réel avec les modules autorisés par ce secteur.
+                </span>
+              </div>
+              <button
+                type="button"
+                data-testid="button-exit-sector-test"
+                onClick={exitSectorTest}
+                className="shrink-0 rounded-lg border border-[hsl(var(--primary)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.1)]"
+              >
+                Quitter le test
+              </button>
+            </div>
+          )}
           {!hidePageHeader && (
             <PageHeader
               {...currentMeta}
@@ -699,6 +770,7 @@ function AppContent() {
                   onNavigate={navigate}
                   onBack={goBack}
                   onModuleAccess={updateCompanyModuleAccess}
+                   onTestSector={startSectorTest}
                   screens={{
                     dashboard: AdminDashboard,
                     control: ControlCenterPage,
@@ -2942,9 +3014,11 @@ function ModulesPage({
 function SectorPresetsPage({
   data,
   mutate,
+  onTestSector,
 }: {
   data: StoreData;
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onTestSector: (preset: SectorPreset) => void;
 }) {
   const { confirm } = useAppDialog();
   const [sectorName, setSectorName] = useState('');
@@ -2953,7 +3027,6 @@ function SectorPresetsPage({
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
-  const [testingSector, setTestingSector] = useState<SectorPreset | null>(null);
   const sectorPresets = data.sectorPresets ?? [];
   const moduleForSector = (id: ModuleId) => {
     const base = modules.find((module) => module.id === id);
@@ -3076,7 +3149,7 @@ function SectorPresetsPage({
 
   const testDraftSector = () => {
     const preset = buildSectorPreset();
-    if (preset) setTestingSector(preset);
+    if (preset) onTestSector(preset);
   };
 
   const closeSectorModal = () => {
@@ -3267,130 +3340,6 @@ function SectorPresetsPage({
           </Modal>
         )}
       </section>
-      {testingSector && (
-        <Modal
-          title={`Test en direct · ${testingSector.name}`}
-          onClose={() => setTestingSector(null)}
-          className="max-h-[88vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
-        >
-          {(() => {
-            const moduleRows = testingSector.moduleIds
-              .map((moduleId) => {
-                const module = moduleForSector(moduleId);
-                if (!module) return null;
-                const packIds = testingSector.modulePackIds?.[moduleId] ?? [];
-                const featureIds = getEffectiveModuleFeatureIds(module, testingSector.moduleFeatures?.[moduleId]);
-                const featureLabels = getModuleFeatureOptions(module).filter((feature) => featureIds.has(feature.id));
-                return { module, packIds, featureLabels };
-              })
-              .filter(
-                (
-                  row,
-                ): row is {
-                  module: NonNullable<ReturnType<typeof moduleForSector>>;
-                  packIds: string[];
-                  featureLabels: { id: string; label: string }[];
-                } => Boolean(row),
-              );
-            const packCount = moduleRows.reduce((total, row) => total + row.packIds.length, 0);
-            const featureCount = moduleRows.reduce((total, row) => total + row.featureLabels.length, 0);
-            return (
-              <div className="space-y-5">
-                <div className="rounded-xl bg-[hsl(var(--primary)/.08)] p-4">
-                  <p className="text-xs font-bold text-[hsl(var(--primary))]">Aperçu non destructif</p>
-                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                    Voici les modules, packs et fonctionnalités qui seront proposés à une entreprise rattachée à ce
-                    secteur. Ce test ne modifie pas la configuration.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Modules</p>
-                    <strong className="mt-1 block text-2xl">{moduleRows.length}</strong>
-                  </div>
-                  <div className="rounded-xl border p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Packs</p>
-                    <strong className="mt-1 block text-2xl">{packCount}</strong>
-                  </div>
-                  <div className="rounded-xl border p-4">
-                    <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                      Fonctionnalités effectives
-                    </p>
-                    <strong className="mt-1 block text-2xl">{featureCount}</strong>
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-xl border">
-                  <div className="border-b bg-[hsl(var(--muted)/.45)] px-4 py-3">
-                    <p className="text-xs font-bold">Périmètre simulé</p>
-                    <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
-                      Les dépendances nécessaires sont incluses automatiquement dans les fonctionnalités effectives.
-                    </p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[680px] text-left text-xs">
-                      <thead className="bg-[hsl(var(--card))] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                        <tr>
-                          <th className="px-4 py-3 font-bold">Module</th>
-                          <th className="px-4 py-3 font-bold">Packs sélectionnés</th>
-                          <th className="px-4 py-3 font-bold">Fonctionnalités accessibles</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {moduleRows.map(({ module, packIds, featureLabels }) => (
-                          <tr key={module.id} className="align-top transition hover:bg-[hsl(var(--muted)/.3)]">
-                            <td className="px-4 py-4">
-                              <strong>{module.name}</strong>
-                              <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">
-                                {featureLabels.length} fonctionnalité(s) effective(s)
-                              </span>
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex flex-wrap gap-1.5">
-                                {packIds.map((packId) => (
-                                  <span
-                                    key={packId}
-                                    className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-semibold text-[hsl(var(--primary))]"
-                                  >
-                                    {module.featurePacks?.find((pack) => pack.id === packId)?.name ?? packId}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex flex-wrap gap-1.5">
-                                {featureLabels.map((feature) => (
-                                  <span key={feature.id} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px]">
-                                    {feature.label}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {moduleRows.length === 0 && (
-                    <p className="p-6 text-center text-xs text-[hsl(var(--muted-foreground))]">
-                      Aucun module sélectionné pour ce secteur.
-                    </p>
-                  )}
-                </div>
-                <div className="flex justify-end border-t pt-4">
-                  <button
-                    type="button"
-                    data-testid="button-close-sector-test"
-                    onClick={() => setTestingSector(null)}
-                    className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
-                  >
-                    Fermer le test
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
-        </Modal>
-      )}
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
           <div>
@@ -3442,7 +3391,7 @@ function SectorPresetsPage({
                 <button
                   type="button"
                   data-testid={`button-test-sector-${preset.id}`}
-                  onClick={() => setTestingSector(preset)}
+                  onClick={() => onTestSector(preset)}
                   aria-label={`Tester le secteur ${preset.name}`}
                   className="rounded-lg p-2 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
                 >
