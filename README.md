@@ -11,6 +11,7 @@ MAXIMUS est une application web fonctionnelle d’ERP SaaS multi-entreprises, co
 - dépendances entre fonctionnalités avec prérequis en visibilité ;
 - gestion de Commerce et de Gestion de stock ;
 - organisation hiérarchique, rôles et managers ;
+- comptes employés provisionnés côté serveur dès leur création, avec révocation et renouvellement de mot de passe ;
 - profils de secteurs d’activité pour préconfigurer les modules et fonctionnalités à l’inscription ;
 - personnalisation des couleurs et du menu de chaque entreprise ;
 - navigation adaptée aux modules autorisés de chaque utilisateur.
@@ -23,6 +24,7 @@ MAXIMUS est une application web fonctionnelle d’ERP SaaS multi-entreprises, co
 - Express pour le serveur API ;
 - PostgreSQL et Drizzle ORM pour les packages serveur ;
 - comptes et sessions internes MAXIMUS stockés côté serveur, avec mots de passe hachés et cookie HttpOnly ;
+- les comptes créés depuis Organisation → Comptes & managers sont utilisables immédiatement ; le mot de passe n’est jamais conservé dans le store local ;
 - PostgreSQL via l’API pour Présences, Stocks et Contrôle & coordination, avec `localStorage` conservé pour les données initiales, certaines fonctions locales et le repli du frontend.
 
 ## Installation

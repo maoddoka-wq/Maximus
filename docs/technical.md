@@ -145,6 +145,16 @@ Les routes Contrôle exigent une session interne MAXIMUS stockée en PostgreSQL.
 
 Les routes `/api/auth/login`, `/api/auth/session` et `/api/auth/logout` gèrent la connexion, la restauration et la révocation de session. Les mots de passe sont hachés avec `scrypt`, les jetons de session sont stockés sous forme de hash et le navigateur ne conserve qu’un cookie `HttpOnly`.
 
+Les comptes employés sont provisionnés par `/api/auth/accounts` depuis l’écran **Organisation → Comptes & managers** :
+
+- une création exige un mot de passe initial et rend le compte immédiatement connectable ;
+- une modification sans nouveau mot de passe conserve le hash existant ;
+- un changement de mot de passe révoque toutes les sessions de l’employé ;
+- une suppression suspend le compte et révoque ses sessions ;
+- un administrateur MAXIMUS peut agir sur toutes les entreprises, un administrateur d’entreprise sur sa propre entreprise et un manager de secteur uniquement sur son périmètre ;
+- les managers reçoivent la liste de leur unité et de toutes ses unités descendantes ;
+- le mot de passe saisi n’est pas écrit dans `localStorage` ni dans le modèle local de l’employé.
+
 ## 5. Modèle d’accès et permissions
 
 La chaîne de contrôle est :
@@ -239,6 +249,8 @@ Les écrans d’organisation sont séparés par responsabilité :
 - `organization-shared.tsx` : composants et modèles partagés.
 
 Les unités utilisent `parentId` pour construire la hiérarchie. Les rôles et employés sont affectés à une unité via `sectorId`.
+
+Lorsqu’un employé est créé ou modifié, le frontend provisionne d’abord le compte PostgreSQL. La mutation du store local et la fermeture de la modale n’ont lieu qu’après une réponse serveur réussie ; les erreurs de périmètre, d’email ou de validation restent affichées dans la modale. La révocation serveur précède toute suppression locale.
 
 Les employés ayant plusieurs modules disposent d’une navigation verticale groupée par module. Les notifications restent accessibles depuis la cloche supérieure.
 

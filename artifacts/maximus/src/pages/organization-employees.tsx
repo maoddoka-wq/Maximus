@@ -10,9 +10,26 @@ import {
   type Role,
   type StoreData,
 } from '@/lib/store';
+import { authApi } from '@/lib/auth-api';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
+type EmployeeFormData = Omit<Employee, 'id' | 'companyId' | 'status' | 'department' | 'subDepartment' | 'role'> & { role: string; loginPassword?: string };
+
+function getSectorDescendantIds(nodes: OrgNode[], rootId: string) {
+  const ids = new Set<string>([rootId]);
+  const pending = [rootId];
+  while (pending.length > 0) {
+    const parentId = pending.pop();
+    if (!parentId) continue;
+    nodes.filter(node => node.parentId === parentId).forEach(node => {
+      if (ids.has(node.id)) return;
+      ids.add(node.id);
+      pending.push(node.id);
+    });
+  }
+  return [...ids];
+}
 
 export function EmployeesTab({
   company,
@@ -25,7 +42,7 @@ export function EmployeesTab({
   mutate: Mutate;
   allowSectorAdmin?: boolean;
 }) {
-  const { confirm } = useAppDialog();
+  const { alert, confirm } = useAppDialog();
   const companyEmployees = data.employees.filter(employee => employee.companyId === company.id);
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
@@ -58,7 +75,16 @@ export function EmployeesTab({
                   <td className="px-6 py-4 text-xs font-medium">{role?.name || 'Non assigné'}</td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2">
                     <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                    {demoEmployeeIds.has(employee.id) ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void confirm({ title: 'Supprimer ce compte employé ?', description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' }).then(ok => { if (ok) mutate(draft => { draft.employees = draft.employees.filter(item => item.id !== employee.id); }, 'Employé supprimé.'); })} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
+                     {demoEmployeeIds.has(employee.id) ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void (async () => {
+                       const ok = await confirm({ title: 'Supprimer ce compte employé ?', description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' });
+                       if (!ok) return;
+                       try {
+                         await authApi.revokeAccount(employee.id);
+                         mutate(draft => { draft.employees = draft.employees.filter(item => item.id !== employee.id); }, 'Employé supprimé.');
+                       } catch (error) {
+                         await alert({ title: 'Suppression impossible', description: error instanceof Error ? error.message : 'La révocation du compte a échoué.', confirmLabel: 'Compris', tone: 'danger' });
+                       }
+                     })()} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
                   </div></td>
                 </tr>
               );
@@ -75,19 +101,34 @@ export function EmployeesTab({
           allEmployees={companyEmployees}
           allowSectorAdmin={allowSectorAdmin}
           onClose={() => setModalOpen(false)}
-          onSave={employeeData => {
+           onSave={async employeeData => {
+             const employeeId = editingEmployee?.id ?? uid('emp');
+             const sectorId = employeeData.sectorId;
+             if (!sectorId) throw new Error('Une unité doit être sélectionnée pour ce compte.');
+             const sectorIds = employeeData.isSectorAdmin
+               ? getSectorDescendantIds(companyNodes, sectorId)
+               : [sectorId];
+             await authApi.provisionAccount({
+               id: employeeId,
+               email: employeeData.email.trim().toLowerCase(),
+               displayName: `${employeeData.firstName.trim()} ${employeeData.lastName.trim()}`,
+               companyId: company.id,
+               employeeId,
+               sectorIds,
+               role: employeeData.isSectorAdmin ? 'sector_manager' : 'employee',
+               ...(employeeData.loginPassword ? { password: employeeData.loginPassword } : {}),
+             });
             mutate(draft => {
               const sector = draft.orgNodes.find(node => node.id === employeeData.sectorId);
               const parent = sector?.parentId ? draft.orgNodes.find(node => node.id === sector.parentId) : null;
-              const normalized = { ...employeeData, email: employeeData.email.trim().toLowerCase(), department: sector?.name ?? '', subDepartment: parent?.name ?? '' };
+               const { loginPassword: _loginPassword, ...employeeFields } = employeeData;
+               const normalized = { ...employeeFields, email: employeeData.email.trim().toLowerCase(), department: sector?.name ?? '', subDepartment: parent?.name ?? '' };
               if (editingEmployee) {
                 const index = draft.employees.findIndex(employee => employee.id === editingEmployee.id);
                 if (index !== -1) draft.employees[index] = { ...draft.employees[index], ...normalized };
               } else {
-                draft.employees.push({ id: uid('emp'), companyId: company.id, status: 'ACTIF', ...normalized } as Employee);
+                 draft.employees.push({ id: employeeId, companyId: company.id, status: 'ACTIF', ...normalized } as Employee);
               }
-              const employeeId = editingEmployee?.id ?? draft.employees[draft.employees.length - 1]?.id;
-              if (!employeeId) return;
               draft.orgNodes.forEach(node => {
                 if (node.managerEmployeeId === employeeId && node.id !== employeeData.sectorId) node.managerEmployeeId = undefined;
               });
@@ -99,7 +140,7 @@ export function EmployeesTab({
               }
             }, editingEmployee ? (employeeData.loginPassword ? 'Employé mis à jour et mot de passe actualisé.' : 'Employé mis à jour.') : 'Employé ajouté. Utilisez son email et son mot de passe initial pour la connexion.');
             setModalOpen(false);
-          }}
+           }}
         />
       </Modal>}
     </div>
@@ -121,9 +162,10 @@ function EmployeeFormModal({
   allEmployees: Employee[];
   allowSectorAdmin?: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Employee, 'id' | 'companyId' | 'status' | 'department' | 'subDepartment' | 'role'> & { role: string; loginPassword?: string }) => void;
+  onSave: (data: EmployeeFormData) => Promise<void>;
 }) {
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     firstName: initialData?.firstName || '',
     lastName: initialData?.lastName || '',
@@ -177,7 +219,9 @@ function EmployeeFormModal({
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
-    onSave({
+    setError('');
+    setSaving(true);
+    void onSave({
       firstName: formData.firstName.trim(),
       lastName: formData.lastName.trim(),
       email,
@@ -188,7 +232,9 @@ function EmployeeFormModal({
       isSectorAdmin: formData.isSectorAdmin,
       role: role.name,
       ...(password ? { loginPassword: password } : {}),
-    });
+    }).catch(nextError => {
+      setError(nextError instanceof Error ? nextError.message : 'La création du compte a échoué.');
+    }).finally(() => setSaving(false));
   };
 
   return (
@@ -210,7 +256,7 @@ function EmployeeFormModal({
         </label>
       </div>
       {allowSectorAdmin && <label className="mt-4 flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold"><input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" /><span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span></label>}
-      <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button><ActionButton primary onClick={handleSave} disabled={!formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>Enregistrer</ActionButton></div>
+      <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
     </div>
   );
 }
