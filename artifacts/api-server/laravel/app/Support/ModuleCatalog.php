@@ -71,11 +71,15 @@ final class ModuleCatalog
 
     public static function isEnabled(string $companyId, string $moduleId): bool
     {
-        return DB::table('maximus_company_modules')
+        return in_array(self::statusFor($companyId, $moduleId), ['ACTIF', 'BETA'], true);
+    }
+
+    public static function statusFor(string $companyId, string $moduleId): string
+    {
+        return (string) (DB::table('maximus_company_modules')
             ->where('company_id', $companyId)
             ->where('module_id', $moduleId)
-            ->whereIn('status', ['ACTIF', 'BETA'])
-            ->exists();
+            ->value('status') ?? 'INACTIF');
     }
 
     public static function bootstrap(string $companyId): array

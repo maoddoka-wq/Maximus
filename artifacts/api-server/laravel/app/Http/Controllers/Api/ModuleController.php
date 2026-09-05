@@ -33,7 +33,7 @@ class ModuleController extends Controller
         }
 
         $input = Validator::make($request->all(), [
-            'status' => ['required', 'in:ACTIF,BETA,INACTIF'],
+            'status' => ['required', 'in:ACTIF,BETA,MAINTENANCE,INACTIF'],
             'featureIds' => ['nullable', 'array'],
             'featureIds.*' => ['string', 'min:1'],
             'configuration' => ['nullable', 'array'],

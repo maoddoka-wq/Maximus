@@ -151,17 +151,23 @@ function AppContent() {
     if (message) setToast(message);
   };
   const notify = (message: string) => setToast(message);
-  const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, enabled: boolean) => {
-    await setCompanyModuleAccess(companyId, moduleId, enabled ? 'ACTIF' : 'INACTIF');
+  const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => {
+    await setCompanyModuleAccess(companyId, moduleId, status);
     mutate(draft => {
       const company = draft.companies.find(item => item.id === companyId);
       if (!company) return;
-      company.allowedModules = enabled
+      company.allowedModules = status !== 'INACTIF'
         ? [...new Set([...company.allowedModules, moduleId])]
         : company.allowedModules.filter(item => item !== moduleId);
       company.refusedModules = company.requestedModules.filter(item => !company.allowedModules.includes(item));
     });
-    notify(enabled ? 'Module activé pour cette entreprise.' : 'Module désactivé pour cette entreprise.');
+    notify(status === 'MAINTENANCE'
+      ? 'Module placé en maintenance pour cette entreprise.'
+      : status === 'INACTIF'
+        ? 'Module désactivé pour cette entreprise.'
+        : status === 'BETA'
+          ? 'Module passé en mode bêta pour cette entreprise.'
+          : 'Module activé pour cette entreprise.');
   };
   const sessionEmployeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
   const sessionEmployee = sessionEmployeeId ? data.employees.find(employee => employee.id === sessionEmployeeId) : null;
@@ -250,7 +256,7 @@ function AppContent() {
   const employeeRole = employee ? data.roles.find(r => r.id === employee.roleId) ?? data.roles.find(r => r.name === employee.role) : null;
   const configuredModules = getConfiguredModules(data);
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability => serverModuleStatuses?.[moduleId] ?? data.moduleStatuses?.[moduleId] ?? configuredModules.find(module => module.id === moduleId)?.status ?? 'INACTIF';
-  const isModuleActive = (moduleId: ModuleId) => moduleStatus(moduleId) !== 'INACTIF';
+  const isModuleActive = (moduleId: ModuleId) => !['INACTIF', 'MAINTENANCE'].includes(moduleStatus(moduleId));
   const companyAllowed = (data.companies.find(c => c.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
   const employeeNode = employee?.sectorId ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) : null;
   const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode ?? null);
@@ -362,7 +368,7 @@ function AppContent() {
              {!hidePageHeader && <PageHeader {...currentMeta} location={location} onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/kora/dashboard')} />}
            <ErrorBoundary resetKey={location}>
              <Suspense fallback={<div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>}>
-                  {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} onBack={goBack} onModuleAccess={updateCompanyModuleAccess} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} onBack={goBack} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
+                  {isAdmin ? <AdminRouter location={location} data={data} mutate={mutate} notify={notify} onNavigate={navigate} onBack={goBack} onModuleAccess={updateCompanyModuleAccess} screens={{ dashboard: AdminDashboard, control: ControlCenterPage, organization: OrganizationAdminPage, companyDetail: CompanyModulesDetail, companies: CompaniesPage, requests: RequestsPage, modules: InteractiveModulesPage, sectors: SectorPresetsPage, subscriptions: SubscriptionsPage, notifications: NotificationsPage, journal: JournalPage, empty: EmptyState }} /> : <KoraRouter location={location} mutate={mutate} data={data} onNavigate={navigate} onBack={goBack} allowed={allowed} canManagePeople={canManagePeople} companyAdmin={session === 'kora' || session.startsWith('company:')} sectorManager={sectorManager} scopeNodeId={employeeNode?.id} companyId={companyId} employee={employee} presenceEmployees={presenceEmployees} hasPermission={hasPermission} hasPresencePermission={hasPresencePermission} stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined} commerceTabIds={commerceTabIds} moduleStatuses={serverModuleStatuses ?? {}} singleModuleNavigation={verticalModuleNavigation} screens={{ dashboard: RoleAwareKoraDashboard, control: ControlCenterPage, notifications: NotificationsPage, organization: CompanyOrganizationAdmin, empty: EmptyState, stocks: StockModulePage, finance: FinancePage, commerce: CommerceModulePage, operational: OperationalModulePage, humanResources: HumanResourcesWorkspace, presence: PresenceModulePage, reports: OperationalReportsPage }} />}
              </Suspense>
            </ErrorBoundary>
         </div>
@@ -627,7 +633,7 @@ function KoraDashboard({ data, onNavigate, allowed }: { data: StoreData; onNavig
 }
 
 function Metric({ label, value, suffix = '', detail, icon: MetricIcon, accent = false, warning = false }: { label: string; value: string; suffix?: string; detail: string; icon: Icon; accent?: boolean; warning?: boolean }) { return <div className={`metric-card card-surface fade-up rounded-2xl p-5 ${accent ? 'border-[hsl(var(--primary)/.25)]' : ''}`}><div className="flex items-start justify-between"><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${warning ? 'bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]' : accent ? 'bg-[hsl(var(--primary)/.11)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}><MetricIcon size={17} /></span>{accent && <span className="mono rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[9px] font-bold text-[hsl(var(--primary))]">LIVE</span>}</div><p className="mt-5 text-xs font-medium text-[hsl(var(--muted-foreground))]">{label}</p><p data-testid={`metric-value-${label}`} className="mt-1 text-2xl font-bold tracking-[-.05em]">{value}<span className="text-sm font-medium">{suffix}</span></p><p className={`mt-2 text-[11px] ${warning ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--muted-foreground))]'}`}>{detail}</p></div>; }
-function StatusBadge({ status }: { status: string }) { const styles: Record<string, string> = { ACTIF: 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]', 'VALIDÉ': 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]', CONFIRMÉ: 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]', 'EN ATTENTE': 'bg-[hsl(var(--accent)/.22)] text-[hsl(var(--foreground))]', SUSPENDU: 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]', BROUILLON: 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' }; return <span data-testid={`status-${status.replace(/\s/g, '-').toLowerCase()}`} className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${styles[status] ?? styles.BROUILLON}`}>{status}</span>; }
+function StatusBadge({ status }: { status: string }) { const styles: Record<string, string> = { ACTIF: 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]', 'VALIDÉ': 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]', CONFIRMÉ: 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]', 'EN ATTENTE': 'bg-[hsl(var(--accent)/.22)] text-[hsl(var(--foreground))]', MAINTENANCE: 'bg-[hsl(var(--accent)/.22)] text-[hsl(var(--foreground))]', SUSPENDU: 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]', BROUILLON: 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' }; return <span data-testid={`status-${status.replace(/\s/g, '-').toLowerCase()}`} className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${styles[status] ?? styles.BROUILLON}`}>{status}</span>; }
 function ActivityRow({ activity, delay = 0 }: { activity: StoreData['activities'][number]; delay?: number }) { return <div data-testid={`row-activity-${activity.id}`} className={`flex items-center gap-3 px-5 py-4 fade-up fade-up-delay-${Math.min(delay + 1, 3)}`}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[10px] font-black text-[hsl(var(--primary))]">{activity.user.split(' ').map(x => x[0]).join('')}</span><div className="min-w-0 flex-1"><p className="truncate text-sm"><strong>{activity.user}</strong> {activity.action}</p><p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">{activity.module} · {activity.object}</p></div><span className="mobile-hide text-[10px] text-[hsl(var(--muted-foreground))]">{activity.date}</span></div>; }
 function DataTable({ headers, rows }: { headers: string[]; rows: (ReactNode)[][] }) { return <div className="table-scroll"><table className="data-table w-full min-w-[680px] text-left text-sm"><thead className="bg-[hsl(var(--muted)/.55)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]"><tr>{headers.map(h => <th key={h} className="px-5 py-3 font-bold">{h}</th>)}</tr></thead><tbody className="divide-y">{rows.map((row, i) => <tr data-testid={`table-row-${i}`} key={i} className="transition hover:bg-[hsl(var(--muted)/.35)]">{row.map((cell, j) => <td key={j} className="px-5 py-4">{cell}</td>)}</tr>)}</tbody></table></div>; }
 function Toolbar({ search, setSearch, children }: { search: string; setSearch: (s: string) => void; children?: ReactNode }) { return <div className="toolbar mb-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="relative min-w-0 max-w-sm flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" /><input data-testid="input-table-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." className="w-full rounded-lg border bg-[hsl(var(--card))] py-2.5 pl-9 pr-3 text-sm" /></div><div className="action-row">{children}</div></div>; }
@@ -1271,28 +1277,45 @@ function AdminCreateCompanyPage({ data, mutate, onComplete, onCancel }: { data: 
   </div>;
 }
 
-function CompanyModulesDetail({ company, data, mutate, onModuleAccess, onBack }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onModuleAccess: (companyId: string, moduleId: ModuleId, enabled: boolean) => Promise<void>; onBack: () => void }) {
-  const [active, setActive] = useState<ModuleId[]>(company.allowedModules);
+function CompanyModulesDetail({ company, data, mutate, onModuleAccess, onBack }: { company: Company; data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>; onBack: () => void }) {
+  const defaultStatuses = () => Object.fromEntries(modules.map(module => [module.id, company.allowedModules.includes(module.id) ? 'ACTIF' : 'INACTIF'])) as Record<ModuleId, ModuleAvailability>;
+  const [moduleStatuses, setModuleStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
+  const [savedStatuses, setSavedStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setActive(company.allowedModules);
+    let cancelled = false;
+    const fallback = defaultStatuses();
+    setModuleStatuses(fallback);
+    setSavedStatuses(fallback);
+    void loadCompanyModuleAccess(company.id)
+      .then(access => {
+        if (cancelled) return;
+        const next = { ...fallback, ...Object.fromEntries(access.filter(item => item.id in fallback).map(item => [item.id, item.status])) } as Record<ModuleId, ModuleAvailability>;
+        setModuleStatuses(next);
+        setSavedStatuses(next);
+      })
+      .catch(() => {
+        // The local company model remains a safe fallback while the server is unavailable.
+      });
+    return () => { cancelled = true; };
   }, [company.id, company.allowedModules.join('|')]);
 
-  const toggle = (id: ModuleId) => {
-    setActive(previous => previous.includes(id) ? previous.filter(moduleId => moduleId !== id) : [...previous, id]);
+  const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
+    setModuleStatuses(previous => ({ ...previous, [id]: status }));
   };
 
   const save = async () => {
     setSaving(true);
     try {
       const changes = modules
-        .filter(module => active.includes(module.id) !== company.allowedModules.includes(module.id))
-        .map(module => onModuleAccess(company.id, module.id, active.includes(module.id)));
+        .filter(module => moduleStatuses[module.id] !== savedStatuses[module.id])
+        .map(module => onModuleAccess(company.id, module.id, moduleStatuses[module.id]));
       await Promise.all(changes);
+      setSavedStatuses(moduleStatuses);
     } catch (error) {
-      setActive(company.allowedModules);
+      setModuleStatuses(savedStatuses);
       window.alert(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.');
     } finally {
       setSaving(false);
@@ -1319,21 +1342,26 @@ function CompanyModulesDetail({ company, data, mutate, onModuleAccess, onBack }:
       <div className="mt-8 grid gap-4 border-t pt-5 text-sm sm:grid-cols-3">
         <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Responsable</p><p className="mt-1 font-bold">{company.manager}</p></div>
         <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Email</p><p className="mt-1 font-bold">{company.email}</p></div>
-        <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Modules actifs</p><p className="mt-1 font-bold">{active.length} / {modules.length}</p></div>
+         <div><p className="text-xs text-[hsl(var(--muted-foreground))]">Modules accessibles</p><p className="mt-1 font-bold">{modules.filter(module => moduleStatuses[module.id] !== 'INACTIF').length} / {modules.length}</p></div>
       </div>
     </div>
     <section className="card-surface rounded-2xl p-6">
       <div className="flex items-center justify-between">
         <div><h2 className="font-bold">Modules autorisés</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajustez le périmètre de l’espace.</p></div>
-        <span className="mono text-xs text-[hsl(var(--muted-foreground))]">{active.length} / {modules.length}</span>
+         <span className="mono text-xs text-[hsl(var(--muted-foreground))]">{modules.filter(module => moduleStatuses[module.id] !== 'INACTIF').length} / {modules.length}</span>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {modules.map(module => {
-          const isAllowed = active.includes(module.id);
-          return <button data-testid={`button-toggle-company-module-${module.id}`} aria-pressed={isAllowed} key={module.id} onClick={() => toggle(module.id)} className={`flex items-center justify-between rounded-xl border p-4 text-left ${isAllowed ? 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)] opacity-65'}`}>
-            <div className="flex items-center gap-3"><span className="rounded-lg bg-[hsl(var(--muted))] p-2"><LayoutGrid size={16} /></span><div><strong className="text-sm">{module.name}</strong><p className="text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</p></div></div>
-            <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${isAllowed ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white' : ''}`}>{isAllowed && <Check size={13} />}</span>
-          </button>;
+           const status = moduleStatuses[module.id] ?? 'INACTIF';
+           return <div data-testid={`card-company-module-${module.id}`} key={module.id} className={`flex items-center justify-between gap-4 rounded-xl border p-4 ${status === 'INACTIF' ? 'bg-[hsl(var(--muted)/.4)] opacity-65' : 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]'}`}>
+             <div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-[hsl(var(--muted))] p-2"><LayoutGrid size={16} /></span><div className="min-w-0"><strong className="block text-sm">{module.name}</strong><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</p></div></div>
+             <select data-testid={`select-company-module-status-${module.id}`} value={status} onChange={event => setModuleStatus(module.id, event.target.value as ModuleAvailability)} className="shrink-0 rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">
+               <option value="ACTIF">Actif</option>
+               <option value="BETA">Bêta</option>
+               <option value="MAINTENANCE">Maintenance</option>
+               <option value="INACTIF">Désactivé</option>
+             </select>
+           </div>;
         })}
       </div>
        <div className="mt-6 flex justify-end"><ActionButton primary testId="button-save-company-modules" onClick={() => { if (!saving) void save(); }}>{saving ? 'Enregistrement…' : 'Enregistrer la configuration'}</ActionButton></div>

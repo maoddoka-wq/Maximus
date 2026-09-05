@@ -21,10 +21,25 @@ class EnsureModuleEnabled
             return response()->json(['error' => 'Contexte entreprise requis pour ce module.'], 400);
         }
 
-        if (!ModuleCatalog::isEnabled($companyId, $moduleId)) {
+        if (($actor['role'] ?? null) === 'maximus_admin') {
+            return $next($request);
+        }
+
+        $status = ModuleCatalog::statusFor($companyId, $moduleId);
+        if ($status === 'MAINTENANCE') {
+            return response()->json([
+                'error' => 'Ce module est temporairement en maintenance.',
+                'code' => 'MODULE_MAINTENANCE',
+                'moduleId' => $moduleId,
+                'status' => $status,
+            ], 503);
+        }
+
+        if (!in_array($status, ['ACTIF', 'BETA'], true)) {
             return response()->json([
                 'error' => 'Ce module n’est pas activé pour cette entreprise.',
                 'moduleId' => $moduleId,
+                'status' => $status,
             ], 403);
         }
 

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ModuleId, StoreData } from '@/lib/store';
+import type { ModuleAvailability, ModuleId, StoreData } from '@/lib/store';
 import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
 
@@ -38,7 +38,7 @@ export function AdminRouter({
   notify: (message: string) => void;
   onNavigate: Navigate;
   onBack: (fallback: string) => void;
-  onModuleAccess: (companyId: string, moduleId: ModuleId, enabled: boolean) => Promise<void>;
+  onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>;
   screens: AdminRouteScreens;
 }) {
   const routePath = location.split('?')[0];
@@ -118,6 +118,7 @@ export function KoraRouter({
   hasPresencePermission,
   stockPermissions,
   commerceTabIds,
+  moduleStatuses,
   singleModuleNavigation,
   screens,
 }: {
@@ -138,6 +139,7 @@ export function KoraRouter({
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
   commerceTabIds?: string[];
+  moduleStatuses: Record<string, ModuleAvailability>;
   singleModuleNavigation?: boolean;
   screens: KoraRouteScreens;
 }) {
@@ -159,6 +161,10 @@ export function KoraRouter({
     '/kora/rapports': 'rapports',
   };
   const requiredModule = routeModules[routePath];
+  const maintenanceModule = routePath === '/kora/controle' ? 'controle' : requiredModule;
+  if (maintenanceModule && moduleStatuses[maintenanceModule] === 'MAINTENANCE') {
+    return <screens.empty title="Module en maintenance" text="Ce module est temporairement indisponible pendant une opération de maintenance. Les autres modules restent accessibles." action={() => onBack('/kora/dashboard')} />;
+  }
   if (requiredModule && !allowed.includes(requiredModule)) {
     return <screens.empty title="Accès non autorisé" text="Votre rôle ne possède pas la permission Consulter pour ce module." action={() => onBack('/kora/dashboard')} />;
   }

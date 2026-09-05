@@ -1,9 +1,11 @@
+import type { ModuleAvailability } from './store';
+
 export type ServerModuleAccess = {
   id: string;
   name: string;
   description: string;
   features: string[];
-  status: 'ACTIF' | 'BETA' | 'INACTIF';
+  status: ModuleAvailability;
   featureIds: string[];
   configuration: Record<string, unknown>;
 };
@@ -28,7 +30,7 @@ export async function loadCompanyModuleAccess(companyId: string): Promise<Server
   return result.modules;
 }
 
-export async function setCompanyModuleAccess(companyId: string, moduleId: string, status: 'ACTIF' | 'INACTIF' | 'BETA'): Promise<ServerModuleAccess> {
+export async function setCompanyModuleAccess(companyId: string, moduleId: string, status: ModuleAvailability): Promise<ServerModuleAccess> {
   const response = await fetch(`/api/modules/${encodeURIComponent(moduleId)}/access?companyId=${encodeURIComponent(companyId)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
