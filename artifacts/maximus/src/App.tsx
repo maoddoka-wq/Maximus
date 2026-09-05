@@ -124,6 +124,9 @@ const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
 );
+const MaximusAiAssistant = lazy(() =>
+  import('@/pages/maximus-ai-assistant').then((module) => ({ default: module.MaximusAiAssistant })),
+);
 function sessionFromAuthUser(user: AuthUser): Session {
   return user.role === 'maximus_admin'
     ? 'admin'
@@ -136,6 +139,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Cockpit MAXIMUS',
     title: 'Bonjour, équipe MAXIMUS.',
     description: 'Voici ce qui mérite votre attention aujourd’hui.',
+  },
+  '/maximus/assistant': {
+    kicker: 'Administration intelligente',
+    title: 'Assistant de configuration',
+    description: 'Construisez un brouillon d’entreprise contrôlable depuis les règles métier MAXIMUS.',
   },
   '/maximus/controle': {
     kicker: 'Pilotage MAXIMUS',
@@ -884,6 +892,7 @@ function AppContent() {
                    onTestSector={startSectorTest}
                   screens={{
                     dashboard: AdminDashboard,
+                    aiAssistant: MaximusAiAssistant,
                     control: ControlCenterPage,
                     organization: OrganizationAdminPage,
                     companyDetail: CompanyModulesDetail,

@@ -10,6 +10,7 @@ type Navigate = (path: string) => void;
 
 export type AdminRouteScreens = {
   dashboard: Screen;
+  aiAssistant: Screen;
   control: Screen;
   organization: Screen;
   companyDetail: Screen;
@@ -47,6 +48,9 @@ export function AdminRouter({
   const routePath = location.split('?')[0];
   if (routePath === '/maximus/dashboard') {
     return <screens.dashboard data={data} onNavigate={onNavigate} />;
+  }
+  if (routePath === '/maximus/assistant') {
+    return <screens.aiAssistant data={data} mutate={mutate} onNavigate={onNavigate} />;
   }
   if (routePath === '/maximus/controle') {
     return <screens.control data={data} mutate={mutate} isAdmin actorName="MAXIMUS" />;

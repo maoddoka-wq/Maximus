@@ -8,6 +8,7 @@ import {
   GitBranch,
   LayoutGrid,
   ListChecks,
+  Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from './store';
@@ -27,6 +28,7 @@ export type NavigationItem = {
 
 export const adminNav: NavigationItem[] = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
+  { href: '/maximus/assistant', label: 'Assistant IA', icon: Sparkles },
   { href: '/maximus/controle', label: 'Contrôle & coordination', icon: ListChecks },
   { href: '/maximus/entreprises', label: 'Entreprises', icon: Building2 },
   { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
