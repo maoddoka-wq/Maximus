@@ -30,6 +30,7 @@ type SidebarProps = {
   employee: StoreData['employees'][number] | null;
   companyName?: string;
   companyPhoto?: string;
+  adminLogo?: string;
   mobileOpen: boolean;
   onClose: () => void;
   collapsed: boolean;
@@ -47,6 +48,7 @@ export function Sidebar({
   employee,
   companyName,
   companyPhoto,
+  adminLogo,
   mobileOpen,
   onClose,
   collapsed,
@@ -129,7 +131,11 @@ export function Sidebar({
               <span
                 className={`flex shrink-0 items-center justify-center overflow-hidden bg-[hsl(var(--accent)/.18)] font-bold text-[hsl(var(--accent))] ${compact ? 'h-8 w-8 rounded-lg text-[10px]' : 'h-12 w-12 rounded-xl text-sm'}`}
               >
-                MX
+                {adminLogo ? (
+                  <img src={adminLogo} alt="Logo de l’administration MAXIMUS" className="h-full w-full object-cover" />
+                ) : (
+                  'MX'
+                )}
               </span>
               {!compact && (
                 <div className="min-w-0">
@@ -235,8 +241,8 @@ export function Sidebar({
           </button>
           <div className={`mt-4 flex ${compact ? 'justify-center' : 'justify-start'}`}>
             {compact ? (
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.18)] text-[10px] font-black text-[hsl(var(--accent))]">
-                M
+              <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--accent)/.18)] text-[10px] font-black text-[hsl(var(--accent))]">
+                {adminLogo ? <img src={adminLogo} alt="" className="h-full w-full object-cover" /> : 'M'}
               </span>
             ) : (
               <span className="text-sm font-black tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">
