@@ -78,12 +78,15 @@ export function RolesTab({
         {companyRoles.map(role => {
           const effectiveRole = restrictRoleToCompany(role, company) ?? role;
           const sector = companyNodes.find(node => node.id === role.sectorId);
+          const sourceModule = role.packModuleId ? moduleDefinitions.find(module => module.id === role.packModuleId) : undefined;
+          const sourcePack = sourceModule?.featurePacks?.find(pack => pack.id === role.packId);
           const assignedEmployees = data.employees.filter(employee => employee.roleId === role.id);
           return (
             <RoleCard
               key={role.id}
               role={effectiveRole}
               sectorName={sector?.name}
+              sourcePackName={sourcePack?.name}
               assignedEmployees={assignedEmployees}
               managerName={company.managerRoleId === role.id ? company.manager : undefined}
               moduleDefinitions={moduleDefinitions}
@@ -124,6 +127,7 @@ export function RolesTab({
 function RoleCard({
   role,
   sectorName,
+  sourcePackName,
   assignedEmployees,
   managerName,
   moduleDefinitions,
@@ -132,6 +136,7 @@ function RoleCard({
 }: {
   role: Role;
   sectorName?: string;
+  sourcePackName?: string;
   assignedEmployees: StoreData['employees'];
   managerName?: string;
   moduleDefinitions: Module[];
@@ -154,7 +159,10 @@ function RoleCard({
           <div className="flex items-center gap-2">
             <span className="rounded-lg bg-[hsl(var(--primary)/.12)] p-2 text-[hsl(var(--primary))]"><ShieldCheck size={17} /></span>
             <div className="min-w-0">
-              <h3 className="truncate font-bold">{role.name}</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="truncate font-bold">{role.name}</h3>
+                {sourcePackName && <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--primary))]">Pack · {sourcePackName}</span>}
+              </div>
               <span className="mt-1 inline-flex items-center gap-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]"><Building2 size={11} /> {sectorName || 'Unité non affectée'}</span>
             </div>
           </div>
@@ -411,7 +419,7 @@ function RoleFormModal({
           <h3 className="text-sm font-bold">Droits d’accès</h3>
           <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le module définit la visibilité. Les actions Créer et Modifier se configurent ensuite dans chaque sous-fonctionnalité. Les droits restent limités aux éléments choisis par l’entreprise.</p>
         </div>
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+        <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto pr-1">
           {availableModules.map(module => (
             <ModulePermissionCard
               key={module.id}

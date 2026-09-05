@@ -11,6 +11,7 @@ import {
   type StoreData,
 } from '@/lib/store';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
+import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -108,11 +109,16 @@ export function StructureTab({
             onSave={nodeData => {
               mutate(draft => {
                 const nodeId = editingNode?.id ?? uid('org');
+                const savedNode: OrgNode = { id: nodeId, companyId: company.id, ...nodeData };
                 if (editingNode) {
                   const index = draft.orgNodes.findIndex(node => node.id === editingNode.id);
-                  if (index !== -1) draft.orgNodes[index] = { ...draft.orgNodes[index], ...nodeData };
+                  if (index !== -1) {
+                    draft.orgNodes[index] = { ...draft.orgNodes[index], ...nodeData };
+                    synchronizeUnitPackRoles(draft, company, draft.orgNodes[index]);
+                  }
                 } else {
-                  draft.orgNodes.push({ id: nodeId, companyId: company.id, ...nodeData });
+                  draft.orgNodes.push(savedNode);
+                  synchronizeUnitPackRoles(draft, company, savedNode);
                 }
               }, editingNode ? 'Unité mise à jour.' : 'Unité créée.');
               setModalOpen(false);
@@ -225,11 +231,11 @@ function StructureFormModal({
   return (
     <div className="space-y-4">
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nom de l'unité *" value={formData.name} onChange={(value: string) => setFormData(current => ({ ...current, name: value }))} testId="input-org-name" help="Nom lisible de la direction, du département, du secteur ou du service." />
         <Field label="Code" value={formData.code} onChange={(value: string) => setFormData(current => ({ ...current, code: value }))} placeholder="Ex: UNITE-01" help="Identifiant court utilisé pour retrouver rapidement cette unité." />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">Type *
           <select value={formData.type} onChange={event => setFormData(current => ({ ...current, type: event.target.value as OrgNode['type'] }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
             <option value="direction">Direction</option><option value="department">Département</option><option value="sector">Secteur</option><option value="service">Service</option>
