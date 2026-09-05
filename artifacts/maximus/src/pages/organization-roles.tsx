@@ -210,7 +210,7 @@ function RoleCard({
           <div id={`role-permissions-${role.id}`} className="mt-3 space-y-2">
             {moduleEntries.map(([key, permissions]) => (
               <div key={key} className="flex flex-wrap items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.2)] px-3 py-2">
-                <span className="text-xs font-bold">{moduleLabels.get(key) ?? key}</span>
+                <span className="text-xs font-bold">{moduleLabels.get(key as ModuleId) ?? key}</span>
                 <span className="flex flex-wrap gap-1.5">
                   {permissions.map(permission => <span key={permission} className="rounded-full bg-[hsl(var(--card))] px-2 py-1 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{permissionLabels[permission as Permission] ?? permission}</span>)}
                 </span>
