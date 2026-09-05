@@ -437,16 +437,46 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState('');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
+  const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(() => Object.fromEntries(initialPreset.moduleIds.map(moduleId => {
+    const module = modules.find(item => item.id === moduleId);
+    return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])] : []];
+  })) as Partial<Record<ModuleId, string[]>>);
   const [moduleError, setModuleError] = useState('');
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find(item => item.name === nextSector);
+    const nextModules = preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds];
     setSector(nextSector);
-    setSelectedModules(preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds]);
+    setSelectedModules(nextModules);
+    setSelectedModuleFeatures(Object.fromEntries(nextModules.map(moduleId => {
+      const module = modules.find(item => item.id === moduleId);
+      return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, preset?.moduleFeatures?.[moduleId])] : []];
+    })) as Partial<Record<ModuleId, string[]>>);
     setModuleError('');
   };
   const toggle = (id: ModuleId) => {
-    setSelectedModules(previous => previous.includes(id) ? previous.filter(moduleId => moduleId !== id) : [...previous, id]);
+    const enabled = selectedModules.includes(id);
+    setSelectedModules(previous => enabled ? previous.filter(moduleId => moduleId !== id) : [...previous, id]);
+    setSelectedModuleFeatures(current => {
+      if (enabled) {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      const module = modules.find(item => item.id === id);
+      return { ...current, [id]: module ? [...getEffectiveModuleFeatureIds(module)] : [] };
+    });
     setModuleError('');
+  };
+  const toggleFeature = (moduleId: ModuleId, featureId: string) => {
+    const module = modules.find(item => item.id === moduleId);
+    if (!module) return;
+    setSelectedModuleFeatures(current => {
+      const options = getModuleFeatureOptions(module);
+      const selected = new Set(current[moduleId] ?? options.map(feature => feature.id));
+      if (selected.has(featureId)) selected.delete(featureId);
+      else selected.add(featureId);
+      return { ...current, [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
+    });
   };
   if (submitted) {
     return <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6">
@@ -466,7 +496,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
       <div className="mb-10">
         <p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Nouvel espace entreprise</p>
         <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1>
-        <p className="mt-3 text-[hsl(var(--muted-foreground))]">Renseignez votre entreprise et choisissez les outils dont vous avez besoin. L’organisation pourra être construite après l’activation de votre espace.</p>
+        <p className="mt-3 text-[hsl(var(--muted-foreground))]">Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra être construite après l’activation de votre espace.</p>
       </div>
       <div className="mb-10 flex items-center gap-3"><Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} /><div className="h-px flex-1 bg-[hsl(var(--border))]" /><Step n={2} label="Fonctionnalités" active={step === 2} done={false} /></div>
       {step === 1 ? <form onSubmit={event => { event.preventDefault(); setStep(2); }} className="card-surface rounded-2xl p-6 sm:p-8">
@@ -493,8 +523,29 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sector ? `La sélection proposée correspond au secteur ${sector}. ` : 'Une sélection de départ vous est proposée. '}Sélectionnez les fonctionnalités à activer au démarrage. Vous pourrez modifier vos choix plus tard.</p>
         </section>
         {moduleError && <p data-testid="signup-module-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{moduleError}</p>}
-        <div className="grid gap-3 sm:grid-cols-2">{modules.map(mod => <button type="button" data-testid={`button-module-${mod.id}`} key={mod.id} onClick={() => toggle(mod.id)} className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(mod.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{selectedModules.includes(mod.id) && <Check size={13} />}</span><span><strong className="block text-sm">{mod.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{mod.description}</span></span></button>)}</div>
-        <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
+        <div className="grid gap-3">{modules.map(mod => {
+          const enabled = selectedModules.includes(mod.id);
+          const featureOptions = getModuleFeatureOptions(mod);
+          const selectedFeatureIds = getEffectiveModuleFeatureIds(mod, selectedModuleFeatures[mod.id]);
+          return <div key={mod.id} className={`rounded-xl border p-3 transition ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}>
+            <button type="button" data-testid={`button-module-${mod.id}`} onClick={() => toggle(mod.id)} className="flex w-full items-start gap-3 text-left">
+              <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>{enabled && <Check size={13} />}</span>
+              <span className="min-w-0 flex-1"><strong className="block text-sm">{mod.name}</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{mod.description}</span></span>
+              <ChevronDown size={16} className={`mt-1 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform ${enabled ? 'rotate-180' : ''}`} />
+            </button>
+            {enabled && <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3">
+              <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités à activer</span><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{selectedFeatureIds.size}/{featureOptions.length}</span></div>
+              <div className="grid gap-1 sm:grid-cols-2">
+                {featureOptions.map(feature => <label key={feature.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[hsl(var(--card)/.7)]">
+                  <input data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`} type="checkbox" checked={selectedFeatureIds.has(feature.id)} onChange={() => toggleFeature(mod.id, feature.id)} className="mt-0.5 accent-[hsl(var(--primary))]" />
+                  <span>{feature.label}</span>
+                </label>)}
+              </div>
+              <p className="mt-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">Les fonctionnalités nécessaires sont ajoutées automatiquement.</p>
+            </div>}
+          </div>;
+        })}</div>
+        <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = modules.find(item => item.id === moduleId); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : []]; })) as Partial<Record<ModuleId, string[]>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedModuleFeatures, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
       </div>}
     </div>
   </div>;
@@ -725,7 +776,28 @@ function CompanyDetail({ company, mutate, onBack }: { company: Company; mutate: 
 
 function RequestsPage({ data, mutate, onNavigate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void; onNavigate: (p: string) => void }) {
   const requests = data.companies.filter(c => c.status === 'EN ATTENTE');
-  return <div className="space-y-4">{requests.length === 0 ? <EmptyState title="Aucune demande en attente" text="Toutes les demandes ont été traitées." action={() => onNavigate('/maximus/entreprises')} /> : requests.map(c => <section data-testid={`card-request-${c.id}`} key={c.id} className="card-surface rounded-2xl p-5 sm:p-6"><div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center"><div className="flex gap-4"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--accent)/.24)] font-black">{c.name.slice(0, 2).toUpperCase()}</span><div><h2 className="font-bold">{c.name}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{c.manager} · {c.email} · {c.country}</p><div className="mt-3 flex flex-wrap gap-2">{c.requestedModules.map(x => <span key={x} className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[10px] font-bold">{modules.find(m => m.id === x)?.name}</span>)}</div></div></div><div className="flex gap-2"><ActionButton testId={`button-refuse-request-${c.id}`} icon={X} onClick={() => mutate(d => { const x = d.companies.find(y => y.id === c.id); if (x) x.status = 'REFUSÉ'; }, 'Demande refusée.')}>Refuser</ActionButton><ActionButton primary testId={`button-approve-request-${c.id}`} icon={Check} onClick={() => mutate(d => { const x = d.companies.find(y => y.id === c.id); if (x) { x.status = 'ACTIF'; x.allowedModules = [...x.requestedModules]; } }, 'Entreprise activée.')}>Autoriser l’espace</ActionButton></div></div></section>)}</div>;
+  return <div className="space-y-4">{requests.length === 0 ? <EmptyState title="Aucune demande en attente" text="Toutes les demandes ont été traitées." action={() => onNavigate('/maximus/entreprises')} /> : requests.map(c => <section data-testid={`card-request-${c.id}`} key={c.id} className="card-surface rounded-2xl p-5 sm:p-6">
+    <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+      <div className="flex gap-4">
+        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--accent)/.24)] font-black">{c.name.slice(0, 2).toUpperCase()}</span>
+        <div className="min-w-0">
+          <h2 className="font-bold">{c.name}</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{c.manager} · {c.email} · {c.country}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {c.requestedModules.map(moduleId => {
+              const requestedFeatures = c.requestedModuleFeatures?.[moduleId];
+              const module = modules.find(item => item.id === moduleId);
+              return <div key={moduleId} className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-[10px]">
+                <strong className="block">{module?.name ?? moduleId}</strong>
+                <span className="text-[hsl(var(--muted-foreground))]">{requestedFeatures === undefined ? 'Fonctionnalités par défaut' : `${requestedFeatures.length} fonctionnalité${requestedFeatures.length > 1 ? 's' : ''} choisie${requestedFeatures.length > 1 ? 's' : ''}`}</span>
+              </div>;
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-2"><ActionButton testId={`button-refuse-request-${c.id}`} icon={X} onClick={() => mutate(d => { const x = d.companies.find(y => y.id === c.id); if (x) x.status = 'REFUSÉ'; }, 'Demande refusée.')}>Refuser</ActionButton><ActionButton primary testId={`button-approve-request-${c.id}`} icon={Check} onClick={() => mutate(d => { const x = d.companies.find(y => y.id === c.id); if (x) { x.status = 'ACTIF'; x.allowedModules = [...x.requestedModules]; } }, 'Entreprise activée.')}>Autoriser l’espace</ActionButton></div>
+    </div>
+  </section>)}</div>;
 }
 function ModulesPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) { return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map((m, i) => { const active = (data.moduleStatuses?.[m.id] ?? m.status) !== 'INACTIF'; return <section data-testid={`card-module-${m.id}`} key={m.id} className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(i + 1, 3)}`}><div className="flex items-start justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><LayoutGrid size={19} /></span><StatusBadge status={active ? m.status : 'INACTIF'} /></div><h2 className="mt-5 text-lg font-bold">{m.name}</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{m.description}</p><div className="mt-5 space-y-2 border-t pt-4">{m.features.map(f => <div key={f} className="flex items-center gap-2 text-xs"><Check size={14} className="text-[hsl(var(--primary))]" />{f}</div>)}</div><button data-testid={`button-toggle-module-${m.id}`} onClick={() => mutate(draft => { draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [m.id]: active ? 'INACTIF' : m.status }; }, active ? `${m.name} désactivé.` : `${m.name} activé.`)} className="mt-5 text-xs font-bold text-[hsl(var(--primary))]">{active ? 'Désactiver' : 'Activer'} <ChevronRight className="inline" size={14} /></button></section>; })}</div>; }
 function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
