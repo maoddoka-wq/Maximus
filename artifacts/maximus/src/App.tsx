@@ -5155,7 +5155,7 @@ function InteractiveModulesPage({
           <Modal
             title={`${editingPackId ? 'Modifier' : 'Ajouter'} un pack de rôle`}
             onClose={closePackDialog}
-            className="max-h-[88vh] w-[min(92vw,960px)] max-w-[960px] overflow-y-auto sm:p-8"
+            className="max-h-[86vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
           >
             <div className="space-y-5">
               <div className="rounded-xl bg-[hsl(var(--muted)/.45)] p-4">
@@ -5187,7 +5187,7 @@ function InteractiveModulesPage({
                     Une fonctionnalité non incluse ne sera pas transmise au rôle.
                   </p>
                 </div>
-                <div className="max-h-[46vh] overflow-y-auto">
+                <div className="max-h-[44vh] overflow-y-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 z-10 bg-[hsl(var(--card))] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                       <tr>
