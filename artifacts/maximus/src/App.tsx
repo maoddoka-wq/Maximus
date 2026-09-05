@@ -1573,11 +1573,6 @@ function ModulePackTestWorkbench({ module, pack, data, mutate, onBack }: { modul
       <button data-testid="button-back-pack-test" onClick={onBack} className="text-xs font-bold text-[hsl(var(--primary))]">← Retour au module</button>
       <span className="rounded-full bg-[hsl(var(--accent)/.2)] px-3 py-1.5 text-[10px] font-bold">{pack ? 'TEST DU PACK MÉTIER' : 'TEST DU MODULE COMPLET'}</span>
     </div>
-    <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-5">
-      <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">{pack ? 'Pack métier' : 'Module métier'}</p>
-      <h1 className="mt-2 text-2xl font-bold">{pack?.name ?? module.name}</h1>
-      <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{pack?.description || (pack ? `Testez le parcours du pack ${pack.name}.` : `Testez toutes les fonctionnalités du module ${module.name}.`)}</p>
-    </section>
     <section className="card-surface rounded-2xl p-5">
       <div className="border-b pb-4"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Aperçu fonctionnel</p><h2 className="mt-2 text-xl font-bold">{module.name}{pack ? ` avec le pack « ${pack.name} »` : ''}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{pack ? 'Les mêmes écrans que ceux utilisés par une entreprise sont ouverts avec le périmètre et les droits de ce pack.' : 'Le parcours complet du module est ouvert avec toutes ses fonctionnalités.'}</p></div>
       <div className="mt-5">
