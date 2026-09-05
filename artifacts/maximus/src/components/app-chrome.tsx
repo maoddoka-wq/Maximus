@@ -266,7 +266,7 @@ export function Topbar({
   const [search, setSearch] = useState('');
 
   return (
-    <header className="topbar flex min-h-[68px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="topbar flex min-h-[78px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <button
           data-testid="button-mobile-menu"
@@ -276,11 +276,20 @@ export function Topbar({
         >
           <Menu size={19} />
         </button>
-        <div className="min-w-0">
-          <p className="hidden text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))] sm:block">
+        <div className="min-w-0 max-w-[calc(100vw-150px)]">
+          <p className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))] sm:flex">
+            <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" aria-hidden="true" />
             Espace de travail
           </p>
-          <div className="truncate text-sm font-bold sm:mt-0.5">{title}</div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-2.5 sm:mt-1">
+            <span className="hidden h-7 w-1 shrink-0 rounded-full bg-[hsl(var(--primary))] sm:block" aria-hidden="true" />
+            <div
+              data-testid="text-topbar-title"
+              className="truncate text-base font-black leading-tight tracking-[-.035em] sm:text-xl"
+            >
+              {title}
+            </div>
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-1.5 sm:gap-2.5">
