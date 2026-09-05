@@ -17,7 +17,7 @@ export type ModuleId =
   | 'documents'
   | 'rapports';
 
-export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
+export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
 export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'MAINTENANCE' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
@@ -150,7 +150,25 @@ export const stockSubmoduleDependencies: Partial<Record<string, string[]>> = {
   settings: ['products'],
 };
 export const sectorPresets: SectorPreset[] = [
-  { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'] },
+  {
+    id: 'distribution',
+    name: 'Distribution',
+    moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'fournisseurs', 'logistique'],
+    businessProfiles: [
+      {
+        id: 'distribution-stock',
+        name: 'Gestion de stock',
+        description: 'Un bloc opérationnel pour consulter les articles et gérer les mouvements de stock.',
+        moduleFeatures: { stocks: ['articles', 'entrees-et-sorties', 'alertes-de-seuil'] },
+      },
+      {
+        id: 'distribution-vente',
+        name: 'Vente et encaissement',
+        description: 'Un bloc pour suivre les clients, les ventes et les opérations de caisse.',
+        moduleFeatures: { commerce: ['clients', 'sales'], ventes: ['devis', 'commandes', 'facturation'] },
+      },
+    ],
+  },
   { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique', 'commerce'] },
   { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'finance', 'rh', 'presences', 'documents', 'rapports'] },
   { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'ventes', 'stocks', 'finance'] },
@@ -166,6 +184,12 @@ export function seedData(): StoreData {
       moduleFeatures: Object.fromEntries(
         Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
       ),
+      businessProfiles: (preset.businessProfiles ?? []).map(profile => ({
+        ...profile,
+        moduleFeatures: Object.fromEntries(
+          Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+        ),
+      })),
     })),
     companies: [
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
@@ -356,7 +380,10 @@ export function loadData(): StoreData {
       })),
       catalogVersion: 2,
        organizationVersion: 8,
-      sectorPresets: parsed.sectorPresets ?? initial.sectorPresets,
+       sectorPresets: (parsed.sectorPresets ?? initial.sectorPresets).map(preset => ({
+         ...preset,
+         businessProfiles: preset.businessProfiles ?? initial.sectorPresets.find(initialPreset => initialPreset.id === preset.id)?.businessProfiles,
+       })),
       companies,
       moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
       moduleOverrides: parsed.moduleOverrides ?? {},

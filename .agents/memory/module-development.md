@@ -15,8 +15,8 @@ For modules with several screens, keep one canonical feature definition shared b
 
 **How to apply:** Add every user-facing capability to the module feature manifest first, derive the module catalog and navigation from it, and add a regression test that compares the manifest with the selectable feature options.
 
-Module employee profiles are recommendations, not automatic role or employee creation. The administrator confirms a suggested profile by using it as a starting point and can add or remove its permissions before saving.
+Sector presets can contain named business packs that group modules and features for a specific trade or activity. The signup flow should apply a selected pack as a starting point while keeping the company’s ability to add or remove features before submitting its request.
 
-**Why:** Automatic creation could add roles that do not match an organization’s structure or grant more access than its administrator intended.
+**Why:** A sector-level business pack represents the company’s operating model; it is different from an employee role and should be validated as part of the company’s module request.
 
-**How to apply:** Store profile templates with the module definition, expose them as optional presets in role creation, and keep the final company role and permission configuration under explicit administrator control.
+**How to apply:** Keep the hierarchy explicit as sector → business pack → modules → features, persist the selected pack with the signup request, and let the administrator review the resulting feature set before activation.

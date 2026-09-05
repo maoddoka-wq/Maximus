@@ -360,34 +360,6 @@ function RoleFormModal({
     });
   };
 
-  const suggestedProfiles = availableModules.flatMap(module => (module.employeeProfiles ?? []).map(profile => ({ module, profile })));
-  const applySuggestedProfile = (value: string) => {
-    const [moduleId, profileId] = value.split('::');
-    const suggestion = suggestedProfiles.find(item => item.module.id === moduleId && item.profile.id === profileId);
-    if (!suggestion) return;
-    const { module, profile } = suggestion;
-    setFormData(previous => {
-      const modulePermissions = { ...previous.modulePermissions };
-      const actions = [...profile.defaultActions];
-      modulePermissions[module.id] = actions;
-      if (module.id === 'presences') {
-        if (actions.includes('voir')) modulePermissions['presence.view'] = ['autorisé'];
-        if (actions.includes('créer')) modulePermissions['presence.create'] = ['autorisé'];
-        if (actions.includes('modifier')) modulePermissions['presence.edit'] = ['autorisé'];
-      } else {
-        profile.featureIds.forEach(featureId => {
-          modulePermissions[permissionFeatureKey(module.id, featureId)] = actions;
-        });
-      }
-      return {
-        ...previous,
-        name: previous.name || profile.name,
-        description: previous.description || profile.description,
-        modulePermissions: normalizeFeatureDependencies(modulePermissions, module.id),
-      };
-    });
-  };
-
   const handleSave = () => {
     const name = formData.name.trim();
     if (!name || !formData.sectorId) {
@@ -421,13 +393,6 @@ function RoleFormModal({
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <Field label="Nom du rôle *" value={formData.name} onChange={(value: string) => setFormData(current => ({ ...current, name: value }))} help="Nom affiché lors de l’affectation d’un rôle à un employé." />
       <Field label="Description" value={formData.description} onChange={(value: string) => setFormData(current => ({ ...current, description: value }))} help="Expliquez les responsabilités principales associées à ce rôle." />
-      {suggestedProfiles.length > 0 && <label className="block text-sm font-semibold">Partir d’un profil recommandé
-        <select defaultValue="" onChange={event => applySuggestedProfile(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
-          <option value="">Choisir un profil sans remplacer vos choix</option>
-          {suggestedProfiles.map(({ module, profile }) => <option key={`${module.id}::${profile.id}`} value={`${module.id}::${profile.id}`}>{module.name} · {profile.name}</option>)}
-        </select>
-        <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Le profil préremplit les droits. Vous pouvez ensuite ajouter ou retirer des fonctionnalités avant d’enregistrer.</span>
-      </label>}
       <label className="mt-4 block text-sm font-semibold">Unité d’appartenance *
         <select disabled={sectorLocked} value={formData.sectorId} onChange={event => setFormData(current => ({ ...current, sectorId: event.target.value, modulePermissions: {} }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
           {allNodes.map(node => <option key={node.id} value={node.id}>{node.name}</option>)}

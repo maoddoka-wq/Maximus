@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
-import { getConfiguredModules, getVisibleNotifications, loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorPreset, type StoreData } from '@/lib/store';
+import { getConfiguredModules, getVisibleNotifications, loadData, modules, money, saveData, shortMoney, stockSubmodules, uid, type Company, type Employee, type ModuleAvailability, type ModuleId, type OrgNode, type Role, type Sale, type SectorBusinessProfile, type SectorPreset, type StoreData } from '@/lib/store';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { type Icon, type Session, type SidebarFeature, type SidebarFeatureGroup } from '@/lib/navigation';
@@ -433,6 +433,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState('');
+  const [selectedBusinessProfileId, setSelectedBusinessProfileId] = useState('');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(() => Object.fromEntries(initialPreset.moduleIds.map(moduleId => {
     const module = modules.find(item => item.id === moduleId);
@@ -443,10 +444,21 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
     const preset = data.sectorPresets.find(item => item.name === nextSector);
     const nextModules = preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds];
     setSector(nextSector);
+    setSelectedBusinessProfileId('');
     setSelectedModules(nextModules);
     setSelectedModuleFeatures(Object.fromEntries(nextModules.map(moduleId => {
       const module = modules.find(item => item.id === moduleId);
       return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, preset?.moduleFeatures?.[moduleId])] : []];
+    })) as Partial<Record<ModuleId, string[]>>);
+    setModuleError('');
+  };
+  const applyBusinessProfile = (profile: SectorBusinessProfile) => {
+    const entries = Object.entries(profile.moduleFeatures ?? {}) as [ModuleId, string[]][];
+    setSelectedBusinessProfileId(profile.id);
+    setSelectedModules(entries.map(([moduleId]) => moduleId));
+    setSelectedModuleFeatures(Object.fromEntries(entries.map(([moduleId, featureIds]) => {
+      const module = modules.find(item => item.id === moduleId);
+      return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, featureIds)] : [...featureIds]];
     })) as Partial<Record<ModuleId, string[]>>);
     setModuleError('');
   };
@@ -515,10 +527,18 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
         <p className="mt-4 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Ce mot de passe servira à l’administrateur de l’entreprise après validation de votre demande.</p>
         <button type="submit" disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm} data-testid="button-next-signup" className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40">Continuer <ChevronRight size={16} /></button>
       </form> : <div className="card-surface rounded-2xl p-6 sm:p-8">
-        <section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
+           <section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
           <h2 className="font-bold">Choisissez les fonctionnalités dont votre entreprise a besoin</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{sector ? `La sélection proposée correspond au secteur ${sector}. ` : 'Une sélection de départ vous est proposée. '}Sélectionnez les fonctionnalités à activer au démarrage. Vous pourrez modifier vos choix plus tard.</p>
         </section>
+         {data.sectorPresets.find(preset => preset.name === sector)?.businessProfiles?.length ? <section className="mb-6 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
+           <h2 className="font-bold">Choisissez un pack métier</h2>
+           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Un pack prépare automatiquement les modules et fonctionnalités d’un métier. Vous pourrez encore les modifier ci-dessous.</p>
+           <div className="mt-4 grid gap-3 sm:grid-cols-2">{data.sectorPresets.find(preset => preset.name === sector)?.businessProfiles?.map(profile => <button type="button" key={profile.id} onClick={() => applyBusinessProfile(profile)} className={`rounded-xl border p-4 text-left transition ${selectedBusinessProfileId === profile.id ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)]' : 'bg-[hsl(var(--card))] hover:border-[hsl(var(--primary)/.5)]'}`}>
+             <span className="flex items-center justify-between gap-3"><strong>{profile.name}</strong>{selectedBusinessProfileId === profile.id && <Check size={16} className="text-[hsl(var(--primary))]" />}</span>
+             <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">{profile.description || 'Modules et fonctionnalités recommandés pour ce métier.'}</span>
+           </button>)}</div>
+         </section> : null}
         {moduleError && <p data-testid="signup-module-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{moduleError}</p>}
         <div className="grid gap-3">{modules.map(mod => {
           const enabled = selectedModules.includes(mod.id);
@@ -542,7 +562,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
             </div>}
           </div>;
         })}</div>
-        <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = modules.find(item => item.id === moduleId); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : []]; })) as Partial<Record<ModuleId, string[]>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedModuleFeatures, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
+         <div className="mt-8 flex gap-3"><button data-testid="button-back-signup" onClick={() => setStep(1)} className="rounded-lg border px-5 py-3 text-sm font-bold">Retour</button><button disabled={selectedModules.length === 0} data-testid="button-submit-signup" onClick={() => { const requestedModuleFeatures = Object.fromEntries(selectedModules.map(moduleId => { const module = modules.find(item => item.id === moduleId); return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : []]; })) as Partial<Record<ModuleId, string[]>>; const newCompany: Company = { id: uid('company'), name, manager, email, adminPassword: password, phone: '', country: 'Sénégal', sector: sector.trim(), status: 'EN ATTENTE', requestedModules: selectedModules, requestedBusinessProfileId: selectedBusinessProfileId || undefined, requestedModuleFeatures, allowedModules: [], refusedModules: [], createdAt: new Date().toISOString().slice(0, 10) }; try { const current = loadData(); current.companies.push(newCompany); saveData(current); } catch { /* localStorage unavailable */ } setSubmitted(true); }} className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Envoyer la demande <Check size={16} /></button></div>
       </div>}
     </div>
   </div>;
@@ -781,6 +801,10 @@ function RequestsPage({ data, mutate, onNavigate }: { data: StoreData; mutate: (
           <h2 className="font-bold">{c.name}</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{c.manager} · {c.email} · {c.country}</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
+             {(() => {
+               const profile = data.sectorPresets.find(preset => preset.name === c.sector)?.businessProfiles?.find(item => item.id === c.requestedBusinessProfileId);
+               return profile ? <div className="rounded-lg border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.08)] px-3 py-2 text-[10px] sm:col-span-2"><strong className="block">Pack métier demandé : {profile.name}</strong><span className="text-[hsl(var(--muted-foreground))]">{profile.description}</span></div> : null;
+             })()}
             {c.requestedModules.map(moduleId => {
               const requestedFeatures = c.requestedModuleFeatures?.[moduleId];
               const module = modules.find(item => item.id === moduleId);
@@ -802,6 +826,12 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
   const [sectorName, setSectorName] = useState('');
   const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
   const [sectorFeatures, setSectorFeatures] = useState<Partial<Record<ModuleId, string[]>>>({});
+  const [businessProfiles, setBusinessProfiles] = useState<SectorBusinessProfile[]>([]);
+  const [profileName, setProfileName] = useState('');
+  const [profileDescription, setProfileDescription] = useState('');
+  const [profileModules, setProfileModules] = useState<ModuleId[]>([]);
+  const [profileFeatures, setProfileFeatures] = useState<Partial<Record<ModuleId, string[]>>>({});
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
   const sectorPresets = data.sectorPresets ?? [];
@@ -839,6 +869,69 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
     });
   };
 
+  const resetBusinessProfile = () => {
+    setProfileName('');
+    setProfileDescription('');
+    setProfileModules([]);
+    setProfileFeatures({});
+    setEditingProfileId(null);
+  };
+
+  const toggleProfileModule = (moduleId: ModuleId) => {
+    const enabled = profileModules.includes(moduleId);
+    setProfileModules(previous => enabled ? previous.filter(id => id !== moduleId) : [...previous, moduleId]);
+    setProfileFeatures(current => {
+      if (enabled) {
+        const next = { ...current };
+        delete next[moduleId];
+        return next;
+      }
+      const module = modules.find(item => item.id === moduleId);
+      return { ...current, [moduleId]: module ? [...getEffectiveModuleFeatureIds(module)] : [] };
+    });
+  };
+
+  const toggleProfileFeature = (moduleId: ModuleId, featureId: string) => {
+    const module = modules.find(item => item.id === moduleId);
+    if (!module) return;
+    setProfileFeatures(current => {
+      const selected = new Set(current[moduleId] ?? getModuleFeatureOptions(module).map(feature => feature.id));
+      if (selected.has(featureId)) selected.delete(featureId);
+      else selected.add(featureId);
+      return { ...current, [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
+    });
+  };
+
+  const editBusinessProfile = (profile: SectorBusinessProfile) => {
+    setEditingProfileId(profile.id);
+    setProfileName(profile.name);
+    setProfileDescription(profile.description ?? '');
+    const moduleIds = Object.keys(profile.moduleFeatures ?? {}) as ModuleId[];
+    setProfileModules(moduleIds);
+    setProfileFeatures(Object.fromEntries(moduleIds.map(moduleId => [moduleId, [...(profile.moduleFeatures?.[moduleId] ?? [])]])));
+  };
+
+  const saveBusinessProfile = () => {
+    const normalizedName = profileName.trim();
+    if (!normalizedName || profileModules.length === 0) return;
+    const moduleFeatures = Object.fromEntries(profileModules.map(moduleId => [moduleId, [...getEffectiveModuleFeatureIds(modules.find(module => module.id === moduleId)!, profileFeatures[moduleId])]])) as Partial<Record<ModuleId, string[]>>;
+    const profile: SectorBusinessProfile = {
+      id: editingProfileId ?? uid('business-profile'),
+      name: normalizedName,
+      description: profileDescription.trim(),
+      moduleFeatures,
+    };
+    setBusinessProfiles(previous => editingProfileId
+      ? previous.map(item => item.id === editingProfileId ? profile : item)
+      : [...previous, profile]);
+    resetBusinessProfile();
+  };
+
+  const deleteBusinessProfile = (profileId: string) => {
+    setBusinessProfiles(previous => previous.filter(profile => profile.id !== profileId));
+    if (editingProfileId === profileId) resetBusinessProfile();
+  };
+
   const openSector = (preset?: SectorPreset) => {
     setEditingSector(preset ?? null);
     setSectorName(preset?.name ?? '');
@@ -849,6 +942,11 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
         return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, preset.moduleFeatures?.[moduleId])] : []];
       }))
       : {});
+    setBusinessProfiles((preset?.businessProfiles ?? []).map(profile => ({
+      ...profile,
+      moduleFeatures: Object.fromEntries(Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]])),
+    })));
+    resetBusinessProfile();
     setSectorError('');
   };
 
@@ -876,11 +974,19 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
       name: normalizedName,
       moduleIds: [...sectorModules],
       moduleFeatures,
+      businessProfiles: businessProfiles.map(profile => ({
+        ...profile,
+        moduleFeatures: Object.fromEntries(
+          Object.entries(profile.moduleFeatures ?? {}).filter(([moduleId]) => sectorModules.includes(moduleId as ModuleId)).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+        ),
+      })),
     };
     mutate(draft => { draft.sectorPresets = editingSector ? (draft.sectorPresets ?? []).map(item => item.id === editingSector.id ? preset : item) : [...(draft.sectorPresets ?? []), preset]; }, editingSector ? 'Secteur modifié.' : 'Secteur et modules par défaut enregistrés.');
     setSectorName('');
     setSectorModules([]);
     setSectorFeatures({});
+    setBusinessProfiles([]);
+    resetBusinessProfile();
     setEditingSector(null);
     setSectorError('');
   };
@@ -924,13 +1030,55 @@ function SectorPresetsPage({ data, mutate }: { data: StoreData; mutate: (fn: (d:
             </div>;
           })}
         </div>
+        <section className="mt-8 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.05)] p-4">
+          <div className="flex items-start gap-3">
+            <span className="rounded-lg bg-[hsl(var(--accent)/.2)] p-2"><KeyRound size={16} /></span>
+            <div><h3 className="font-bold">Packs métiers proposés à l’inscription</h3><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Créez un bloc nommé par métier, avec ses modules et fonctionnalités. L’entreprise pourra le choisir puis ajuster ses fonctionnalités avant validation.</p></div>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[.8fr_1.2fr]">
+            <div className="space-y-3">
+              <Field label="Nom du métier ou du pack" value={profileName} onChange={setProfileName} placeholder="Ex. Gestion de stock" testId="input-business-profile-name" />
+              <label className="block text-sm font-semibold">Description
+                <textarea data-testid="input-business-profile-description" value={profileDescription} onChange={event => setProfileDescription(event.target.value)} placeholder="Ex. Consultation et gestion des mouvements de stock" rows={3} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal" />
+              </label>
+              <div className="flex gap-2">
+                <button type="button" data-testid="button-save-business-profile" disabled={!profileName.trim() || profileModules.length === 0} onClick={saveBusinessProfile} className="btn rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40">{editingProfileId ? 'Mettre à jour le pack' : 'Ajouter le pack'}</button>
+                {editingProfileId && <button type="button" onClick={resetBusinessProfile} className="rounded-lg border px-3 py-2 text-xs font-bold">Annuler</button>}
+              </div>
+              {businessProfiles.length > 0 && <div className="space-y-2 border-t pt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Packs enregistrés</p>
+                {businessProfiles.map(profile => <div key={profile.id} className="flex items-center justify-between gap-3 rounded-lg border bg-[hsl(var(--card))] px-3 py-2">
+                  <div className="min-w-0"><strong className="block truncate text-xs">{profile.name}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{Object.keys(profile.moduleFeatures).length} module(s)</span></div>
+                  <div className="flex shrink-0 gap-1"><button type="button" onClick={() => editBusinessProfile(profile)} className="rounded-md p-1.5 text-xs font-bold hover:bg-[hsl(var(--muted))]">Modifier</button><button type="button" onClick={() => deleteBusinessProfile(profile.id)} className="rounded-md p-1.5 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]">Supprimer</button></div>
+                </div>)}
+              </div>}
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Fonctionnalités du pack</p>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez les modules du secteur puis les fonctions incluses dans ce métier.</p>
+              {sectorModules.length === 0 ? <p className="mt-4 rounded-lg border border-dashed p-4 text-xs text-[hsl(var(--muted-foreground))]">Sélectionnez d’abord un module dans la section précédente.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {sectorModules.map(moduleId => {
+                  const module = modules.find(item => item.id === moduleId);
+                  if (!module) return null;
+                  const enabled = profileModules.includes(moduleId);
+                  const options = getModuleFeatureOptions(module);
+                  const selected = new Set(profileFeatures[moduleId] ?? []);
+                  return <div key={moduleId} className={`rounded-lg border p-3 ${enabled ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--card))]' : ''}`}>
+                    <button type="button" onClick={() => toggleProfileModule(moduleId)} className="flex w-full items-center gap-2 text-left text-xs font-bold"><span className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : ''}`}>{enabled && <Check size={11} />}</span>{module.name}</button>
+                    {enabled && <div className="mt-2 space-y-1 border-t pt-2">{options.map(feature => <label key={feature.id} className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={selected.has(feature.id)} onChange={() => toggleProfileFeature(moduleId, feature.id)} className="accent-[hsl(var(--primary))]" />{feature.label}</label>)}</div>}
+                  </div>;
+                })}
+              </div>}
+            </div>
+          </div>
+        </section>
         {sectorError && <p data-testid="sector-error" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{sectorError}</p>}
          <div className="mt-5 flex flex-wrap gap-2"><button data-testid="button-create-sector" type="submit" className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">{editingSector ? <Edit3 size={15} /> : <Plus size={15} />}{editingSector ? 'Enregistrer les modifications' : 'Enregistrer le secteur'}</button>{editingSector && <button type="button" onClick={() => openSector()} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler la modification</button>}</div>
       </form>
     </section>
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3 px-1"><div><h2 className="font-bold">Secteurs configurés</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{sectorPresets.length} secteur{sectorPresets.length > 1 ? 's' : ''} disponible{sectorPresets.length > 1 ? 's' : ''} à l’inscription</p></div></div>
-       {sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="card-surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-start gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><Building2 size={19} /></span><div><strong>{preset.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{preset.moduleIds.length} module{preset.moduleIds.length > 1 ? 's' : ''} · {preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0)} fonctionnalité{preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0) > 1 ? 's' : ''} proposée{preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0) > 1 ? 's' : ''}</p><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)} · {preset.moduleFeatures?.[moduleId]?.length ?? 'toutes'}</span>)}</div></div></div><div className="flex self-start sm:self-center"><button type="button" data-testid={`button-edit-sector-${preset.id}`} onClick={() => openSector(preset)} aria-label={`Modifier le secteur ${preset.name}`} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={16} /></button><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={16} /></button></div></article>)}
+       {sectorPresets.map(preset => <article data-testid={`card-sector-preset-${preset.id}`} key={preset.id} className="card-surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-start gap-3"><span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]"><Building2 size={19} /></span><div><strong>{preset.name}</strong><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{preset.moduleIds.length} module{preset.moduleIds.length > 1 ? 's' : ''} · {preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0)} fonctionnalité{preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0) > 1 ? 's' : ''} proposée{preset.moduleIds.reduce((total, moduleId) => total + (preset.moduleFeatures?.[moduleId]?.length ?? 0), 0) > 1 ? 's' : ''} · {preset.businessProfiles?.length ?? 0} pack{(preset.businessProfiles?.length ?? 0) > 1 ? 's' : ''} métier</p><div className="mt-2 flex flex-wrap gap-1.5">{preset.moduleIds.map(moduleId => <span key={moduleId} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold">{moduleName(moduleId)} · {preset.moduleFeatures?.[moduleId]?.length ?? 'toutes'}</span>)}{preset.businessProfiles?.map(profile => <span key={profile.id} className="rounded-full bg-[hsl(var(--accent)/.16)] px-2 py-1 text-[10px] font-semibold">{profile.name}</span>)}</div></div></div><div className="flex self-start sm:self-center"><button type="button" data-testid={`button-edit-sector-${preset.id}`} onClick={() => openSector(preset)} aria-label={`Modifier le secteur ${preset.name}`} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><Edit3 size={16} /></button><button type="button" data-testid={`button-delete-sector-${preset.id}`} onClick={() => deleteSector(preset)} aria-label={`Supprimer le secteur ${preset.name}`} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={16} /></button></div></article>)}
       {sectorPresets.length === 0 && <div className="card-surface rounded-2xl border-dashed p-10 text-center"><Building2 className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} /><h3 className="mt-4 font-bold">Aucun secteur configuré</h3><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajoutez un premier secteur pour guider les inscriptions.</p></div>}
     </section>
   </div>;
@@ -1183,7 +1331,6 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
           <div className="mt-6 space-y-3 border-t pt-5 text-sm">
             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span><strong>{selected.features.length}</strong></div>
-             <div className="flex items-center justify-between"><span className="text-[hsl(var(--muted-foreground))]">Profils recommandés</span><strong>{selected.employeeProfiles?.length ?? 0}</strong></div>
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
             <button data-testid={`button-detail-toggle-module-${selected.id}`} onClick={() => toggleModule(selected.id)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}>
@@ -1208,21 +1355,6 @@ function InteractiveModulesPage({ data, mutate, notify }: { data: StoreData; mut
           })}</div>
         </section>
       </div>
-      {selected.employeeProfiles && selected.employeeProfiles.length > 0 && <section className="card-surface rounded-2xl p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Modèles de rôles</p><h2 className="mt-2 text-xl font-bold">Profils prêts à proposer</h2><p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Ces profils servent de base à l’administrateur. Ils ne créent aucun rôle ni employé automatiquement.</p></div>
-          <Users size={19} className="text-[hsl(var(--primary))]" />
-        </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">{selected.employeeProfiles.map(profile => {
-          const profileFeatures = profile.featureIds.map(featureId => selected.features.find(feature => featureSlug(feature) === featureId) ?? featureId);
-          return <article key={profile.id} className="rounded-xl border bg-[hsl(var(--muted)/.18)] p-4">
-            <h3 className="font-bold">{profile.name}</h3>
-            <p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{profile.description}</p>
-            <div className="mt-4 flex flex-wrap gap-1.5">{profileFeatures.map(feature => <span key={feature} className="rounded-full bg-[hsl(var(--card))] px-2 py-1 text-[10px] font-semibold">{feature}</span>)}</div>
-            <p className="mt-4 border-t pt-3 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Actions par défaut : {profile.defaultActions.join(' · ')}</p>
-          </article>;
-        })}</div>
-      </section>}
      {editingModule && <Modal title="Modifier le module" onClose={() => setEditingModule(null)}><div className="space-y-4"><Field label="Nom du module" value={moduleForm.name} onChange={value => setModuleForm(current => ({ ...current, name: value }))} testId="input-module-name" /><Field label="Description" value={moduleForm.description} onChange={value => setModuleForm(current => ({ ...current, description: value }))} testId="input-module-description" /><label className="block text-sm font-semibold">Fonctionnalités<textarea data-testid="input-module-features" value={moduleForm.features} onChange={event => setModuleForm(current => ({ ...current, features: event.target.value }))} placeholder="Une fonctionnalité par ligne" rows={5} className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]" /></label><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Les fonctionnalités peuvent être séparées par des lignes ou des virgules.</p><div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingModule(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><ActionButton primary testId="button-save-module" onClick={saveModule}>Enregistrer les modifications</ActionButton></div></div></Modal>}
     </div>;
   }

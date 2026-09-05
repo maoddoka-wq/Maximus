@@ -17,8 +17,8 @@ import {
 import { parseQueryTab } from './query-tab';
 import { featureSlug, resolveFeatureDependencies } from './permission-keys';
 import { getModuleFeatureOptions } from './module-features';
-import { presenceEmployeeProfiles, presenceFeatureDefinitions } from './presence-features';
-import { recordControlEvent, stockSubmoduleDependencies } from './store';
+import { presenceFeatureDefinitions } from './presence-features';
+import { recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
 import type { Employee, ModuleId, OrgNode, Role, StoreData } from './store';
 
@@ -226,11 +226,14 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
     presenceFeatureDefinitions.map(feature => feature.label),
   );
   assert.equal(presenceFeatureDefinitions.length, 16);
-  assert.equal(presenceEmployeeProfiles.length, 3);
-  presenceEmployeeProfiles.forEach(profile => {
-    assert.ok(profile.featureIds.length > 0);
-    assert.ok(profile.featureIds.every(featureId => presenceFeatureDefinitions.some(feature => featureSlug(feature.label) === featureId)));
-  });
+});
+
+test('conserve les packs métiers configurés dans un secteur', () => {
+  const distribution = sectorPresets.find(preset => preset.id === 'distribution');
+  const stockPack = distribution?.businessProfiles?.find(profile => profile.id === 'distribution-stock');
+  assert.ok(stockPack);
+  assert.equal(stockPack.name, 'Gestion de stock');
+  assert.deepEqual(stockPack.moduleFeatures.stocks, ['articles', 'entrees-et-sorties', 'alertes-de-seuil']);
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {
