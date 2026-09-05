@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\AuthSession;
+use App\Models\AuthUser;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+
+final class MaximusAuth
+{
+    public const COOKIE = 'maximus_session';
+
+    public static function actor(AuthUser $user): array
+    {
+        return [
+            'role' => $user->role,
+            'displayName' => $user->display_name,
+            'companyId' => $user->company_id,
+            'employeeId' => $user->employee_id,
+            'sectorIds' => is_array($user->sector_ids) ? $user->sector_ids : [],
+        ];
+    }
+
+    public static function userFromRequest(Request $request): ?AuthUser
+    {
+        $token = $request->cookie(self::COOKIE);
+
+        if (!$token) {
+            return null;
+        }
+
+        $session = AuthSession::query()
+            ->where('token_hash', self::hashToken($token))
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$session) {
+            return null;
+        }
+
+        return AuthUser::query()
+            ->whereKey($session->user_id)
+            ->where('status', 'ACTIF')
+            ->first();
+    }
+
+    public static function issueSession(AuthUser $user): string
+    {
+        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+
+        AuthSession::query()->create([
+            'id' => (string) str()->uuid(),
+            'token_hash' => self::hashToken($token),
+            'user_id' => $user->id,
+            'expires_at' => Carbon::now()->addHours(8),
+            'created_at' => Carbon::now(),
+        ]);
+
+        return $token;
+    }
+
+    public static function hashToken(string $token): string
+    {
+        return hash('sha256', $token);
+    }
+}

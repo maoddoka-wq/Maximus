@@ -6,3 +6,4 @@
 - [Frontière des données Commerce](commerce-data-boundary.md) — les workflows Commerce doivent synchroniser explicitement l’état local entreprise et le StoreData partagé lorsqu’ils touchent au stock.
 - [Routage avec paramètres](query-routing.md) — les routeurs d’espace doivent comparer le chemin sans query string, car les onglets internes modifient l’URL courante.
 - [Thème du menu entreprise](company-menu-theme.md) — le fond du menu reste distinct, mais les états actif et survol reprennent la couleur principale de l’entreprise.
+- [Migration Laravel progressive](laravel-migration-boundary.md) — conserver Laravel en parallèle et réversible jusqu’à preuve de parité avec Express et PostgreSQL.
