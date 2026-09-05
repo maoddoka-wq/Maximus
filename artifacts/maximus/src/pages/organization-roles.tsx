@@ -518,12 +518,12 @@ function ModulePermissionCard({
         <div className="flex min-w-0 items-start gap-3">
           <span className="rounded-lg bg-[hsl(var(--primary)/.12)] p-2 text-[hsl(var(--primary))]"><Layers3 size={16} /></span>
           <div className="min-w-0">
-            <h4 className="text-sm font-bold">{module.name}</h4>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
+             <h4 className="text-base font-bold">{module.name}</h4>
+             <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
           </div>
         </div>
         <div className="shrink-0">
-          <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
+           <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
           <PermissionToggleGroup permissions={['voir']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
         </div>
       </div>
@@ -558,10 +558,10 @@ function FeaturePermissionList({
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
-          <h5 className="text-xs font-bold">Sous-fonctionnalités</h5>
-          <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Définissez les menus et actions visibles dans ce module.</p>
+           <h5 className="text-sm font-bold">Sous-fonctionnalités</h5>
+           <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Définissez les menus et actions visibles dans ce module.</p>
         </div>
-         <span className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{features.length} élément{features.length > 1 ? 's' : ''}</span>
+         <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{features.length} élément{features.length > 1 ? 's' : ''}</span>
       </div>
       <div className="grid gap-2">
         {features.map(feature => {
@@ -574,8 +574,8 @@ function FeaturePermissionList({
           return (
             <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <span className="text-xs font-semibold">{feature.label}</span>
-                {dependencyLabels.length > 0 && <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Prérequis activé automatiquement : {dependencyLabels.join(', ')}</p>}
+                 <span className="text-sm font-semibold">{feature.label}</span>
+                 {dependencyLabels.length > 0 && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Prérequis activé automatiquement : {dependencyLabels.join(', ')}</p>}
               </div>
               <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={activePermissions} onToggle={permission => onToggle(module.id, feature.id, permission)} />
             </div>
@@ -596,8 +596,8 @@ function StockPermissionList({
   return (
     <div>
       <div className="mb-2">
-        <h5 className="text-xs font-bold">Sous-fonctions de Gestion de stock</h5>
-        <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Ces règles précisent les droits de l’employé dans son unité.</p>
+         <h5 className="text-sm font-bold">Sous-fonctions de Gestion de stock</h5>
+         <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Ces règles précisent les droits de l’employé dans son unité.</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {stockSubmodules.map(submodule => {
@@ -607,8 +607,8 @@ function StockPermissionList({
           return (
             <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3">
               <div>
-                <span className="text-xs font-semibold">{submodule.name}</span>
-                {dependencyLabels.length > 0 && <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Prérequis activé automatiquement : {dependencyLabels.join(', ')}</p>}
+                 <span className="text-sm font-semibold">{submodule.name}</span>
+                 {dependencyLabels.length > 0 && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Prérequis activé automatiquement : {dependencyLabels.join(', ')}</p>}
               </div>
               <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={modulePermissions[key] || []} onToggle={permission => onToggle(submodule.id, permission)} />
             </div>
@@ -641,14 +641,14 @@ function PresencePermissionList({
   return (
     <div>
       <div className="mb-2">
-        <h5 className="text-xs font-bold">Droits détaillés des présences</h5>
-        <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">Chaque capacité reste limitée à l’unité du rôle.</p>
+         <h5 className="text-sm font-bold">Droits détaillés des présences</h5>
+         <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Chaque capacité reste limitée à l’unité du rôle.</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
         {permissions.map(([key, label]) => {
           const active = Boolean(modulePermissions[`presence.${key}`]?.length);
-          return (
-            <button key={key} type="button" aria-pressed={active} onClick={() => onToggle(key)} className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-xs font-semibold transition ${active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--muted)/.16)] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)]'}`}>
+           return (
+             <button key={key} type="button" aria-pressed={active} onClick={() => onToggle(key)} className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--muted)/.16)] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)]'}`}>
               {label}
               {active && <Check size={13} className="text-[hsl(var(--primary))]" />}
             </button>
