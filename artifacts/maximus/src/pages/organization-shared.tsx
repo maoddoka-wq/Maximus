@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
 import {
   modules as allModules,
@@ -53,7 +54,7 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  return (
+  return createPortal(
     <div className="modal-backdrop organization-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in">
       <div className="modal-panel card-surface w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-in zoom-in-95">
         <div className="modal-header mb-5 flex items-center justify-between">
@@ -68,7 +69,8 @@ export function Modal({
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
