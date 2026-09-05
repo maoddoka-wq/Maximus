@@ -20,3 +20,9 @@ Each module owns its named business packs; sector presets compose those module p
 **Why:** Packs describe reusable module capabilities, while the sector only describes which module packs fit the company’s operating model; neither concept is an employee role.
 
 **How to apply:** Keep the hierarchy explicit as module → module pack → features, then sector → selected module packs; persist the selected composition with the signup request and let the administrator review it before activation.
+
+Legacy packs without an explicit feature permission map are interpreted as view-only when they are edited, tested, or copied into an onboarding request.
+
+**Why:** The new pack contract must not silently grant create or modify rights to existing data that only recorded a feature list.
+
+**How to apply:** Treat a missing or empty feature permission as `voir` for included features, and persist the explicit permission map on the next save or signup request.
