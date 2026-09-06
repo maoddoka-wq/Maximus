@@ -23,6 +23,7 @@ import {
 import {
   createEcommerceApi,
   type EcommerceBootstrap,
+  type EcommerceDomain,
   type EcommerceOrder,
   type EcommerceOrderStatus,
   type EcommerceProduct,
@@ -190,7 +191,7 @@ export default function EcommerceModulePage({
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
       {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
-      {tab === 'parametres' && <SettingsPanel store={store} canModify={canModify} run={run} />}
+      {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
       </>}
     </div>
   );
@@ -313,7 +314,7 @@ function Deliveries({ data, canModify, run }: { data: EcommerceBootstrap; canMod
   return <div className="space-y-5 fade-up"><Panel title="Livraisons" description="Le flux des commandes qui ont quitté le bureau pour rejoindre vos clients.">{shipments.length === 0 ? <Empty icon={Truck} title="Aucune livraison en cours" text="Les commandes en préparation et expédiées seront suivies ici." /> : <div className="grid gap-3 md:grid-cols-2">{shipments.map(order => <div key={order.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><h3 className="mt-1 font-bold">{order.customerName}</h3></div><StatusPill value={order.status} /></div><p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{order.shippingAddress || 'Adresse de livraison non renseignée'}</p><div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs font-bold">{money(order.total, data.store.currency)}</span>{canModify && <select aria-label={`Avancer la livraison ${order.reference}`} value={order.status} onChange={event => void change(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.filter(item => !['NOUVELLE', 'ANNULÉE'].includes(item)).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}</Panel></div>;
 }
 
-function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [form, setForm] = useState({
     name: store.name,
     slug: store.slug,
@@ -324,12 +325,44 @@ function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canMo
     accentColor: store.accentColor,
     logoUrl: store.logoUrl,
   });
+  const [domainInput, setDomainInput] = useState('');
   const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
   const save = (event: FormEvent) => {
     event.preventDefault();
     void run(() => createEcommerceApi(store.companyId).updateStore(form), 'Paramètres de la boutique enregistrés.');
   };
-  return <div className="space-y-5 fade-up"><Panel title="Paramètres de la boutique" description="Ces informations structurent votre vitrine publique et votre expérience d’achat."><form onSubmit={save} className="max-w-3xl space-y-5"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => patch({ slug: value })} disabled={!canModify} /><Field label="URL du logo" value={form.logoUrl} onChange={value => patch({ logoUrl: value })} disabled={!canModify} placeholder="https://..." /><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div><label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div><div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div></form></Panel></div>;
+  const addDomain = (event: FormEvent) => {
+    event.preventDefault();
+    const domain = domainInput.trim();
+    if (!domain) return;
+    void run(() => createEcommerceApi(store.companyId).createDomain(domain), 'Domaine ajouté. Configurez le DNS puis lancez la vérification.');
+    setDomainInput('');
+  };
+  const verifyDomain = (domain: EcommerceDomain) => {
+    void run(() => createEcommerceApi(store.companyId).verifyDomain(domain.id), `Domaine ${domain.domain} vérifié.`);
+  };
+  const removeDomain = (domain: EcommerceDomain) => {
+    void run(() => createEcommerceApi(store.companyId).deleteDomain(domain.id), 'Domaine retiré de la boutique.');
+  };
+  return <div className="space-y-5 fade-up">
+    <Panel title="Paramètres de la boutique" description="Ces informations structurent votre vitrine publique et votre expérience d’achat.">
+      <form onSubmit={save} className="max-w-3xl space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => patch({ slug: value })} disabled={!canModify} /><Field label="URL du logo" value={form.logoUrl} onChange={value => patch({ logoUrl: value })} disabled={!canModify} placeholder="https://..." /><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div>
+        <label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+        <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
+        <div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div>
+      </form>
+    </Panel>
+    <Panel title="Domaine personnalisé" description="Connectez le domaine acheté par votre entreprise à cette boutique publique.">
+      <div className="space-y-5">
+        <form onSubmit={addDomain} className="flex flex-col gap-3 sm:flex-row">
+          <Field label="Nom de domaine" value={domainInput} onChange={setDomainInput} placeholder="boutique.exemple.sn" disabled={!canModify} />
+          <button type="submit" disabled={!canModify || !domainInput.trim()} className="self-end rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">Ajouter le domaine</button>
+        </form>
+        {domains.length === 0 ? <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">Aucun domaine personnalisé n’est encore connecté.</p> : <div className="space-y-3">{domains.map(domain => <div key={domain.id} className="rounded-xl border p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><strong>{domain.domain}</strong><StatusPill value={domain.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING'} /></div><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{domain.status === 'ACTIVE' ? 'La boutique répond sur ce domaine après configuration de l’hébergement.' : 'En attente de la configuration DNS.'}</p></div><div className="flex gap-2"><button type="button" disabled={!canModify} onClick={() => verifyDomain(domain)} className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50">Vérifier</button><button type="button" disabled={!canModify} onClick={() => removeDomain(domain)} className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50">Retirer</button></div></div><div className="mt-4 grid gap-3 rounded-lg bg-[hsl(var(--muted)/.35)] p-3 text-xs sm:grid-cols-2"><div><p className="font-bold">Enregistrement TXT de vérification</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Nom : {domain.verificationName}</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Valeur : {domain.verificationValue}</p></div><div><p className="font-bold">Cible CNAME de la boutique</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Cible : {domain.targetHost}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">Ajoutez le TXT ou le CNAME chez votre fournisseur DNS, attendez sa propagation, puis cliquez sur Vérifier.</p></div></div>{domain.lastError && <p className="mt-3 text-xs text-[hsl(var(--destructive))]">{domain.lastError}</p>}</div>)}</div>}
+      </div>
+    </Panel>
+  </div>;
 }
 
 function ColorField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {

@@ -27,6 +27,7 @@ class EcommerceController extends Controller
 
         return response()->json([
             'store' => $this->store($store),
+            'domains' => $this->domains($company),
             'products' => DB::table('ecommerce_products')
                 ->where('company_id', $company)
                 ->where('status', '!=', 'ARCHIVED')
@@ -75,6 +76,112 @@ class EcommerceController extends Controller
         ]);
 
         return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $row->id)->first()));
+    }
+
+    public function createDomain(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'settings')) {
+            return $this->forbidden();
+        }
+
+        $input = Validator::make($request->all(), [
+            'domain' => ['required', 'string', 'max:253'],
+        ])->validate();
+        $domain = $this->normalizeDomain($input['domain']);
+        if (! $domain) {
+            return response()->json(['error' => 'Saisissez un nom de domaine valide, sans http:// ni chemin.'], 422);
+        }
+
+        $company = $this->company($request);
+        if (DB::table('ecommerce_domains')->where('domain', $domain)->exists()) {
+            return response()->json(['error' => 'Ce domaine est déjà rattaché à une boutique.'], 422);
+        }
+
+        $row = [
+            'id' => $this->id('domain'),
+            'company_id' => $company,
+            'domain' => $domain,
+            'target_host' => $this->domainTarget($request),
+            'verification_token' => 'maximus-'.Str::lower(Str::random(40)),
+            'status' => 'PENDING',
+            'last_error' => '',
+            'verified_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('ecommerce_domains')->insert($row);
+
+        return response()->json($this->domain((object) $row), 201);
+    }
+
+    public function verifyDomain(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'settings')) {
+            return $this->forbidden();
+        }
+
+        $row = DB::table('ecommerce_domains')
+            ->where('id', $id)
+            ->where('company_id', $this->company($request))
+            ->first();
+        if (! $row) {
+            return response()->json(['error' => 'Domaine introuvable.'], 404);
+        }
+
+        $verificationName = '_maximus-verification.'.$row->domain;
+        $verifiedByTxt = false;
+        $verifiedByCname = false;
+        if (function_exists('dns_get_record')) {
+            $txtRecords = @dns_get_record($verificationName, DNS_TXT) ?: [];
+            $verifiedByTxt = collect($txtRecords)->contains(
+                fn (array $record): bool => trim((string) ($record['txt'] ?? '')) === $row->verification_token,
+            );
+
+            $cnameRecords = @dns_get_record($row->domain, DNS_CNAME) ?: [];
+            $expectedTarget = rtrim(Str::lower($row->target_host), '.');
+            $verifiedByCname = collect($cnameRecords)->contains(
+                fn (array $record): bool => rtrim(Str::lower((string) ($record['target'] ?? '')), '.') === $expectedTarget,
+            );
+        }
+
+        if (! $verifiedByTxt && ! $verifiedByCname) {
+            DB::table('ecommerce_domains')->where('id', $row->id)->update([
+                'status' => 'PENDING',
+                'last_error' => 'Aucun enregistrement TXT ou CNAME correspondant n’a été trouvé.',
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'error' => 'Le domaine n’est pas encore vérifié. Ajoutez l’enregistrement DNS indiqué puis réessayez.',
+                'domain' => $this->domain(DB::table('ecommerce_domains')->where('id', $row->id)->first()),
+            ], 422);
+        }
+
+        DB::table('ecommerce_domains')->where('id', $row->id)->update([
+            'status' => 'ACTIVE',
+            'last_error' => '',
+            'verified_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json($this->domain(DB::table('ecommerce_domains')->where('id', $row->id)->first()));
+    }
+
+    public function deleteDomain(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'settings')) {
+            return $this->forbidden();
+        }
+
+        $deleted = DB::table('ecommerce_domains')
+            ->where('id', $id)
+            ->where('company_id', $this->company($request))
+            ->delete();
+        if (! $deleted) {
+            return response()->json(['error' => 'Domaine introuvable.'], 404);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function createProduct(Request $request): JsonResponse
@@ -166,6 +273,31 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
+        return response()->json($this->publicStore($store));
+    }
+
+    public function publicBootstrapByDomain(Request $request): JsonResponse
+    {
+        $store = $this->publishedStoreByDomain($request->getHost());
+        if (! $store) {
+            return response()->json(['available' => false]);
+        }
+
+        return response()->json($this->publicStore($store));
+    }
+
+    public function createPublicDomainOrder(Request $request): JsonResponse
+    {
+        $store = $this->publishedStoreByDomain($request->getHost());
+        if (! $store) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+
+        return $this->createOrderForStore($request, $store);
+    }
+
+    private function publicStore(object $store): array
+    {
         return response()->json([
             'store' => $this->store($store),
             'products' => DB::table('ecommerce_products')
@@ -177,7 +309,7 @@ class EcommerceController extends Controller
                 ->get()
                 ->map(fn ($row) => $this->product($row))
                 ->values(),
-        ]);
+        ])->getData(true);
     }
 
     public function createPublicOrder(Request $request, string $slug): JsonResponse
@@ -186,6 +318,11 @@ class EcommerceController extends Controller
         if (! $store) {
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
+        return $this->createOrderForStore($request, $store);
+    }
+
+    private function createOrderForStore(Request $request, object $store): JsonResponse
+    {
         $input = Validator::make($request->all(), [
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
             'customerEmail' => ['required', 'email', 'max:160'],
@@ -264,6 +401,77 @@ class EcommerceController extends Controller
                     : 'La commande n’a pas pu être enregistrée.',
             ], $error->getMessage() === 'STOCK_INSUFFICIENT' ? 409 : 400);
         }
+    }
+
+    private function publishedStoreByDomain(string $host): ?object
+    {
+        $domain = $this->normalizeDomain($host);
+        if (! $domain) {
+            return null;
+        }
+
+        $domainRow = DB::table('ecommerce_domains')
+            ->where('domain', $domain)
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domainRow) {
+            return null;
+        }
+
+        return DB::table('ecommerce_stores')
+            ->where('company_id', $domainRow->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+    }
+
+    private function domains(string $company): array
+    {
+        return DB::table('ecommerce_domains')
+            ->where('company_id', $company)
+            ->orderBy('domain')
+            ->get()
+            ->map(fn ($row) => $this->domain($row))
+            ->values()
+            ->all();
+    }
+
+    private function domain(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'companyId' => $row->company_id,
+            'domain' => $row->domain,
+            'targetHost' => $row->target_host,
+            'verificationName' => '_maximus-verification.'.$row->domain,
+            'verificationValue' => $row->verification_token,
+            'status' => $row->status,
+            'lastError' => $row->last_error,
+            'verifiedAt' => $row->verified_at,
+        ];
+    }
+
+    private function normalizeDomain(string $value): ?string
+    {
+        $domain = Str::lower(trim($value));
+        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
+        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
+        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
+        $domain = rtrim($domain, '.');
+        if ($domain === '' || strlen($domain) > 253 || ! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+            return null;
+        }
+
+        return $domain;
+    }
+
+    private function domainTarget(Request $request): string
+    {
+        $configured = (string) env('MAXIMUS_CUSTOM_DOMAIN_TARGET', '');
+        if ($configured !== '') {
+            return rtrim(Str::lower($configured), '.');
+        }
+
+        return $this->normalizeDomain($request->getHost()) ?? $request->getHost();
     }
 
     private function orders(string $company): array

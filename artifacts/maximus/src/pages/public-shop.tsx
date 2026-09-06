@@ -7,7 +7,7 @@ type CartLine = { product: EcommerceProduct; quantity: number };
 const money = (value: number, currency: PublicShopBootstrap['store']['currency']) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: currency === 'XOF' ? 0 : 2 }).format(value) + ` ${currency}`;
 
-export default function PublicShopPage({ slug }: { slug: string }) {
+export default function PublicShopPage({ slug, domain = false }: { slug?: string; domain?: boolean }) {
   const [data, setData] = useState<PublicShopBootstrap | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,12 +18,18 @@ export default function PublicShopPage({ slug }: { slug: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    void publicEcommerceApi.bootstrap(slug)
+    const load = domain
+      ? publicEcommerceApi.bootstrapDomain().then(result => {
+          if (!('store' in result)) throw new Error('Aucune boutique publiée ne correspond à ce domaine.');
+          return result;
+        })
+      : publicEcommerceApi.bootstrap(slug ?? '');
+    void load
       .then(result => { if (!cancelled) setData(result); })
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Boutique indisponible.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [domain, slug]);
 
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0), [cart]);
   const add = (product: EcommerceProduct) => setCart(current => {
@@ -39,10 +45,15 @@ export default function PublicShopPage({ slug }: { slug: string }) {
   const submit = async () => {
     if (!data || !form.customerName.trim() || !form.customerEmail.trim() || !form.shippingAddress.trim() || cart.length === 0) return;
     try {
-      const order = await publicEcommerceApi.createOrder(slug, {
-        ...form,
-        items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity })),
-      });
+       const order = domain
+         ? await publicEcommerceApi.createDomainOrder({
+             ...form,
+             items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity })),
+           })
+         : await publicEcommerceApi.createOrder(slug ?? '', {
+             ...form,
+             items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity })),
+           });
       setSubmitted(order);
       setCart([]);
       setCheckoutOpen(false);

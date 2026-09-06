@@ -8,11 +8,17 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
+        Route::post('/domains', [EcommerceController::class, 'createDomain']);
+        Route::post('/domains/{id}/verify', [EcommerceController::class, 'verifyDomain']);
+        Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);
         Route::post('/products', [EcommerceController::class, 'createProduct']);
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
     });
+
+Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
+Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/', [EcommerceController::class, 'publicBootstrap']);

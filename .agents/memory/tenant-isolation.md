@@ -26,3 +26,13 @@ entreprise après actualisation.
 **How to apply:** Ajouter `companyId` aux types et aux créations de produits,
 ventes, paiements, mouvements, activités, fournisseurs et commandes avant
 d’étendre un écran métier qui utilise `/api/app-state`.
+
+Les boutiques par domaine personnalisé doivent résoudre l’entreprise depuis le
+Host réel de la requête et non depuis un `X-Forwarded-Host` fourni par le client.
+
+**Why:** Un en-tête de proxy non vérifié permettrait à une requête publique de
+choisir le domaine d’une autre entreprise et de franchir la frontière tenant.
+
+**How to apply:** Configurer la confiance proxy au niveau de l’infrastructure
+si nécessaire, puis garder les routes publiques par domaine séparées des
+routes de gestion authentifiées et tester un Host actif par entreprise.

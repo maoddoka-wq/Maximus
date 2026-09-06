@@ -98,6 +98,7 @@ import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/mod
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
+import { publicEcommerceApi } from '@/lib/ecommerce-api';
 import {
   loadCompanyModuleAccess,
   setCompanyModuleAccess,
@@ -313,6 +314,9 @@ function AppContent() {
   const { alert, confirm } = useAppDialog();
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [appStateVersion, setAppStateVersion] = useState(0);
+  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>(
+    () => (window.location.pathname === '/' ? 'checking' : 'none'),
+  );
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
@@ -336,6 +340,25 @@ function AppContent() {
     const timer = window.setTimeout(() => setToast(''), 3000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+  useEffect(() => {
+    if (pathname !== '/' || session) {
+      setCustomDomainState('none');
+      return undefined;
+    }
+
+    let active = true;
+    setCustomDomainState('checking');
+    void publicEcommerceApi.bootstrapDomain()
+      .then((result) => {
+        if (active) setCustomDomainState('store' in result ? 'shop' : 'none');
+      })
+      .catch(() => {
+        if (active) setCustomDomainState('none');
+      });
+    return () => {
+      active = false;
+    };
+  }, [pathname, session]);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
@@ -700,6 +723,12 @@ function AppContent() {
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)$/);
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
+  }
+  if (pathname === '/' && !session && customDomainState === 'checking') {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de la boutique…</div>;
+  }
+  if (pathname === '/' && !session && customDomainState === 'shop') {
+    return <PublicShopPage domain />;
   }
   const loginEmployees = [
     ...data.employees,

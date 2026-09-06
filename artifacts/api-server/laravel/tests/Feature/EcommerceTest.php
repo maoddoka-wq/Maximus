@@ -150,6 +150,87 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseCount('ecommerce_orders', 0);
     }
 
+    public function test_company_admin_can_register_verify_and_remove_a_custom_domain(): void
+    {
+        $request = $this->asActor();
+        $created = $request->postJson('/api/ecommerce/domains?companyId=kora', [
+            'domain' => 'https://boutique.kora.test/',
+        ])->assertCreated()
+            ->assertJsonPath('domain', 'boutique.kora.test')
+            ->assertJsonPath('status', 'PENDING')
+            ->assertJsonPath('verificationName', '_maximus-verification.boutique.kora.test');
+
+        $domainId = $created->json('id');
+        $request->postJson('/api/ecommerce/domains/'.$domainId.'/verify?companyId=kora')
+            ->assertStatus(422)
+            ->assertJsonPath('domain.status', 'PENDING');
+
+        $request->deleteJson('/api/ecommerce/domains/'.$domainId.'?companyId=kora')
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+        $this->assertDatabaseMissing('ecommerce_domains', ['id' => $domainId]);
+    }
+
+    public function test_active_custom_domain_serves_only_its_published_company_store(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique domaine KORA',
+            'slug' => 'kora-domaine-test',
+            'description' => 'Boutique publiée sur son domaine.',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit domaine',
+            'slug' => 'produit-domaine',
+            'sku' => 'DOMAIN-01',
+            'price' => 1800,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        DB::table('ecommerce_domains')->insert([
+            'id' => 'domain-active-kora',
+            'company_id' => 'kora',
+            'domain' => 'boutique-active.kora.test',
+            'target_host' => 'maximus.test',
+            'verification_token' => 'maximus-test-token',
+            'status' => 'ACTIVE',
+            'last_error' => '',
+            'verified_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson('http://boutique-active.kora.test/api/shop-domain')
+            ->assertOk()
+            ->assertJsonPath('store.companyId', 'kora')
+            ->assertJsonPath('products.0.id', $product->json('id'));
+
+        $this->postJson('http://boutique-active.kora.test/api/shop-domain/orders', [
+                'customerName' => 'Client Domaine',
+                'customerEmail' => 'domain@example.test',
+                'shippingAddress' => 'Dakar, Sénégal',
+                'items' => [['productId' => $product->json('id'), 'quantity' => 1]],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('total', 1800);
+
+        $this->assertDatabaseHas('ecommerce_products', [
+            'id' => $product->json('id'),
+            'company_id' => 'kora',
+            'stock' => 1,
+        ]);
+
+        $this->getJson('http://unknown-domain.test/api/shop-domain')
+            ->assertOk()
+            ->assertJson(['available' => false]);
+    }
+
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([
