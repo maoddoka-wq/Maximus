@@ -1,5 +1,6 @@
 export const moduleIds = [
   'commerce',
+  'ecommerce',
   'ventes',
   'achats',
   'stocks',

@@ -119,6 +119,7 @@ export type KoraRouteScreens = {
   organization: Screen;
   empty: Screen;
   stocks: Screen;
+  ecommerce: Screen;
   finance: Screen;
   commerce: Screen;
   operational: Screen;
@@ -142,6 +143,7 @@ export function KoraRouter({
   employee,
   presenceEmployees,
   presenceFeatureIds,
+  ecommerceFeatureIds,
   hasPermission,
   hasPresencePermission,
   stockPermissions,
@@ -164,6 +166,7 @@ export function KoraRouter({
   employee: StoreData['employees'][number] | null;
   presenceEmployees: Employee[];
   presenceFeatureIds?: string[];
+  ecommerceFeatureIds?: string[];
   hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean;
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
@@ -252,6 +255,15 @@ export function KoraRouter({
       canCreate: hasPermission('stocks', 'créer'),
       canModify: hasPermission('stocks', 'modifier'),
       stockPermissions,
+      singleModuleNavigation,
+    });
+  }
+  if (routePath === '/kora/ecommerce') {
+    return renderScreen(screens.ecommerce, {
+      companyId,
+      canCreate: hasPermission('ecommerce', 'créer'),
+      canModify: hasPermission('ecommerce', 'modifier'),
+      allowedFeatureIds: ecommerceFeatureIds,
       singleModuleNavigation,
     });
   }

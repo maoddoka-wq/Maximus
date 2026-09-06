@@ -20,3 +20,9 @@ Le workflow de démonstration provisionne les comptes avant de démarrer le serv
 **Why:** Une nouvelle colonne de permissions a bloqué le démarrage alors que les tests, qui exécutent les migrations, passaient correctement.
 
 **How to apply:** Pour toute donnée requise par `ensureAuthUsers` ou un autre provisionneur de démarrage, vérifier/créer la colonne de façon idempotente avant le premier `updateOrCreate`; conserver la migration pour les environnements normaux.
+
+Les migrations lancées depuis le shell doivent elles aussi recevoir explicitement `DB_CONNECTION=pgsql`; sinon elles peuvent être appliquées à la base SQLite locale alors que le serveur HTTP utilise PostgreSQL.
+
+**Why:** Une migration considérée comme terminée en CLI a laissé les tables absentes de la base réellement interrogée par l’API.
+
+**How to apply:** Vérifier `DB_CONNECTION=pgsql php artisan migrate:status` avant toute validation d’une nouvelle route Laravel.

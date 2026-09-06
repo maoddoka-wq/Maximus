@@ -1,0 +1,373 @@
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  Archive,
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  CircleDollarSign,
+  ClipboardList,
+  LayoutDashboard,
+  Megaphone,
+  Package,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  ShoppingBag,
+  Store,
+  Truck,
+  Users,
+  X,
+} from 'lucide-react';
+import {
+  createEcommerceApi,
+  type EcommerceBootstrap,
+  type EcommerceOrder,
+  type EcommerceOrderStatus,
+  type EcommerceProduct,
+  type EcommerceStore,
+} from '@/lib/ecommerce-api';
+import { useQueryTab } from '@/lib/query-tab';
+import { useAppDialog } from '@/components/confirm-dialog';
+
+type EcommerceTab = 'dashboard' | 'catalogue' | 'commandes' | 'clients' | 'promotions' | 'livraisons' | 'parametres';
+
+const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+  { id: 'catalogue', label: 'Catalogue', icon: Package },
+  { id: 'commandes', label: 'Commandes', icon: ClipboardList },
+  { id: 'clients', label: 'Clients', icon: Users },
+  { id: 'promotions', label: 'Promotions', icon: Megaphone },
+  { id: 'livraisons', label: 'Livraisons', icon: Truck },
+  { id: 'parametres', label: 'Paramètres', icon: Settings },
+];
+
+const orderStatuses: EcommerceOrderStatus[] = ['NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'EXPÉDIÉE', 'LIVRÉE', 'ANNULÉE'];
+const money = (value: number, currency: EcommerceStore['currency'] = 'XOF') =>
+  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: currency === 'XOF' ? 0 : 2 }).format(value) + ` ${currency}`;
+const dateLabel = (value: string) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(parsed);
+};
+const slugify = (value: string) =>
+  value.trim().toLocaleLowerCase('fr-FR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+type ProductForm = {
+  name: string;
+  slug: string;
+  sku: string;
+  description: string;
+  category: string;
+  price: string;
+  compareAtPrice: string;
+  stock: string;
+  imageUrl: string;
+  featured: boolean;
+  status: EcommerceProduct['status'];
+};
+
+const blankProduct: ProductForm = {
+  name: '',
+  slug: '',
+  sku: '',
+  description: '',
+  category: 'Divers',
+  price: '',
+  compareAtPrice: '',
+  stock: '0',
+  imageUrl: '',
+  featured: false,
+  status: 'DRAFT',
+};
+
+export default function EcommerceModulePage({
+  companyId,
+  canCreate = true,
+  canModify = true,
+  allowedFeatureIds,
+  singleModuleNavigation = false,
+}: {
+  companyId: string;
+  canCreate?: boolean;
+  canModify?: boolean;
+  allowedFeatureIds?: string[];
+  singleModuleNavigation?: boolean;
+}) {
+  const [data, setData] = useState<EcommerceBootstrap | null>(null);
+  const visibleTabs = allowedFeatureIds ? tabs.filter(item => allowedFeatureIds.includes(item.id)) : tabs;
+  const visibleTabIds = visibleTabs.map(item => item.id);
+  const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
+  const api = createEcommerceApi(companyId);
+
+  const load = async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    try {
+      setData(await api.bootstrap());
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace e-commerce.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeout = window.setTimeout(() => setToast(''), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  const run = async (action: () => Promise<unknown>, success: string) => {
+    try {
+      await action();
+      await load(true);
+      setToast(success);
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Opération impossible.');
+    }
+  };
+
+  if (loading) return <LoadingState />;
+  if (!data) return <ErrorState message={error} onRetry={() => void load()} />;
+
+  const store = data.store;
+  const navigate = (next: EcommerceTab) => setTab(next);
+
+  return (
+    <div className="space-y-5" data-testid="ecommerce-module">
+      {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button type="button" aria-label="Fermer le message" onClick={() => setError('')}><X size={16} /></button></div>}
+      {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-bold text-[hsl(var(--sidebar-foreground))] shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
+
+      <section className="mobile-hero card-surface overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.2)]">
+        <div className="relative p-5 sm:p-7">
+          <div className="pointer-events-none absolute right-[-4rem] top-[-5rem] h-52 w-52 rounded-full border-[18px] border-[hsl(var(--primary)/.08)]" />
+          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Commerce cockpit</span>
+                <StatusPill value={store.status} />
+              </div>
+              <h1 className="mt-2 text-2xl font-bold tracking-[-.045em] sm:text-3xl">{store.name || 'Votre boutique en ligne'}</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{store.description || 'Un espace de vente clair, prêt à transformer votre catalogue en commandes.'}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+                <span className="inline-flex items-center gap-1.5"><Store size={14} className="text-[hsl(var(--primary))]" />/{store.slug || 'boutique'}</span>
+                <span className="h-1 w-1 rounded-full bg-[hsl(var(--border))]" />
+                <span>{data.products.filter(product => product.status !== 'ARCHIVED').length} références actives</span>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button type="button" onClick={() => void load(true)} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))]" title="Actualiser">
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser
+              </button>
+              <button type="button" onClick={() => navigate('parametres')} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Settings size={14} />Configurer la boutique</button>
+            </div>
+          </div>
+        </div>
+        {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="module-tabs flex min-w-0 gap-1.5 overflow-x-auto border-t px-4 py-3 sm:px-6">
+          {visibleTabs.map(item => {
+            const Icon = item.icon;
+            return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>;
+          })}
+        </nav>}
+      </section>
+
+      {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
+      {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
+      {tab === 'catalogue' && <Catalogue data={data} canCreate={canCreate} canModify={canModify} run={run} />}
+      {tab === 'commandes' && <Orders data={data} canModify={canModify} run={run} />}
+      {tab === 'clients' && <Clients data={data} />}
+      {tab === 'promotions' && <Promotions />}
+      {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
+      {tab === 'parametres' && <SettingsPanel store={store} canModify={canModify} run={run} />}
+      </>}
+    </div>
+  );
+}
+
+function LoadingState() {
+  return <div className="card-surface min-h-80 rounded-2xl p-5 sm:p-7" aria-label="Chargement de la boutique"><div className="h-3 w-36 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="mt-4 h-8 w-72 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="mt-3 h-4 max-w-xl animate-pulse rounded bg-[hsl(var(--muted)/.72)]" /><div className="mt-8 grid gap-3 sm:grid-cols-3"><div className="h-28 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-28 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-28 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-5 h-52 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>;
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div className="card-surface rounded-2xl p-8"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]"><Store size={20} /></div><h2 className="mt-4 text-lg font-bold">La boutique n’est pas disponible</h2><p className="mt-2 max-w-lg text-sm leading-6 text-[hsl(var(--muted-foreground))]">{message || 'Une erreur inattendue empêche le chargement de cet espace.'}</p><button type="button" onClick={onRetry} className="btn mt-5 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><RefreshCw size={14} />Réessayer</button></div>;
+}
+
+function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: EcommerceTab) => void }) {
+  const activeProducts = data.products.filter(product => product.status !== 'ARCHIVED');
+  const published = activeProducts.filter(product => product.status === 'PUBLISHED').length;
+  const pending = data.orders.filter(order => !['LIVRÉE', 'ANNULÉE'].includes(order.status)).length;
+  const revenue = data.orders.filter(order => order.status !== 'ANNULÉE').reduce((sum, order) => sum + order.total, 0);
+  const lowStock = activeProducts.filter(product => product.stock <= 5);
+  return <div className="space-y-5 fade-up">
+    <div className="mobile-kpi-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Metric label="Chiffre d’affaires" value={money(revenue, data.store.currency)} detail="Commandes non annulées" icon={CircleDollarSign} accent />
+      <Metric label="Commandes à traiter" value={String(pending)} detail="Dans le flux opérationnel" icon={ClipboardList} />
+      <Metric label="Catalogue publié" value={`${published}/${activeProducts.length}`} detail="Références visibles en ligne" icon={ShoppingBag} />
+      <Metric label="Stock à surveiller" value={String(lowStock.length)} detail="5 unités ou moins" icon={Package} warning={lowStock.length > 0} />
+    </div>
+    <div className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]">
+      <Panel title="Commandes récentes" description="Le dernier mouvement de votre boutique, au même endroit." action={<button type="button" onClick={() => onTab('commandes')} className="text-xs font-bold text-[hsl(var(--primary))]">Voir toutes les commandes <ChevronRight className="inline" size={14} /></button>}>
+        {data.orders.length === 0 ? <Empty icon={ClipboardList} title="Pas encore de commande" text="Les commandes de votre boutique apparaîtront ici dès la première vente." action={<button type="button" onClick={() => onTab('catalogue')} className="text-xs font-bold text-[hsl(var(--primary))]">Vérifier le catalogue</button>} /> : <div className="divide-y">{data.orders.slice(0, 5).map(order => <OrderRow key={order.id} order={order} currency={data.store.currency} />)}</div>}
+      </Panel>
+      <Panel title="À surveiller" description="Les signaux qui méritent votre attention." action={<button type="button" onClick={() => onTab('catalogue')} className="text-xs font-bold text-[hsl(var(--primary))]">Catalogue <ChevronRight className="inline" size={14} /></button>}>
+        <div className="space-y-3">
+          {lowStock.length === 0 && <Empty icon={Check} title="Tout est sous contrôle" text="Aucune référence ne se trouve sous le seuil de surveillance." />}
+          {lowStock.slice(0, 5).map(product => <div key={product.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--accent)/.3)] bg-[hsl(var(--accent)/.08)] p-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]"><Package size={16} /></span><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}</p><p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">{product.stock} unité{product.stock > 1 ? 's' : ''} restante{product.stock > 1 ? 's' : ''}</p></div><span className="mono ml-auto text-xs font-bold">{product.sku}</span></div>)}
+        </div>
+        <div className="mt-5 rounded-xl border border-dashed p-4"><p className="mono text-[9px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Vitrine</p><p className="mt-2 text-sm font-bold">Votre boutique est {data.store.status === 'PUBLISHED' ? 'ouverte au public' : 'en préparation'}.</p><button type="button" onClick={() => onTab('parametres')} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Gérer la vitrine <ArrowUpRight size={13} /></button></div>
+      </Panel>
+    </div>
+    <Panel title="Performance du catalogue" description="Une lecture rapide de la couverture de votre assortiment.">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Insight label="Références actives" value={activeProducts.length} detail="Non archivées" />
+        <Insight label="Produits vedettes" value={activeProducts.filter(product => product.featured).length} detail="Mis en avant" />
+        <Insight label="Catégories" value={new Set(activeProducts.map(product => product.category)).size} detail="Dans le catalogue" />
+      </div>
+    </Panel>
+  </div>;
+}
+
+function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const { confirm, alert } = useAppDialog();
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<'ALL' | EcommerceProduct['status']>('ALL');
+  const [modal, setModal] = useState<EcommerceProduct | 'new' | null>(null);
+  const [form, setForm] = useState<ProductForm>(blankProduct);
+  const filtered = data.products.filter(product => status === 'ALL' || product.status === status).filter(product => `${product.name} ${product.sku} ${product.category}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
+  const open = (product?: EcommerceProduct) => {
+    setModal(product ?? 'new');
+    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), imageUrl: product.imageUrl, featured: product.featured, status: product.status } : blankProduct);
+  };
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    const price = Number(form.price);
+    const stock = Number(form.stock);
+    const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
+    if (!form.name.trim() || !form.sku.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0 || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0))) {
+      await alert({ title: 'Informations incomplètes', description: 'Renseignez un nom, une référence, un prix et un stock valides.', confirmLabel: 'Compris' });
+      return;
+    }
+    const body = { name: form.name.trim(), slug: slugify(form.slug || form.name), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', price, compareAtPrice, stock, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
+    if (modal === 'new') await run(() => createEcommerceApi(data.store.companyId).createProduct(body), 'Produit ajouté au catalogue.');
+    else if (modal) await run(() => createEcommerceApi(data.store.companyId).updateProduct(modal.id, body), 'Produit mis à jour.');
+    setModal(null);
+  };
+  const archive = async (product: EcommerceProduct) => {
+    if (!await confirm({ title: 'Archiver ce produit ?', description: `« ${product.name} » ne sera plus proposé dans le catalogue actif.`, confirmLabel: 'Archiver', tone: 'danger' })) return;
+    await run(() => createEcommerceApi(data.store.companyId).archiveProduct(product.id), 'Produit archivé.');
+  };
+  return <div className="space-y-5 fade-up">
+    <Panel title="Catalogue en ligne" description="Organisez les références qui alimentent directement votre vitrine." action={canCreate ? <button type="button" onClick={() => open()} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un produit</button> : undefined}>
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par nom, référence ou catégorie" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option><option value="PUBLISHED">Publié</option><option value="DRAFT">Brouillon</option><option value="ARCHIVED">Archivé</option></select></div>
+      {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreate && !query ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Produit</th><th className="px-4">Référence</th><th className="px-4">Prix</th><th className="px-4">Stock</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{filtered.map(product => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.category}{product.featured ? ' · Vedette' : ''}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}</td><td className="px-4 py-3 font-bold">{money(product.price, data.store.currency)}</td><td className={`px-4 py-3 font-bold ${product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}`}>{product.stock}</td><td className="px-4 py-3"><StatusPill value={product.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={13} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
+    </Panel>
+    {modal && <ProductModal modal={modal} form={form} setForm={setForm} onClose={() => setModal(null)} onSave={save} />}
+  </div>;
+}
+
+function ProductModal({ modal, form, setForm, onClose, onSave }: { modal: EcommerceProduct | 'new'; form: ProductForm; setForm: (value: ProductForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
+  const patch = (updates: Partial<ProductForm>) => setForm({ ...form, ...updates });
+  return <Modal title={modal === 'new' ? 'Nouveau produit' : `Modifier ${modal.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du produit" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Sacoche Atlas" /><Field label="Référence SKU" required value={form.sku} onChange={value => patch({ sku: value })} placeholder="ATLAS-001" /><Field label="Catégorie" value={form.category} onChange={value => patch({ category: value })} placeholder="Accessoires" /><Field label="Slug public" value={form.slug} onChange={value => patch({ slug: value })} placeholder="généré depuis le nom si vide" /><Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" /><Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /><Field label="Image URL" value={form.imageUrl} onChange={value => patch({ imageUrl: value })} placeholder="https://..." /></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as ProductForm['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs font-bold"><input type="checkbox" checked={form.featured} onChange={event => patch({ featured: event.target.checked })} className="h-4 w-4 accent-[hsl(var(--primary))]" />Mettre en avant dans la boutique</label></div><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
+}
+
+function Orders({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'ALL' | EcommerceOrderStatus>('ALL');
+  const orders = data.orders.filter(order => (filter === 'ALL' || order.status === filter) && `${order.reference} ${order.customerName} ${order.customerEmail}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
+  const changeStatus = (order: EcommerceOrder, status: EcommerceOrderStatus) => run(() => createEcommerceApi(data.store.companyId).updateOrderStatus(order.id, status), 'Statut de commande mis à jour.');
+  return <div className="space-y-5 fade-up"><Panel title="Commandes" description="Suivez chaque vente, du premier clic à la livraison."><div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par référence, nom ou e-mail" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={filter} onChange={event => setFilter(event.target.value as typeof filter)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option>{orderStatuses.map(item => <option key={item} value={item}>{item}</option>)}</select></div>{orders.length === 0 ? <Empty icon={ClipboardList} title={data.orders.length ? 'Aucune commande trouvée' : 'Aucune commande pour le moment'} text={data.orders.length ? 'Modifiez votre recherche ou le filtre de statut.' : 'Les ventes réalisées sur votre boutique apparaîtront ici.'} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Commande</th><th className="px-4">Client</th><th className="px-4">Articles</th><th className="px-4">Total</th><th className="px-4">Statut</th><th className="px-4">Mise à jour</th></tr></thead><tbody className="divide-y">{orders.map(order => <tr key={order.id}><td className="px-4 py-4"><strong className="block">{order.reference}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(order.createdAt)}</small></td><td className="px-4 py-4"><strong className="block">{order.customerName}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{order.customerEmail}</small></td><td className="px-4 py-4 text-xs">{order.items.reduce((sum, item) => sum + item.quantity, 0)} article{order.items.length > 1 ? 's' : ''}</td><td className="px-4 py-4 font-bold">{money(order.total, data.store.currency)}</td><td className="px-4 py-4"><StatusPill value={order.status} /></td><td className="px-4 py-4">{canModify ? <select aria-label={`Changer le statut de ${order.reference}`} value={order.status} onChange={event => void changeStatus(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.map(item => <option key={item} value={item}>{item}</option>)}</select> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Lecture seule</span>}</td></tr>)}</tbody></table></div>}</Panel></div>;
+}
+
+function Clients({ data }: { data: EcommerceBootstrap }) {
+  const clients = useMemo(() => {
+    const map = new Map<string, { name: string; email: string; phone: string; orders: number; total: number; lastOrder: string }>();
+    data.orders.forEach(order => {
+      const key = order.customerEmail || order.customerName;
+      const previous = map.get(key);
+      map.set(key, { name: order.customerName, email: order.customerEmail, phone: order.customerPhone, orders: (previous?.orders ?? 0) + 1, total: (previous?.total ?? 0) + order.total, lastOrder: previous?.lastOrder && new Date(previous.lastOrder) > new Date(order.createdAt) ? previous.lastOrder : order.createdAt });
+    });
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [data.orders]);
+  return <div className="space-y-5 fade-up"><Panel title="Clients" description="Une vue consolidée des acheteurs issus de votre boutique.">{clients.length === 0 ? <Empty icon={Users} title="Votre fichier client est vide" text="Les coordonnées apparaîtront automatiquement après les premières commandes." /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Client</th><th className="px-4">Contact</th><th className="px-4">Commandes</th><th className="px-4">Valeur cumulée</th><th className="px-4">Dernière commande</th></tr></thead><tbody className="divide-y">{clients.map(client => <tr key={client.email || client.name}><td className="px-4 py-4 font-bold">{client.name}</td><td className="px-4 py-4"><span className="block text-xs">{client.email || 'E-mail non renseigné'}</span><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{client.phone || 'Téléphone non renseigné'}</span></td><td className="px-4 py-4">{client.orders}</td><td className="px-4 py-4 font-bold">{money(client.total, data.store.currency)}</td><td className="px-4 py-4 text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(client.lastOrder)}</td></tr>)}</tbody></table></div>}</Panel></div>;
+}
+
+function Promotions() {
+  return <div className="fade-up"><Panel title="Promotions" description="Préparez vos temps forts commerciaux sans perdre de vue la cohérence de votre catalogue."><div className="mx-auto max-w-2xl py-8 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Megaphone size={24} /></span><h2 className="mt-5 text-xl font-bold">Les promotions arrivent dans votre cockpit</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Cette vue est prête pour vos futures campagnes. En attendant, gérez vos prix et vos prix barrés directement depuis le catalogue.</p></div></Panel></div>;
+}
+
+function Deliveries({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const shipments = data.orders.filter(order => !['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'].includes(order.status));
+  const change = (order: EcommerceOrder, status: EcommerceOrderStatus) => run(() => createEcommerceApi(data.store.companyId).updateOrderStatus(order.id, status), 'Flux de livraison mis à jour.');
+  return <div className="space-y-5 fade-up"><Panel title="Livraisons" description="Le flux des commandes qui ont quitté le bureau pour rejoindre vos clients.">{shipments.length === 0 ? <Empty icon={Truck} title="Aucune livraison en cours" text="Les commandes en préparation et expédiées seront suivies ici." /> : <div className="grid gap-3 md:grid-cols-2">{shipments.map(order => <div key={order.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><h3 className="mt-1 font-bold">{order.customerName}</h3></div><StatusPill value={order.status} /></div><p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{order.shippingAddress || 'Adresse de livraison non renseignée'}</p><div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs font-bold">{money(order.total, data.store.currency)}</span>{canModify && <select aria-label={`Avancer la livraison ${order.reference}`} value={order.status} onChange={event => void change(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.filter(item => !['NOUVELLE', 'ANNULÉE'].includes(item)).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}</Panel></div>;
+}
+
+function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [form, setForm] = useState({
+    name: store.name,
+    slug: store.slug,
+    description: store.description,
+    status: store.status,
+    currency: store.currency,
+    primaryColor: store.primaryColor,
+    accentColor: store.accentColor,
+    logoUrl: store.logoUrl,
+  });
+  const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    void run(() => createEcommerceApi(store.companyId).updateStore(form), 'Paramètres de la boutique enregistrés.');
+  };
+  return <div className="space-y-5 fade-up"><Panel title="Paramètres de la boutique" description="Ces informations structurent votre vitrine publique et votre expérience d’achat."><form onSubmit={save} className="max-w-3xl space-y-5"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => patch({ slug: value })} disabled={!canModify} /><Field label="URL du logo" value={form.logoUrl} onChange={value => patch({ logoUrl: value })} disabled={!canModify} placeholder="https://..." /><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div><label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div><div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div></form></Panel></div>;
+}
+
+function ColorField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {
+  return <label className="block text-xs font-bold">{label}<div className="mt-1.5 flex gap-2"><input type="color" value={value || '#d8a21b'} onChange={event => onChange(event.target.value)} disabled={disabled} className="h-11 w-12 rounded-lg border p-1" /><input value={value} onChange={event => onChange(event.target.value)} disabled={disabled} className="min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-sm" placeholder="#D8A21B" /></div></label>;
+}
+
+function OrderRow({ order, currency }: { order: EcommerceOrder; currency: EcommerceStore['currency'] }) {
+  return <div className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--primary))]"><ShoppingBag size={16} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{order.reference} <span className="font-normal text-[hsl(var(--muted-foreground))]">· {order.customerName}</span></p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(order.createdAt)}</p></div><div className="text-right"><p className="text-sm font-bold">{money(order.total, currency)}</p><StatusPill value={order.status} /></div></div>;
+}
+
+function Panel({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) {
+  return <section className="card-surface overflow-hidden rounded-2xl"><header className="section-heading border-b px-5 py-4 sm:px-6"><div><h2 className="font-bold">{title}</h2>{description && <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{description}</p>}</div>{action}</header><div className="p-5 sm:p-6">{children}</div></section>;
+}
+
+function Metric({ label, value, detail, icon: Icon, accent, warning }: { label: string; value: string; detail: string; icon: typeof CircleDollarSign; accent?: boolean; warning?: boolean }) {
+  return <div className={`metric-card card-surface rounded-xl p-4 ${accent ? 'border-[hsl(var(--primary)/.3)]' : ''}`}><div className="flex items-start justify-between gap-2"><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${warning ? 'bg-[hsl(var(--accent)/.18)] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]'}`}><Icon size={17} /></span><span className="mono text-[9px] uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Live</span></div><p className="mt-5 text-xs text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-2xl font-bold tracking-[-.04em]">{value}</p><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{detail}</p></div>;
+}
+
+function Insight({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return <div className="rounded-xl border bg-[hsl(var(--muted)/.25)] p-4"><p className="text-xs text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{detail}</p></div>;
+}
+
+function Empty({ icon: Icon, title, text, action }: { icon: typeof Package; title: string; text: string; action?: ReactNode }) {
+  return <div className="rounded-xl border border-dashed bg-[hsl(var(--muted)/.18)] px-5 py-10 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Icon size={19} /></span><h3 className="mt-4 text-sm font-bold">{title}</h3><p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p>{action && <div className="mt-4">{action}</div>}</div>;
+}
+
+function StatusPill({ value }: { value: string }) {
+  const positive = ['PUBLISHED', 'LIVRÉE'];
+  const warning = ['DRAFT', 'NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION'];
+  const danger = ['ARCHIVED', 'ANNULÉE'];
+  const tone = positive.includes(value) ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : warning.includes(value) ? 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--foreground))]' : danger.includes(value) ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]';
+  return <span className={`inline-flex rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[.06em] ${tone}`}>{value}</span>;
+}
+
+function Field({ label, value, onChange, placeholder, type = 'text', required, disabled }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean; disabled?: boolean }) {
+  return <label className="block text-xs font-bold">{label}{required && <span className="ml-1 text-[hsl(var(--destructive))]">*</span>}<input required={required} disabled={disabled} type={type} value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60" /></label>;
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return <div className="modal-backdrop fixed inset-0 z-40 flex items-center justify-center bg-[hsl(var(--foreground)/.4)] backdrop-blur-sm" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className="modal-panel card-surface w-full max-w-2xl rounded-2xl p-5 sm:p-6 fade-up"><header className="modal-header flex items-center justify-between gap-4"><h2 className="text-lg font-bold">{title}</h2><button type="button" aria-label="Fermer" onClick={onClose} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={17} /></button></header><div className="modal-body pt-5">{children}</div></section></div>;
+}

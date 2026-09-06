@@ -11,6 +11,7 @@ import {
   Package,
   Settings,
   ShoppingCart,
+  ShoppingBag,
   Store,
   Users,
   WalletCards,
@@ -63,6 +64,16 @@ const stockFeatureIcons: Record<string, Icon> = {
   users: Users,
 };
 
+const ecommerceFeatureIcons: Record<string, Icon> = {
+  dashboard: Gauge,
+  catalogue: Package,
+  commandes: ShoppingCart,
+  clients: Users,
+  promotions: CreditCard,
+  livraisons: Warehouse,
+  parametres: Settings,
+};
+
 type SidebarNavigationInput = {
   allowed: ModuleId[];
   configuredModules: Module[];
@@ -105,6 +116,15 @@ export function buildSidebarFeatureGroups({
             label: submodule.name,
             icon: stockFeatureIcons[submodule.id] ?? Warehouse,
           }))
+        : moduleId === 'ecommerce'
+          ? module.features
+            .map(feature => featureSlug(feature))
+            .filter(featureId => selectedFeatureIds.has(featureId))
+            .map(featureId => ({
+              href: `/kora/ecommerce?tab=${featureId}`,
+              label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
+              icon: ecommerceFeatureIcons[featureId] ?? ShoppingBag,
+            }))
         : moduleId === 'presences'
           ? module.features
             .map(feature => ({

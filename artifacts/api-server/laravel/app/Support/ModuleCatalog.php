@@ -11,6 +11,17 @@ final class ModuleCatalog
     {
         return [
             ['id' => 'commerce', 'name' => 'Gestion commerciale', 'description' => 'Ventes, clients et performance commerciale.', 'features' => ['Clients', 'Devis et commandes', 'Chiffre d’affaires']],
+            [
+                'id' => 'ecommerce',
+                'name' => 'E-commerce',
+                'description' => 'Boutique en ligne, catalogue public et commandes clients.',
+                'features' => ['Tableau de bord', 'Catalogue', 'Commandes', 'Clients', 'Promotions', 'Livraisons', 'Paramètres'],
+                'feature_dependencies' => [
+                    'commandes' => ['catalogue'],
+                    'promotions' => ['catalogue'],
+                    'livraisons' => ['commandes'],
+                ],
+            ],
             ['id' => 'stocks', 'name' => 'Gestion de stock', 'description' => 'Articles, entrées, sorties et niveaux de stock.', 'features' => ['Articles', 'Entrées et sorties', 'Alertes de seuil']],
             [
                 'id' => 'presences',

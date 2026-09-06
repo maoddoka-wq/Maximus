@@ -121,6 +121,8 @@ type DemoAccount = { id: string; label: string; email: string; password: string 
 const defaultDemoAccounts: DemoAccount[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
+const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
+const PublicShopPage = lazy(() => import('@/pages/public-shop'));
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
 );
@@ -695,6 +697,10 @@ function AppContent() {
         }}
       />
     );
+  const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)$/);
+  if (publicShopMatch) {
+    return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
+  }
   const loginEmployees = [
     ...data.employees,
     ...data.companies
@@ -730,6 +736,7 @@ function AppContent() {
     hasPresencePermission,
     presenceEmployees,
     selectedPresenceFeatureIds,
+    selectedEcommerceFeatureIds,
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
@@ -907,6 +914,7 @@ function AppContent() {
                   hasPermission={hasPermission}
                   hasPresencePermission={hasPresencePermission}
                   presenceFeatureIds={selectedPresenceFeatureIds}
+                  ecommerceFeatureIds={selectedEcommerceFeatureIds}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
@@ -918,6 +926,7 @@ function AppContent() {
                     organization: CompanyOrganizationAdmin,
                     empty: EmptyState,
                     stocks: StockModulePage,
+                    ecommerce: EcommerceModulePage,
                     finance: FinancePage,
                     commerce: CommerceModulePage,
                     operational: OperationalModulePage,
@@ -6006,6 +6015,7 @@ function ModulePackTestWorkbench({
             <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />
           )}
           {module.id === 'presences' && <PresencesPage data={data} visibleFeatureIds={testFeatureIds} />}
+           {module.id === 'ecommerce' && <EcommerceModulePage companyId="kora" canCreate canModify />}
           {operationalModules.includes(module.id) && (
             <OperationalModulePage
               moduleId={module.id}
@@ -6015,7 +6025,7 @@ function ModulePackTestWorkbench({
             />
           )}
           {module.id === 'rapports' && <OperationalReportsPage data={data} />}
-          {!['stocks', 'commerce', 'ventes', 'finance', 'rh', 'presences', 'rapports', ...operationalModules].includes(
+           {!['stocks', 'commerce', 'ventes', 'ecommerce', 'finance', 'rh', 'presences', 'rapports', ...operationalModules].includes(
             module.id,
           ) && (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">

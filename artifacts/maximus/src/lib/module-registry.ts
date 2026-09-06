@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Package,
   ShoppingCart,
+  ShoppingBag,
   Store,
   UserRoundCog,
   Users,
@@ -18,6 +19,7 @@ import { modules } from './store';
 
 export type ModuleRouteKind =
   | 'commerce'
+  | 'ecommerce'
   | 'stocks'
   | 'finance'
   | 'humanResources'
@@ -39,6 +41,7 @@ const moduleRouteConfig: Record<
   Pick<ModuleDescriptor, 'icon' | 'routeKind'>
 > = {
   commerce: { icon: ShoppingCart, routeKind: 'commerce' },
+  ecommerce: { icon: ShoppingBag, routeKind: 'ecommerce' },
   ventes: { icon: CreditCard, routeKind: 'commerce' },
   achats: { icon: Store, routeKind: 'operational' },
   stocks: { icon: Boxes, routeKind: 'stocks' },

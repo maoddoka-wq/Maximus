@@ -40,6 +40,10 @@ final class ModuleAuthorization
             return self::allowsPresence($permissions, $action);
         }
 
+        if ($module === 'ecommerce') {
+            return self::allowsEcommerce($permissions, $action, $feature);
+        }
+
         return false;
     }
 
@@ -101,6 +105,26 @@ final class ModuleAuthorization
         }
 
         return self::contains($permissions['presences'] ?? [], self::stockAction($action));
+    }
+
+    private static function allowsEcommerce(array $permissions, string $action, ?string $feature): bool
+    {
+        $required = self::stockAction($action);
+        $detailedKeys = array_filter(
+            array_keys($permissions),
+            fn (string $key): bool => str_starts_with($key, 'ecommerce:menu:'),
+        );
+
+        if ($feature && $detailedKeys !== []) {
+            return self::contains($permissions['ecommerce:menu:'.$feature] ?? [], $required);
+        }
+
+        if ($detailedKeys !== []) {
+            return $action === 'view' && collect($detailedKeys)
+                ->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], 'voir'));
+        }
+
+        return self::contains($permissions['ecommerce'] ?? [], $required);
     }
 
     private static function stockAction(string $action): string
