@@ -941,8 +941,9 @@ function Login({
   onLogin: (space: 'admin' | 'kora', email: string, password: string) => Promise<void>;
   employees: StoreData['employees'];
 }) {
-  const [email, setEmail] = useState('admin@kora.demo');
-  const [password, setPassword] = useState('Kora123!');
+  const showDemoAccounts = import.meta.env.DEV;
+  const [email, setEmail] = useState(showDemoAccounts ? 'admin@kora.demo' : '');
+  const [password, setPassword] = useState(showDemoAccounts ? 'Kora123!' : '');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
@@ -955,22 +956,24 @@ function Login({
       .finally(() => setPendingEmail(''));
   };
   const submitLogin = (space: 'admin' | 'kora') => loginWithCredentials(space, email, password);
-  const demoAccounts = [
-    ...defaultDemoAccounts,
-    ...employees
-      .filter(
-        (account) =>
-          account.status === 'ACTIF' &&
-          Boolean(account.loginPassword) &&
-          !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
-      )
-      .map((account) => ({
-        id: account.id,
-        label: `${account.firstName} ${account.lastName} · ${account.position}`,
-        email: account.email,
-        password: account.loginPassword ?? 'Kora123!',
-      })),
-  ];
+  const demoAccounts = showDemoAccounts
+    ? [
+        ...defaultDemoAccounts,
+        ...employees
+          .filter(
+            (account) =>
+              account.status === 'ACTIF' &&
+              Boolean(account.loginPassword) &&
+              !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
+          )
+          .map((account) => ({
+            id: account.id,
+            label: `${account.firstName} ${account.lastName} · ${account.position}`,
+            email: account.email,
+            password: account.loginPassword ?? 'Kora123!',
+          })),
+      ]
+    : [];
   const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
     setEmail(account.email);
     setPassword(account.password);
@@ -1050,8 +1053,8 @@ function Login({
             </div>
             {loginHelp && (
               <p className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                Utilisez l’email et le mot de passe du compte. Le manager KORA, les employés et l’administration MAXIMUS
-                se connectent tous depuis ce même formulaire.
+                Utilisez l’adresse email et le mot de passe fournis par votre administrateur. Tous les comptes se
+                connectent depuis ce même formulaire.
               </p>
             )}
             {error && (
@@ -1078,33 +1081,35 @@ function Login({
               Créer une entreprise
             </Link>
           </div>
-          <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
-            <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
-            <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
-              Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {demoAccounts.map((account) => (
-                <button
-                  type="button"
-                  disabled={Boolean(pendingEmail)}
-                  data-testid={`button-demo-account-${account.id}`}
-                  key={account.id}
-                  onClick={() => selectDemoAccount(account)}
-                  className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
-                >
-                  <span className="block text-xs font-bold">{account.label}</span>
-                  <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
-                  <span
-                    data-testid={`demo-account-password-${account.id}`}
-                    className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
+          {showDemoAccounts && demoAccounts.length > 0 && (
+            <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
+              <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+                Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {demoAccounts.map((account) => (
+                  <button
+                    type="button"
+                    disabled={Boolean(pendingEmail)}
+                    data-testid={`button-demo-account-${account.id}`}
+                    key={account.id}
+                    onClick={() => selectDemoAccount(account)}
+                    className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
                   >
-                    Mot de passe : {account.password}
-                  </span>
-                </button>
-              ))}
+                    <span className="block text-xs font-bold">{account.label}</span>
+                    <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
+                    <span
+                      data-testid={`demo-account-password-${account.id}`}
+                      className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
+                    >
+                      Mot de passe : {account.password}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </div>
