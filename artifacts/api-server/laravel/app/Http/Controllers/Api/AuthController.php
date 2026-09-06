@@ -129,6 +129,53 @@ class AuthController extends Controller
         return response()->json(['ok' => true], $existing ? 200 : 201);
     }
 
+    public function provisionCompanyAdmin(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string', 'min:1'],
+            'email' => ['required', 'email', 'max:255'],
+            'displayName' => ['required', 'string', 'min:1', 'max:180'],
+            'companyId' => ['required', 'string', 'min:1'],
+            'password' => ['required', 'string', 'min:8', 'max:200'],
+        ]);
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'Seule l’administration MAXIMUS peut activer un compte entreprise.'], 403);
+        }
+
+        $email = Str::lower(trim($data['email']));
+        $existing = AuthUser::query()->whereKey($data['id'])->first();
+        $emailOwner = AuthUser::query()->where('email', $email)->first();
+        if ($emailOwner && (! $existing || $emailOwner->id !== $existing->id)) {
+            return response()->json(['error' => 'Cette adresse email est déjà utilisée.'], 409);
+        }
+
+        $values = [
+            'email' => $email,
+            'password_hash' => MaximusPassword::hash($data['password']),
+            'display_name' => trim($data['displayName']),
+            'role' => 'company_admin',
+            'company_id' => $data['companyId'],
+            'employee_id' => null,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+            'updated_at' => now(),
+        ];
+
+        if ($existing) {
+            $existing->update($values);
+            AuthSession::query()->where('user_id', $existing->id)->delete();
+        } else {
+            AuthUser::query()->create(array_merge($values, [
+                'id' => $data['id'],
+                'created_at' => now(),
+            ]));
+        }
+
+        return response()->json(['ok' => true], $existing ? 200 : 201);
+    }
+
     public function deleteAccount(Request $request, string $employeeId): Response|JsonResponse
     {
         $actor = $request->attributes->get('authActor');

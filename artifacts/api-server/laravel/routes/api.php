@@ -19,6 +19,10 @@ Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): v
     Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
 });
 
+Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {
+    Route::post('/', [AuthController::class, 'provisionCompanyAdmin']);
+});
+
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
     Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);

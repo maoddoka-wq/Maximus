@@ -68,7 +68,7 @@ export function AdminRouter({
     return <screens.companies data={data} mutate={mutate} onNavigate={onNavigate} detail={false} />;
   }
   if (routePath === '/maximus/demandes') {
-    return <screens.requests data={data} mutate={mutate} onNavigate={onNavigate} />;
+    return <screens.requests data={data} mutate={mutate} notify={notify} onNavigate={onNavigate} />;
   }
   if (routePath === '/maximus/modules') {
     return <screens.modules data={data} mutate={mutate} notify={notify} />;

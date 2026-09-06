@@ -111,6 +111,41 @@ class MaximusAuthTest extends TestCase
             ->assertJsonPath('user.permissions.presences.0', 'voir');
     }
 
+    public function test_maximus_can_provision_an_approved_company_admin_who_logs_in_immediately(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'maximus-approver',
+            'email' => 'approver@maximus.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/auth/company-admins', [
+                'id' => 'company-admin:new-company',
+                'email' => 'admin@new-company.test',
+                'displayName' => 'Responsable Nouvelle Entreprise',
+                'companyId' => 'new-company',
+                'password' => 'CompanyAdmin2026!',
+            ])
+            ->assertCreated()
+            ->assertJson(['ok' => true]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'ADMIN@NEW-COMPANY.TEST',
+            'password' => 'CompanyAdmin2026!',
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.role', 'company_admin')
+            ->assertJsonPath('user.companyId', 'new-company')
+            ->assertJsonPath('user.displayName', 'Responsable Nouvelle Entreprise');
+    }
+
     public function test_sector_manager_cannot_provision_an_account_across_sector_boundaries(): void
     {
         $manager = AuthUser::query()->create([

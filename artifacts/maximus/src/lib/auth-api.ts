@@ -39,5 +39,16 @@ export const authApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   }),
+  provisionCompanyAdmin: (input: {
+    id: string;
+    email: string;
+    displayName: string;
+    companyId: string;
+    password: string;
+  }) => request<{ ok: true }>('/auth/company-admins', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }),
   revokeAccount: (employeeId: string) => request<void>(`/auth/accounts/${encodeURIComponent(employeeId)}`, { method: 'DELETE' }),
 };

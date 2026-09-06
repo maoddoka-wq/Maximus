@@ -349,6 +349,21 @@ function AppContent() {
         localStorage.removeItem('maximus-session');
       });
   }, []);
+  useEffect(() => {
+    if (session !== 'admin') return;
+    const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF' && company.adminPassword);
+    void Promise.allSettled(
+      activeCompanies.map((company) =>
+        authApi.provisionCompanyAdmin({
+          id: `company-admin:${company.id}`,
+          email: company.email,
+          displayName: company.manager,
+          companyId: company.id,
+          password: company.adminPassword as string,
+        }),
+      ),
+    );
+  }, [session]);
 
   const mutate = (fn: (draft: StoreData) => void, message?: string) => {
     setData((prev) => {
@@ -2592,19 +2607,22 @@ function ActionButton({
   primary = false,
   testId,
   icon: ButtonIcon = Plus,
+  disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   primary?: boolean;
   testId: string;
   icon?: Icon;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       data-testid={testId}
       onClick={onClick}
-      className={`app-action btn flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'}`}
+      disabled={disabled}
+      className={`app-action btn flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold disabled:cursor-wait disabled:opacity-60 ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'}`}
     >
       <ButtonIcon size={15} />
       {children}
@@ -2898,13 +2916,43 @@ function CompanyDetail({
 function RequestsPage({
   data,
   mutate,
+  notify,
   onNavigate,
 }: {
   data: StoreData;
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  notify: (message: string) => void;
   onNavigate: (p: string) => void;
 }) {
   const requests = data.companies.filter((c) => c.status === 'EN ATTENTE');
+  const [pendingCompanyId, setPendingCompanyId] = useState<string | null>(null);
+  const approveRequest = async (company: Company) => {
+    if (!company.adminPassword) {
+      notify('Impossible d’activer cette entreprise : le mot de passe administrateur est absent.');
+      return;
+    }
+    setPendingCompanyId(company.id);
+    try {
+      await authApi.provisionCompanyAdmin({
+        id: `company-admin:${company.id}`,
+        email: company.email,
+        displayName: company.manager,
+        companyId: company.id,
+        password: company.adminPassword,
+      });
+      mutate((d) => {
+        const target = d.companies.find((item) => item.id === company.id);
+        if (target) {
+          target.status = 'ACTIF';
+          target.allowedModules = [...target.requestedModules];
+        }
+      }, 'Entreprise activée et compte administrateur synchronisé.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'La synchronisation du compte entreprise a échoué.');
+    } finally {
+      setPendingCompanyId(null);
+    }
+  };
   return (
     <div className="space-y-4">
       {requests.length === 0 ? (
@@ -2961,17 +3009,10 @@ function RequestsPage({
                   primary
                   testId={`button-approve-request-${c.id}`}
                   icon={Check}
-                  onClick={() =>
-                    mutate((d) => {
-                      const x = d.companies.find((y) => y.id === c.id);
-                      if (x) {
-                        x.status = 'ACTIF';
-                        x.allowedModules = [...x.requestedModules];
-                      }
-                    }, 'Entreprise activée.')
-                  }
+                  disabled={pendingCompanyId === c.id}
+                  onClick={() => void approveRequest(c)}
                 >
-                  Autoriser l’espace
+                  {pendingCompanyId === c.id ? 'Synchronisation…' : 'Autoriser l’espace'}
                 </ActionButton>
               </div>
             </div>
