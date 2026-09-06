@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Config;
+use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Tests\TestCase;
 
 class DemoProvisioningTest extends TestCase
@@ -32,6 +35,17 @@ class DemoProvisioningTest extends TestCase
         }
 
         $this->assertDatabaseHas('maximus_modules', ['id' => 'commerce']);
+    }
+
+    public function test_database_seeder_does_not_create_test_users_outside_local_or_testing(): void
+    {
+        Config::set('app.env', 'production');
+
+        (new DatabaseSeeder())->run();
+
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('auth_users', 0);
+        $this->assertDatabaseCount('stock_products', 0);
     }
 
     private function provision(): void

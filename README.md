@@ -98,6 +98,9 @@ En production, le démarrage ne provisionne aucune donnée de démonstration.
 Il applique les migrations PostgreSQL puis crée uniquement l’administrateur
 MAXIMUS à partir des secrets `ADMIN_USER` et `ADMIN_PASSWORD`. `APP_KEY` est
 également obligatoire ; le service refuse de démarrer s’il est absent.
+Le seeder Laravel est également neutralisé hors des environnements local et de
+test : `db:seed` ne peut donc pas créer l’utilisateur de démonstration sur
+Render.
 
 ```bash
 cd artifacts/api-server/laravel

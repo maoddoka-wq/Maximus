@@ -15,6 +15,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (! in_array((string) config('app.env'), ['local', 'testing'], true)) {
+            return;
+        }
+
         // User::factory(10)->create();
 
         User::factory()->create([
