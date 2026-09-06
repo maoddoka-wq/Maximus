@@ -113,6 +113,13 @@ class AppStateController extends Controller
             'domainEvents',
             'auditEntries',
             'notifications',
+            'products',
+            'movements',
+            'sales',
+            'payments',
+            'activities',
+            'purchaseOrders',
+            'supplierRecords',
         ] as $key) {
             if (!isset($state[$key]) || !is_array($state[$key])) {
                 continue;

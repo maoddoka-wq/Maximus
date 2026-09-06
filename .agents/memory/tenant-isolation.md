@@ -14,3 +14,15 @@ Les opérations d’administration par secteur doivent vérifier l’inclusion c
 **Why:** Une intersection autorisait un manager à soumettre une opération mélangeant un secteur autorisé et un secteur externe, ce qui contournait l’isolation organisationnelle.
 
 **How to apply:** Pour toute création, mise à jour ou révocation délimitée par des secteurs, comparer l’ensemble des secteurs cibles à l’ensemble des secteurs de l’acteur et refuser toute différence.
+
+Pour les listes métier conservées dans l’état applicatif partagé, chaque nouvel
+enregistrement doit porter `companyId`; le filtrage et la fusion serveur
+s’appuient sur cette propriété.
+
+**Why:** Sans rattachement explicite, une donnée Commerce nouvellement créée
+peut être ignorée lors de la fusion d’état ou devenir visible par une autre
+entreprise après actualisation.
+
+**How to apply:** Ajouter `companyId` aux types et aux créations de produits,
+ventes, paiements, mouvements, activités, fournisseurs et commandes avant
+d’étendre un écran métier qui utilise `/api/app-state`.
