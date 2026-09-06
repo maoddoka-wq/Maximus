@@ -128,12 +128,12 @@ export interface StoreData {
 }
 
 export const modules: Module[] = [
-  { id: 'commerce', name: 'Gestion commerciale', description: 'Ventes, clients et performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
+  { id: 'commerce', name: 'Gestion commerciale', description: 'Piloter les ventes, les clients, les achats et la performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
     { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
     { id: 'commerce-gestion', name: 'Gestion commerciale', description: 'Gérer les ventes, clients et indicateurs.', featureIds: ['clients', 'sales', 'products', 'reports'] },
   ], status: 'ACTIF' },
   { id: 'ecommerce', name: 'E-commerce', description: 'Boutique en ligne, catalogue public et commandes clients.', features: ecommerceFeatureDefinitions.map(feature => feature.label), featureDependencies: ecommerceFeatureDependencies, featurePacks: ecommerceFeaturePacks.map(pack => ({ ...pack, featureIds: [...pack.featureIds], featurePermissions: Object.fromEntries(Object.entries(pack.featurePermissions).map(([featureId, permissions]) => [featureId, [...permissions]])) })), status: 'ACTIF' },
-  { id: 'stocks', name: 'Gestion de stock', description: 'Articles, entrées, sorties et niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
+  { id: 'stocks', name: 'Gestion de stock', description: 'Suivre les articles, les entrées, les sorties et les niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
     { id: 'stock-consultation', name: 'Consultation du stock', description: 'Consulter les articles et les niveaux de stock.', featureIds: ['dashboard', 'products', 'reports'] },
     { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },

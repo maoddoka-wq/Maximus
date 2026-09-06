@@ -61,7 +61,7 @@ export const buildModulePack = (module: Module, draft: ModulePackDraft, id: stri
     .map((feature) => feature.id)
     .filter((featureId) => draft.featurePermissions[featureId]?.length);
 
-  if (!draft.name.trim() || featureIds.length === 0) return null;
+  if (!draft.name.trim() || !draft.description.trim() || featureIds.length === 0) return null;
 
   return {
     id,

@@ -3335,12 +3335,15 @@ function SectorPresetsPage({
                                 onChange={() => toggleSectorPack(module.id, pack.id)}
                                 className="mt-0.5 accent-[hsl(var(--primary))]"
                               />
-                              <span>
-                                <strong className="block">{pack.name}</strong>
-                                <span className="text-[9px] text-[hsl(var(--muted-foreground))]">
-                                  {pack.featureIds.length} fonctionnalité(s)
-                                </span>
-                              </span>
+                               <span>
+                                 <strong className="block">{pack.name}</strong>
+                                 <span className="mt-1 block text-[9px] leading-4 text-[hsl(var(--muted-foreground))]">
+                                   {pack.description || 'Description à compléter.'}
+                                 </span>
+                                 <span className="mt-1 block text-[9px] text-[hsl(var(--muted-foreground))]">
+                                   {pack.featureIds.length} fonctionnalité(s)
+                                 </span>
+                               </span>
                             </label>
                           );
                         })}
@@ -5267,7 +5270,7 @@ function InteractiveModulesPage({
     const nextPack = packForm.name.trim()
       ? buildModulePack(moduleForPack, packForm, uid(`pack-${editingModule.id}`))
       : null;
-    if (packForm.name.trim() && !nextPack) return;
+    if (packForm.name.trim() && (!packForm.description.trim() || !nextPack)) return;
     mutate(
       (draft) => {
         updateCatalogDraft(draft, (catalogDraft) => {
@@ -5366,7 +5369,7 @@ function InteractiveModulesPage({
   };
 
   const savePack = () => {
-    if (!selected || !packForm.name.trim() || packForm.featureIds.length === 0) return;
+    if (!selected || !packForm.name.trim() || !packForm.description.trim() || packForm.featureIds.length === 0) return;
     const nextPack = buildModulePack(selected, packForm, editingPackId ?? uid(`pack-${selected.id}`));
     if (!nextPack) return;
     mutate(
@@ -5671,7 +5674,7 @@ function InteractiveModulesPage({
                 <button
                   type="button"
                   data-testid="button-save-module-pack"
-                  disabled={!packForm.name.trim() || packForm.featureIds.length === 0}
+                   disabled={!packForm.name.trim() || !packForm.description.trim() || packForm.featureIds.length === 0}
                   onClick={savePack}
                   className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -5855,6 +5858,7 @@ function InteractiveModulesPage({
                 </span>
                 <span className="mt-4 line-clamp-2 text-sm font-bold leading-5">{module.name}</span>
                 <span className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</span>
+                <span className="mt-2 line-clamp-3 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">{module.description}</span>
               </button>
               <div className="mt-3 flex justify-center gap-1 border-t pt-3">
                 <button

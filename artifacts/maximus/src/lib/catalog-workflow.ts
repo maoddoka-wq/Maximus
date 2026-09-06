@@ -94,11 +94,15 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   });
 
   Object.entries(snapshot.moduleOverrides).forEach(([moduleId, override]) => {
+    if (override?.description !== undefined && !override.description.trim()) {
+      errors.push(`Le module « ${moduleId} » doit avoir une description compréhensible.`);
+    }
     const packNames = (override?.featurePacks ?? []).map(pack => pack.name.trim().toLowerCase()).filter(Boolean);
     if (new Set(packNames).size !== packNames.length) errors.push(`Le module « ${moduleId} » contient des packs portant le même nom.`);
     if ((override?.features ?? []).length === 0 && override?.features) errors.push(`Le module « ${moduleId} » ne contient aucune fonctionnalité.`);
     (override?.featurePacks ?? []).forEach(pack => {
       if (pack.featureIds.length === 0) errors.push(`Le pack « ${pack.name || pack.id} » ne contient aucune fonctionnalité.`);
+      if (!pack.description?.trim()) errors.push(`Le pack « ${pack.name || pack.id} » doit avoir une description compréhensible.`);
     });
   });
 

@@ -118,6 +118,18 @@ class ModuleAccessTest extends TestCase
         );
     }
 
+    public function test_module_bootstrap_exposes_descriptions_for_modules_and_packs(): void
+    {
+        $response = $this->asCompanyAdmin()
+            ->getJson('/api/modules/bootstrap?companyId=kora')
+            ->assertOk();
+
+        $response
+            ->assertJsonPath('modules.0.description', 'Piloter les ventes, les clients, les achats et la performance commerciale.')
+            ->assertJsonPath('modules.0.featurePacks.0.description', 'Consulter les clients et le suivi commercial.')
+            ->assertJsonPath('modules.1.featurePacks.0.description', 'Publier une boutique et présenter vos produits.');
+    }
+
     private function asCompanyAdmin(): self
     {
         $user = AuthUser::query()->create([

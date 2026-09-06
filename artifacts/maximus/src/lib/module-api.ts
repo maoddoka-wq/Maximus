@@ -1,10 +1,12 @@
-import { modules, type ModuleAvailability } from './store';
+import { modules, type ModuleAvailability, type ModuleFeaturePack } from './store';
 
 export type ServerModuleAccess = {
   id: string;
   name: string;
   description: string;
   features: string[];
+  featurePacks: ModuleFeaturePack[];
+  featureDependencies: Partial<Record<string, string[]>>;
   status: ModuleAvailability;
   featureIds: string[];
   configuration: Record<string, unknown>;

@@ -61,7 +61,7 @@ export function ModulePackDraftForm({ module, packForm, onChange }: ModulePackDr
           testId="input-module-initial-pack-name"
         />
         <PackField
-          label="Description"
+          label="Description *"
           value={packForm.description}
           onChange={(value) => onChange((current) => ({ ...current, description: value }))}
           placeholder="À quoi sert ce pack ?"
