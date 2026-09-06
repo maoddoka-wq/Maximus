@@ -112,13 +112,6 @@ const readState = (data: StoreData, companyId: string): CommerceState => {
   };
 };
 
-const tabUrl = (id: Tab) => {
-  const url = new URL(window.location.href);
-  url.searchParams.set('tab', id);
-  window.history.pushState({}, '', `${url.pathname}?${url.searchParams.toString()}`);
-  window.dispatchEvent(new Event('pushState'));
-};
-
 export default function CommerceModulePage({
   companyId,
   data,
@@ -162,7 +155,6 @@ export default function CommerceModulePage({
 
   const navigateTab = (next: Tab) => {
     setTab(next);
-    tabUrl(next);
     setQuery('');
   };
   const updateState = (fn: (draft: CommerceState) => void, message?: string) => {
