@@ -32,14 +32,30 @@ class AppStateRecoveryTest extends TestCase
             'status' => 'ACTIF',
         ]);
 
-        $this->withCredentials()
+        $request = $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user))
+        ;
+        $bootstrap = $request
             ->getJson('/api/app-state/bootstrap')
             ->assertOk()
+            ->assertJsonPath('version', 1)
             ->assertJsonPath('data.companies.0.id', 'recovery-company')
             ->assertJsonPath('data.companies.0.allowedModules.0', 'stocks')
             ->assertJsonPath('data.employees.0.id', 'recovery-employee')
             ->assertJsonPath('data.roles.0.modulePermissions.stocks.0', 'voir');
+
+        $request
+            ->putJson('/api/app-state', [
+                'version' => $bootstrap->json('version'),
+                'data' => [
+                    'companies' => [[
+                        'id' => 'recovery-company',
+                        'name' => 'Entreprise récupérée',
+                    ]],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('version', 2);
 
         $this->assertDatabaseHas('maximus_app_states', ['scope' => 'workspace']);
         $this->assertNotNull(DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'));

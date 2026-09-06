@@ -26,6 +26,7 @@ class AppStateController extends Controller
         if (!is_array($state)) {
             $state = [];
         }
+        $stateVersion = (int) ($row?->version ?? 0);
         if (empty($state['companies']) && AuthUser::query()->whereNotNull('company_id')->exists()) {
             $state = $this->recoverStateFromAccounts();
             $nextVersion = ((int) ($row?->version ?? 0)) + 1;
@@ -39,6 +40,7 @@ class AppStateController extends Controller
                     'created_at' => $row?->created_at ?? now(),
                 ],
             );
+            $stateVersion = $nextVersion;
         }
 
         if (($actor['role'] ?? null) !== 'maximus_admin') {
@@ -49,7 +51,7 @@ class AppStateController extends Controller
             'scope' => ($actor['role'] ?? null) === 'maximus_admin'
                 ? 'workspace'
                 : 'company:'.((string) ($actor['companyId'] ?? '')),
-            'version' => (int) ($row?->version ?? 0),
+            'version' => $stateVersion,
             'data' => $state,
         ]);
     }
