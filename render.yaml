@@ -7,9 +7,6 @@ services:
     plan: free
     healthCheckPath: /api/healthz
     autoDeploy: false
-    preDeployCommand: >-
-      php artisan migrate --force --no-interaction
-      && php artisan maximus:provision-admin --no-interaction
     envVars:
       - key: APP_ENV
         value: production
