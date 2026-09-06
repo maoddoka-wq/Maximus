@@ -176,10 +176,10 @@ export function Sidebar({
               {!compact && (
                 <div className="min-w-0">
                   <p
-                    title={companyName ?? 'KORA Distribution'}
+                    title={companyName ?? 'Entreprise'}
                     className="break-words text-sm font-bold leading-tight"
                   >
-                    {companyName ?? 'KORA Distribution'}
+                    {companyName ?? 'Entreprise'}
                   </p>
                   <p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">
                     {employee ? employee.role : 'Espace entreprise'}

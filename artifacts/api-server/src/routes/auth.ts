@@ -26,24 +26,6 @@ const accountInput = z.object({
 
 type AuthUserRecord = typeof authUsersTable.$inferSelect;
 
-const demoAccounts: Array<{
-  id: string;
-  email: string;
-  password: string;
-  displayName: string;
-  role: ControlActorRole;
-  companyId?: string;
-  employeeId?: string;
-  sectorIds: string[];
-}> = [
-  { id: "maximus-admin", email: "admin@maximus.demo", password: "Admin123!", displayName: "Administration MAXIMUS", role: "maximus_admin", sectorIds: [] },
-  { id: "kora-admin", email: "admin@kora.demo", password: "Kora123!", displayName: "Administrateur KORA", role: "company_admin", companyId: "kora", sectorIds: [] },
-  { id: "demo-emp-awa", email: "awa.ndiaye@kora.demo", password: "AwaKora2026!", displayName: "Awa Ndiaye", role: "employee", companyId: "kora", employeeId: "demo-emp-awa", sectorIds: ["kora-service-vente"] },
-  { id: "demo-emp-ibrahima", email: "ibrahima.kane@kora.demo", password: "IbrahimaKora2026!", displayName: "Ibrahima Kane", role: "employee", companyId: "kora", employeeId: "demo-emp-ibrahima", sectorIds: ["kora-service-stock"] },
-  { id: "demo-emp-ndeye", email: "ndeye.sarr@kora.demo", password: "NdeyeKora2026!", displayName: "Ndeye Sarr", role: "employee", companyId: "kora", employeeId: "demo-emp-ndeye", sectorIds: ["kora-service-rh"] },
-  { id: "demo-emp-mamadou", email: "mamadou.ba@kora.demo", password: "MamadouKora2026!", displayName: "Mamadou Ba", role: "sector_manager", companyId: "kora", employeeId: "demo-emp-mamadou", sectorIds: ["kora-service-finance"] },
-];
-
 function passwordHash(password: string, salt = randomBytes(16).toString("hex")) {
   const derived = scryptSync(password, salt, 64).toString("hex");
   return `${salt}:${derived}`;
@@ -110,38 +92,7 @@ export async function requireAuth(request: Request, response: Response, next: Ne
 }
 
 export async function ensureDemoAuthUsers() {
-  for (const account of demoAccounts) {
-    const now = new Date();
-    const values = {
-      id: account.id,
-      email: account.email,
-      passwordHash: passwordHash(account.password),
-      displayName: account.displayName,
-      role: account.role,
-      companyId: account.companyId,
-      employeeId: account.employeeId,
-      sectorIds: account.sectorIds,
-      status: "ACTIF",
-      updatedAt: now,
-    };
-    const [existing] = await db.select().from(authUsersTable).where(eq(authUsersTable.id, account.id)).limit(1);
-    if (existing) {
-      const needsRepair = existing.email !== account.email
-        || existing.displayName !== account.displayName
-        || existing.role !== account.role
-        || existing.companyId !== (account.companyId ?? null)
-        || existing.employeeId !== (account.employeeId ?? null)
-        || JSON.stringify(existing.sectorIds ?? []) !== JSON.stringify(account.sectorIds)
-        || existing.status !== "ACTIF"
-        || !passwordMatches(account.password, existing.passwordHash);
-      if (needsRepair) {
-        await db.update(authUsersTable).set(values).where(eq(authUsersTable.id, account.id));
-        await db.delete(authSessionsTable).where(eq(authSessionsTable.userId, account.id));
-      }
-    } else {
-      await db.insert(authUsersTable).values({ ...values, createdAt: now });
-    }
-  }
+  // Legacy compatibility hook. User accounts are created from the active database.
 }
 
 function canManageAuthAccount(actor: ControlActorContext, input: z.infer<typeof accountInput>) {

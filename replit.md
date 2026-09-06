@@ -179,8 +179,9 @@ MAXIMUS permet de parcourir l’administration globale, inscrire et valider des 
 
 ## Gotchas
 
-- Les identifiants de démonstration sont visibles sur l’écran de connexion; les comptes employés KORA utilisent le mot de passe `Kora123!`.
-- La réinitialisation de la démo se fait depuis Administration → Paramètres.
+- Les comptes et données métier viennent de la base active ; aucun compte ou
+  jeu de données de démonstration n’est embarqué dans le frontend ou le runtime
+  de production.
 
 ## Pointers
 

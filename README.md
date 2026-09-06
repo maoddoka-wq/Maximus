@@ -42,9 +42,8 @@ scripts/              # scripts du workspace
 - **API legacy** : Express 5 et Drizzle restent présents pour la migration
   progressive et la comparaison de parité. Ils ne servent pas le preview actif.
 - **Session** : cookie `HttpOnly` géré côté serveur.
-- **Stockage** : PostgreSQL pour l’authentification et les opérations
-  Présences, Stocks et Contrôle ; `localStorage` reste utilisé pour le store
-  de démonstration et certaines interactions locales.
+- **Stockage** : PostgreSQL pour l’authentification et les données métier ;
+  `localStorage` reste réservé aux préférences d’interface et à la session.
 
 La règle importante est donc : une correction de sécurité ou de périmètre doit
 d’abord être faite dans Laravel. Express ne doit pas être supprimé tant que la
@@ -83,23 +82,19 @@ Depuis `artifacts/api-server` :
 ```bash
 cd artifacts/api-server/laravel
 DB_CONNECTION=pgsql php artisan migrate
-DB_CONNECTION=pgsql php artisan maximus:provision-demo
 DB_CONNECTION=pgsql php -S 0.0.0.0:8080 ../server.php
 ```
 
-En développement, le workflow actif exécute automatiquement le provisionnement
-de démonstration avant de démarrer le serveur PHP :
+Le workflow actif démarre directement le serveur PHP. Les données de
+démonstration de l’environnement Replit résident dans sa base PostgreSQL et ne
+sont pas recréées depuis le dépôt :
 
 ```bash
 cd laravel
-DB_CONNECTION=pgsql php artisan maximus:provision-demo
 DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php
 ```
 
-Cette commande est idempotente : elle crée les comptes manquants et répare
-leurs données ou leurs hash de mot de passe sans créer de doublons.
-
-En production, le démarrage ne provisionne pas les données KORA de démonstration.
+En production, le démarrage ne provisionne aucune donnée de démonstration.
 Il applique les migrations PostgreSQL puis crée uniquement l’administrateur
 MAXIMUS à partir des secrets `ADMIN_USER` et `ADMIN_PASSWORD`. `APP_KEY` est
 également obligatoire ; le service refuse de démarrer s’il est absent.
@@ -121,30 +116,9 @@ Les trois workflows habituels sont :
 | `artifacts/api-server: API Server` | Laravel + PostgreSQL |
 | `artifacts/mockup-sandbox: Component Preview Server` | previews de composants |
 
-## Comptes de démonstration
-
-Les comptes suivants sont uniquement destinés au développement et à la
-démonstration :
-
-| Espace | Email | Mot de passe |
-| --- | --- | --- |
-| Administration MAXIMUS | `admin@maximus.demo` | `Admin123!` |
-| Administrateur KORA | `admin@kora.demo` | `Kora123!` |
-| Awa Ndiaye | `awa.ndiaye@kora.demo` | `AwaKora2026!` |
-| Ibrahima Kane | `ibrahima.kane@kora.demo` | `IbrahimaKora2026!` |
-| Ndeye Sarr | `ndeye.sarr@kora.demo` | `NdeyeKora2026!` |
-| Mamadou Ba | `mamadou.ba@kora.demo` | `MamadouKora2026!` |
-
-Si un compte démo retourne `401 Email ou mot de passe incorrect` en
-développement, le frontend fonctionne probablement mais la base active n’a pas
-été provisionnée ou contient un état ancien. Relancer :
-
-```bash
-cd artifacts/api-server/laravel
-DB_CONNECTION=pgsql php artisan maximus:provision-demo
-```
-
-Puis redémarrer le workflow API. Ne jamais enregistrer un mot de passe
+Les comptes et données de chaque environnement doivent être créés dans sa base
+PostgreSQL active. Aucun compte ou mot de passe de démonstration n’est embarqué
+dans le dépôt ou dans le bundle frontend. Ne jamais enregistrer un mot de passe
 utilisateur dans `localStorage` ou dans le store frontend.
 
 ## Organisation du frontend

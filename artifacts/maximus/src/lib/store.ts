@@ -116,6 +116,7 @@ export interface StoreData {
   deliveries: Delivery[];
   businessDocuments: BusinessDocument[];
   subscriptions: CompanySubscription[];
+  commerceStates: Record<string, unknown>;
   sectorPresets: SectorPreset[];
   moduleStatuses?: ModuleStatusMap;
   moduleOverrides?: ModuleOverrides;
@@ -184,20 +185,14 @@ export function emptyStoreData(): StoreData {
     companies: [], employees: [], roles: [], products: [], movements: [], sales: [], payments: [],
     activities: [], controlTasks: [], domainEvents: [], auditEntries: [], orgNodes: [], notifications: [],
     purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
-    deliveries: [], businessDocuments: [], subscriptions: [],
+    deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
     sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
     moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
     moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
 }
 
-/**
- * Kept as a compatibility name for callers while the server bootstrap hydrates the state.
- * It deliberately contains no business fixture and never reads localStorage.
- */
 export function seedData(): StoreData { return emptyStoreData(); }
-export function loadData(): StoreData { return emptyStoreData(); }
-export function saveData(_data: StoreData): void { /* Business data belongs to the API database. */ }
 
 export function uid(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 export const money = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n) + ' FCFA';

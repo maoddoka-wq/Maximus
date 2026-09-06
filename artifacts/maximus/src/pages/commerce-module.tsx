@@ -88,47 +88,28 @@ type CommerceState = {
   settings: CommerceSettings;
 };
 
-const initialState: CommerceState = {
-  clients: [
-    { id: 'client-1', name: 'Boutique Keur Gui', phone: '+221 77 401 21 10', email: 'contact@keur-gui.sn', address: 'Dakar', balance: 0 },
-    { id: 'client-2', name: 'Maison Baobab', phone: '+221 76 304 18 55', email: 'achats@baobab.sn', address: 'Thiès', balance: 42000 },
-    { id: 'client-3', name: 'Marché Tilène', phone: '+221 78 224 06 32', email: 'tilene@client.sn', address: 'Dakar', balance: 0 },
-  ],
-  expenses: [
-    { id: 'expense-1', label: 'Transport livraison Dakar', category: 'Logistique', amount: 18500, date: '18 juin 2024', account: 'Caisse principale' },
-    { id: 'expense-2', label: 'Fournitures de bureau', category: 'Fonctionnement', amount: 12500, date: '17 juin 2024', account: 'Caisse principale' },
-  ],
-  cashAccounts: [
-    { id: 'cash-1', name: 'Caisse principale', balance: 1248500, responsible: 'Aminata Diop', active: true },
-    { id: 'cash-2', name: 'Compte bancaire UBA', balance: 3840000, responsible: 'Mamadou Ba', active: true },
-    { id: 'cash-3', name: 'Caisse boutique Dakar', balance: 462000, responsible: 'Ibrahima Kane', active: true },
-  ],
-  credits: [
-    { id: 'credit-1', client: 'Maison Baobab', reference: 'CRD-2406-002', amount: 145000, paid: 103000, dueDate: '30 juin 2024', status: 'EN COURS' },
-    { id: 'credit-2', client: 'Marché Tilène', reference: 'CRD-2406-001', amount: 94000, paid: 94000, dueDate: '15 juin 2024', status: 'RÉGLÉ' },
-  ],
-  returns: [
-    { id: 'return-1', reference: 'AVR-2406-003', type: 'RETOUR CLIENT', partner: 'Maison Baobab', amount: 18000, date: '17 juin 2024', status: 'CONFIRMÉ' },
-  ],
-  settings: { taxRate: '18', defaultCash: 'Caisse principale', receiptFooter: 'Merci pour votre confiance.', lowStockAlerts: true },
-};
+const emptyState = (): CommerceState => ({
+  clients: [],
+  expenses: [],
+  cashAccounts: [],
+  credits: [],
+  returns: [],
+  settings: { taxRate: '18', defaultCash: '', receiptFooter: '', lowStockAlerts: true },
+});
 
-const readState = (companyId: string): CommerceState => {
-  try {
-    const stored = localStorage.getItem(`maximus-commerce-${companyId}`);
-    if (!stored) return structuredClone(initialState);
-    const parsed = JSON.parse(stored) as Partial<CommerceState>;
-    return {
-      clients: parsed.clients ?? initialState.clients,
-      expenses: parsed.expenses ?? initialState.expenses,
-      cashAccounts: parsed.cashAccounts ?? initialState.cashAccounts,
-      credits: parsed.credits ?? initialState.credits,
-      returns: parsed.returns ?? initialState.returns,
-      settings: { ...initialState.settings, ...(parsed.settings ?? {}) },
-    };
-  } catch {
-    return structuredClone(initialState);
-  }
+const readState = (data: StoreData, companyId: string): CommerceState => {
+  const fallback = emptyState();
+  const stored = data.commerceStates?.[companyId];
+  if (!stored || typeof stored !== 'object') return fallback;
+  const parsed = stored as Partial<CommerceState>;
+  return {
+    clients: parsed.clients ?? fallback.clients,
+    expenses: parsed.expenses ?? fallback.expenses,
+    cashAccounts: parsed.cashAccounts ?? fallback.cashAccounts,
+    credits: parsed.credits ?? fallback.credits,
+    returns: parsed.returns ?? fallback.returns,
+    settings: { ...fallback.settings, ...(parsed.settings ?? {}) },
+  };
 };
 
 const tabUrl = (id: Tab) => {
@@ -161,7 +142,7 @@ export default function CommerceModulePage({
   singleModuleNavigation?: boolean;
   onNavigate?: (path: string) => void;
 }) {
-  const [state, setState] = useState<CommerceState>(() => readState(companyId));
+  const [state, setState] = useState<CommerceState>(() => readState(data, companyId));
   const availableTabIds = allowedTabs
     ? tabs.filter(item => allowedTabs.includes(item.id)).map(item => item.id)
     : tabs.map(item => item.id);
@@ -171,16 +152,8 @@ export default function CommerceModulePage({
   const [toast, setToast] = useState('');
 
   useEffect(() => {
-    localStorage.setItem(`maximus-commerce-${companyId}`, JSON.stringify(state));
-  }, [companyId, state]);
-  useEffect(() => {
-    setState(readState(companyId));
-  }, [companyId]);
-  useEffect(() => {
-    const sync = () => setState(readState(companyId));
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, [companyId]);
+    setState(readState(data, companyId));
+  }, [companyId, data.commerceStates]);
   useEffect(() => {
     if (!toast) return undefined;
     const timeout = window.setTimeout(() => setToast(''), 2800);
@@ -196,6 +169,9 @@ export default function CommerceModulePage({
     setState(previous => {
       const next = structuredClone(previous) as CommerceState;
       fn(next);
+      mutate(draft => {
+        draft.commerceStates[companyId] = next;
+      });
       return next;
     });
     if (message) setToast(message);
@@ -236,7 +212,7 @@ export default function CommerceModulePage({
         })}
       </nav>}
     </section>
-    {tab !== 'dashboard' && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative block max-w-xl flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input data-testid="input-commerce-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher dans cet espace..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label><button type="button" onClick={() => setState(readState(companyId))} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold hover:bg-[hsl(var(--muted))]"><RefreshCw size={14} />Actualiser</button></div>}
+    {tab !== 'dashboard' && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative block max-w-xl flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input data-testid="input-commerce-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher dans cet espace..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label><button type="button" onClick={() => setState(readState(data, companyId))} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold hover:bg-[hsl(var(--muted))]"><RefreshCw size={14} />Actualiser</button></div>}
     {tab === 'dashboard' && <Dashboard data={data} state={state} lowStock={lowStock} revenue={revenue} onTab={navigateTab} />}
      {tab === 'sales' && <SalesPageFunctional data={data} query={query} mutate={mutate} canCreate={currentCanCreate} canModify={currentCanModify} taxRate={Number(state.settings.taxRate) || 0} companyId={companyId} />}
      {tab === 'products' && <ProductsPageComplete data={data} query={query} mutate={mutate} canCreate={currentCanCreate} canModify={currentCanModify} />}

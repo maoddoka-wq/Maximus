@@ -124,6 +124,12 @@ class AppStateController extends Controller
             ));
         }
 
+        if (isset($state['commerceStates']) && is_array($state['commerceStates'])) {
+            $state['commerceStates'] = array_key_exists($companyId, $state['commerceStates'])
+                ? [$companyId => $state['commerceStates'][$companyId]]
+                : [];
+        }
+
         return $state;
     }
 
@@ -131,6 +137,13 @@ class AppStateController extends Controller
     {
         foreach ($incoming as $key => $value) {
             if (!is_array($value) || !isset($current[$key]) || !is_array($current[$key])) {
+                continue;
+            }
+
+            if ($key === 'commerceStates') {
+                if (array_key_exists($companyId, $value)) {
+                    $current[$key][$companyId] = $value[$companyId];
+                }
                 continue;
             }
 

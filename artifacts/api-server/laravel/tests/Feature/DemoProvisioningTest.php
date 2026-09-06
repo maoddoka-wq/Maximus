@@ -10,31 +10,28 @@ class DemoProvisioningTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_demo_provisioning_covers_all_api_workflows_and_is_idempotent(): void
+    public function test_demo_provisioning_does_not_create_business_data(): void
     {
         $this->provision();
 
         $counts = [
-            'stock_products' => 5,
-            'stock_movements' => 4,
-            'stock_requests' => 1,
-            'stock_inventories' => 1,
-            'stock_inventory_lines' => 2,
-            'control_tasks' => 3,
-            'control_events' => 3,
-            'control_audit_entries' => 3,
-            'presence_items' => 6,
+            'auth_users' => 0,
+            'stock_products' => 0,
+            'stock_movements' => 0,
+            'stock_requests' => 0,
+            'stock_inventories' => 0,
+            'stock_inventory_lines' => 0,
+            'control_tasks' => 0,
+            'control_events' => 0,
+            'control_audit_entries' => 0,
+            'presence_items' => 0,
         ];
 
         foreach ($counts as $table => $count) {
             $this->assertDatabaseCount($table, $count);
         }
 
-        $this->provision();
-
-        foreach ($counts as $table => $count) {
-            $this->assertDatabaseCount($table, $count);
-        }
+        $this->assertDatabaseHas('maximus_modules', ['id' => 'commerce']);
     }
 
     private function provision(): void

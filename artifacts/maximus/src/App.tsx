@@ -62,10 +62,8 @@ import {
   getConfiguredModules,
   getVisibleNotifications,
   emptyStoreData,
-  loadData,
   modules,
   money,
-  saveData,
   shortMoney,
   stockSubmodules,
   uid,
@@ -116,11 +114,11 @@ import {
 } from '@/lib/module-pack';
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
-import { useDebouncedPersistence } from '@/hooks/use-persisted-store';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
-const defaultDemoAccounts: never[] = [];
+type DemoAccount = { id: string; label: string; email: string; password: string };
+const defaultDemoAccounts: DemoAccount[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const OperationalModulePage = lazy(() =>
@@ -311,7 +309,7 @@ const routesWithModuleHeaders = new Set([
 
 function AppContent() {
   const { alert, confirm } = useAppDialog();
-  const [data, setData] = useState<StoreData>(() => loadData());
+  const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
@@ -328,7 +326,6 @@ function AppContent() {
   const [pathname, setLocation] = useLocation();
   const [search] = useSearch();
   const location = search ? `${pathname}?${search}` : pathname;
-  useDebouncedPersistence(data, saveData);
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
@@ -337,11 +334,6 @@ function AppContent() {
     const timer = window.setTimeout(() => setToast(''), 3000);
     return () => window.clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    const syncData = () => setData(loadData());
-    window.addEventListener('storage', syncData);
-    return () => window.removeEventListener('storage', syncData);
-  }, []);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
@@ -696,8 +688,8 @@ function AppContent() {
     ) : (
       <Signup
         data={data}
+        mutate={mutate}
         onComplete={() => {
-          setData(loadData());
           setToast('Votre demande a bien été envoyée.');
           setLocation('/');
         }}
@@ -1040,7 +1032,7 @@ function Login({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              submitLogin(email.toLowerCase() === 'admin@maximus.demo' ? 'admin' : 'kora');
+              submitLogin('kora');
             }}
             className="space-y-5"
           >
@@ -1135,7 +1127,15 @@ function Login({
   );
 }
 
-function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void }) {
+function Signup({
+  data,
+  mutate,
+  onComplete,
+}: {
+  data: StoreData;
+  mutate: (fn: (draft: StoreData) => void, message?: string) => void;
+  onComplete: () => void;
+}) {
   const fallbackPreset: SectorPreset = {
     id: 'default',
     name: 'Distribution',
@@ -1396,7 +1396,7 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
                 label="Nom de l’entreprise"
-                placeholder="Ex. Teranga Agro"
+                placeholder="Ex. votre entreprise"
                 value={name}
                 onChange={setName}
                 testId="input-company-name"
@@ -1671,13 +1671,9 @@ function Signup({ data, onComplete }: { data: StoreData; onComplete: () => void 
                     refusedModules: [],
                     createdAt: new Date().toISOString().slice(0, 10),
                   };
-                  try {
-                    const current = loadData();
-                    current.companies.push(newCompany);
-                    saveData(current);
-                  } catch {
-                    /* localStorage unavailable */
-                  }
+                  mutate((draft) => {
+                    draft.companies.push(newCompany);
+                  });
                   setSubmitted(true);
                 }}
                 className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
@@ -3468,7 +3464,6 @@ function SimpleAdminPage({
       <DataTable
         headers={['Utilisateur', 'Espace', 'Dernière activité', 'Statut']}
         rows={[
-          ['admin@maximus.demo', 'Administration MAXIMUS', 'Aujourd’hui, 10:22', <StatusBadge status="ACTIF" />],
           ...data.employees.map((e) => [
             `${e.firstName} ${e.lastName}`,
             data.companies.find((company) => company.id === e.companyId)?.name ?? 'Entreprise',
@@ -6249,7 +6244,7 @@ function AdminCreateCompanyPage({
       setError('Sélectionnez au moins un module.');
       return;
     }
-    if (loadData().companies.some((company) => company.email.toLowerCase() === normalizedEmail)) {
+    if (data.companies.some((company) => company.email.toLowerCase() === normalizedEmail)) {
       setError('Une entreprise utilise déjà cette adresse email.');
       return;
     }
@@ -6315,7 +6310,7 @@ function AdminCreateCompanyPage({
             label="Nom de l’entreprise"
             value={name}
             onChange={setName}
-            placeholder="Ex. Teranga Agro"
+            placeholder="Ex. votre entreprise"
             testId="input-admin-company-name"
           />
           <Field

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Support\MaximusDemoProvisioner;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,7 +21,6 @@ class StockController extends Controller
             return $this->forbidden();
         }
         $companyId = (string) $request->attributes->get('companyId');
-        MaximusDemoProvisioner::ensureStockSeed($companyId);
         $where = fn (string $table) => DB::table($table)->where('company_id', $companyId);
 
         $inventories = $where('stock_inventories')->orderByDesc('inventory_date')->get();
