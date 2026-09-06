@@ -5136,7 +5136,6 @@ function InteractiveModulesPage({
     const requested = new URLSearchParams(value).get('module');
     return requested && modules.some((module) => module.id === requested) ? (requested as ModuleId) : null;
   };
-  const [selectedId, setSelectedId] = useState<ModuleId | null>(() => readSelectedModule(search));
   const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
@@ -5152,9 +5151,7 @@ function InteractiveModulesPage({
   const moduleDefinitions = modules
     .filter((module) => !catalog.removedModules.includes(module.id))
     .map((module) => ({ ...module, ...(catalog.moduleOverrides[module.id] ?? {}) }));
-  useEffect(() => {
-    setSelectedId(readSelectedModule(search));
-  }, [search]);
+  const selectedId = readSelectedModule(search);
   const selectModule = (moduleId: ModuleId | null, replace = false) => {
     const url = new URL(window.location.href);
     if (moduleId) {
@@ -5174,7 +5171,6 @@ function InteractiveModulesPage({
             : 1,
     };
     setLocation(nextUrl, { replace, state: historyState });
-    setSelectedId(moduleId);
   };
   const statusOf = (moduleId: ModuleId): ModuleAvailability =>
     catalog.removedModules.includes(moduleId)

@@ -19,3 +19,13 @@ premier clic avant que le détail soit affiché.
 
 **How to apply:** Conserver la query dans l’URL, passer l’état d’historique à
 `setLocation`, et laisser Wouter synchroniser `useSearch`.
+
+Les vues de catalogue ouvertes par query string doivent dériver leur élément
+sélectionné de `useSearch`, sans conserver une seconde copie locale de cet
+identifiant.
+
+**Why:** Une synchronisation bidirectionnelle URL/état local peut consommer le
+premier clic lorsqu’un rendu intermédiaire réapplique l’ancienne query.
+
+**How to apply:** Faire de la query la source de vérité pour le détail ouvert ;
+les actions modifient l’URL via Wouter, puis le rendu suit cette URL.
