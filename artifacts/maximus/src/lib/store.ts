@@ -1,6 +1,7 @@
 import { presenceFeatureDefinitions, presenceFeatureDependencies, presenceFeaturePacks } from './presence-features';
 import type { ModuleId } from './module-ids';
 import { buildSubscriptionForCompany, type CompanySubscription } from './subscription-model';
+import type { CatalogDraft } from './catalog-workflow';
 
 export type { ModuleId } from './module-ids';
 export type {
@@ -128,6 +129,7 @@ export interface StoreData {
   moduleStatuses?: ModuleStatusMap;
   moduleOverrides?: ModuleOverrides;
   removedModules?: ModuleId[];
+  catalogDraft?: CatalogDraft;
   catalogVersion?: number;
   organizationVersion?: number;
 }

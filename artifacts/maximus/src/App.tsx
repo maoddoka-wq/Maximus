@@ -80,6 +80,14 @@ import {
   type StoreData,
   subscriptionPlans,
 } from '@/lib/store';
+import {
+  discardCatalogDraft,
+  getCatalogImpact,
+  getCatalogSnapshot,
+  publishCatalogDraft,
+  updateCatalogDraft,
+  validateCatalogDraft,
+} from '@/lib/catalog-workflow';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { type Session } from '@/lib/navigation';
@@ -2821,6 +2829,116 @@ function RequestsPage({
     </div>
   );
 }
+function CatalogWorkflowBar({
+  data,
+  mutate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  const { confirm } = useAppDialog();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const impact = getCatalogImpact(data);
+  const validation = validateCatalogDraft(data);
+  const hasDraft = Boolean(data.catalogDraft);
+
+  if (!hasDraft) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] px-4 py-3">
+        <div className="flex items-center gap-2 text-xs">
+          <Check size={15} className="text-[hsl(var(--primary))]" />
+          <span>
+            Catalogue publié · version <strong>{data.catalogVersion ?? 1}</strong>
+          </span>
+        </div>
+        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+          Toute modification sera d’abord enregistrée en brouillon.
+        </span>
+      </div>
+    );
+  }
+
+  const discard = async () => {
+    if (
+      !(await confirm({
+        title: 'Annuler le brouillon du catalogue ?',
+        description: 'Toutes les modifications non publiées sur les modules, packs et secteurs seront abandonnées.',
+        confirmLabel: 'Annuler le brouillon',
+        tone: 'danger',
+      }))
+    )
+      return;
+    mutate((draft) => discardCatalogDraft(draft), 'Brouillon du catalogue annulé.');
+  };
+
+  const publish = () => {
+    if (validation.errors.length > 0) return;
+    mutate((draft) => publishCatalogDraft(draft), `Catalogue publié · version ${(data.catalogVersion ?? 1) + 1}.`);
+  };
+
+  return (
+    <section
+      data-testid="catalog-workflow-bar"
+      className="rounded-2xl border border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.05)] p-4"
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="rounded-lg bg-[hsl(var(--primary)/.14)] p-2 text-[hsl(var(--primary))]">
+            <GitBranch size={17} />
+          </span>
+          <div>
+            <p className="text-xs font-bold">Brouillon du catalogue</p>
+            <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+              Les changements ne seront proposés aux inscriptions et aux entreprises qu’après publication.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid="button-catalog-impact"
+            onClick={() => setDetailsOpen((value) => !value)}
+            className="rounded-lg border px-3 py-2 text-[10px] font-bold"
+          >
+            {detailsOpen ? 'Masquer les impacts' : 'Voir les impacts'}
+          </button>
+          <button type="button" onClick={discard} className="rounded-lg border px-3 py-2 text-[10px] font-bold">
+            Annuler
+          </button>
+          <button
+            type="button"
+            data-testid="button-publish-catalog"
+            disabled={validation.errors.length > 0}
+            onClick={publish}
+            className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Publier les changements
+          </button>
+        </div>
+      </div>
+      {detailsOpen && (
+        <div className="mt-4 grid gap-2 border-t border-[hsl(var(--primary)/.15)] pt-4 text-[11px] sm:grid-cols-4">
+          <span><strong>{impact.changedModules}</strong> module(s) modifié(s)</span>
+          <span><strong>{impact.changedSectors}</strong> secteur(s) modifié(s)</span>
+          <span><strong>{impact.affectedCompanies}</strong> entreprise(s) concernée(s)</span>
+          <span><strong>{impact.affectedUnits}</strong> unité(s) concernée(s)</span>
+        </div>
+      )}
+      {validation.errors.length > 0 && (
+        <div className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.1)] px-3 py-2 text-[11px] font-semibold text-[hsl(var(--destructive))]">
+          <p>Publication bloquée : {validation.errors[0]}</p>
+          {validation.errors.length > 1 && <p className="mt-1 font-normal">+ {validation.errors.length - 1} autre(s) erreur(s)</p>}
+        </div>
+      )}
+      {validation.errors.length === 0 && validation.warnings.length > 0 && (
+        <p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">
+          Attention : {validation.warnings[0]}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function ModulesPage({
   data,
   mutate,
@@ -2890,10 +3008,11 @@ function SectorPresetsPage({
   const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
   const [sectorError, setSectorError] = useState('');
   const [sectorModalOpen, setSectorModalOpen] = useState(false);
-  const sectorPresets = data.sectorPresets ?? [];
+  const catalog = getCatalogSnapshot(data);
+  const sectorPresets = catalog.sectorPresets;
   const moduleForSector = (id: ModuleId) => {
     const base = modules.find((module) => module.id === id);
-    return base ? { ...base, ...(data.moduleOverrides?.[id] ?? {}) } : undefined;
+    return base ? { ...base, ...(catalog.moduleOverrides[id] ?? {}) } : undefined;
   };
   const moduleName = (id: ModuleId) => moduleForSector(id)?.name ?? id;
 
@@ -2996,9 +3115,11 @@ function SectorPresetsPage({
     if (!preset) return;
     mutate(
       (draft) => {
-        draft.sectorPresets = editingSector
-          ? (draft.sectorPresets ?? []).map((item) => (item.id === editingSector.id ? preset : item))
-          : [...(draft.sectorPresets ?? []), preset];
+        updateCatalogDraft(draft, (catalogDraft) => {
+          catalogDraft.sectorPresets = editingSector
+            ? catalogDraft.sectorPresets.map((item) => (item.id === editingSector.id ? preset : item))
+            : [...catalogDraft.sectorPresets, preset];
+        });
       },
       editingSector ? 'Secteur modifié.' : 'Secteur et modules par défaut enregistrés.',
     );
@@ -3039,12 +3160,15 @@ function SectorPresetsPage({
     )
       return;
     mutate((draft) => {
-      draft.sectorPresets = (draft.sectorPresets ?? []).filter((item) => item.id !== preset.id);
-    }, 'Secteur supprimé.');
+      updateCatalogDraft(draft, (catalogDraft) => {
+        catalogDraft.sectorPresets = catalogDraft.sectorPresets.filter((item) => item.id !== preset.id);
+      });
+    }, 'Secteur retiré du brouillon.');
   };
 
   return (
     <div className="space-y-5">
+      <CatalogWorkflowBar data={data} mutate={mutate} />
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
@@ -3094,7 +3218,7 @@ function SectorPresetsPage({
             Sélectionnez d’abord un module. Ses packs déjà nommés et configurés apparaîtront ensuite.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {modules.map((baseModule) => {
+            {modules.filter((baseModule) => !catalog.removedModules.includes(baseModule.id)).map((baseModule) => {
               const module = moduleForSector(baseModule.id) ?? baseModule;
               const packs = module.featurePacks ?? [];
               const selectedModule = sectorModules.includes(module.id);
@@ -5004,9 +5128,10 @@ function InteractiveModulesPage({
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
+  const catalog = getCatalogSnapshot(data);
   const moduleDefinitions = modules
-    .filter((module) => !data.removedModules?.includes(module.id))
-    .map((module) => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
+    .filter((module) => !catalog.removedModules.includes(module.id))
+    .map((module) => ({ ...module, ...(catalog.moduleOverrides[module.id] ?? {}) }));
   useEffect(() => {
     setSelectedId(readSelectedModule(search));
   }, [search]);
@@ -5033,9 +5158,9 @@ function InteractiveModulesPage({
     setSelectedId(moduleId);
   };
   const statusOf = (moduleId: ModuleId): ModuleAvailability =>
-    data.removedModules?.includes(moduleId)
+    catalog.removedModules.includes(moduleId)
       ? 'INACTIF'
-      : (data.moduleStatuses?.[moduleId] ?? modules.find((module) => module.id === moduleId)?.status ?? 'INACTIF');
+      : (catalog.moduleStatuses[moduleId] ?? modules.find((module) => module.id === moduleId)?.status ?? 'INACTIF');
   const selected = selectedId ? (moduleDefinitions.find((module) => module.id === selectedId) ?? null) : null;
   const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
   const categoryOf = (moduleId: ModuleId) => {
@@ -5076,21 +5201,23 @@ function InteractiveModulesPage({
     if (packForm.name.trim() && !nextPack) return;
     mutate(
       (draft) => {
-        const currentOverride = draft.moduleOverrides?.[editingModule.id] ?? {};
-        const nextOverride = {
-          ...currentOverride,
-          name: moduleForm.name.trim(),
-          description: moduleForm.description.trim(),
-          features,
-        };
-        if (nextPack) {
-          const currentPacks =
-            currentOverride.featurePacks ??
-            modules.find((module) => module.id === editingModule.id)?.featurePacks ??
-            [];
-          nextOverride.featurePacks = [...currentPacks, nextPack];
-        }
-        draft.moduleOverrides = { ...(draft.moduleOverrides ?? {}), [editingModule.id]: nextOverride };
+        updateCatalogDraft(draft, (catalogDraft) => {
+          const currentOverride = catalogDraft.moduleOverrides[editingModule.id] ?? {};
+          const nextOverride = {
+            ...currentOverride,
+            name: moduleForm.name.trim(),
+            description: moduleForm.description.trim(),
+            features,
+          };
+          if (nextPack) {
+            const currentPacks =
+              currentOverride.featurePacks ??
+              modules.find((module) => module.id === editingModule.id)?.featurePacks ??
+              [];
+            nextOverride.featurePacks = [...currentPacks, nextPack];
+          }
+          catalogDraft.moduleOverrides = { ...catalogDraft.moduleOverrides, [editingModule.id]: nextOverride };
+        });
       },
       packForm.name.trim()
         ? `${moduleForm.name.trim()} et son pack métier ont été enregistrés.`
@@ -5102,20 +5229,21 @@ function InteractiveModulesPage({
 
   const removeModule = (module: (typeof modules)[number]) => {
     mutate((draft) => {
-      draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [module.id]: 'INACTIF' };
-      draft.removedModules = [...new Set([...(draft.removedModules ?? []), module.id])];
-      draft.companies.forEach((company) => {
-        company.allowedModules = company.allowedModules.filter((id) => id !== module.id);
+      updateCatalogDraft(draft, (catalogDraft) => {
+        catalogDraft.moduleStatuses = { ...catalogDraft.moduleStatuses, [module.id]: 'INACTIF' };
+        catalogDraft.removedModules = [...new Set([...catalogDraft.removedModules, module.id])];
+        catalogDraft.sectorPresets = catalogDraft.sectorPresets.map((preset) => ({
+          ...preset,
+          moduleIds: preset.moduleIds.filter((id) => id !== module.id),
+          modulePackIds: Object.fromEntries(
+            Object.entries(preset.modulePackIds ?? {}).filter(([moduleId]) => moduleId !== module.id),
+          ),
+          moduleFeatures: Object.fromEntries(
+            Object.entries(preset.moduleFeatures ?? {}).filter(([moduleId]) => moduleId !== module.id),
+          ),
+        }));
       });
-      draft.sectorPresets = (draft.sectorPresets ?? []).map((preset) => ({
-        ...preset,
-        moduleIds: preset.moduleIds.filter((id) => id !== module.id),
-      }));
-      draft.orgNodes = draft.orgNodes.map((node) => ({
-        ...node,
-        moduleIds: node.moduleIds?.filter((id) => id !== module.id),
-      }));
-    }, `${module.name} a été supprimé et désactivé.`);
+    }, `${module.name} sera retiré à la prochaine publication.`);
     if (selectedId === module.id) selectModule(null, true);
     setDeletingModule(null);
   };
@@ -5126,13 +5254,14 @@ function InteractiveModulesPage({
     const isActive = statusOf(moduleId) !== 'INACTIF';
     mutate(
       (draft) => {
-        draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [moduleId]: isActive ? 'INACTIF' : 'ACTIF' };
-        if (isActive)
-          draft.companies.forEach((company) => {
-            company.allowedModules = company.allowedModules.filter((id) => id !== moduleId);
-          });
+        updateCatalogDraft(draft, (catalogDraft) => {
+          catalogDraft.moduleStatuses = {
+            ...catalogDraft.moduleStatuses,
+            [moduleId]: isActive ? 'INACTIF' : 'ACTIF',
+          };
+        });
       },
-      isActive ? `${module.name} a été désactivé pour tous les espaces.` : `${module.name} est maintenant actif.`,
+      isActive ? `${module.name} sera désactivé à la prochaine publication.` : `${module.name} sera activé à la prochaine publication.`,
     );
   };
 
@@ -5173,19 +5302,21 @@ function InteractiveModulesPage({
     if (!nextPack) return;
     mutate(
       (draft) => {
-        const current =
-          draft.moduleOverrides?.[selected.id]?.featurePacks ??
-          modules.find((module) => module.id === selected.id)?.featurePacks ??
-          [];
-        draft.moduleOverrides = {
-          ...(draft.moduleOverrides ?? {}),
-          [selected.id]: {
-            ...(draft.moduleOverrides?.[selected.id] ?? {}),
-            featurePacks: editingPackId
-              ? current.map((pack) => (pack.id === editingPackId ? nextPack : pack))
-              : [...current, nextPack],
-          },
-        };
+        updateCatalogDraft(draft, (catalogDraft) => {
+          const current =
+            catalogDraft.moduleOverrides[selected.id]?.featurePacks ??
+            modules.find((module) => module.id === selected.id)?.featurePacks ??
+            [];
+          catalogDraft.moduleOverrides = {
+            ...catalogDraft.moduleOverrides,
+            [selected.id]: {
+              ...(catalogDraft.moduleOverrides[selected.id] ?? {}),
+              featurePacks: editingPackId
+                ? current.map((pack) => (pack.id === editingPackId ? nextPack : pack))
+                : [...current, nextPack],
+            },
+          };
+        });
       },
       editingPackId ? 'Pack métier mis à jour.' : 'Pack métier créé.',
     );
@@ -5195,19 +5326,31 @@ function InteractiveModulesPage({
 
   const deletePack = (packId: string) => {
     if (!selected) return;
+    const referencedBySector = catalog.sectorPresets.some((preset) =>
+      (preset.modulePackIds?.[selected.id] ?? []).includes(packId),
+    );
+    const referencedByUnit = data.orgNodes.some((node) =>
+      (node.modulePackIds?.[selected.id] ?? []).includes(packId),
+    );
+    if (referencedBySector || referencedByUnit) {
+      notify('Ce pack est utilisé par un secteur ou une unité. Modifiez d’abord ces configurations avant de le retirer.');
+      return;
+    }
     mutate((draft) => {
-      const current =
-        draft.moduleOverrides?.[selected.id]?.featurePacks ??
-        modules.find((module) => module.id === selected.id)?.featurePacks ??
-        [];
-      draft.moduleOverrides = {
-        ...(draft.moduleOverrides ?? {}),
-        [selected.id]: {
-          ...(draft.moduleOverrides?.[selected.id] ?? {}),
-          featurePacks: current.filter((pack) => pack.id !== packId),
-        },
-      };
-    }, 'Pack métier supprimé.');
+      updateCatalogDraft(draft, (catalogDraft) => {
+        const current =
+          catalogDraft.moduleOverrides[selected.id]?.featurePacks ??
+          modules.find((module) => module.id === selected.id)?.featurePacks ??
+          [];
+        catalogDraft.moduleOverrides = {
+          ...catalogDraft.moduleOverrides,
+          [selected.id]: {
+            ...(catalogDraft.moduleOverrides[selected.id] ?? {}),
+            featurePacks: current.filter((pack) => pack.id !== packId),
+          },
+        };
+      });
+    }, 'Pack métier retiré du brouillon.');
     if (editingPackId === packId) resetPackForm();
   };
 
@@ -5231,6 +5374,7 @@ function InteractiveModulesPage({
     const isActive = status !== 'INACTIF';
     return (
       <div className="space-y-5">
+        <CatalogWorkflowBar data={data} mutate={mutate} />
         <button
           data-testid="button-back-modules"
           onClick={() => selectModule(null, true)}
@@ -5538,6 +5682,7 @@ function InteractiveModulesPage({
 
   return (
     <div className="space-y-5">
+      <CatalogWorkflowBar data={data} mutate={mutate} />
       <section className="card-surface rounded-2xl p-5 sm:p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
           <div>
