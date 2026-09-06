@@ -1,38 +1,10 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, X, type LucideIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 
-type ActionButtonProps = {
-  children: React.ReactNode;
-  onClick?: React.MouseEventHandler<HTMLButtonElement>;
-  primary?: boolean;
-  testId?: string;
-  icon?: LucideIcon;
-  disabled?: boolean;
-  className?: string;
-};
+import { ActionButton, Field } from '@/components/app-ui';
 
-export function ActionButton({
-  children,
-  onClick,
-  primary = false,
-  testId,
-  icon: ButtonIcon = Plus,
-  disabled = false,
-  className = '',
-}: ActionButtonProps) {
-  return (
-    <button
-      disabled={disabled}
-      data-testid={testId}
-      onClick={onClick}
-      className={`app-action btn flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
-    >
-      <ButtonIcon size={15} />
-      {children}
-    </button>
-  );
-}
+export { ActionButton, Field } from '@/components/app-ui';
 
 export function Modal({
   title,
@@ -60,43 +32,5 @@ export function Modal({
       </div>
     </div>,
     document.body,
-  );
-}
-
-export function Field({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  testId,
-  placeholder = '',
-  help,
-}: {
-  label: React.ReactNode;
-  value: string | number;
-  onChange: (value: string) => void;
-  type?: React.HTMLInputTypeAttribute;
-  testId?: string;
-  placeholder?: string;
-  help?: string;
-}) {
-  const explanation =
-    help ?? `Saisissez ${String(label).toLowerCase().replace(' *', '')}.`;
-
-  return (
-    <label className="block text-sm font-semibold">
-      {label}
-      <input
-        data-testid={testId}
-        type={type}
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--primary))]"
-      />
-      <span className="field-help mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-        {explanation}
-      </span>
-    </label>
   );
 }

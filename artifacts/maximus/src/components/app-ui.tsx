@@ -1,6 +1,6 @@
 import { Check, Plus, Search } from 'lucide-react';
 import { Link } from 'wouter';
-import type { ReactNode } from 'react';
+import type { HTMLInputTypeAttribute, MouseEventHandler, ReactNode } from 'react';
 
 import type { Icon } from '@/lib/navigation';
 import type { StoreData } from '@/lib/store';
@@ -70,18 +70,20 @@ export function Field({
   testId,
   help,
 }: {
-  label: string;
-  value: string;
+  label: ReactNode;
+  value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
-  type?: string;
-  testId: string;
+  type?: HTMLInputTypeAttribute;
+  testId?: string;
   help?: string;
 }) {
-  const explanation = help ?? `Saisissez ${label.toLowerCase().replace(' *', '')}.`;
-  const autoComplete = testId.includes('login-email')
+  const labelText = typeof label === 'string' ? label : 'ce champ';
+  const explanation = help ?? `Saisissez ${labelText.toLowerCase().replace(' *', '')}.`;
+  const fieldTestId = testId ?? '';
+  const autoComplete = fieldTestId.includes('login-email')
     ? 'email'
-    : testId.includes('login-password')
+    : fieldTestId.includes('login-password')
       ? 'current-password'
       : type === 'email'
         ? 'email'
@@ -273,13 +275,15 @@ export function ActionButton({
   testId,
   icon: ButtonIcon = Plus,
   disabled = false,
+  className = '',
 }: {
   children: ReactNode;
-  onClick: () => void;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
   primary?: boolean;
-  testId: string;
+  testId?: string;
   icon?: Icon;
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <button
@@ -291,7 +295,7 @@ export function ActionButton({
         primary
           ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
           : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'
-      }`}
+      } ${className}`}
     >
       <ButtonIcon size={15} />
       {children}
