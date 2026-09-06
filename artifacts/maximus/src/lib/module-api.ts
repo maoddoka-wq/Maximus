@@ -27,6 +27,9 @@ async function request<T>(path: string): Promise<T> {
 export async function loadCompanyModuleAccess(companyId: string): Promise<ServerModuleAccess[]> {
   const query = new URLSearchParams({ companyId });
   const result = await request<ModuleBootstrap>(`/modules/bootstrap?${query.toString()}`);
+  if (result.companyId !== companyId || !Array.isArray(result.modules)) {
+    throw new Error('La réponse des accès modules ne correspond pas à cette entreprise.');
+  }
   return result.modules;
 }
 
@@ -44,5 +47,12 @@ export async function setCompanyModuleAccess(companyId: string, moduleId: string
 }
 
 export async function synchronizeCompanyModuleAccess(companyId: string, moduleIds: string[]) {
-  await Promise.all(moduleIds.map(moduleId => setCompanyModuleAccess(companyId, moduleId, 'ACTIF')));
+  const synchronized = await Promise.all(moduleIds.map(moduleId => setCompanyModuleAccess(companyId, moduleId, 'ACTIF')));
+  const missing = moduleIds.filter((moduleId) => {
+    const module = synchronized.find((item) => item.id === moduleId);
+    return !module || module.status === 'INACTIF';
+  });
+  if (missing.length > 0) {
+    throw new Error(`Les accès serveur n’ont pas été confirmés pour : ${missing.join(', ')}.`);
+  }
 }

@@ -23,6 +23,7 @@ export type AppAccessInput = {
   activeCompany?: Company;
   sectorTestCompanyId: string | null;
   serverModuleStatuses: Record<string, ModuleAvailability> | null;
+  serverModuleAccessReady?: boolean;
 };
 
 export type AppAccessContext = {
@@ -51,6 +52,7 @@ export function buildAppAccessContext({
   activeCompany,
   sectorTestCompanyId,
   serverModuleStatuses,
+  serverModuleAccessReady = true,
 }: AppAccessInput): AppAccessContext {
   const companyId = activeCompanyId ?? 'kora';
   const configuredModules = getConfiguredModules(data);
@@ -68,7 +70,9 @@ export function buildAppAccessContext({
     configuredModules.find(module => module.id === moduleId)?.status ??
     'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => !['INACTIF', 'MAINTENANCE'].includes(moduleStatus(moduleId));
-  const companyAllowed = (data.companies.find(company => company.id === companyId)?.allowedModules ?? []).filter(isModuleActive);
+  const companyAllowed = serverModuleAccessReady
+    ? (data.companies.find(company => company.id === companyId)?.allowedModules ?? []).filter(isModuleActive)
+    : [];
   const employeeNode = employee?.sectorId
     ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) ?? null
     : sectorTestCompanyId && accessRole?.sectorId

@@ -314,6 +314,8 @@ function AppContent() {
   const [toast, setToast] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
+  const [serverModuleAccessReady, setServerModuleAccessReady] = useState(false);
+  const [serverModuleAccessError, setServerModuleAccessError] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('maximus-sidebar-collapsed') === 'true',
   );
@@ -368,7 +370,7 @@ function AppContent() {
   useEffect(() => {
     if (session !== 'admin') return;
     const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF' && company.adminPassword);
-    void Promise.allSettled(
+    void Promise.all(
       activeCompanies.flatMap((company) => [
         authApi.provisionCompanyAdmin({
           id: `company-admin:${company.id}`,
@@ -379,7 +381,9 @@ function AppContent() {
         }),
         synchronizeCompanyModuleAccess(company.id, company.allowedModules),
       ]),
-    );
+    ).catch((error) => {
+      setToast(error instanceof Error ? `Synchronisation incomplète : ${error.message}` : 'Synchronisation des entreprises incomplète.');
+    });
   }, [session]);
 
   const mutate = (fn: (draft: StoreData) => void, message?: string) => {
@@ -423,27 +427,40 @@ function AppContent() {
         ? session.slice('company:'.length)
         : sessionEmployee?.companyId;
   const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
+  const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
   useEffect(() => {
     if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
       setServerModuleStatuses(null);
+      setServerModuleAccessReady(true);
+      setServerModuleAccessError('');
       return;
     }
 
     let cancelled = false;
-    void loadCompanyModuleAccess(activeCompanyId)
+    setServerModuleAccessReady(false);
+    setServerModuleAccessError('');
+    void loadCompanyModuleAccess(activeCompanyId, activeCompany?.allowedModules ?? [])
       .then((access) => {
         if (!cancelled) {
           setServerModuleStatuses(Object.fromEntries(access.map((module) => [module.id, module.status])));
+          setServerModuleAccessReady(true);
         }
       })
-      .catch(() => {
-        if (!cancelled) setServerModuleStatuses({});
+      .catch((error) => {
+        if (!cancelled) {
+          setServerModuleStatuses(Object.fromEntries(modules.map((module) => [module.id, 'INACTIF' as const])));
+          setServerModuleAccessReady(true);
+          setServerModuleAccessError(
+            error instanceof Error
+              ? error.message
+              : 'Les accès modules de cette entreprise ne sont pas confirmés par le serveur.',
+          );
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [activeCompanyId, sectorTestCompanyId, session]);
-  const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
+  }, [activeCompanyId, activeCompany?.allowedModules.join(','), sectorTestCompanyId, session]);
   const activeCompanyTheme = companyThemeVariables(activeCompany);
   const activeNavStyle: CSSProperties | undefined = activeCompany
     ? {
@@ -700,6 +717,7 @@ function AppContent() {
     activeCompany: currentCompany,
     sectorTestCompanyId,
     serverModuleStatuses,
+    serverModuleAccessReady,
   });
   const baseMeta =
     pageMeta[location.split('?')[0]] ??
@@ -799,6 +817,18 @@ function AppContent() {
               location={location}
               onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/kora/dashboard')}
             />
+          )}
+          {serverModuleAccessError && !isAdmin && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-[hsl(var(--destructive)/.35)] bg-[hsl(var(--destructive)/.08)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"
+            >
+              <strong className="block">Accès modules non confirmé</strong>
+              <span className="mt-1 block text-xs leading-5">
+                {serverModuleAccessError} Les modules sont masqués par sécurité. Un administrateur MAXIMUS doit
+                resynchroniser cette entreprise avant sa prochaine utilisation.
+              </span>
+            </div>
           )}
           <ErrorBoundary resetKey={location}>
             <Suspense
