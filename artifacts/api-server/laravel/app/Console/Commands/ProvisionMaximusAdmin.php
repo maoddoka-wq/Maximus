@@ -28,8 +28,8 @@ class ProvisionMaximusAdmin extends Command
             return self::FAILURE;
         }
 
-        if (strlen($password) < 12) {
-            $this->error('ADMIN_PASSWORD doit contenir au moins 12 caractères.');
+        if (strlen($password) < 8) {
+            $this->error('ADMIN_PASSWORD doit contenir au moins 8 caractères.');
 
             return self::FAILURE;
         }

@@ -32,11 +32,13 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 COPY artifacts/api-server/laravel ./laravel
+COPY render-entrypoint.sh /usr/local/bin/render-entrypoint.sh
 
 RUN cd laravel \
     && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
-    && chmod -R ug+rw storage bootstrap/cache
+    && chmod -R ug+rw storage bootstrap/cache \
+    && chmod +x /usr/local/bin/render-entrypoint.sh
 
 COPY --from=frontend-build /workspace/artifacts/maximus/dist/public/ ./laravel/public/
 
@@ -44,4 +46,4 @@ WORKDIR /app/laravel
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "php artisan migrate --force --no-interaction && php artisan maximus:provision-admin --no-interaction && exec php -S 0.0.0.0:${PORT:-10000} server.php"]
+CMD ["/usr/local/bin/render-entrypoint.sh"]
