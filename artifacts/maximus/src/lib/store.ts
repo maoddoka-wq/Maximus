@@ -1,7 +1,21 @@
 import { presenceFeatureDefinitions, presenceFeatureDependencies, presenceFeaturePacks } from './presence-features';
 import type { ModuleId } from './module-ids';
+import { buildSubscriptionForCompany, type CompanySubscription } from './subscription-model';
 
 export type { ModuleId } from './module-ids';
+export type {
+  CompanySubscription,
+  InvoiceStatus,
+  PaymentMethodType,
+  SubscriptionEventType,
+  SubscriptionHistoryEntry,
+  SubscriptionInterval,
+  SubscriptionLimits,
+  SubscriptionPaymentStatus,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} from './subscription-model';
+export { subscriptionPlans } from './subscription-model';
 
 export type Status = 'ACTIF' | 'EN ATTENTE' | 'SUSPENDU' | 'REFUSÉ' | 'ARCHIVÉ' | 'BROUILLON' | 'VALIDÉ' | 'CONFIRMÉ';
 export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedModulePackIds?: Partial<Record<ModuleId, string[]>>; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
@@ -109,6 +123,7 @@ export interface StoreData {
   supplierRecords: SupplierRecord[];
   deliveries: Delivery[];
   businessDocuments: BusinessDocument[];
+  subscriptions: CompanySubscription[];
   sectorPresets: SectorPreset[];
   moduleStatuses?: ModuleStatusMap;
   moduleOverrides?: ModuleOverrides;
@@ -214,6 +229,74 @@ export function seedData(): StoreData {
       { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
       { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', adminPassword: 'Kora123!', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
       { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', adminPassword: 'Kora123!', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
+    ],
+    subscriptions: [
+      {
+        id: 'subscription-kora',
+        companyId: 'kora',
+        planId: 'scale',
+        planName: 'Scale',
+        status: 'ACTIF',
+        amount: 185000,
+        currency: 'XOF',
+        interval: 'MENSUEL',
+        startedAt: '2024-04-12',
+        endsAt: null,
+        nextRenewalAt: '2026-10-12',
+        trialEndsAt: null,
+        paymentStatus: 'À JOUR',
+        paymentMethod: { type: 'MOBILE_MONEY', label: 'Wave Business', last4: '2218' },
+        limits: { employees: 250, modules: 14, storageGb: 250 },
+        invoices: [
+          { id: 'invoice-kora-09', number: 'FAC-2026-09-001', amount: 185000, currency: 'XOF', issuedAt: '2026-09-12', dueAt: '2026-09-12', status: 'PAYÉE' },
+          { id: 'invoice-kora-08', number: 'FAC-2026-08-001', amount: 185000, currency: 'XOF', issuedAt: '2026-08-12', dueAt: '2026-08-12', status: 'PAYÉE' },
+        ],
+        history: [
+          { id: 'subscription-kora-history-1', type: 'CHANGEMENT DE PLAN', label: 'Passage au plan Scale', date: '2025-04-12', actor: 'Aminata Diop' },
+          { id: 'subscription-kora-history-2', type: 'PAIEMENT', label: 'Paiement mensuel confirmé', date: '2026-09-12', actor: 'Wave Business' },
+        ],
+        moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'],
+      },
+      {
+        id: 'subscription-teranga',
+        companyId: 'teranga',
+        planId: 'essential',
+        planName: 'Essentiel',
+        status: 'ESSAI',
+        amount: 45000,
+        currency: 'XOF',
+        interval: 'MENSUEL',
+        startedAt: '2024-06-18',
+        endsAt: null,
+        nextRenewalAt: '2024-07-18',
+        trialEndsAt: '2024-07-02',
+        paymentStatus: 'EN ATTENTE',
+        paymentMethod: { type: 'AUCUN', label: 'Moyen de paiement à renseigner' },
+        limits: { employees: 10, modules: 4, storageGb: 10 },
+        invoices: [{ id: 'invoice-teranga-01', number: 'FAC-2024-06-001', amount: 45000, currency: 'XOF', issuedAt: '2024-06-18', dueAt: '2024-07-02', status: 'OUVERTE' }],
+        history: [{ id: 'subscription-teranga-history-1', type: 'ESSAI', label: 'Période d’essai ouverte', date: '2024-06-18', actor: 'MAXIMUS' }],
+        moduleIds: ['finance', 'stocks'],
+      },
+      {
+        id: 'subscription-naya',
+        companyId: 'naya',
+        planId: 'growth',
+        planName: 'Croissance',
+        status: 'IMPAYÉ',
+        amount: 95000,
+        currency: 'XOF',
+        interval: 'MENSUEL',
+        startedAt: '2024-03-02',
+        endsAt: null,
+        nextRenewalAt: '2024-06-02',
+        trialEndsAt: null,
+        paymentStatus: 'IMPAYÉ',
+        paymentMethod: { type: 'CARTE', label: 'Carte bancaire', last4: '4242' },
+        limits: { employees: 50, modules: 8, storageGb: 50 },
+        invoices: [{ id: 'invoice-naya-04', number: 'FAC-2024-06-002', amount: 95000, currency: 'XOF', issuedAt: '2024-06-02', dueAt: '2024-06-09', status: 'EN RETARD' }],
+        history: [{ id: 'subscription-naya-history-1', type: 'SUSPENSION', label: 'Accès suspendu après impayé', date: '2024-06-10', actor: 'MAXIMUS' }],
+        moduleIds: ['finance', 'rh'],
+      },
     ],
     employees: [
       { id: 'demo-emp-awa', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa.ndiaye@kora.demo', phone: '+221 77 640 28 91', position: 'Gestionnaire commerciale', department: 'Commerce', subDepartment: 'Ventes', role: 'Vendeuse', status: 'ACTIF', loginPassword: 'AwaKora2026!', companyId: 'kora', sectorId: 'kora-service-vente', roleId: 'kora-role-vendeur' },
@@ -409,6 +492,16 @@ export function loadData(): StoreData {
       ...demoEmployees,
       ...storedEmployees.filter(employee => !demoEmployeeIds.has(employee.id) && !initial.employees.some(seed => seed.email === employee.email)),
     ];
+    const storedSubscriptions = parsed.subscriptions ?? [];
+    const subscriptions = companies.map((company) =>
+      storedSubscriptions.find(subscription => subscription.companyId === company.id)
+        ?? initial.subscriptions.find(subscription => subscription.companyId === company.id)
+        ?? buildSubscriptionForCompany({
+          companyId: company.id,
+          createdAt: company.createdAt,
+          moduleIds: company.allowedModules,
+        }),
+    );
     return {
       ...initial,
       ...storedData,
@@ -438,6 +531,7 @@ export function loadData(): StoreData {
       supplierRecords: parsed.supplierRecords ?? initial.supplierRecords,
       deliveries: parsed.deliveries ?? initial.deliveries,
       businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
+       subscriptions,
       controlTasks: parsed.controlTasks ?? initial.controlTasks,
       domainEvents: parsed.domainEvents ?? initial.domainEvents,
       auditEntries: parsed.auditEntries ?? initial.auditEntries,

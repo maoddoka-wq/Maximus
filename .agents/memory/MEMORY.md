@@ -14,3 +14,4 @@
 - [Navigation navigateur](browser-navigation.md) — les liens internes et le bouton Retour doivent partager l’historique réel, avec un fallback dashboard pour un accès direct.
 - [Performance authentification](password-hashing.md) — les nouveaux hash sont rapides, avec migration transparente des anciens hash scrypt après validation.
 - [Exports Fast Refresh](fast-refresh-exports.md) — les fichiers de composants React doivent éviter les exports de constantes ou utilitaires non visuels.
+- [Frontière des abonnements](subscription-boundary.md) — un abonnement est une entité de facturation distincte des modules autorisés d’une entreprise.

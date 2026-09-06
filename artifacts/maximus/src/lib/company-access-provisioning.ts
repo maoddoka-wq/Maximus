@@ -11,6 +11,7 @@ import {
   type StoreData,
 } from './store';
 import { synchronizeUnitPackRoles } from './module-role-sync';
+import { buildSubscriptionForCompany } from './subscription-model';
 
 type RootSeed = Pick<OrgNode, 'name' | 'code' | 'type'>;
 
@@ -119,6 +120,13 @@ export function provisionCompanyAccess(
     }),
   ) as Partial<Record<ModuleId, string[]>>;
   company.requestedModuleFeatures = requestedFeatures;
+  if (!data.subscriptions.some(subscription => subscription.companyId === company.id)) {
+    data.subscriptions.push(buildSubscriptionForCompany({
+      companyId: company.id,
+      createdAt: company.createdAt,
+      moduleIds,
+    }));
+  }
 
   const rootSeed = options.root ?? {};
   let root = data.orgNodes.find(node => node.companyId === company.id && !node.parentId);

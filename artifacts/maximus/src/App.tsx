@@ -78,6 +78,7 @@ import {
   type Sale,
   type SectorPreset,
   type StoreData,
+  subscriptionPlans,
 } from '@/lib/store';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
@@ -3379,49 +3380,42 @@ function SubscriptionsPage({
   data: StoreData;
   onNavigate: (path: string) => void;
 }) {
-  const [selectedCompanyId, setSelectedCompanyId] = useState(data.companies[0]?.id ?? '');
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(data.subscriptions[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
+  const subscriptions = data.subscriptions;
+  const formatDate = (value: string | null) => {
+    if (!value) return '—';
+    return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
+  };
+  const formatAmount = (value: number) => `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value)} FCFA`;
 
   useEffect(() => {
-    if (data.companies.some((company) => company.id === selectedCompanyId)) return;
-    setSelectedCompanyId(data.companies[0]?.id ?? '');
-  }, [data.companies, selectedCompanyId]);
+    if (subscriptions.some((subscription) => subscription.id === selectedSubscriptionId)) return;
+    setSelectedSubscriptionId(subscriptions[0]?.id ?? '');
+  }, [subscriptions, selectedSubscriptionId]);
 
-  const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF');
-  const pendingCompanies = data.companies.filter((company) => company.status === 'EN ATTENTE');
-  const configuredModules = data.companies.reduce((total, company) => total + company.allowedModules.length, 0);
-  const filteredCompanies = data.companies.filter((company) => {
+  const filteredSubscriptions = subscriptions.filter((subscription) => {
+    const company = data.companies.find((item) => item.id === subscription.companyId);
     const query = searchTerm.trim().toLowerCase();
-    return !query || `${company.name} ${company.email} ${company.sector}`.toLowerCase().includes(query);
+    return !query || `${company?.name ?? ''} ${subscription.planName} ${subscription.status} ${subscription.paymentStatus}`.toLowerCase().includes(query);
   });
-  const selectedCompany = data.companies.find((company) => company.id === selectedCompanyId);
-  const selectedEmployees = selectedCompany
-    ? data.employees.filter((employee) => employee.companyId === selectedCompany.id)
-    : [];
-  const selectedUnits = selectedCompany
-    ? data.orgNodes.filter((node) => node.companyId === selectedCompany.id)
-    : [];
-  const selectedRoles = selectedCompany
-    ? data.roles.filter((role) => role.companyId === selectedCompany.id)
-    : [];
-  const selectedRequestedModules = selectedCompany?.requestedModules ?? [];
-  const selectedActiveModules = selectedCompany
-    ? modules.filter((module) => selectedCompany.allowedModules.includes(module.id))
-    : [];
-  const selectedMissingModules = selectedRequestedModules.filter(
-    (moduleId) => !selectedCompany?.allowedModules.includes(moduleId),
+  const selectedSubscription = subscriptions.find((subscription) => subscription.id === selectedSubscriptionId);
+  const selectedCompany = data.companies.find((company) => company.id === selectedSubscription?.companyId);
+  const selectedPlan = subscriptionPlans.find((plan) => plan.id === selectedSubscription?.planId);
+  const selectedEmployees = selectedCompany ? data.employees.filter((employee) => employee.companyId === selectedCompany.id).length : 0;
+  const activeSubscriptions = subscriptions.filter((subscription) => subscription.status === 'ACTIF' || subscription.status === 'ESSAI');
+  const monthlyRevenue = activeSubscriptions.reduce(
+    (total, subscription) => total + (subscription.interval === 'ANNUEL' ? subscription.amount / 12 : subscription.amount),
+    0,
   );
-  const coverage = selectedRequestedModules.length
-    ? Math.min(100, Math.round((selectedCompany?.allowedModules.length ?? 0) / selectedRequestedModules.length * 100))
-    : selectedCompany?.allowedModules.length
-      ? 100
-      : 0;
+  const unpaidSubscriptions = subscriptions.filter((subscription) => subscription.paymentStatus === 'IMPAYÉ').length;
+  const overdueInvoices = subscriptions.flatMap((subscription) => subscription.invoices).filter((invoice) => invoice.status === 'EN RETARD').length;
 
-  if (data.companies.length === 0) {
+  if (subscriptions.length === 0) {
     return (
       <EmptyState
-        title="Aucun abonnement à suivre"
-        text="Les abonnements apparaîtront ici dès qu’une entreprise sera créée ou validée."
+        title="Aucun abonnement enregistré"
+        text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
         action={() => onNavigate('/maximus/demandes')}
       />
     );
@@ -3432,251 +3426,151 @@ function SubscriptionsPage({
       <section className="relative overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(120deg,hsl(var(--sidebar)),hsl(var(--sidebar)/.88))] p-6 text-[hsl(var(--sidebar-foreground))] shadow-sm sm:p-8">
         <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
-            <p className="mono text-[10px] uppercase tracking-[.22em] text-[hsl(var(--accent))]">
-              Portefeuille & accès
-            </p>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-              Une vue fiable de ce qui est réellement actif.
-            </h1>
+            <p className="mono text-[10px] uppercase tracking-[.22em] text-[hsl(var(--accent))]">Gestion financière</p>
+            <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Abonnements, paiements et échéances.</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--sidebar-foreground)/.72)]">
-              Suivez les entreprises, les modules autorisés et les éléments à régulariser depuis un seul espace.
-              Les accès sont pilotés par entreprise ; aucune donnée de facturation n’est inventée ici.
+              Chaque souscription possède son propre plan, son cycle de vie, ses limites et son historique de facturation.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-            <ShieldCheck size={20} className="text-[hsl(var(--accent))]" />
+            <CreditCard size={20} className="text-[hsl(var(--accent))]" />
             <div>
-              <p className="text-xs font-bold">Accès contrôlés</p>
-              <p className="mt-1 text-[10px] text-[hsl(var(--sidebar-foreground)/.62)]">
-                Synchronisation par entreprise
-              </p>
+              <p className="text-xs font-bold">Suivi des souscriptions</p>
+              <p className="mt-1 text-[10px] text-[hsl(var(--sidebar-foreground)/.62)]">Plans · paiements · factures</p>
             </div>
           </div>
         </div>
         <div className="absolute -right-14 -top-16 h-48 w-48 rounded-full border border-white/10 bg-white/[.03]" />
-        <div className="absolute -bottom-28 right-24 h-48 w-48 rounded-full border border-[hsl(var(--accent)/.18)]" />
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Entreprises suivies', value: data.companies.length, detail: 'dans le portefeuille', icon: Building2 },
-          { label: 'Actives', value: activeCompanies.length, detail: 'espaces opérationnels', icon: ShieldCheck },
-          { label: 'Modules configurés', value: configuredModules, detail: 'accès cumulés', icon: Package },
-          { label: 'À traiter', value: pendingCompanies.length, detail: 'demandes en attente', icon: ClipboardCheck },
+          { label: 'Souscriptions actives', value: activeSubscriptions.length, detail: `${subscriptions.length} enregistrée(s)`, icon: ShieldCheck },
+          { label: 'Revenu mensuel prévu', value: formatAmount(monthlyRevenue), detail: 'sur les plans actifs', icon: TrendingUp },
+          { label: 'Paiements impayés', value: unpaidSubscriptions, detail: 'souscription(s) à relancer', icon: CreditCard },
+          { label: 'Factures en retard', value: overdueInvoices, detail: 'à régulariser', icon: FileBarChart },
         ].map((metric) => {
           const Icon = metric.icon;
           return (
-            <section key={metric.label} data-testid={`subscription-metric-${metric.label}`} className="card-surface rounded-2xl p-4">
+            <section key={metric.label} className="card-surface rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">{metric.label}</p>
                   <p className="mt-3 text-2xl font-bold tracking-tight">{metric.value}</p>
                   <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{metric.detail}</p>
                 </div>
-                <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-2.5 text-[hsl(var(--primary))]">
-                  <Icon size={17} />
-                </span>
+                <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-2.5 text-[hsl(var(--primary))]"><Icon size={17} /></span>
               </div>
             </section>
           );
         })}
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(380px,.95fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(390px,.98fr)]">
         <section className="card-surface overflow-hidden rounded-2xl">
           <div className="border-b border-[hsl(var(--border))] p-5 sm:p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div>
-                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Portefeuille</p>
-                <h2 className="mt-2 text-xl font-bold">Entreprises et accès</h2>
-                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                  Sélectionnez une entreprise pour inspecter sa configuration.
-                </p>
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Registre</p>
+                <h2 className="mt-2 text-xl font-bold">Souscriptions clientes</h2>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les données de paiement sont rattachées à une souscription, pas seulement à une entreprise.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => onNavigate('/maximus/demandes')}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.55)]"
-              >
-                <FileClock size={14} />
-                Voir les demandes
+              <button type="button" onClick={() => onNavigate('/maximus/demandes')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.55)]">
+                <FileClock size={14} /> Voir les demandes
               </button>
             </div>
             <label className="relative mt-5 block">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Rechercher une entreprise, un secteur…"
-                className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[hsl(var(--primary))]"
-              />
+              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Rechercher une entreprise, un plan ou un statut…" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[hsl(var(--primary))]" />
             </label>
           </div>
           <div className="divide-y divide-[hsl(var(--border))]">
-            {filteredCompanies.length === 0 ? (
-              <p className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune entreprise ne correspond à cette recherche.</p>
-            ) : (
-              filteredCompanies.map((company) => {
-                const isSelected = company.id === selectedCompanyId;
-                const companyModuleCount = company.allowedModules.length;
-                return (
-                  <button
-                    type="button"
-                    key={company.id}
-                    data-testid={`subscription-company-${company.id}`}
-                    onClick={() => setSelectedCompanyId(company.id)}
-                    className={`flex w-full items-center gap-4 px-5 py-4 text-left transition sm:px-6 ${isSelected ? 'bg-[hsl(var(--primary)/.07)]' : 'hover:bg-[hsl(var(--muted)/.35)]'}`}
-                  >
-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${isSelected ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))]'}`}>
-                      {company.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <strong className="truncate text-sm">{company.name}</strong>
-                        <StatusBadge status={company.status} />
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">
-                        {company.sector} · {company.email}
-                      </span>
-                    </span>
-                    <span className="hidden shrink-0 text-right sm:block">
-                      <strong className="block text-sm">{companyModuleCount}</strong>
-                      <span className="text-[10px] text-[hsl(var(--muted-foreground))]">modules actifs</span>
-                    </span>
-                    <ChevronRight size={16} className={isSelected ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'} />
-                  </button>
-                );
-              })
-            )}
+            {filteredSubscriptions.map((subscription) => {
+              const company = data.companies.find((item) => item.id === subscription.companyId);
+              const isSelected = subscription.id === selectedSubscriptionId;
+              return (
+                <button type="button" key={subscription.id} data-testid={`subscription-row-${subscription.id}`} onClick={() => setSelectedSubscriptionId(subscription.id)} className={`flex w-full items-center gap-4 px-5 py-4 text-left transition sm:px-6 ${isSelected ? 'bg-[hsl(var(--primary)/.07)]' : 'hover:bg-[hsl(var(--muted)/.35)]'}`}>
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${isSelected ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))]'}`}>
+                    {(company?.name ?? '?').slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2"><strong className="truncate text-sm">{company?.name ?? subscription.companyId}</strong><StatusBadge status={subscription.status} /></span>
+                    <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{subscription.planName} · {subscription.paymentStatus}</span>
+                  </span>
+                  <span className="hidden shrink-0 text-right sm:block"><strong className="block text-sm">{formatAmount(subscription.amount)}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">/ {subscription.interval === 'MENSUEL' ? 'mois' : 'an'}</span></span>
+                  <ChevronRight size={16} className={isSelected ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'} />
+                </button>
+              );
+            })}
           </div>
         </section>
 
-        {selectedCompany && (
+        {selectedSubscription && (
           <section className="card-surface rounded-2xl p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Fiche abonnement</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-xl font-bold">{selectedCompany.name}</h2>
-                  <StatusBadge status={selectedCompany.status} />
-                </div>
-                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                  {selectedCompany.sector} · créée le {selectedCompany.createdAt}
-                </p>
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Souscription sélectionnée</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-bold">{selectedCompany?.name ?? selectedSubscription.companyId}</h2><StatusBadge status={selectedSubscription.status} /></div>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{selectedSubscription.planName} · créée le {formatDate(selectedSubscription.startedAt)}</p>
               </div>
-              <button
-                type="button"
-                title="Ouvrir la fiche entreprise"
-                onClick={() => onNavigate(`/maximus/entreprises/${selectedCompany.id}`)}
-                className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
-              >
-                <ChevronRight size={17} />
-              </button>
+              {selectedCompany && <button type="button" title="Ouvrir la fiche entreprise" onClick={() => onNavigate(`/maximus/entreprises/${selectedCompany.id}`)} className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))]"><Building2 size={17} /></button>}
             </div>
 
-            <div className="mt-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.3)] p-4">
-              <div className="flex items-start gap-3">
-                <CreditCard size={17} className="mt-0.5 text-[hsl(var(--primary))]" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold">Configuration sur mesure</p>
-                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                    Accès calculés à partir des modules et packs sélectionnés.
-                  </p>
-                  <span className="mt-3 inline-flex items-center rounded-full border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">
-                    Facturation à configurer
-                  </span>
-                </div>
-              </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-[hsl(var(--border))] p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Plan</p><strong className="mt-2 block text-lg">{selectedSubscription.planName}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedPlan?.description}</span></div>
+              <div className="rounded-xl border border-[hsl(var(--border))] p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Tarif</p><strong className="mt-2 block text-lg">{formatAmount(selectedSubscription.amount)}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">par {selectedSubscription.interval === 'MENSUEL' ? 'mois' : 'an'}</span></div>
             </div>
 
-            <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[
-                { label: 'Employés', value: selectedEmployees.length, icon: Users },
-                { label: 'Unités', value: selectedUnits.length, icon: GitBranch },
-                { label: 'Rôles', value: selectedRoles.length, icon: KeyRound },
-              ].map((metric) => {
-                const Icon = metric.icon;
-                return (
-                  <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] p-3">
-                    <Icon size={15} className="text-[hsl(var(--primary))]" />
-                    <strong className="mt-2 block text-lg">{metric.value}</strong>
-                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{metric.label}</span>
-                  </div>
-                );
-              })}
+                ['Début', formatDate(selectedSubscription.startedAt)],
+                ['Fin', formatDate(selectedSubscription.endsAt)],
+                ['Prochain renouvellement', formatDate(selectedSubscription.nextRenewalAt)],
+                ['Fin d’essai', formatDate(selectedSubscription.trialEndsAt)],
+              ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 text-xs"><span className="text-[hsl(var(--muted-foreground))]">{label}</span><strong>{value}</strong></div>)}
             </div>
 
-            <div className="mt-6">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold">Couverture des accès</p>
-                  <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
-                    {selectedCompany.allowedModules.length} actif(s) sur {selectedRequestedModules.length || selectedCompany.allowedModules.length} demandé(s)
-                  </p>
-                </div>
-                <strong className="text-sm text-[hsl(var(--primary))]">{coverage}%</strong>
-              </div>
-              <div className="mt-3 h-2 rounded-full bg-[hsl(var(--muted))]">
-                <div className="h-full rounded-full bg-[hsl(var(--primary))] transition-all" style={{ width: `${coverage}%` }} />
-              </div>
+            <div className="mt-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.28)] p-4">
+              <div className="flex items-start gap-3"><CreditCard size={17} className="mt-0.5 text-[hsl(var(--primary))]" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">Paiement</p><StatusBadge status={selectedSubscription.paymentStatus} /></div><p className="mt-2 text-sm font-semibold">{selectedSubscription.paymentMethod.label}{selectedSubscription.paymentMethod.last4 ? ` · ···· ${selectedSubscription.paymentMethod.last4}` : ''}</p></div></div>
             </div>
 
-            <div className="mt-6">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold">Modules actifs</p>
-                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedActiveModules.length} configuré(s)</span>
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {selectedActiveModules.map((module) => {
-                  const Icon = moduleIconById[module.id] ?? Package;
-                  return (
-                    <div key={module.id} className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5">
-                      <Icon size={14} className="text-[hsl(var(--primary))]" />
-                      <span className="min-w-0 flex-1 truncate text-xs font-semibold">{module.name}</span>
-                      <ShieldCheck size={13} className="text-emerald-600" />
-                    </div>
-                  );
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold">Limites du plan</p><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedEmployees} / {selectedSubscription.limits.employees} employés</span></div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Employés', used: selectedEmployees, limit: selectedSubscription.limits.employees, Icon: Users },
+                  { label: 'Modules', used: selectedSubscription.moduleIds.length, limit: selectedSubscription.limits.modules, Icon: Package },
+                  { label: 'Stockage', used: '—', limit: selectedSubscription.limits.storageGb, Icon: FolderKanban },
+                ].map(({ label, used, limit, Icon: MetricIcon }) => {
+                  return <div key={label} className="rounded-lg border border-[hsl(var(--border))] p-3"><MetricIcon size={14} className="text-[hsl(var(--primary))]" /><strong className="mt-2 block text-sm">{used} <span className="text-[10px] font-normal text-[hsl(var(--muted-foreground))]">/ {limit}{label === 'Stockage' ? ' Go' : ''}</span></strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{label}</span></div>;
                 })}
-                {selectedActiveModules.length === 0 && (
-                  <p className="col-span-full rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
-                    Aucun module actif pour cette entreprise.
-                  </p>
-                )}
               </div>
             </div>
 
-            {selectedMissingModules.length > 0 && (
-              <div className="mt-5 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.08)] p-3">
-                <p className="text-xs font-bold text-[hsl(var(--primary))]">Configuration à vérifier</p>
-                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                  {selectedMissingModules.length} module(s) demandé(s) ne sont pas encore actifs côté entreprise.
-                </p>
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold">Factures récentes</p><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedSubscription.invoices.length} document(s)</span></div>
+              <div className="mt-3 space-y-2">
+                {selectedSubscription.invoices.map((invoice) => <div key={invoice.id} className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5"><FileBarChart size={14} className="text-[hsl(var(--primary))]" /><div className="min-w-0 flex-1"><strong className="block truncate text-xs">{invoice.number}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">Échéance {formatDate(invoice.dueAt)}</span></div><span className="hidden text-xs font-bold sm:block">{formatAmount(invoice.amount)}</span><StatusBadge status={invoice.status} /></div>)}
+                {selectedSubscription.invoices.length === 0 && <p className="rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">Aucune facture enregistrée.</p>}
               </div>
-            )}
+            </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onNavigate(`/maximus/entreprises/${selectedCompany.id}`)}
-                className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
-              >
-                <Building2 size={14} />
-                Gérer l’entreprise
-              </button>
-              {selectedCompany.status === 'EN ATTENTE' && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('/maximus/demandes')}
-                  className="inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"
-                >
-                  <ClipboardCheck size={14} />
-                  Traiter la demande
-                </button>
-              )}
+            <div className="mt-5">
+              <p className="text-xs font-bold">Historique du cycle de vie</p>
+              <div className="mt-3 space-y-3 border-l border-[hsl(var(--border))] pl-4">
+                {selectedSubscription.history.map((event) => <div key={event.id} className="relative"><span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-[hsl(var(--primary))]" /><p className="text-xs font-semibold">{event.label}</p><p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{formatDate(event.date)} · {event.actor}</p></div>)}
+              </div>
             </div>
           </section>
         )}
       </div>
+
+      <section>
+        <div className="mb-3"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Catalogue</p><h2 className="mt-2 text-xl font-bold">Plans disponibles</h2></div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {subscriptionPlans.map((plan) => <section key={plan.id} className={`card-surface rounded-2xl p-5 ${selectedSubscription?.planId === plan.id ? 'border-[hsl(var(--primary)/.55)] ring-1 ring-[hsl(var(--primary)/.22)]' : ''}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{plan.name}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{plan.description}</p></div>{selectedSubscription?.planId === plan.id && <StatusBadge status="ACTIF" />}</div><p className="mt-5 text-2xl font-bold">{formatAmount(plan.monthlyAmount)}<span className="text-xs font-normal text-[hsl(var(--muted-foreground))]"> / mois</span></p><div className="mt-4 space-y-2 text-xs text-[hsl(var(--muted-foreground))]"><p className="flex justify-between"><span>Employés</span><strong className="text-[hsl(var(--foreground))]">{plan.limits.employees}</strong></p><p className="flex justify-between"><span>Modules</span><strong className="text-[hsl(var(--foreground))]">{plan.limits.modules}</strong></p><p className="flex justify-between"><span>Stockage</span><strong className="text-[hsl(var(--foreground))]">{plan.limits.storageGb} Go</strong></p></div></section>)}
+        </div>
+      </section>
     </div>
   );
 }
