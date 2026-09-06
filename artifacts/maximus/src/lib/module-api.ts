@@ -42,3 +42,7 @@ export async function setCompanyModuleAccess(companyId: string, moduleId: string
   }
   return (body as { module: ServerModuleAccess }).module;
 }
+
+export async function synchronizeCompanyModuleAccess(companyId: string, moduleIds: string[]) {
+  await Promise.all(moduleIds.map(moduleId => setCompanyModuleAccess(companyId, moduleId, 'ACTIF')));
+}

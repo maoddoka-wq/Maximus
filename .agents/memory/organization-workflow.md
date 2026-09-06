@@ -20,3 +20,9 @@ Les choix d’inscription doivent être matérialisés dès l’activation : uni
 **Why:** Conserver les choix uniquement dans la demande laisse les employés sans unité ni rôle compatible, même si l’entreprise voit correctement ses modules.
 
 **How to apply:** Utiliser un provisioning idempotent partagé par l’approbation MAXIMUS et la création administrative ; il doit réutiliser l’unité racine et ne pas dupliquer les rôles automatiques.
+
+Les modules autorisés doivent aussi être synchronisés dans `maximus_company_modules` côté Laravel ; sinon le bootstrap serveur renvoie `INACTIF` et masque les modules locaux après connexion.
+
+**Why:** L’interface locale peut afficher brièvement les modules avant que le bootstrap serveur ne remplace les statuts par ceux de PostgreSQL.
+
+**How to apply:** Écrire les accès serveur avant l’activation locale et resynchroniser les entreprises déjà actives lors d’une session MAXIMUS.

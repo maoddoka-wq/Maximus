@@ -89,7 +89,11 @@ import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/mod
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
-import { loadCompanyModuleAccess, setCompanyModuleAccess } from '@/lib/module-api';
+import {
+  loadCompanyModuleAccess,
+  setCompanyModuleAccess,
+  synchronizeCompanyModuleAccess,
+} from '@/lib/module-api';
 import {
   buildModulePack,
   defaultFeaturePermissions,
@@ -365,7 +369,7 @@ function AppContent() {
     if (session !== 'admin') return;
     const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF' && company.adminPassword);
     void Promise.allSettled(
-      activeCompanies.map((company) =>
+      activeCompanies.flatMap((company) => [
         authApi.provisionCompanyAdmin({
           id: `company-admin:${company.id}`,
           email: company.email,
@@ -373,7 +377,8 @@ function AppContent() {
           companyId: company.id,
           password: company.adminPassword as string,
         }),
-      ),
+        synchronizeCompanyModuleAccess(company.id, company.allowedModules),
+      ]),
     );
   }, [session]);
 
@@ -2696,6 +2701,7 @@ function RequestsPage({
         companyId: company.id,
         password: company.adminPassword,
       });
+      await synchronizeCompanyModuleAccess(company.id, company.requestedModules);
       mutate((d) => {
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
@@ -5828,6 +5834,7 @@ function AdminCreateCompanyPage({
   const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find((item) => item.name === nextSector);
     setSector(nextSector);
@@ -5841,7 +5848,7 @@ function AdminCreateCompanyPage({
     );
     setError('');
   };
-  const save = () => {
+  const save = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (
       !name.trim() ||
@@ -5863,41 +5870,49 @@ function AdminCreateCompanyPage({
       setError('Une entreprise utilise déjà cette adresse email.');
       return;
     }
-    mutate((draft) => {
+    setSaving(true);
+    try {
       const companyId = uid('company');
-      const preset = data.sectorPresets.find((item) => item.name === sector);
-      const newCompany: Company = {
-        id: companyId,
-        name: name.trim(),
-        manager: manager.trim(),
-        email: normalizedEmail,
-        adminPassword: password,
-        phone: '',
-        country: 'Sénégal',
-        sector,
-        status: 'ACTIF',
-        requestedModules: [...selectedModules],
-        allowedModules: [...selectedModules],
-        requestedModulePackIds: Object.fromEntries(
-          Object.entries(preset?.modulePackIds ?? {})
-            .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
-            .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
-        ),
-        refusedModules: [],
-        createdAt: new Date().toISOString().slice(0, 10),
-      };
-      draft.companies.push(newCompany);
-      provisionCompanyAccess(draft, newCompany, {
-        moduleIds: [...selectedModules],
-        modulePackIds: newCompany.requestedModulePackIds,
-        root: {
-          name: orgName.trim(),
-          code: orgCode.trim().toUpperCase(),
-          type: orgType,
-        },
-      });
-    }, 'Entreprise créée et activée.');
-    onComplete();
+      await synchronizeCompanyModuleAccess(companyId, selectedModules);
+      mutate((draft) => {
+        const preset = data.sectorPresets.find((item) => item.name === sector);
+        const newCompany: Company = {
+          id: companyId,
+          name: name.trim(),
+          manager: manager.trim(),
+          email: normalizedEmail,
+          adminPassword: password,
+          phone: '',
+          country: 'Sénégal',
+          sector,
+          status: 'ACTIF',
+          requestedModules: [...selectedModules],
+          allowedModules: [...selectedModules],
+          requestedModulePackIds: Object.fromEntries(
+            Object.entries(preset?.modulePackIds ?? {})
+              .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
+              .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+          ),
+          refusedModules: [],
+          createdAt: new Date().toISOString().slice(0, 10),
+        };
+        draft.companies.push(newCompany);
+        provisionCompanyAccess(draft, newCompany, {
+          moduleIds: [...selectedModules],
+          modulePackIds: newCompany.requestedModulePackIds,
+          root: {
+            name: orgName.trim(),
+            code: orgCode.trim().toUpperCase(),
+            type: orgType,
+          },
+        });
+      }, 'Entreprise créée et activée.');
+      onComplete();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'La synchronisation des modules a échoué.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -6042,6 +6057,7 @@ function AdminCreateCompanyPage({
           <button
             data-testid="button-cancel-admin-company"
             onClick={onCancel}
+            disabled={saving}
             className="rounded-lg border px-5 py-3 text-sm font-bold"
           >
             Annuler
@@ -6049,9 +6065,10 @@ function AdminCreateCompanyPage({
           <button
             data-testid="button-save-admin-company"
             onClick={save}
+            disabled={saving}
             className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
           >
-            Créer l’entreprise
+            {saving ? 'Synchronisation…' : 'Créer l’entreprise'}
           </button>
         </div>
       </section>
