@@ -26,3 +26,9 @@ Les modules autorisés doivent aussi être synchronisés dans `maximus_company_m
 **Why:** L’interface locale peut afficher brièvement les modules avant que le bootstrap serveur ne remplace les statuts par ceux de PostgreSQL.
 
 **How to apply:** Écrire les accès serveur avant l’activation locale et resynchroniser les entreprises déjà actives lors d’une session MAXIMUS.
+
+Les réponses d’accès modules doivent rester liées à l’entreprise demandée et ne doivent jamais être utilisées tant que leur contexte n’est pas prêt.
+
+**Why:** Un statut chargé pour une entreprise précédente peut afficher ou masquer les modules de la mauvaise entreprise pendant une transition de session.
+
+**How to apply:** Vérifier l’identifiant d’entreprise renvoyé par Laravel, bloquer l’interface pendant le chargement et afficher une erreur explicite en cas d’incohérence.

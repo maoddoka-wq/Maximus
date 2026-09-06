@@ -24,11 +24,18 @@ async function request<T>(path: string): Promise<T> {
   return body as T;
 }
 
-export async function loadCompanyModuleAccess(companyId: string): Promise<ServerModuleAccess[]> {
+export async function loadCompanyModuleAccess(companyId: string, expectedModuleIds: string[] = []): Promise<ServerModuleAccess[]> {
   const query = new URLSearchParams({ companyId });
   const result = await request<ModuleBootstrap>(`/modules/bootstrap?${query.toString()}`);
   if (result.companyId !== companyId || !Array.isArray(result.modules)) {
     throw new Error('La réponse des accès modules ne correspond pas à cette entreprise.');
+  }
+  const missing = expectedModuleIds.filter((moduleId) => {
+    const module = result.modules.find((item) => item.id === moduleId);
+    return !module || module.status === 'INACTIF';
+  });
+  if (missing.length > 0) {
+    throw new Error(`Les accès serveur sont incomplets pour : ${missing.join(', ')}.`);
   }
   return result.modules;
 }

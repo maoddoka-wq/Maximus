@@ -315,6 +315,7 @@ function AppContent() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
   const [serverModuleAccessReady, setServerModuleAccessReady] = useState(false);
+  const [serverModuleAccessCompanyId, setServerModuleAccessCompanyId] = useState<string | null>(null);
   const [serverModuleAccessError, setServerModuleAccessError] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('maximus-sidebar-collapsed') === 'true',
@@ -432,24 +433,28 @@ function AppContent() {
     if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
       setServerModuleStatuses(null);
       setServerModuleAccessReady(true);
+      setServerModuleAccessCompanyId(null);
       setServerModuleAccessError('');
       return;
     }
 
     let cancelled = false;
     setServerModuleAccessReady(false);
+    setServerModuleAccessCompanyId(null);
     setServerModuleAccessError('');
     void loadCompanyModuleAccess(activeCompanyId, activeCompany?.allowedModules ?? [])
       .then((access) => {
         if (!cancelled) {
           setServerModuleStatuses(Object.fromEntries(access.map((module) => [module.id, module.status])));
           setServerModuleAccessReady(true);
+          setServerModuleAccessCompanyId(activeCompanyId);
         }
       })
       .catch((error) => {
         if (!cancelled) {
           setServerModuleStatuses(Object.fromEntries(modules.map((module) => [module.id, 'INACTIF' as const])));
           setServerModuleAccessReady(true);
+          setServerModuleAccessCompanyId(activeCompanyId);
           setServerModuleAccessError(
             error instanceof Error
               ? error.message
@@ -717,7 +722,8 @@ function AppContent() {
     activeCompany: currentCompany,
     sectorTestCompanyId,
     serverModuleStatuses,
-    serverModuleAccessReady,
+    serverModuleAccessReady:
+      serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
   const baseMeta =
     pageMeta[location.split('?')[0]] ??
@@ -818,7 +824,7 @@ function AppContent() {
               onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/kora/dashboard')}
             />
           )}
-          {serverModuleAccessError && !isAdmin && (
+          {serverModuleAccessError && serverModuleAccessCompanyId === activeCompanyId && !isAdmin && (
             <div
               role="alert"
               className="mb-5 rounded-xl border border-[hsl(var(--destructive)/.35)] bg-[hsl(var(--destructive)/.08)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"
