@@ -16,3 +16,4 @@
 - [Exports Fast Refresh](fast-refresh-exports.md) — les fichiers de composants React doivent éviter les exports de constantes ou utilitaires non visuels.
 - [Frontière des abonnements](subscription-boundary.md) — un abonnement est une entité de facturation distincte des modules autorisés d’une entreprise.
 - [Publication du catalogue](catalog-workflow.md) — les changements modules, packs et secteurs restent en brouillon jusqu’à validation et publication explicite.
+- [Séparation production et démonstration](production-demo-separation.md) — les fixtures KORA restent locales et le fallback production ne doit contenir aucune donnée fictive.
