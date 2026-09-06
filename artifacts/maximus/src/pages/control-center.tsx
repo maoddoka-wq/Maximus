@@ -285,7 +285,7 @@ export function ControlCenterPage({
   return (
     <div className="space-y-6 pb-10" data-testid="control-center">
       <section className="card-surface overflow-hidden rounded-2xl border">
-        <div className="flex flex-col gap-4 bg-[hsl(var(--sidebar))] p-6 text-[hsl(var(--sidebar-foreground))] md:flex-row md:items-end md:justify-between">
+        <div className="mobile-hero flex flex-col gap-4 bg-[hsl(var(--sidebar))] p-6 text-[hsl(var(--sidebar-foreground))] md:flex-row md:items-end md:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--accent))]"><Workflow size={15} /> Couche de contrôle</div>
             <h2 className="text-2xl font-bold">Tâches, décisions et événements au même endroit.</h2>
@@ -296,7 +296,7 @@ export function ControlCenterPage({
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mobile-kpi-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'À traiter', value: pendingCount, icon: Clock3, color: 'text-amber-600', detail: 'tâches ouvertes' },
           { label: 'Approbations', value: approvalCount, icon: FileCheck2, color: 'text-blue-600', detail: 'décisions attendues' },

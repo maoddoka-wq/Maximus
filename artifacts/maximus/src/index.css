@@ -477,6 +477,45 @@ body {
     padding-bottom: 2rem;
   }
 
+  .mobile-stat-grid,
+  .mobile-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .65rem;
+  }
+
+  .mobile-stat-grid > .metric-card,
+  .mobile-kpi-grid > .metric-card {
+    min-width: 0;
+  }
+
+  .mobile-kpi-grid > * {
+    padding: .85rem;
+  }
+
+  .mobile-kpi-grid > * .text-3xl {
+    font-size: 1.65rem;
+  }
+
+  .mobile-hero {
+    padding: 1.1rem !important;
+  }
+
+  .mobile-hero h1,
+  .mobile-hero h2 {
+    font-size: 1.45rem;
+    line-height: 1.12;
+  }
+
+  .mobile-hero .module-tabs {
+    margin-top: 1rem;
+    padding-top: .75rem;
+  }
+
+  .page-pad .grid:has(> .metric-card) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .65rem;
+  }
+
   .page-header {
     min-height: 0;
     padding-bottom: 1rem;
@@ -519,18 +558,30 @@ body {
     min-width: 680px;
   }
 
-  .page-pad > .space-y-5 > .grid:has(> .metric-card),
-  .page-pad > .space-y-6 > .grid:has(> .metric-card) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .7rem;
-  }
-
   .page-pad .metric-card {
     min-height: 8.5rem;
-    padding: 1rem;
+    padding: .9rem;
   }
 
   .page-pad .metric-card .text-2xl {
-    font-size: 1.45rem;
+    font-size: 1.35rem;
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+  }
+
+  .page-pad .metric-card .text-xs {
+    line-height: 1.25;
+  }
+
+  .page-pad .metric-card .mt-5 {
+    margin-top: .8rem;
+  }
+
+  .page-pad .metric-card .mt-2 {
+    margin-top: .4rem;
+  }
+
+  .page-pad .metric-card .mt-1 {
+    margin-top: .25rem;
   }
 }

@@ -2051,7 +2051,7 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
   const pending = data.companies.filter((c) => c.status === 'EN ATTENTE').length;
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         <Metric
           label="Entreprises actives"
           value={String(data.companies.filter((c) => c.status === 'ACTIF').length)}
@@ -2213,7 +2213,7 @@ function RoleAwareKoraDashboard({
           : 'Voir mon organisation';
   return (
     <div className="space-y-6">
-      <div className={`grid gap-4 md:grid-cols-2 ${cards.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
+      <div className={`mobile-stat-grid grid gap-4 md:grid-cols-2 ${cards.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
         {cards.length ? (
           cards
         ) : (
@@ -2322,7 +2322,7 @@ function KoraDashboard({
   const canPresences = allowed.includes('presences');
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Encaissements du mois"
           value={shortMoney(revenue)}
@@ -4244,7 +4244,7 @@ function KoraRolesPage({
           Ajouter un rôle
         </ActionButton>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         {data.roles.map((r) => (
           <section data-testid={`card-kora-role-${r.id}`} key={r.id} className="card-surface rounded-2xl p-5">
             <div className="flex items-start justify-between">
@@ -4373,7 +4373,7 @@ function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreD
   };
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         <Metric
           label="Références actives"
           value={String(data.products.length)}
@@ -4536,7 +4536,7 @@ function FinancePage({
   };
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         <Metric
           label="Revenus encaissés"
           value={shortMoney(confirmed.reduce((a, p) => a + p.amount, 0))}
