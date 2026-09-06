@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, type LucideIcon } from 'lucide-react';
 import {
   modules as allModules,
   stockSubmodules,
@@ -23,6 +23,16 @@ export const companyThemePresets = [
 
 export const isHexColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
 
+type ActionButtonProps = {
+  children: React.ReactNode;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  primary?: boolean;
+  testId?: string;
+  icon?: LucideIcon;
+  disabled?: boolean;
+  className?: string;
+};
+
 export function ActionButton({
   children,
   onClick,
@@ -31,7 +41,7 @@ export function ActionButton({
   icon: ButtonIcon = Plus,
   disabled = false,
   className = '',
-}: any) {
+}: ActionButtonProps) {
   return (
     <button
       disabled={disabled}
@@ -82,7 +92,15 @@ export function Field({
   testId,
   placeholder = '',
   help,
-}: any) {
+}: {
+  label: React.ReactNode;
+  value: string | number;
+  onChange: (value: string) => void;
+  type?: React.HTMLInputTypeAttribute;
+  testId?: string;
+  placeholder?: string;
+  help?: string;
+}) {
   const explanation =
     help ?? `Saisissez ${String(label).toLowerCase().replace(' *', '')}.`;
 

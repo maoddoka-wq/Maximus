@@ -88,8 +88,34 @@ export interface AppNotification {
   href?: string;
 }
 export interface NotificationContext { isAdmin: boolean; companyId?: string; }
-export interface StoreData { companies: Company[]; employees: Employee[]; roles: Role[]; products: Product[]; movements: Movement[]; sales: Sale[]; payments: Payment[]; activities: Activity[]; controlTasks: ControlTask[]; domainEvents: DomainEvent[]; auditEntries: AuditEntry[]; orgNodes: OrgNode[]; notifications: AppNotification[]; purchaseOrders: PurchaseOrder[]; accountingEntries: AccountingEntry[]; payrollSlips: PayrollSlip[]; crmOpportunities: CrmOpportunity[]; supplierRecords: SupplierRecord[]; deliveries: Delivery[]; businessDocuments: BusinessDocument[]; sectorPresets: SectorPreset[]; moduleStatuses?: ModuleStatusMap; moduleOverrides?: ModuleOverrides; removedModules?: ModuleId[]; }
-export interface StoreData { catalogVersion?: number; organizationVersion?: number; }
+export interface StoreData {
+  companies: Company[];
+  employees: Employee[];
+  roles: Role[];
+  products: Product[];
+  movements: Movement[];
+  sales: Sale[];
+  payments: Payment[];
+  activities: Activity[];
+  controlTasks: ControlTask[];
+  domainEvents: DomainEvent[];
+  auditEntries: AuditEntry[];
+  orgNodes: OrgNode[];
+  notifications: AppNotification[];
+  purchaseOrders: PurchaseOrder[];
+  accountingEntries: AccountingEntry[];
+  payrollSlips: PayrollSlip[];
+  crmOpportunities: CrmOpportunity[];
+  supplierRecords: SupplierRecord[];
+  deliveries: Delivery[];
+  businessDocuments: BusinessDocument[];
+  sectorPresets: SectorPreset[];
+  moduleStatuses?: ModuleStatusMap;
+  moduleOverrides?: ModuleOverrides;
+  removedModules?: ModuleId[];
+  catalogVersion?: number;
+  organizationVersion?: number;
+}
 
 const today = new Date().toISOString();
 export const modules: Module[] = [
