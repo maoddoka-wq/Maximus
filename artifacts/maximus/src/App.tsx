@@ -5131,6 +5131,7 @@ function InteractiveModulesPage({
   notify: (message: string) => void;
 }) {
   const [search] = useSearch();
+  const [, setLocation] = useLocation();
   const readSelectedModule = (value: string) => {
     const requested = new URLSearchParams(value).get('module');
     return requested && modules.some((module) => module.id === requested) ? (requested as ModuleId) : null;
@@ -5172,8 +5173,7 @@ function InteractiveModulesPage({
             ? 0
             : 1,
     };
-    window.history[replace ? 'replaceState' : 'pushState'](historyState, '', nextUrl);
-    window.dispatchEvent(new Event(replace ? 'replaceState' : 'pushState'));
+    setLocation(nextUrl, { replace, state: historyState });
     setSelectedId(moduleId);
   };
   const statusOf = (moduleId: ModuleId): ModuleAvailability =>
