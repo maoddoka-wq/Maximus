@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -5136,6 +5136,8 @@ function InteractiveModulesPage({
     const requested = new URLSearchParams(value).get('module');
     return requested && modules.some((module) => module.id === requested) ? (requested as ModuleId) : null;
   };
+  const [selectedId, setSelectedId] = useState<ModuleId | null>(() => readSelectedModule(search));
+  const pendingSelection = useRef<ModuleId | null | undefined>(undefined);
   const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
   const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
@@ -5151,7 +5153,14 @@ function InteractiveModulesPage({
   const moduleDefinitions = modules
     .filter((module) => !catalog.removedModules.includes(module.id))
     .map((module) => ({ ...module, ...(catalog.moduleOverrides[module.id] ?? {}) }));
-  const selectedId = readSelectedModule(search);
+  useEffect(() => {
+    const requested = readSelectedModule(search);
+    if (pendingSelection.current !== undefined) {
+      if (requested !== pendingSelection.current) return;
+      pendingSelection.current = undefined;
+    }
+    setSelectedId(requested);
+  }, [search]);
   const selectModule = (moduleId: ModuleId | null, replace = false) => {
     const url = new URL(window.location.href);
     if (moduleId) {
@@ -5170,6 +5179,8 @@ function InteractiveModulesPage({
             ? 0
             : 1,
     };
+    pendingSelection.current = moduleId;
+    setSelectedId(moduleId);
     setLocation(nextUrl, { replace, state: historyState });
   };
   const statusOf = (moduleId: ModuleId): ModuleAvailability =>
