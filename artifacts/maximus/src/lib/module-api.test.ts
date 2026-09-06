@@ -51,6 +51,28 @@ test('refuse un accès attendu absent ou inactif', async () => {
   );
 });
 
+test('ignore les anciens identifiants de modules sans masquer les modules actifs', async () => {
+  globalThis.fetch = async () =>
+    jsonResponse({
+      companyId: 'ana',
+      modules: [
+        {
+          id: 'stocks',
+          name: 'Gestion de stock',
+          description: '',
+          features: [],
+          status: 'ACTIF',
+          featureIds: [],
+          configuration: {},
+        },
+      ],
+    });
+
+  const access = await loadCompanyModuleAccess('ana', ['stocks', 'rapports']);
+
+  assert.deepEqual(access.map(module => module.id), ['stocks']);
+});
+
 test('synchronise tous les modules et confirme leur activation', async () => {
   const requests: string[] = [];
   globalThis.fetch = async (input, init) => {

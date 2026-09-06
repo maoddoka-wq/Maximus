@@ -32,3 +32,9 @@ Les réponses d’accès modules doivent rester liées à l’entreprise demand�
 **Why:** Un statut chargé pour une entreprise précédente peut afficher ou masquer les modules de la mauvaise entreprise pendant une transition de session.
 
 **How to apply:** Vérifier l’identifiant d’entreprise renvoyé par Laravel, bloquer l’interface pendant le chargement et afficher une erreur explicite en cas d’incohérence.
+
+Les fiches `companies` sont filtrées par leur champ `id`, contrairement aux autres enregistrements métier qui portent `companyId`; toute restriction ou fusion serveur doit traiter explicitement cette différence.
+
+**Why:** Un filtre uniforme sur `companyId` renvoie un état vide aux comptes entreprise et masque simultanément leurs modules, fonctionnalités et employés.
+
+**How to apply:** Centraliser la résolution du périmètre entreprise dans un helper partagé par bootstrap et sauvegarde, puis couvrir séparément une session entreprise et une session employé.

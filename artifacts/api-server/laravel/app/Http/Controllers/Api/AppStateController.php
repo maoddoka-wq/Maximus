@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuthUser;
+use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,20 @@ class AppStateController extends Controller
         if (!is_array($state)) {
             $state = [];
         }
+        if (empty($state['companies']) && AuthUser::query()->whereNotNull('company_id')->exists()) {
+            $state = $this->recoverStateFromAccounts();
+            $nextVersion = ((int) ($row?->version ?? 0)) + 1;
+            DB::table('maximus_app_states')->updateOrInsert(
+                ['scope' => 'workspace'],
+                [
+                    'company_id' => null,
+                    'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'version' => $nextVersion,
+                    'updated_at' => now(),
+                    'created_at' => $row?->created_at ?? now(),
+                ],
+            );
+        }
 
         if (($actor['role'] ?? null) !== 'maximus_admin') {
             $state = $this->restrictToCompany($state, (string) ($actor['companyId'] ?? ''));
@@ -36,6 +52,125 @@ class AppStateController extends Controller
             'version' => (int) ($row?->version ?? 0),
             'data' => $state,
         ]);
+    }
+
+    /**
+     * Rebuild only the minimum business state needed to reconnect accounts when
+     * the app-state row was not persisted, using auth and module-access records.
+     * This is deliberately idempotent and never copies password data.
+     */
+    private function recoverStateFromAccounts(): array
+    {
+        ModuleCatalog::ensureCatalog();
+
+        $users = AuthUser::query()
+            ->whereNotNull('company_id')
+            ->where('status', 'ACTIF')
+            ->orderBy('created_at')
+            ->get();
+        $accessRows = DB::table('maximus_company_modules')
+            ->whereIn('company_id', $users->pluck('company_id')->filter()->unique()->values()->all())
+            ->get()
+            ->groupBy('company_id');
+        $definitions = collect(ModuleCatalog::definitions())->keyBy('id');
+        $companyIds = $users->pluck('company_id')->filter()->unique()->values();
+
+        $companies = $companyIds->map(function (string $companyId) use ($users, $accessRows): array {
+            $admin = $users->first(
+                fn (AuthUser $user): bool => $user->company_id === $companyId && $user->role === 'company_admin',
+            );
+            $allowedModules = collect($accessRows->get($companyId, []))
+                ->filter(fn (object $row): bool => in_array($row->status, ['ACTIF', 'BETA'], true))
+                ->pluck('module_id')
+                ->values()
+                ->all();
+            $displayName = trim((string) ($admin?->display_name ?? ''));
+            $createdAt = ($admin?->created_at ?? now())->toISOString();
+
+            return [
+                'id' => $companyId,
+                'name' => $displayName !== '' ? $displayName : $companyId,
+                'manager' => $displayName !== '' ? $displayName : 'Administrateur',
+                'email' => (string) ($admin?->email ?? ''),
+                'phone' => '',
+                'country' => '',
+                'sector' => '',
+                'status' => 'ACTIF',
+                'requestedModules' => $allowedModules,
+                'allowedModules' => $allowedModules,
+                'refusedModules' => [],
+                'createdAt' => $createdAt,
+            ];
+        })->values()->all();
+
+        $nodes = [];
+        foreach ($users as $user) {
+            $companyId = (string) $user->company_id;
+            foreach (array_values(array_filter($user->sector_ids ?? [])) as $sectorId) {
+                $nodeId = (string) $sectorId;
+                if (isset($nodes[$nodeId])) {
+                    continue;
+                }
+                $allowedModules = collect($accessRows->get($companyId, []))
+                    ->filter(fn (object $row): bool => in_array($row->status, ['ACTIF', 'BETA'], true))
+                    ->pluck('module_id')
+                    ->values()
+                    ->all();
+                $nodes[$nodeId] = [
+                    'id' => $nodeId,
+                    'companyId' => $companyId,
+                    'name' => 'Unité '.$nodeId,
+                    'code' => 'UNIT',
+                    'type' => 'service',
+                    'parentId' => null,
+                    'moduleIds' => $allowedModules,
+                ];
+            }
+        }
+
+        $roles = [];
+        $employees = [];
+        foreach ($users->filter(fn (AuthUser $user): bool => $user->employee_id !== null) as $user) {
+            $sectorId = array_values(array_filter($user->sector_ids ?? []))[0] ?? null;
+            $roleId = 'recovered-role-'.$user->id;
+            $permissions = is_array($user->permissions) ? $user->permissions : [];
+            $roles[] = [
+                'id' => $roleId,
+                'name' => trim((string) $user->display_name) !== '' ? trim((string) $user->display_name) : (string) $user->role,
+                'description' => 'Rôle récupéré depuis le compte authentifié.',
+                'companyId' => (string) $user->company_id,
+                'sectorId' => $sectorId,
+                'modulePermissions' => $permissions,
+            ];
+            $parts = preg_split('/\s+/', trim((string) $user->display_name), 2) ?: [];
+            $employees[] = [
+                'id' => (string) $user->employee_id,
+                'firstName' => $parts[0] ?? 'Employé',
+                'lastName' => $parts[1] ?? 'MAXIMUS',
+                'email' => (string) $user->email,
+                'phone' => '',
+                'position' => (string) $user->role,
+                'department' => '',
+                'subDepartment' => '',
+                'role' => (string) $user->role,
+                'status' => 'ACTIF',
+                'companyId' => (string) $user->company_id,
+                'sectorId' => $sectorId,
+                'roleId' => $roleId,
+                'isSectorAdmin' => $user->role === 'sector_manager',
+            ];
+        }
+
+        return [
+            'companies' => $companies,
+            'employees' => $employees,
+            'roles' => $roles,
+            'orgNodes' => array_values($nodes),
+            'subscriptions' => [],
+            'commerceStates' => [],
+            'moduleOverrides' => [],
+            'removedModules' => [],
+        ];
     }
 
     public function save(Request $request): JsonResponse
@@ -126,8 +261,7 @@ class AppStateController extends Controller
             }
             $state[$key] = array_values(array_filter(
                 $state[$key],
-                static fn (mixed $item): bool => is_array($item)
-                    && (($item['companyId'] ?? $item['company_id'] ?? null) === $companyId),
+                fn (mixed $item): bool => $this->belongsToCompany($item, $companyId, $key),
             ));
         }
 
@@ -161,8 +295,7 @@ class AppStateController extends Controller
 
             $existing = collect($current[$key]);
             $incomingCompanyRecords = collect($value)->filter(
-                static fn (mixed $item): bool => is_array($item)
-                    && (($item['companyId'] ?? $item['company_id'] ?? null) === $companyId),
+                fn (mixed $item): bool => $this->belongsToCompany($item, $companyId, $key),
             );
             if ($incomingCompanyRecords->isEmpty()) {
                 continue;
@@ -170,13 +303,25 @@ class AppStateController extends Controller
 
             $ids = $incomingCompanyRecords->pluck('id')->filter()->all();
             $preserved = $existing->filter(
-                static fn (mixed $item): bool => !is_array($item)
-                    || (($item['companyId'] ?? $item['company_id'] ?? null) !== $companyId
-                        && !in_array($item['id'] ?? null, $ids, true)),
+                fn (mixed $item): bool => !$this->belongsToCompany($item, $companyId, $key)
+                    && (!is_array($item) || !in_array($item['id'] ?? null, $ids, true)),
             );
             $current[$key] = $preserved->concat($incomingCompanyRecords)->values()->all();
         }
 
         return $current;
+    }
+
+    private function belongsToCompany(mixed $item, string $companyId, string $key): bool
+    {
+        if (!is_array($item)) {
+            return false;
+        }
+
+        $recordCompanyId = $key === 'companies'
+            ? ($item['id'] ?? null)
+            : ($item['companyId'] ?? $item['company_id'] ?? null);
+
+        return $recordCompanyId === $companyId;
     }
 }

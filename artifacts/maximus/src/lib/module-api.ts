@@ -1,4 +1,4 @@
-import type { ModuleAvailability } from './store';
+import { modules, type ModuleAvailability } from './store';
 
 export type ServerModuleAccess = {
   id: string;
@@ -30,7 +30,9 @@ export async function loadCompanyModuleAccess(companyId: string, expectedModuleI
   if (result.companyId !== companyId || !Array.isArray(result.modules)) {
     throw new Error('La réponse des accès modules ne correspond pas à cette entreprise.');
   }
+  const knownModuleIds = new Set(modules.map(module => module.id));
   const missing = expectedModuleIds.filter((moduleId) => {
+    if (!knownModuleIds.has(moduleId as (typeof modules)[number]['id'])) return false;
     const module = result.modules.find((item) => item.id === moduleId);
     return !module || module.status === 'INACTIF';
   });
