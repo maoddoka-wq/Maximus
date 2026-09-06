@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, presenceItemsTable } from "@workspace/db";
@@ -28,7 +28,7 @@ const clockInput = z.object({
   tolerance: z.coerce.number().int().nonnegative().default(10),
 });
 const idOf = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
-const companyOf = (req: any) => typeof req.query.companyId === "string" ? req.query.companyId : typeof req.body?.companyId === "string" ? req.body.companyId : "";
+const companyOf = (req: Request) => typeof req.query.companyId === "string" ? req.query.companyId : typeof req.body?.companyId === "string" ? req.body.companyId : "";
 const minutes = (value: string) => { const [hours, mins] = value.split(":").map(Number); return hours * 60 + mins; };
 
 async function writeHistory(companyId: string, actor: string, action: string, payload: Record<string, unknown>) {

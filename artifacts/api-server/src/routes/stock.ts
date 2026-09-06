@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@workspace/db";
@@ -92,8 +92,8 @@ const requestInput = z.object({
 });
 
 const idOf = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
-const jsonError = (res: Parameters<IRouter["get"]>[1] extends never ? never : any, status: number, message: string) => res.status(status).json({ error: message });
-const companyIdOf = (req: any) => typeof req.query.companyId === "string" ? req.query.companyId : typeof req.body?.companyId === "string" ? req.body.companyId : COMPANY_ID;
+const jsonError = (res: Response, status: number, message: string) => res.status(status).json({ error: message });
+const companyIdOf = (req: Request) => typeof req.query.companyId === "string" ? req.query.companyId : typeof req.body?.companyId === "string" ? req.body.companyId : COMPANY_ID;
 
 async function ensureSeed() {
   const [existing] = await db.select({ id: stockProductsTable.id }).from(stockProductsTable).where(eq(stockProductsTable.companyId, COMPANY_ID)).limit(1);
@@ -141,7 +141,9 @@ async function getBootstrap(companyId: string) {
   return { products, warehouses, locations, suppliers, balances, movements, requests, inventories, inventoryLines };
 }
 
-async function updateBalance(tx: any, companyId: string, productId: string, warehouseId: string, locationId: string | null | undefined, delta: number) {
+type StockTransaction = Pick<typeof db, "select" | "insert" | "update">;
+
+async function updateBalance(tx: StockTransaction, companyId: string, productId: string, warehouseId: string, locationId: string | null | undefined, delta: number) {
   const conditions = [eq(stockBalancesTable.companyId, companyId), eq(stockBalancesTable.productId, productId), eq(stockBalancesTable.warehouseId, warehouseId), locationId ? eq(stockBalancesTable.locationId, locationId) : sql`${stockBalancesTable.locationId} is null`];
   const [balance] = await tx.select().from(stockBalancesTable).where(and(...conditions)).limit(1);
   if (!balance) {
