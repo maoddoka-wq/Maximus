@@ -3372,27 +3372,311 @@ function RolesPage({ data, onNavigate }: { data: StoreData; onNavigate: (path: s
     </div>
   );
 }
-function SubscriptionsPage({ data }: { data: StoreData }) {
+function SubscriptionsPage({
+  data,
+  onNavigate,
+}: {
+  data: StoreData;
+  onNavigate: (path: string) => void;
+}) {
+  const [selectedCompanyId, setSelectedCompanyId] = useState(data.companies[0]?.id ?? '');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (data.companies.some((company) => company.id === selectedCompanyId)) return;
+    setSelectedCompanyId(data.companies[0]?.id ?? '');
+  }, [data.companies, selectedCompanyId]);
+
+  const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF');
+  const pendingCompanies = data.companies.filter((company) => company.status === 'EN ATTENTE');
+  const configuredModules = data.companies.reduce((total, company) => total + company.allowedModules.length, 0);
+  const filteredCompanies = data.companies.filter((company) => {
+    const query = searchTerm.trim().toLowerCase();
+    return !query || `${company.name} ${company.email} ${company.sector}`.toLowerCase().includes(query);
+  });
+  const selectedCompany = data.companies.find((company) => company.id === selectedCompanyId);
+  const selectedEmployees = selectedCompany
+    ? data.employees.filter((employee) => employee.companyId === selectedCompany.id)
+    : [];
+  const selectedUnits = selectedCompany
+    ? data.orgNodes.filter((node) => node.companyId === selectedCompany.id)
+    : [];
+  const selectedRoles = selectedCompany
+    ? data.roles.filter((role) => role.companyId === selectedCompany.id)
+    : [];
+  const selectedRequestedModules = selectedCompany?.requestedModules ?? [];
+  const selectedActiveModules = selectedCompany
+    ? modules.filter((module) => selectedCompany.allowedModules.includes(module.id))
+    : [];
+  const selectedMissingModules = selectedRequestedModules.filter(
+    (moduleId) => !selectedCompany?.allowedModules.includes(moduleId),
+  );
+  const coverage = selectedRequestedModules.length
+    ? Math.min(100, Math.round((selectedCompany?.allowedModules.length ?? 0) / selectedRequestedModules.length * 100))
+    : selectedCompany?.allowedModules.length
+      ? 100
+      : 0;
+
+  if (data.companies.length === 0) {
+    return (
+      <EmptyState
+        title="Aucun abonnement à suivre"
+        text="Les abonnements apparaîtront ici dès qu’une entreprise sera créée ou validée."
+        action={() => onNavigate('/maximus/demandes')}
+      />
+    );
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {data.companies.map((c) => (
-        <section className="card-surface rounded-2xl p-5" key={c.id}>
-          <div className="flex items-center justify-between">
-            <span className="font-bold">{c.name}</span>
-            <StatusBadge status={c.status} />
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(120deg,hsl(var(--sidebar)),hsl(var(--sidebar)/.88))] p-6 text-[hsl(var(--sidebar-foreground))] shadow-sm sm:p-8">
+        <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div className="max-w-2xl">
+            <p className="mono text-[10px] uppercase tracking-[.22em] text-[hsl(var(--accent))]">
+              Portefeuille & accès
+            </p>
+            <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+              Une vue fiable de ce qui est réellement actif.
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--sidebar-foreground)/.72)]">
+              Suivez les entreprises, les modules autorisés et les éléments à régulariser depuis un seul espace.
+              Les accès sont pilotés par entreprise ; aucune donnée de facturation n’est inventée ici.
+            </p>
           </div>
-          <p className="mt-6 text-3xl font-bold">Sur mesure</p>
-          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-            Facturation mensuelle · {c.allowedModules.length} modules
-          </p>
-          <div className="mt-5 h-1.5 rounded-full bg-[hsl(var(--muted))]">
-            <div
-              className="h-full rounded-full bg-[hsl(var(--primary))]"
-              style={{ width: `${Math.max(12, c.allowedModules.length * 20)}%` }}
-            />
+          <div className="flex shrink-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+            <ShieldCheck size={20} className="text-[hsl(var(--accent))]" />
+            <div>
+              <p className="text-xs font-bold">Accès contrôlés</p>
+              <p className="mt-1 text-[10px] text-[hsl(var(--sidebar-foreground)/.62)]">
+                Synchronisation par entreprise
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="absolute -right-14 -top-16 h-48 w-48 rounded-full border border-white/10 bg-white/[.03]" />
+        <div className="absolute -bottom-28 right-24 h-48 w-48 rounded-full border border-[hsl(var(--accent)/.18)]" />
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Entreprises suivies', value: data.companies.length, detail: 'dans le portefeuille', icon: Building2 },
+          { label: 'Actives', value: activeCompanies.length, detail: 'espaces opérationnels', icon: ShieldCheck },
+          { label: 'Modules configurés', value: configuredModules, detail: 'accès cumulés', icon: Package },
+          { label: 'À traiter', value: pendingCompanies.length, detail: 'demandes en attente', icon: ClipboardCheck },
+        ].map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <section key={metric.label} data-testid={`subscription-metric-${metric.label}`} className="card-surface rounded-2xl p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">{metric.label}</p>
+                  <p className="mt-3 text-2xl font-bold tracking-tight">{metric.value}</p>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{metric.detail}</p>
+                </div>
+                <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-2.5 text-[hsl(var(--primary))]">
+                  <Icon size={17} />
+                </span>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(380px,.95fr)]">
+        <section className="card-surface overflow-hidden rounded-2xl">
+          <div className="border-b border-[hsl(var(--border))] p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div>
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Portefeuille</p>
+                <h2 className="mt-2 text-xl font-bold">Entreprises et accès</h2>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                  Sélectionnez une entreprise pour inspecter sa configuration.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('/maximus/demandes')}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.55)]"
+              >
+                <FileClock size={14} />
+                Voir les demandes
+              </button>
+            </div>
+            <label className="relative mt-5 block">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Rechercher une entreprise, un secteur…"
+                className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[hsl(var(--primary))]"
+              />
+            </label>
+          </div>
+          <div className="divide-y divide-[hsl(var(--border))]">
+            {filteredCompanies.length === 0 ? (
+              <p className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune entreprise ne correspond à cette recherche.</p>
+            ) : (
+              filteredCompanies.map((company) => {
+                const isSelected = company.id === selectedCompanyId;
+                const companyModuleCount = company.allowedModules.length;
+                return (
+                  <button
+                    type="button"
+                    key={company.id}
+                    data-testid={`subscription-company-${company.id}`}
+                    onClick={() => setSelectedCompanyId(company.id)}
+                    className={`flex w-full items-center gap-4 px-5 py-4 text-left transition sm:px-6 ${isSelected ? 'bg-[hsl(var(--primary)/.07)]' : 'hover:bg-[hsl(var(--muted)/.35)]'}`}
+                  >
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${isSelected ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))]'}`}>
+                      {company.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <strong className="truncate text-sm">{company.name}</strong>
+                        <StatusBadge status={company.status} />
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">
+                        {company.sector} · {company.email}
+                      </span>
+                    </span>
+                    <span className="hidden shrink-0 text-right sm:block">
+                      <strong className="block text-sm">{companyModuleCount}</strong>
+                      <span className="text-[10px] text-[hsl(var(--muted-foreground))]">modules actifs</span>
+                    </span>
+                    <ChevronRight size={16} className={isSelected ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'} />
+                  </button>
+                );
+              })
+            )}
           </div>
         </section>
-      ))}
+
+        {selectedCompany && (
+          <section className="card-surface rounded-2xl p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Fiche abonnement</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-xl font-bold">{selectedCompany.name}</h2>
+                  <StatusBadge status={selectedCompany.status} />
+                </div>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                  {selectedCompany.sector} · créée le {selectedCompany.createdAt}
+                </p>
+              </div>
+              <button
+                type="button"
+                title="Ouvrir la fiche entreprise"
+                onClick={() => onNavigate(`/maximus/entreprises/${selectedCompany.id}`)}
+                className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.3)] p-4">
+              <div className="flex items-start gap-3">
+                <CreditCard size={17} className="mt-0.5 text-[hsl(var(--primary))]" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold">Configuration sur mesure</p>
+                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                    Accès calculés à partir des modules et packs sélectionnés.
+                  </p>
+                  <span className="mt-3 inline-flex items-center rounded-full border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">
+                    Facturation à configurer
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {[
+                { label: 'Employés', value: selectedEmployees.length, icon: Users },
+                { label: 'Unités', value: selectedUnits.length, icon: GitBranch },
+                { label: 'Rôles', value: selectedRoles.length, icon: KeyRound },
+              ].map((metric) => {
+                const Icon = metric.icon;
+                return (
+                  <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] p-3">
+                    <Icon size={15} className="text-[hsl(var(--primary))]" />
+                    <strong className="mt-2 block text-lg">{metric.value}</strong>
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{metric.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold">Couverture des accès</p>
+                  <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                    {selectedCompany.allowedModules.length} actif(s) sur {selectedRequestedModules.length || selectedCompany.allowedModules.length} demandé(s)
+                  </p>
+                </div>
+                <strong className="text-sm text-[hsl(var(--primary))]">{coverage}%</strong>
+              </div>
+              <div className="mt-3 h-2 rounded-full bg-[hsl(var(--muted))]">
+                <div className="h-full rounded-full bg-[hsl(var(--primary))] transition-all" style={{ width: `${coverage}%` }} />
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold">Modules actifs</p>
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedActiveModules.length} configuré(s)</span>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {selectedActiveModules.map((module) => {
+                  const Icon = moduleIconById[module.id] ?? Package;
+                  return (
+                    <div key={module.id} className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5">
+                      <Icon size={14} className="text-[hsl(var(--primary))]" />
+                      <span className="min-w-0 flex-1 truncate text-xs font-semibold">{module.name}</span>
+                      <ShieldCheck size={13} className="text-emerald-600" />
+                    </div>
+                  );
+                })}
+                {selectedActiveModules.length === 0 && (
+                  <p className="col-span-full rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
+                    Aucun module actif pour cette entreprise.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {selectedMissingModules.length > 0 && (
+              <div className="mt-5 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.08)] p-3">
+                <p className="text-xs font-bold text-[hsl(var(--primary))]">Configuration à vérifier</p>
+                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  {selectedMissingModules.length} module(s) demandé(s) ne sont pas encore actifs côté entreprise.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigate(`/maximus/entreprises/${selectedCompany.id}`)}
+                className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+              >
+                <Building2 size={14} />
+                Gérer l’entreprise
+              </button>
+              {selectedCompany.status === 'EN ATTENTE' && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/maximus/demandes')}
+                  className="inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"
+                >
+                  <ClipboardCheck size={14} />
+                  Traiter la demande
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

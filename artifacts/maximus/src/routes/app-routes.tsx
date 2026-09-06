@@ -97,7 +97,7 @@ export function AdminRouter({
     return renderScreen(screens.sectors, { data, mutate, onTestSector });
   }
   if (routePath === '/maximus/abonnements') {
-    return renderScreen(screens.subscriptions, { data });
+    return renderScreen(screens.subscriptions, { data, onNavigate });
   }
   if (routePath === '/maximus/notifications') {
     return renderScreen(screens.notifications, { data, mutate, context: { isAdmin: true } });
