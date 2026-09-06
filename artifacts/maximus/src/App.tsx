@@ -118,14 +118,21 @@ import { useDebouncedPersistence } from '@/hooks/use-persisted-store';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
-const defaultDemoAccounts = [
-  { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
-  { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
-  { id: 'demo-emp-awa', label: 'Awa Ndiaye · Gestionnaire commerciale', email: 'awa.ndiaye@kora.demo', password: 'AwaKora2026!' },
-  { id: 'demo-emp-ibrahima', label: 'Ibrahima Kane · Responsable magasin', email: 'ibrahima.kane@kora.demo', password: 'IbrahimaKora2026!' },
-  { id: 'demo-emp-ndeye', label: 'Ndeye Sarr · Assistante RH', email: 'ndeye.sarr@kora.demo', password: 'NdeyeKora2026!' },
-  { id: 'demo-emp-mamadou', label: 'Mamadou Ba · Comptable', email: 'mamadou.ba@kora.demo', password: 'MamadouKora2026!' },
-] as const;
+const defaultDemoAccounts = import.meta.env.DEV
+  ? [
+      { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
+      { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
+      { id: 'demo-emp-awa', label: 'Awa Ndiaye · Gestionnaire commerciale', email: 'awa.ndiaye@kora.demo', password: 'AwaKora2026!' },
+      {
+        id: 'demo-emp-ibrahima',
+        label: 'Ibrahima Kane · Responsable magasin',
+        email: 'ibrahima.kane@kora.demo',
+        password: 'IbrahimaKora2026!',
+      },
+      { id: 'demo-emp-ndeye', label: 'Ndeye Sarr · Assistante RH', email: 'ndeye.sarr@kora.demo', password: 'NdeyeKora2026!' },
+      { id: 'demo-emp-mamadou', label: 'Mamadou Ba · Comptable', email: 'mamadou.ba@kora.demo', password: 'MamadouKora2026!' },
+    ]
+  : [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const OperationalModulePage = lazy(() =>

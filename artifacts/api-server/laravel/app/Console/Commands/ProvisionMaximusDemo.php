@@ -14,6 +14,12 @@ class ProvisionMaximusDemo extends Command
 
     public function handle(): int
     {
+        if ($this->laravel->environment('production')) {
+            $this->error('Le provisioning de démonstration est désactivé en production.');
+
+            return self::FAILURE;
+        }
+
         ModuleCatalog::ensureCatalog();
         MaximusDemoProvisioner::ensureAuthUsers();
         ModuleCatalog::ensureCompanyAccess('kora');
