@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { UserRound } from 'lucide-react';
 import type { Company, StoreData } from '@/lib/store';
+import { companyThemePresets, defaultCompanyTheme, isHexColor } from './organization-shared-utils';
 import {
-  companyThemePresets,
-  defaultCompanyTheme,
   Field,
-  isHexColor,
 } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;

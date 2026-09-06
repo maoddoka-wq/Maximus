@@ -4,18 +4,21 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, legacy Express entrypoint)
+- `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php` and provisions the demo idempotently before serving HTTP.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env for Laravel: `DB_CONNECTION=pgsql` and the managed PostgreSQL connection settings.
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
+- API active: Laravel HTTP kernel + Eloquent on PostgreSQL.
+- API legacy: Express 5 remains available for parity work and rollback, but is not the active preview workflow.
+- DB active: PostgreSQL through Laravel/Eloquent.
+- DB legacy: PostgreSQL + Drizzle ORM in the Express layer.
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
@@ -26,12 +29,26 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 - `artifacts/maximus/src/lib/store.ts` — modèles, dépendances et données de démonstration persistées localement.
 - `artifacts/maximus/src/index.css` — tokens visuels et responsive de MAXIMUS.
 - `artifacts/maximus` — application web principale servie à la racine.
+- `artifacts/api-server/laravel` — API active et autorisations serveur.
+- `artifacts/api-server/src` — API Express legacy conservée pendant la migration.
 
 ## Architecture decisions
 
 - Le prototype utilise `localStorage` pour rendre les parcours de démonstration persistants sans service externe.
 - Les modules disponibles et les dépendances sont définis comme des données structurées afin de préparer l’ajout de futurs modules.
 - L’espace KORA calcule son menu à partir des modules autorisés et, pour un employé, des permissions de son rôle.
+- Le périmètre entreprise est résolu à partir de la session serveur ; un `companyId` fourni par le navigateur ne peut pas élargir celui d’un acteur non MAXIMUS.
+- Laravel reste la couche active tant que la parité PostgreSQL avec Express n’est pas prouvée par des tests de comportement et de données.
+
+### Migration Laravel progressive
+
+Le workflow de prévisualisation utilise Laravel avec PostgreSQL. Express est une implémentation parallèle de compatibilité, pas la source de vérité opérationnelle.
+
+- Toute correction de sécurité ou de règle métier doit d’abord être appliquée à Laravel.
+- Une fonctionnalité ne peut être supprimée d’Express qu’après comparaison des réponses, statuts HTTP, effets PostgreSQL et contrôles de périmètre.
+- Le retour temporaire à Express doit rester possible jusqu’à la validation de la parité ; ne pas supprimer ses routeurs ni ses tests pendant cette phase.
+- Les nouveaux endpoints doivent documenter leur middleware d’authentification, leur résolution d’entreprise, leur contrôle de module et leur permission d’action.
+- Les tests Laravel doivent être exécutés avec PostgreSQL, pas uniquement avec un mock ou une base SQLite.
 
 ## Contrat de création des modules
 
@@ -51,6 +68,9 @@ Cette section est la référence obligatoire pour ajouter ou modifier un module 
 - `artifacts/maximus/src/lib/navigation.ts` déclare les entrées de navigation et leurs modules.
 - `artifacts/maximus/src/routes/app-routes.tsx` protège les routes et connecte les écrans aux chemins.
 - `artifacts/maximus/src/lib/commerce-permissions.ts` est la référence spécifique aux onglets et alias historiques de Commerce.
+- `artifacts/api-server/laravel/app/Http/Middleware/AuthenticateMaximus.php` authentifie la session serveur.
+- `artifacts/api-server/laravel/app/Http/Middleware/ResolveCompanyContext.php` fixe l’entreprise effective avant le contrôleur.
+- `artifacts/api-server/laravel/app/Http/Middleware/EnsureModuleEnabled.php` applique le statut du module avant l’accès métier.
 
 ### Chaîne d’accès obligatoire
 

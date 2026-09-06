@@ -22,7 +22,8 @@ import {
   type StoreData,
 } from '@/lib/store';
 import { restrictRoleToCompany } from '@/lib/employee-permissions';
-import { ActionButton, Field, Modal, permissionLabel } from './organization-shared';
+import { permissionLabel } from './organization-shared-utils';
+import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 type Permission = 'voir' | 'créer' | 'modifier';
