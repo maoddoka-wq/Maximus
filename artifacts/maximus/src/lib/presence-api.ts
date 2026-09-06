@@ -1,11 +1,8 @@
-// Legacy records may still exist in PostgreSQL, but the Laravel API no longer
-// accepts them for new writes. Keeping them readable lets the history screen
-// render old data while the current catalog stays restricted.
-export type PresenceWriteType = 'attendance' | 'absence' | 'schedule' | 'leave';
-export type PresenceItemType = PresenceWriteType | 'history' | 'planning' | 'mission' | 'holiday' | 'settings';
+export type PresenceItemType = 'attendance' | 'absence' | 'schedule' | 'planning' | 'mission' | 'holiday' | 'settings' | 'history' | 'leave';
+export type PresenceWriteType = Exclude<PresenceItemType, 'history'>;
 export type PresencePayload = Record<string, unknown>;
 export type PresenceItem = { id: string; companyId: string; type: PresenceItemType; employeeId: string | null; workDate: string | null; startDate: string | null; endDate: string | null; status: string; payload: PresencePayload; createdBy: string; updatedBy: string; createdAt: string; updatedAt: string };
-export type PresenceItemInput = Omit<PresenceItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'type'> & { type: PresenceWriteType; actor?: string };
+export type PresenceItemInput = { type: PresenceWriteType; companyId?: string; employeeId?: string | null; workDate?: string | null; startDate?: string | null; endDate?: string | null; status: string; payload: PresencePayload; actor?: string };
 const json = (body: unknown) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, options);
