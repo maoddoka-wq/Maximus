@@ -87,8 +87,8 @@ DB_CONNECTION=pgsql php artisan maximus:provision-demo
 DB_CONNECTION=pgsql php -S 0.0.0.0:8080 ../server.php
 ```
 
-Le workflow actif exécute automatiquement le provisionnement avant de démarrer
-le serveur PHP :
+En développement, le workflow actif exécute automatiquement le provisionnement
+de démonstration avant de démarrer le serveur PHP :
 
 ```bash
 cd laravel
@@ -98,6 +98,18 @@ DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php
 
 Cette commande est idempotente : elle crée les comptes manquants et répare
 leurs données ou leurs hash de mot de passe sans créer de doublons.
+
+En production, le démarrage ne provisionne pas les données KORA de démonstration.
+Il applique les migrations PostgreSQL puis crée uniquement l’administrateur
+MAXIMUS à partir des secrets `ADMIN_USER` et `ADMIN_PASSWORD`. `APP_KEY` est
+également obligatoire ; le service refuse de démarrer s’il est absent.
+
+```bash
+cd artifacts/api-server/laravel
+DB_CONNECTION=pgsql php artisan migrate --force --no-interaction
+DB_CONNECTION=pgsql php artisan maximus:provision-admin --no-interaction
+DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php
+```
 
 ### Workflows du projet
 
@@ -123,9 +135,9 @@ démonstration :
 | Ndeye Sarr | `ndeye.sarr@kora.demo` | `NdeyeKora2026!` |
 | Mamadou Ba | `mamadou.ba@kora.demo` | `MamadouKora2026!` |
 
-Si un compte démo retourne `401 Email ou mot de passe incorrect`, le frontend
-fonctionne probablement mais la base active n’a pas été provisionnée ou
-contient un état ancien. Relancer :
+Si un compte démo retourne `401 Email ou mot de passe incorrect` en
+développement, le frontend fonctionne probablement mais la base active n’a pas
+été provisionnée ou contient un état ancien. Relancer :
 
 ```bash
 cd artifacts/api-server/laravel

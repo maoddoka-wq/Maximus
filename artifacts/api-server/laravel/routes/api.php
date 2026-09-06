@@ -4,14 +4,13 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ModuleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 Route::get('/healthz', function () {
     try {
         DB::connection()->getPdo();
 
         return response()->json(['ok' => true, 'database' => true]);
-    } catch (Throwable $exception) {
+    } catch (\Throwable $exception) {
         report($exception);
 
         return response()->json(['ok' => false, 'database' => false], 503);

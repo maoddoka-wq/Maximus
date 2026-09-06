@@ -5,7 +5,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, legacy Express entrypoint)
-- `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php` and provisions the demo idempotently before serving HTTP.
+- `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php`; development provisions the demo idempotently, while production migrates the schema and provisions only the MAXIMUS admin from environment secrets.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec

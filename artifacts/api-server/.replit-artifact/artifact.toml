@@ -18,13 +18,22 @@ run = "cd laravel && DB_CONNECTION=pgsql php artisan maximus:provision-demo && D
 args = ["bash", "-lc", "cd laravel && composer install --no-interaction --prefer-dist --no-dev"]
 
 [services.production.build.env]
+APP_ENV = "production"
+APP_DEBUG = "false"
 NODE_ENV = "production"
 
 [services.production.run]
 # we don't run through pnpm to make startup faster in production
-args = ["bash", "-lc", "cd laravel && DB_CONNECTION=pgsql php artisan maximus:provision-demo && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php"]
+args = ["bash", "-lc", "set -euo pipefail; test -n \"${APP_KEY:-}\" || { echo 'APP_KEY is required in production' >&2; exit 1; }; cd laravel && DB_CONNECTION=pgsql php artisan migrate --force --no-interaction && DB_CONNECTION=pgsql php artisan maximus:provision-admin --no-interaction && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php"]
 
 [services.production.run.env]
+APP_ENV = "production"
+APP_DEBUG = "false"
+SESSION_DRIVER = "database"
+SESSION_SECURE_COOKIE = "true"
+CACHE_STORE = "database"
+LOG_CHANNEL = "stderr"
+LOG_LEVEL = "warning"
 PORT = "8080"
 NODE_ENV = "production"
 

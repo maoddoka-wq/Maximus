@@ -15,9 +15,16 @@ localPort = 19624
 run = "pnpm --filter @workspace/maximus run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/maximus", "run", "build" ]
 serve = "static"
 publicDir = "artifacts/maximus/dist/public"
+
+[services.production.build]
+args = [ "pnpm", "--filter", "@workspace/maximus", "run", "build" ]
+
+[services.production.build.env]
+NODE_ENV = "production"
+PORT = "19624"
+BASE_PATH = "/"
 
 [[services.production.rewrites]]
 from = "/*"
