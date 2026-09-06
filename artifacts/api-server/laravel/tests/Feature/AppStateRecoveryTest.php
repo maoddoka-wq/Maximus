@@ -31,6 +31,17 @@ class AppStateRecoveryTest extends TestCase
             ],
             'status' => 'ACTIF',
         ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'recovery-admin',
+            'email' => 'recovery.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Admin Récupérée',
+            'role' => 'company_admin',
+            'company_id' => 'recovery-company',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
 
         $request = $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user))
@@ -44,7 +55,8 @@ class AppStateRecoveryTest extends TestCase
             ->assertJsonPath('data.employees.0.id', 'recovery-employee')
             ->assertJsonPath('data.roles.0.modulePermissions.stocks.0', 'voir');
 
-        $request
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
             ->putJson('/api/app-state', [
                 'version' => $bootstrap->json('version'),
                 'data' => [

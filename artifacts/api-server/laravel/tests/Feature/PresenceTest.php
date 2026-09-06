@@ -110,16 +110,15 @@ class PresenceTest extends TestCase
         ])->assertOk()->assertJson(['ok' => true]);
 
         $this->assertDatabaseMissing('presence_items', ['id' => $item->id]);
-        $this->assertDatabaseHas('presence_items', [
-            'type' => 'history',
-            'payload' => json_encode([
-                'action' => 'schedule.delete',
-                'itemId' => 'presence-kora-1',
-                'oldValue' => ['shift' => 'matin'],
-                'employeeId' => null,
-                'workDate' => null,
-            ]),
-        ]);
+        $history = PresenceItem::query()
+            ->where('type', 'history')
+            ->latest('created_at')
+            ->firstOrFail();
+        $this->assertSame('schedule.delete', $history->payload['action']);
+        $this->assertSame('presence-kora-1', $history->payload['itemId']);
+        $this->assertSame(['shift' => 'matin'], $history->payload['oldValue']);
+        $this->assertNull($history->payload['employeeId']);
+        $this->assertNull($history->payload['workDate']);
     }
 
     public function test_presence_rejects_a_company_different_from_the_actor(): void
