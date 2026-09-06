@@ -100,6 +100,7 @@ import {
   updatePackPermission,
 } from '@/lib/module-pack';
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
+import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { useDebouncedPersistence } from '@/hooks/use-persisted-store';
 import { buildAppAccessContext } from '@/lib/app-access';
 
@@ -2699,7 +2700,7 @@ function RequestsPage({
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
           target.status = 'ACTIF';
-          target.allowedModules = [...target.requestedModules];
+          provisionCompanyAccess(d, target);
         }
       }, 'Entreprise activée et compte administrateur synchronisé.');
     } catch (error) {
@@ -5864,7 +5865,8 @@ function AdminCreateCompanyPage({
     }
     mutate((draft) => {
       const companyId = uid('company');
-      draft.companies.push({
+      const preset = data.sectorPresets.find((item) => item.name === sector);
+      const newCompany: Company = {
         id: companyId,
         name: name.trim(),
         manager: manager.trim(),
@@ -5876,17 +5878,23 @@ function AdminCreateCompanyPage({
         status: 'ACTIF',
         requestedModules: [...selectedModules],
         allowedModules: [...selectedModules],
+        requestedModulePackIds: Object.fromEntries(
+          Object.entries(preset?.modulePackIds ?? {})
+            .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
+            .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
         refusedModules: [],
         createdAt: new Date().toISOString().slice(0, 10),
-      });
-      draft.orgNodes.push({
-        id: uid('org'),
-        companyId,
-        name: orgName.trim(),
-        code: orgCode.trim().toUpperCase(),
-        type: orgType,
-        parentId: null,
-        moduleIds: [],
+      };
+      draft.companies.push(newCompany);
+      provisionCompanyAccess(draft, newCompany, {
+        moduleIds: [...selectedModules],
+        modulePackIds: newCompany.requestedModulePackIds,
+        root: {
+          name: orgName.trim(),
+          code: orgCode.trim().toUpperCase(),
+          type: orgType,
+        },
       });
     }, 'Entreprise créée et activée.');
     onComplete();

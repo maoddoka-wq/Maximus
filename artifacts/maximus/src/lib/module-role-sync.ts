@@ -48,6 +48,7 @@ function defaultFeaturePermissions(pack: ModuleFeaturePack, featureId: string) {
 }
 
 function buildPackRolePermissions(
+  company: Company,
   module: Module,
   pack: ModuleFeaturePack,
   selectedFeatureIds: string[],
@@ -69,7 +70,9 @@ function buildPackRolePermissions(
       const previous = keys.flatMap(key => previousPermissions[key] ?? []);
       const next = previous.length > 0
         ? [...new Set(['voir', ...previous])]
-        : defaultFeaturePermissions(pack, featureId);
+        : company.requestedModulePermissions?.[module.id]?.[featureId]?.length
+          ? [...new Set(company.requestedModulePermissions[module.id]![featureId]!)]
+          : defaultFeaturePermissions(pack, featureId);
       keys.forEach(key => { delete permissions[key]; });
       if (next.length > 0) permissions[keys[0]] = next;
     });
@@ -115,7 +118,7 @@ export function synchronizeUnitPackRoles(data: StoreData, company: Company, node
         sectorId: node.id,
         name: pack.name,
         description: existingRole?.description || pack.description || `Rôle prérempli depuis le pack « ${pack.name} ».`,
-        modulePermissions: buildPackRolePermissions(module, pack, selectedFeatureIds, existingRole?.modulePermissions),
+        modulePermissions: buildPackRolePermissions(company, module, pack, selectedFeatureIds, existingRole?.modulePermissions),
         packId: pack.id,
         packModuleId: module.id,
       };

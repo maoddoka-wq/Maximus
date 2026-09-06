@@ -14,3 +14,9 @@ L’activation MAXIMUS d’une entreprise doit provisionner son compte `company_
 **Why:** Le formulaire d’inscription conserve la demande dans le navigateur, tandis que la connexion est vérifiée par Laravel. Changer uniquement le statut local rendait l’espace visuellement actif mais impossible à ouvrir.
 
 **How to apply:** Toute validation d’entreprise doit appeler l’API protégée de provisioning et ne confirmer l’activation locale qu’après sa réussite. Garder une resynchronisation idempotente pour réparer les demandes activées avant cette règle.
+
+Les choix d’inscription doivent être matérialisés dès l’activation : unité racine, modules autorisés, fonctionnalités, rôles de packs et rôle de secours pour les modules sans pack.
+
+**Why:** Conserver les choix uniquement dans la demande laisse les employés sans unité ni rôle compatible, même si l’entreprise voit correctement ses modules.
+
+**How to apply:** Utiliser un provisioning idempotent partagé par l’approbation MAXIMUS et la création administrative ; il doit réutiliser l’unité racine et ne pas dupliquer les rôles automatiques.
