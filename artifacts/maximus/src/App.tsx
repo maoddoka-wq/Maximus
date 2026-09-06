@@ -1139,7 +1139,7 @@ function Signup({
   const fallbackPreset: SectorPreset = {
     id: 'default',
     name: 'Distribution',
-    moduleIds: ['finance', 'commerce', 'stocks'],
+    moduleIds: ['commerce', 'stocks', 'presences'],
   };
   const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
   const [step, setStep] = useState(1);
@@ -6198,7 +6198,7 @@ function AdminCreateCompanyPage({
   const fallbackPreset: SectorPreset = {
     id: 'default',
     name: 'Distribution',
-    moduleIds: ['finance', 'commerce', 'stocks'],
+    moduleIds: ['commerce', 'stocks', 'presences'],
   };
   const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
   const [name, setName] = useState('');

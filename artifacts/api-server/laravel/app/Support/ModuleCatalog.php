@@ -11,12 +11,7 @@ final class ModuleCatalog
     {
         return [
             ['id' => 'commerce', 'name' => 'Gestion commerciale', 'description' => 'Ventes, clients et performance commerciale.', 'features' => ['Clients', 'Devis et commandes', 'Chiffre d’affaires']],
-            ['id' => 'ventes', 'name' => 'Ventes', 'description' => 'Devis, commandes, factures et paiements clients.', 'features' => ['Devis', 'Commandes', 'Facturation']],
-            ['id' => 'achats', 'name' => 'Achats', 'description' => 'Demandes, commandes et suivi des achats.', 'features' => ['Demandes d’achat', 'Commandes fournisseurs', 'Réceptions']],
             ['id' => 'stocks', 'name' => 'Gestion de stock', 'description' => 'Articles, entrées, sorties et niveaux de stock.', 'features' => ['Articles', 'Entrées et sorties', 'Alertes de seuil']],
-            ['id' => 'finance', 'name' => 'Finance', 'description' => 'Trésorerie, paiements et pilotage financier.', 'features' => ['Suivi des paiements', 'Trésorerie', 'Rapports financiers']],
-            ['id' => 'comptabilite', 'name' => 'Comptabilité', 'description' => 'Écritures, rapprochements et clôture comptable.', 'features' => ['Plan comptable', 'Journaux', 'Rapprochement']],
-            ['id' => 'rh', 'name' => 'Ressources humaines', 'description' => 'Collaborateurs, rôles et organisation.', 'features' => ['Employés', 'Rôles', 'Organisation']],
             [
                 'id' => 'presences',
                 'name' => 'Présences',
@@ -27,13 +22,6 @@ final class ModuleCatalog
                     'rapports' => ['pointage', 'présences'],
                 ],
             ],
-            ['id' => 'paie', 'name' => 'Paie', 'description' => 'Préparation et suivi des bulletins de salaire.', 'features' => ['Périodes de paie', 'Bulletins', 'Déclarations']],
-            ['id' => 'crm', 'name' => 'CRM / Clients', 'description' => 'Fiches clients, opportunités et relances.', 'features' => ['Fiches clients', 'Opportunités', 'Relances']],
-            ['id' => 'fournisseurs', 'name' => 'Fournisseurs', 'description' => 'Référentiel et relations fournisseurs.', 'features' => ['Référentiel', 'Évaluation', 'Historique']],
-            ['id' => 'logistique', 'name' => 'Logistique', 'description' => 'Entrepôts, livraisons et transport.', 'features' => ['Entrepôts', 'Livraisons', 'Transport']],
-            ['id' => 'documents', 'name' => 'Documents', 'description' => 'Classement et circulation des documents métier.', 'features' => ['Classement', 'Partage', 'Versions']],
-            ['id' => 'rapports', 'name' => 'Rapports', 'description' => 'Synthèses et indicateurs pour décider plus vite.', 'features' => ['Rapports métier', 'Filtres', 'Exports']],
-            ['id' => 'controle', 'name' => 'Contrôle', 'description' => 'Tâches, décisions, événements et audit.', 'features' => ['Tâches', 'Décisions', 'Traçabilité']],
         ];
     }
 

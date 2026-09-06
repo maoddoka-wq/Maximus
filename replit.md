@@ -170,7 +170,11 @@ Les fonctionnalités d’un même module peuvent aussi avoir des prérequis. Ell
 
 ## Product
 
-MAXIMUS permet de parcourir l’administration globale, inscrire et valider des entreprises, configurer les modules et dépendances, puis piloter KORA avec des vues Finance, Commerce, Stocks, RH et Présences. Les actions de vente, paiement, organisation, collaborateurs, rôles et journal sont interactives.
+MAXIMUS permet de parcourir l’administration globale, inscrire et valider des
+entreprises, puis piloter trois modules actifs : Commerce, Stocks et Présences.
+Les autres identifiants historiques restent uniquement pour compatibilité et
+ne doivent pas être proposés dans le catalogue actif, les secteurs ou la
+navigation.
 
 ## User preferences
 
