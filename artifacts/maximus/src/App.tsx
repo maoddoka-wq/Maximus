@@ -658,6 +658,7 @@ function AppContent() {
     selectedPresenceFeatureIds,
     sidebarFeatureGroups,
     stockPermissions,
+    sectorManager,
     verticalModuleNavigation,
   } = buildAppAccessContext({
     data,
