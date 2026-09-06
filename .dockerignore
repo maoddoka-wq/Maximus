@@ -1,0 +1,16 @@
+.git
+.local
+.agents
+node_modules
+**/node_modules
+dist
+**/dist
+vendor
+**/vendor
+coverage
+**/.phpunit.cache
+**/.env
+**/.env.*
+*.log
+Dockerfile*
+docker-compose*.yml

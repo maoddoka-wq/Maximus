@@ -1,0 +1,47 @@
+FROM node:24-bookworm-slim AS frontend-build
+
+WORKDIR /workspace
+
+RUN corepack enable \
+    && corepack prepare pnpm@10.26.1 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY artifacts ./artifacts
+COPY lib ./lib
+COPY scripts ./scripts
+COPY attached_assets ./attached_assets
+
+RUN pnpm install --frozen-lockfile
+RUN PORT=10000 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/maximus run build
+
+FROM php:8.2-cli-bookworm
+
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    LOG_LEVEL=warning \
+    DB_CONNECTION=pgsql
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq-dev unzip \
+    && docker-php-ext-install pdo_pgsql \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+COPY artifacts/api-server/laravel ./laravel
+
+RUN cd laravel \
+    && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
+    && chmod -R ug+rw storage bootstrap/cache
+
+COPY --from=frontend-build /workspace/artifacts/maximus/dist/public/ ./laravel/public/
+
+WORKDIR /app/laravel
+
+EXPOSE 10000
+
+CMD ["sh", "-c", "exec php -S 0.0.0.0:${PORT:-10000} server.php"]
