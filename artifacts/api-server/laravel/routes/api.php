@@ -3,13 +3,23 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ModuleController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
 Route::get('/healthz', function () {
-    return response()->json(['ok' => true]);
+    try {
+        DB::connection()->getPdo();
+
+        return response()->json(['ok' => true, 'database' => true]);
+    } catch (Throwable $exception) {
+        report($exception);
+
+        return response()->json(['ok' => false, 'database' => false], 503);
+    }
 });
 
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::get('/session', [AuthController::class, 'session']);
     Route::post('/logout', [AuthController::class, 'logout']);
 });
