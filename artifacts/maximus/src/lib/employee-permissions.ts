@@ -128,8 +128,8 @@ export function employeeHasPresencePermission(
   if (!role || !unitAllowsModule(employeeNode, 'presences')) return false;
 
   const explicitPermission = role.modulePermissions[`presence.${permission}`];
-  const hasExplicitPermissions = Object.keys(role.modulePermissions)
-    .some(key => key.startsWith('presence.'));
+  const operationalPermissions: PresencePermission[] = ['view', 'create', 'edit', 'delete', 'correct', 'validate', 'manage', 'export', 'reports'];
+  const hasExplicitPermissions = operationalPermissions.some(key => Object.prototype.hasOwnProperty.call(role.modulePermissions, `presence.${key}`));
 
   if (hasExplicitPermissions) {
     return Boolean(explicitPermission?.length);

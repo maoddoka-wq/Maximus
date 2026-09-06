@@ -1572,6 +1572,11 @@ function Signup({
                                       <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
                                         {pack.description ?? `${pack.featureIds.length} fonctionnalité(s)`}
                                       </span>
+                                        <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">
+                                          {pack.featureIds
+                                            .map(featureId => getModuleFeatureOptions(mod).find(feature => feature.id === featureId)?.label ?? featureId)
+                                            .join(' · ')}
+                                        </span>
                                     </span>
                                   </label>
                                 );

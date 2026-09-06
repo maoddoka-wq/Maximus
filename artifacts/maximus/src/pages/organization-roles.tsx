@@ -9,6 +9,7 @@ import {
   type CommerceTabId,
 } from '@/lib/commerce-permissions';
 import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from '@/lib/permission-keys';
+import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import {
   getConfiguredModules,
   type Company,
@@ -291,6 +292,8 @@ function RoleFormModal({
   const featurePermissionKeys = (moduleId: ModuleId, feature: string) =>
     moduleId === 'commerce'
       ? commerceTabPermissionKeys(feature as CommerceTabId)
+      : moduleId === 'presences'
+        ? [`presence.${featureSlug(feature)}`]
       : [permissionFeatureKey(moduleId, feature)];
 
   const normalizeFeatureDependencies = (modulePermissions: Record<string, string[]>, moduleId: ModuleId) => {
@@ -511,6 +514,8 @@ function ModulePermissionCard({
   const permissions = modulePermissions[module.id] || [];
   const features = module.id === 'commerce'
     ? commerceTabDefinitions
+    : module.id === 'presences'
+      ? presenceFeatureDefinitions.map(feature => ({ id: feature.tab, label: feature.label }))
     : module.features.map(feature => ({ id: feature, label: feature }));
 
   return (
@@ -529,7 +534,7 @@ function ModulePermissionCard({
         </div>
       </div>
       <div className="space-y-3 p-4">
-        {module.id !== 'stocks' && module.id !== 'presences' && (
+        {module.id !== 'stocks' && (
           <FeaturePermissionList
             module={module}
             features={features}
@@ -566,7 +571,11 @@ function FeaturePermissionList({
       </div>
       <div className="grid gap-2">
         {features.map(feature => {
-          const key = module.id === 'commerce' ? commerceTabPermissionKey(feature.id as CommerceTabId) : permissionFeatureKey(module.id, feature.id);
+          const key = module.id === 'commerce'
+            ? commerceTabPermissionKey(feature.id as CommerceTabId)
+            : module.id === 'presences'
+              ? `presence.${featureSlug(feature.id)}`
+              : permissionFeatureKey(module.id, feature.id);
           const activePermissions = module.id === 'commerce'
             ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => modulePermissions[permissionKey] || []))]
             : modulePermissions[key] || [];
@@ -642,8 +651,8 @@ function PresencePermissionList({
   return (
     <div>
       <div className="mb-2">
-         <h5 className="text-sm font-bold">Droits détaillés des présences</h5>
-         <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Chaque capacité reste limitée à l’unité du rôle.</p>
+         <h5 className="text-sm font-bold">Droits opérationnels des présences</h5>
+         <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Ces capacités complètent les fonctionnalités sélectionnées pour le rôle.</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
         {permissions.map(([key, label]) => {
