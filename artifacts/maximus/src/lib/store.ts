@@ -19,17 +19,57 @@ export type {
 export { subscriptionPlans } from './subscription-model';
 
 export type Status = 'ACTIF' | 'EN ATTENTE' | 'SUSPENDU' | 'REFUSÉ' | 'ARCHIVÉ' | 'BROUILLON' | 'VALIDÉ' | 'CONFIRMÉ';
-export interface Company { id: string; name: string; manager: string; email: string; phone: string; country: string; sector: string; status: Status; requestedModules: ModuleId[]; requestedModulePackIds?: Partial<Record<ModuleId, string[]>>; requestedBusinessProfileId?: string; requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>; requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>; allowedModules: ModuleId[]; refusedModules: ModuleId[]; createdAt: string; adminPassword?: string; profilePhoto?: string; primaryColor?: string; accentColor?: string; sidebarColor?: string; managerRoleId?: string; }
-export interface ModuleFeaturePack { id: string; name: string; description?: string; featureIds: string[]; featurePermissions?: Partial<Record<string, string[]>>; }
-export interface Module { id: ModuleId; name: string; description: string; features: string[]; featureDependencies?: Partial<Record<string, string[]>>; featurePacks?: ModuleFeaturePack[]; status: 'ACTIF' | 'BETA'; }
 export type ModuleAvailability = 'ACTIF' | 'BETA' | 'MAINTENANCE' | 'INACTIF';
 export type ModuleStatusMap = Partial<Record<ModuleId, ModuleAvailability>>;
+
+export interface Company {
+  id: string;
+  name: string;
+  manager: string;
+  email: string;
+  phone: string;
+  country: string;
+  sector: string;
+  status: Status;
+  requestedModules: ModuleId[];
+  requestedModulePackIds?: Partial<Record<ModuleId, string[]>>;
+  requestedBusinessProfileId?: string;
+  requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>;
+  requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
+  allowedModules: ModuleId[];
+  refusedModules: ModuleId[];
+  createdAt: string;
+  adminPassword?: string;
+  profilePhoto?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  sidebarColor?: string;
+  managerRoleId?: string;
+}
+
+export interface ModuleFeaturePack {
+  id: string;
+  name: string;
+  description?: string;
+  featureIds: string[];
+  featurePermissions?: Partial<Record<string, string[]>>;
+}
+
+export interface Module {
+  id: ModuleId;
+  name: string;
+  description: string;
+  features: string[];
+  featureDependencies?: Partial<Record<string, string[]>>;
+  featurePacks?: ModuleFeaturePack[];
+  status: 'ACTIF' | 'BETA';
+}
+
 export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
-export const demoEmployeeIds = new Set(['demo-emp-awa', 'demo-emp-ibrahima', 'demo-emp-ndeye', 'demo-emp-mamadou']);
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; }
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; paymentMethod?: string; paidAmount?: number; }
@@ -48,61 +88,12 @@ export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
 export type ControlTaskStatus = 'À FAIRE' | 'EN COURS' | 'VALIDÉ' | 'REFUSÉ' | 'TERMINÉ';
 export type ControlTaskPriority = 'BASSE' | 'NORMALE' | 'HAUTE' | 'CRITIQUE';
 export type DomainEventType = 'TASK_CREATED' | 'TASK_STATUS_CHANGED' | 'APPROVAL_GRANTED' | 'APPROVAL_REFUSED' | 'SYSTEM';
-export interface ControlTask {
-  id: string;
-  title: string;
-  description: string;
-  companyId?: string;
-  sectorId?: string;
-  moduleId?: ModuleId;
-  assigneeEmployeeId?: string;
-  assigneeName?: string;
-  createdBy: string;
-  status: ControlTaskStatus;
-  priority: ControlTaskPriority;
-  requiresApproval?: boolean;
-  dueDate?: string;
-  relatedObject?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-export interface DomainEvent {
-  id: string;
-  type: DomainEventType;
-  label: string;
-  summary: string;
-  companyId?: string;
-  moduleId?: ModuleId;
-  actorName: string;
-  entityType: string;
-  entityId?: string;
-  severity: NotificationSeverity;
-  createdAt: string;
-}
-export interface AuditEntry {
-  id: string;
-  action: string;
-  summary: string;
-  companyId?: string;
-  moduleId?: ModuleId;
-  actorName: string;
-  entityType: string;
-  entityId?: string;
-  createdAt: string;
-}
-export interface AppNotification {
-  id: string;
-  title: string;
-  text: string;
-  read: boolean;
-  date: string;
-  audience?: NotificationAudience;
-  companyId?: string;
-  module?: ModuleId;
-  severity?: NotificationSeverity;
-  href?: string;
-}
+export interface ControlTask { id: string; title: string; description: string; companyId?: string; sectorId?: string; moduleId?: ModuleId; assigneeEmployeeId?: string; assigneeName?: string; createdBy: string; status: ControlTaskStatus; priority: ControlTaskPriority; requiresApproval?: boolean; dueDate?: string; relatedObject?: string; createdAt: string; updatedAt: string; }
+export interface DomainEvent { id: string; type: DomainEventType; label: string; summary: string; companyId?: string; moduleId?: ModuleId; actorName: string; entityType: string; entityId?: string; severity: NotificationSeverity; createdAt: string; }
+export interface AuditEntry { id: string; action: string; summary: string; companyId?: string; moduleId?: ModuleId; actorName: string; entityType: string; entityId?: string; createdAt: string; }
+export interface AppNotification { id: string; title: string; text: string; read: boolean; date: string; audience?: NotificationAudience; companyId?: string; module?: ModuleId; severity?: NotificationSeverity; href?: string; }
 export interface NotificationContext { isAdmin: boolean; companyId?: string; }
+
 export interface StoreData {
   companies: Company[];
   employees: Employee[];
@@ -134,7 +125,6 @@ export interface StoreData {
   organizationVersion?: number;
 }
 
-const today = new Date().toISOString();
 export const modules: Module[] = [
   { id: 'commerce', name: 'Gestion commerciale', description: 'Ventes, clients et performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
     { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
@@ -145,20 +135,12 @@ export const modules: Module[] = [
   { id: 'stocks', name: 'Gestion de stock', description: 'Articles, entrées, sorties et niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
     { id: 'stock-consultation', name: 'Consultation du stock', description: 'Consulter les articles et les niveaux de stock.', featureIds: ['dashboard', 'products', 'reports'] },
     { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
-    { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter l’ensemble des opérations et des paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
+    { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
   ], status: 'ACTIF' },
   { id: 'finance', name: 'Finance', description: 'Trésorerie, paiements et pilotage financier.', features: ['Suivi des paiements', 'Trésorerie', 'Rapports financiers'], status: 'ACTIF' },
   { id: 'comptabilite', name: 'Comptabilité', description: 'Écritures, rapprochements et clôture comptable.', features: ['Plan comptable', 'Journaux', 'Rapprochement'], status: 'ACTIF' },
   { id: 'rh', name: 'Ressources humaines', description: 'Collaborateurs, rôles et organisation.', features: ['Employés', 'Rôles', 'Organisation'], status: 'ACTIF' },
-  {
-    id: 'presences',
-    name: 'Présences',
-    description: 'Pointage, absences, horaires et suivi quotidien des équipes.',
-    features: presenceFeatureDefinitions.map(feature => feature.label),
-    featureDependencies: presenceFeatureDependencies,
-    featurePacks: presenceFeaturePacks,
-    status: 'ACTIF',
-  },
+  { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Préparation et suivi des bulletins de salaire.', features: ['Périodes de paie', 'Bulletins', 'Déclarations'], status: 'ACTIF' },
   { id: 'crm', name: 'CRM / Clients', description: 'Fiches clients, opportunités et relances.', features: ['Fiches clients', 'Opportunités', 'Relances'], featureDependencies: { opportunites: ['fiches-clients'], relances: ['opportunites'] }, status: 'ACTIF' },
   { id: 'fournisseurs', name: 'Fournisseurs', description: 'Référentiel et relations fournisseurs.', features: ['Référentiel', 'Évaluation', 'Historique'], status: 'ACTIF' },
@@ -166,12 +148,6 @@ export const modules: Module[] = [
   { id: 'documents', name: 'Documents', description: 'Classement et circulation des documents métier.', features: ['Classement', 'Partage', 'Versions'], status: 'ACTIF' },
   { id: 'rapports', name: 'Rapports', description: 'Synthèses et indicateurs pour décider plus vite.', features: ['Rapports métier', 'Filtres', 'Exports'], status: 'ACTIF' },
 ];
-
-export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
-  return modules
-    .filter(module => !data.removedModules?.includes(module.id))
-    .map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
-}
 
 export const stockSubmodules = [
   { id: 'dashboard', name: 'Tableau de bord' },
@@ -186,485 +162,43 @@ export const stockSubmodules = [
   { id: 'settings', name: 'Paramètres' },
 ] as const;
 export const stockSubmoduleDependencies: Partial<Record<string, string[]>> = {
-  entries: ['products'],
-  exits: ['products'],
-  requests: ['products'],
-  inventory: ['products'],
-  reports: ['products'],
-  references: ['products'],
-  users: ['products'],
-  settings: ['products'],
+  entries: ['products'], exits: ['products'], requests: ['products'], inventory: ['products'],
+  reports: ['products'], references: ['products'], users: ['products'], settings: ['products'],
 };
+
 export const sectorPresets: SectorPreset[] = [
-  {
-    id: 'distribution',
-    name: 'Distribution',
-     moduleIds: ['commerce', 'stocks'],
-    modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] },
-  },
+  { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
   { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique', 'commerce'] },
   { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'finance', 'rh', 'presences', 'documents', 'rapports'] },
   { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'ventes', 'stocks', 'finance'] },
 ];
 
-function productionSeedData(): StoreData {
+export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
+  return modules
+    .filter(module => !data.removedModules?.includes(module.id))
+    .map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
+}
+
+export function emptyStoreData(): StoreData {
   return {
-    companies: [],
-    employees: [],
-    roles: [],
-    products: [],
-    movements: [],
-    sales: [],
-    payments: [],
-    activities: [],
-    controlTasks: [],
-    domainEvents: [],
-    auditEntries: [],
-    orgNodes: [],
-    notifications: [],
-    purchaseOrders: [],
-    accountingEntries: [],
-    payrollSlips: [],
-    crmOpportunities: [],
-    supplierRecords: [],
-    deliveries: [],
-    businessDocuments: [],
-    subscriptions: [],
-    sectorPresets: sectorPresets.map((preset) => ({
-      ...preset,
-      moduleIds: [...preset.moduleIds],
-      moduleFeatures: Object.fromEntries(
-        Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
-      ),
-      businessProfiles: (preset.businessProfiles ?? []).map((profile) => ({
-        ...profile,
-        modulePackIds: Object.fromEntries(
-          Object.entries(profile.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
-        ),
-        moduleFeatures: Object.fromEntries(
-          Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
-        ),
-      })),
-    })),
-    moduleStatuses: Object.fromEntries(modules.map((module) => [module.id, module.status])) as ModuleStatusMap,
-    moduleOverrides: {},
-    removedModules: [],
-    catalogVersion: 3,
-    organizationVersion: 8,
+    companies: [], employees: [], roles: [], products: [], movements: [], sales: [], payments: [],
+    activities: [], controlTasks: [], domainEvents: [], auditEntries: [], orgNodes: [], notifications: [],
+    purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
+    deliveries: [], businessDocuments: [], subscriptions: [],
+    sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
+    moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
+    moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
 }
 
-export function seedData(): StoreData {
-  if (import.meta.env.PROD) return productionSeedData();
+/**
+ * Kept as a compatibility name for callers while the server bootstrap hydrates the state.
+ * It deliberately contains no business fixture and never reads localStorage.
+ */
+export function seedData(): StoreData { return emptyStoreData(); }
+export function loadData(): StoreData { return emptyStoreData(); }
+export function saveData(_data: StoreData): void { /* Business data belongs to the API database. */ }
 
-  return {
-    catalogVersion: 3,
-    organizationVersion: 8,
-    sectorPresets: sectorPresets.map(preset => ({
-      ...preset,
-      moduleIds: [...preset.moduleIds],
-      moduleFeatures: Object.fromEntries(
-        Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
-      ),
-      businessProfiles: (preset.businessProfiles ?? []).map(profile => ({
-        ...profile,
-        modulePackIds: Object.fromEntries(
-          Object.entries(profile.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
-        ),
-        moduleFeatures: Object.fromEntries(
-          Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
-        ),
-      })),
-    })),
-    companies: [
-      { id: 'kora', name: 'KORA Distribution', manager: 'Aminata Diop', email: 'admin@kora.demo', adminPassword: 'Kora123!', managerRoleId: 'kora-role-manager', phone: '+221 77 501 22 18', country: 'Sénégal', sector: 'Distribution', status: 'ACTIF', requestedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], allowedModules: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'], refusedModules: [], createdAt: '2024-04-12' },
-      { id: 'teranga', name: 'Teranga Agro', manager: 'Moussa Fall', email: 'contact@teranga.demo', adminPassword: 'Kora123!', phone: '+221 76 210 08 34', country: 'Sénégal', sector: 'Agroalimentaire', status: 'EN ATTENTE', requestedModules: ['finance', 'stocks'], allowedModules: [], refusedModules: [], createdAt: '2024-06-18' },
-      { id: 'naya', name: 'Naya Services', manager: 'Fatou Camara', email: 'hello@naya.demo', adminPassword: 'Kora123!', phone: '+225 07 44 19 02', country: 'Côte d’Ivoire', sector: 'Services', status: 'SUSPENDU', requestedModules: ['finance', 'rh'], allowedModules: ['finance', 'rh'], refusedModules: [], createdAt: '2024-03-02' },
-    ],
-    subscriptions: [
-      {
-        id: 'subscription-kora',
-        companyId: 'kora',
-        planId: 'scale',
-        planName: 'Scale',
-        status: 'ACTIF',
-        amount: 185000,
-        currency: 'XOF',
-        interval: 'MENSUEL',
-        startedAt: '2024-04-12',
-        endsAt: null,
-        nextRenewalAt: '2026-10-12',
-        trialEndsAt: null,
-        paymentStatus: 'À JOUR',
-        paymentMethod: { type: 'MOBILE_MONEY', label: 'Wave Business', last4: '2218' },
-        limits: { employees: 250, modules: 14, storageGb: 250 },
-        invoices: [
-          { id: 'invoice-kora-09', number: 'FAC-2026-09-001', amount: 185000, currency: 'XOF', issuedAt: '2026-09-12', dueAt: '2026-09-12', status: 'PAYÉE' },
-          { id: 'invoice-kora-08', number: 'FAC-2026-08-001', amount: 185000, currency: 'XOF', issuedAt: '2026-08-12', dueAt: '2026-08-12', status: 'PAYÉE' },
-        ],
-        history: [
-          { id: 'subscription-kora-history-1', type: 'CHANGEMENT DE PLAN', label: 'Passage au plan Scale', date: '2025-04-12', actor: 'Aminata Diop' },
-          { id: 'subscription-kora-history-2', type: 'PAIEMENT', label: 'Paiement mensuel confirmé', date: '2026-09-12', actor: 'Wave Business' },
-        ],
-        moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'],
-      },
-      {
-        id: 'subscription-teranga',
-        companyId: 'teranga',
-        planId: 'essential',
-        planName: 'Essentiel',
-        status: 'ESSAI',
-        amount: 45000,
-        currency: 'XOF',
-        interval: 'MENSUEL',
-        startedAt: '2024-06-18',
-        endsAt: null,
-        nextRenewalAt: '2024-07-18',
-        trialEndsAt: '2024-07-02',
-        paymentStatus: 'EN ATTENTE',
-        paymentMethod: { type: 'AUCUN', label: 'Moyen de paiement à renseigner' },
-        limits: { employees: 10, modules: 4, storageGb: 10 },
-        invoices: [{ id: 'invoice-teranga-01', number: 'FAC-2024-06-001', amount: 45000, currency: 'XOF', issuedAt: '2024-06-18', dueAt: '2024-07-02', status: 'OUVERTE' }],
-        history: [{ id: 'subscription-teranga-history-1', type: 'ESSAI', label: 'Période d’essai ouverte', date: '2024-06-18', actor: 'MAXIMUS' }],
-        moduleIds: ['finance', 'stocks'],
-      },
-      {
-        id: 'subscription-naya',
-        companyId: 'naya',
-        planId: 'growth',
-        planName: 'Croissance',
-        status: 'IMPAYÉ',
-        amount: 95000,
-        currency: 'XOF',
-        interval: 'MENSUEL',
-        startedAt: '2024-03-02',
-        endsAt: null,
-        nextRenewalAt: '2024-06-02',
-        trialEndsAt: null,
-        paymentStatus: 'IMPAYÉ',
-        paymentMethod: { type: 'CARTE', label: 'Carte bancaire', last4: '4242' },
-        limits: { employees: 50, modules: 8, storageGb: 50 },
-        invoices: [{ id: 'invoice-naya-04', number: 'FAC-2024-06-002', amount: 95000, currency: 'XOF', issuedAt: '2024-06-02', dueAt: '2024-06-09', status: 'EN RETARD' }],
-        history: [{ id: 'subscription-naya-history-1', type: 'SUSPENSION', label: 'Accès suspendu après impayé', date: '2024-06-10', actor: 'MAXIMUS' }],
-        moduleIds: ['finance', 'rh'],
-      },
-    ],
-    employees: [
-      { id: 'demo-emp-awa', firstName: 'Awa', lastName: 'Ndiaye', email: 'awa.ndiaye@kora.demo', phone: '+221 77 640 28 91', position: 'Gestionnaire commerciale', department: 'Commerce', subDepartment: 'Ventes', role: 'Vendeuse', status: 'ACTIF', loginPassword: 'AwaKora2026!', companyId: 'kora', sectorId: 'kora-service-vente', roleId: 'kora-role-vendeur' },
-      { id: 'demo-emp-ibrahima', firstName: 'Ibrahima', lastName: 'Kane', email: 'ibrahima.kane@kora.demo', phone: '+221 76 512 44 08', position: 'Responsable magasin', department: 'Opérations', subDepartment: 'Stock & logistique', role: 'Magasinier', status: 'ACTIF', loginPassword: 'IbrahimaKora2026!', companyId: 'kora', sectorId: 'kora-service-stock', roleId: 'kora-role-magasinier' },
-      { id: 'demo-emp-ndeye', firstName: 'Ndeye', lastName: 'Sarr', email: 'ndeye.sarr@kora.demo', phone: '+221 78 304 19 62', position: 'Assistante RH', department: 'Ressources humaines', subDepartment: 'Administration du personnel', role: 'Gestionnaire RH', status: 'ACTIF', loginPassword: 'NdeyeKora2026!', companyId: 'kora', sectorId: 'kora-service-rh', roleId: 'kora-role-rh' },
-      { id: 'demo-emp-mamadou', firstName: 'Mamadou', lastName: 'Ba', email: 'mamadou.ba@kora.demo', phone: '+221 76 805 17 44', position: 'Comptable', department: 'Finance', subDepartment: 'Comptabilité', role: 'Comptable', status: 'ACTIF', loginPassword: 'MamadouKora2026!', isSectorAdmin: true, companyId: 'kora', sectorId: 'kora-service-finance', roleId: 'kora-role-comptable' },
-    ],
-    roles: [
-      { id: 'kora-role-vendeur', name: 'Vendeur', description: 'Gère les clients, les devis et les commandes.', companyId: 'kora', sectorId: 'kora-service-vente', modulePermissions: { commerce: ['voir', 'créer', 'modifier'], ventes: ['voir', 'créer', 'modifier'], crm: ['voir', 'créer'] } },
-      { id: 'kora-role-magasinier', name: 'Magasinier', description: 'Consulte toute la gestion de stock et réalise les opérations de son périmètre.', companyId: 'kora', sectorId: 'kora-service-stock', modulePermissions: { stocks: ['voir'], 'stocks:dashboard': ['voir'], 'stocks:products': ['voir', 'créer', 'modifier'], 'stocks:entries': ['voir', 'créer', 'modifier'], 'stocks:exits': ['voir', 'créer', 'modifier'], 'stocks:requests': ['voir', 'créer', 'modifier'], 'stocks:inventory': ['voir', 'modifier'], 'stocks:reports': ['voir'], 'stocks:references': ['voir'], 'stocks:users': ['voir'], 'stocks:settings': ['voir'], achats: ['voir', 'créer'], fournisseurs: ['voir'], logistique: ['voir'] } },
-      { id: 'kora-role-rh', name: 'Gestionnaire RH', description: 'Suit les collaborateurs, présences et éléments de paie.', companyId: 'kora', sectorId: 'kora-service-rh', modulePermissions: { rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer', 'modifier'], paie: ['voir', 'créer'] } },
-      { id: 'kora-role-comptable', name: 'Comptable', description: 'Prépare les écritures, paiements et rapports financiers.', companyId: 'kora', sectorId: 'kora-service-finance', modulePermissions: { finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'], rapports: ['voir', 'créer'], documents: ['voir', 'créer'] } },
-      { id: 'kora-role-manager', name: 'Manager entreprise', description: 'Pilote l’ensemble de KORA et supervise les équipes.', companyId: 'kora', sectorId: 'kora-direction', modulePermissions: { commerce: ['voir', 'créer', 'modifier'], ventes: ['voir', 'créer', 'modifier'], achats: ['voir', 'créer', 'modifier'], stocks: ['voir', 'créer', 'modifier'], finance: ['voir', 'créer', 'modifier'], comptabilite: ['voir', 'créer', 'modifier'], rh: ['voir', 'créer', 'modifier'], presences: ['voir', 'créer', 'modifier'], paie: ['voir', 'créer', 'modifier'], crm: ['voir', 'créer', 'modifier'], fournisseurs: ['voir', 'créer', 'modifier'], logistique: ['voir', 'créer', 'modifier'], documents: ['voir', 'créer', 'modifier'], rapports: ['voir', 'créer', 'modifier'] } },
-      { id: 'kora-role-visiteur', name: 'Visiteur', description: 'Accès visiteur sans module ni action autorisée.', companyId: 'kora', sectorId: 'kora-direction', modulePermissions: {} },
-    ],
-    products: [
-      { id: 'p-1', sku: 'KOR-CAF-01', name: 'Café Touba 250g', category: 'Épicerie', stock: 184, threshold: 50, price: 3500 },
-      { id: 'p-2', sku: 'KOR-HUI-02', name: 'Huile d’arachide 1L', category: 'Épicerie', stock: 38, threshold: 45, price: 2200 },
-      { id: 'p-3', sku: 'KOR-RIZ-03', name: 'Riz local 5kg', category: 'Épicerie', stock: 76, threshold: 30, price: 6800 },
-      { id: 'p-4', sku: 'KOR-SAV-04', name: 'Savon naturel', category: 'Hygiène', stock: 12, threshold: 25, price: 1200 },
-      { id: 'p-5', sku: 'KOR-COS-05', name: 'Baume karité 100ml', category: 'Bien-être', stock: 92, threshold: 20, price: 4500 },
-    ],
-    movements: [
-      { id: 'm-1', product: 'Huile d’arachide 1L', quantity: 20, type: 'SORTIE', date: 'Aujourd’hui, 09:42', user: 'Ibrahima Kane', location: 'Boutique Dakar' },
-      { id: 'm-2', product: 'Café Touba 250g', quantity: 80, type: 'ENTRÉE', date: 'Hier, 16:18', user: 'Ndeye Sarr', location: 'Entrepôt principal' },
-      { id: 'm-3', product: 'Savon naturel', quantity: 8, type: 'SORTIE', date: 'Hier, 11:05', user: 'Ibrahima Kane', location: 'Boutique Dakar' },
-    ],
-    sales: [
-      { id: 's-1', reference: 'VTE-240618-004', client: 'Boutique Keur Gui', amount: 186500, status: 'VALIDÉ', date: 'Aujourd’hui, 10:14', items: [{ productId: 'p-1', quantity: 12 }, { productId: 'p-2', quantity: 8 }] },
-      { id: 's-2', reference: 'VTE-240617-021', client: 'Marché Tilène', amount: 94500, status: 'VALIDÉ', date: 'Hier, 15:38', items: [{ productId: 'p-3', quantity: 5 }] },
-      { id: 's-3', reference: 'VTE-240617-019', client: 'Maison Baobab', amount: 42000, status: 'BROUILLON', date: 'Hier, 12:07', items: [] },
-    ],
-    payments: [
-      { id: 'pay-1', reference: 'PAY-09281', invoice: 'FAC-2406-18', amount: 186500, status: 'CONFIRMÉ', date: 'Aujourd’hui, 10:18' },
-      { id: 'pay-2', reference: 'PAY-09264', invoice: 'FAC-2406-14', amount: 315000, status: 'EN ATTENTE', date: 'Hier, 14:02' },
-      { id: 'pay-3', reference: 'PAY-09239', invoice: 'FAC-2406-09', amount: 128000, status: 'CONFIRMÉ', date: '16 juin, 09:31' },
-    ],
-    activities: [
-      { id: 'a-1', user: 'Ibrahima Kane', action: 'a validé une vente', module: 'Commerce', object: 'VTE-240618-004', date: 'Aujourd’hui, 10:14', status: 'VALIDÉ' },
-      { id: 'a-2', user: 'Mamadou Ba', action: 'a confirmé un paiement', module: 'Finance', object: 'PAY-09281', date: 'Aujourd’hui, 10:18', status: 'CONFIRMÉ' },
-      { id: 'a-3', user: 'Ndeye Sarr', action: 'a enregistré une entrée', module: 'Stocks', object: 'Café Touba 250g', date: 'Hier, 16:18', status: 'ACTIF' },
-      { id: 'a-4', user: 'Aminata Diop', action: 'a modifié un rôle', module: 'RH', object: 'Manager', date: 'Hier, 08:49', status: 'ACTIF' },
-    ],
-    controlTasks: [
-      { id: 'task-1', title: 'Valider le réassort d’huile d’arachide', description: 'La demande doit être confirmée avant la création du bon de commande fournisseur.', companyId: 'kora', sectorId: 'kora-service-finance', moduleId: 'achats', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ibrahima Kane', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'BC-2406-038', createdAt: '2024-06-18T08:40:00.000Z', updatedAt: '2024-06-18T08:40:00.000Z' },
-      { id: 'task-2', title: 'Contrôler l’écart d’inventaire', description: 'Comparer le stock théorique et le comptage physique de la boutique Dakar.', companyId: 'kora', sectorId: 'kora-service-stock', moduleId: 'stocks', assigneeEmployeeId: 'demo-emp-ibrahima', assigneeName: 'Ibrahima Kane', createdBy: 'Aminata Diop', status: 'EN COURS', priority: 'CRITIQUE', requiresApproval: false, dueDate: 'Demain', relatedObject: 'INV-2406-02', createdAt: '2024-06-17T15:10:00.000Z', updatedAt: '2024-06-18T09:20:00.000Z' },
-      { id: 'task-3', title: 'Valider la période de paie de juin', description: 'La période est prête pour validation avant génération des bulletins.', companyId: 'kora', sectorId: 'kora-service-rh', moduleId: 'paie', assigneeEmployeeId: 'demo-emp-mamadou', assigneeName: 'Mamadou Ba', createdBy: 'Ndeye Sarr', status: 'À FAIRE', priority: 'NORMALE', requiresApproval: true, dueDate: '20 juin', relatedObject: 'PAIE-2024-06', createdAt: '2024-06-18T07:35:00.000Z', updatedAt: '2024-06-18T07:35:00.000Z' },
-      { id: 'task-4', title: 'Examiner la demande d’ouverture Teranga Agro', description: 'Vérifier les modules demandés et la première unité avant activation.', companyId: 'teranga', moduleId: 'commerce', createdBy: 'MAXIMUS', status: 'À FAIRE', priority: 'HAUTE', requiresApproval: true, dueDate: 'Aujourd’hui', relatedObject: 'teranga', createdAt: '2024-06-18T06:50:00.000Z', updatedAt: '2024-06-18T06:50:00.000Z' },
-    ],
-    domainEvents: [
-      { id: 'event-1', type: 'TASK_CREATED', label: 'Tâche créée', summary: 'Valider le réassort d’huile d’arachide', companyId: 'kora', moduleId: 'achats', actorName: 'Ibrahima Kane', entityType: 'task', entityId: 'task-1', severity: 'warning', createdAt: '2024-06-18T08:40:00.000Z' },
-      { id: 'event-2', type: 'SYSTEM', label: 'Seuil de stock atteint', summary: 'Huile d’arachide 1L est sous son seuil de sécurité.', companyId: 'kora', moduleId: 'stocks', actorName: 'MAXIMUS', entityType: 'product', entityId: 'p-2', severity: 'warning', createdAt: '2024-06-18T08:20:00.000Z' },
-      { id: 'event-3', type: 'SYSTEM', label: 'Paiement confirmé', summary: 'Le paiement PAY-09281 a été enregistré.', companyId: 'kora', moduleId: 'finance', actorName: 'Mamadou Ba', entityType: 'payment', entityId: 'pay-1', severity: 'success', createdAt: '2024-06-18T10:18:00.000Z' },
-    ],
-    auditEntries: [
-      { id: 'audit-1', action: 'VENTE_VALIDÉE', summary: 'VTE-240618-004 a été validée.', companyId: 'kora', moduleId: 'commerce', actorName: 'Ibrahima Kane', entityType: 'sale', entityId: 's-1', createdAt: '2024-06-18T10:14:00.000Z' },
-      { id: 'audit-2', action: 'PAIEMENT_CONFIRMÉ', summary: 'PAY-09281 a été confirmé.', companyId: 'kora', moduleId: 'finance', actorName: 'Mamadou Ba', entityType: 'payment', entityId: 'pay-1', createdAt: '2024-06-18T10:18:00.000Z' },
-      { id: 'audit-3', action: 'RÔLE_MODIFIÉ', summary: 'Le rôle Manager a été modifié.', companyId: 'kora', moduleId: 'rh', actorName: 'Aminata Diop', entityType: 'role', entityId: 'kora-role-manager', createdAt: '2024-06-17T08:49:00.000Z' },
-    ],
-    orgNodes: [
-      { id: 'kora-direction', companyId: 'kora', code: 'DG', name: 'Direction générale', type: 'direction', parentId: null, moduleIds: ['commerce', 'ventes', 'achats', 'stocks', 'finance', 'comptabilite', 'rh', 'presences', 'paie', 'crm', 'fournisseurs', 'logistique', 'documents', 'rapports'] },
-      { id: 'kora-sector-commerce', companyId: 'kora', code: 'COM', name: 'Pôle commercial', type: 'sector', parentId: 'kora-direction', moduleIds: ['commerce', 'ventes', 'crm'] },
-      { id: 'kora-service-vente', companyId: 'kora', code: 'VTE', name: 'Service ventes & relation client', type: 'service', parentId: 'kora-sector-commerce', moduleIds: ['commerce', 'ventes', 'crm'] },
-      { id: 'kora-sector-operations', companyId: 'kora', code: 'OPS', name: 'Pôle opérations', type: 'sector', parentId: 'kora-direction', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique'] },
-      { id: 'kora-service-stock', companyId: 'kora', code: 'LOG', name: 'Service stock & logistique', type: 'service', parentId: 'kora-sector-operations', moduleIds: ['achats', 'stocks', 'fournisseurs', 'logistique'] },
-      { id: 'kora-sector-support', companyId: 'kora', code: 'SUP', name: 'Pôle support', type: 'sector', parentId: 'kora-direction', moduleIds: ['finance', 'comptabilite', 'rh', 'presences', 'paie', 'documents', 'rapports'] },
-      { id: 'kora-service-finance', companyId: 'kora', code: 'FIN', name: 'Service finance & comptabilité', type: 'service', parentId: 'kora-sector-support', moduleIds: ['finance', 'comptabilite', 'rapports', 'documents'] },
-      { id: 'kora-service-rh', companyId: 'kora', code: 'RH', name: 'Service ressources humaines', type: 'service', parentId: 'kora-sector-support', moduleIds: ['rh', 'presences', 'paie'] },
-    ],
-    notifications: [
-      { id: 'n-1', title: 'Stock à surveiller', text: 'Huile d’arachide 1L est sous son seuil de sécurité.', read: false, date: 'Il y a 18 min', audience: 'company', companyId: 'kora', module: 'stocks', severity: 'warning', href: '/kora/stocks?tab=products' },
-      { id: 'n-2', title: 'Paiement confirmé', text: 'Le paiement PAY-09281 a été enregistré.', read: false, date: 'Il y a 24 min', audience: 'company', companyId: 'kora', module: 'finance', severity: 'success', href: '/kora/commerce?tab=cash' },
-      { id: 'n-3', title: 'Rapport disponible', text: 'Votre rapport hebdomadaire est prêt.', read: true, date: 'Hier', audience: 'all', module: 'rapports', severity: 'info', href: '/kora/rapports' },
-    ],
-    purchaseOrders: [
-      { id: 'po-1', reference: 'BC-2406-041', supplier: 'SENARIZ SA', subject: 'Riz local 5 kg · réassort', amount: 612000, date: '18 juin 2024', status: 'VALIDÉ' },
-      { id: 'po-2', reference: 'BC-2406-038', supplier: 'Huilerie du Saloum', subject: 'Huile d’arachide 1 L', amount: 385000, date: '17 juin 2024', status: 'EN ATTENTE' },
-    ],
-    accountingEntries: [
-      { id: 'acc-1', reference: 'OD-240618-12', journal: 'Banque', label: 'Encaissement FAC-2406-18', debit: 186500, credit: 186500, date: '18 juin 2024', status: 'VALIDÉ' },
-      { id: 'acc-2', reference: 'AC-240617-08', journal: 'Achats', label: 'Facture Huilerie du Saloum', debit: 385000, credit: 385000, date: '17 juin 2024', status: 'BROUILLON' },
-    ],
-    payrollSlips: [
-      { id: 'payroll-1', reference: 'PAIE-2024-05-001', employee: 'Mamadou Ba', period: 'Mai 2024', gross: 485000, net: 398250, status: 'VALIDÉ' },
-      { id: 'payroll-2', reference: 'PAIE-2024-06-002', employee: 'Awa Ndiaye', period: 'Juin 2024', gross: 350000, net: 289500, status: 'BROUILLON' },
-    ],
-    crmOpportunities: [
-      { id: 'crm-1', client: 'Boutique Keur Gui', contact: 'Khadim Gueye', subject: 'Référencement gamme bien-être', amount: 275000, nextAction: 'Relance le 20 juin', status: 'EN ATTENTE' },
-      { id: 'crm-2', client: 'Maison Baobab', contact: 'Marième Ba', subject: 'Commande Ramadan', amount: 420000, nextAction: 'Proposition envoyée', status: 'ACTIF' },
-    ],
-    supplierRecords: [
-      { id: 'sup-1', name: 'SENARIZ SA', contact: 'Cheikh Seck', phone: '+221 33 821 40 22', category: 'Épicerie', score: 92, status: 'ACTIF' },
-      { id: 'sup-2', name: 'Huilerie du Saloum', contact: 'Aïssatou Diouf', phone: '+221 77 456 19 88', category: 'Épicerie', score: 84, status: 'ACTIF' },
-    ],
-    deliveries: [
-      { id: 'del-1', reference: 'LIV-240618-07', recipient: 'Boutique Keur Gui', destination: 'Médina, Dakar', driver: 'Lamine Diallo', date: '18 juin · 14:30', status: 'CONFIRMÉ' },
-      { id: 'del-2', reference: 'LIV-240618-08', recipient: 'Marché Tilène', destination: 'Tilène, Dakar', driver: 'Ousmane Ndiaye', date: '18 juin · 16:00', status: 'EN ATTENTE' },
-    ],
-    businessDocuments: [
-      { id: 'doc-1', name: 'Contrat SENARIZ 2024.pdf', category: 'Contrats', owner: 'Mamadou Ba', updatedAt: '18 juin 2024', version: 2, status: 'VALIDÉ' },
-      { id: 'doc-2', name: 'Procédure réception entrepôt.pdf', category: 'Procédures', owner: 'Ndeye Sarr', updatedAt: '16 juin 2024', version: 1, status: 'ACTIF' },
-    ],
-  };
-}
-
-function isDemoValue(value: unknown): boolean {
-  return (
-    typeof value === 'string' &&
-    (/^demo[-_]/i.test(value) ||
-      /^(kora|teranga|naya)$/i.test(value) ||
-      /\.demo$/i.test(value))
-  );
-}
-
-function removePersistedDemoData(data: StoreData): StoreData {
-  const withoutDemoRecords = <T>(records: T[]): T[] =>
-    records.filter((record) => {
-      if (!record || typeof record !== 'object') return true;
-      const candidate = record as Record<string, unknown>;
-      return ![
-        candidate.id,
-        candidate.companyId,
-        candidate.employeeId,
-        candidate.email,
-        candidate.entityId,
-      ].some(isDemoValue);
-    });
-
-  return {
-    ...productionSeedData(),
-    ...data,
-    companies: withoutDemoRecords(data.companies),
-    employees: withoutDemoRecords(data.employees),
-    roles: withoutDemoRecords(data.roles),
-    products: withoutDemoRecords(data.products),
-    movements: withoutDemoRecords(data.movements),
-    sales: withoutDemoRecords(data.sales),
-    payments: withoutDemoRecords(data.payments),
-    activities: withoutDemoRecords(data.activities),
-    controlTasks: withoutDemoRecords(data.controlTasks),
-    domainEvents: withoutDemoRecords(data.domainEvents),
-    auditEntries: withoutDemoRecords(data.auditEntries),
-    orgNodes: withoutDemoRecords(data.orgNodes),
-    notifications: withoutDemoRecords(data.notifications),
-    purchaseOrders: withoutDemoRecords(data.purchaseOrders),
-    accountingEntries: withoutDemoRecords(data.accountingEntries),
-    payrollSlips: withoutDemoRecords(data.payrollSlips),
-    crmOpportunities: withoutDemoRecords(data.crmOpportunities),
-    supplierRecords: withoutDemoRecords(data.supplierRecords),
-    deliveries: withoutDemoRecords(data.deliveries),
-    businessDocuments: withoutDemoRecords(data.businessDocuments),
-    subscriptions: withoutDemoRecords(data.subscriptions),
-  };
-}
-
-export function loadData(): StoreData {
-  try {
-    const saved = localStorage.getItem('maximus-data-v1');
-    if (!saved) return seedData();
-    const parsed = JSON.parse(saved) as StoreData;
-    if (import.meta.env.PROD) return removePersistedDemoData(parsed);
-    const initial = seedData();
-    const { preferences: _legacyPreferences, dependencies: _legacyDependencies, ...storedData } = parsed as StoreData & { preferences?: unknown; dependencies?: unknown };
-    const storedModuleOverrides = parsed.moduleOverrides ?? {};
-    const storedPresenceOverride = storedModuleOverrides.presences;
-    const shouldMigratePresenceCatalog =
-      (parsed.catalogVersion ?? 1) < 3 &&
-      Boolean(
-        storedPresenceOverride &&
-          (storedPresenceOverride.features?.length ?? 0) >= 16 &&
-          (storedPresenceOverride.featurePacks?.length ?? 0) === 0,
-      );
-    const moduleOverrides: ModuleOverrides = shouldMigratePresenceCatalog
-      ? {
-          ...storedModuleOverrides,
-          presences: {
-            ...storedPresenceOverride,
-            features: presenceFeatureDefinitions.map((feature) => feature.label),
-            featureDependencies: presenceFeatureDependencies,
-            featurePacks: presenceFeaturePacks,
-          },
-        }
-      : storedModuleOverrides;
-    const defaultModuleStatuses = Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap;
-    const seededByEmail = new Map(initial.employees.map(employee => [employee.email, employee]));
-    const rawCompanies = (parsed.catalogVersion ?? 1) < 2
-      ? parsed.companies.map(company => company.id === 'kora' ? { ...company, requestedModules: initial.companies[0].requestedModules, allowedModules: initial.companies[0].allowedModules, refusedModules: [] } : company)
-      : parsed.companies;
-    const companies = rawCompanies.map(company => ({ ...company, adminPassword: company.adminPassword ?? 'Kora123!', managerRoleId: company.managerRoleId ?? (company.id === 'kora' ? 'kora-role-manager' : undefined) }));
-    const removeGeneratedHierarchy = (parsed.organizationVersion ?? 1) < 3;
-    const seedDemoOrganization = (parsed.organizationVersion ?? 1) < 4;
-    const generatedNodeIds = new Set(['org-1', 'org-2', 'org-3', 'org-4', 'org-5', 'org-6', 'org-7']);
-    const generatedRoleIds = new Set(['role-admin', 'role-compta', 'role-manager', 'role-magasinier', 'role-rh', 'role-logistique', 'role-vendeur']);
-    const generatedEmployeeIds = new Set(['emp-1', 'emp-2', 'emp-3', 'emp-4', 'emp-5', 'emp-6', 'emp-7', 'emp-8']);
-    const nodeSource = parsed.orgNodes?.length
-      ? (seedDemoOrganization ? [...initial.orgNodes.filter(initialNode => !parsed.orgNodes.some(node => node.id === initialNode.id)), ...parsed.orgNodes] : parsed.orgNodes)
-      : initial.orgNodes;
-    const orgNodes = nodeSource
-      .filter(node => !removeGeneratedHierarchy || !generatedNodeIds.has(node.id))
-      .map(node => ({
-        ...node,
-        companyId: node.companyId || 'kora',
-        code: node.code || node.name.substring(0, 3).toUpperCase(),
-        parentId: removeGeneratedHierarchy && node.parentId && generatedNodeIds.has(node.parentId) ? null : node.parentId,
-        moduleIds: node.moduleIds || [],
-      })) as OrgNode[];
-    const savedRoleSource = parsed.roles?.length ? parsed.roles : initial.roles;
-    const repairDemoAssignments = (parsed.organizationVersion ?? 1) < 5;
-    const roleSource = repairDemoAssignments || seedDemoOrganization
-      ? [...initial.roles.filter(initialRole => !savedRoleSource.some(role => role.id === initialRole.id)), ...savedRoleSource]
-      : savedRoleSource;
-    const legacyMagasinierPermissions = initial.roles.find(role => role.id === 'kora-role-magasinier')?.modulePermissions ?? {};
-    const roles = [...roleSource, ...initial.roles.filter(initialRole => initialRole.id === 'kora-role-visiteur' && !roleSource.some(role => role.id === initialRole.id))]
-      .filter(role => !removeGeneratedHierarchy || !generatedRoleIds.has(role.id))
-      .map(role => ({
-        ...role,
-        companyId: role.companyId || 'kora',
-        sectorId: removeGeneratedHierarchy && role.sectorId && generatedNodeIds.has(role.sectorId) ? undefined : role.sectorId,
-        modulePermissions: role.id === 'kora-role-magasinier' && (parsed.organizationVersion ?? 1) < 8
-          ? {
-              ...Object.fromEntries(Object.entries(role.modulePermissions).filter(([key]) => key !== 'commerce' && key !== 'ventes' && !key.startsWith('commerce:') && !key.startsWith('ventes:'))),
-              stocks: JSON.stringify(role.modulePermissions.stocks ?? []) === JSON.stringify(['voir', 'créer', 'modifier']) ? ['voir'] : role.modulePermissions.stocks,
-              ...Object.fromEntries(Object.entries(legacyMagasinierPermissions).filter(([key]) => key.startsWith('stocks:') && !role.modulePermissions[key])),
-            }
-          : role.modulePermissions,
-      })) as Role[];
-
-    const storedEmployees = parsed.employees ?? [];
-    const demoEmployees = initial.employees.map(seed => {
-      const stored = storedEmployees.find(employee => employee.id === seed.id || employee.email === seed.email);
-      return {
-        ...seed,
-        ...stored,
-        id: seed.id,
-        companyId: 'kora',
-        status: 'ACTIF' as const,
-        loginPassword: stored?.loginPassword || seed.loginPassword,
-        sectorId: stored?.sectorId || seed.sectorId,
-        roleId: stored?.roleId || seed.roleId,
-        role: stored?.role || seed.role,
-      };
-    });
-    const rawEmployees = [
-      ...demoEmployees,
-      ...storedEmployees.filter(employee => !demoEmployeeIds.has(employee.id) && !initial.employees.some(seed => seed.email === employee.email)),
-    ];
-    const storedSubscriptions = parsed.subscriptions ?? [];
-    const subscriptions = companies.map((company) =>
-      storedSubscriptions.find(subscription => subscription.companyId === company.id)
-        ?? initial.subscriptions.find(subscription => subscription.companyId === company.id)
-        ?? buildSubscriptionForCompany({
-          companyId: company.id,
-          createdAt: company.createdAt,
-          moduleIds: company.allowedModules,
-        }),
-    );
-    return {
-      ...initial,
-      ...storedData,
-      notifications: (parsed.notifications ?? initial.notifications).map(notification => ({
-        ...notification,
-        audience: notification.audience ?? 'all',
-        severity: notification.severity ?? 'info',
-      })),
-       catalogVersion: 3,
-       organizationVersion: 8,
-       sectorPresets: (parsed.sectorPresets ?? initial.sectorPresets).map(preset => {
-         const legacyProfiles = preset.businessProfiles ?? [];
-         const legacyPackIds = Object.fromEntries(legacyProfiles.flatMap(profile => Object.entries(profile.modulePackIds ?? {}))) as Partial<Record<ModuleId, string[]>>;
-         return {
-           ...preset,
-           modulePackIds: preset.modulePackIds ?? (Object.keys(legacyPackIds).length ? legacyPackIds : initial.sectorPresets.find(initialPreset => initialPreset.id === preset.id)?.modulePackIds),
-         };
-       }),
-      companies,
-      moduleStatuses: { ...defaultModuleStatuses, ...(parsed.moduleStatuses ?? {}) },
-       moduleOverrides,
-      removedModules: parsed.removedModules ?? [],
-      purchaseOrders: parsed.purchaseOrders ?? initial.purchaseOrders,
-      accountingEntries: parsed.accountingEntries ?? initial.accountingEntries,
-      payrollSlips: parsed.payrollSlips ?? initial.payrollSlips,
-      crmOpportunities: parsed.crmOpportunities ?? initial.crmOpportunities,
-      supplierRecords: parsed.supplierRecords ?? initial.supplierRecords,
-      deliveries: parsed.deliveries ?? initial.deliveries,
-      businessDocuments: parsed.businessDocuments ?? initial.businessDocuments,
-       subscriptions,
-      controlTasks: parsed.controlTasks ?? initial.controlTasks,
-      domainEvents: parsed.domainEvents ?? initial.domainEvents,
-      auditEntries: parsed.auditEntries ?? initial.auditEntries,
-      orgNodes,
-       employees: rawEmployees.filter(employee => !removeGeneratedHierarchy || !generatedEmployeeIds.has(employee.id)).map(employee => {
-        const seeded = seededByEmail.get(employee.email);
-        const generatedSector = Boolean(removeGeneratedHierarchy && employee.sectorId && generatedNodeIds.has(employee.sectorId));
-        const generatedRole = Boolean(removeGeneratedHierarchy && employee.roleId && generatedRoleIds.has(employee.roleId));
-        const demoRole = repairDemoAssignments && seeded?.companyId === 'kora'
-          ? roles.find(role => role.id === (employee.roleId && roles.some(candidate => candidate.id === employee.roleId) ? employee.roleId : seeded.roleId))
-          : undefined;
-        const demoSector = repairDemoAssignments && seeded?.companyId === 'kora'
-          ? orgNodes.find(node => node.id === (employee.sectorId && orgNodes.some(candidate => candidate.id === employee.sectorId) ? employee.sectorId : seeded.sectorId))
-          : undefined;
-        return {
-          ...employee,
-          loginPassword: employee.loginPassword ?? seeded?.loginPassword ?? 'Kora123!',
-          isSectorAdmin: (parsed.organizationVersion ?? 1) < 6 && employee.email === 'mamadou.ba@kora.demo' ? true : employee.isSectorAdmin ?? seeded?.isSectorAdmin ?? false,
-          companyId: employee.companyId || 'kora',
-           sectorId: generatedSector ? undefined : demoSector?.id ?? employee.sectorId ?? seeded?.sectorId,
-           roleId: generatedRole ? undefined : demoRole?.id ?? employee.roleId ?? seeded?.roleId,
-          department: generatedSector ? '' : employee.department || (demoSector?.type === 'service' ? (orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.department ?? '') : (seeded?.department ?? '')),
-          subDepartment: generatedSector ? '' : employee.subDepartment || (demoSector?.parentId ? (orgNodes.find(node => node.id === demoSector.parentId)?.name ?? seeded?.subDepartment ?? '') : (seeded?.subDepartment ?? '')),
-          role: generatedRole ? 'Non affecté' : demoRole?.name ?? employee.role ?? seeded?.role,
-        };
-      }),
-      roles,
-    };
-  } catch { return seedData(); }
-}
-export function saveData(data: StoreData) { localStorage.setItem('maximus-data-v1', JSON.stringify(data)); }
 export function uid(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 export const money = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n) + ' FCFA';
 export const shortMoney = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);
@@ -707,28 +241,15 @@ export function recordControlEvent(
 ) {
   const createdAt = new Date().toISOString();
   draft.domainEvents.unshift({
-    id: uid('event'),
-    type: input.type,
-    label: input.label,
-    summary: input.summary,
-    companyId: input.companyId,
-    moduleId: input.moduleId,
-    actorName: input.actorName,
-    entityType: input.entityType,
-    entityId: input.entityId,
-    severity: input.severity ?? 'info',
-    createdAt,
+    id: uid('event'), type: input.type, label: input.label, summary: input.summary,
+    companyId: input.companyId, moduleId: input.moduleId, actorName: input.actorName,
+    entityType: input.entityType, entityId: input.entityId, severity: input.severity ?? 'info', createdAt,
   });
   draft.auditEntries.unshift({
     id: uid('audit'),
     action: input.label.toUpperCase().replaceAll(' ', '_'),
-    summary: input.summary,
-    companyId: input.companyId,
-    moduleId: input.moduleId,
-    actorName: input.actorName,
-    entityType: input.entityType,
-    entityId: input.entityId,
-    createdAt,
+    summary: input.summary, companyId: input.companyId, moduleId: input.moduleId,
+    actorName: input.actorName, entityType: input.entityType, entityId: input.entityId, createdAt,
   });
   draft.domainEvents = draft.domainEvents.slice(0, 200);
   draft.auditEntries = draft.auditEntries.slice(0, 200);

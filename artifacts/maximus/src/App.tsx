@@ -61,6 +61,7 @@ import {
 import {
   getConfiguredModules,
   getVisibleNotifications,
+  emptyStoreData,
   loadData,
   modules,
   money,
@@ -80,6 +81,7 @@ import {
   type StoreData,
   subscriptionPlans,
 } from '@/lib/store';
+import { appStateApi } from '@/lib/app-state-api';
 import {
   discardCatalogDraft,
   getCatalogImpact,
@@ -118,21 +120,7 @@ import { useDebouncedPersistence } from '@/hooks/use-persisted-store';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
-const defaultDemoAccounts = import.meta.env.DEV
-  ? [
-      { id: 'maximus-admin', label: 'Administration MAXIMUS', email: 'admin@maximus.demo', password: 'Admin123!' },
-      { id: 'kora-manager', label: 'Manager KORA · KORA Distribution', email: 'admin@kora.demo', password: 'Kora123!' },
-      { id: 'demo-emp-awa', label: 'Awa Ndiaye · Gestionnaire commerciale', email: 'awa.ndiaye@kora.demo', password: 'AwaKora2026!' },
-      {
-        id: 'demo-emp-ibrahima',
-        label: 'Ibrahima Kane · Responsable magasin',
-        email: 'ibrahima.kane@kora.demo',
-        password: 'IbrahimaKora2026!',
-      },
-      { id: 'demo-emp-ndeye', label: 'Ndeye Sarr · Assistante RH', email: 'ndeye.sarr@kora.demo', password: 'NdeyeKora2026!' },
-      { id: 'demo-emp-mamadou', label: 'Mamadou Ba · Comptable', email: 'mamadou.ba@kora.demo', password: 'MamadouKora2026!' },
-    ]
-  : [];
+const defaultDemoAccounts: never[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const OperationalModulePage = lazy(() =>
@@ -204,9 +192,9 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     description: 'Chaque action importante, horodatée et attribuée.',
   },
   '/kora/dashboard': {
-    kicker: 'KORA Distribution',
-    title: 'Le rythme de KORA, en un regard.',
-    description: 'Mardi 18 juin 2024 · Dakar, Sénégal',
+    kicker: 'Espace entreprise',
+    title: 'Votre activité, en un regard.',
+    description: 'Pilotez vos opérations depuis un espace unifié.',
   },
   '/kora/controle': {
     kicker: 'Espace entreprise',
@@ -324,6 +312,7 @@ const routesWithModuleHeaders = new Set([
 function AppContent() {
   const { alert, confirm } = useAppDialog();
   const [data, setData] = useState<StoreData>(() => loadData());
+  const [appStateVersion, setAppStateVersion] = useState(0);
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
@@ -385,6 +374,24 @@ function AppContent() {
       });
   }, []);
   useEffect(() => {
+    if (!session) return undefined;
+    let cancelled = false;
+    void appStateApi.bootstrap()
+      .then(({ data: remoteData, version }) => {
+        if (cancelled) return;
+        setData({ ...emptyStoreData(), ...remoteData } as StoreData);
+        setAppStateVersion(version);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setToast(error instanceof Error ? error.message : 'Les données métier sont indisponibles.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+  useEffect(() => {
     if (session !== 'admin') return;
     const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF' && company.adminPassword);
     void Promise.all(
@@ -404,11 +411,16 @@ function AppContent() {
   }, [session]);
 
   const mutate = (fn: (draft: StoreData) => void, message?: string) => {
-    setData((prev) => {
-      const next = structuredClone(prev) as StoreData;
-      fn(next);
-      return next;
-    });
+    const next = structuredClone(data) as StoreData;
+    fn(next);
+    setData(next);
+    if (session) {
+      void appStateApi.save(next, appStateVersion)
+        .then(({ version }) => setAppStateVersion(version))
+        .catch((error) => {
+          setToast(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.');
+        });
+    }
     if (message) setToast(message);
   };
   const notify = (message: string) => setToast(message);
@@ -948,9 +960,9 @@ function Login({
   onLogin: (space: 'admin' | 'kora', email: string, password: string) => Promise<void>;
   employees: StoreData['employees'];
 }) {
-  const showDemoAccounts = import.meta.env.DEV;
-  const [email, setEmail] = useState(showDemoAccounts ? 'admin@kora.demo' : '');
-  const [password, setPassword] = useState(showDemoAccounts ? 'Kora123!' : '');
+  const showDemoAccounts = false;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
@@ -977,7 +989,7 @@ function Login({
             id: account.id,
             label: `${account.firstName} ${account.lastName} · ${account.position}`,
             email: account.email,
-            password: account.loginPassword ?? 'Kora123!',
+            password: account.loginPassword ?? '',
           })),
       ]
     : [];
@@ -3990,7 +4002,7 @@ function EmployeesPage({
     position: '',
     department: sectorAdminDepartment ?? 'Commerce',
     role: 'Vendeur',
-    loginPassword: 'Kora123!',
+    loginPassword: '',
     isSectorAdmin: false,
   });
   const list = data.employees
@@ -4007,7 +4019,7 @@ function EmployeesPage({
       position: '',
       department: sectorAdminDepartment ?? 'Commerce',
       role: 'Vendeur',
-      loginPassword: 'Kora123!',
+      loginPassword: '',
       isSectorAdmin: false,
     });
   const openEmployee = (employee?: Employee) => {
@@ -4033,7 +4045,7 @@ function EmployeesPage({
             position: '',
             department: sectorAdminDepartment ?? 'Commerce',
             role: 'Vendeur',
-            loginPassword: 'Kora123!',
+            loginPassword: '',
             isSectorAdmin: false,
           },
     );
@@ -4133,7 +4145,7 @@ function EmployeesPage({
             </div>,
             <div className="text-xs">
               <span className="block font-semibold">Email + mot de passe</span>
-              <small className="text-[hsl(var(--muted-foreground))]">{e.loginPassword ?? 'Kora123!'}</small>
+              <small className="text-[hsl(var(--muted-foreground))]">{e.loginPassword ? 'Mot de passe configuré' : 'Non configuré'}</small>
             </div>,
             <StatusBadge status={e.status} />,
             <div className="flex gap-1">

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Building2, Settings, Trash2 } from 'lucide-react';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
-  demoEmployeeIds,
   uid,
   type Company,
   type Employee,
@@ -113,7 +112,7 @@ export function EmployeesTab({
               </dl>
               <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
                 <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                {demoEmployeeIds.has(employee.id) ? <span className="inline-flex w-full items-center justify-center rounded-lg border border-dashed px-2 py-2 text-center text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
+                <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
               </div>
             </article>
           );
@@ -136,7 +135,7 @@ export function EmployeesTab({
                   <td className="px-6 py-4 text-xs font-medium">{role?.name || 'Non assigné'}</td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2">
                     <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                      {demoEmployeeIds.has(employee.id) ? <span className="inline-flex items-center rounded-lg border border-dashed px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">Compte démo protégé</span> : <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>}
+                      <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive)/.1)] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
                   </div></td>
                 </tr>
               );

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\ModuleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,11 @@ Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
     Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
+});
+
+Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
+    Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);
+    Route::put('/', [AppStateController::class, 'save']);
 });
 
 require __DIR__.'/control.php';
