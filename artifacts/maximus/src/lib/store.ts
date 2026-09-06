@@ -207,7 +207,56 @@ export const sectorPresets: SectorPreset[] = [
   { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'ventes', 'stocks', 'finance'] },
 ];
 
+function productionSeedData(): StoreData {
+  return {
+    companies: [],
+    employees: [],
+    roles: [],
+    products: [],
+    movements: [],
+    sales: [],
+    payments: [],
+    activities: [],
+    controlTasks: [],
+    domainEvents: [],
+    auditEntries: [],
+    orgNodes: [],
+    notifications: [],
+    purchaseOrders: [],
+    accountingEntries: [],
+    payrollSlips: [],
+    crmOpportunities: [],
+    supplierRecords: [],
+    deliveries: [],
+    businessDocuments: [],
+    subscriptions: [],
+    sectorPresets: sectorPresets.map((preset) => ({
+      ...preset,
+      moduleIds: [...preset.moduleIds],
+      moduleFeatures: Object.fromEntries(
+        Object.entries(preset.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+      ),
+      businessProfiles: (preset.businessProfiles ?? []).map((profile) => ({
+        ...profile,
+        modulePackIds: Object.fromEntries(
+          Object.entries(profile.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
+        moduleFeatures: Object.fromEntries(
+          Object.entries(profile.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+        ),
+      })),
+    })),
+    moduleStatuses: Object.fromEntries(modules.map((module) => [module.id, module.status])) as ModuleStatusMap,
+    moduleOverrides: {},
+    removedModules: [],
+    catalogVersion: 3,
+    organizationVersion: 8,
+  };
+}
+
 export function seedData(): StoreData {
+  if (import.meta.env.PROD) return productionSeedData();
+
   return {
     catalogVersion: 3,
     organizationVersion: 8,
@@ -404,11 +453,62 @@ export function seedData(): StoreData {
   };
 }
 
+function isDemoValue(value: unknown): boolean {
+  return (
+    typeof value === 'string' &&
+    (/^demo[-_]/i.test(value) ||
+      /^(kora|teranga|naya)$/i.test(value) ||
+      /\.demo$/i.test(value))
+  );
+}
+
+function removePersistedDemoData(data: StoreData): StoreData {
+  const withoutDemoRecords = <T>(records: T[]): T[] =>
+    records.filter((record) => {
+      if (!record || typeof record !== 'object') return true;
+      const candidate = record as Record<string, unknown>;
+      return ![
+        candidate.id,
+        candidate.companyId,
+        candidate.employeeId,
+        candidate.email,
+        candidate.entityId,
+      ].some(isDemoValue);
+    });
+
+  return {
+    ...productionSeedData(),
+    ...data,
+    companies: withoutDemoRecords(data.companies),
+    employees: withoutDemoRecords(data.employees),
+    roles: withoutDemoRecords(data.roles),
+    products: withoutDemoRecords(data.products),
+    movements: withoutDemoRecords(data.movements),
+    sales: withoutDemoRecords(data.sales),
+    payments: withoutDemoRecords(data.payments),
+    activities: withoutDemoRecords(data.activities),
+    controlTasks: withoutDemoRecords(data.controlTasks),
+    domainEvents: withoutDemoRecords(data.domainEvents),
+    auditEntries: withoutDemoRecords(data.auditEntries),
+    orgNodes: withoutDemoRecords(data.orgNodes),
+    notifications: withoutDemoRecords(data.notifications),
+    purchaseOrders: withoutDemoRecords(data.purchaseOrders),
+    accountingEntries: withoutDemoRecords(data.accountingEntries),
+    payrollSlips: withoutDemoRecords(data.payrollSlips),
+    crmOpportunities: withoutDemoRecords(data.crmOpportunities),
+    supplierRecords: withoutDemoRecords(data.supplierRecords),
+    deliveries: withoutDemoRecords(data.deliveries),
+    businessDocuments: withoutDemoRecords(data.businessDocuments),
+    subscriptions: withoutDemoRecords(data.subscriptions),
+  };
+}
+
 export function loadData(): StoreData {
   try {
     const saved = localStorage.getItem('maximus-data-v1');
     if (!saved) return seedData();
     const parsed = JSON.parse(saved) as StoreData;
+    if (import.meta.env.PROD) return removePersistedDemoData(parsed);
     const initial = seedData();
     const { preferences: _legacyPreferences, dependencies: _legacyDependencies, ...storedData } = parsed as StoreData & { preferences?: unknown; dependencies?: unknown };
     const storedModuleOverrides = parsed.moduleOverrides ?? {};
