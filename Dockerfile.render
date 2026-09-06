@@ -20,7 +20,9 @@ ENV APP_ENV=production \
     APP_DEBUG=false \
     LOG_CHANNEL=stderr \
     LOG_LEVEL=warning \
-    DB_CONNECTION=pgsql
+    DB_CONNECTION=pgsql \
+    COMPOSER_MAX_PARALLEL_HTTP=4 \
+    COMPOSER_PROCESS_TIMEOUT=900
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq-dev unzip \
@@ -35,7 +37,14 @@ COPY artifacts/api-server/laravel ./laravel
 COPY render-entrypoint.sh /usr/local/bin/render-entrypoint.sh
 
 RUN cd laravel \
-    && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+    && attempt=1; \
+    until composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader; do \
+        if [ "$attempt" -ge 3 ]; then exit 1; fi; \
+        echo "Composer download failed; retrying (${attempt}/3)..." >&2; \
+        rm -rf vendor; \
+        sleep $((attempt * 10)); \
+        attempt=$((attempt + 1)); \
+    done \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
     && chmod -R ug+rw storage bootstrap/cache \
     && chmod +x /usr/local/bin/render-entrypoint.sh
