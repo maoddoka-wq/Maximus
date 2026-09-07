@@ -12,7 +12,7 @@ MAXIMUS ERP est une application web React/TypeScript construite dans un monorepo
 - des écrans métier pour Commerce, Stocks, Présences et les modules opérationnels ;
 - une personnalisation visuelle par entreprise.
 
-Les fonctionnalités opérationnelles sont exécutées dans l’application et les workflows Présences, Stocks et Contrôle & coordination disposent d’une persistance PostgreSQL via le serveur API. `localStorage` reste utilisé pour les données initiales, certaines fonctions locales et le repli du frontend.
+Les fonctionnalités opérationnelles sont exécutées dans l’application et les workflows Présences, Stocks et Contrôle & coordination disposent d’une persistance PostgreSQL via le serveur API. `localStorage` reste réservé aux préférences d’interface et à certaines fonctions locales ; aucune donnée métier fictive n’est injectée au démarrage.
 
 ## 2. Structure du monorepo
 
@@ -33,7 +33,7 @@ Le workspace est défini dans `pnpm-workspace.yaml`. Les packages situés dans `
 ### 3.1 Entrée et rendu
 
 - `artifacts/maximus/src/main.tsx` monte l’application React.
-- `artifacts/maximus/src/App.tsx` orchestre la session, l’état global de démonstration, la navigation, le thème et les écrans.
+- `artifacts/maximus/src/App.tsx` orchestre la session, l’état global, la navigation, le thème et les écrans.
 - `artifacts/maximus/src/index.css` contient les tokens visuels, les variables de thème et les règles responsive.
 - `artifacts/maximus/vite.config.ts` configure Vite, l’alias `@`, le chemin de base et le proxy `/api`.
 
@@ -51,7 +51,7 @@ Le routage est assuré par Wouter :
 - `/` : connexion ;
 - `/inscription` : inscription ou création administrative d’une entreprise ;
 - `/maximus/...` : espace d’administration MAXIMUS ;
-- `/entreprise/...` : espace entreprise et employés. Les anciennes URLs `/kora/...` sont uniquement des alias de compatibilité.
+- `/entreprise/...` : espace entreprise et employés. Les anciennes URLs historiques restent uniquement des alias de compatibilité.
 
 Les routes sont centralisées dans `artifacts/maximus/src/routes/app-routes.tsx` :
 
@@ -78,7 +78,7 @@ Les routeurs comparent le chemin sans la query string. Les écrans utilisent `sr
 - le catalogue des modules ;
 - les sous-rubriques Stocks ;
 - les presets de secteurs d’activité ;
-- les entreprises, employés, rôles et unités de démonstration ;
+- les entreprises, employés, rôles et unités chargés pour la session courante ;
 - les fonctions `loadData()` et `saveData()`.
 
 La clé principale de persistance est :
@@ -92,7 +92,7 @@ La lecture du store :
 1. tente de charger les données JSON existantes ;
 2. restaure la structure attendue ;
 3. complète les données héritées si nécessaire ;
-4. utilise les données de démonstration lorsque le store est absent ou invalide.
+4. utilise une structure vide lorsque le store est absent ou invalide ; les données métier viennent de la base active.
 
 ### 4.2 Session et préférences
 

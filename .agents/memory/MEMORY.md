@@ -23,3 +23,4 @@
 - [Espace client e-commerce](ecommerce-customer-space.md) — les sessions, commandes, adresses, favoris et paniers sont toujours bornés par client et entreprise.
 - [Intégration DiamanoPay](diamanopay-integration.md) — vérifier chaque webhook avec la transaction officielle avant tout crédit, sans dépendre d’une signature HMAC non documentée.
 - [Aperçus sociaux publics](public-social-previews.md) — rendre les métadonnées et les images de partage côté serveur, sans dépendre de React ou d’une session.
+- [Codegen OpenAPI et Zod](orval-zod-version.md) — Orval doit être configuré explicitement en Zod 3 dans ce workspace.

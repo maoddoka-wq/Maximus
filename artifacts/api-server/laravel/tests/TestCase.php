@@ -15,6 +15,5 @@ abstract class TestCase extends BaseTestCase
             return;
         }
         ModuleCatalog::ensureCatalog();
-        ModuleCatalog::ensureCompanyAccess('kora');
     }
 }

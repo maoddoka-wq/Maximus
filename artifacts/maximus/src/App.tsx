@@ -122,8 +122,6 @@ import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
-type DemoAccount = { id: string; label: string; email: string; password: string };
-const defaultDemoAccounts: DemoAccount[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
@@ -770,10 +768,7 @@ function AppContent() {
   if (isPotentialCustomShopPath && !session && customDomainState === 'shop') {
     return <PublicShopPage domain />;
   }
-  const loginEmployees = [
-    ...data.employees,
-  ];
-  if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
+  if (location === '/' || !session) return <Login onLogin={login} />;
   const isAdmin = session === 'admin';
   const employeeId = sessionEmployeeId;
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
@@ -1010,12 +1005,9 @@ function AppContent() {
 
 function Login({
   onLogin,
-  employees,
 }: {
   onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
-  employees: StoreData['employees'];
 }) {
-  const showDemoAccounts = false;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -1030,30 +1022,6 @@ function Login({
       .finally(() => setPendingEmail(''));
   };
   const submitLogin = (space: 'admin' | 'company') => loginWithCredentials(space, email, password);
-  const demoAccounts = showDemoAccounts
-    ? [
-        ...defaultDemoAccounts,
-        ...employees
-          .filter(
-            (account) =>
-              account.status === 'ACTIF' &&
-              Boolean(account.loginPassword) &&
-              !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
-          )
-          .map((account) => ({
-            id: account.id,
-            label: `${account.firstName} ${account.lastName} · ${account.position}`,
-            email: account.email,
-            password: account.loginPassword ?? '',
-          })),
-      ]
-    : [];
-  const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
-    setEmail(account.email);
-    setPassword(account.password);
-    setError('');
-    loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
-  };
   return (
     <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
       <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
@@ -1155,35 +1123,6 @@ function Login({
               Créer une entreprise
             </Link>
           </div>
-          {showDemoAccounts && demoAccounts.length > 0 && (
-            <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
-              <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
-              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
-                Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {demoAccounts.map((account) => (
-                  <button
-                    type="button"
-                    disabled={Boolean(pendingEmail)}
-                    data-testid={`button-demo-account-${account.id}`}
-                    key={account.id}
-                    onClick={() => selectDemoAccount(account)}
-                    className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
-                  >
-                    <span className="block text-xs font-bold">{account.label}</span>
-                    <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
-                    <span
-                      data-testid={`demo-account-password-${account.id}`}
-                      className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
-                    >
-                      Mot de passe : {account.password}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </section>
     </div>

@@ -5,12 +5,19 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Models\PresenceItem;
 use App\Support\MaximusAuth;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PresenceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        ModuleCatalog::ensureCompanyAccess('kora');
+    }
 
     public function test_presence_items_are_persisted_with_a_history_record(): void
     {

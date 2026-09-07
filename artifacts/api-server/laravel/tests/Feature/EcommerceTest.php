@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Support\CompanyRegistry;
 use App\Support\MaximusAuth;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,12 @@ use Tests\TestCase;
 class EcommerceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        ModuleCatalog::ensureCompanyAccess('kora');
+    }
 
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {

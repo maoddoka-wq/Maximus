@@ -283,8 +283,6 @@ export function getCompanyDirectoryCompanies(companies: Company[]): Company[] {
   return companies.filter(company => company.status !== 'EN ATTENTE');
 }
 
-export function seedData(): StoreData { return emptyStoreData(); }
-
 export function uid(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 export const money = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n) + ' FCFA';
 export const shortMoney = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n);

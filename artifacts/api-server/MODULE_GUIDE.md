@@ -3,8 +3,7 @@
 Ce document est la règle de travail pour ajouter un module métier à MAXIMUS.
 Un module est conçu indépendamment de toute entreprise, comme un outil métier
 complet que différentes entreprises peuvent choisir d’utiliser. Il existe dans
-le catalogue MAXIMUS avant d’être attribué à une entreprise. Ce n’est pas une
-copie spécifique de KORA.
+le catalogue MAXIMUS avant d’être attribué à une entreprise.
 
 ## 1. Le modèle mental
 
@@ -29,8 +28,8 @@ change que :
 - ses données ;
 - ses couleurs et son identité.
 
-KORA est uniquement l’entreprise de démonstration. Elle ne doit jamais être
-une condition pour créer, tester ou faire évoluer un module.
+Un module ne doit jamais dépendre d’une entreprise fictive pour être créé, testé
+ou faire évoluer son catalogue.
 
 ## 2. Règle d’isolation obligatoire
 
@@ -57,8 +56,8 @@ Ne jamais écrire ceci dans un nouveau module :
 $companyId = $request->input('companyId');
 ```
 
-sans vérifier le contexte serveur. Ne jamais ajouter un fallback KORA dans le
-code métier.
+sans vérifier le contexte serveur. Ne jamais ajouter de fallback d’entreprise
+dans le code métier.
 
 Les routes publiques d’un futur site commercial doivent être séparées des
 routes internes MAXIMUS. Elles auront leur propre contrat et ne doivent pas
@@ -212,7 +211,8 @@ cd artifacts/api-server/laravel
 php artisan test
 ```
 
-Puis vérifier le workflow API et le parcours frontend dans la démo.
+Puis vérifier le workflow API et le parcours frontend avec une entreprise de
+test créée explicitement.
 
 ## 7. Checklist de livraison humaine
 
@@ -220,7 +220,7 @@ Avant de déclarer un module terminé, le développeur coche :
 
 - [ ] L’identifiant du module est stable et documenté.
 - [ ] Le module peut être attribué à n’importe quelle entreprise autorisée.
-- [ ] Aucun identifiant KORA n’est utilisé dans le code métier.
+- [ ] Aucun identifiant d’entreprise fictive n’est utilisé dans le code métier.
 - [ ] Les routes internes utilisent `maximus.auth` et `maximus.company`.
 - [ ] Toutes les requêtes sont filtrées par le contexte serveur.
 - [ ] Les rôles et actions sont vérifiés côté Laravel.
@@ -231,7 +231,7 @@ Avant de déclarer un module terminé, le développeur coche :
 - [ ] L’interface masque les fonctionnalités non autorisées sans compter sur ce
       masquage pour la sécurité.
 - [ ] Le module est visible dans le catalogue et activable par entreprise.
-- [ ] Le parcours complet a été vérifié dans la démo.
+- [ ] Le parcours complet a été vérifié avec des données de test explicites.
 - [ ] Les décisions non évidentes sont ajoutées à la documentation.
 
 ## 8. Definition of Done
