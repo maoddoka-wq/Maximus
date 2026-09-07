@@ -1,6 +1,6 @@
-import { Check, Plus, Search } from 'lucide-react';
+import { Check, Eye, EyeOff, Plus, Search } from 'lucide-react';
 import { Link } from 'wouter';
-import type { HTMLInputTypeAttribute, MouseEventHandler, ReactNode } from 'react';
+import { useState, type HTMLInputTypeAttribute, type MouseEventHandler, type ReactNode } from 'react';
 
 import type { Icon } from '@/lib/navigation';
 import type { StoreData } from '@/lib/store';
@@ -81,6 +81,8 @@ export function Field({
   const labelText = typeof label === 'string' ? label : 'ce champ';
   const explanation = help ?? `Saisissez ${labelText.toLowerCase().replace(' *', '')}.`;
   const fieldTestId = testId ?? '';
+  const isPassword = type === 'password';
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const autoComplete = fieldTestId.includes('login-email')
     ? 'email'
     : fieldTestId.includes('login-password')
@@ -94,15 +96,28 @@ export function Field({
   return (
     <label className="block text-sm font-semibold">
       {label}
-      <input
-        data-testid={testId}
-        autoComplete={autoComplete}
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal transition focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]"
-      />
+      <span className="relative mt-2 block">
+        <input
+          data-testid={testId}
+          autoComplete={autoComplete}
+          type={isPassword && passwordVisible ? 'text' : type}
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={`w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal transition focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)] ${isPassword ? 'pr-11' : ''}`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            data-testid={fieldTestId ? `button-toggle-password-${fieldTestId}` : undefined}
+            aria-label={passwordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+            onClick={() => setPasswordVisible((visible) => !visible)}
+            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[hsl(var(--muted-foreground))] transition hover:text-[hsl(var(--foreground))]"
+          >
+            {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        )}
+      </span>
       <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
         {explanation}
       </span>
