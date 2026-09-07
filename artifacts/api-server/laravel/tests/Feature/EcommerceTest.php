@@ -151,6 +151,12 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseCount('ecommerce_orders', 1);
         $this->assertDatabaseCount('ecommerce_order_items', 1);
 
+        DB::table('ecommerce_products')->where('id', $product->json('id'))->update(['stock' => 0]);
+        $this->getJson('/api/shop/kora-boutique-test')
+            ->assertOk()
+            ->assertJsonPath('products.0.slug', 'cafe-local')
+            ->assertJsonPath('products.0.stock', 0);
+
         $this->postJson('/api/shop/kora-boutique-test/orders', [
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
