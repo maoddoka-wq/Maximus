@@ -14,6 +14,7 @@
 - [Navigation navigateur](browser-navigation.md) — les liens internes et le bouton Retour doivent partager l’historique réel, avec un fallback dashboard pour un accès direct.
 - [Routes entreprise canoniques](company-routes.md) — utiliser `/entreprise/...`; garder `/kora/...` uniquement comme compatibilité d’anciens liens.
 - [Frontière credentials et état](state-credential-boundary.md) — nettoyer les credentials et filtrer les tenants absents avant toute lecture/écriture d’état partagé.
+- [Photos produits e-commerce](commerce-product-images.md) — utiliser des fichiers téléversés liés au tenant et servis par l’API, jamais une nouvelle URL externe saisie.
 - [Performance authentification](password-hashing.md) — les nouveaux hash sont rapides, avec migration transparente des anciens hash scrypt après validation.
 - [Exports Fast Refresh](fast-refresh-exports.md) — les fichiers de composants React doivent éviter les exports de constantes ou utilitaires non visuels.
 - [Frontière des abonnements](subscription-boundary.md) — un abonnement est une entité de facturation distincte des modules autorisés d’une entreprise.

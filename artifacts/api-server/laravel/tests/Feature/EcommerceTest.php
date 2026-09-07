@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EcommerceTest extends TestCase
@@ -153,6 +155,40 @@ class EcommerceTest extends TestCase
         ])->assertStatus(400);
 
         $this->assertDatabaseCount('ecommerce_orders', 0);
+    }
+
+    public function test_company_admin_can_upload_and_replace_a_product_image(): void
+    {
+        Storage::fake('public');
+        $request = $this->asActor();
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit avec photo',
+            'slug' => 'produit-photo',
+            'sku' => 'PHOTO-01',
+            'price' => 1200,
+            'stock' => 4,
+        ])->assertCreated();
+
+        $first = $request->post('/api/ecommerce/products/'.$product->json('id').'/image?companyId=kora', [
+            'image' => UploadedFile::fake()->image('premiere-photo.jpg'),
+        ])->assertOk();
+        $firstUrl = $first->json('imageUrl');
+        $this->assertStringStartsWith('/api/product-images/kora/', $firstUrl);
+        $firstPath = 'ecommerce/products/kora/'.basename($firstUrl);
+        Storage::disk('public')->assertExists($firstPath);
+        $this->getJson($firstUrl)->assertOk();
+
+        $second = $request->post('/api/ecommerce/products/'.$product->json('id').'/image?companyId=kora', [
+            'image' => UploadedFile::fake()->image('seconde-photo.png'),
+        ])->assertOk();
+        $secondUrl = $second->json('imageUrl');
+        $this->assertNotSame($firstUrl, $secondUrl);
+        Storage::disk('public')->assertMissing($firstPath);
+        Storage::disk('public')->assertExists('ecommerce/products/kora/'.basename($secondUrl));
+        $this->assertDatabaseHas('ecommerce_products', [
+            'id' => $product->json('id'),
+            'image_url' => $secondUrl,
+        ]);
     }
 
     public function test_company_admin_can_register_verify_and_remove_a_custom_domain(): void

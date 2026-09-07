@@ -7,6 +7,7 @@ use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Throwable;
@@ -242,6 +243,55 @@ class EcommerceController extends Controller
         $query->update($changes);
 
         return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
+    }
+
+    public function uploadProductImage(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $product = DB::table('ecommerce_products')
+            ->where('id', $id)
+            ->where('company_id', $company)
+            ->first();
+        if (! $product) {
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
+        }
+
+        $input = Validator::make($request->all(), [
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ])->validate();
+        $path = $input['image']->store('ecommerce/products/'.$company, 'public');
+        if (! is_string($path) || $path === '') {
+            return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
+        }
+
+        $imageUrl = '/api/product-images/'.rawurlencode($company).'/'.rawurlencode(basename($path));
+        DB::table('ecommerce_products')->where('id', $id)->update([
+            'image_url' => $imageUrl,
+            'updated_at' => now(),
+        ]);
+        $this->deleteStoredImage($product->image_url, $imageUrl);
+
+        return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
+    }
+
+    public function serveProductImage(string $company, string $filename)
+    {
+        if (! preg_match('/^[A-Za-z0-9_-]+$/', $company) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
+            abort(404);
+        }
+
+        $path = 'ecommerce/products/'.$company.'/'.$filename;
+        if (! Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk('public')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
     }
 
     public function archiveProduct(Request $request, string $id): JsonResponse
@@ -500,6 +550,29 @@ class EcommerceController extends Controller
         }
 
         return $domain;
+    }
+
+    private function deleteStoredImage(?string $imageUrl, string $replacement): void
+    {
+        if (! is_string($imageUrl)) {
+            return;
+        }
+        if ($imageUrl === $replacement) {
+            return;
+        }
+
+        $path = str_starts_with($imageUrl, '/storage/')
+            ? substr($imageUrl, strlen('/storage/'))
+            : null;
+        if (str_starts_with($imageUrl, '/api/product-images/')) {
+            $parts = explode('/', trim($imageUrl, '/'));
+            if (count($parts) === 4) {
+                $path = 'ecommerce/products/'.$parts[2].'/'.$parts[3];
+            }
+        }
+        if ($path) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     private function domainTarget(Request $request): string

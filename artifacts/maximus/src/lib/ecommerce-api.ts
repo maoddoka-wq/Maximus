@@ -108,6 +108,18 @@ export const createEcommerceApi = (companyId: string) => {
     deleteDomain: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createProduct: (body: Omit<EcommerceProduct, 'id' | 'companyId'>) => request<EcommerceProduct>(withCompany('/ecommerce/products'), json(body)),
     updateProduct: (id: string, body: Partial<Omit<EcommerceProduct, 'id' | 'companyId'>>) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'PATCH', body: JSON.stringify(body) }),
+    uploadProductImage: async (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await fetch(`/api${withCompany(`/ecommerce/products/${encodeURIComponent(id)}/image`)}`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? 'La photo n’a pas pu être envoyée.');
+      return body as EcommerceProduct;
+    },
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
     updateOrderStatus: (id: string, status: EcommerceOrderStatus) => request<EcommerceOrder>(withCompany(`/ecommerce/orders/${id}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
   };

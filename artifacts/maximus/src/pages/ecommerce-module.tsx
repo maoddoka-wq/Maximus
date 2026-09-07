@@ -65,6 +65,7 @@ type ProductForm = {
   compareAtPrice: string;
   stock: string;
   imageUrl: string;
+  imageFile: File | null;
   featured: boolean;
   status: EcommerceProduct['status'];
 };
@@ -79,6 +80,7 @@ const blankProduct: ProductForm = {
   compareAtPrice: '',
   stock: '0',
   imageUrl: '',
+  imageFile: null,
   featured: false,
   status: 'DRAFT',
 };
@@ -130,14 +132,16 @@ export default function EcommerceModulePage({
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const run = async (action: () => Promise<unknown>, success: string) => {
+  const run = async <T,>(action: () => Promise<T>, success: string): Promise<T | undefined> => {
     try {
-      await action();
+      const result = await action();
       await load(true);
       setToast(success);
       setError('');
+      return result;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Opération impossible.');
+      return undefined;
     }
   };
 
@@ -241,7 +245,7 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
   </div>;
 }
 
-function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const { confirm, alert } = useAppDialog();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'ALL' | EcommerceProduct['status']>('ALL');
@@ -250,7 +254,7 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
   const filtered = data.products.filter(product => status === 'ALL' || product.status === status).filter(product => `${product.name} ${product.sku} ${product.category}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
   const open = (product?: EcommerceProduct) => {
     setModal(product ?? 'new');
-    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), imageUrl: product.imageUrl, featured: product.featured, status: product.status } : blankProduct);
+    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), imageUrl: product.imageUrl, imageFile: null, featured: product.featured, status: product.status } : blankProduct);
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -262,8 +266,17 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
       return;
     }
     const body = { name: form.name.trim(), slug: slugify(form.slug || form.name), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', price, compareAtPrice, stock, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
-    if (modal === 'new') await run(() => createEcommerceApi(data.store.companyId).createProduct(body), 'Produit ajouté au catalogue.');
-    else if (modal) await run(() => createEcommerceApi(data.store.companyId).updateProduct(modal.id, body), 'Produit mis à jour.');
+    const api = createEcommerceApi(data.store.companyId);
+    const saved = modal === 'new'
+      ? await run(() => api.createProduct(body), 'Produit ajouté au catalogue.')
+      : modal
+        ? await run(() => api.updateProduct(modal.id, body), 'Produit mis à jour.')
+        : undefined;
+    if (!saved) return;
+    const savedProduct = saved as EcommerceProduct;
+    if (form.imageFile) {
+      await run(() => api.uploadProductImage(savedProduct.id, form.imageFile as File), 'Produit et photo enregistrés.');
+    }
     setModal(null);
   };
   const archive = async (product: EcommerceProduct) => {
@@ -281,10 +294,10 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
 
 function ProductModal({ modal, form, setForm, onClose, onSave }: { modal: EcommerceProduct | 'new'; form: ProductForm; setForm: (value: ProductForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
   const patch = (updates: Partial<ProductForm>) => setForm({ ...form, ...updates });
-  return <Modal title={modal === 'new' ? 'Nouveau produit' : `Modifier ${modal.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du produit" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Sacoche Atlas" /><Field label="Référence SKU" required value={form.sku} onChange={value => patch({ sku: value })} placeholder="ATLAS-001" /><Field label="Catégorie" value={form.category} onChange={value => patch({ category: value })} placeholder="Accessoires" /><Field label="Slug public" value={form.slug} onChange={value => patch({ slug: value })} placeholder="généré depuis le nom si vide" /><Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" /><Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /><Field label="Image URL" value={form.imageUrl} onChange={value => patch({ imageUrl: value })} placeholder="https://..." /></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as ProductForm['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs font-bold"><input type="checkbox" checked={form.featured} onChange={event => patch({ featured: event.target.checked })} className="h-4 w-4 accent-[hsl(var(--primary))]" />Mettre en avant dans la boutique</label></div><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
+  return <Modal title={modal === 'new' ? 'Nouveau produit' : `Modifier ${modal.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du produit" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Sacoche Atlas" /><Field label="Référence SKU" required value={form.sku} onChange={value => patch({ sku: value })} placeholder="ATLAS-001" /><Field label="Catégorie" value={form.category} onChange={value => patch({ category: value })} placeholder="Accessoires" /><Field label="Slug public" value={form.slug} onChange={value => patch({ slug: value })} placeholder="généré depuis le nom si vide" /><Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" /><Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /><label className="block text-xs font-bold">Photo du produit<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum · envoyée à l’enregistrement</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as ProductForm['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs font-bold"><input type="checkbox" checked={form.featured} onChange={event => patch({ featured: event.target.checked })} className="h-4 w-4 accent-[hsl(var(--primary))]" />Mettre en avant dans la boutique</label></div><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
 }
 
-function Orders({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+function Orders({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | EcommerceOrderStatus>('ALL');
   const orders = data.orders.filter(order => (filter === 'ALL' || order.status === filter) && `${order.reference} ${order.customerName} ${order.customerEmail}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
@@ -309,13 +322,13 @@ function Promotions() {
   return <div className="fade-up"><Panel title="Promotions" description="Préparez vos temps forts commerciaux sans perdre de vue la cohérence de votre catalogue."><div className="mx-auto max-w-2xl py-8 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Megaphone size={24} /></span><h2 className="mt-5 text-xl font-bold">Les promotions arrivent dans votre cockpit</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Cette vue est prête pour vos futures campagnes. En attendant, gérez vos prix et vos prix barrés directement depuis le catalogue.</p></div></Panel></div>;
 }
 
-function Deliveries({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+function Deliveries({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const shipments = data.orders.filter(order => !['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'].includes(order.status));
   const change = (order: EcommerceOrder, status: EcommerceOrderStatus) => run(() => createEcommerceApi(data.store.companyId).updateOrderStatus(order.id, status), 'Flux de livraison mis à jour.');
   return <div className="space-y-5 fade-up"><Panel title="Livraisons" description="Le flux des commandes qui ont quitté le bureau pour rejoindre vos clients.">{shipments.length === 0 ? <Empty icon={Truck} title="Aucune livraison en cours" text="Les commandes en préparation et expédiées seront suivies ici." /> : <div className="grid gap-3 md:grid-cols-2">{shipments.map(order => <div key={order.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><h3 className="mt-1 font-bold">{order.customerName}</h3></div><StatusPill value={order.status} /></div><p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{order.shippingAddress || 'Adresse de livraison non renseignée'}</p><div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs font-bold">{money(order.total, data.store.currency)}</span>{canModify && <select aria-label={`Avancer la livraison ${order.reference}`} value={order.status} onChange={event => void change(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.filter(item => !['NOUVELLE', 'ANNULÉE'].includes(item)).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}</Panel></div>;
 }
 
-function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [form, setForm] = useState({
     name: store.name,
     slug: store.slug,
