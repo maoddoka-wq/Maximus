@@ -1,0 +1,281 @@
+CORRECTION CIBLÉE — PARAMÈTRES DU PROFIL ENTREPRISE
+
+J'ai un problème précis dans :
+
+Administration de l'entreprise → Profil / Paramètres → Modification des paramètres
+
+Sur la page, les paramètres s'affichent correctement, mais lorsque j'appuie sur :
+
+« Enregistrer les modifications »
+
+une erreur apparaît :
+
+"Cannot read properties of null (reading 'trim')"
+
+Voir la capture d'écran fournie.
+
+IMPORTANT
+
+Ne corrige PAS simplement l'erreur en ajoutant ".trim()" avec une valeur par défaut partout.
+
+Je veux que tu identifies exactement quelle donnée est "null", pourquoi elle arrive à "null", à quel endroit ".trim()" est appelé et pourquoi le formulaire d'enregistrement accepte cette situation.
+
+---
+
+1. NE MODIFIE PAS LE RESTE DE L'APPLICATION
+
+Cette correction concerne uniquement le problème d'enregistrement des paramètres du profil entreprise.
+
+Avant de modifier le code :
+
+- identifie la page concernée ;
+- identifie le composant du formulaire ;
+- identifie tous les champs ;
+- identifie la fonction appelée par « Enregistrer les modifications » ;
+- identifie l'API utilisée ;
+- identifie la route backend ;
+- identifie le contrôleur/service ;
+- identifie le modèle ;
+- identifie les colonnes DB ;
+- identifie les validations ;
+- identifie exactement l'endroit où ".trim()" est exécuté.
+
+Ne refactore pas toute l'application.
+
+Ne change pas la navigation.
+
+Ne change pas les permissions.
+
+Ne change pas le système de modules.
+
+Ne change pas l'e-commerce.
+
+Ne change pas les autres pages.
+
+---
+
+2. TROUVER LA CAUSE RACINE
+
+Recherche dans le code toutes les utilisations de :
+
+".trim()"
+
+dans le flux de sauvegarde de ce formulaire.
+
+Identifie la variable exacte qui provoque :
+
+"Cannot read properties of null"
+
+Par exemple, cela peut être un champ comme :
+
+- nom ;
+- description ;
+- téléphone ;
+- email ;
+- adresse ;
+- couleur ;
+- logo ;
+- autre paramètre.
+
+Mais ne suppose pas lequel.
+
+Vérifie réellement la valeur reçue.
+
+---
+
+3. VÉRIFIER LE FLUX COMPLET
+
+Analyse :
+
+Formulaire
+↓
+état React
+↓
+validation
+↓
+construction du payload
+↓
+requête API
+↓
+route backend
+↓
+contrôleur
+↓
+service
+↓
+modèle/ORM
+↓
+base de données
+↓
+réponse API
+↓
+mise à jour de l'interface.
+
+Détermine à quel niveau "null" apparaît.
+
+---
+
+4. CORRECTION PROPRE
+
+Une fois la cause trouvée, corrige-la au bon niveau.
+
+Si un champ peut réellement être vide :
+
+→ le code doit gérer correctement "null" / chaîne vide selon les règles métier.
+
+Si le champ est obligatoire :
+
+→ validation claire avant l'envoi.
+
+Si la DB retourne "null" alors que le frontend attend une chaîne :
+
+→ corriger le mapping ou la normalisation à la bonne couche.
+
+Si le backend accepte une valeur incorrecte :
+
+→ corriger la validation backend.
+
+Si le frontend construit incorrectement le payload :
+
+→ corriger le payload.
+
+Ne masque pas le problème avec une succession de "|| ''" ou "?.trim()" sans comprendre la cause.
+
+Une valeur par défaut est acceptable uniquement si elle correspond réellement au comportement métier attendu.
+
+---
+
+5. VÉRIFIER TOUS LES CHAMPS DU FORMULAIRE
+
+Teste l'enregistrement avec :
+
+Cas 1
+
+Tous les champs remplis.
+
+Cas 2
+
+Un champ optionnel vide.
+
+Cas 3
+
+Plusieurs champs optionnels vides.
+
+Cas 4
+
+Champs contenant des espaces.
+
+Cas 5
+
+Valeurs normales.
+
+Cas 6
+
+Modification d'une seule valeur.
+
+Cas 7
+
+Aucune modification.
+
+Dans chaque cas :
+
+- aucune erreur JavaScript ;
+- aucune erreur "trim" ;
+- API correcte ;
+- sauvegarde réelle ;
+- données correctement enregistrées.
+
+---
+
+6. VÉRIFIER LA PERSISTANCE
+
+Après avoir enregistré :
+
+1. vérifier que l'API répond correctement ;
+2. vérifier que la DB contient les nouvelles valeurs ;
+3. actualiser complètement la page ;
+4. vérifier que les valeurs sont toujours présentes ;
+5. se déconnecter ;
+6. se reconnecter ;
+7. vérifier à nouveau.
+
+Le bouton « Enregistrer les modifications » ne doit afficher un succès que si la sauvegarde backend a réellement réussi.
+
+---
+
+7. NE PAS CASSER LES PARAMÈTRES EXISTANTS
+
+Les paramètres déjà fonctionnels doivent continuer à fonctionner.
+
+Vérifie notamment les champs visibles dans cette page, dont :
+
+- couleur principale ;
+- couleur d'accent ;
+- couleur du menu latéral ;
+- palettes rapides ;
+- autres paramètres réellement présents.
+
+Ne supprime aucune fonctionnalité existante.
+
+Ne change pas leur fonctionnement sans raison.
+
+---
+
+8. TEST DE NON-RÉGRESSION
+
+Après correction, vérifie :
+
+- affichage de la page ;
+- chargement des paramètres ;
+- modification ;
+- enregistrement ;
+- actualisation ;
+- reconnexion ;
+- autres paramètres ;
+- navigation vers les autres pages de l'administration.
+
+Si un composant ou service est partagé avec d'autres pages, vérifie que ta modification ne casse pas ces pages.
+
+---
+
+9. RÈGLE ABSOLUE
+
+Je ne veux pas que tu corriges uniquement le message :
+
+"Cannot read properties of null (reading 'trim')"
+
+Je veux que tu répondes à ces 4 questions :
+
+1. Quelle variable était "null" ?
+2. Pourquoi était-elle "null" ?
+3. À quel endroit ".trim()" provoquait l'erreur ?
+4. Quelle correction structurelle as-tu appliquée pour empêcher le problème de revenir ?
+
+---
+
+10. AVANT DE TERMINER
+
+Ne touche à rien qui n'est pas nécessaire à cette correction.
+
+Ne fais pas de refonte générale.
+
+Ne modifie pas d'autres modules pour résoudre ce problème.
+
+Ne crée aucune donnée fictive.
+
+Ne change pas les permissions.
+
+Ne change pas la structure des menus.
+
+Ne modifie pas le comportement de l'e-commerce.
+
+Une seule mission : rendre l'enregistrement des paramètres du profil entreprise fiable et sans régression.
+
+À la fin, donne-moi :
+
+- cause exacte ;
+- fichier(s) modifié(s) ;
+- correction appliquée ;
+- tests effectués ;
+- résultat de chaque test ;
+- confirmation que les autres fonctionnalités concernées n'ont pas été cassées.
