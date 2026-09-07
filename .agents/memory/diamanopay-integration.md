@@ -10,3 +10,9 @@ Une erreur de création ne doit jamais être convertie en `PENDING` générique 
 **Why:** La documentation officielle ne décrit pas de signature HMAC de webhook et sépare l’identifiant de demande de paiement (`paymentRequestId`) de l’identifiant de transaction (`transactionId`). Confondre ces identifiants ou créditer directement depuis le webhook crée des erreurs de rapprochement et des risques de double crédit.
 
 **How to apply:** Conserver l’idempotence des événements, rechercher le paiement avec la référence ou l’identifiant de demande, vérifier `transactionId` via l’API DiamanoPay, puis seulement créditer le wallet. Utiliser le remboursement complet documenté pour Wave et un payout pour le cas Orange Money.
+
+La configuration DiamanoPay doit être évaluée uniquement côté backend à partir de `config()`, avec l’URL API et un mode d’authentification valides ; les URLs de retour ne doivent pas faire passer des credentials valides pour une absence de configuration. En production, reconstruire explicitement le cache Laravel après injection des variables Render.
+
+**Why:** Une URL callback manquante ou un cache de configuration construit avant les variables de production pouvait produire un faux message « non configuré », alors que le token ou les credentials existaient.
+
+**How to apply:** Enregistrer le provider comme singleton, normaliser les valeurs de configuration et ne journaliser que les erreurs techniques sans secrets. Pour une commande e-commerce, remplacer le callback global par une URL de retour HTTPS générée côté serveur avec le domaine ou le slug de la boutique et la référence de commande.

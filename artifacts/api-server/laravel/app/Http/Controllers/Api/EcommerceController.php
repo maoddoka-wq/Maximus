@@ -474,7 +474,17 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
         }
 
-        return $this->createOrderForStore($request, $store);
+        return $this->createOrderForStore($request, $store, true);
+    }
+
+    public function publicDomainOrderPaymentStatus(Request $request, string $reference): JsonResponse
+    {
+        $store = $this->publishedStoreByDomain($request->getHost());
+        if (! $store) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+
+        return $this->orderPaymentStatus($store, $reference);
     }
 
     private function publicStore(object $store): array
@@ -530,7 +540,20 @@ class EcommerceController extends Controller
         return $this->createOrderForStore($request, $store);
     }
 
-    private function createOrderForStore(Request $request, object $store): JsonResponse
+    public function publicOrderPaymentStatus(Request $request, string $slug, string $reference): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->orderPaymentStatus($store, $reference);
+    }
+
+    private function createOrderForStore(Request $request, object $store, bool $customDomain = false): JsonResponse
     {
         $input = Validator::make($request->all(), [
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
@@ -571,7 +594,10 @@ class EcommerceController extends Controller
                         'currency' => (string) $store->currency,
                         'payment_method' => $input['paymentMethod'],
                         'description' => 'Commande '.$existing->reference,
-                        'metadata' => ['order_reference' => $existing->reference],
+                        'metadata' => [
+                            'order_reference' => $existing->reference,
+                            'return_url' => $this->paymentReturnUrl($request, $store, (string) $existing->reference, $customDomain),
+                        ],
                         'idempotency_key' => 'order-payment:'.$existing->id,
                         'customer' => [
                             'name' => $existing->customer_name,
@@ -691,7 +717,10 @@ class EcommerceController extends Controller
                 'currency' => (string) $store->currency,
                 'payment_method' => $input['paymentMethod'] ?? null,
                 'description' => 'Commande '.$order['reference'],
-                'metadata' => ['order_reference' => $order['reference']],
+                 'metadata' => [
+                     'order_reference' => $order['reference'],
+                     'return_url' => $this->paymentReturnUrl($request, $store, $order['reference'], $customDomain),
+                 ],
                 'idempotency_key' => 'order-payment:'.$order['id'],
                 'customer' => [
                     'name' => $input['customerName'],
@@ -718,6 +747,48 @@ class EcommerceController extends Controller
                     : 'La commande n’a pas pu être enregistrée.',
             ], $error->getMessage() === 'STOCK_INSUFFICIENT' ? 409 : 400);
         }
+    }
+
+    private function orderPaymentStatus(object $store, string $reference): JsonResponse
+    {
+        $order = DB::table('ecommerce_orders')
+            ->where('company_id', $store->company_id)
+            ->where('reference', $reference)
+            ->first();
+        if (! $order) {
+            return response()->json(['error' => 'Commande introuvable.'], 404);
+        }
+
+        $payment = $order->payment_id
+            ? app(PaymentService::class)->getForTenant((string) $store->company_id, (string) $order->payment_id)
+            : null;
+        $paymentPayload = $payment ? app(PaymentService::class)->payload($payment) : null;
+
+        return response()->json([
+            'reference' => $order->reference,
+            'total' => (int) $order->total,
+            'orderStatus' => $order->status,
+            'paymentStatus' => (string) ($paymentPayload['status'] ?? $order->payment_status),
+            'payment' => $paymentPayload ? [
+                'status' => $paymentPayload['status'],
+                'checkoutUrl' => $paymentPayload['checkoutUrl'],
+                'providerMessage' => $paymentPayload['providerMessage'],
+            ] : null,
+        ])->header('Cache-Control', 'no-store')->header('Vary', 'Host');
+    }
+
+    private function paymentReturnUrl(Request $request, object $store, string $reference, bool $customDomain): string
+    {
+        $host = $request->getHost();
+        $scheme = in_array($host, ['localhost', '127.0.0.1'], true) ? $request->getScheme() : 'https';
+        $port = $request->getPort();
+        $defaultPort = $port === 80 || $port === 443;
+        $origin = $scheme.'://'.$host.($defaultPort ? '' : ':'.$port);
+        $path = $customDomain
+            ? '/paiement/retour'
+            : '/shop/'.rawurlencode((string) $store->slug).'/paiement/retour';
+
+        return $origin.$path.'?order='.rawurlencode($reference);
     }
 
     private function publishedStoreByDomain(string $host): ?object

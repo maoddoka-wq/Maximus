@@ -109,7 +109,7 @@ class PaymentService
             $updates['failed_at'] = now();
         }
         DB::table('payments')->where('id', $id)->update($updates);
-        Log::info('[DIAMANOPAY] Final payment status', [
+        Log::debug('[DIAMANOPAY] Final payment status', [
             'reference' => $reference,
             'payment_id' => $id,
             'status' => $updates['status'],
@@ -125,7 +125,7 @@ class PaymentService
         $reference = $this->firstString($payload, ['clientReference', 'public_reference', 'reference', 'merchant_reference']);
         $reference ??= $this->firstString($payload, ['extraData.clientReference', 'extraData.publicReference']);
         $status = $this->normalizeStatus($this->firstString($payload, ['status', 'payment_status', 'state']) ?? 'PENDING');
-        Log::info('[DIAMANOPAY] Webhook received', [
+        Log::debug('[DIAMANOPAY] Webhook received', [
             'status' => $status,
             'transaction_id' => $providerTransactionId,
             'payment_request_id' => $providerRequestId,
@@ -210,7 +210,7 @@ class PaymentService
                 ->where('provider_event_id', $eventId)
                 ->update(['processing_status' => 'PROCESSED', 'processed_at' => now(), 'updated_at' => now()]);
         });
-        Log::info('[DIAMANOPAY] Final payment status', [
+        Log::debug('[DIAMANOPAY] Final payment status', [
             'payment_id' => $payment->id,
             'reference' => $payment->public_reference,
             'status' => $status,

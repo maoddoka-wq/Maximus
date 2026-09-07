@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Support\CompanyRegistry;
+use App\Support\EcommerceCustomerAuth;
 use App\Support\MaximusAuth;
+use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -166,6 +170,155 @@ class EcommerceTest extends TestCase
         ])->assertStatus(409);
 
         $this->assertDatabaseCount('ecommerce_orders', 1);
+    }
+
+    public function test_guest_payment_uses_the_shop_return_url_and_public_status_route(): void
+    {
+        $this->configureDiamanoPayForCheckout();
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique retour invité',
+            'slug' => 'retour-invite-test',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit retour invité',
+            'slug' => 'produit-retour-invite',
+            'sku' => 'RETURN-GUEST-01',
+            'price' => 2400,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        $order = $this->postJson('http://maximus.test/api/shop/retour-invite-test/orders', [
+            'customerName' => 'Client invité',
+            'customerEmail' => 'invite@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar, Sénégal',
+            'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
+        ])->assertCreated()->json();
+
+        Http::assertSent(function ($httpRequest) use ($order): bool {
+            return $httpRequest->url() === 'https://api.diamanopay.com/api/charges'
+                && ($httpRequest->data()['redirectUrl'] ?? null) === 'https://maximus.test/shop/retour-invite-test/paiement/retour?order='.rawurlencode($order['reference'])
+                && ($httpRequest->data()['webhook'] ?? null) === 'https://maximus.test/api/webhooks/diamanopay';
+        });
+
+        $this->getJson('/api/shop/retour-invite-test/orders/'.$order['reference'].'/payment-status')
+            ->assertOk()
+            ->assertJsonPath('reference', $order['reference'])
+            ->assertJsonPath('payment.status', 'PENDING');
+    }
+
+    public function test_connected_custom_domain_payment_returns_to_the_public_domain_without_login(): void
+    {
+        $this->configureDiamanoPayForCheckout();
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique retour connecté',
+            'slug' => 'retour-connecte-test',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit retour connecté',
+            'slug' => 'produit-retour-connecte',
+            'sku' => 'RETURN-CONNECTED-01',
+            'price' => 3200,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+        DB::table('ecommerce_domains')->insert([
+            'id' => 'domain-return-connected',
+            'company_id' => 'kora',
+            'domain' => 'boutique-retour.kora.test',
+            'target_host' => 'maximus.test',
+            'verification_token' => 'return-token',
+            'status' => 'ACTIVE',
+            'last_error' => '',
+            'verified_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('ecommerce_customers')->insert([
+            'id' => 'customer-return-connected',
+            'company_id' => 'kora',
+            'email' => 'connecte@example.test',
+            'name' => 'Client connecté',
+            'phone' => '+221700000000',
+            'password_hash' => MaximusPassword::hash('motdepasse-solide'),
+            'status' => 'ACTIF',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $customer = DB::table('ecommerce_customers')->where('id', 'customer-return-connected')->first();
+
+        $order = $this->withCredentials()
+            ->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, EcommerceCustomerAuth::issueSession($customer))
+            ->postJson('http://boutique-retour.kora.test/api/shop-domain/orders', [
+                'customerName' => 'Valeur remplacée',
+                'customerEmail' => 'usurpation@example.test',
+                'paymentMethod' => 'ORANGE_MONEY',
+                'shippingAddress' => 'Dakar, Sénégal',
+                'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
+            ])->assertCreated()->json();
+
+        Http::assertSent(function ($httpRequest) use ($order): bool {
+            return ($httpRequest->data()['redirectUrl'] ?? null) === 'https://boutique-retour.kora.test/paiement/retour?order='.rawurlencode($order['reference']);
+        });
+
+        $this->getJson('http://boutique-retour.kora.test/api/shop-domain/orders/'.$order['reference'].'/payment-status')
+            ->assertOk()
+            ->assertJsonPath('reference', $order['reference'])
+            ->assertJsonPath('payment.status', 'PENDING');
+    }
+
+    public function test_public_payment_return_exposes_success_cancel_and_failure_without_authentication(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique statuts retour',
+            'slug' => 'statuts-retour-test',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit statuts retour',
+            'slug' => 'produit-statuts-retour',
+            'sku' => 'RETURN-STATUS-01',
+            'price' => 1100,
+            'stock' => 5,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        $order = $this->postJson('/api/shop/statuts-retour-test/orders', [
+            'customerName' => 'Client statut',
+            'customerEmail' => 'statut@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar, Sénégal',
+            'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
+        ])->assertCreated()->json();
+        $paymentId = DB::table('ecommerce_orders')->where('reference', $order['reference'])->value('payment_id');
+
+        foreach (['PAID', 'CANCELLED', 'FAILED'] as $status) {
+            DB::table('payments')->where('id', $paymentId)->update(['status' => $status, 'metadata' => json_encode([
+                'checkout_url' => null,
+                'provider_message' => $status === 'FAILED' ? 'Paiement refusé' : null,
+            ], JSON_THROW_ON_ERROR)]);
+            $this->getJson('/api/shop/statuts-retour-test/orders/'.$order['reference'].'/payment-status')
+                ->assertOk()
+                ->assertJsonPath('payment.status', $status);
+        }
     }
 
     public function test_public_order_cannot_use_a_product_from_another_company(): void
@@ -486,5 +639,24 @@ class EcommerceTest extends TestCase
         return $this
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    private function configureDiamanoPayForCheckout(): void
+    {
+        Config::set([
+            'payments.diamanopay.base_url' => 'https://api.diamanopay.com',
+            'payments.diamanopay.access_token' => 'test-access-token',
+            'payments.diamanopay.client_id' => null,
+            'payments.diamanopay.client_secret' => null,
+            'payments.webhook_url' => 'https://maximus.test/api/webhooks/diamanopay',
+            'payments.callback_url' => 'https://maximus.test/login',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'chargeId' => 'charge-return-test',
+                'status' => 'PENDING',
+                'paymentUrl' => 'https://pay.diamanopay.com/checkout/return-test',
+            ], 201),
+        ]);
     }
 }

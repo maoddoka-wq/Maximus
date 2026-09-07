@@ -17,7 +17,7 @@ class PaymentWebhookController extends Controller
         if (! is_array($payload) || ! isset($payload['status'], $payload['transactionId'])) {
             return response()->json(['error' => 'Payload webhook invalide.'], 422);
         }
-        Log::info('[DIAMANOPAY] Webhook received', [
+        Log::debug('[DIAMANOPAY] Webhook received', [
             'status' => $payload['status'],
             'transaction_id' => $payload['transactionId'],
             'payment_request_id' => $payload['paymentRequestId'] ?? null,

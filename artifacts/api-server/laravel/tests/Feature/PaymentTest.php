@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\PaymentProviderInterface;
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,6 +14,40 @@ use Tests\TestCase;
 class PaymentTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_valid_credentials_are_not_reported_as_missing_and_provider_is_singleton(): void
+    {
+        Config::set([
+            'payments.diamanopay.base_url' => 'https://api.diamanopay.com',
+            'payments.diamanopay.access_token' => 'access-token-test',
+            'payments.diamanopay.client_id' => null,
+            'payments.diamanopay.client_secret' => null,
+            'payments.callback_url' => '',
+            'payments.webhook_url' => '',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'chargeId' => 'charge-configured-test',
+                'status' => 'PENDING',
+                'paymentUrl' => 'https://pay.diamanopay.com/checkout/configured-test',
+            ], 201),
+        ]);
+
+        $first = $this->app->make(PaymentProviderInterface::class);
+        $second = $this->app->make(PaymentProviderInterface::class);
+        $result = $first->initialize([
+            'public_reference' => 'MAX-CONFIGURED-TEST',
+            'amount' => 1000,
+            'currency' => 'XOF',
+            'description' => 'Configuration stable',
+            'payment_method' => 'WAVE',
+            'metadata' => [],
+        ]);
+
+        $this->assertSame($first, $second);
+        $this->assertTrue($result['ok']);
+        $this->assertNotSame('DIAMANOPAY_NOT_CONFIGURED', $result['error_code'] ?? null);
+    }
 
     public function test_missing_diamanopay_configuration_is_reported_as_a_failed_payment(): void
     {
