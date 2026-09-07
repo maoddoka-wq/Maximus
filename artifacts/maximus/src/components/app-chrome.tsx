@@ -59,7 +59,7 @@ export function Sidebar({
   activeNavStyle,
 }: SidebarProps) {
   const isAdmin = session === 'admin';
-  const companyAdmin = session === 'kora' || session.startsWith('company:');
+  const companyAdmin = session.startsWith('company:');
   const nav = isAdmin
     ? adminNav
     : koraNav.filter(
@@ -434,7 +434,7 @@ export function PageHeader({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        {location !== '/maximus/dashboard' && location !== '/kora/dashboard' && (
+        {location !== '/maximus/dashboard' && location !== '/entreprise/dashboard' && (
           <button
             type="button"
             data-testid="button-page-back"
@@ -445,7 +445,7 @@ export function PageHeader({
             Retour
           </button>
         )}
-        {location !== '/maximus/dashboard' && location !== '/kora/dashboard' && (
+        {location !== '/maximus/dashboard' && location !== '/entreprise/dashboard' && (
           <div className="mono hidden text-[9px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))] sm:block">
             Mis à jour à l’instant
           </div>

@@ -78,8 +78,8 @@ export interface EcommerceBootstrap {
 }
 
 export interface PublicShopBootstrap {
-  store: EcommerceStore;
-  products: EcommerceProduct[];
+  store: Omit<EcommerceStore, 'id' | 'companyId'>;
+  products: Array<Omit<EcommerceProduct, 'id' | 'companyId' | 'sku' | 'status'>>;
 }
 
 export type PublicDomainBootstrap = PublicShopBootstrap | { available: false };
@@ -116,6 +116,6 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productId: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productId: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
 };

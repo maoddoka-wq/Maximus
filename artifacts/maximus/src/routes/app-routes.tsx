@@ -54,7 +54,10 @@ export function AdminRouter({
   onTestSector: (preset: SectorPreset) => void;
   screens: AdminRouteScreens;
 }) {
-  const routePath = location.split('?')[0];
+  const rawRoutePath = location.split('?')[0];
+  const routePath = rawRoutePath.startsWith('/entreprise')
+    ? `/kora${rawRoutePath.slice('/entreprise'.length)}`
+    : rawRoutePath;
   if (routePath === '/maximus/dashboard') {
     return renderScreen(screens.dashboard, { data, onNavigate });
   }

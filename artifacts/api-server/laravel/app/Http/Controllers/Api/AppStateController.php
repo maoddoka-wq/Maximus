@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,8 @@ class AppStateController extends Controller
 
         if (($actor['role'] ?? null) !== 'maximus_admin') {
             $state = $this->restrictToCompany($state, (string) ($actor['companyId'] ?? ''));
+        } else {
+            $state = $this->mergeRegistryCompanies($state);
         }
 
         return response()->json([
@@ -54,6 +57,37 @@ class AppStateController extends Controller
             'version' => $stateVersion,
             'data' => $state,
         ]);
+    }
+
+    private function mergeRegistryCompanies(array $state): array
+    {
+        $known = collect($state['companies'] ?? [])->keyBy('id');
+        Company::query()->whereNull('deleted_at')->orderBy('created_at')->get()->each(
+            function (Company $company) use (&$state, $known): void {
+                if ($known->has($company->id)) {
+                    return;
+                }
+                $state['companies'][] = [
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'manager' => $company->manager,
+                    'email' => $company->email,
+                    'phone' => $company->phone,
+                    'country' => $company->country,
+                    'sector' => $company->sector,
+                    'status' => $company->status,
+                    'requestedModules' => $company->requested_modules ?? [],
+                    'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],
+                    'requestedModuleFeatures' => $company->requested_module_features ?? [],
+                    'requestedModulePermissions' => $company->requested_module_permissions ?? [],
+                    'allowedModules' => $company->status === 'ACTIF' ? ($company->requested_modules ?? []) : [],
+                    'refusedModules' => [],
+                    'createdAt' => optional($company->created_at)->toISOString(),
+                ];
+            },
+        );
+
+        return $state;
     }
 
     /**

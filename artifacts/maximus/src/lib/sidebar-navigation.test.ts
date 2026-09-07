@@ -7,21 +7,22 @@ const configuredModules = getConfiguredModules({});
 
 test('le menu latéral générique respecte les fonctionnalités sélectionnées', () => {
   const groups = buildSidebarFeatureGroups({
-    allowed: ['finance'],
+    allowed: ['commerce'],
     configuredModules,
     employeeRole: {
-      id: 'finance-reader',
-      name: 'Lecteur finance',
+      id: 'commerce-reader',
+      name: 'Lecteur commerce',
       description: '',
       modulePermissions: {
-        'finance:menu:suivi-des-paiements': ['voir'],
+        'commerce:menu:sales': ['voir'],
       },
     },
     employeeNode: null,
+    commerceTabIds: ['sales'],
   });
 
   assert.deepEqual(groups[0]?.items.map(item => item.href), [
-    '/kora/finance?feature=suivi-des-paiements',
+    '/kora/commerce?tab=sales',
   ]);
 });
 

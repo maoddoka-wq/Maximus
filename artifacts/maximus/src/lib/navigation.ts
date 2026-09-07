@@ -14,7 +14,7 @@ import type { ModuleId } from './store';
 import { moduleRegistry } from './module-registry';
 
 export type Icon = LucideIcon;
-export type Session = 'admin' | 'kora' | `employee:${string}` | `company:${string}`;
+export type Session = 'admin' | `employee:${string}` | `company:${string}`;
 export type SidebarFeature = { href: string; label: string; icon: Icon };
 export type SidebarFeatureGroup = { label: string; items: SidebarFeature[] };
 export type NavigationItem = {

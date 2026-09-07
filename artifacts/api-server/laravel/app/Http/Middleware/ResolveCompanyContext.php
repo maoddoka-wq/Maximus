@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use App\Support\CompanyRegistry;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -33,6 +34,17 @@ class ResolveCompanyContext
             $companyId = $actorCompany;
         } else {
             $companyId = $requestedCompany ?? $actorCompany;
+        }
+
+        if ($companyId !== null && !CompanyRegistry::isActive($companyId)) {
+            $legacyModuleProvisioning = ($actor['role'] ?? null) === 'maximus_admin'
+                && str_ends_with($request->path(), '/access');
+            if (!$legacyModuleProvisioning) {
+                return response()->json([
+                    'error' => 'Cette entreprise n’est plus active ou n’existe plus.',
+                    'code' => 'COMPANY_UNAVAILABLE',
+                ], 403);
+            }
         }
 
         $request->attributes->set('companyId', $companyId);

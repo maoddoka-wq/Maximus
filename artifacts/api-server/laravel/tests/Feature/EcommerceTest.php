@@ -41,6 +41,7 @@ class EcommerceTest extends TestCase
         ]);
 
         $request->getJson('/api/ecommerce/bootstrap?companyId=kora')->assertOk();
+        $this->assertDatabaseMissing('ecommerce_stores', ['id' => 'ecommerce-store-kora']);
 
         $request->postJson('/api/ecommerce/products?companyId=kora', [
             'name' => 'Produit interdit',
@@ -81,14 +82,18 @@ class EcommerceTest extends TestCase
         $this->getJson('/api/shop/kora-boutique-test')
             ->assertOk()
             ->assertJsonPath('products.0.price', 2500)
-            ->assertJsonMissingPath('store.company_id');
+            ->assertJsonPath('products.0.slug', 'cafe-local')
+            ->assertJsonMissingPath('store.id')
+            ->assertJsonMissingPath('store.companyId')
+            ->assertJsonMissingPath('products.0.id')
+            ->assertJsonMissingPath('products.0.companyId');
 
         $this->postJson('/api/shop/kora-boutique-test/orders', [
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
             'customerPhone' => '+221700000000',
             'shippingAddress' => 'Dakar, Sénégal',
-            'items' => [['productId' => $product->json('id'), 'quantity' => 2]],
+            'items' => [['productSlug' => $product->json('slug'), 'quantity' => 2]],
         ])->assertCreated()
             ->assertJsonPath('total', 5000);
 
@@ -103,7 +108,7 @@ class EcommerceTest extends TestCase
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
             'shippingAddress' => 'Dakar, Sénégal',
-            'items' => [['productId' => $product->json('id'), 'quantity' => 2]],
+            'items' => [['productSlug' => $product->json('slug'), 'quantity' => 2]],
         ])->assertStatus(409);
 
         $this->assertDatabaseCount('ecommerce_orders', 1);
@@ -144,7 +149,7 @@ class EcommerceTest extends TestCase
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
             'shippingAddress' => 'Dakar, Sénégal',
-            'items' => [['productId' => 'foreign-product', 'quantity' => 1]],
+            'items' => [['productSlug' => 'produit-autre', 'quantity' => 1]],
         ])->assertStatus(400);
 
         $this->assertDatabaseCount('ecommerce_orders', 0);
@@ -208,14 +213,15 @@ class EcommerceTest extends TestCase
 
         $this->getJson('http://boutique-active.kora.test/api/shop-domain')
             ->assertOk()
-            ->assertJsonPath('store.companyId', 'kora')
-            ->assertJsonPath('products.0.id', $product->json('id'));
+            ->assertJsonPath('products.0.slug', 'produit-domaine')
+            ->assertJsonMissingPath('store.companyId')
+            ->assertJsonMissingPath('products.0.id');
 
         $this->postJson('http://boutique-active.kora.test/api/shop-domain/orders', [
                 'customerName' => 'Client Domaine',
                 'customerEmail' => 'domain@example.test',
                 'shippingAddress' => 'Dakar, Sénégal',
-                'items' => [['productId' => $product->json('id'), 'quantity' => 1]],
+                'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
             ])
             ->assertCreated()
             ->assertJsonPath('total', 1800);

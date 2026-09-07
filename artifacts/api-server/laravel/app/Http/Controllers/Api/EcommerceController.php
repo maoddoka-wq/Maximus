@@ -63,7 +63,7 @@ class EcommerceController extends Controller
         }
 
         $row = $this->ensureStore($company);
-        DB::table('ecommerce_stores')->where('id', $row->id)->update([
+        $storeValues = [
             'slug' => $input['slug'],
             'name' => $input['name'],
             'description' => $input['description'] ?? '',
@@ -73,7 +73,16 @@ class EcommerceController extends Controller
             'accent_color' => $input['accentColor'],
             'logo_url' => $input['logoUrl'] ?? '',
             'updated_at' => now(),
-        ]);
+        ];
+        if (DB::table('ecommerce_stores')->where('id', $row->id)->exists()) {
+            DB::table('ecommerce_stores')->where('id', $row->id)->update($storeValues);
+        } else {
+            DB::table('ecommerce_stores')->insert(array_merge([
+                'id' => $row->id,
+                'company_id' => $company,
+                'created_at' => now(),
+            ], $storeValues));
+        }
 
         return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $row->id)->first()));
     }
@@ -299,7 +308,7 @@ class EcommerceController extends Controller
     private function publicStore(object $store): array
     {
         return response()->json([
-            'store' => $this->store($store),
+            'store' => $this->publicStorePayload($store),
             'products' => DB::table('ecommerce_products')
                 ->where('company_id', $store->company_id)
                 ->where('status', 'PUBLISHED')
@@ -307,9 +316,38 @@ class EcommerceController extends Controller
                 ->orderByDesc('featured')
                 ->orderBy('name')
                 ->get()
-                ->map(fn ($row) => $this->product($row))
+                ->map(fn ($row) => $this->publicProduct($row))
                 ->values(),
         ])->getData(true);
+    }
+
+    private function publicStorePayload(object $row): array
+    {
+        return [
+            'slug' => $row->slug,
+            'name' => $row->name,
+            'description' => $row->description,
+            'status' => $row->status,
+            'currency' => $row->currency,
+            'primaryColor' => $row->primary_color,
+            'accentColor' => $row->accent_color,
+            'logoUrl' => $row->logo_url,
+        ];
+    }
+
+    private function publicProduct(object $row): array
+    {
+        return [
+            'slug' => $row->slug,
+            'name' => $row->name,
+            'description' => $row->description,
+            'category' => $row->category,
+            'price' => (int) $row->price,
+            'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
+            'stock' => (int) $row->stock,
+            'imageUrl' => $row->image_url,
+            'featured' => (bool) $row->featured,
+        ];
     }
 
     public function createPublicOrder(Request $request, string $slug): JsonResponse
@@ -330,7 +368,7 @@ class EcommerceController extends Controller
             'shippingAddress' => ['required', 'string', 'min:5', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
-            'items.*.productId' => ['required', 'string'],
+            'items.*.productSlug' => ['required', 'string', 'min:2', 'max:160'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ])->validate();
 
@@ -340,7 +378,7 @@ class EcommerceController extends Controller
                 $total = 0;
                 foreach ($input['items'] as $item) {
                     $product = DB::table('ecommerce_products')
-                        ->where('id', $item['productId'])
+                        ->where('slug', $item['productSlug'])
                         ->where('company_id', $store->company_id)
                         ->where('status', 'PUBLISHED')
                         ->lockForUpdate()
@@ -390,7 +428,7 @@ class EcommerceController extends Controller
                     DB::table('ecommerce_order_items')->insert(array_merge($line, ['order_id' => $id]));
                 }
 
-                return ['id' => $id, 'reference' => $reference, 'total' => $total];
+                return ['reference' => $reference, 'total' => $total];
             });
 
             return response()->json($order, 201);
@@ -565,24 +603,23 @@ class EcommerceController extends Controller
     private function ensureStore(string $company): object
     {
         $id = 'ecommerce-store-'.$company;
-        DB::table('ecommerce_stores')->updateOrInsert(
-            ['id' => $id],
-            [
-                'company_id' => $company,
-                'slug' => Str::slug($company).'-boutique',
-                'name' => 'Boutique '.Str::headline($company),
-                'description' => 'Découvrez notre sélection et commandez en ligne.',
-                'status' => 'DRAFT',
-                'currency' => 'XOF',
-                'primary_color' => '#D69E2E',
-                'accent_color' => '#172033',
-                'logo_url' => '',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
+        $existing = DB::table('ecommerce_stores')->where('id', $id)->first();
+        if ($existing) {
+            return $existing;
+        }
 
-        return DB::table('ecommerce_stores')->where('id', $id)->first();
+        return (object) [
+            'id' => $id,
+            'company_id' => $company,
+            'slug' => Str::slug($company).'-boutique',
+            'name' => 'Boutique '.Str::headline($company),
+            'description' => 'Découvrez notre sélection et commandez en ligne.',
+            'status' => 'DRAFT',
+            'currency' => 'XOF',
+            'primary_color' => '#D69E2E',
+            'accent_color' => '#172033',
+            'logo_url' => '',
+        ];
     }
 
     private function allowed(Request $request, string $action, ?string $feature = null): bool

@@ -98,6 +98,7 @@ import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/mod
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
+import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
 import {
   loadCompanyModuleAccess,
@@ -118,6 +119,7 @@ import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
+const canonicalCompanyPath = (path: string) => path.replace(/^\/kora(?=\/|$)/, '/entreprise');
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
@@ -427,15 +429,28 @@ function AppContent() {
     });
   }, [session]);
 
+  const appStateSaveQueue = useRef(Promise.resolve());
+  const appStateVersionRef = useRef(appStateVersion);
+  useEffect(() => {
+    appStateVersionRef.current = appStateVersion;
+  }, [appStateVersion]);
   const mutate = (fn: (draft: StoreData) => void, message?: string) => {
+    const previous = data;
     const next = structuredClone(data) as StoreData;
     fn(next);
     setData(next);
     if (session) {
-      void appStateApi.save(next, appStateVersion)
-        .then(({ version }) => setAppStateVersion(version))
+      appStateSaveQueue.current = appStateSaveQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          const { version } = await appStateApi.save(next, appStateVersionRef.current);
+          appStateVersionRef.current = version;
+          setAppStateVersion(version);
+        })
         .catch((error) => {
+          setData((current) => current === next ? previous : current);
           setToast(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.');
+          throw error;
         });
     }
     if (message) setToast(message);
@@ -467,11 +482,9 @@ function AppContent() {
     ? data.employees.find((employee) => employee.id === sessionEmployeeId)
     : null;
   const activeCompanyId =
-    session === 'kora'
-      ? 'kora'
-      : session?.startsWith('company:')
-        ? session.slice('company:'.length)
-        : sessionEmployee?.companyId;
+    session?.startsWith('company:')
+      ? session.slice('company:'.length)
+      : sessionEmployee?.companyId;
   const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
   const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
   useEffect(() => {
@@ -497,8 +510,8 @@ function AppContent() {
       })
       .catch((error) => {
         if (!cancelled) {
-          setServerModuleStatuses(Object.fromEntries(modules.map((module) => [module.id, 'INACTIF' as const])));
-          setServerModuleAccessReady(true);
+           setServerModuleStatuses(null);
+           setServerModuleAccessReady(false);
           setServerModuleAccessCompanyId(activeCompanyId);
           setServerModuleAccessError(
             error instanceof Error
@@ -526,9 +539,9 @@ function AppContent() {
     const nextSession = sessionFromAuthUser(user);
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
-    setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/kora/dashboard');
+    setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
   };
-  const login = async (_space: 'admin' | 'kora', email: string, password: string) => {
+  const login = async (_space: 'admin' | 'company', email: string, password: string) => {
     const { user } = await authApi.login(email, password);
     applyAuthenticatedUser(user);
   };
@@ -649,7 +662,7 @@ function AppContent() {
     const nextSession = `company:${testCompanyId}` as Session;
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
-    setLocation('/kora/dashboard');
+    setLocation('/entreprise/dashboard');
     setToast(`Test réel lancé pour le secteur « ${preset.name} ».`);
   };
   const exitSectorTest = () => {
@@ -682,7 +695,8 @@ function AppContent() {
   const navigate = (path: string) => {
     const state = window.history.state as { maximusIndex?: number } | null;
     const currentIndex = typeof state?.maximusIndex === 'number' ? state.maximusIndex : 0;
-    setLocation(path);
+    const nextPath = canonicalCompanyPath(path);
+    setLocation(nextPath);
     window.history.replaceState(
       { ...(window.history.state ?? {}), maximus: true, maximusIndex: currentIndex + 1 },
       '',
@@ -713,7 +727,6 @@ function AppContent() {
     ) : (
       <Signup
         data={data}
-        mutate={mutate}
         onComplete={() => {
           setToast('Votre demande a bien été envoyée.');
           setLocation('/');
@@ -753,7 +766,7 @@ function AppContent() {
   const isAdmin = session === 'admin';
   const employeeId = sessionEmployeeId;
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
-  const companyId = activeCompanyId ?? 'kora';
+  const companyId = activeCompanyId ?? '';
   const currentCompany = activeCompany;
   const {
     accessRole,
@@ -782,8 +795,8 @@ function AppContent() {
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
   const baseMeta =
-    pageMeta[location.split('?')[0]] ??
-    modulePageMeta[location.split('?')[0]] ??
+    pageMeta[location.split('?')[0].replace(/^\/entreprise(?=\/|$)/, '/kora')] ??
+    modulePageMeta[location.split('?')[0].replace(/^\/entreprise(?=\/|$)/, '/kora')] ??
     (location.startsWith('/maximus/entreprises/')
       ? {
           kicker: 'Administration',
@@ -791,9 +804,10 @@ function AppContent() {
           description: 'Consultez et ajustez l’espace client sélectionné.',
         }
       : pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard']);
+  const companyRoutePath = location.split('?')[0].replace(/^\/entreprise(?=\/|$)/, '/kora');
   const currentMeta =
     !isAdmin && currentCompany
-      ? location === '/kora/dashboard'
+      ? companyRoutePath === '/kora/dashboard'
         ? {
             kicker: currentCompany.name,
             title: `Le rythme de ${currentCompany.name}, en un regard.`,
@@ -801,7 +815,7 @@ function AppContent() {
           }
         : { ...baseMeta, kicker: currentCompany.name }
       : baseMeta;
-  const currentPath = location.split('?')[0];
+  const currentPath = companyRoutePath;
   const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
   const companyInitials =
     currentCompany?.name
@@ -841,7 +855,7 @@ function AppContent() {
           isAdmin={isAdmin}
           onNavigate={navigate}
           onToggleMenu={() => setMobileOpen(true)}
-          notificationPath={isAdmin ? '/maximus/notifications' : '/kora/notifications'}
+          notificationPath={isAdmin ? '/maximus/notifications' : '/entreprise/notifications'}
           unreadCount={unreadNotifications}
           onHelp={() => {
             void alert({
@@ -877,7 +891,7 @@ function AppContent() {
             <PageHeader
               {...currentMeta}
               location={location}
-              onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/kora/dashboard')}
+               onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/entreprise/dashboard')}
             />
           )}
           {serverModuleAccessError && serverModuleAccessCompanyId === activeCompanyId && !isAdmin && (
@@ -934,7 +948,7 @@ function AppContent() {
                   onBack={goBack}
                   allowed={allowed}
                   canManagePeople={canManagePeople}
-                  companyAdmin={session === 'kora' || session.startsWith('company:')}
+                  companyAdmin={session.startsWith('company:')}
                   sectorManager={sectorManager}
                   scopeNodeId={employeeNode?.id}
                   companyId={companyId}
@@ -987,7 +1001,7 @@ function Login({
   onLogin,
   employees,
 }: {
-  onLogin: (space: 'admin' | 'kora', email: string, password: string) => Promise<void>;
+  onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
   employees: StoreData['employees'];
 }) {
   const showDemoAccounts = false;
@@ -996,7 +1010,7 @@ function Login({
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
-  const loginWithCredentials = (space: 'admin' | 'kora', nextEmail: string, nextPassword: string) => {
+  const loginWithCredentials = (space: 'admin' | 'company', nextEmail: string, nextPassword: string) => {
     if (pendingEmail) return;
     setError('');
     setPendingEmail(nextEmail);
@@ -1004,7 +1018,7 @@ function Login({
       .catch((loginError) => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'))
       .finally(() => setPendingEmail(''));
   };
-  const submitLogin = (space: 'admin' | 'kora') => loginWithCredentials(space, email, password);
+  const submitLogin = (space: 'admin' | 'company') => loginWithCredentials(space, email, password);
   const demoAccounts = showDemoAccounts
     ? [
         ...defaultDemoAccounts,
@@ -1027,7 +1041,7 @@ function Login({
     setEmail(account.email);
     setPassword(account.password);
     setError('');
-    loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'kora', account.email, account.password);
+    loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
   };
   return (
     <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
@@ -1070,7 +1084,7 @@ function Login({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              submitLogin('kora');
+              submitLogin('company');
             }}
             className="space-y-5"
           >
@@ -1167,11 +1181,9 @@ function Login({
 
 function Signup({
   data,
-  mutate,
   onComplete,
 }: {
   data: StoreData;
-  mutate: (fn: (draft: StoreData) => void, message?: string) => void;
   onComplete: () => void;
 }) {
   const fallbackPreset: SectorPreset = {
@@ -1217,6 +1229,8 @@ function Signup({
       ) as Partial<Record<ModuleId, FeaturePermissionMap>>,
   );
   const [moduleError, setModuleError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const configuredModule = (moduleId: ModuleId) => {
     const base = modules.find((item) => item.id === moduleId);
     return base ? { ...base, ...(data.moduleOverrides?.[moduleId] ?? {}) } : undefined;
@@ -1672,10 +1686,16 @@ function Signup({
               >
                 Retour
               </button>
-              <button
+               {submitError && (
+                 <p role="alert" className="mb-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+                   {submitError}
+                 </p>
+               )}
+               <button
                 disabled={selectedModules.length === 0}
                 data-testid="button-submit-signup"
-                onClick={() => {
+                 onClick={() => {
+                   if (submitting) return;
                   const requestedModuleFeatures = Object.fromEntries(
                     selectedModules.map((moduleId) => {
                       const module = configuredModule(moduleId);
@@ -1694,34 +1714,32 @@ function Signup({
                       ),
                     ]),
                   ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
-                  const newCompany: Company = {
-                    id: uid('company'),
-                    name,
-                    manager,
-                    email,
-                    adminPassword: password,
-                    phone: '',
-                    country: 'Sénégal',
-                    sector: sector.trim(),
-                    status: 'EN ATTENTE',
-                    requestedModules: selectedModules,
-                    requestedModulePackIds: Object.fromEntries(
-                      Object.entries(selectedModulePackIds).filter(([, packIds]) => (packIds ?? []).length),
-                    ),
-                    requestedModuleFeatures,
-                    requestedModulePermissions,
-                    allowedModules: [],
-                    refusedModules: [],
-                    createdAt: new Date().toISOString().slice(0, 10),
-                  };
-                  mutate((draft) => {
-                    draft.companies.push(newCompany);
-                  });
-                  setSubmitted(true);
+                   setSubmitting(true);
+                   setSubmitError('');
+                   void companyRequestApi.create({
+                     name: name.trim(),
+                     manager: manager.trim(),
+                     email: email.trim(),
+                     password,
+                     country: 'Sénégal',
+                     sector: sector.trim(),
+                     requestedModules: selectedModules,
+                     requestedModulePackIds: Object.fromEntries(
+                       Object.entries(selectedModulePackIds).filter(([, packIds]) => (packIds ?? []).length),
+                     ),
+                     requestedModuleFeatures,
+                     requestedModulePermissions,
+                   })
+                     .then(() => setSubmitted(true))
+                     .catch((error) => {
+                       setSubmitError(error instanceof Error ? error.message : 'La demande n’a pas pu être enregistrée.');
+                     })
+                     .finally(() => setSubmitting(false));
                 }}
+                 aria-busy={submitting}
                 className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
               >
-                Envoyer la demande <Check size={16} />
+                 {submitting ? 'Enregistrement…' : 'Envoyer la demande'} <Check size={16} />
               </button>
             </div>
           </div>
@@ -2513,7 +2531,7 @@ function CompaniesPage({
   const [search, setSearch] = useState(() => sessionStorage.getItem('maximus-company-search') ?? '');
   const [filter, setFilter] = useState('Toutes');
   const [selected, setSelected] = useState<Company | null>(
-    detail ? (data.companies.find((c) => c.id === 'kora') ?? null) : null,
+    detail ? (data.companies[0] ?? null) : null,
   );
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const list = data.companies
@@ -2526,15 +2544,6 @@ function CompaniesPage({
         (filter === 'Suspendues' && c.status === 'SUSPENDU'),
     );
   const deleteCompany = async (company: Company) => {
-    if (company.id === 'kora') {
-      await alert({
-        title: 'Suppression impossible',
-        description: 'L’espace de démonstration KORA est protégé et ne peut pas être supprimé.',
-        confirmLabel: 'Compris',
-        tone: 'danger',
-      });
-      return;
-    }
     if (
       !(await confirm({
         title: 'Supprimer cette entreprise ?',
@@ -2544,12 +2553,22 @@ function CompaniesPage({
       }))
     )
       return;
-    mutate((draft) => {
-      draft.companies = draft.companies.filter((item) => item.id !== company.id);
-      draft.employees = draft.employees.filter((item) => item.companyId !== company.id);
-      draft.roles = draft.roles.filter((item) => item.companyId !== company.id);
-      draft.orgNodes = draft.orgNodes.filter((item) => item.companyId !== company.id);
-    }, 'Entreprise et données d’organisation supprimées.');
+    try {
+      await companyRequestApi.remove(company.id);
+      mutate((draft) => {
+        draft.companies = draft.companies.filter((item) => item.id !== company.id);
+        draft.employees = draft.employees.filter((item) => item.companyId !== company.id);
+        draft.roles = draft.roles.filter((item) => item.companyId !== company.id);
+        draft.orgNodes = draft.orgNodes.filter((item) => item.companyId !== company.id);
+      }, 'Entreprise archivée et accès révoqués.');
+    } catch (error) {
+      await alert({
+        title: 'Suppression impossible',
+        description: error instanceof Error ? error.message : 'L’entreprise n’a pas pu être archivée.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+    }
   };
   if (selected)
     return (
@@ -2624,8 +2643,7 @@ function CompaniesPage({
             <button
               data-testid={`button-delete-company-${c.id}`}
               aria-label={`Supprimer ${c.name}`}
-              title={c.id === 'kora' ? 'L’espace KORA est protégé' : `Supprimer ${c.name}`}
-              disabled={c.id === 'kora'}
+              title={`Supprimer ${c.name}`}
               onClick={() => deleteCompany(c)}
               className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -2793,46 +2811,71 @@ function RequestsPage({
   notify: (message: string) => void;
   onNavigate: (p: string) => void;
 }) {
-  const requests = data.companies.filter((c) => c.status === 'EN ATTENTE');
+  const [requests, setRequests] = useState<CompanyRequest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [pendingCompanyId, setPendingCompanyId] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void companyRequestApi.list()
+      .then((result) => {
+        if (active) setRequests(result.requests);
+      })
+      .catch((error) => notify(error instanceof Error ? error.message : 'Les demandes sont indisponibles.'))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   const approveRequest = async (company: Company) => {
-    if (!company.adminPassword) {
-      notify('Impossible d’activer cette entreprise : le mot de passe administrateur est absent.');
-      return;
-    }
     setPendingCompanyId(company.id);
     try {
-      await authApi.provisionCompanyAdmin({
-        id: `company-admin:${company.id}`,
-        email: company.email,
-        displayName: company.manager,
-        companyId: company.id,
-        password: company.adminPassword,
-      });
-      await synchronizeCompanyModuleAccess(company.id, company.requestedModules);
+      const result = await companyRequestApi.approve(company.id);
       mutate((d) => {
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
-          target.status = 'ACTIF';
-          provisionCompanyAccess(d, target);
+          Object.assign(target, { ...result.company, adminPassword: undefined });
         }
       }, 'Entreprise activée et compte administrateur synchronisé.');
+      setRequests((current) => current.filter((item) => item.id !== company.id));
     } catch (error) {
       notify(error instanceof Error ? error.message : 'La synchronisation du compte entreprise a échoué.');
     } finally {
       setPendingCompanyId(null);
     }
   };
+  const rejectRequest = async (company: Company) => {
+    setPendingCompanyId(company.id);
+    try {
+      await companyRequestApi.reject(company.id);
+      mutate((d) => {
+        const target = d.companies.find((item) => item.id === company.id);
+        if (target) target.status = 'REFUSÉ';
+      });
+      setRequests((current) => current.filter((item) => item.id !== company.id));
+      notify('Demande refusée.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Le refus de la demande a échoué.');
+    } finally {
+      setPendingCompanyId(null);
+    }
+  };
   return (
     <div className="space-y-4">
-      {requests.length === 0 ? (
+      {loading ? (
+        <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement des demandes…</div>
+      ) : requests.length === 0 ? (
         <EmptyState
           title="Aucune demande en attente"
           text="Toutes les demandes ont été traitées."
           action={() => onNavigate('/maximus/entreprises')}
         />
       ) : (
-        requests.map((c) => (
+        requests.map((request) => {
+          const c = request.company;
+          return (
           <section data-testid={`card-request-${c.id}`} key={c.id} className="card-surface rounded-2xl p-5 sm:p-6">
             <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
               <div className="flex gap-4">
@@ -2866,12 +2909,8 @@ function RequestsPage({
                 <ActionButton
                   testId={`button-refuse-request-${c.id}`}
                   icon={X}
-                  onClick={() =>
-                    mutate((d) => {
-                      const x = d.companies.find((y) => y.id === c.id);
-                      if (x) x.status = 'REFUSÉ';
-                    }, 'Demande refusée.')
-                  }
+                  disabled={pendingCompanyId === c.id}
+                  onClick={() => void rejectRequest(c)}
                 >
                   Refuser
                 </ActionButton>
@@ -2887,7 +2926,8 @@ function RequestsPage({
               </div>
             </div>
           </section>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -4997,9 +5037,9 @@ function CommercePage({
     </div>
   );
 }
-function RHPage({ data }: { data: StoreData }) {
-  const units = data.orgNodes.filter((node) => node.companyId === 'kora');
-  const employees = data.employees.filter((employee) => employee.companyId === 'kora');
+function RHPage({ data, companyId }: { data: StoreData; companyId: string }) {
+  const units = data.orgNodes.filter((node) => node.companyId === companyId);
+  const employees = data.employees.filter((employee) => employee.companyId === companyId);
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_.8fr]">
       <section className="card-surface rounded-2xl p-6">
@@ -5036,7 +5076,7 @@ function RHPage({ data }: { data: StoreData }) {
         <Users size={19} className="text-[hsl(var(--primary))]" />
         <h2 className="mt-5 font-bold">Effectif total</h2>
         <p className="mt-1 text-4xl font-bold">{employees.length}</p>
-        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">collaborateurs enregistrés dans KORA</p>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">collaborateurs enregistrés dans l’entreprise</p>
         <div className="mt-6 border-t pt-5 text-xs leading-6 text-[hsl(var(--muted-foreground))]">
           {employees.filter((employee) => employee.sectorId).length} employé(s) affecté(s) à une unité créée par
           l’entreprise.
@@ -5045,13 +5085,13 @@ function RHPage({ data }: { data: StoreData }) {
     </div>
   );
 }
-function PresencesPage({ data, visibleFeatureIds }: { data: StoreData; visibleFeatureIds?: string[] }) {
-  const employees = data.employees.filter((employee) => employee.companyId === 'kora');
+function PresencesPage({ data, companyId, visibleFeatureIds }: { data: StoreData; companyId: string; visibleFeatureIds?: string[] }) {
+  const employees = data.employees.filter((employee) => employee.companyId === companyId);
   return (
     <PresenceModulePage
-      companyId="kora"
+      companyId={companyId}
       employees={employees}
-      nodes={data.orgNodes.filter((node) => node.companyId === 'kora')}
+      nodes={data.orgNodes.filter((node) => node.companyId === companyId)}
       currentEmployee={null}
       canView
       canCreate
@@ -5957,7 +5997,8 @@ function ModulePackTestWorkbench({
     'logistique',
     'documents',
   ];
-  const koraCompany = data.companies.find((company) => company.id === 'kora');
+  const previewCompany = data.companies[0];
+  const previewCompanyId = previewCompany?.id ?? '';
   const featureOptions = getModuleFeatureOptions(module);
   const fullFeatureIds = featureOptions.map((feature) => feature.id);
   const testFeatureIds = pack
@@ -6032,10 +6073,10 @@ function ModulePackTestWorkbench({
           </p>
         </div>
         <div className="mt-5">
-          {module.id === 'stocks' && <StockModulePage companyId="kora" stockPermissions={stockPermissions} />}
+          {module.id === 'stocks' && <StockModulePage companyId={previewCompanyId} stockPermissions={stockPermissions} />}
           {(module.id === 'commerce' || module.id === 'ventes') && (
             <CommerceModulePage
-              companyId="kora"
+              companyId={previewCompanyId}
               data={data}
               mutate={mutate}
               tabPermissions={commerceTabPermissions}
@@ -6044,11 +6085,11 @@ function ModulePackTestWorkbench({
             />
           )}
           {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
-          {module.id === 'rh' && koraCompany && (
-            <CompanyOrganizationAdmin company={koraCompany} data={data} mutate={mutate} />
+          {module.id === 'rh' && previewCompany && (
+            <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
-          {module.id === 'presences' && <PresencesPage data={data} visibleFeatureIds={testFeatureIds} />}
-           {module.id === 'ecommerce' && <EcommerceModulePage companyId="kora" canCreate canModify />}
+          {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={testFeatureIds} />}
+           {module.id === 'ecommerce' && <EcommerceModulePage companyId={previewCompanyId} canCreate canModify />}
           {operationalModules.includes(module.id) && (
             <OperationalModulePage
               moduleId={module.id}
@@ -6222,7 +6263,7 @@ function HumanResourcesWorkspace({
 }) {
   const company = data.companies.find((item) => item.id === companyId);
   if (companyAdmin && company) return <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} />;
-  return <RHPage data={data} />;
+  return <RHPage data={data} companyId={companyId} />;
 }
 
 function App() {

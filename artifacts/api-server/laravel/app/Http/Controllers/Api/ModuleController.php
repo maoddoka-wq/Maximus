@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\ModuleCatalog;
+use App\Support\CompanyRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,9 @@ class ModuleController extends Controller
         $companyId = (string) $request->attributes->get('companyId');
         if ($companyId === '') {
             return response()->json(['error' => 'companyId requis pour modifier un accès module.'], 400);
+        }
+        if (!CompanyRegistry::exists($companyId)) {
+            CompanyRegistry::ensureActive($companyId);
         }
         DB::table('maximus_company_modules')->updateOrInsert(
             ['company_id' => $companyId, 'module_id' => $moduleId],

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildSubscriptionForCompany, subscriptionPlans } from './subscription-model';
-import { seedData } from './store';
+import { emptyStoreData } from './store';
 
 test('crée une souscription initiale cohérente avec le nombre de modules', () => {
   const subscription = buildSubscriptionForCompany({
@@ -23,14 +23,9 @@ test('le catalogue expose les limites et les prix de chaque plan', () => {
   assert.ok(subscriptionPlans.every(plan => plan.limits.employees > 0 && plan.limits.modules > 0 && plan.limits.storageGb > 0));
 });
 
-test('les données de démonstration associent une souscription à chaque entreprise', () => {
-  const data = seedData();
+test('le magasin initial ne contient aucune entreprise ou souscription fictive', () => {
+  const data = emptyStoreData();
 
-  assert.equal(data.subscriptions.length, data.companies.length);
-  assert.deepEqual(
-    data.companies.map(company => company.id),
-    data.subscriptions.map(subscription => subscription.companyId),
-  );
-  assert.ok(data.subscriptions.some(subscription => subscription.paymentStatus === 'IMPAYÉ'));
-  assert.ok(data.subscriptions.some(subscription => subscription.invoices.length > 0));
+  assert.equal(data.companies.length, 0);
+  assert.equal(data.subscriptions.length, 0);
 });

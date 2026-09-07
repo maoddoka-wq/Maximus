@@ -55,7 +55,7 @@ export function buildAppAccessContext({
   serverModuleStatuses,
   serverModuleAccessReady = true,
 }: AppAccessInput): AppAccessContext {
-  const companyId = activeCompanyId ?? 'kora';
+  const companyId = activeCompanyId ?? '';
   const configuredModules = getConfiguredModules(data);
   const rawEmployeeRole = employee
     ? (data.roles.find(role => role.id === employee.roleId) ?? data.roles.find(role => role.name === employee.role))
@@ -85,7 +85,7 @@ export function buildAppAccessContext({
     : employeeRoleMatchesUnit(accessRole, employee, employeeAncestry);
   const canViewModule = (moduleId: ModuleId) => roleHasPermission(accessRole, employeeNode, moduleId, 'voir');
   const allowed =
-    session === 'kora'
+    session.startsWith('company:')
       ? companyAllowed
       : session.startsWith('company:')
         ? sectorTestCompanyId && accessRole && accessRoleMatchesScope
@@ -95,12 +95,12 @@ export function buildAppAccessContext({
           ? companyAllowed.filter(moduleId => canViewModule(moduleId))
           : [];
   const hasPermission = (moduleId: ModuleId, permission: ModulePermission) => {
-    if (session === 'kora' || (session.startsWith('company:') && !sectorTestCompanyId)) return true;
+    if (session.startsWith('company:') && !sectorTestCompanyId) return true;
     if (!accessRoleMatchesScope || !accessRole) return false;
     return roleHasPermission(accessRole, employeeNode, moduleId, permission);
   };
   const hasPresencePermission = (permission: PresencePermission) => {
-    if (session === 'kora' || (session.startsWith('company:') && !sectorTestCompanyId)) return true;
+    if (session.startsWith('company:') && !sectorTestCompanyId) return true;
     if (!accessRoleMatchesScope || !accessRole) return false;
     return employeeHasPresencePermission(accessRole, employeeNode, permission, hasPermission);
   };
@@ -193,6 +193,6 @@ export function buildAppAccessContext({
     sidebarFeatureGroups,
     verticalModuleNavigation: Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length),
     sectorManager,
-    canManagePeople: session === 'kora' || session.startsWith('company:') || sectorManager,
+    canManagePeople: session.startsWith('company:') || sectorManager,
   };
 }

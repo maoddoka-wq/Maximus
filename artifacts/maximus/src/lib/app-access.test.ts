@@ -1,24 +1,76 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildAppAccessContext } from './app-access';
-import { seedData } from './store';
+import { emptyStoreData, type Company, type Employee, type OrgNode, type Role } from './store';
+
+function createAccessFixture() {
+  const data = emptyStoreData();
+  const company: Company = {
+    id: 'company-test',
+    name: 'Entreprise de test',
+    manager: 'Awa Diallo',
+    email: 'admin@company-test.example',
+    phone: '',
+    country: 'Sénégal',
+    sector: 'Services',
+    status: 'ACTIF',
+    requestedModules: ['commerce'],
+    allowedModules: ['commerce'],
+    refusedModules: [],
+    createdAt: '2026-09-07',
+  };
+  const node: OrgNode = {
+    id: 'unit-test',
+    companyId: company.id,
+    name: 'Unité commerciale',
+    type: 'service',
+    parentId: null,
+    moduleIds: ['commerce'],
+  };
+  const role: Role = {
+    id: 'commerce-reader',
+    companyId: company.id,
+    sectorId: node.id,
+    name: 'Lecteur commerce',
+    description: '',
+    modulePermissions: { commerce: ['voir', 'créer'] },
+  };
+  const employee: Employee = {
+    id: 'employee-awa',
+    firstName: 'Awa',
+    lastName: 'Diallo',
+    email: 'awa@company-test.example',
+    phone: '',
+    position: 'Commerciale',
+    department: node.name,
+    subDepartment: '',
+    role: role.name,
+    roleId: role.id,
+    status: 'ACTIF',
+    companyId: company.id,
+    sectorId: node.id,
+  };
+  data.companies.push(company);
+  data.orgNodes.push(node);
+  data.roles.push(role);
+  data.employees.push(employee);
+  return { data, company, employee };
+}
 
 test('calcule un accès employé limité à son rôle et à son unité', () => {
-  const data = seedData();
-  const employee = data.employees.find(item => item.id === 'demo-emp-awa');
-  assert.ok(employee);
+  const { data, company, employee } = createAccessFixture();
 
   const access = buildAppAccessContext({
     data,
     session: `employee:${employee.id}`,
     employee,
-    activeCompanyId: 'kora',
-    activeCompany: data.companies.find(company => company.id === 'kora'),
+    activeCompanyId: company.id,
+    activeCompany: company,
     sectorTestCompanyId: null,
     serverModuleStatuses: null,
   });
 
-  assert.equal(access.companyId, 'kora');
+  assert.equal(access.companyId, company.id);
   assert.ok(access.allowed.includes('commerce'));
   assert.ok(!access.allowed.includes('stocks'));
   assert.equal(access.hasPermission('commerce', 'créer'), true);
@@ -27,11 +79,7 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
 });
 
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {
-  const data = seedData();
-  const employee = data.employees.find(item => item.id === 'demo-emp-mamadou');
-  assert.ok(employee);
-  const company = data.companies.find(item => item.id === 'kora');
-  assert.ok(company);
+  const { data, company, employee } = createAccessFixture();
   const foreignCompany = { ...company, id: 'foreign-company' };
 
   const access = buildAppAccessContext({

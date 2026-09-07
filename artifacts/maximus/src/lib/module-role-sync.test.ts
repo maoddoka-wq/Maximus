@@ -1,12 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seedData, type OrgNode } from './store';
+import { emptyStoreData, type Company, type OrgNode, type StoreData } from './store';
 import { synchronizeUnitPackRoles } from './module-role-sync';
+
+function createData(): { data: StoreData; company: Company } {
+  const data = emptyStoreData();
+  const company: Company = {
+    id: 'company-test',
+    name: 'Entreprise de test',
+    manager: 'Responsable',
+    email: 'admin@company-test.example',
+    phone: '',
+    country: 'Sénégal',
+    sector: 'Distribution',
+    status: 'ACTIF',
+    requestedModules: ['stocks'],
+    allowedModules: ['stocks'],
+    refusedModules: [],
+    createdAt: '2026-09-07',
+  };
+  data.companies.push(company);
+  return { data, company };
+}
 
 function createStockUnit(): OrgNode {
   return {
     id: 'test-stock-unit',
-    companyId: 'kora',
+    companyId: 'company-test',
     name: 'Unité stock de test',
     type: 'service',
     parentId: null,
@@ -19,9 +39,7 @@ function createStockUnit(): OrgNode {
 }
 
 test('crée un rôle automatique avec les permissions du pack et de l’unité', () => {
-  const data = seedData();
-  const company = data.companies.find(item => item.id === 'kora');
-  assert.ok(company);
+  const { data, company } = createData();
   const node = createStockUnit();
 
   synchronizeUnitPackRoles(data, company, node);
@@ -35,9 +53,7 @@ test('crée un rôle automatique avec les permissions du pack et de l’unité',
 });
 
 test('supprime un rôle automatique retiré lorsqu’il n’est pas affecté', () => {
-  const data = seedData();
-  const company = data.companies.find(item => item.id === 'kora');
-  assert.ok(company);
+  const { data, company } = createData();
   const node = createStockUnit();
 
   synchronizeUnitPackRoles(data, company, node);
@@ -48,9 +64,7 @@ test('supprime un rôle automatique retiré lorsqu’il n’est pas affecté', (
 });
 
 test('convertit en rôle personnalisé un rôle automatique déjà affecté', () => {
-  const data = seedData();
-  const company = data.companies.find(item => item.id === 'kora');
-  assert.ok(company);
+  const { data, company } = createData();
   const node = createStockUnit();
 
   synchronizeUnitPackRoles(data, company, node);

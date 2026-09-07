@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AppStateController;
+use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ModuleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +19,22 @@ Route::get('/healthz', function () {
     }
 });
 
+Route::post('/company-requests', [CompanyController::class, 'createRequest'])->middleware('throttle:login');
+
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::get('/session', [AuthController::class, 'session']);
     Route::post('/logout', [AuthController::class, 'logout']);
+});
+
+Route::middleware('maximus.auth')->prefix('company-requests')->group(function (): void {
+    Route::get('/', [CompanyController::class, 'index']);
+    Route::post('/{companyId}/approve', [CompanyController::class, 'approve']);
+    Route::post('/{companyId}/reject', [CompanyController::class, 'reject']);
+});
+
+Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
+    Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
 
 Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {
