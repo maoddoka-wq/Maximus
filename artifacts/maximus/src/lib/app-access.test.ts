@@ -136,5 +136,7 @@ test('applique les permissions du rôle pendant un test réel de secteur', () =>
   assert.equal(access.hasPermission('commerce', 'créer'), true);
   assert.equal(access.hasPermission('stocks', 'voir'), false);
   assert.equal(access.sectorManager, false);
+  assert.equal(access.verticalModuleNavigation, true);
+  assert.ok(access.sidebarFeatureGroups.some(group => group.label === 'Gestion commerciale'));
   assert.equal(employee.companyId, company.id);
 });

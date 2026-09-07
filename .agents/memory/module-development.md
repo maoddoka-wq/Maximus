@@ -38,3 +38,9 @@ Le registre de module doit dériver l’identité métier du catalogue et porter
 **Why:** Un module ajouté dans une seule liste peut apparaître dans le catalogue sans route, ou être routable sans apparaître dans le menu, ce qui crée des écrans inaccessibles et des régressions silencieuses.
 
 **How to apply:** Lorsqu’un module est ajouté, enregistrer son identifiant dans le catalogue et sa configuration d’exécution dans le registre, puis laisser les tests de parité vérifier la route et la navigation.
+
+Le test réel d’un secteur doit construire la navigation détaillée depuis le rôle et l’unité temporaires, même sans créer un employé de démonstration.
+
+**Why:** Le test représente une entreprise avec les droits du secteur ; exiger un employé artificiel masquait les fonctionnalités des modules dans le menu.
+
+**How to apply:** Utiliser le rôle de test, les fonctionnalités explicites de l’unité et les permissions calculées pour afficher les sous-fonctionnalités, tout en conservant les mêmes gardes d’accès que l’espace entreprise.
