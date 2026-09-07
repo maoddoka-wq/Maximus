@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentProviderInterface;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class DiamanoPayProvider implements PaymentProviderInterface
 {
@@ -27,6 +28,11 @@ class DiamanoPayProvider implements PaymentProviderInterface
             ];
         }
 
+        Log::info('[DIAMANOPAY] Create charge started', [
+            'reference' => $payment['public_reference'],
+            'amount' => (int) $payment['amount'],
+            'provider' => $provider,
+        ]);
         $response = $this->client()->post($this->path('payment_path'), [
             'amount' => $payment['amount'],
             'provider' => $provider,
@@ -39,8 +45,35 @@ class DiamanoPayProvider implements PaymentProviderInterface
                 'currency' => $payment['currency'],
             ], $payment['metadata'] ?? []),
         ]);
+        Log::info('[DIAMANOPAY] Create charge HTTP status', [
+            'status' => $response->status(),
+            'reference' => $payment['public_reference'],
+        ]);
 
-        return $this->normalize($response, ['chargeId'], true);
+        $result = $this->normalize($response, ['chargeId'], true);
+        Log::info('[DIAMANOPAY] Create charge response', [
+            'status' => $result['status'],
+            'charge_id' => $result['provider_transaction_id'],
+            'payment_url_present' => is_string($result['checkout_url']) && $result['checkout_url'] !== '',
+            'message' => $result['message'],
+        ]);
+        if ($result['ok'] && (! is_string($result['checkout_url']) || $result['checkout_url'] === '')) {
+            Log::error('[DIAMANOPAY] Checkout URL missing', [
+                'reference' => $payment['public_reference'],
+                'charge_id' => $result['provider_transaction_id'],
+            ]);
+            $result['ok'] = false;
+            $result['status'] = 'FAILED';
+            $result['message'] = 'DiamanoPay n’a pas retourné d’URL de paiement.';
+            $result['error_code'] = 'DIAMANOPAY_CHECKOUT_URL_MISSING';
+        } elseif ($result['ok']) {
+            Log::info('[DIAMANOPAY] Checkout URL received', [
+                'reference' => $payment['public_reference'],
+                'charge_id' => $result['provider_transaction_id'],
+            ]);
+        }
+
+        return $result;
     }
 
     public function verify(string $providerTransactionId, array $context = []): array
@@ -50,11 +83,21 @@ class DiamanoPayProvider implements PaymentProviderInterface
         }
 
         $path = str_replace('{providerTransactionId}', rawurlencode($providerTransactionId), $this->path('verify_path'));
+        Log::info('[DIAMANOPAY] Transaction verification', [
+            'transaction_id' => $providerTransactionId,
+        ]);
         $result = $this->normalize($this->client()->get($path), ['transactionId', 'id'], false);
         $result['verified'] = $result['ok']
             && $result['provider_transaction_id'] === $providerTransactionId
             && $this->matchesExpectedAmount($result, $context['expected_amount'] ?? null)
             && $this->matchesExpectedReference($result, $context['expected_reference'] ?? null);
+        Log::info('[DIAMANOPAY] Transaction verification result', [
+            'transaction_id' => $providerTransactionId,
+            'verified' => $result['verified'],
+            'status' => $result['status'],
+            'amount_matches' => $this->matchesExpectedAmount($result, $context['expected_amount'] ?? null),
+            'reference_matches' => $this->matchesExpectedReference($result, $context['expected_reference'] ?? null),
+        ]);
 
         return $result;
     }
@@ -111,6 +154,8 @@ class DiamanoPayProvider implements PaymentProviderInterface
     private function configured(): bool
     {
         return (string) config('payments.diamanopay.base_url') !== ''
+            && (string) config('payments.callback_url') !== ''
+            && (string) config('payments.webhook_url') !== ''
             && ((string) config('payments.diamanopay.access_token') !== ''
                 || ((string) config('payments.diamanopay.client_id') !== '' && (string) config('payments.diamanopay.client_secret') !== ''));
     }
@@ -124,9 +169,15 @@ class DiamanoPayProvider implements PaymentProviderInterface
 
         $token = (string) config('payments.diamanopay.access_token');
         if ($token !== '') {
+            Log::info('[DIAMANOPAY] Authentication started', ['mode' => 'long_lived_access_token']);
+            Log::info('[DIAMANOPAY] Authentication result', [
+                'mode' => 'long_lived_access_token',
+                'successful' => true,
+            ]);
             return $client->withToken($token);
         }
 
+        Log::info('[DIAMANOPAY] Authentication started', ['mode' => 'client_credentials']);
         $auth = Http::baseUrl((string) config('payments.diamanopay.base_url'))
             ->asForm()
             ->acceptJson()
@@ -136,6 +187,11 @@ class DiamanoPayProvider implements PaymentProviderInterface
                 'client_id' => (string) config('payments.diamanopay.client_id'),
                 'client_secret' => (string) config('payments.diamanopay.client_secret'),
             ]);
+        Log::info('[DIAMANOPAY] Authentication result', [
+            'mode' => 'client_credentials',
+            'status' => $auth->status(),
+            'successful' => $auth->successful(),
+        ]);
         $auth->throw();
 
         $accessToken = (string) ($auth->json('accessToken') ?? $auth->json('access_token') ?? '');
@@ -212,13 +268,32 @@ class DiamanoPayProvider implements PaymentProviderInterface
 
     private function unavailable(): array
     {
+        $missing = [];
+        foreach ([
+            'DIAMANOPAY_BASE_URL' => config('payments.diamanopay.base_url'),
+            'DIAMANOPAY_CALLBACK_URL' => config('payments.callback_url'),
+            'DIAMANOPAY_WEBHOOK_URL' => config('payments.webhook_url'),
+        ] as $name => $value) {
+            if ((string) $value === '') {
+                $missing[] = $name;
+            }
+        }
+        if ((string) config('payments.diamanopay.access_token') === ''
+            && ((string) config('payments.diamanopay.client_id') === '' || (string) config('payments.diamanopay.client_secret') === '')) {
+            $missing[] = 'DIAMANOPAY_ACCESS_TOKEN ou DIAMANOPAY_CLIENT_ID/DIAMANOPAY_CLIENT_SECRET';
+        }
+        Log::error('[DIAMANOPAY] Configuration missing', [
+            'missing' => $missing,
+        ]);
+
         return [
             'ok' => false,
-            'status' => 'PENDING',
+            'status' => 'FAILED',
             'provider_transaction_id' => null,
             'provider_request_id' => null,
             'checkout_url' => null,
-            'message' => 'DiamanoPay n’est pas encore configuré côté serveur.',
+            'message' => 'DiamanoPay n’est pas configuré côté serveur.',
+            'error_code' => 'DIAMANOPAY_NOT_CONFIGURED',
             'raw' => [],
         ];
     }

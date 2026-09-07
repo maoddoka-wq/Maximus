@@ -4,6 +4,7 @@ namespace App\Services\Payments;
 
 use App\Contracts\PaymentProviderInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PaymentService
@@ -70,15 +71,31 @@ class PaymentService
             ]);
         } catch (\Throwable $exception) {
             report($exception);
+            Log::error('[DIAMANOPAY] Create charge exception', [
+                'reference' => $reference,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
             $providerResult = [
-                'status' => 'PENDING',
+                'ok' => false,
+                'status' => 'FAILED',
                 'provider_transaction_id' => null,
+                'provider_request_id' => null,
                 'checkout_url' => null,
-                'message' => 'Le prestataire sera réessayé après configuration.',
+                'message' => 'DiamanoPay n’a pas pu créer le paiement.',
+                'error_code' => 'DIAMANOPAY_CREATE_FAILED',
             ];
         }
+        $providerStatus = $providerResult['status'] ?? 'FAILED';
         $updates = [
-            'status' => $providerResult['status'] === 'PROCESSING' ? 'PROCESSING' : 'PENDING',
+            'status' => match ($providerStatus) {
+                'PROCESSING' => 'PROCESSING',
+                'PAID' => 'PAID',
+                'FAILED' => 'FAILED',
+                'CANCELLED' => 'CANCELLED',
+                'EXPIRED' => 'EXPIRED',
+                default => 'PENDING',
+            },
             'provider_transaction_id' => $providerResult['provider_transaction_id'],
             'metadata' => json_encode(array_merge($data['metadata'] ?? [], [
                 'checkout_url' => $providerResult['checkout_url'] ?? null,
@@ -87,11 +104,16 @@ class PaymentService
             ]), JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ];
-        if ($providerResult['status'] === 'FAILED') {
+        if (in_array($providerStatus, ['FAILED', 'CANCELLED', 'EXPIRED'], true)) {
             $updates['status'] = 'FAILED';
             $updates['failed_at'] = now();
         }
         DB::table('payments')->where('id', $id)->update($updates);
+        Log::info('[DIAMANOPAY] Final payment status', [
+            'reference' => $reference,
+            'payment_id' => $id,
+            'status' => $updates['status'],
+        ]);
 
         return $this->payload(DB::table('payments')->where('id', $id)->first());
     }
@@ -103,6 +125,11 @@ class PaymentService
         $reference = $this->firstString($payload, ['clientReference', 'public_reference', 'reference', 'merchant_reference']);
         $reference ??= $this->firstString($payload, ['extraData.clientReference', 'extraData.publicReference']);
         $status = $this->normalizeStatus($this->firstString($payload, ['status', 'payment_status', 'state']) ?? 'PENDING');
+        Log::info('[DIAMANOPAY] Webhook received', [
+            'status' => $status,
+            'transaction_id' => $providerTransactionId,
+            'payment_request_id' => $providerRequestId,
+        ]);
         $payment = $reference
             ? DB::table('payments')->where('public_reference', $reference)->first()
             : null;
@@ -183,6 +210,11 @@ class PaymentService
                 ->where('provider_event_id', $eventId)
                 ->update(['processing_status' => 'PROCESSED', 'processed_at' => now(), 'updated_at' => now()]);
         });
+        Log::info('[DIAMANOPAY] Final payment status', [
+            'payment_id' => $payment->id,
+            'reference' => $payment->public_reference,
+            'status' => $status,
+        ]);
 
         return $this->payload(DB::table('payments')->where('id', $payment->id)->first());
     }

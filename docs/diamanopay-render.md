@@ -13,7 +13,7 @@ Ajouter les variables suivantes dans l’environnement **Production** du service
 - `DIAMANOPAY_CALLBACK_URL`
 - `DIAMANOPAY_WEBHOOK_URL`
 
-Avec `CLIENT_ID` et `CLIENT_SECRET`, MAXIMUS obtient automatiquement un Bearer Token via `/oauth2/token`. Les identifiants ne doivent jamais être ajoutés au dépôt, au frontend ou aux logs. Les entrées `sync: false` correspondantes sont déjà déclarées dans `render.yaml`.
+Avec `CLIENT_ID` et `CLIENT_SECRET`, MAXIMUS obtient automatiquement un Bearer Token via `/oauth2/token`. Si `DIAMANOPAY_ACCESS_TOKEN` est renseigné, il est prioritaire et l’authentification OAuth2 n’est pas appelée ; ne laissez donc pas un ancien token invalide actif lorsque vous utilisez le couple client OAuth. Les identifiants ne doivent jamais être ajoutés au dépôt, au frontend ou aux logs. Les entrées `sync: false` correspondantes sont déjà déclarées dans `render.yaml`.
 
 ## Webhook
 
@@ -42,4 +42,4 @@ Le prochain déploiement Render :
 3. exécute les migrations financières avec `php artisan migrate --force --no-interaction` ;
 4. démarre le serveur sur `PORT`.
 
-Tant que les variables DiamanoPay ne sont pas renseignées, les commandes restent `PENDING` et aucune écriture de paiement confirmé ni aucun crédit wallet n’est créé.
+Si les variables DiamanoPay sont absentes ou si la création de charge échoue, le paiement est marqué `FAILED`, l’erreur est journalisée côté backend sans secret, et le frontend affiche l’erreur au client. Une commande ne doit jamais afficher `PENDING` pour masquer une absence de configuration.

@@ -14,6 +14,89 @@ class PaymentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_missing_diamanopay_configuration_is_reported_as_a_failed_payment(): void
+    {
+        Config::set([
+            'payments.diamanopay.base_url' => '',
+            'payments.diamanopay.client_id' => null,
+            'payments.diamanopay.client_secret' => null,
+            'payments.diamanopay.access_token' => null,
+            'payments.callback_url' => '',
+            'payments.webhook_url' => '',
+        ]);
+        $request = $this->asActor();
+
+        $request->postJson('/api/payments', [
+            'sourceModule' => 'ecommerce',
+            'sourceType' => 'ecommerce_order',
+            'sourceId' => 'order-unconfigured-test',
+            'amount' => 1000,
+            'currency' => 'XOF',
+            'paymentMethod' => 'WAVE',
+            'idempotencyKey' => 'payment-unconfigured-1',
+        ])->assertCreated()
+            ->assertJsonPath('status', 'FAILED')
+            ->assertJsonPath('providerMessage', 'DiamanoPay n’est pas configuré côté serveur.');
+    }
+
+    public function test_client_credentials_and_charge_use_the_official_diamanopay_contract(): void
+    {
+        Config::set([
+            'payments.diamanopay.base_url' => 'https://api.diamanopay.com',
+            'payments.diamanopay.client_id' => 'client-id-test',
+            'payments.diamanopay.client_secret' => 'client-secret-test',
+            'payments.diamanopay.access_token' => null,
+            'payments.callback_url' => 'https://maximus.test/',
+            'payments.webhook_url' => 'https://maximus.test/api/webhooks/diamanopay',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/oauth2/token' => Http::response([
+                'accessToken' => 'oauth-access-token-test',
+            ], 200),
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'chargeId' => 'charge-oauth-test',
+                'status' => 'PENDING',
+                'paymentUrl' => 'https://pay.diamanopay.com/checkout/oauth-test',
+            ], 201),
+        ]);
+
+        $response = $this->asActor()->postJson('/api/payments', [
+            'sourceModule' => 'ecommerce',
+            'sourceType' => 'ecommerce_order',
+            'sourceId' => 'order-oauth-test',
+            'amount' => 1200,
+            'currency' => 'XOF',
+            'paymentMethod' => 'ORANGE_MONEY',
+            'description' => 'Commande OAuth',
+            'idempotencyKey' => 'payment-oauth-1',
+        ])->assertCreated()
+            ->assertJsonPath('status', 'PENDING')
+            ->assertJsonPath('checkoutUrl', 'https://pay.diamanopay.com/checkout/oauth-test');
+
+        Http::assertSent(function ($request): bool {
+            if ($request->url() !== 'https://api.diamanopay.com/oauth2/token') {
+                return false;
+            }
+            $data = $request->data();
+            return $request->method() === 'POST'
+                && ($data['grant_type'] ?? null) === 'client_credentials'
+                && ($data['client_id'] ?? null) === 'client-id-test'
+                && ($data['client_secret'] ?? null) === 'client-secret-test';
+        });
+        Http::assertSent(function ($request): bool {
+            if ($request->url() !== 'https://api.diamanopay.com/api/charges') {
+                return false;
+            }
+            $data = $request->data();
+            return $request->method() === 'POST'
+                && ($data['amount'] ?? null) === 1200
+                && ($data['provider'] ?? null) === 'ORANGE_MONEY'
+                && is_string($data['clientReference'] ?? null)
+                && ($data['redirectUrl'] ?? null) === 'https://maximus.test/'
+                && ($data['webhook'] ?? null) === 'https://maximus.test/api/webhooks/diamanopay';
+        });
+    }
+
     public function test_payment_creation_is_idempotent_and_webhook_settles_wallet_once(): void
     {
         $this->configureDiamanoPay();
