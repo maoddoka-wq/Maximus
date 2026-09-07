@@ -102,7 +102,6 @@ import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
-import { createPaymentsApi, type FinancialPayment, type FinancialWallet } from '@/lib/payments-api';
 import {
   loadCompanyModuleAccess,
   setCompanyModuleAccess,
@@ -122,11 +121,12 @@ import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
+type DemoAccount = { id: string; label: string; email: string; password: string };
+const defaultDemoAccounts: DemoAccount[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
-const PaymentReturnPage = lazy(() => import('@/pages/payment-return'));
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
 );
@@ -143,22 +143,6 @@ function sessionFromAuthUser(user: AuthUser): Session {
     : user.role === 'company_admin'
       ? `company:${user.companyId}`
       : `employee:${user.employeeId}`;
-}
-
-const paymentReturnPaths = new Set([
-  '/payment/callback',
-  '/payment/return',
-  '/paiement/callback',
-  '/paiement/retour',
-]);
-
-function isPaymentReturn(pathname: string, search: string): boolean {
-  if (paymentReturnPaths.has(pathname)) return true;
-  if (pathname !== '/') return false;
-
-  const params = new URLSearchParams(search);
-  return ['status', 'transactionId', 'paymentRequestId', 'clientReference', 'reference']
-    .some((key) => params.has(key));
 }
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': {
@@ -774,9 +758,6 @@ function AppContent() {
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
-  if (isPaymentReturn(pathname, search)) {
-    return <PaymentReturnPage />;
-  }
   const isPotentialCustomShopPath = pathname === '/'
     || pathname === '/connexion'
     || pathname === '/inscription-client'
@@ -788,7 +769,10 @@ function AppContent() {
   if (isPotentialCustomShopPath && !session && customDomainState === 'shop') {
     return <PublicShopPage domain />;
   }
-  if (location === '/' || !session) return <Login onLogin={login} />;
+  const loginEmployees = [
+    ...data.employees,
+  ];
+  if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
   const employeeId = sessionEmployeeId;
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
@@ -1025,9 +1009,12 @@ function AppContent() {
 
 function Login({
   onLogin,
+  employees,
 }: {
   onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
+  employees: StoreData['employees'];
 }) {
+  const showDemoAccounts = false;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -1042,6 +1029,30 @@ function Login({
       .finally(() => setPendingEmail(''));
   };
   const submitLogin = (space: 'admin' | 'company') => loginWithCredentials(space, email, password);
+  const demoAccounts = showDemoAccounts
+    ? [
+        ...defaultDemoAccounts,
+        ...employees
+          .filter(
+            (account) =>
+              account.status === 'ACTIF' &&
+              Boolean(account.loginPassword) &&
+              !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
+          )
+          .map((account) => ({
+            id: account.id,
+            label: `${account.firstName} ${account.lastName} · ${account.position}`,
+            email: account.email,
+            password: account.loginPassword ?? '',
+          })),
+      ]
+    : [];
+  const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError('');
+    loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
+  };
   return (
     <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
       <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
@@ -1143,6 +1154,35 @@ function Login({
               Créer une entreprise
             </Link>
           </div>
+          {showDemoAccounts && demoAccounts.length > 0 && (
+            <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
+              <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+                Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {demoAccounts.map((account) => (
+                  <button
+                    type="button"
+                    disabled={Boolean(pendingEmail)}
+                    data-testid={`button-demo-account-${account.id}`}
+                    key={account.id}
+                    onClick={() => selectDemoAccount(account)}
+                    className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
+                  >
+                    <span className="block text-xs font-bold">{account.label}</span>
+                    <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
+                    <span
+                      data-testid={`demo-account-password-${account.id}`}
+                      className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
+                    >
+                      Mot de passe : {account.password}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -4704,11 +4744,9 @@ function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreD
 function FinancePage({
   data,
   mutate,
-  companyId,
 }: {
   data: StoreData;
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
-  companyId: string;
 }) {
   const { confirm } = useAppDialog();
   const confirmed = data.payments.filter((p) => p.status === 'CONFIRMÉ');
@@ -4748,7 +4786,6 @@ function FinancePage({
   };
   return (
     <div className="space-y-5">
-      <FinancialOpsPanel companyId={companyId} />
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         <Metric
           label="Revenus encaissés"
@@ -4849,98 +4886,6 @@ function FinancePage({
         </Modal>
       )}
     </div>
-  );
-}
-
-function FinancialOpsPanel({ companyId }: { companyId: string }) {
-  const [payments, setPayments] = useState<FinancialPayment[]>([]);
-  const [wallet, setWallet] = useState<FinancialWallet | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!companyId) return;
-    let active = true;
-    setLoading(true);
-    setError('');
-    const api = createPaymentsApi(companyId);
-    Promise.all([api.payments(), api.wallet()])
-      .then(([paymentResult, walletResult]) => {
-        if (!active) return;
-        setPayments(paymentResult.payments);
-        setWallet(walletResult.wallet);
-      })
-      .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Les données financières sont indisponibles.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [companyId]);
-
-  const paid = payments.filter((payment) => payment.status === 'PAID');
-  const pending = payments.filter((payment) => ['PENDING', 'PROCESSING'].includes(payment.status));
-  const totalPaid = paid.reduce((total, payment) => total + payment.amount, 0);
-  const currency = wallet?.currency ?? 'XOF';
-
-  return (
-    <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.22)] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Ledger financier</p>
-          <h2 className="mt-1 font-bold">Paiements DiamanoPay et portefeuille vendeur</h2>
-          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-            Données persistées côté Laravel/PostgreSQL, isolées par entreprise.
-          </p>
-        </div>
-        <span className="rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-[10px] font-bold">DiamanoPay-ready</span>
-      </div>
-      {loading ? (
-        <p className="mt-5 text-sm text-[hsl(var(--muted-foreground))]">Chargement du journal financier…</p>
-      ) : error ? (
-        <p className="mt-5 rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.06)] p-3 text-sm text-[hsl(var(--destructive))]">
-          {error}
-        </p>
-      ) : (
-        <>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <Metric label="Encaissements confirmés" value={shortMoney(totalPaid)} suffix={` ${currency}`} detail={`${paid.length} paiement(s)`} icon={WalletCards} accent />
-            <Metric label="Paiements en attente" value={shortMoney(pending.reduce((total, payment) => total + payment.amount, 0))} suffix={` ${currency}`} detail={`${pending.length} à suivre`} icon={CreditCard} />
-            <Metric label="Solde disponible" value={shortMoney(wallet?.availableBalance ?? 0)} suffix={` ${currency}`} detail="wallet vendeur courant" icon={ArrowUpFromLine} />
-          </div>
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-xs">
-              <thead>
-                <tr className="border-b text-[10px] uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                  <th className="px-3 py-2">Référence</th>
-                  <th className="px-3 py-2">Source</th>
-                  <th className="px-3 py-2">Montant</th>
-                  <th className="px-3 py-2">Statut</th>
-                  <th className="px-3 py-2">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.slice(0, 8).map((payment) => (
-                  <tr key={payment.id} className="border-b last:border-0">
-                    <td className="px-3 py-3 font-bold">{payment.publicReference}</td>
-                    <td className="px-3 py-3">{payment.sourceModule}</td>
-                    <td className="px-3 py-3">{money(payment.amount)}</td>
-                    <td className="px-3 py-3"><StatusBadge status={payment.status} /></td>
-                    <td className="px-3 py-3 text-[hsl(var(--muted-foreground))]">{payment.createdAt}</td>
-                  </tr>
-                ))}
-                {!payments.length && (
-                  <tr><td colSpan={5} className="px-3 py-5 text-center text-[hsl(var(--muted-foreground))]">Aucun paiement persistant.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </section>
   );
 }
 function CommercePage({
@@ -6184,7 +6129,7 @@ function ModulePackTestWorkbench({
               initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')}
             />
           )}
-          {module.id === 'finance' && <FinancePage data={data} mutate={mutate} companyId={previewCompanyId} />}
+          {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
           {module.id === 'rh' && previewCompany && (
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}

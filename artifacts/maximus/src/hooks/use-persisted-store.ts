@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 /**
  * Persists the latest store value without blocking the render that triggered it.
  * The first render is intentionally not written back because it already came
- * from storage or the empty initial store.
+ * from storage (or from the seed data).
  */
 export function useDebouncedPersistence<T>(
   value: T,

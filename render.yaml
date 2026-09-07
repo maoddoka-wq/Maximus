@@ -12,8 +12,6 @@ services:
         value: production
       - key: APP_DEBUG
         value: "false"
-      - key: APP_URL
-        value: https://maximus-erp.onrender.com
       - key: APP_KEY
         sync: false
       - key: ADMIN_USER
@@ -35,23 +33,7 @@ services:
       - key: LOG_CHANNEL
         value: stderr
       - key: LOG_LEVEL
-        value: info
-      - key: PAYMENT_PROVIDER
-        value: diamanopay
-      - key: PAYMENT_DEFAULT_CURRENCY
-        value: XOF
-      - key: DIAMANOPAY_BASE_URL
-        sync: false
-      - key: DIAMANOPAY_CLIENT_ID
-        sync: false
-      - key: DIAMANOPAY_CLIENT_SECRET
-        sync: false
-      - key: DIAMANOPAY_ACCESS_TOKEN
-        sync: false
-      - key: DIAMANOPAY_WEBHOOK_URL
-        sync: false
-      - key: DIAMANOPAY_CALLBACK_URL
-        sync: false
+        value: warning
 
 databases:
   - name: maximus-postgres

@@ -5,7 +5,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, legacy Express entrypoint)
-- `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php`; production migrates the schema and provisions only the MAXIMUS admin from environment secrets.
+- `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php`; development provisions the demo idempotently, while production migrates the schema and provisions only the MAXIMUS admin from environment secrets.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -26,7 +26,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 ## Where things live
 
 - `artifacts/maximus/src/App.tsx` — navigation, écrans et interactions du prototype.
-- `artifacts/maximus/src/lib/store.ts` — modèles, catalogue et état local vide par défaut.
+- `artifacts/maximus/src/lib/store.ts` — modèles, dépendances et données de démonstration persistées localement.
 - `artifacts/maximus/src/index.css` — tokens visuels et responsive de MAXIMUS.
 - `artifacts/maximus` — application web principale servie à la racine.
 - `artifacts/api-server/laravel` — API active et autorisations serveur.
@@ -34,7 +34,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 
 ## Architecture decisions
 
-- Le frontend utilise `localStorage` pour ses préférences et certains états locaux ; les données métier proviennent de la base active.
+- Le prototype utilise `localStorage` pour rendre les parcours de démonstration persistants sans service externe.
 - Les modules disponibles et les dépendances sont définis comme des données structurées afin de préparer l’ajout de futurs modules.
 - L’espace entreprise calcule son menu à partir des modules autorisés et, pour un employé, des permissions de son rôle.
 - Le périmètre entreprise est résolu à partir de la session serveur ; un `companyId` fourni par le navigateur ne peut pas élargir celui d’un acteur non MAXIMUS.
@@ -184,8 +184,8 @@ navigation.
 ## Gotchas
 
 - Les comptes et données métier viennent de la base active ; aucun compte ou
-  jeu de données fictif n’est embarqué dans le frontend ou le runtime de
-  production.
+  jeu de données de démonstration n’est embarqué dans le frontend ou le runtime
+  de production.
 
 ## Pointers
 

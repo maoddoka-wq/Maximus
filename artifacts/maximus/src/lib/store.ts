@@ -126,38 +126,6 @@ export interface StoreData {
   organizationVersion?: number;
 }
 
-const standardModule = (
-  id: ModuleId,
-  name: string,
-  description: string,
-  features: string[],
-): Module => {
-  const featureIds = features.map(feature =>
-    feature.trim().toLowerCase().replace(/[^a-z0-9à-ÿ]+/gi, '-').replace(/^-|-$/g, ''),
-  );
-  return {
-    id,
-    name,
-    description,
-    features,
-    featurePacks: [
-      {
-        id: `${id}-consultation`,
-        name: `Consultation ${name.toLowerCase()}`,
-        description: `Consulter les données et indicateurs de ${name.toLowerCase()}.`,
-        featureIds: featureIds.slice(0, 3),
-      },
-      {
-        id: `${id}-gestion`,
-        name: `Gestion ${name.toLowerCase()}`,
-        description: `Gérer les opérations de ${name.toLowerCase()}.`,
-        featureIds,
-      },
-    ],
-    status: 'ACTIF',
-  };
-};
-
 export const modules: Module[] = [
   { id: 'commerce', name: 'Gestion commerciale', description: 'Piloter les ventes, les clients, les achats et la performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
     { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
@@ -170,17 +138,6 @@ export const modules: Module[] = [
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
   ], status: 'ACTIF' },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
-  standardModule('ventes', 'Ventes', 'Gérer les ventes, les devis, les commandes et le suivi client.', ['Tableau de bord', 'Clients', 'Devis', 'Commandes', 'Facturation', 'Rapports']),
-  standardModule('achats', 'Achats', 'Piloter les demandes, commandes et réceptions fournisseurs.', ['Tableau de bord', 'Demandes d’achat', 'Commandes fournisseurs', 'Réceptions', 'Rapports']),
-  standardModule('finance', 'Finance', 'Suivre les flux financiers, les paiements et la trésorerie.', ['Tableau de bord', 'Trésorerie', 'Paiements', 'Dépenses', 'Budgets', 'Rapports']),
-  standardModule('comptabilite', 'Comptabilité', 'Organiser les journaux, écritures et documents comptables.', ['Tableau de bord', 'Journaux', 'Écritures', 'Factures', 'Rapprochements', 'Rapports']),
-  standardModule('rh', 'Ressources humaines', 'Administrer les collaborateurs, les rôles et l’organisation.', ['Tableau de bord', 'Collaborateurs', 'Organisation', 'Rôles', 'Documents', 'Rapports']),
-  standardModule('paie', 'Paie', 'Préparer les périodes de paie et suivre les bulletins.', ['Tableau de bord', 'Périodes', 'Bulletins', 'Variables', 'Rapports']),
-  standardModule('crm', 'CRM', 'Développer la relation client et suivre les opportunités.', ['Tableau de bord', 'Contacts', 'Opportunités', 'Activités', 'Rapports']),
-  standardModule('fournisseurs', 'Fournisseurs', 'Centraliser les fiches et la performance des fournisseurs.', ['Tableau de bord', 'Référentiel', 'Évaluations', 'Contrats', 'Rapports']),
-  standardModule('logistique', 'Logistique', 'Coordonner les livraisons, transporteurs et réceptions.', ['Tableau de bord', 'Expéditions', 'Livraisons', 'Transporteurs', 'Suivi', 'Rapports']),
-  standardModule('documents', 'Documents', 'Classer, partager et suivre les documents de l’entreprise.', ['Tableau de bord', 'Bibliothèque', 'Dossiers', 'Versions', 'Partages', 'Rapports']),
-  standardModule('rapports', 'Rapports', 'Consolider les indicateurs et produire les rapports métier.', ['Ventes', 'Stocks', 'Finance', 'Activité', 'Exports']),
 ];
 
 export const stockSubmodules = [
@@ -325,6 +282,8 @@ export function sanitizeStoreData(data: Partial<StoreData> | null | undefined): 
 export function getCompanyDirectoryCompanies(companies: Company[]): Company[] {
   return companies.filter(company => company.status !== 'EN ATTENTE');
 }
+
+export function seedData(): StoreData { return emptyStoreData(); }
 
 export function uid(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 export const money = (n: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n) + ' FCFA';

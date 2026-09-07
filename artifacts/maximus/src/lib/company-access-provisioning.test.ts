@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { provisionCompanyAccess } from './company-access-provisioning';
 import { buildAppAccessContext } from './app-access';
-import { emptyStoreData, type Company, type Employee } from './store';
+import { seedData, type Company, type Employee } from './store';
 
 test('propage une sélection d’inscription vers l’unité, le rôle et le menu employé', () => {
-  const data = emptyStoreData();
+  const data = seedData();
   const company: Company = {
     id: 'signup-company',
     name: 'Entreprise inscrite',

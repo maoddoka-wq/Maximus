@@ -62,47 +62,6 @@ final class ModuleCatalog
                     'rapports' => ['pointage', 'présences'],
                 ],
             ],
-            self::standardDefinition('ventes', 'Ventes', 'Gérer les ventes, les devis, les commandes et le suivi client.', ['Tableau de bord', 'Clients', 'Devis', 'Commandes', 'Facturation', 'Rapports']),
-            self::standardDefinition('achats', 'Achats', 'Piloter les demandes, commandes et réceptions fournisseurs.', ['Tableau de bord', 'Demandes d’achat', 'Commandes fournisseurs', 'Réceptions', 'Rapports']),
-            self::standardDefinition('finance', 'Finance', 'Suivre les flux financiers, les paiements et la trésorerie.', ['Tableau de bord', 'Trésorerie', 'Paiements', 'Dépenses', 'Budgets', 'Rapports']),
-            self::standardDefinition('comptabilite', 'Comptabilité', 'Organiser les journaux, écritures et documents comptables.', ['Tableau de bord', 'Journaux', 'Écritures', 'Factures', 'Rapprochements', 'Rapports']),
-            self::standardDefinition('rh', 'Ressources humaines', 'Administrer les collaborateurs, les rôles et l’organisation.', ['Tableau de bord', 'Collaborateurs', 'Organisation', 'Rôles', 'Documents', 'Rapports']),
-            self::standardDefinition('paie', 'Paie', 'Préparer les périodes de paie et suivre les bulletins.', ['Tableau de bord', 'Périodes', 'Bulletins', 'Variables', 'Rapports']),
-            self::standardDefinition('crm', 'CRM', 'Développer la relation client et suivre les opportunités.', ['Tableau de bord', 'Contacts', 'Opportunités', 'Activités', 'Rapports']),
-            self::standardDefinition('fournisseurs', 'Fournisseurs', 'Centraliser les fiches et la performance des fournisseurs.', ['Tableau de bord', 'Référentiel', 'Évaluations', 'Contrats', 'Rapports']),
-            self::standardDefinition('logistique', 'Logistique', 'Coordonner les livraisons, transporteurs et réceptions.', ['Tableau de bord', 'Expéditions', 'Livraisons', 'Transporteurs', 'Suivi', 'Rapports']),
-            self::standardDefinition('documents', 'Documents', 'Classer, partager et suivre les documents de l’entreprise.', ['Tableau de bord', 'Bibliothèque', 'Dossiers', 'Versions', 'Partages', 'Rapports']),
-            self::standardDefinition('rapports', 'Rapports', 'Consolider les indicateurs et produire les rapports métier.', ['Ventes', 'Stocks', 'Finance', 'Activité', 'Exports']),
-        ];
-    }
-
-    private static function standardDefinition(string $id, string $name, string $description, array $features): array
-    {
-        $featureIds = array_map(
-            fn (string $feature): string => trim((string) preg_replace('/[^a-z0-9à-ÿ]+/iu', '-', mb_strtolower($feature)), '-'),
-            $features,
-        );
-
-        return [
-            'id' => $id,
-            'name' => $name,
-            'description' => $description,
-            'features' => $features,
-            'feature_packs' => [
-                [
-                    'id' => $id.'-consultation',
-                    'name' => 'Consultation '.mb_strtolower($name),
-                    'description' => 'Consulter les données et indicateurs de '.mb_strtolower($name).'.',
-                    'feature_ids' => array_slice($featureIds, 0, 3),
-                ],
-                [
-                    'id' => $id.'-gestion',
-                    'name' => 'Gestion '.mb_strtolower($name),
-                    'description' => 'Gérer les opérations de '.mb_strtolower($name).'.',
-                    'feature_ids' => $featureIds,
-                ],
-            ],
-            'feature_dependencies' => [],
         ];
     }
 

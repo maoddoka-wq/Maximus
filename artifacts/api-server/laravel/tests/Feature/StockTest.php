@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
-use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -12,12 +11,6 @@ use Tests\TestCase;
 class StockTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        ModuleCatalog::ensureCompanyAccess('kora');
-    }
 
     public function test_stock_catalog_and_movements_preserve_the_json_contract(): void
     {

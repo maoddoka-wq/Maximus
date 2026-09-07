@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
-use App\Services\Payments\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,7 +113,10 @@ class EcommerceController extends Controller
             'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:100000'],
         ])->validate();
         $company = $this->company($request);
-        $slug = $this->uniqueCategorySlug($input['slug'] ?? $input['name'], $company);
+        $slug = $this->categorySlug($input['slug'] ?? $input['name']);
+        if (DB::table('ecommerce_categories')->where('company_id', $company)->where('slug', $slug)->exists()) {
+            return response()->json(['error' => 'Cette catégorie existe déjà.'], 422);
+        }
 
         $row = [
             'id' => $this->id('category'),
@@ -150,9 +152,10 @@ class EcommerceController extends Controller
             'isActive' => ['sometimes', 'boolean'],
             'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:100000'],
         ])->validate();
-        $slug = isset($input['slug'])
-            ? $this->uniqueCategorySlug($input['slug'], $company, $id)
-            : $existing->slug;
+        $slug = isset($input['slug']) ? $this->categorySlug($input['slug']) : $existing->slug;
+        if (DB::table('ecommerce_categories')->where('company_id', $company)->where('slug', $slug)->where('id', '!=', $id)->exists()) {
+            return response()->json(['error' => 'Cette catégorie existe déjà.'], 422);
+        }
         $changes = [];
         if (array_key_exists('name', $input)) $changes['name'] = trim($input['name']);
         if (array_key_exists('slug', $input)) $changes['slug'] = $slug;
@@ -301,9 +304,11 @@ class EcommerceController extends Controller
         $input = $this->productInput($request);
         $company = $this->company($request);
         $input = $this->normalizeProductCategory($input, $company);
-        $input['slug'] = $this->uniqueProductSlug($input['slug'] ?? $input['name'], $company);
         if (DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
+        }
+        if (DB::table('ecommerce_products')->where('slug', $input['slug'])->exists()) {
+            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
 
         $row = array_merge([
@@ -337,11 +342,11 @@ class EcommerceController extends Controller
         }
         $input = $this->productInput($request, true);
         $input = $this->normalizeProductCategory($input, $company);
-        if (isset($input['slug'])) {
-            $input['slug'] = $this->uniqueProductSlug($input['slug'], $company, $id);
-        }
         if (isset($input['sku']) && DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->where('id', '!=', $id)->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
+        }
+        if (isset($input['slug']) && DB::table('ecommerce_products')->where('slug', $input['slug'])->where('id', '!=', $id)->exists()) {
+            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
         $changes = $this->snake($input);
         $changes['updated_at'] = now();
@@ -478,6 +483,7 @@ class EcommerceController extends Controller
             'products' => DB::table('ecommerce_products')
                 ->where('company_id', $store->company_id)
                 ->where('status', 'PUBLISHED')
+                ->where('stock', '>', 0)
                 ->orderByDesc('featured')
                 ->orderBy('name')
                 ->get()
@@ -530,7 +536,6 @@ class EcommerceController extends Controller
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
             'customerEmail' => ['required', 'email', 'max:160'],
             'customerPhone' => ['nullable', 'string', 'max:40'],
-            'paymentMethod' => ['required', 'string', 'in:WAVE,ORANGE_MONEY'],
             'shippingAddress' => ['required', 'string', 'min:5', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
@@ -549,43 +554,7 @@ class EcommerceController extends Controller
                 ->where('idempotency_key', $idempotencyKey)
                 ->first();
             if ($existing) {
-                $payment = $existing->payment_id
-                    ? app(PaymentService::class)->getForTenant((string) $store->company_id, (string) $existing->payment_id)
-                    : null;
-                $paymentPayload = $payment ? app(PaymentService::class)->payload($payment) : null;
-                if (! $payment) {
-                    $payment = app(PaymentService::class)->create([
-                        'tenant_id' => (string) $store->company_id,
-                        'customer_id' => $existing->customer_id,
-                        'seller_id' => (string) $store->company_id,
-                        'source_module' => 'ecommerce',
-                        'source_type' => 'ecommerce_order',
-                        'source_id' => $existing->id,
-                        'amount' => (int) $existing->total,
-                        'currency' => (string) $store->currency,
-                        'payment_method' => $input['paymentMethod'],
-                        'description' => 'Commande '.$existing->reference,
-                        'metadata' => ['order_reference' => $existing->reference],
-                        'idempotency_key' => 'order-payment:'.$existing->id,
-                        'customer' => [
-                            'name' => $existing->customer_name,
-                            'email' => $existing->customer_email,
-                            'phone' => $existing->customer_phone,
-                        ],
-                        'request_id' => $request->header('X-Request-Id'),
-                    ]);
-                    DB::table('ecommerce_orders')->where('id', $existing->id)->update([
-                        'payment_id' => $payment['id'],
-                        'payment_status' => $payment['status'],
-                        'updated_at' => now(),
-                    ]);
-                    $paymentPayload = $payment;
-                }
-                return response()->json([
-                    'reference' => $existing->reference,
-                    'total' => (int) $existing->total,
-                    'payment' => $paymentPayload,
-                ]);
+                return response()->json(['reference' => $existing->reference, 'total' => (int) $existing->total]);
             }
         }
         if ($customer) {
@@ -671,40 +640,10 @@ class EcommerceController extends Controller
                         ->delete();
                 }
 
-                return ['id' => $id, 'reference' => $reference, 'total' => $total];
+                return ['reference' => $reference, 'total' => $total];
             });
 
-            $payment = app(PaymentService::class)->create([
-                'tenant_id' => (string) $store->company_id,
-                'customer_id' => $customer?->id,
-                'seller_id' => (string) $store->company_id,
-                'source_module' => 'ecommerce',
-                'source_type' => 'ecommerce_order',
-                'source_id' => $order['id'],
-                'amount' => $order['total'],
-                'currency' => (string) $store->currency,
-                'payment_method' => $input['paymentMethod'] ?? null,
-                'description' => 'Commande '.$order['reference'],
-                'metadata' => ['order_reference' => $order['reference']],
-                'idempotency_key' => 'order-payment:'.$order['id'],
-                'customer' => [
-                    'name' => $input['customerName'],
-                    'email' => $input['customerEmail'],
-                    'phone' => $input['customerPhone'] ?? '',
-                ],
-                'request_id' => $request->header('X-Request-Id'),
-            ]);
-            DB::table('ecommerce_orders')->where('id', $order['id'])->update([
-                'payment_id' => $payment['id'],
-                'payment_status' => $payment['status'],
-                'updated_at' => now(),
-            ]);
-
-            return response()->json([
-                'reference' => $order['reference'],
-                'total' => $order['total'],
-                'payment' => $payment,
-            ], 201);
+            return response()->json($order, 201);
         } catch (Throwable $error) {
             return response()->json([
                 'error' => $error->getMessage() === 'STOCK_INSUFFICIENT'
@@ -885,7 +824,7 @@ class EcommerceController extends Controller
 
         return Validator::make($request->all(), [
             'name' => array_merge($required, ['string', 'min:2', 'max:160']),
-            'slug' => array_merge($partial ? ['sometimes', 'nullable'] : ['nullable'], ['string', 'min:2', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/']),
+            'slug' => array_merge($required, ['string', 'min:2', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/']),
             'sku' => array_merge($required, ['string', 'min:1', 'max:80']),
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['nullable', 'string', 'max:80'],
@@ -952,50 +891,6 @@ class EcommerceController extends Controller
     private function categorySlug(string $value): string
     {
         return Str::slug(trim($value));
-    }
-
-    private function uniqueProductSlug(string $value, string $company, ?string $ignoreId = null): string
-    {
-        $base = $this->categorySlug($value);
-        if ($base === '') {
-            $base = 'produit';
-        }
-        $base = substr($base, 0, 160);
-        $candidate = $base;
-        $suffix = 2;
-
-        while (DB::table('ecommerce_products')
-            ->where('company_id', $company)
-            ->where('slug', $candidate)
-            ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
-            ->exists()) {
-            $suffixText = '-'.$suffix++;
-            $candidate = substr($base, 0, 160 - strlen($suffixText)).$suffixText;
-        }
-
-        return $candidate;
-    }
-
-    private function uniqueCategorySlug(string $value, string $company, ?string $ignoreId = null): string
-    {
-        $base = $this->categorySlug($value);
-        if ($base === '') {
-            $base = 'categorie';
-        }
-        $base = substr($base, 0, 100);
-        $candidate = $base;
-        $suffix = 2;
-
-        while (DB::table('ecommerce_categories')
-            ->where('company_id', $company)
-            ->where('slug', $candidate)
-            ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
-            ->exists()) {
-            $suffixText = '-'.$suffix++;
-            $candidate = substr($base, 0, 100 - strlen($suffixText)).$suffixText;
-        }
-
-        return $candidate;
     }
 
     private function ensureStore(string $company): object

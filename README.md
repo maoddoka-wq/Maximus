@@ -13,7 +13,7 @@ Le produit couvre actuellement :
 - les rôles, permissions détaillées et dépendances entre fonctionnalités ;
 - la personnalisation visuelle de chaque entreprise ;
 - la persistance PostgreSQL des parcours opérationnels ;
-   - un démarrage sans données métier fictives, avec des fixtures locales isolées pour les tests.
+- des données et comptes de démonstration provisionnés de façon idempotente.
 
 ## Architecture en une minute
 
@@ -86,16 +86,16 @@ DB_CONNECTION=pgsql php -S 0.0.0.0:8080 ../server.php
 ```
 
 Le workflow actif démarre directement le serveur PHP. Les données de
-l’environnement Replit résident dans sa base PostgreSQL et ne sont pas
-recréées depuis le dépôt :
+démonstration de l’environnement Replit résident dans sa base PostgreSQL et ne
+sont pas recréées depuis le dépôt :
 
 ```bash
 cd laravel
 DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php
 ```
 
-En production, le démarrage n’injecte aucune donnée métier fictive. Il applique
-les migrations PostgreSQL puis crée uniquement l’administrateur
+En production, le démarrage ne provisionne aucune donnée de démonstration.
+Il applique les migrations PostgreSQL puis crée uniquement l’administrateur
 MAXIMUS à partir des secrets `ADMIN_USER` et `ADMIN_PASSWORD`. `APP_KEY` est
 également obligatoire ; le service refuse de démarrer s’il est absent.
 
@@ -144,7 +144,7 @@ artifacts/maximus/src/
 ├── hooks/                     # état React réutilisable
 └── lib/
     ├── app-access.ts          # contexte d’accès effectif
-    ├── store.ts               # modèles, catalogue et état local vide par défaut
+    ├── store.ts               # modèles, catalogue et démo locale
     ├── module-registry.ts     # registre des modules et chemins
     ├── employee-permissions.ts
     ├── permission-keys.ts

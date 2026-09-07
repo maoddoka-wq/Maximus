@@ -13,12 +13,6 @@ class ModuleAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        ModuleCatalog::ensureCompanyAccess('kora');
-    }
-
     public function test_disabled_module_denies_operational_route_even_when_client_requests_it(): void
     {
         DB::table('maximus_company_modules')

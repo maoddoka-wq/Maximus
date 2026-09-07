@@ -2,8 +2,6 @@
 
 namespace App\Providers;
 
-use App\Contracts\PaymentProviderInterface;
-use App\Services\Payments\DiamanoPayProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(PaymentProviderInterface::class, DiamanoPayProvider::class);
+        //
     }
 
     /**
@@ -36,10 +34,6 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('orders', function (Request $request): Limit {
             return Limit::perMinute(20)->by($request->ip());
-        });
-
-        RateLimiter::for('payment-webhooks', function (Request $request): Limit {
-            return Limit::perMinute(120)->by('payment-webhook:'.$request->ip());
         });
     }
 }

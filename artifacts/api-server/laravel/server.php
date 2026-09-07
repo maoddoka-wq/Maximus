@@ -18,7 +18,7 @@ if (
         return false;
     }
 
-    require $publicPath.'/index.php';
+    readfile($publicPath.'/index.html');
     return true;
 }
 

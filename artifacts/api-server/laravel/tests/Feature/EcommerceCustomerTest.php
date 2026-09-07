@@ -37,7 +37,6 @@ class EcommerceCustomerTest extends TestCase
             ->postJson('/api/shop/kora-client/orders', [
                 'customerName' => 'Nom fourni au checkout',
                 'customerEmail' => 'checkout@example.test',
-                'paymentMethod' => 'WAVE',
                 'shippingAddress' => 'Dakar, Sénégal',
                 'items' => [['productSlug' => 'cafe-client', 'quantity' => 1]],
             ])
@@ -110,7 +109,6 @@ class EcommerceCustomerTest extends TestCase
             ->postJson('/api/shop/kora-cart/orders', [
                 'customerName' => 'Valeur ignorée',
                 'customerEmail' => 'usurpation@example.test',
-                'paymentMethod' => 'WAVE',
                 'shippingAddress' => 'Dakar, Sénégal',
                 'items' => [['productSlug' => 'cart-product', 'quantity' => 1]],
             ])

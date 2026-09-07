@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Support\CompanyRegistry;
 use App\Support\MaximusAuth;
-use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -15,12 +14,6 @@ use Tests\TestCase;
 class EcommerceTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        ModuleCatalog::ensureCompanyAccess('kora');
-    }
 
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {
@@ -107,48 +100,6 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_categories', ['id' => $category['id']]);
     }
 
-    public function test_product_slugs_are_generated_and_scoped_to_the_company(): void
-    {
-        $first = $this->asActor()->postJson('/api/ecommerce/products?companyId=kora', [
-            'name' => 'Café local',
-            'sku' => 'CAFE-AUTO-01',
-            'price' => 2500,
-            'stock' => 2,
-        ])->assertCreated();
-
-        $second = $this->asActor()->postJson('/api/ecommerce/products?companyId=kora', [
-            'name' => 'Café local',
-            'sku' => 'CAFE-AUTO-02',
-            'price' => 2600,
-            'stock' => 3,
-        ])->assertCreated();
-
-        ModuleCatalog::ensureCompanyAccess('other-company');
-        $other = $this->asActorForCompany('other-company')->postJson('/api/ecommerce/products?companyId=other-company', [
-            'name' => 'Café local',
-            'sku' => 'CAFE-AUTO-01',
-            'price' => 2700,
-            'stock' => 4,
-        ])->assertCreated();
-
-        $this->assertSame('cafe-local', $first->json('slug'));
-        $this->assertSame('cafe-local-2', $second->json('slug'));
-        $this->assertSame('cafe-local', $other->json('slug'));
-    }
-
-    public function test_category_slugs_are_generated_and_suffixed_within_the_company(): void
-    {
-        $first = $this->asActor()->postJson('/api/ecommerce/categories?companyId=kora', [
-            'name' => 'Épicerie fine',
-        ])->assertCreated();
-        $second = $this->asActor()->postJson('/api/ecommerce/categories?companyId=kora', [
-            'name' => 'Épicerie fine',
-        ])->assertCreated();
-
-        $this->assertSame('epicerie-fine', $first->json('slug'));
-        $this->assertSame('epicerie-fine-2', $second->json('slug'));
-    }
-
     public function test_published_shop_recalculates_total_and_decrements_stock_transactionally(): void
     {
         $request = $this->asActor();
@@ -187,7 +138,6 @@ class EcommerceTest extends TestCase
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
             'customerPhone' => '+221700000000',
-            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => $product->json('slug'), 'quantity' => 2]],
         ])->assertCreated()
@@ -200,16 +150,9 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseCount('ecommerce_orders', 1);
         $this->assertDatabaseCount('ecommerce_order_items', 1);
 
-        DB::table('ecommerce_products')->where('id', $product->json('id'))->update(['stock' => 0]);
-        $this->getJson('/api/shop/kora-boutique-test')
-            ->assertOk()
-            ->assertJsonPath('products.0.slug', 'cafe-local')
-            ->assertJsonPath('products.0.stock', 0);
-
         $this->postJson('/api/shop/kora-boutique-test/orders', [
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
-            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => $product->json('slug'), 'quantity' => 2]],
         ])->assertStatus(409);
@@ -251,7 +194,6 @@ class EcommerceTest extends TestCase
         $this->postJson('/api/shop/kora-isolation-test/orders', [
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
-            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => 'produit-autre', 'quantity' => 1]],
         ])->assertStatus(400);
@@ -283,7 +225,6 @@ class EcommerceTest extends TestCase
         $payload = [
             'customerName' => 'Client Transition',
             'customerEmail' => 'transition@example.test',
-            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => 'produit-transition', 'quantity' => 1]],
         ];
@@ -308,62 +249,6 @@ class EcommerceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'ANNULÉE');
         $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-transition', 'stock' => 3]);
-    }
-
-    public function test_idempotent_order_recovers_when_previous_payment_is_missing(): void
-    {
-        $request = $this->asActor();
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'name' => 'Boutique reprise paiement',
-            'slug' => 'reprise-paiement-test',
-            'description' => '',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primaryColor' => '#D69E2E',
-            'accentColor' => '#172033',
-        ])->assertOk();
-        $request->postJson('/api/ecommerce/products?companyId=kora', [
-            'name' => 'Produit reprise',
-            'slug' => 'produit-reprise',
-            'sku' => 'REPRISE-01',
-            'price' => 2200,
-            'stock' => 2,
-            'status' => 'PUBLISHED',
-        ])->assertCreated();
-
-        $payload = [
-            'customerName' => 'Client reprise',
-            'customerEmail' => 'reprise@example.test',
-            'paymentMethod' => 'WAVE',
-            'shippingAddress' => 'Dakar',
-            'items' => [['productSlug' => 'produit-reprise', 'quantity' => 1]],
-        ];
-        $first = $this->withHeader('Idempotency-Key', 'checkout-reprise-1')
-            ->postJson('/api/shop/reprise-paiement-test/orders', $payload)
-            ->assertCreated()
-            ->json();
-        $order = DB::table('ecommerce_orders')->where('reference', $first['reference'])->first();
-        $this->assertNotNull($order);
-
-        DB::table('payments')->where('id', $order->payment_id)->delete();
-        DB::table('ecommerce_orders')->where('id', $order->id)->update([
-            'payment_id' => null,
-            'payment_status' => 'À CONFIRMER',
-        ]);
-
-        $second = $this->withHeader('Idempotency-Key', 'checkout-reprise-1')
-            ->postJson('/api/shop/reprise-paiement-test/orders', $payload)
-            ->assertOk()
-            ->json();
-
-        $this->assertSame($first['reference'], $second['reference']);
-        $this->assertNotNull($second['payment']);
-        $this->assertDatabaseHas('ecommerce_orders', [
-            'id' => $order->id,
-            'payment_id' => $second['payment']['id'],
-        ]);
-        $this->assertDatabaseCount('ecommerce_orders', 1);
-        $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-reprise', 'stock' => 1]);
     }
 
     public function test_public_order_by_slug_rejects_an_inactive_company(): void
@@ -394,7 +279,6 @@ class EcommerceTest extends TestCase
         $this->postJson('/api/shop/boutique-inactive-test/orders', [
             'customerName' => 'Client Inactif',
             'customerEmail' => 'inactive@example.test',
-            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar',
             'items' => [['productSlug' => 'produit-inactif', 'quantity' => 1]],
         ])->assertNotFound();
@@ -499,7 +383,6 @@ class EcommerceTest extends TestCase
         $this->postJson('http://boutique-active.kora.test/api/shop-domain/orders', [
                 'customerName' => 'Client Domaine',
                 'customerEmail' => 'domain@example.test',
-                'paymentMethod' => 'WAVE',
                 'shippingAddress' => 'Dakar, Sénégal',
                 'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
             ])
@@ -519,22 +402,13 @@ class EcommerceTest extends TestCase
 
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
-        return $this->asActorForCompany('kora', $role, $permissions);
-    }
-
-    private function asActorForCompany(string $companyId, string $role = 'company_admin', array $permissions = []): self
-    {
-        static $actorSequence = 0;
-        $actorSequence++;
-        $identity = 'ecommerce-'.strtolower($role).'-'.$companyId.'-'.$actorSequence;
-
         $user = AuthUser::query()->create([
-            'id' => $identity,
-            'email' => $identity.'@demo.test',
+            'id' => 'ecommerce-'.strtolower($role),
+            'email' => 'ecommerce-'.strtolower($role).'@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Gestionnaire E-commerce',
             'role' => $role,
-            'company_id' => $companyId,
+            'company_id' => 'kora',
             'employee_id' => $role === 'employee' ? 'ecommerce-employee' : null,
             'sector_ids' => [],
             'permissions' => $permissions,
