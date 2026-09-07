@@ -157,3 +157,43 @@ test('applique les permissions du rôle pendant un test réel de secteur', () =>
   assert.equal(access.sectorManager, false);
   assert.equal(employee.companyId, company.id);
 });
+
+test('affiche le menu des modules pendant un test réel de secteur', () => {
+  const { data, company } = createAccessFixture();
+  const testCompanyId = 'sector-test-menu-company';
+  const testNodeId = 'sector-test-menu-node';
+  const testRoleId = 'sector-test-menu-role';
+  const testCompany = {
+    ...company,
+    id: testCompanyId,
+    allowedModules: ['commerce'],
+    managerRoleId: testRoleId,
+  };
+  const testNode = {
+    ...data.orgNodes[0],
+    id: testNodeId,
+    companyId: testCompanyId,
+  };
+  const testRole = {
+    ...data.roles[0],
+    id: testRoleId,
+    companyId: testCompanyId,
+    sectorId: testNodeId,
+  };
+  data.companies = [testCompany];
+  data.orgNodes = [testNode];
+  data.roles = [testRole];
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${testCompanyId}`,
+    employee: null,
+    activeCompanyId: testCompanyId,
+    activeCompany: testCompany,
+    sectorTestCompanyId: testCompanyId,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
+  assert.equal(access.verticalModuleNavigation, true);
+});

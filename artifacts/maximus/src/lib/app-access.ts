@@ -165,7 +165,7 @@ export function buildAppAccessContext({
   );
   const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    (employee || companyAdmin) && allowed.length >= 1
+    (employee || companyAdmin || sectorTestCompanyId) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
@@ -192,7 +192,7 @@ export function buildAppAccessContext({
     commerceTabIds,
     sidebarFeatureGroups,
     verticalModuleNavigation: Boolean(
-      (employee || companyAdmin)
+      (employee || companyAdmin || sectorTestCompanyId)
       && allowed.length >= 1
       && sidebarFeatureGroups.length,
     ),

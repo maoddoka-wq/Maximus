@@ -46,3 +46,60 @@ test('conserve les données valides pendant le nettoyage des credentials', () =>
   assert.equal(sanitized.companies[0]?.name, 'Entreprise test');
   assert.equal('adminPassword' in sanitized.companies[0], false);
 });
+
+test('conserve les packs des presets de secteur dans l’état initial', () => {
+  const data = emptyStoreData();
+  const distribution = data.sectorPresets.find(preset => preset.id === 'distribution');
+  const services = data.sectorPresets.find(preset => preset.id === 'services');
+  const commerce = data.sectorPresets.find(preset => preset.id === 'commerce');
+
+  assert.deepEqual(distribution?.modulePackIds, {
+    stocks: ['stock-gestion'],
+    commerce: ['commerce-gestion'],
+  });
+  assert.deepEqual(services?.modulePackIds, {
+    stocks: ['stock-consultation'],
+    commerce: ['commerce-consultation'],
+    presences: ['presence-consultation'],
+  });
+  assert.deepEqual(commerce?.modulePackIds, {
+    commerce: ['commerce-gestion'],
+    stocks: ['stock-gestion'],
+    ecommerce: ['ecommerce-gestion'],
+  });
+});
+
+test('rétablit les packs des presets intégrés dans une sauvegarde ancienne', () => {
+  const normalized = normalizeStoreData({
+    sectorPresets: [
+      {
+        id: 'distribution',
+        name: 'Distribution personnalisée',
+        moduleIds: ['commerce', 'stocks'],
+      },
+    ],
+    catalogDraft: {
+      moduleOverrides: {},
+      moduleStatuses: {},
+      removedModules: [],
+      sectorPresets: [
+        {
+          id: 'services',
+          name: 'Services',
+          moduleIds: ['commerce', 'stocks', 'presences'],
+        },
+      ],
+      updatedAt: '2026-09-07T00:00:00.000Z',
+    },
+  });
+
+  assert.deepEqual(normalized.sectorPresets[0]?.modulePackIds, {
+    stocks: ['stock-gestion'],
+    commerce: ['commerce-gestion'],
+  });
+  assert.deepEqual(normalized.catalogDraft?.sectorPresets[0]?.modulePackIds, {
+    stocks: ['stock-consultation'],
+    commerce: ['commerce-consultation'],
+    presences: ['presence-consultation'],
+  });
+});

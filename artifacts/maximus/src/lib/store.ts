@@ -159,9 +159,9 @@ export const stockSubmoduleDependencies: Partial<Record<string, string[]>> = {
 
 export const sectorPresets: SectorPreset[] = [
   { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
-  { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['commerce', 'stocks'] },
-  { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'presences'] },
-  { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'stocks', 'ecommerce'], modulePackIds: { ecommerce: ['ecommerce-gestion'] } },
+  { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
+  { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'presences'], modulePackIds: { stocks: ['stock-consultation'], commerce: ['commerce-consultation'], presences: ['presence-consultation'] } },
+  { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'stocks', 'ecommerce'], modulePackIds: { commerce: ['commerce-gestion'], stocks: ['stock-gestion'], ecommerce: ['ecommerce-gestion'] } },
 ];
 
 export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
@@ -170,13 +170,27 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
     .map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
 }
 
+function restoreBuiltInSectorPackSelections(presets: SectorPreset[]): SectorPreset[] {
+  return presets.map(preset => {
+    const builtIn = sectorPresets.find(candidate => candidate.id === preset.id);
+    if (!builtIn) return preset;
+    return {
+      ...preset,
+      modulePackIds: {
+        ...builtIn.modulePackIds,
+        ...(preset.modulePackIds ?? {}),
+      },
+    };
+  });
+}
+
 export function emptyStoreData(): StoreData {
   return {
     companies: [], employees: [], roles: [], products: [], movements: [], sales: [], payments: [],
     activities: [], controlTasks: [], domainEvents: [], auditEntries: [], orgNodes: [], notifications: [],
     purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
-    sectorPresets: sectorPresets.map(preset => ({ ...preset, moduleIds: [...preset.moduleIds] })),
+    sectorPresets: structuredClone(sectorPresets),
     moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
     moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
@@ -228,6 +242,15 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
   }
   if (!Array.isArray(source.removedModules)) {
     normalized.removedModules = defaults.removedModules;
+  }
+  if (Array.isArray(source.sectorPresets)) {
+    normalized.sectorPresets = restoreBuiltInSectorPackSelections(normalized.sectorPresets);
+  }
+  if (normalized.catalogDraft?.sectorPresets) {
+    normalized.catalogDraft = {
+      ...normalized.catalogDraft,
+      sectorPresets: restoreBuiltInSectorPackSelections(normalized.catalogDraft.sectorPresets),
+    };
   }
 
   return normalized;
