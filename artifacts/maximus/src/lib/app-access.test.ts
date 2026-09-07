@@ -92,9 +92,8 @@ test('affiche les modules dans le menu de l’administrateur d’entreprise', ()
   });
 
   assert.deepEqual(access.allowed, ['commerce']);
-  assert.equal(access.verticalModuleNavigation, true);
-  assert.equal(access.sidebarFeatureGroups[0]?.label, 'Gestion commerciale');
-  assert.ok(access.sidebarFeatureGroups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
+  assert.equal(access.verticalModuleNavigation, false);
+  assert.deepEqual(access.sidebarFeatureGroups, []);
 });
 
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {
@@ -252,9 +251,9 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
   const { data, company } = createAccessFixture();
   company.requestedModules = ['commerce', 'ecommerce'];
   company.allowedModules = ['commerce', 'ecommerce'];
-  company.requestedModulePackIds = { ecommerce: ['ecommerce-catalogue'] };
+  company.requestedModulePackIds = {};
   company.requestedModuleFeatures = {
-    ecommerce: ['dashboard', 'catalogue', 'parametres'],
+    ecommerce: ['dashboard', 'catalogue'],
   };
 
   const access = buildAppAccessContext({
@@ -268,15 +267,6 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
   });
 
   assert.deepEqual(access.selectedEcommerceFeatureIds, ['dashboard', 'catalogue', 'parametres']);
-  const ecommerceGroup = access.sidebarFeatureGroups.find(group => group.label === 'E-commerce');
-  assert.ok(ecommerceGroup);
-  assert.deepEqual(
-    ecommerceGroup.items.map(item => item.href),
-    [
-      '/entreprise/ecommerce?tab=dashboard',
-      '/entreprise/ecommerce?tab=catalogue',
-      '/entreprise/ecommerce?tab=parametres',
-    ],
-  );
-  assert.equal(ecommerceGroup.items.some(item => item.href.includes('promotions')), false);
+  assert.equal(access.verticalModuleNavigation, false);
+  assert.deepEqual(access.sidebarFeatureGroups, []);
 });

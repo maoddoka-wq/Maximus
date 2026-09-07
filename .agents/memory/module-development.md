@@ -39,6 +39,12 @@ Feature manifests must expose stable ids separately from display labels; navigat
 
 **How to apply:** Keep one id/label definition for each module, use it in feature option builders and navigation, and add a regression test for a restricted pack that excludes a neighboring feature.
 
+Dans l’espace entreprise, le menu global doit rester au niveau des modules ; les fonctionnalités détaillées se naviguent à l’intérieur du module. La navigation détaillée peut rester active pour les parcours employés ou les tests de secteur.
+
+**Why:** Mélanger l’entrée du module et ses fonctionnalités dans le menu principal surcharge l’espace entreprise et donne l’impression que chaque fonctionnalité est un module autonome.
+
+**How to apply:** Garder les liens `/entreprise/<module>` dans le menu entreprise, afficher les onglets fonctionnels dans la page du module, et conserver les paramètres administratifs accessibles même lorsqu’une sélection de fonctionnalités est limitée.
+
 Le registre de module doit dériver l’identité métier du catalogue et porter les informations de route, d’icône et de type d’écran ; navigation et routeur ne doivent pas recopier une liste de modules.
 
 **Why:** Un module ajouté dans une seule liste peut apparaître dans le catalogue sans route, ou être routable sans apparaître dans le menu, ce qui crée des écrans inaccessibles et des régressions silencieuses.

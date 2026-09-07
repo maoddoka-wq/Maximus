@@ -76,18 +76,22 @@ export function buildAppAccessContext({
   const companyAllowed = (sectorTestCompanyId || serverModuleAccessReady ? localCompanyAllowed : [])
     .filter(isModuleActive);
   const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
+  const keepCompanySettings = (module: NonNullable<typeof configuredModules[number]>, featureIds: string[]) =>
+    module.id === 'ecommerce' && companyAdmin
+      ? [...new Set([...featureIds, 'parametres'])]
+      : featureIds;
   const companySelectedFeatureIds = (module: NonNullable<typeof configuredModules[number]>) => {
     if (!companyAdmin || !activeCompany) return undefined;
 
     const selectedPackIds = activeCompany.requestedModulePackIds?.[module.id] ?? [];
     if (selectedPackIds.length > 0) {
-      return [
+      return keepCompanySettings(module, [
         ...new Set(
           (module.featurePacks ?? [])
             .filter(pack => selectedPackIds.includes(pack.id))
             .flatMap(pack => pack.featureIds),
         ),
-      ];
+      ]);
     }
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;
@@ -96,9 +100,9 @@ export function buildAppAccessContext({
     }
 
     const validFeatureIds = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
-    return [
+    return keepCompanySettings(module, [
       ...new Set((requestedFeatures[module.id] ?? []).filter(featureId => validFeatureIds.has(featureId))),
-    ];
+    ]);
   };
   const selectedFeatureIdsByModule = Object.fromEntries(
     configuredModules
@@ -199,7 +203,7 @@ export function buildAppAccessContext({
     selectedCommercialTabIds,
   );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    (employee || companyAdmin || sectorTestCompanyId) && allowed.length >= 1
+    (employee || sectorTestCompanyId) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
@@ -227,7 +231,7 @@ export function buildAppAccessContext({
     commerceTabIds,
     sidebarFeatureGroups,
     verticalModuleNavigation: Boolean(
-      (employee || companyAdmin || sectorTestCompanyId)
+      (employee || sectorTestCompanyId)
       && allowed.length >= 1
       && sidebarFeatureGroups.length,
     ),
