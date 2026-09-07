@@ -304,11 +304,13 @@ class EcommerceController extends Controller
         $input = $this->productInput($request);
         $company = $this->company($request);
         $input = $this->normalizeProductCategory($input, $company);
+        $input['slug'] = $this->uniqueProductSlug(
+            (string) ($input['slug'] ?? ''),
+            (string) $input['name'],
+            (string) $input['sku'],
+        );
         if (DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
-        }
-        if (DB::table('ecommerce_products')->where('slug', $input['slug'])->exists()) {
-            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
 
         $row = array_merge([
@@ -824,7 +826,7 @@ class EcommerceController extends Controller
 
         return Validator::make($request->all(), [
             'name' => array_merge($required, ['string', 'min:2', 'max:160']),
-            'slug' => array_merge($required, ['string', 'min:2', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/']),
+            'slug' => ['nullable', 'string', 'min:2', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'sku' => array_merge($required, ['string', 'min:1', 'max:80']),
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['nullable', 'string', 'max:80'],
@@ -891,6 +893,26 @@ class EcommerceController extends Controller
     private function categorySlug(string $value): string
     {
         return Str::slug(trim($value));
+    }
+
+    private function uniqueProductSlug(string $requested, string $name, string $sku): string
+    {
+        $base = Str::slug(trim($requested));
+        if ($base === '') {
+            $base = Str::slug(trim($name));
+        }
+        if ($base === '') {
+            $base = Str::slug(trim($sku));
+        }
+        $base = $base !== '' ? $base : 'produit';
+        $slug = $base;
+        $suffix = 2;
+        while (DB::table('ecommerce_products')->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $slug;
     }
 
     private function ensureStore(string $company): object

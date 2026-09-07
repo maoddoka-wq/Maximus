@@ -75,12 +75,12 @@ class EcommerceTest extends TestCase
 
         $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
             'name' => 'Coffret dégustation',
-            'slug' => 'coffret-degustation',
             'sku' => 'COFFRET-01',
             'categoryId' => $category['id'],
             'price' => 15000,
             'stock' => 4,
         ])->assertCreated()
+            ->assertJsonPath('slug', 'coffret-degustation')
             ->assertJsonPath('categoryId', $category['id'])
             ->assertJsonPath('category', 'Épicerie fine')
             ->json();
