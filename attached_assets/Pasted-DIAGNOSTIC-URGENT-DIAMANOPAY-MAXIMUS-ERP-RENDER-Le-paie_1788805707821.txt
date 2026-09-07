@@ -1,0 +1,242 @@
+DIAGNOSTIC URGENT DIAMANOPAY — MAXIMUS ERP / RENDER
+
+Le paiement e-commerce affiche actuellement :
+« DiamanoPay n'est pas configuré côté serveur. »
+
+La commande est créée, mais le paiement ne démarre pas.
+
+IMPORTANT : NE MODIFIE RIEN POUR L’INSTANT.
+
+Je veux d’abord que tu identifies la cause exacte dans le code et dans l’environnement de production Render. Aucun correctif, aucune modification de code, aucune modification de base de données, aucune modification de route ou d’interface avant la fin du diagnostic.
+
+OBJECTIF UNIQUE :
+Déterminer précisément pourquoi MAXIMUS considère DiamanoPay comme « non configuré côté serveur ».
+
+1. RETROUVE L’ORIGINE EXACTE DU MESSAGE
+
+Recherche dans tout le projet :
+- « DiamanoPay n'est pas configuré côté serveur »
+- « DiamanoPay »
+- « DIAMANOPAY »
+- « not configured »
+- « create charge »
+- « payment »
+
+Identifie :
+- fichier ;
+- fonction ;
+- contrôleur/service ;
+- route appelée ;
+- condition exacte qui déclenche le message ;
+- réponse envoyée au frontend.
+
+Montre-moi la condition exacte qui fait apparaître ce message.
+
+2. TRACE LE FLUX COMPLET
+
+Analyse le parcours réel :
+
+Panier
+→ checkout
+→ création commande
+→ création transaction
+→ appel backend paiement
+→ service DiamanoPay
+→ authentification
+→ création du paiement DiamanoPay
+→ récupération de la réponse
+→ récupération de l'URL de paiement
+→ retour au navigateur.
+
+Détermine exactement à quelle étape le flux s'arrête.
+
+3. AUDITE LES VARIABLES D’ENVIRONNEMENT
+
+Ne devine pas les noms des variables.
+
+Recherche dans le code toutes les variables réellement utilisées pour DiamanoPay.
+
+Pour chacune indique :
+- nom ;
+- fichier qui la lit ;
+- fonction ;
+- obligatoire ou non ;
+- ce qui se passe lorsqu'elle est absente ;
+- si elle est utilisée en production.
+
+NE M’AFFICHE JAMAIS les valeurs des secrets.
+
+Vérifie notamment si l'application attend un token, un client ID, un client secret ou une autre configuration réellement présente dans le code.
+
+4. VÉRIFIE RENDER
+
+Analyse la configuration nécessaire au fonctionnement en production.
+
+Vérifie :
+- variables d'environnement ;
+- environnement production ;
+- URL API utilisée ;
+- configuration Laravel/Node ;
+- cache de configuration Laravel s'il existe ;
+- version/commit réellement déployé ;
+- configuration serveur ;
+- éventuelles différences entre Replit et Render.
+
+Si tu ne peux pas accéder directement aux variables secrètes de Render, ne les invente pas. Indique exactement ce que je dois vérifier manuellement dans Render.
+
+5. VÉRIFIE L’API DIAMANOPAY
+
+Analyse l'intégration réellement présente dans le code.
+
+Vérifie :
+- URL API ;
+- méthode HTTP ;
+- authentification ;
+- Authorization ;
+- headers ;
+- Content-Type ;
+- payload ;
+- montant ;
+- devise ;
+- description ;
+- référence de commande ;
+- traitement de la réponse ;
+- traitement des erreurs ;
+- récupération de checkout_url.
+
+Ne suppose pas qu'une configuration est correcte simplement parce qu'une variable existe.
+
+6. VÉRIFIE SI L’ERREUR EST MAL INTERPRÉTÉE
+
+C’est PRIORITAIRE.
+
+Je veux savoir si MAXIMUS affiche :
+
+« DiamanoPay n'est pas configuré côté serveur »
+
+alors que la vraie erreur est éventuellement :
+- token invalide ;
+- authentification refusée ;
+- mauvais endpoint ;
+- erreur 400 ;
+- erreur 401 ;
+- erreur 403 ;
+- erreur 404 ;
+- erreur 422 ;
+- erreur 500 ;
+- timeout ;
+- réponse API inattendue ;
+- problème réseau ;
+- mauvaise lecture d'une variable.
+
+Une erreur d'API ne doit pas être confondue avec une absence de configuration.
+
+7. ANALYSE LES LOGS
+
+Cherche les logs correspondant à une tentative réelle de paiement.
+
+Si possible, utilise la commande de référence :
+CMD-18356168
+
+Recherche :
+- exception ;
+- erreur HTTP ;
+- réponse DiamanoPay ;
+- erreur d'authentification ;
+- variable manquante ;
+- timeout ;
+- erreur réseau ;
+- erreur de parsing ;
+- stack trace.
+
+NE LOGUE ET NE M’AFFICHE AUCUN SECRET.
+
+8. VÉRIFIE LE FRONTEND
+
+Identifie précisément l'appel effectué par le frontend.
+
+Vérifie si le backend renvoie réellement une erreur de configuration ou si le frontend transforme une autre erreur en :
+
+« DiamanoPay n'est pas configuré côté serveur ».
+
+Ne modifie pas le frontend.
+
+9. VÉRIFIE LA TRANSACTION
+
+Détermine :
+- quand la commande est créée ;
+- quand la transaction de paiement est créée ;
+- pourquoi elle passe à PENDING ;
+- si DiamanoPay a réellement été appelé ;
+- si une transaction DiamanoPay existe ;
+- si un checkout_url a été reçu.
+
+Ne supprime ni ne modifie aucune donnée.
+
+10. RÈGLE ABSOLUE
+
+Ne fais surtout pas ces corrections :
+- supprimer le message ;
+- forcer DiamanoPay à être considéré comme configuré ;
+- mettre une valeur par défaut ;
+- simuler un paiement ;
+- contourner la vérification ;
+- créer un faux checkout_url ;
+- remplacer l'erreur par un statut pending artificiel ;
+- modifier plusieurs modules pour essayer de faire fonctionner le paiement.
+
+Je veux la CAUSE RACINE.
+
+À LA FIN, NE MODIFIE TOUJOURS RIEN.
+
+Retourne uniquement un rapport avec cette structure :
+
+=== DIAGNOSTIC DIAMANOPAY ===
+
+CAUSE EXACTE :
+...
+
+ÉTAPE PRÉCISE DU FLUX QUI ÉCHOUE :
+...
+
+FICHIER / FONCTION RESPONSABLE :
+...
+
+CONDITION QUI DÉCLENCHE L’ERREUR :
+...
+
+VARIABLES D’ENVIRONNEMENT NÉCESSAIRES :
+...
+
+CONFIGURATION RENDER :
+...
+
+REQUÊTE ENVOYÉE À DIAMANOPAY :
+...
+
+RÉPONSE DIAMANOPAY :
+...
+
+ERREUR RÉELLE :
+...
+
+POURQUOI MAXIMUS AFFICHЕ « NON CONFIGURÉ » :
+...
+
+CORRECTIF NÉCESSAIRE :
+...
+
+RISQUE DE RÉGRESSION :
+...
+
+TESTS À EFFECTUER APRÈS CORRECTION :
+...
+
+IMPORTANT :
+Après ce diagnostic, ARRÊTE-TOI.
+
+Ne modifie aucun fichier tant que je ne t'ai pas donné l'autorisation explicite de corriger.
+
+MAXIMUS est une application SaaS multi-tenant en production. Ne touche à aucun autre module, aucune navigation, aucune permission, aucune donnée, aucun système e-commerce ou aucune logique tenant pendant ce diagnostic.
+
+Je veux une analyse basée sur le code réel et les logs réels, pas une hypothèse.
