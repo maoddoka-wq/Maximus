@@ -126,6 +126,7 @@ const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
+const PaymentReturnPage = lazy(() => import('@/pages/payment-return'));
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
 );
@@ -142,6 +143,22 @@ function sessionFromAuthUser(user: AuthUser): Session {
     : user.role === 'company_admin'
       ? `company:${user.companyId}`
       : `employee:${user.employeeId}`;
+}
+
+const paymentReturnPaths = new Set([
+  '/payment/callback',
+  '/payment/return',
+  '/paiement/callback',
+  '/paiement/retour',
+]);
+
+function isPaymentReturn(pathname: string, search: string): boolean {
+  if (paymentReturnPaths.has(pathname)) return true;
+  if (pathname !== '/') return false;
+
+  const params = new URLSearchParams(search);
+  return ['status', 'transactionId', 'paymentRequestId', 'clientReference', 'reference']
+    .some((key) => params.has(key));
 }
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': {
@@ -756,6 +773,9 @@ function AppContent() {
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
+  }
+  if (isPaymentReturn(pathname, search)) {
+    return <PaymentReturnPage />;
   }
   const isPotentialCustomShopPath = pathname === '/'
     || pathname === '/connexion'

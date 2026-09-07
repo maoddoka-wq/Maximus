@@ -198,8 +198,14 @@ HTML;
     private function origin(Request $request): string
     {
         $host = $request->getHost();
-        $scheme = in_array($host, ['localhost', '127.0.0.1'], true) ? $request->getScheme() : 'https';
-        $port = $request->getPort();
+        $forwardedProto = strtolower(trim(explode(',', (string) $request->header('X-Forwarded-Proto'))[0] ?? ''));
+        $scheme = in_array($forwardedProto, ['http', 'https'], true)
+            ? $forwardedProto
+            : (in_array($host, ['localhost', '127.0.0.1'], true) ? $request->getScheme() : 'https');
+        $forwardedPort = trim(explode(',', (string) $request->header('X-Forwarded-Port'))[0] ?? '');
+        $port = ctype_digit($forwardedPort)
+            ? (int) $forwardedPort
+            : ($scheme === 'https' ? 443 : $request->getPort());
         $defaultPort = ($scheme === 'https' && $port === 443) || ($scheme === 'http' && $port === 80);
 
         return $scheme.'://'.$host.($defaultPort ? '' : ':'.$port);
