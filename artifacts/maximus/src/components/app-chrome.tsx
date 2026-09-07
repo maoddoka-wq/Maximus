@@ -60,7 +60,6 @@ export function Sidebar({
 }: SidebarProps) {
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
-  const sectorTest = session.startsWith('company:sector-test-');
   const nav = isAdmin
     ? adminNav
     : companyNav.filter(
@@ -71,7 +70,7 @@ export function Sidebar({
   const companyCoreItems = nav.filter(item => item.module === null);
   const companyModuleItems = nav.filter(item => item.module !== null);
   const verticalModuleMenu = Boolean(
-    (employee || sectorTest) && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
+    employee && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
   );
   const compact = collapsed && !mobileOpen;
   const active = (href: string) =>

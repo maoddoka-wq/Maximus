@@ -163,9 +163,8 @@ export function buildAppAccessContext({
     canViewModule,
     selectedCommercialTabIds,
   );
-  const detailedCompanyView = Boolean(employee || sectorTestCompanyId);
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    detailedCompanyView && allowed.length >= 1
+    employee && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
@@ -190,7 +189,7 @@ export function buildAppAccessContext({
     stockPermissions,
     commerceTabIds,
     sidebarFeatureGroups,
-    verticalModuleNavigation: Boolean(detailedCompanyView && allowed.length >= 1 && sidebarFeatureGroups.length),
+    verticalModuleNavigation: Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length),
     sectorManager,
     canManagePeople: session.startsWith('company:') || sectorManager,
   };
