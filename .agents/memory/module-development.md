@@ -33,6 +33,12 @@ Feature visibility must use the explicit feature selection, while dependencies r
 
 **How to apply:** Preserve dependencies when calculating effective permissions, but pass the pack or unit’s explicit feature ids to tests, navigation, and tab guards; never infer visible pack scope from dependency-expanded role permissions.
 
+Feature manifests must expose stable ids separately from display labels; navigation and access checks should consume the manifest ids rather than slugging translated labels.
+
+**Why:** Slugging labels such as “Tableau de bord” or “Paramètres” produces ids that no longer match pack selections like `dashboard` or `parametres`, silently hiding authorized features or showing the wrong scope.
+
+**How to apply:** Keep one id/label definition for each module, use it in feature option builders and navigation, and add a regression test for a restricted pack that excludes a neighboring feature.
+
 Le registre de module doit dériver l’identité métier du catalogue et porter les informations de route, d’icône et de type d’écran ; navigation et routeur ne doivent pas recopier une liste de modules.
 
 **Why:** Un module ajouté dans une seule liste peut apparaître dans le catalogue sans route, ou être routable sans apparaître dans le menu, ce qui crée des écrans inaccessibles et des régressions silencieuses.

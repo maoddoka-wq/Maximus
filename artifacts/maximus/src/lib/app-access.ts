@@ -13,6 +13,7 @@ import {
   type PresencePermission,
 } from './employee-permissions';
 import { getConfiguredModules } from './store';
+import { getModuleFeatureOptions } from './module-features';
 import { buildSidebarFeatureGroups } from './sidebar-navigation';
 
 export type AppAccessInput = {
@@ -74,6 +75,36 @@ export function buildAppAccessContext({
   const localCompanyAllowed = data.companies.find(company => company.id === companyId)?.allowedModules ?? [];
   const companyAllowed = (sectorTestCompanyId || serverModuleAccessReady ? localCompanyAllowed : [])
     .filter(isModuleActive);
+  const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
+  const companySelectedFeatureIds = (module: NonNullable<typeof configuredModules[number]>) => {
+    if (!companyAdmin || !activeCompany) return undefined;
+
+    const selectedPackIds = activeCompany.requestedModulePackIds?.[module.id] ?? [];
+    if (selectedPackIds.length > 0) {
+      return [
+        ...new Set(
+          (module.featurePacks ?? [])
+            .filter(pack => selectedPackIds.includes(pack.id))
+            .flatMap(pack => pack.featureIds),
+        ),
+      ];
+    }
+
+    const requestedFeatures = activeCompany.requestedModuleFeatures;
+    if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
+      return undefined;
+    }
+
+    const validFeatureIds = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
+    return [
+      ...new Set((requestedFeatures[module.id] ?? []).filter(featureId => validFeatureIds.has(featureId))),
+    ];
+  };
+  const selectedFeatureIdsByModule = Object.fromEntries(
+    configuredModules
+      .map(module => [module.id, companySelectedFeatureIds(module)] as const)
+      .filter(([, featureIds]) => featureIds !== undefined),
+  ) as Partial<Record<ModuleId, string[]>>;
   const employeeNode = employee?.sectorId
     ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) ?? null
     : sectorTestCompanyId && accessRole?.sectorId
@@ -105,14 +136,18 @@ export function buildAppAccessContext({
 
   const presenceModule = configuredModules.find(module => module.id === 'presences');
   const selectedPresenceFeatureIds =
-    accessRole && presenceModule
-      ? [...getSelectedFeatureIds(accessRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
+    presenceModule && companyAdmin
+      ? companySelectedFeatureIds(presenceModule)
+      : accessRole && presenceModule
+        ? [...getSelectedFeatureIds(accessRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
       : undefined;
   const ecommerceModule = configuredModules.find(module => module.id === 'ecommerce');
   const selectedEcommerceFeatureIds =
-    accessRole && ecommerceModule
-      ? [...getSelectedFeatureIds(accessRole, ecommerceModule, employeeNode?.moduleFeatures?.[ecommerceModule.id])]
-      : undefined;
+    ecommerceModule && companyAdmin
+      ? companySelectedFeatureIds(ecommerceModule)
+      : accessRole && ecommerceModule
+        ? [...getSelectedFeatureIds(accessRole, ecommerceModule, employeeNode?.moduleFeatures?.[ecommerceModule.id])]
+        : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
@@ -163,7 +198,6 @@ export function buildAppAccessContext({
     canViewModule,
     selectedCommercialTabIds,
   );
-  const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
     (employee || companyAdmin || sectorTestCompanyId) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
@@ -172,6 +206,7 @@ export function buildAppAccessContext({
           employeeRole: accessRole,
           employeeNode,
           companyAdmin,
+          selectedFeatureIdsByModule,
           commerceTabIds,
           stockPermissions,
         })

@@ -247,3 +247,36 @@ test('affiche immédiatement les modules du test réel sans attendre les accès 
   ]);
   assert.equal(access.verticalModuleNavigation, true);
 });
+
+test('limite le menu e-commerce de l’administrateur aux fonctionnalités choisies', () => {
+  const { data, company } = createAccessFixture();
+  company.requestedModules = ['commerce', 'ecommerce'];
+  company.allowedModules = ['commerce', 'ecommerce'];
+  company.requestedModulePackIds = { ecommerce: ['ecommerce-catalogue'] };
+  company.requestedModuleFeatures = {
+    ecommerce: ['dashboard', 'catalogue', 'parametres'],
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.selectedEcommerceFeatureIds, ['dashboard', 'catalogue', 'parametres']);
+  const ecommerceGroup = access.sidebarFeatureGroups.find(group => group.label === 'E-commerce');
+  assert.ok(ecommerceGroup);
+  assert.deepEqual(
+    ecommerceGroup.items.map(item => item.href),
+    [
+      '/entreprise/ecommerce?tab=dashboard',
+      '/entreprise/ecommerce?tab=catalogue',
+      '/entreprise/ecommerce?tab=parametres',
+    ],
+  );
+  assert.equal(ecommerceGroup.items.some(item => item.href.includes('promotions')), false);
+});

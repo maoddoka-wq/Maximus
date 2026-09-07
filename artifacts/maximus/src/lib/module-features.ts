@@ -1,4 +1,5 @@
 import { commerceTabDefinitions, commerceTabDependencies, type CommerceTabId } from './commerce-permissions';
+import { ecommerceFeatureDefinitions } from './ecommerce-features';
 import { featureSlug, resolveFeatureDependencies } from './permission-keys';
 import { stockSubmoduleDependencies, stockSubmodules, type Module } from './store';
 
@@ -13,6 +14,9 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
   }
   if (module.id === 'stocks') {
     return stockSubmodules.map(submodule => ({ id: submodule.id, label: submodule.name }));
+  }
+  if (module.id === 'ecommerce') {
+    return ecommerceFeatureDefinitions.map(feature => ({ id: feature.id, label: feature.label }));
   }
   return module.features.map(feature => ({ id: featureSlug(feature), label: feature }));
 }

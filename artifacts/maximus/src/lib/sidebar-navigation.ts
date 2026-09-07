@@ -22,6 +22,7 @@ import {
   type CommerceTabId,
 } from './commerce-permissions';
 import { getSelectedFeatureIds } from './employee-permissions';
+import { getModuleFeatureOptions } from './module-features';
 import { featureSlug } from './permission-keys';
 import { presenceFeatureDefinitions } from './presence-features';
 import {
@@ -80,6 +81,7 @@ type SidebarNavigationInput = {
   employeeRole: Role | null;
   employeeNode: OrgNode | null;
   companyAdmin?: boolean;
+  selectedFeatureIdsByModule?: Partial<Record<ModuleId, string[]>>;
   commerceTabIds?: string[];
   stockPermissions?: Record<string, string[]>;
 };
@@ -90,6 +92,7 @@ export function buildSidebarFeatureGroups({
   employeeRole,
   employeeNode,
   companyAdmin = false,
+  selectedFeatureIdsByModule,
   commerceTabIds,
   stockPermissions,
 }: SidebarNavigationInput): SidebarFeatureGroup[] {
@@ -97,7 +100,10 @@ export function buildSidebarFeatureGroups({
     const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];
     const selectedFeatureIds = companyAdmin && !employeeRole
-      ? new Set(module.features.map(feature => featureSlug(feature)))
+      ? new Set(
+          selectedFeatureIdsByModule?.[module.id]
+            ?? module.features.map(feature => featureSlug(feature)),
+        )
       : getSelectedFeatureIds(
           employeeRole,
           module,
@@ -127,14 +133,13 @@ export function buildSidebarFeatureGroups({
             icon: stockFeatureIcons[submodule.id] ?? Warehouse,
           }))
         : moduleId === 'ecommerce'
-          ? module.features
-            .map(feature => featureSlug(feature))
-            .filter(featureId => selectedFeatureIds.has(featureId))
-            .map(featureId => ({
-              href: `/entreprise/ecommerce?tab=${featureId}`,
-              label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
-              icon: ecommerceFeatureIcons[featureId] ?? ShoppingBag,
-            }))
+          ? getModuleFeatureOptions(module)
+              .filter(feature => selectedFeatureIds.has(feature.id))
+              .map(feature => ({
+                href: `/entreprise/ecommerce?tab=${feature.id}`,
+                label: feature.label,
+                icon: ecommerceFeatureIcons[feature.id] ?? ShoppingBag,
+              }))
         : moduleId === 'presences'
           ? module.features
             .map(feature => ({
