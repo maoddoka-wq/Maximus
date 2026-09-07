@@ -628,7 +628,6 @@ class EcommerceController extends Controller
                     'note' => $input['note'] ?? '',
                     'total' => $total,
                     'status' => 'NOUVELLE',
-                    'payment_status' => 'À CONFIRMER',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -807,7 +806,6 @@ class EcommerceController extends Controller
             'note' => $row->note,
             'total' => (int) $row->total,
             'status' => $row->status,
-            'paymentStatus' => $row->payment_status,
             'createdAt' => $row->created_at,
             'items' => array_map(fn ($item) => [
                 'id' => $item->id,

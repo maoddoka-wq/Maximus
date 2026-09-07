@@ -58,7 +58,6 @@ return new class extends Migration
                 $table->text('note')->default('');
                 $table->integer('total')->default(0);
                 $table->text('status')->default('NOUVELLE');
-                $table->text('payment_status')->default('À CONFIRMER');
                 $table->timestampsTz();
                 $table->unique(['company_id', 'reference']);
             });

@@ -72,8 +72,7 @@ export interface Employee { id: string; firstName: string; lastName: string; ema
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; companyId?: string; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; companyId?: string; }
-export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; paymentMethod?: string; paidAmount?: number; companyId?: string; }
-export interface Payment { id: string; reference: string; invoice: string; amount: number; status: Status; date: string; companyId?: string; }
+export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; companyId?: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; companyId?: string; }
 export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: 'direction' | 'sector' | 'service' | 'department'; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; managerEmployeeId?: string; }
 export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; productId?: string; quantity?: number; companyId?: string; }
@@ -101,7 +100,6 @@ export interface StoreData {
   products: Product[];
   movements: Movement[];
   sales: Sale[];
-  payments: Payment[];
   activities: Activity[];
   controlTasks: ControlTask[];
   domainEvents: DomainEvent[];
@@ -186,7 +184,7 @@ function restoreBuiltInSectorPackSelections(presets: SectorPreset[]): SectorPres
 
 export function emptyStoreData(): StoreData {
   return {
-    companies: [], employees: [], roles: [], products: [], movements: [], sales: [], payments: [],
+    companies: [], employees: [], roles: [], products: [], movements: [], sales: [],
     activities: [], controlTasks: [], domainEvents: [], auditEntries: [], orgNodes: [], notifications: [],
     purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
@@ -203,7 +201,6 @@ const storeArrayKeys = [
   'products',
   'movements',
   'sales',
-  'payments',
   'activities',
   'controlTasks',
   'domainEvents',
@@ -225,6 +222,7 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
   const defaults = emptyStoreData();
   const source = input && typeof input === 'object' ? input : {};
   const normalized = { ...defaults, ...source } as StoreData;
+  delete (normalized as StoreData & { payments?: unknown }).payments;
 
   for (const key of storeArrayKeys) {
     if (!Array.isArray(source[key])) {

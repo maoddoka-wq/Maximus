@@ -32,7 +32,6 @@ function fixture(): StoreData {
     products: [],
     movements: [],
     sales: [],
-    payments: [],
     activities: [],
     controlTasks: [],
     domainEvents: [],

@@ -78,7 +78,6 @@ class EcommerceCustomerTest extends TestCase
             'note' => '',
             'total' => 1000,
             'status' => 'NOUVELLE',
-            'payment_status' => 'À CONFIRMER',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -76,7 +76,6 @@ export interface EcommerceOrder {
   note: string;
   total: number;
   status: EcommerceOrderStatus;
-  paymentStatus: string;
   createdAt: string;
   items: EcommerceOrderItem[];
 }
@@ -140,7 +139,6 @@ export interface EcommerceCustomerOrder {
   note: string;
   total: number;
   status: EcommerceOrderStatus;
-  paymentStatus: string;
   createdAt: string;
   items: EcommerceOrderItem[];
 }

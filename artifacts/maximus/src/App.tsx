@@ -10,11 +10,13 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleDollarSign,
   ClipboardCheck,
   CreditCard,
   Edit3,
   FileBarChart,
   FileClock,
+  FileText,
   FolderKanban,
   Gauge,
   GitBranch,
@@ -2253,9 +2255,9 @@ function RoleAwareCompanyDashboard({
   const canStocks = allowed.includes('stocks');
   const canFinance = allowed.includes('finance') || allowed.includes('comptabilite');
   const canPresences = allowed.includes('presences');
-  const revenue = data.payments
-    .filter((payment) => payment.status === 'CONFIRMÉ')
-    .reduce((sum, payment) => sum + payment.amount, 0);
+  const revenue = data.sales
+    .filter((sale) => sale.status === 'VALIDÉ')
+    .reduce((sum, sale) => sum + sale.amount, 0);
   const low = data.products.filter((product) => product.stock <= product.threshold).length;
   const cards = [
     canCommerce ? (
@@ -2283,7 +2285,7 @@ function RoleAwareCompanyDashboard({
         label="Encaissements du mois"
         value={shortMoney(revenue)}
         suffix=" FCFA"
-        detail="paiements confirmés"
+        detail="ventes validées"
         icon={TrendingUp}
         accent
       />
@@ -2414,7 +2416,7 @@ function CompanyDashboard({
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
 }) {
-  const revenue = data.payments.filter((p) => p.status === 'CONFIRMÉ').reduce((a, p) => a + p.amount, 0);
+  const revenue = data.sales.filter((sale) => sale.status === 'VALIDÉ').reduce((sum, sale) => sum + sale.amount, 0);
   const low = data.products.filter((p) => p.stock <= p.threshold).length;
   const canCommerce = allowed.includes('commerce');
   const canStocks = allowed.includes('stocks');
@@ -2426,7 +2428,7 @@ function CompanyDashboard({
           label="Encaissements du mois"
           value={shortMoney(revenue)}
           suffix=" FCFA"
-          detail="+12,8% vs. mois dernier"
+          detail="Ventes validées"
           icon={TrendingUp}
           accent
         />
@@ -4743,148 +4745,46 @@ function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreD
 }
 function FinancePage({
   data,
-  mutate,
 }: {
   data: StoreData;
-  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  mutate?: (fn: (d: StoreData) => void, msg?: string) => void;
 }) {
-  const { confirm } = useAppDialog();
-  const confirmed = data.payments.filter((p) => p.status === 'CONFIRMÉ');
-  const pending = data.payments.filter((p) => p.status === 'EN ATTENTE');
-  const [editing, setEditing] = useState<StoreData['payments'][number] | null>(null);
-  const [invoice, setInvoice] = useState('');
-  const [amount, setAmount] = useState('');
-  const open = (payment: StoreData['payments'][number]) => {
-    setEditing(payment);
-    setInvoice(payment.invoice);
-    setAmount(String(payment.amount));
-  };
-  const save = () => {
-    if (!editing || !invoice.trim() || !amount || Number(amount) < 0) return;
-    mutate((d) => {
-      const target = d.payments.find((payment) => payment.id === editing.id);
-      if (target) {
-        target.invoice = invoice.trim();
-        target.amount = Number(amount);
-      }
-    }, 'Paiement modifié.');
-    setEditing(null);
-  };
-  const remove = async (payment: StoreData['payments'][number]) => {
-    if (
-      !(await confirm({
-        title: 'Supprimer ce paiement ?',
-        description: `Le paiement ${payment.reference} sera supprimé.`,
-        confirmLabel: 'Supprimer',
-        tone: 'danger',
-      }))
-    )
-      return;
-    mutate((d) => {
-      d.payments = d.payments.filter((item) => item.id !== payment.id);
-    }, 'Paiement supprimé.');
-  };
   return (
     <div className="space-y-5">
-      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-2">
         <Metric
-          label="Revenus encaissés"
-          value={shortMoney(confirmed.reduce((a, p) => a + p.amount, 0))}
-          suffix=" FCFA"
-          detail="depuis le début du mois"
-          icon={WalletCards}
+          label="Écritures comptables"
+          value={String(data.accountingEntries.length)}
+          detail="Journaux enregistrés"
+          icon={FileText}
           accent
         />
         <Metric
-          label="En attente"
-          value={shortMoney(pending.reduce((a, p) => a + p.amount, 0))}
+          label="Débit total"
+          value={shortMoney(data.accountingEntries.reduce((sum, entry) => sum + entry.debit, 0))}
           suffix=" FCFA"
-          detail={`${pending.length} paiements à suivre`}
-          icon={CreditCard}
+          detail="Écritures comptables"
+          icon={TrendingUp}
         />
-        <Metric label="Taux d’encaissement" value="84,6" suffix="%" detail="+4,2 points ce mois" icon={TrendingUp} />
+        <Metric label="Crédit total" value={shortMoney(data.accountingEntries.reduce((sum, entry) => sum + entry.credit, 0))} suffix=" FCFA" detail="Écritures comptables" icon={CircleDollarSign} />
       </div>
       <section className="card-surface overflow-hidden rounded-2xl">
         <div className="border-b p-5">
-          <h2 className="font-bold">Paiements récents</h2>
+          <h2 className="font-bold">Journal comptable</h2>
         </div>
         <DataTable
-          headers={['Référence', 'Facture', 'Montant', 'Date', 'Statut', 'Actions']}
-          rows={data.payments.map((p) => [
-            <strong>{p.reference}</strong>,
-            p.invoice,
-            money(p.amount),
-            p.date,
-            <StatusBadge status={p.status} />,
-            p.status === 'EN ATTENTE' ? (
-              <div className="flex flex-wrap gap-1">
-                <button
-                  data-testid={`button-edit-payment-${p.id}`}
-                  aria-label={`Modifier le paiement ${p.reference}`}
-                  title="Modifier"
-                  onClick={() => open(p)}
-                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"
-                >
-                  <Settings size={13} />
-                  <span>Modifier</span>
-                </button>
-                <button
-                  data-testid={`button-delete-payment-${p.id}`}
-                  aria-label={`Supprimer le paiement ${p.reference}`}
-                  title="Supprimer"
-                  onClick={() => remove(p)}
-                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
-                >
-                  <Trash2 size={13} />
-                  <span>Supprimer</span>
-                </button>
-                <button
-                  data-testid={`button-confirm-payment-${p.id}`}
-                  onClick={() =>
-                    mutate((d) => {
-                      const x = d.payments.find((y) => y.id === p.id);
-                      if (x) x.status = 'CONFIRMÉ';
-                      d.activities.unshift({
-                        id: uid('a'),
-                        user: 'Aminata Diop',
-                        action: 'a confirmé un paiement',
-                        module: 'Finance',
-                        object: p.reference,
-                        date: 'À l’instant',
-                        status: 'CONFIRMÉ',
-                      });
-                    }, 'Paiement confirmé.')
-                  }
-                  className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))]"
-                >
-                  Confirmer
-                </button>
-              </div>
-            ) : (
-              <Check size={16} className="text-[hsl(var(--primary))]" />
-            ),
+          headers={['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date', 'Statut']}
+          rows={data.accountingEntries.map((entry) => [
+            <strong key={entry.id}>{entry.reference}</strong>,
+            entry.journal,
+            entry.label,
+            money(entry.debit),
+            money(entry.credit),
+            entry.date,
+            <StatusBadge key={`${entry.id}-status`} status={entry.status} />,
           ])}
         />
       </section>
-      {editing && (
-        <Modal title="Modifier le paiement" onClose={() => setEditing(null)}>
-          <div className="space-y-4">
-            <Field label="Facture" value={invoice} onChange={setInvoice} testId="input-payment-invoice" />
-            <Field
-              label="Montant (FCFA)"
-              value={amount}
-              onChange={setAmount}
-              type="number"
-              testId="input-payment-amount"
-            />
-          </div>
-          <div className="mt-6 flex justify-end">
-            <ActionButton primary testId="button-save-payment" onClick={save}>
-              Enregistrer les modifications
-            </ActionButton>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
@@ -6129,7 +6029,7 @@ function ModulePackTestWorkbench({
               initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')}
             />
           )}
-          {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
+           {module.id === 'finance' && <FinancePage data={data} />}
           {module.id === 'rh' && previewCompany && (
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
@@ -6182,9 +6082,9 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
     },
     finance: {
       label: 'Finance',
-      description: 'Paiements et encaissements enregistrés.',
-      headers: ['Référence', 'Facture', 'Montant', 'Statut', 'Date'],
-      rows: data.payments.map((item) => [item.reference, item.invoice, money(item.amount), item.status, item.date]),
+      description: 'Écritures comptables enregistrées.',
+      headers: ['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date'],
+      rows: data.accountingEntries.map((item) => [item.reference, item.journal, item.label, money(item.debit), money(item.credit), item.date]),
     },
     activity: {
       label: 'Activité',

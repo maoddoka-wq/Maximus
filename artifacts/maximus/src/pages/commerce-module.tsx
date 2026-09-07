@@ -8,7 +8,6 @@ import {
   Boxes,
   BriefcaseBusiness,
   Building2,
-  Calculator,
   Check,
   ChevronRight,
   CircleDollarSign,
@@ -228,7 +227,7 @@ function Dashboard({ data, state, lowStock, revenue, onTab }: { data: StoreData;
   const stockValue = data.products.reduce((sum, product) => sum + product.stock * product.price, 0);
   const activityCards: { label: string; value: number; icon: Icon }[] = [
     { label: 'Ventes validées', value: data.sales.filter(sale => sale.status === 'VALIDÉ').length, icon: ShoppingCart },
-    { label: 'Paiements confirmés', value: data.payments.filter(payment => payment.status === 'CONFIRMÉ').length, icon: Calculator },
+    { label: 'Ventes en brouillon', value: data.sales.filter(sale => sale.status === 'BROUILLON').length, icon: FileText },
     { label: 'Commandes fournisseurs', value: data.purchaseOrders.length, icon: Package },
   ];
   return <div className="space-y-5">
@@ -466,8 +465,6 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
   const [manualAmount, setManualAmount] = useState('');
   const [discount, setDiscount] = useState('0');
   const [saleTaxRate, setSaleTaxRate] = useState(String(taxRate));
-  const [paymentMethod, setPaymentMethod] = useState('Espèces');
-  const [paidAmount, setPaidAmount] = useState('');
   const [lines, setLines] = useState<CommerceSaleLine[]>([]);
   const open = (sale?: Sale) => {
     setModal(sale ?? 'new');
@@ -475,8 +472,6 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
     setManualAmount(sale && !sale.items.length ? String(sale.amount) : '');
     setDiscount(String(sale?.discount ?? 0));
     setSaleTaxRate(String(sale?.taxRate ?? taxRate));
-    setPaymentMethod(sale?.paymentMethod ?? 'Espèces');
-    setPaidAmount(sale?.paidAmount ? String(sale.paidAmount) : '');
     setLines(sale?.items.map(item => ({ productId: item.productId, quantity: String(item.quantity) })) ?? []);
   };
   const subtotal = lines.reduce((sum, line) => sum + (data.products.find(product => product.id === line.productId)?.price ?? 0) * (Number(line.quantity) || 0), 0) || Number(manualAmount) || 0;
@@ -486,7 +481,7 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
   const save = () => {
     const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) })).filter(item => item.productId && Number.isFinite(item.quantity) && item.quantity > 0);
     if (!client.trim() || total <= 0) return;
-    const details = { client: client.trim(), amount: total, items, discount: discountValue, taxRate: Math.max(0, Number(saleTaxRate) || 0), paymentMethod, paidAmount: Math.min(total, Math.max(0, Number(paidAmount) || 0)) };
+    const details = { client: client.trim(), amount: total, items, discount: discountValue, taxRate: Math.max(0, Number(saleTaxRate) || 0) };
     mutate(draft => {
       if (modal !== 'new' && modal) {
         const target = draft.sales.find(item => item.id === modal.id);
@@ -514,12 +509,11 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
           if (product.stock <= product.threshold) addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/entreprise/stocks?tab=products' });
         }
       });
-      if ((target.paidAmount ?? 0) > 0) draft.payments.unshift({ id: uid('payment'), reference: `PAY-${Date.now().toString().slice(-6)}`, invoice: `FAC-${target.reference.replace('VTE-', '')}`, amount: target.paidAmount ?? 0, status: 'CONFIRMÉ', date: 'À l’instant', companyId });
       draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente', module: 'Gestion commerciale', object: target.reference, date: 'À l’instant', status: 'VALIDÉ', companyId });
       recordControlEvent(draft, {
         type: 'APPROVAL_GRANTED',
         label: 'Vente validée',
-        summary: `${target.reference} a été validée, avec mise à jour du stock${target.paidAmount ? ' et de l’encaissement' : ''}.`,
+        summary: `${target.reference} a été validée et le stock a été mis à jour.`,
         actorName: 'Utilisateur actuel',
         entityType: 'sale',
         entityId: target.id,
@@ -528,22 +522,22 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
         severity: 'success',
       });
           addNotification(draft, { title: 'Vente validée', text: `La vente ${target.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/entreprise/commerce?tab=sales' });
-    }, 'Vente validée, encaissement enregistré et stock mis à jour.');
+    }, 'Vente validée et stock mis à jour.');
   };
   const remove = async (sale: Sale) => { if (!await confirm({ title: 'Supprimer ce brouillon ?', description: `Le brouillon ${sale.reference} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' })) return; mutate(draft => { draft.sales = draft.sales.filter(item => item.id !== sale.id); }, 'Vente supprimée.'); };
   const sales = data.sales.filter(item => `${item.reference} ${item.client} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="space-y-5">
     <Panel title="Ventes & caisse" description="Composez la vente, appliquez la remise et les taxes, puis encaissez et validez." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouvelle vente</Button> : undefined}>
-      <div className="grid gap-3 sm:grid-cols-3"><Metric label="Ventes" value={String(data.sales.length)} detail="Brouillons compris" icon={ShoppingCart} /><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Encaissements" value={money(data.payments.filter(item => item.status === 'CONFIRMÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Paiements confirmés" icon={WalletCards} /></div>
+      <div className="grid gap-3 sm:grid-cols-3"><Metric label="Ventes" value={String(data.sales.length)} detail="Brouillons compris" icon={ShoppingCart} /><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Panier moyen" value={money(data.sales.length ? data.sales.reduce((sum, item) => sum + item.amount, 0) / data.sales.length : 0)} detail="Sur les ventes enregistrées" icon={Tags} /></div>
     </Panel>
-    <Panel title="Journal des ventes"><DataTable headers={['Référence', 'Client', 'Montant', 'Encaissement', 'Date', 'Statut', 'Actions']} rows={sales.map(sale => [<strong key={sale.id}>{sale.reference}</strong>, sale.client, money(sale.amount), sale.paidAmount ? `${money(sale.paidAmount)} · ${sale.paymentMethod ?? 'Paiement'}` : 'Non encaissé', sale.date, <StatusBadge key={`${sale.id}-status`} status={sale.status} />, sale.status === 'BROUILLON' ? <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => validate(sale)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Valider</button>}{canModify && <button type="button" onClick={() => remove(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Stock déduit</span>])} /></Panel>
+    <Panel title="Journal des ventes"><DataTable headers={['Référence', 'Client', 'Montant', 'Date', 'Statut', 'Actions']} rows={sales.map(sale => [<strong key={sale.id}>{sale.reference}</strong>, sale.client, money(sale.amount), sale.date, <StatusBadge key={`${sale.id}-status`} status={sale.status} />, sale.status === 'BROUILLON' ? <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => validate(sale)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Valider</button>}{canModify && <button type="button" onClick={() => remove(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Stock déduit</span>])} /></Panel>
     {modal && <Modal title={modal === 'new' ? 'Nouvelle vente' : `Modifier ${modal.reference}`} onClose={() => setModal(null)}>
       <div className="space-y-4"><Field label="Client" value={client} onChange={setClient} placeholder="Nom du client" />
         <div className="rounded-xl border p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Articles</h3><p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Le stock est contrôlé puis déduit uniquement à la validation.</p></div><button type="button" onClick={() => setLines(current => [...current, { productId: data.products[0]?.id ?? '', quantity: '1' }])} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Plus size={13} />Ajouter un article</button></div>
           <div className="mt-3 space-y-2">{lines.map((line, index) => <div key={`${line.productId}-${index}`} className="flex gap-2"><select aria-label={`Article ${index + 1}`} value={line.productId} onChange={event => setLines(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, productId: event.target.value } : item))} className="min-w-0 flex-1 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-xs">{data.products.map(product => <option key={product.id} value={product.id}>{product.name} · {money(product.price)}</option>)}</select><input aria-label={`Quantité article ${index + 1}`} type="number" min="1" value={line.quantity} onChange={event => setLines(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item))} className="w-20 rounded-lg border bg-transparent px-2.5 py-2 text-xs" /><button type="button" aria-label="Retirer l’article" onClick={() => setLines(current => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg p-2 text-[hsl(var(--destructive))]"><Trash2 size={14} /></button></div>)}</div>
           {lines.length === 0 && <Field label="Montant hors article" value={manualAmount} onChange={setManualAmount} type="number" help="Ajoutez des articles pour que le stock soit géré automatiquement." />}<p className="mt-3 text-right text-sm font-bold">Sous-total : {money(subtotal)}</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2"><Field label="Remise" value={discount} onChange={setDiscount} type="number" /><Field label="Taxes (%)" value={saleTaxRate} onChange={setSaleTaxRate} type="number" /><label className="block text-xs font-bold">Mode de paiement<select value={paymentMethod} onChange={event => setPaymentMethod(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm font-normal"><option>Espèces</option><option>Carte bancaire</option><option>Virement</option><option>Crédit client</option></select></label><Field label="Montant encaissé" value={paidAmount} onChange={setPaidAmount} type="number" help={`Total TTC : ${money(total)}. Le montant est plafonné au total.`} /></div>
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="Remise" value={discount} onChange={setDiscount} type="number" /><Field label="Taxes (%)" value={saleTaxRate} onChange={setSaleTaxRate} type="number" /></div>
         <div className="rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-right"><p className="text-xs text-[hsl(var(--muted-foreground))]">Total TTC</p><p className="text-2xl font-bold">{money(total)}</p></div><div className="flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={save}><Check size={15} />Enregistrer le brouillon</Button></div>
       </div>
     </Modal>}
