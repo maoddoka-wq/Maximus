@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
+  Copy,
   LayoutDashboard,
   Megaphone,
   Package,
@@ -325,11 +326,36 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     accentColor: store.accentColor,
     logoUrl: store.logoUrl,
   });
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState('');
+  useEffect(() => {
+    setForm({
+      name: store.name,
+      slug: store.slug,
+      description: store.description,
+      status: store.status,
+      currency: store.currency,
+      primaryColor: store.primaryColor,
+      accentColor: store.accentColor,
+      logoUrl: store.logoUrl,
+    });
+    setSlugManuallyEdited(false);
+  }, [store]);
   const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
+  const publicUrl = `${window.location.origin}/shop/${encodeURIComponent(slugify(form.slug || form.name) || 'boutique')}`;
   const save = (event: FormEvent) => {
     event.preventDefault();
     void run(() => createEcommerceApi(store.companyId).updateStore(form), 'Paramètres de la boutique enregistrés.');
+  };
+  const copyPublicUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
   };
   const addDomain = (event: FormEvent) => {
     event.preventDefault();
@@ -347,7 +373,8 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
   return <div className="space-y-5 fade-up">
     <Panel title="Paramètres de la boutique" description="Ces informations structurent votre vitrine publique et votre expérience d’achat.">
       <form onSubmit={save} className="max-w-3xl space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => patch({ slug: value })} disabled={!canModify} /><Field label="URL du logo" value={form.logoUrl} onChange={value => patch({ logoUrl: value })} disabled={!canModify} placeholder="https://..." /><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div>
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value, ...(slugManuallyEdited ? {} : { slug: slugify(value) }) })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} disabled={!canModify} /><Field label="URL du logo" value={form.logoUrl} onChange={value => patch({ logoUrl: value })} disabled={!canModify} placeholder="https://..." /><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div>
+        <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-xs font-bold">Lien public de la boutique<input readOnly value={publicUrl} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))]" /></label><div className="flex gap-2"><button type="button" onClick={() => void copyPublicUrl()} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><Copy size={14} />{copied ? 'Copié' : 'Copier'}</button><a href={publicUrl} target="_blank" rel="noreferrer" className="btn inline-flex items-center rounded-lg border px-3 py-2.5 text-xs font-bold">Ouvrir</a></div></div><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Ce lien se met à jour avec le nom ou le slug de la boutique. La vitrine sera accessible publiquement lorsqu’elle sera publiée.</p></div>
         <label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
         <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
         <div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div>
