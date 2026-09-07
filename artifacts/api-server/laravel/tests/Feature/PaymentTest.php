@@ -87,6 +87,42 @@ class PaymentTest extends TestCase
         });
     }
 
+    public function test_token_only_configuration_uses_the_official_base_url_and_accepts_optional_bearer_prefix(): void
+    {
+        Config::set([
+            'payments.diamanopay.base_url' => '',
+            'payments.diamanopay.access_token' => 'Bearer access-token-test',
+            'payments.diamanopay.client_id' => null,
+            'payments.diamanopay.client_secret' => null,
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'id' => 'charge-token-only-test',
+                'status' => 'PENDING',
+                'checkout_url' => 'https://pay.diamanopay.com/checkout/token-only-test',
+            ], 201),
+        ]);
+
+        $this->asActor()
+            ->postJson('/api/payments', [
+                'sourceModule' => 'ecommerce',
+                'sourceType' => 'ecommerce_order',
+                'sourceId' => 'order-token-only-test',
+                'amount' => 10,
+                'currency' => 'XOF',
+                'paymentMethod' => 'WAVE',
+                'idempotencyKey' => 'token-only-test-1',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('status', 'PENDING')
+            ->assertJsonPath('checkoutUrl', 'https://pay.diamanopay.com/checkout/token-only-test');
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'https://api.diamanopay.com/api/charges'
+                && $request->header('Authorization')[0] === 'Bearer access-token-test';
+        });
+    }
+
     public function test_expired_access_token_is_reported_without_reusing_it_or_retrying_the_charge(): void
     {
         Config::set([

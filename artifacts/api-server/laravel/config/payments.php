@@ -6,7 +6,7 @@ return [
     'callback_url' => env('DIAMANOPAY_CALLBACK_URL', ''),
     'webhook_url' => env('DIAMANOPAY_WEBHOOK_URL', ''),
     'diamanopay' => [
-        'base_url' => rtrim((string) env('DIAMANOPAY_BASE_URL', ''), '/'),
+        'base_url' => rtrim((string) env('DIAMANOPAY_BASE_URL', 'https://api.diamanopay.com'), '/'),
         'client_id' => env('DIAMANOPAY_CLIENT_ID'),
         'client_secret' => env('DIAMANOPAY_CLIENT_SECRET'),
         'access_token' => env('DIAMANOPAY_ACCESS_TOKEN'),

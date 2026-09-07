@@ -247,23 +247,47 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     const currentKey = checkoutKey ?? crypto.randomUUID();
     setCheckoutKey(currentKey);
     try {
-      const order = domain
+      const createdOrder = domain
         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
-      if (!order.payment) throw new Error('Le paiement DiamanoPay n’a pas été initialisé.');
-      if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(order.payment.status)) {
-        throw new Error(order.payment.providerMessage ?? 'DiamanoPay n’a pas pu initialiser le paiement.');
+      let order = createdOrder;
+      if (!order.payment) {
+        const paymentStatus = domain
+          ? await publicEcommerceApi.domainPaymentStatus(order.reference)
+          : await publicEcommerceApi.paymentStatus(slug ?? '', order.reference);
+        if (!paymentStatus.payment) {
+          throw new Error('Le serveur n’a pas renvoyé les informations du paiement DiamanoPay.');
+        }
+        order = {
+          ...order,
+          payment: {
+            id: '',
+            publicReference: '',
+            status: paymentStatus.payment.status,
+            amount: order.total,
+            currency: data.store.currency,
+            checkoutUrl: paymentStatus.payment.checkoutUrl,
+            providerMessage: paymentStatus.payment.providerMessage,
+          },
+        };
+      }
+      const payment = order.payment;
+      if (!payment) {
+        throw new Error('Le serveur n’a pas renvoyé les informations du paiement DiamanoPay.');
+      }
+      if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(payment.status)) {
+        throw new Error(payment.providerMessage ?? 'DiamanoPay n’a pas pu initialiser le paiement.');
       }
       setCheckoutKey(null);
       setCart([]);
       if (customer) {
         void api.clearCart().then(() => api.bootstrap()).then(setCustomerData).catch(() => undefined);
       }
-      if (order.payment.checkoutUrl) {
-        window.location.assign(order.payment.checkoutUrl);
+      if (payment.checkoutUrl) {
+        window.location.assign(payment.checkoutUrl);
         return;
       }
-      if (order.payment.status !== 'PAID') throw new Error('DiamanoPay n’a pas retourné d’URL de paiement.');
+      if (payment.status !== 'PAID') throw new Error('DiamanoPay n’a pas retourné d’URL de paiement.');
       setSubmitted(order);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La commande n’a pas pu être envoyée.');

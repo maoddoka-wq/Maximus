@@ -331,12 +331,20 @@ class DiamanoPayProvider implements PaymentProviderInterface
     private function configuration(): array
     {
         $configuration = config('payments.diamanopay', []);
+        $baseUrl = trim((string) ($configuration['base_url'] ?? ''));
+        $accessToken = trim((string) ($configuration['access_token'] ?? ''));
+        if ($baseUrl === '') {
+            $baseUrl = 'https://api.diamanopay.com';
+        }
+        if (str_starts_with(strtolower($accessToken), 'bearer ')) {
+            $accessToken = trim(substr($accessToken, 7));
+        }
 
         return [
-            'base_url' => rtrim(trim((string) ($configuration['base_url'] ?? '')), '/'),
+            'base_url' => rtrim($baseUrl, '/'),
             'client_id' => trim((string) ($configuration['client_id'] ?? '')),
             'client_secret' => trim((string) ($configuration['client_secret'] ?? '')),
-            'access_token' => trim((string) ($configuration['access_token'] ?? '')),
+            'access_token' => $accessToken,
         ];
     }
 
