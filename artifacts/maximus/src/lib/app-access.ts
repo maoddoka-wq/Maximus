@@ -71,9 +71,9 @@ export function buildAppAccessContext({
     configuredModules.find(module => module.id === moduleId)?.status ??
     'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => !['INACTIF', 'MAINTENANCE'].includes(moduleStatus(moduleId));
-  const companyAllowed = serverModuleAccessReady
-    ? (data.companies.find(company => company.id === companyId)?.allowedModules ?? []).filter(isModuleActive)
-    : [];
+  const localCompanyAllowed = data.companies.find(company => company.id === companyId)?.allowedModules ?? [];
+  const companyAllowed = (sectorTestCompanyId || serverModuleAccessReady ? localCompanyAllowed : [])
+    .filter(isModuleActive);
   const employeeNode = employee?.sectorId
     ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) ?? null
     : sectorTestCompanyId && accessRole?.sectorId

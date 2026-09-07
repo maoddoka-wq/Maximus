@@ -197,3 +197,53 @@ test('affiche le menu des modules pendant un test réel de secteur', () => {
   assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
   assert.equal(access.verticalModuleNavigation, true);
 });
+
+test('affiche immédiatement les modules du test réel sans attendre les accès serveur', () => {
+  const { data, company } = createAccessFixture();
+  const testCompanyId = 'sector-test-ready-company';
+  const testNodeId = 'sector-test-ready-node';
+  const testRoleId = 'sector-test-ready-role';
+  const testCompany = {
+    ...company,
+    id: testCompanyId,
+    allowedModules: ['commerce', 'stocks'],
+    managerRoleId: testRoleId,
+  };
+  const testNode = {
+    ...data.orgNodes[0],
+    id: testNodeId,
+    companyId: testCompanyId,
+    moduleIds: ['commerce', 'stocks'],
+  };
+  const testRole = {
+    ...data.roles[0],
+    id: testRoleId,
+    companyId: testCompanyId,
+    sectorId: testNodeId,
+    modulePermissions: {
+      commerce: ['voir'],
+      stocks: ['voir'],
+    },
+  };
+  data.companies = [testCompany];
+  data.orgNodes = [testNode];
+  data.roles = [testRole];
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${testCompanyId}`,
+    employee: null,
+    activeCompanyId: testCompanyId,
+    activeCompany: testCompany,
+    sectorTestCompanyId: testCompanyId,
+    serverModuleStatuses: null,
+    serverModuleAccessReady: false,
+  });
+
+  assert.deepEqual(access.allowed, ['commerce', 'stocks']);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
+    'Gestion commerciale',
+    'Gestion de stock',
+  ]);
+  assert.equal(access.verticalModuleNavigation, true);
+});
