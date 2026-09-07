@@ -1,0 +1,760 @@
+MISSION : FINALISER LE MODULE E-COMMERCE DE MAXIMUS POUR LA PRODUCTION
+
+Je veux maintenant que tu termines complètement le module E-commerce de MAXIMUS.
+
+Je ne veux pas un prototype ni quelques pages supplémentaires.
+
+Je veux un véritable système e-commerce SaaS multi-entreprises, fonctionnel, cohérent, sécurisé, professionnel et préparé pour la production.
+
+IMPORTANT :
+
+NE CASSE PAS LES FONCTIONNALITÉS EXISTANTES DE MAXIMUS.
+
+Avant toute modification, analyse l'implémentation actuelle du module E-commerce et ses dépendances.
+
+Ne modifie pas au hasard les composants partagés, les menus, les permissions ou les autres modules.
+
+Travaille progressivement et teste après chaque partie importante.
+
+---
+
+1. COMMENCER PAR L'AUDIT DE L'EXISTANT
+
+Avant de coder, identifie ce qui existe déjà pour :
+
+- produits ;
+- catégories ;
+- variantes ;
+- images ;
+- prix ;
+- stock ;
+- clients ;
+- commandes ;
+- paiements ;
+- livraisons ;
+- paramètres de boutique ;
+- utilisateurs ;
+- rôles ;
+- permissions ;
+- panier ;
+- checkout ;
+- boutique publique ;
+- espace client ;
+- URLs publiques ;
+- domaine/sous-domaine.
+
+Identifie également :
+
+- tables DB ;
+- relations ;
+- APIs ;
+- routes ;
+- contrôleurs ;
+- services ;
+- composants frontend ;
+- middleware ;
+- authentification ;
+- cache ;
+- système de tenant/company.
+
+Réutilise ce qui fonctionne déjà.
+
+Ne crée pas un deuxième système parallèle pour remplacer l'ancien.
+
+---
+
+2. ARCHITECTURE DU MODULE
+
+Le module doit être clairement séparé en trois espaces :
+
+ADMINISTRATION E-COMMERCE
+
+Pour l'entreprise :
+
+- tableau de bord ;
+- produits ;
+- catégories ;
+- stock ;
+- commandes ;
+- clients ;
+- promotions si existantes ;
+- livraisons ;
+- paiements ;
+- paramètres ;
+- apparence/boutique ;
+- autres fonctionnalités réellement nécessaires.
+
+BOUTIQUE PUBLIQUE
+
+Pour les visiteurs et acheteurs :
+
+- accueil ;
+- catalogue ;
+- catégories ;
+- recherche ;
+- filtres ;
+- produit ;
+- panier ;
+- checkout ;
+- paiement ;
+- confirmation ;
+- compte client.
+
+ESPACE CLIENT
+
+Pour les acheteurs connectés :
+
+- tableau de bord ;
+- commandes ;
+- détail commande ;
+- suivi ;
+- profil ;
+- adresses ;
+- favoris ;
+- panier ;
+- paiements ;
+- factures si disponibles ;
+- retours/remboursements si disponibles ;
+- notifications ;
+- sécurité ;
+- support.
+
+Ces trois espaces doivent être clairement séparés.
+
+---
+
+3. TABLEAU DE BORD ADMIN E-COMMERCE
+
+Créer un véritable dashboard de gestion de boutique.
+
+Afficher uniquement des données réelles :
+
+- chiffre d'affaires ;
+- commandes ;
+- commandes en attente ;
+- commandes récentes ;
+- produits ;
+- stock ;
+- produits presque en rupture ;
+- clients ;
+- autres indicateurs disponibles.
+
+Ajouter des raccourcis utiles :
+
+- Ajouter un produit ;
+- Voir les commandes ;
+- Gérer les produits ;
+- Voir la boutique.
+
+L'interface doit être professionnelle, claire et compacte.
+
+---
+
+4. GESTION DES PRODUITS
+
+Vérifie et finalise :
+
+- création ;
+- modification ;
+- suppression ;
+- activation/désactivation ;
+- prix ;
+- description ;
+- images ;
+- stock ;
+- catégorie ;
+- référence/SKU si disponible ;
+- variantes si le système les supporte.
+
+Une modification doit être réellement enregistrée en DB.
+
+Après actualisation et reconnexion, les données doivent rester correctes.
+
+---
+
+5. CATÉGORIES
+
+Permettre de gérer correctement :
+
+- création ;
+- modification ;
+- suppression ;
+- activation ;
+- ordre si pertinent.
+
+Les produits doivent être correctement liés à leur catégorie.
+
+---
+
+6. COMMANDES
+
+Finaliser la gestion des commandes.
+
+L'entreprise doit pouvoir :
+
+- voir les commandes ;
+- rechercher ;
+- filtrer ;
+- consulter le détail ;
+- modifier le statut selon les règles métier ;
+- consulter les informations client ;
+- consulter les produits ;
+- consulter les montants ;
+- consulter paiement/livraison.
+
+Les statuts doivent être cohérents entre :
+
+client → boutique → administration.
+
+Une commande ne doit jamais apparaître avec un statut contradictoire.
+
+---
+
+7. PANIER ET CHECKOUT
+
+Vérifie le parcours complet :
+
+Produit
+→ panier
+→ modification quantité
+→ checkout
+→ informations client
+→ adresse
+→ livraison
+→ paiement
+→ confirmation
+→ commande créée.
+
+Aucune étape ne doit être simulée.
+
+Si un moyen de paiement n'est pas réellement intégré, ne fais pas croire au client qu'il fonctionne.
+
+---
+
+8. BOUTIQUE PUBLIQUE
+
+La boutique publique doit être une vraie boutique commerciale.
+
+Elle doit fonctionner correctement sur :
+
+- téléphone ;
+- tablette ;
+- ordinateur.
+
+Prévoir :
+
+- accueil ;
+- catalogue ;
+- catégories ;
+- recherche ;
+- filtres ;
+- produit ;
+- panier ;
+- checkout ;
+- connexion ;
+- inscription ;
+- espace client.
+
+Ne jamais afficher d'informations techniques.
+
+---
+
+9. ESPACE CLIENT — DONNER LE MEILLEUR
+
+Je veux un véritable espace client complet, pas simplement une page de profil.
+
+Créer une expérience professionnelle comprenant :
+
+Tableau de bord
+
+- bienvenue ;
+- résumé ;
+- commandes récentes ;
+- commandes en cours ;
+- raccourcis.
+
+Commandes
+
+- toutes les commandes ;
+- détail ;
+- produits ;
+- prix ;
+- quantité ;
+- statut ;
+- paiement ;
+- livraison.
+
+Suivi
+
+Afficher une timeline lorsque les données réelles le permettent :
+
+Commande
+→ Confirmation
+→ Préparation
+→ Expédition
+→ Livraison
+
+Profil
+
+- informations personnelles ;
+- modification ;
+- sauvegarde réelle.
+
+Adresses
+
+- ajouter ;
+- modifier ;
+- supprimer ;
+- adresse principale.
+
+Favoris
+
+- produits favoris ;
+- suppression ;
+- accès au produit ;
+- ajout au panier.
+
+Paiements
+
+- historique des paiements liés aux commandes.
+
+Factures
+
+Si le backend les supporte, permettre leur consultation/téléchargement.
+
+Retours
+
+Si le système les supporte, afficher les demandes et leurs statuts.
+
+Notifications
+
+Afficher les notifications réellement disponibles.
+
+Sécurité
+
+- changement de mot de passe ;
+- déconnexion.
+
+Support
+
+Accès aux informations de contact/support de la boutique.
+
+Ne crée pas de fausses fonctionnalités.
+
+---
+
+10. LIENS PUBLICS — SIMPLIFIER
+
+Je ne veux plus que les liens publics ressemblent à des URLs techniques ou à des URLs générées de manière compliquée.
+
+Le système doit être conçu autour d'une URL publique simple.
+
+Exemple d'architecture souhaitée :
+
+Boutique publique :
+
+"https://boutique.domaine.com"
+
+ou, lorsque le système utilise un domaine principal :
+
+"https://nom-boutique.domaine.com"
+
+Pour le client, l'URL doit être simple, lisible et professionnelle.
+
+Ne jamais afficher :
+
+- URL Render ;
+- URL Replit ;
+- endpoint API ;
+- IDs internes ;
+- company_id ;
+- identifiants techniques.
+
+---
+
+11. SOUS-DOMAINES — PRÊT POUR LA PRODUCTION
+
+Je veux que le système de sous-domaines des boutiques soit conçu correctement pour la production, et pas comme une simple redirection frontend.
+
+Architecture souhaitée :
+
+Sous-domaine
+↓
+résolution du domaine
+↓
+identification de la boutique/entreprise
+↓
+vérification que la boutique est active
+↓
+chargement du tenant correspondant
+↓
+affichage de sa boutique uniquement.
+
+Chaque sous-domaine doit correspondre à UNE boutique.
+
+Exemple conceptuel :
+
+"boutique1.mondomaine.com"
+→ entreprise 1
+
+"boutique2.mondomaine.com"
+→ entreprise 2
+
+Une entreprise ne doit jamais pouvoir récupérer les données d'une autre.
+
+---
+
+12. IDENTIFICATION DU TENANT PAR DOMAINE
+
+Ne fais jamais confiance à un "company_id" envoyé par le navigateur pour déterminer la boutique.
+
+Le backend doit déterminer la boutique à partir du domaine/sous-domaine reconnu.
+
+Il faut prévoir :
+
+- mapping domaine → entreprise ;
+- vérification d'existence ;
+- vérification du statut ;
+- résolution sécurisée ;
+- isolation tenant ;
+- gestion des domaines inconnus ;
+- gestion d'une boutique inactive ;
+- gestion des conflits de sous-domaines.
+
+Les sous-domaines doivent être uniques.
+
+---
+
+13. PRÉPARATION AUX DOMAINES PERSONNALISÉS
+
+Même si les domaines personnalisés ne sont pas encore activés, construis l'architecture de façon à pouvoir supporter plus tard :
+
+"www.maboutique.com"
+
+→ boutique de l'entreprise concernée.
+
+Prévoir conceptuellement :
+
+- domaine système ;
+- sous-domaine système ;
+- domaine personnalisé ;
+- statut du domaine ;
+- entreprise associée ;
+- vérification du domaine ;
+- possibilité future de SSL ;
+- suppression/changement du domaine.
+
+Ne mets pas une solution temporaire difficile à remplacer.
+
+---
+
+14. SÉCURITÉ DES SOUS-DOMAINES
+
+Vérifie impérativement :
+
+- isolation entre boutiques ;
+- host/domain validation ;
+- authentification ;
+- autorisation ;
+- accès API ;
+- cookies ;
+- sessions ;
+- CORS ;
+- cache ;
+- données mises en cache ;
+- URLs internes.
+
+Attention aux caches : une réponse générée pour la boutique A ne doit jamais être servie à la boutique B.
+
+---
+
+15. MULTI-TENANT
+
+C'est NON NÉGOCIABLE.
+
+Toutes les données e-commerce doivent appartenir au bon tenant.
+
+Vérifie :
+
+- produits ;
+- catégories ;
+- commandes ;
+- clients ;
+- paniers ;
+- favoris ;
+- adresses ;
+- paiements ;
+- livraisons ;
+- paramètres ;
+- images ;
+- promotions ;
+- domaines ;
+- utilisateurs.
+
+Un client ou une entreprise ne doit jamais pouvoir accéder aux données d'un autre tenant en modifiant un ID.
+
+Teste volontairement ce scénario.
+
+---
+
+16. PARAMÈTRES DE LA BOUTIQUE
+
+Finaliser correctement les paramètres :
+
+- nom ;
+- description ;
+- logo ;
+- coordonnées ;
+- devise ;
+- couleurs ;
+- apparence ;
+- livraison ;
+- paiement ;
+- autres paramètres réellement disponibles.
+
+Chaque sauvegarde doit :
+
+1. valider ;
+2. envoyer au backend ;
+3. enregistrer en DB ;
+4. retourner la nouvelle valeur ;
+5. mettre à jour l'interface ;
+6. rester après actualisation ;
+7. rester après reconnexion.
+
+Aucun faux succès.
+
+---
+
+17. RÔLES ET UNITÉS
+
+L'activation de l'e-commerce ne doit pas créer inutilement des rôles ou unités dans l'organisation.
+
+Si certains éléments sont réellement nécessaires :
+
+- les créer uniquement pour le tenant concerné ;
+- une seule fois ;
+- de manière idempotente ;
+- sans duplication ;
+- sans dépendance à une entreprise fictive.
+
+---
+
+18. AUCUNE ENTREPRISE FICTIVE
+
+Supprime toute dépendance restante à Kora ou à toute autre entreprise fictive dans le fonctionnement réel.
+
+Recherche :
+
+- code ;
+- seeders ;
+- migrations ;
+- fixtures ;
+- IDs ;
+- services ;
+- tests ;
+- configuration.
+
+Une nouvelle entreprise doit pouvoir activer et utiliser l'e-commerce sans données fictives.
+
+---
+
+19. DESIGN
+
+Le résultat doit ressembler à un vrai produit SaaS/e-commerce commercial.
+
+Pas de :
+
+- grands espaces inutiles ;
+- blocs géants ;
+- menus désordonnés ;
+- textes inutiles ;
+- interfaces surchargées ;
+- pages qui semblent générées automatiquement ;
+- boutons sans fonction.
+
+Le design doit être cohérent entre :
+
+administration → boutique → espace client.
+
+---
+
+20. GESTION DES ERREURS
+
+Chaque fonctionnalité doit gérer :
+
+- chargement ;
+- succès ;
+- erreur ;
+- état vide.
+
+Une erreur backend ne doit jamais être présentée comme un succès.
+
+Ne masque aucune erreur avec des valeurs fictives.
+
+---
+
+21. NE PAS CRÉER DE RÉGRESSIONS
+
+Avant chaque modification importante, vérifie les composants et services réutilisés ailleurs.
+
+Après chaque groupe de modifications, teste :
+
+- connexion ;
+- entreprise ;
+- administration ;
+- modules ;
+- navigation ;
+- permissions ;
+- e-commerce ;
+- boutique publique ;
+- espace client.
+
+Une correction du e-commerce ne doit pas casser l'administration de l'entreprise.
+
+---
+
+22. TESTS DE PRODUCTION
+
+Avant de considérer le module terminé, teste au minimum ce scénario complet :
+
+ENTREPRISE
+
+Créer entreprise
+→ approuver
+→ activer e-commerce.
+
+BOUTIQUE
+
+Configurer boutique
+→ créer catégorie
+→ créer produit
+→ ajouter image
+→ définir prix/stock
+→ vérifier boutique publique.
+
+CLIENT
+
+Créer compte
+→ consulter produit
+→ ajouter panier
+→ checkout
+→ passer commande.
+
+ENTREPRISE
+
+Recevoir commande
+→ consulter commande
+→ modifier son statut.
+
+CLIENT
+
+Voir commande
+→ voir nouveau statut
+→ consulter détail
+→ suivre livraison lorsque disponible.
+
+SOUS-DOMAINE
+
+Accéder au sous-domaine
+→ bonne boutique affichée.
+
+Tester ensuite une deuxième entreprise :
+
+Entreprise A ≠ Entreprise B
+
+et vérifier qu'aucune donnée ne fuit entre elles.
+
+---
+
+23. TESTER LES CAS NÉGATIFS
+
+Teste également :
+
+- boutique inexistante ;
+- sous-domaine inexistant ;
+- entreprise inactive ;
+- produit supprimé ;
+- produit sans stock ;
+- client non connecté ;
+- client connecté ;
+- commande inexistante ;
+- ID d'une autre entreprise ;
+- accès API interdit ;
+- session expirée.
+
+L'application doit répondre proprement dans tous ces cas.
+
+---
+
+24. RÈGLE DE TRAVAIL
+
+NE fais pas :
+
+« Je vois un problème → je modifie rapidement → je passe au suivant. »
+
+Travaille ainsi :
+
+ANALYSER
+→ PLANIFIER
+→ MODIFIER
+→ TESTER
+→ VÉRIFIER LES RÉGRESSIONS
+→ PASSER À LA PARTIE SUIVANTE
+
+Si tu découvres un problème qui peut affecter une autre fonctionnalité, analyse-le avant de continuer.
+
+---
+
+25. CRITÈRE FINAL
+
+Je considère le module terminé uniquement lorsque :
+
+- l'administration e-commerce fonctionne ;
+- la boutique publique fonctionne ;
+- le parcours d'achat fonctionne ;
+- l'espace client est complet ;
+- les paramètres persistent ;
+- les commandes fonctionnent ;
+- les données sont réellement enregistrées ;
+- le multi-tenant est sécurisé ;
+- les URLs publiques sont simples ;
+- le système de sous-domaines est correctement architecturé ;
+- aucune URL technique n'est exposée au client ;
+- Kora n'est plus nécessaire ;
+- aucune donnée fictive n'est injectée en production ;
+- les erreurs sont correctement gérées ;
+- les fonctionnalités existantes de MAXIMUS ne sont pas cassées ;
+- les tests de régression sont passés.
+
+---
+
+CONSIGNE FINALE
+
+Ne cherche pas à terminer rapidement. Cherche à terminer correctement.
+
+Je préfère que tu identifies une fonctionnalité réellement manquante plutôt que de créer une fausse fonctionnalité.
+
+Je préfère une architecture propre qu'un correctif rapide.
+
+Je préfère que tu réutilises le code existant lorsqu'il est bon plutôt que de créer un deuxième système.
+
+Ne déclare pas « terminé » simplement parce que les pages s'affichent.
+
+Le module doit fonctionner de bout en bout avec de vraies données, de vraies API, une vraie base de données et une vraie isolation entre entreprises.
+
+À la fin, donne-moi un rapport indiquant :
+
+- ce qui existait ;
+- ce qui a été corrigé ;
+- ce qui a été ajouté ;
+- les fichiers modifiés ;
+- les changements DB ;
+- les APIs utilisées/créées ;
+- le système de sous-domaines ;
+- les protections multi-tenant ;
+- les tests effectués ;
+- les tests réussis/échoués ;
+- les éventuels éléments restant à finaliser.
+
+AUCUNE CORRECTION NE DOIT ÊTRE FAITE AU DÉTRIMENT D'UNE AUTRE FONCTIONNALITÉ.
