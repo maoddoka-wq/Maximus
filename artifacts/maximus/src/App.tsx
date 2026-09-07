@@ -416,7 +416,7 @@ function AppContent() {
     void appStateApi.bootstrap()
       .then(({ data: remoteData, version }) => {
         if (cancelled) return;
-        setData(sanitizeStoreData({ ...emptyStoreData(), ...remoteData } as StoreData));
+        setData(sanitizeStoreData(remoteData));
         setAppStateVersion(version);
       })
       .catch((error) => {

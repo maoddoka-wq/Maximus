@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { emptyStoreData, normalizeStoreData, sanitizeStoreData } from './store';
+
+test('reconstruit les collections métier quand une sauvegarde partielle contient null', () => {
+  const normalized = normalizeStoreData({
+    companies: null as never,
+    roles: null as never,
+    orgNodes: null as never,
+    controlTasks: null as never,
+    domainEvents: null as never,
+    auditEntries: null as never,
+    commerceStates: [] as never,
+    moduleOverrides: [] as never,
+  });
+
+  assert.deepEqual(normalized.companies, []);
+  assert.deepEqual(normalized.roles, []);
+  assert.deepEqual(normalized.orgNodes, []);
+  assert.deepEqual(normalized.controlTasks, []);
+  assert.deepEqual(normalized.domainEvents, []);
+  assert.deepEqual(normalized.auditEntries, []);
+  assert.deepEqual(normalized.commerceStates, {});
+  assert.deepEqual(normalized.moduleOverrides, {});
+});
+
+test('conserve les données valides pendant le nettoyage des credentials', () => {
+  const data = emptyStoreData();
+  data.companies.push({
+    id: 'company-test',
+    name: 'Entreprise test',
+    manager: 'Admin',
+    email: 'admin@test.local',
+    phone: '',
+    country: 'Sénégal',
+    sector: 'Services',
+    status: 'ACTIF',
+    requestedModules: ['commerce'],
+    allowedModules: ['commerce'],
+    refusedModules: [],
+    createdAt: '2026-09-07',
+    adminPassword: 'ne-doit-pas-sortir',
+  } as never);
+
+  const sanitized = sanitizeStoreData(data);
+  assert.equal(sanitized.companies[0]?.name, 'Entreprise test');
+  assert.equal('adminPassword' in sanitized.companies[0], false);
+});

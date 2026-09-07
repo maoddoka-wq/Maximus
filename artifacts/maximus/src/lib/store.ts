@@ -182,8 +182,59 @@ export function emptyStoreData(): StoreData {
   };
 }
 
-export function sanitizeStoreData(data: StoreData): StoreData {
-  const safe = structuredClone(data) as StoreData;
+const storeArrayKeys = [
+  'companies',
+  'employees',
+  'roles',
+  'products',
+  'movements',
+  'sales',
+  'payments',
+  'activities',
+  'controlTasks',
+  'domainEvents',
+  'auditEntries',
+  'orgNodes',
+  'notifications',
+  'purchaseOrders',
+  'accountingEntries',
+  'payrollSlips',
+  'crmOpportunities',
+  'supplierRecords',
+  'deliveries',
+  'businessDocuments',
+  'subscriptions',
+  'sectorPresets',
+] as const;
+
+export function normalizeStoreData(input: Partial<StoreData> | null | undefined): StoreData {
+  const defaults = emptyStoreData();
+  const source = input && typeof input === 'object' ? input : {};
+  const normalized = { ...defaults, ...source } as StoreData;
+
+  for (const key of storeArrayKeys) {
+    if (!Array.isArray(source[key])) {
+      normalized[key] = defaults[key] as never;
+    }
+  }
+  if (!source.commerceStates || Array.isArray(source.commerceStates) || typeof source.commerceStates !== 'object') {
+    normalized.commerceStates = defaults.commerceStates;
+  }
+  if (!source.moduleOverrides || Array.isArray(source.moduleOverrides) || typeof source.moduleOverrides !== 'object') {
+    normalized.moduleOverrides = defaults.moduleOverrides;
+  }
+  if (!source.moduleStatuses || Array.isArray(source.moduleStatuses) || typeof source.moduleStatuses !== 'object') {
+    normalized.moduleStatuses = defaults.moduleStatuses;
+  }
+  if (!Array.isArray(source.removedModules)) {
+    normalized.removedModules = defaults.removedModules;
+  }
+
+  return normalized;
+}
+
+export function sanitizeStoreData(data: Partial<StoreData> | null | undefined): StoreData {
+  const safe = structuredClone(normalizeStoreData(data)) as StoreData;
   const stripCredentials = <T extends object>(value: T): T => {
     const copy = { ...value } as Record<string, unknown>;
     delete copy.loginPassword;
