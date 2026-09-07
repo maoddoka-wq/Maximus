@@ -1,0 +1,981 @@
+CAHIER D’ARCHITECTURE
+
+Système de paiement MAXIMUS + DiamanoPay
+
+1. OBJECTIF
+
+Créer dans MAXIMUS une infrastructure de paiement centralisée permettant de gérer de manière sécurisée :
+
+- les paiements clients ;
+- les encaissements des entreprises ;
+- les paiements e-commerce ;
+- les commissions ;
+- les portefeuilles vendeurs ;
+- les remboursements ;
+- les demandes de retrait ;
+- les reversements aux vendeurs ;
+- les abonnements MAXIMUS ;
+- les futures fonctionnalités financières.
+
+DiamanoPay constitue la passerelle de paiement externe.
+
+MAXIMUS constitue la couche métier qui orchestre les transactions, les droits, les portefeuilles, les commissions et l'historique financier.
+
+---
+
+2. PRINCIPE FONDAMENTAL
+
+Ne pas construire un système de paiement indépendant dans chaque module.
+
+Architecture :
+
+CLIENT
+↓
+MODULE MAXIMUS
+↓
+PAYMENT SERVICE MAXIMUS
+↓
+DIAMANOPAY
+↓
+Wave / Orange Money / Carte / autre moyen disponible
+↓
+Confirmation
+↓
+Webhook DiamanoPay
+↓
+MAXIMUS
+↓
+Ledger financier
+↓
+Portefeuille concerné
+↓
+Module métier
+
+DiamanoPay doit être considéré comme le prestataire de paiement.
+
+MAXIMUS doit rester la source de vérité concernant les opérations métier et les écritures internes.
+
+---
+
+3. ARCHITECTURE GÉNÉRALE
+
+L'architecture doit être organisée en couches.
+
+Couche 1 — Interface
+
+React/Vite :
+
+- checkout ;
+- paiement ;
+- portefeuille ;
+- transactions ;
+- retraits ;
+- remboursements ;
+- administration financière.
+
+Le frontend ne communique jamais directement avec les secrets DiamanoPay.
+
+Couche 2 — API MAXIMUS
+
+Laravel/Node selon l'architecture existante :
+
+- PaymentController ;
+- PaymentService ;
+- WalletService ;
+- LedgerService ;
+- CommissionService ;
+- RefundService ;
+- WithdrawalService ;
+- WebhookController ;
+- PaymentProviderService.
+
+Couche 3 — Provider
+
+Créer une abstraction :
+
+PaymentProviderInterface
+
+Puis :
+
+DiamanoPayProvider
+
+L'objectif est de pouvoir ajouter ultérieurement un autre prestataire sans reconstruire MAXIMUS.
+
+Architecture :
+
+Payment Service
+→ Provider Interface
+→ DiamanoPay Provider
+
+et éventuellement demain :
+
+Payment Service
+→ Wave Provider
+ou
+→ autre Provider.
+
+---
+
+4. DIAMANOPAY
+
+L'intégration doit respecter strictement la documentation officielle disponible.
+
+DiamanoPay indique actuellement une API avec authentification serveur, création de charge/paiement, webhook et vérification de transaction. Les credentials doivent rester côté backend.
+
+Variables d'environnement recommandées :
+
+DIAMANOPAY_CLIENT_ID
+DIAMANOPAY_CLIENT_SECRET
+DIAMANOPAY_ACCESS_TOKEN
+DIAMANOPAY_BASE_URL
+DIAMANOPAY_WEBHOOK_SECRET
+
+Les noms exacts doivent être adaptés à la méthode d'authentification effectivement utilisée par le compte MAXIMUS.
+
+Aucune clé secrète dans :
+
+- React ;
+- Vite ;
+- localStorage ;
+- cookies accessibles au JavaScript ;
+- GitHub ;
+- logs ;
+- réponses API publiques.
+
+---
+
+5. IDENTIFICATION D'UNE TRANSACTION
+
+Chaque opération doit posséder deux références :
+
+Référence MAXIMUS
+
+Exemple :
+
+MAX-PAY-20260907-000001
+
+Référence DiamanoPay
+
+Identifiant fourni par DiamanoPay.
+
+Ne jamais utiliser uniquement la référence du prestataire.
+
+La transaction doit également connaître son origine :
+
+tenant_id
+source_module
+source_type
+source_id
+customer_id
+seller_id
+payment_provider
+provider_transaction_id
+
+---
+
+6. TABLE PAYMENT
+
+Concept :
+
+payments
+
+Champs principaux :
+
+- id ;
+- public_reference ;
+- tenant_id ;
+- customer_id ;
+- seller_id ;
+- source_module ;
+- source_type ;
+- source_id ;
+- provider ;
+- provider_transaction_id ;
+- amount ;
+- currency ;
+- payment_method ;
+- status ;
+- description ;
+- metadata ;
+- initiated_at ;
+- paid_at ;
+- failed_at ;
+- created_at ;
+- updated_at.
+
+Statuts :
+
+PENDING
+PROCESSING
+PAID
+FAILED
+CANCELLED
+EXPIRED
+PARTIALLY_REFUNDED
+REFUNDED
+
+Les statuts doivent être contrôlés côté backend.
+
+---
+
+7. FLUX DE PAIEMENT
+
+Exemple e-commerce
+
+Client :
+
+Panier = 50 000 FCFA
+
+Étape 1 :
+
+MAXIMUS crée la commande.
+
+Statut :
+
+PENDING_PAYMENT
+
+Étape 2 :
+
+MAXIMUS crée une transaction.
+
+Statut :
+
+PENDING
+
+Étape 3 :
+
+MAXIMUS demande à DiamanoPay d'initialiser le paiement.
+
+Étape 4 :
+
+Le client effectue le paiement.
+
+Étape 5 :
+
+DiamanoPay confirme le résultat.
+
+Étape 6 :
+
+MAXIMUS reçoit le webhook.
+
+Étape 7 :
+
+MAXIMUS vérifie la transaction.
+
+Étape 8 :
+
+La transaction devient :
+
+PAID
+
+Étape 9 :
+
+La commande devient :
+
+PAID
+
+Étape 10 :
+
+MAXIMUS crée les écritures financières.
+
+IMPORTANT :
+
+La redirection du client vers une page « paiement réussi » ne suffit jamais pour créditer le vendeur.
+
+---
+
+8. WEBHOOK
+
+Créer :
+
+POST /api/webhooks/diamanopay
+
+Le webhook doit :
+
+1. recevoir la notification ;
+2. vérifier son authenticité ;
+3. identifier la transaction ;
+4. vérifier le montant ;
+5. vérifier la référence ;
+6. vérifier le statut ;
+7. vérifier le tenant ;
+8. empêcher le double traitement ;
+9. enregistrer l'événement ;
+10. mettre à jour la transaction ;
+11. déclencher le traitement métier.
+
+Créer une table :
+
+payment_events
+
+avec :
+
+- id ;
+- payment_id ;
+- provider ;
+- event_type ;
+- provider_event_id ;
+- payload ;
+- signature ;
+- processed_at ;
+- processing_status ;
+- error_message.
+
+Créer une contrainte d'idempotence.
+
+Un même événement reçu plusieurs fois ne doit produire qu'un seul traitement financier.
+
+---
+
+9. LEDGER FINANCIER
+
+C'est une partie essentielle.
+
+NE PAS gérer les soldes uniquement avec :
+
+balance = balance + montant
+
+Créer un ledger financier.
+
+Table :
+
+ledger_entries
+
+Chaque mouvement possède :
+
+- id ;
+- tenant_id ;
+- wallet_id ;
+- transaction_id ;
+- type ;
+- direction ;
+- amount ;
+- currency ;
+- reference ;
+- description ;
+- status ;
+- created_at.
+
+Exemples :
+
+PAYMENT_CREDIT
+COMMISSION_DEBIT
+REFUND_DEBIT
+WITHDRAWAL_DEBIT
+WITHDRAWAL_REVERSED
+ADJUSTMENT
+
+Le ledger doit permettre de reconstituer l'intégralité d'un solde.
+
+---
+
+10. PORTEFEUILLES
+
+Table :
+
+wallets
+
+Un portefeuille peut appartenir à :
+
+- une entreprise ;
+- un vendeur ;
+- un compte spécifique selon les besoins futurs.
+
+Exemple :
+
+Vendeur A
+
+Solde disponible :
+95 000 FCFA
+
+Solde en attente :
+20 000 FCFA
+
+Solde retiré :
+150 000 FCFA
+
+Les valeurs affichées doivent être calculables à partir des écritures du ledger.
+
+Prévoir également :
+
+available_balance
+pending_balance
+
+mais ces valeurs doivent être maintenues de façon transactionnelle et rester cohérentes avec le ledger.
+
+---
+
+11. EXEMPLE FINANCIER
+
+Commande :
+
+100 000 FCFA
+
+Commission MAXIMUS :
+
+5 000 FCFA
+
+Écriture logique :
+
+Encaissement :
++100 000
+
+Commission :
+-5 000
+
+Montant vendeur :
++95 000
+
+Le vendeur voit :
+
+Solde disponible :
+95 000 FCFA
+
+MAXIMUS conserve l'historique complet permettant d'expliquer pourquoi le vendeur possède exactement 95 000 FCFA.
+
+---
+
+12. COMMISSIONS
+
+Créer :
+
+commission_rules
+
+et
+
+commissions
+
+La commission peut être :
+
+- pourcentage ;
+- montant fixe ;
+- combinaison des deux ;
+- règle spécifique selon le module.
+
+Ne jamais coder :
+
+commission = 5%
+
+directement dans plusieurs fichiers.
+
+Les règles doivent être configurables.
+
+Une commission enregistrée doit rester historisée.
+
+---
+
+13. RETRAITS VENDEURS
+
+Créer :
+
+withdrawals
+
+Champs :
+
+- id ;
+- tenant_id ;
+- seller_id ;
+- wallet_id ;
+- payout_account_id ;
+- amount ;
+- fees ;
+- net_amount ;
+- provider ;
+- provider_reference ;
+- status ;
+- requested_at ;
+- processed_at ;
+- failure_reason.
+
+Statuts :
+
+REQUESTED
+APPROVED
+PROCESSING
+COMPLETED
+FAILED
+CANCELLED
+
+Flux :
+
+Vendeur
+→ Demande de retrait
+→ Vérification du solde
+→ Réservation des fonds
+→ Validation
+→ Payout DiamanoPay
+→ Confirmation
+→ Ledger
+→ Retrait COMPLETED
+
+IMPORTANT :
+
+Ne jamais considérer un retrait comme terminé simplement parce que l'API a accepté la demande.
+
+Le statut final doit être confirmé.
+
+---
+
+14. COMPTE DE RETRAIT
+
+Créer :
+
+payout_accounts
+
+Un vendeur peut enregistrer son moyen de réception :
+
+- opérateur ;
+- numéro ;
+- nom du bénéficiaire ;
+- pays ;
+- type de compte.
+
+Les données sensibles doivent être protégées.
+
+Prévoir vérification et modification sécurisée.
+
+Le vendeur ne doit pas pouvoir utiliser le compte de retrait d'un autre vendeur.
+
+---
+
+15. POINT CRITIQUE : ARGENT REÇU PAR MAXIMUS
+
+Si les paiements des clients arrivent sur le compte marchand DiamanoPay de MAXIMUS, MAXIMUS doit maintenir une séparation comptable interne entre les montants.
+
+Exemple :
+
+DiamanoPay reçoit :
+
+500 000 FCFA
+
+Cela ne signifie pas :
+
+« MAXIMUS possède 500 000 FCFA ».
+
+Le ledger MAXIMUS doit savoir :
+
+Vendeur A : 200 000
+Vendeur B : 150 000
+Vendeur C : 100 000
+Commission MAXIMUS : 50 000
+
+La somme doit rester réconciliable avec les opérations réellement confirmées.
+
+IMPORTANT :
+
+Cette architecture logicielle ne constitue pas à elle seule une qualification juridique des fonds. Avant une mise en production marketplace à grande échelle, valider avec DiamanoPay et, si nécessaire, un conseiller juridique/comptable, les règles applicables à la détention et au reversement des fonds.
+
+---
+
+16. REMBOURSEMENTS
+
+Table :
+
+refunds
+
+Un remboursement doit être lié au paiement original.
+
+Champs :
+
+- payment_id ;
+- amount ;
+- reason ;
+- provider_reference ;
+- status ;
+- created_at ;
+- completed_at.
+
+Types :
+
+FULL
+PARTIAL
+
+Règle :
+
+Montant total remboursé
+≤
+Montant payé.
+
+Un remboursement doit produire les écritures correspondantes dans le ledger.
+
+---
+
+17. INTÉGRATION E-COMMERCE
+
+Le module e-commerce ne doit pas posséder sa propre infrastructure financière.
+
+Il appelle :
+
+PaymentService
+
+Exemple :
+
+Order
+→ PaymentService.createPayment()
+→ DiamanoPay
+→ Webhook
+→ PaymentService.confirmPayment()
+→ OrderService.markPaid()
+→ LedgerService.record()
+→ CommissionService.calculate()
+→ WalletService.credit()
+
+---
+
+18. INTÉGRATION DES AUTRES MODULES
+
+Même logique pour :
+
+Abonnement MAXIMUS
+
+Subscription
+→ PaymentService
+
+Facturation
+
+Invoice
+→ PaymentService
+
+Commerce
+
+Sale
+→ PaymentService
+
+Finance
+
+Financial transaction
+→ LedgerService
+
+E-commerce
+
+Order
+→ PaymentService
+
+Le paiement est donc transversal.
+
+---
+
+19. RÉCONCILIATION
+
+Créer un mécanisme de rapprochement.
+
+Objectif :
+
+Comparer :
+
+Transactions MAXIMUS
+↔
+Transactions DiamanoPay.
+
+Détecter :
+
+- transaction absente ;
+- montant différent ;
+- statut différent ;
+- doublon ;
+- paiement confirmé chez DiamanoPay mais absent de MAXIMUS ;
+- transaction MAXIMUS PAID sans confirmation fournisseur.
+
+Prévoir une interface :
+
+Administration
+→ Paiements
+→ Réconciliation.
+
+---
+
+20. SÉCURITÉ
+
+Obligatoire :
+
+- secrets côté serveur ;
+- HTTPS ;
+- validation backend ;
+- RBAC ;
+- isolation tenant ;
+- idempotence ;
+- protection webhook ;
+- transactions DB atomiques ;
+- audit logs ;
+- rate limiting ;
+- références uniques ;
+- protection contre double paiement ;
+- protection contre double retrait.
+
+Ne jamais faire confiance aux données financières provenant du frontend.
+
+---
+
+21. ADMINISTRATION MAXIMUS
+
+Créer un espace :
+
+MAXIMUS
+→ Finance
+→ Paiements
+
+Sous-sections :
+
+- Transactions ;
+- Portefeuilles ;
+- Retraits ;
+- Remboursements ;
+- Commissions ;
+- Webhooks ;
+- Réconciliation ;
+- Journal financier.
+
+Dashboard :
+
+- volume encaissé ;
+- nombre de paiements ;
+- paiements réussis ;
+- paiements échoués ;
+- remboursements ;
+- retraits ;
+- commissions ;
+- montant en attente.
+
+---
+
+22. ESPACE VENDEUR
+
+Le vendeur doit avoir :
+
+Vue d'ensemble
+
+Solde disponible
+
+Solde en attente
+
+Total vendu
+
+Total retiré
+
+Commissions
+
+Transactions
+
+Liste complète des opérations.
+
+Retraits
+
+- demander un retrait ;
+- suivre le statut ;
+- consulter l'historique.
+
+Moyens de réception
+
+- ajouter ;
+- modifier ;
+- désactiver.
+
+Détails
+
+Chaque opération doit être explicable.
+
+---
+
+23. API INTERNE MAXIMUS
+
+Créer une couche API cohérente.
+
+Exemples :
+
+POST /api/payments
+GET /api/payments/{id}
+GET /api/payments
+POST /api/refunds
+GET /api/wallet
+GET /api/wallet/transactions
+POST /api/withdrawals
+GET /api/withdrawals
+GET /api/payout-accounts
+POST /api/payout-accounts
+POST /api/webhooks/diamanopay
+
+Adapter les routes à l'architecture actuelle.
+
+Ne pas créer de doublons si des endpoints existent déjà.
+
+---
+
+24. TESTS
+
+Tester obligatoirement :
+
+Paiement
+
+- succès ;
+- échec ;
+- annulation ;
+- expiration ;
+- double paiement ;
+- paiement avec montant incorrect.
+
+Webhook
+
+- webhook valide ;
+- webhook invalide ;
+- webhook répété ;
+- webhook retardé ;
+- événement inconnu.
+
+Portefeuille
+
+- crédit ;
+- débit ;
+- solde insuffisant ;
+- concurrence ;
+- isolation tenant.
+
+Retrait
+
+- retrait normal ;
+- retrait supérieur au solde ;
+- double demande ;
+- retrait échoué ;
+- retrait confirmé ;
+- retrait en attente.
+
+Remboursement
+
+- total ;
+- partiel ;
+- dépassement interdit ;
+- double remboursement.
+
+Multi-tenant
+
+Entreprise A ne doit jamais accéder aux données financières de B.
+
+---
+
+25. OBSERVABILITÉ
+
+Créer des logs techniques et financiers distincts.
+
+Chaque opération importante doit pouvoir être suivie par :
+
+- request_id ;
+- payment_reference ;
+- provider_reference ;
+- tenant_id ;
+- utilisateur ;
+- date ;
+- statut.
+
+Ne jamais enregistrer les secrets ou données sensibles dans les logs.
+
+---
+
+26. ENVIRONNEMENTS
+
+Séparer :
+
+DEVELOPMENT
+STAGING
+PRODUCTION
+
+Utiliser les credentials appropriés à chaque environnement.
+
+Ne jamais utiliser une clé production dans les tests.
+
+---
+
+27. EXTENSIBILITÉ
+
+L'architecture doit permettre ultérieurement d'ajouter :
+
+- autre PSP ;
+- paiement bancaire ;
+- autres pays ;
+- autres devises ;
+- nouveaux moyens de paiement ;
+- nouveaux types de payout ;
+- nouveaux modules MAXIMUS.
+
+Ne pas coupler toute l'application directement aux endpoints DiamanoPay.
+
+---
+
+28. RÈGLE DE CONCEPTION
+
+MAXIMUS doit fonctionner selon cette séparation :
+
+DIAMANOPAY
+= infrastructure externe de paiement
+
+PAYMENT SERVICE
+= orchestration des paiements
+
+LEDGER
+= historique financier interne
+
+WALLET
+= représentation du solde disponible
+
+COMMISSION SERVICE
+= calcul des commissions
+
+PAYOUT SERVICE
+= gestion des reversements
+
+REFUND SERVICE
+= gestion des remboursements
+
+MODULE MÉTIER
+= commande, facture, abonnement, vente, etc.
+
+---
+
+29. RÈGLE ABSOLUE
+
+Aucune opération financière ne doit être considérée comme définitive sans confirmation fiable du prestataire.
+
+Aucun solde ne doit être créé artificiellement.
+
+Aucun retrait ne doit être simulé.
+
+Aucun paiement ne doit être marqué « réussi » simplement parce que le frontend affiche une page de succès.
+
+Aucune entreprise ne doit pouvoir accéder aux données financières d'une autre.
+
+Aucune clé secrète ne doit apparaître dans le frontend.
+
+---
+
+30. OBJECTIF FINAL
+
+À terme, MAXIMUS doit disposer d'une architecture où :
+
+CLIENT
+↓
+PAIEMENT
+↓
+DIAMANOPAY
+↓
+CONFIRMATION
+↓
+MAXIMUS
+↓
+TRANSACTION
+↓
+LEDGER
+↓
+COMMISSION
+↓
+PORTEFEUILLE VENDEUR
+↓
+RETRAIT
+↓
+PAYOUT DIAMANOPAY
+↓
+CONFIRMATION
+↓
+LEDGER FINAL
+
+Cette architecture doit être la fondation financière de MAXIMUS et non une fonctionnalité spécifique de l'e-commerce.
+
+Toute implémentation doit privilégier :
+sécurité + traçabilité + idempotence + isolation multi-tenant + réconciliation + extensibilité + absence de régression.
