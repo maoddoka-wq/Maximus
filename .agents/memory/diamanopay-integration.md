@@ -16,3 +16,9 @@ La configuration DiamanoPay doit être évaluée uniquement côté backend à pa
 **Why:** Une URL callback manquante ou un cache de configuration construit avant les variables de production pouvait produire un faux message « non configuré », alors que le token ou les credentials existaient.
 
 **How to apply:** Enregistrer le provider comme singleton, normaliser les valeurs de configuration et ne journaliser que les erreurs techniques sans secrets. Pour une commande e-commerce, remplacer le callback global par une URL de retour HTTPS générée côté serveur avec le domaine ou le slug de la boutique et la référence de commande.
+
+Les réponses de lancement DiamanoPay peuvent utiliser plusieurs noms pour l’URL de checkout (`paymentUrl`, `checkout_url`, `checkoutUrl` ou variantes imbriquées) ; une création de paiement ne doit être considérée réussie que si une URL HTTPS/HTTP valide est réellement extraite. Les créations doivent rester sans retry automatique, avec idempotence en base pour absorber les doubles requêtes.
+
+**Why:** Une réponse valide pouvait être classée en échec lorsque son champ ne portait pas exactement le nom attendu, tandis qu’une concurrence entre deux clics pouvait provoquer un second passage dans le flux de création.
+
+**How to apply:** Normaliser les variantes documentées de réponse, journaliser uniquement le statut HTTP et un identifiant de corrélation, classer les erreurs de transport/authentification séparément, et récupérer l’enregistrement existant après un conflit d’unicité plutôt que rappeler le prestataire.

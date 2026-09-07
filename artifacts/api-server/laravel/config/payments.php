@@ -15,6 +15,7 @@ return [
         'verify_path' => env('DIAMANOPAY_VERIFY_PATH', '/api/transaction/{providerTransactionId}'),
         'refund_path' => env('DIAMANOPAY_REFUND_PATH', '/api/payout/refund/{providerTransactionId}'),
         'payout_path' => env('DIAMANOPAY_PAYOUT_PATH', '/api/payout'),
-        'timeout' => (int) env('DIAMANOPAY_TIMEOUT', 15),
+        'connect_timeout' => (int) env('DIAMANOPAY_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('DIAMANOPAY_TIMEOUT', 30),
     ],
 ];

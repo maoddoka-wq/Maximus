@@ -7,6 +7,7 @@ use App\Support\EcommerceCustomerAuth;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use App\Services\Payments\PaymentService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -578,46 +579,7 @@ class EcommerceController extends Controller
                 ->where('idempotency_key', $idempotencyKey)
                 ->first();
             if ($existing) {
-                $payment = $existing->payment_id
-                    ? app(PaymentService::class)->getForTenant((string) $store->company_id, (string) $existing->payment_id)
-                    : null;
-                $paymentPayload = $payment ? app(PaymentService::class)->payload($payment) : null;
-                if (! $payment) {
-                    $payment = app(PaymentService::class)->create([
-                        'tenant_id' => (string) $store->company_id,
-                        'customer_id' => $existing->customer_id,
-                        'seller_id' => (string) $store->company_id,
-                        'source_module' => 'ecommerce',
-                        'source_type' => 'ecommerce_order',
-                        'source_id' => $existing->id,
-                        'amount' => (int) $existing->total,
-                        'currency' => (string) $store->currency,
-                        'payment_method' => $input['paymentMethod'],
-                        'description' => 'Commande '.$existing->reference,
-                        'metadata' => [
-                            'order_reference' => $existing->reference,
-                            'return_url' => $this->paymentReturnUrl($request, $store, (string) $existing->reference, $customDomain),
-                        ],
-                        'idempotency_key' => 'order-payment:'.$existing->id,
-                        'customer' => [
-                            'name' => $existing->customer_name,
-                            'email' => $existing->customer_email,
-                            'phone' => $existing->customer_phone,
-                        ],
-                        'request_id' => $request->header('X-Request-Id'),
-                    ]);
-                    DB::table('ecommerce_orders')->where('id', $existing->id)->update([
-                        'payment_id' => $payment['id'],
-                        'payment_status' => $payment['status'],
-                        'updated_at' => now(),
-                    ]);
-                    $paymentPayload = $payment;
-                }
-                return response()->json([
-                    'reference' => $existing->reference,
-                    'total' => (int) $existing->total,
-                    'payment' => $paymentPayload,
-                ]);
+                return $this->existingOrderPaymentResponse($request, $store, $existing, $input, $customDomain);
             }
         }
         if ($customer) {
@@ -740,6 +702,20 @@ class EcommerceController extends Controller
                 'total' => $order['total'],
                 'payment' => $payment,
             ], 201);
+        } catch (QueryException $error) {
+            if ($idempotencyKey !== '' && $this->isUniqueViolation($error)) {
+                $existing = DB::table('ecommerce_orders')
+                    ->where('company_id', $store->company_id)
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->first();
+                if ($existing) {
+                    return $this->existingOrderPaymentResponse($request, $store, $existing, $input, $customDomain);
+                }
+            }
+
+            return response()->json([
+                'error' => 'La commande n’a pas pu être enregistrée.',
+            ], 409);
         } catch (Throwable $error) {
             return response()->json([
                 'error' => $error->getMessage() === 'STOCK_INSUFFICIENT'
@@ -747,6 +723,51 @@ class EcommerceController extends Controller
                     : 'La commande n’a pas pu être enregistrée.',
             ], $error->getMessage() === 'STOCK_INSUFFICIENT' ? 409 : 400);
         }
+    }
+
+    private function existingOrderPaymentResponse(Request $request, object $store, object $existing, array $input, bool $customDomain): JsonResponse
+    {
+        $payments = app(PaymentService::class);
+        $payment = $existing->payment_id
+            ? $payments->getForTenant((string) $store->company_id, (string) $existing->payment_id)
+            : null;
+        $paymentPayload = $payment ? $payments->payload($payment) : null;
+        if (! $payment) {
+            $paymentPayload = $payments->create([
+                'tenant_id' => (string) $store->company_id,
+                'customer_id' => $existing->customer_id,
+                'seller_id' => (string) $store->company_id,
+                'source_module' => 'ecommerce',
+                'source_type' => 'ecommerce_order',
+                'source_id' => $existing->id,
+                'amount' => (int) $existing->total,
+                'currency' => (string) $store->currency,
+                'payment_method' => $input['paymentMethod'],
+                'description' => 'Commande '.$existing->reference,
+                'metadata' => [
+                    'order_reference' => $existing->reference,
+                    'return_url' => $this->paymentReturnUrl($request, $store, (string) $existing->reference, $customDomain),
+                ],
+                'idempotency_key' => 'order-payment:'.$existing->id,
+                'customer' => [
+                    'name' => $existing->customer_name,
+                    'email' => $existing->customer_email,
+                    'phone' => $existing->customer_phone,
+                ],
+                'request_id' => $request->header('X-Request-Id'),
+            ]);
+            DB::table('ecommerce_orders')->where('id', $existing->id)->update([
+                'payment_id' => $paymentPayload['id'],
+                'payment_status' => $paymentPayload['status'],
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'reference' => $existing->reference,
+            'total' => (int) $existing->total,
+            'payment' => $paymentPayload,
+        ]);
     }
 
     private function orderPaymentStatus(object $store, string $reference): JsonResponse
@@ -789,6 +810,12 @@ class EcommerceController extends Controller
             : '/shop/'.rawurlencode((string) $store->slug).'/paiement/retour';
 
         return $origin.$path.'?order='.rawurlencode($reference);
+    }
+
+    private function isUniqueViolation(QueryException $exception): bool
+    {
+        return in_array((string) $exception->getCode(), ['23000', '23505'], true)
+            || str_contains(strtolower($exception->getMessage()), 'unique');
     }
 
     private function publishedStoreByDomain(string $host): ?object

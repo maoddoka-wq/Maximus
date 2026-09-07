@@ -199,6 +199,7 @@ class EcommerceTest extends TestCase
             'customerEmail' => 'invite@example.test',
             'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
+            'idempotencyKey' => 'checkout-guest-1',
             'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
         ])->assertCreated()->json();
 
@@ -208,10 +209,100 @@ class EcommerceTest extends TestCase
                 && ($httpRequest->data()['webhook'] ?? null) === 'https://maximus.test/api/webhooks/diamanopay';
         });
 
+        $duplicate = $this->postJson('http://maximus.test/api/shop/retour-invite-test/orders', [
+            'customerName' => 'Client invité',
+            'customerEmail' => 'invite@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar, Sénégal',
+            'idempotencyKey' => 'checkout-guest-1',
+            'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
+        ])->assertOk()->json();
+        $successive = $this->postJson('http://maximus.test/api/shop/retour-invite-test/orders', [
+            'customerName' => 'Client invité',
+            'customerEmail' => 'invite@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar, Sénégal',
+            'idempotencyKey' => 'checkout-guest-2',
+            'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
+        ])->assertCreated()->json();
+        $this->assertSame($order['reference'], $duplicate['reference']);
+        $this->assertNotSame($order['reference'], $successive['reference']);
+        $this->assertDatabaseCount('ecommerce_orders', 2);
+        $this->assertDatabaseCount('payments', 2);
+        Http::assertSentCount(2);
+
         $this->getJson('/api/shop/retour-invite-test/orders/'.$order['reference'].'/payment-status')
             ->assertOk()
             ->assertJsonPath('reference', $order['reference'])
             ->assertJsonPath('payment.status', 'PENDING');
+    }
+
+    public function test_shop_return_context_is_isolated_between_two_tenants(): void
+    {
+        $this->configureDiamanoPayForCheckout();
+        CompanyRegistry::ensureActive('other-company', 'Autre entreprise');
+        foreach ([
+            ['company' => 'kora', 'slug' => 'boutique-a-test', 'product' => 'produit-a-test', 'sku' => 'A-RETURN-01'],
+            ['company' => 'other-company', 'slug' => 'boutique-b-test', 'product' => 'produit-b-test', 'sku' => 'B-RETURN-01'],
+        ] as $fixture) {
+            DB::table('ecommerce_stores')->insert([
+                'id' => 'store-'.$fixture['company'].'-return',
+                'company_id' => $fixture['company'],
+                'slug' => $fixture['slug'],
+                'name' => 'Boutique '.$fixture['slug'],
+                'description' => '',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primary_color' => '#D69E2E',
+                'accent_color' => '#172033',
+                'logo_url' => '',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('ecommerce_products')->insert([
+                'id' => 'product-'.$fixture['company'].'-return',
+                'company_id' => $fixture['company'],
+                'name' => 'Produit '.$fixture['slug'],
+                'slug' => $fixture['product'],
+                'sku' => $fixture['sku'],
+                'description' => '',
+                'category' => 'Général',
+                'compare_at_price' => null,
+                'price' => 1000,
+                'stock' => 3,
+                'image_url' => '',
+                'featured' => false,
+                'status' => 'PUBLISHED',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $orderA = $this->postJson('http://maximus.test/api/shop/boutique-a-test/orders', [
+            'customerName' => 'Client A',
+            'customerEmail' => 'a@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar',
+            'idempotencyKey' => 'tenant-return-a',
+            'items' => [['productSlug' => 'produit-a-test', 'quantity' => 1]],
+        ])->assertCreated()->json();
+        $orderB = $this->postJson('http://maximus.test/api/shop/boutique-b-test/orders', [
+            'customerName' => 'Client B',
+            'customerEmail' => 'b@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar',
+            'idempotencyKey' => 'tenant-return-b',
+            'items' => [['productSlug' => 'produit-b-test', 'quantity' => 1]],
+        ])->assertCreated()->json();
+
+        Http::assertSent(function ($request) use ($orderA): bool {
+            return str_contains((string) ($request->data()['redirectUrl'] ?? ''), '/shop/boutique-a-test/paiement/retour?order='.$orderA['reference']);
+        });
+        Http::assertSent(function ($request) use ($orderB): bool {
+            return str_contains((string) ($request->data()['redirectUrl'] ?? ''), '/shop/boutique-b-test/paiement/retour?order='.$orderB['reference']);
+        });
+        $this->getJson('/api/shop/boutique-a-test/orders/'.$orderB['reference'].'/payment-status')->assertNotFound();
+        $this->getJson('/api/shop/boutique-b-test/orders/'.$orderA['reference'].'/payment-status')->assertNotFound();
     }
 
     public function test_connected_custom_domain_payment_returns_to_the_public_domain_without_login(): void
