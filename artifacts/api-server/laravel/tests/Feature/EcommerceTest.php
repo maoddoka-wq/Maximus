@@ -373,6 +373,7 @@ class EcommerceTest extends TestCase
 
     public function test_public_payment_return_exposes_success_cancel_and_failure_without_authentication(): void
     {
+        $this->configureDiamanoPayForCheckout();
         $request = $this->asActor();
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
             'name' => 'Boutique statuts retour',
@@ -410,6 +411,14 @@ class EcommerceTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('payment.status', $status);
         }
+
+        $payment = DB::table('payments')->where('id', $paymentId)->first();
+        $this->getJson('/api/shop/statuts-retour-test/orders/'.$payment->public_reference.'/payment-status')
+            ->assertOk()
+            ->assertJsonPath('reference', $order['reference']);
+        $this->getJson('/api/shop/statuts-retour-test/orders/'.$payment->provider_transaction_id.'/payment-status')
+            ->assertOk()
+            ->assertJsonPath('reference', $order['reference']);
     }
 
     public function test_public_order_cannot_use_a_product_from_another_company(): void

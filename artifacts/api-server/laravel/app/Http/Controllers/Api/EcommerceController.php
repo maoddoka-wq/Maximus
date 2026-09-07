@@ -777,6 +777,24 @@ class EcommerceController extends Controller
             ->where('reference', $reference)
             ->first();
         if (! $order) {
+            $payment = DB::table('payments')
+                ->where('tenant_id', $store->company_id)
+                ->where('source_type', 'ecommerce_order')
+                ->where(function ($query) use ($reference): void {
+                    $query
+                        ->where('id', $reference)
+                        ->orWhere('public_reference', $reference)
+                        ->orWhere('provider_transaction_id', $reference);
+                })
+                ->first();
+            $order = $payment
+                ? DB::table('ecommerce_orders')
+                    ->where('company_id', $store->company_id)
+                    ->where('id', $payment->source_id)
+                    ->first()
+                : null;
+        }
+        if (! $order) {
             return response()->json(['error' => 'Commande introuvable.'], 404);
         }
 

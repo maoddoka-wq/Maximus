@@ -33,7 +33,11 @@ const addressText = (address: EcommerceCustomerAddress) =>
 export default function PublicShopPage({ slug, domain = false }: { slug?: string; domain?: boolean }) {
   const [location, setLocation] = useLocation();
   const routePath = location.split('?')[0];
-  const paymentReturnReference = useMemo(() => new URLSearchParams(location.split('?')[1] ?? '').get('order'), [location]);
+  const paymentReturnReferences = useMemo(() => {
+    const params = new URLSearchParams(location.split('?')[1] ?? '');
+    const keys = ['order', 'reference', 'clientReference', 'publicReference', 'paymentRequestId', 'payment_request_id', 'transactionId', 'chargeId', 'paymentId'];
+    return [...new Set(keys.map(key => params.get(key)?.trim()).filter((value): value is string => Boolean(value)))];
+  }, [location]);
   const [data, setData] = useState<PublicShopBootstrap | null>(null);
   const [customer, setCustomer] = useState<EcommerceCustomer | null>(null);
   const [customerData, setCustomerData] = useState<EcommerceCustomerBootstrap | null>(null);
@@ -137,10 +141,21 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
       .then(async result => {
         if (cancelled) return;
         setData(result);
-        if (paymentReturnReference) {
-          const paymentStatus = domain
-            ? await publicEcommerceApi.domainPaymentStatus(paymentReturnReference)
-            : await publicEcommerceApi.paymentStatus(slug ?? '', paymentReturnReference);
+        if (paymentReturnReferences.length > 0) {
+          let paymentStatus: Awaited<ReturnType<typeof publicEcommerceApi.paymentStatus>> | null = null;
+          let lastPaymentStatusError: unknown = null;
+          for (const reference of paymentReturnReferences) {
+            try {
+              paymentStatus = domain
+                ? await publicEcommerceApi.domainPaymentStatus(reference)
+                : await publicEcommerceApi.paymentStatus(slug ?? '', reference);
+              break;
+            } catch (cause) {
+              lastPaymentStatusError = cause;
+              if (!(cause instanceof Error) || !cause.message.toLowerCase().includes('commande introuvable')) throw cause;
+            }
+          }
+          if (!paymentStatus) throw lastPaymentStatusError instanceof Error ? lastPaymentStatusError : new Error('Commande introuvable.');
           if (cancelled) return;
           setSubmitted({
             reference: paymentStatus.reference,
@@ -180,7 +195,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Boutique indisponible.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [api, domain, paymentReturnReference, slug]);
+  }, [api, domain, paymentReturnReferences, slug]);
 
   useEffect(() => {
     if (customer || !data) return;
