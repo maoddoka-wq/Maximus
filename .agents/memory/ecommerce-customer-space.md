@@ -14,3 +14,9 @@ Une commande idempotente déjà persistée doit pouvoir reprendre l’initialisa
 **Why:** Une première tentative interrompue peut laisser une commande valide sans paiement associé ; renvoyer `payment: null` bloque définitivement le checkout et transforme une reprise légitime en erreur frontend.
 
 **How to apply:** Réutiliser l’identifiant de commande comme clé d’idempotence du paiement, rattacher le nouveau paiement à la commande existante, puis renvoyer le même `reference` avec le payload de paiement.
+
+Les produits épuisés restent visibles dans le catalogue client avec un état « Rupture de stock » ; seul l’ajout au panier est bloqué.
+
+**Why:** Filtrer les produits sur `stock > 0` masque complètement un article après une réservation ou un paiement échoué et donne l’impression que le catalogue a disparu.
+
+**How to apply:** Inclure les produits publiés même avec un stock nul dans le bootstrap public, puis désactiver l’action d’achat côté client et conserver la validation serveur du stock.
