@@ -160,7 +160,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error ?? 'Une erreur est survenue.');
+  if (!response.ok) {
+    const validationErrors = body.errors && typeof body.errors === 'object'
+      ? Object.values(body.errors).flat().filter(value => typeof value === 'string').join(' ')
+      : '';
+    throw new Error(body.error ?? validationErrors ?? body.message ?? 'Une erreur est survenue.');
+  }
   return body as T;
 }
 
