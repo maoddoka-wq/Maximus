@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AuthSession;
 use App\Models\AuthUser;
+use App\Support\CompanyRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -40,14 +41,30 @@ final class MaximusAuth
             return null;
         }
 
-        return AuthUser::query()
+        $user = AuthUser::query()
             ->whereKey($session->user_id)
             ->where('status', 'ACTIF')
             ->first();
+
+        return $user && self::canAuthenticate($user) ? $user : null;
+    }
+
+    public static function canAuthenticate(AuthUser $user): bool
+    {
+        if ($user->status !== 'ACTIF') {
+            return false;
+        }
+
+        return $user->company_id === null
+            || CompanyRegistry::isActive((string) $user->company_id);
     }
 
     public static function issueSession(AuthUser $user): string
     {
+        if (! self::canAuthenticate($user)) {
+            throw new \LogicException('Impossible de créer une session pour un compte ou une entreprise inactive.');
+        }
+
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
 
         AuthSession::query()->create([

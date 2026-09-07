@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AuthSession;
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MaximusAuthTest extends TestCase
@@ -255,5 +257,124 @@ class MaximusAuthTest extends TestCase
             'company_id' => 'kora',
             'employee_id' => 'shared-employee-id',
         ]);
+    }
+
+    public function test_deleted_company_invalidates_credentials_sessions_tokens_and_protected_data_access(): void
+    {
+        Company::query()->create([
+            'id' => 'deleted-company',
+            'name' => 'Entreprise à supprimer',
+            'manager' => 'Administrateur supprimé',
+            'email' => 'admin@deleted-company.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['presences', 'stocks', 'ecommerce'],
+        ]);
+
+        $companyUser = AuthUser::query()->create([
+            'id' => 'deleted-company-admin',
+            'email' => 'admin@deleted-company.test',
+            'password_hash' => MaximusPassword::hash('DeletedCompany2026!'),
+            'display_name' => 'Administrateur supprimé',
+            'role' => 'company_admin',
+            'company_id' => 'deleted-company',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $oldToken = MaximusAuth::issueSession($companyUser);
+
+        $maximusAdmin = AuthUser::query()->create([
+            'id' => 'deletion-maximus-admin',
+            'email' => 'deletion-admin@maximus.test',
+            'password_hash' => MaximusPassword::hash('MaximusDeletion2026!'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $adminToken = MaximusAuth::issueSession($maximusAdmin);
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'companies' => [
+                    ['id' => 'deleted-company', 'name' => 'Entreprise à supprimer', 'status' => 'ACTIF'],
+                ],
+                'employees' => [
+                    ['id' => 'deleted-employee', 'companyId' => 'deleted-company'],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'deleted-company-store',
+            'company_id' => 'deleted-company',
+            'slug' => 'deleted-company-shop',
+            'name' => 'Boutique supprimée',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#000000',
+            'accent_color' => '#ffffff',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->deleteJson('/api/companies/deleted-company')
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas('companies', [
+            'id' => 'deleted-company',
+            'status' => 'ARCHIVÉ',
+        ]);
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'deleted-company-admin',
+            'status' => 'SUSPENDU',
+        ]);
+        $this->assertDatabaseMissing('auth_sessions', [
+            'token_hash' => MaximusAuth::hashToken($oldToken),
+        ]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'admin@deleted-company.test',
+            'password' => 'DeletedCompany2026!',
+        ])->assertUnauthorized();
+        $this->assertSame(0, AuthSession::query()->where('user_id', 'deleted-company-admin')->count());
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $oldToken)
+            ->getJson('/api/auth/session')
+            ->assertOk()
+            ->assertJson(['user' => null]);
+
+        $oldSession = fn () => $this
+            ->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $oldToken);
+
+        $oldSession()->getJson('/api/app-state/bootstrap')->assertUnauthorized();
+        $oldSession()->putJson('/api/app-state', [
+            'data' => ['companies' => [['id' => 'deleted-company']]],
+            'version' => 1,
+        ])->assertUnauthorized();
+        $oldSession()->getJson('/api/modules/bootstrap?companyId=deleted-company')->assertUnauthorized();
+        $oldSession()->getJson('/api/presence/bootstrap')->assertUnauthorized();
+        $oldSession()->postJson('/api/presence/items', [
+            'id' => 'should-not-be-created',
+            'type' => 'absence',
+        ])->assertUnauthorized();
+        $this->getJson('/api/shop/deleted-company-shop')->assertNotFound();
+
+        $adminState = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk();
+        $this->assertFalse(collect($adminState->json('data.companies'))->contains('id', 'deleted-company'));
+        $this->assertFalse(collect($adminState->json('data.employees'))->contains('companyId', 'deleted-company'));
     }
 }

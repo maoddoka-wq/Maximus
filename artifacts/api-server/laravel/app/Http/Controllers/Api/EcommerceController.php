@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\EcommerceCustomerAuth;
+use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -328,8 +329,11 @@ class EcommerceController extends Controller
 
     public function publicBootstrap(string $slug): JsonResponse
     {
-        $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
-        if (! $store) {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
@@ -514,10 +518,11 @@ class EcommerceController extends Controller
             return null;
         }
 
-        return DB::table('ecommerce_stores')
+        $store = DB::table('ecommerce_stores')
             ->where('company_id', $domainRow->company_id)
             ->where('status', 'PUBLISHED')
             ->first();
+        return $store && CompanyRegistry::isActive((string) $store->company_id) ? $store : null;
     }
 
     private function domains(string $company): array

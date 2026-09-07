@@ -81,7 +81,7 @@ import {
   subscriptionPlans,
   sanitizeStoreData,
 } from '@/lib/store';
-import { appStateApi } from '@/lib/app-state-api';
+import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
 import {
   discardCatalogDraft,
   getCatalogImpact,
@@ -423,6 +423,13 @@ function AppContent() {
       })
       .catch((error) => {
         if (!cancelled) {
+          if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
+            setSession(null);
+            localStorage.removeItem('maximus-session');
+            localStorage.removeItem('maximus-sector-test-company');
+            setToast('Votre session MAXIMUS n’est plus active.');
+            return;
+          }
           setToast(error instanceof Error ? error.message : 'Les données métier sont indisponibles.');
         }
       });

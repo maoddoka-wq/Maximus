@@ -29,7 +29,11 @@ class AuthController extends Controller
             ->where('status', 'ACTIF')
             ->first();
 
-        if (! $user || ! MaximusPassword::check($data['password'], $user->password_hash)) {
+        if (
+            ! $user
+            || ! MaximusPassword::check($data['password'], $user->password_hash)
+            || ! MaximusAuth::canAuthenticate($user)
+        ) {
             return response()->json([
                 'error' => 'Email ou mot de passe incorrect.',
             ], 401);

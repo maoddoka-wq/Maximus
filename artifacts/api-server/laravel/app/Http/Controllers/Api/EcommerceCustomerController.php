@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\CompanyRegistry;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Http\JsonResponse;
@@ -374,10 +375,11 @@ class EcommerceCustomerController extends Controller
     private function publishedStore(Request $request, ?string $slug): ?object
     {
         if (is_string($slug) && $slug !== '') {
-            return DB::table('ecommerce_stores')
+            $store = DB::table('ecommerce_stores')
                 ->where('slug', $slug)
                 ->where('status', 'PUBLISHED')
                 ->first();
+            return $store && CompanyRegistry::isActive((string) $store->company_id) ? $store : null;
         }
         $domain = Str::lower(rtrim($request->getHost(), '.'));
         $domainRow = DB::table('ecommerce_domains')->where('domain', $domain)->where('status', 'ACTIVE')->first();
@@ -385,10 +387,11 @@ class EcommerceCustomerController extends Controller
             return null;
         }
 
-        return DB::table('ecommerce_stores')
+        $store = DB::table('ecommerce_stores')
             ->where('company_id', $domainRow->company_id)
             ->where('status', 'PUBLISHED')
             ->first();
+        return $store && CompanyRegistry::isActive((string) $store->company_id) ? $store : null;
     }
 
     private function addresses(object $customer): array

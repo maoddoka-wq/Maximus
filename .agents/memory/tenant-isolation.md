@@ -27,6 +27,17 @@ entreprise après actualisation.
 ventes, paiements, mouvements, activités, fournisseurs et commandes avant
 d’étendre un écran métier qui utilise `/api/app-state`.
 
+La résolution d’une session MAXIMUS doit vérifier l’existence et le statut actif
+de l’entreprise avant de retourner l’utilisateur ; le middleware seul ne suffit
+pas pour les endpoints de session, la connexion et les boutiques publiques.
+
+**Why:** Une session valide techniquement pouvait sinon survivre à l’archivage
+d’un tenant sur les chemins qui ne traversent pas le middleware métier.
+
+**How to apply:** Centraliser le contrôle dans la résolution et l’émission des
+tokens, révoquer les sessions lors de l’archivage, et appliquer la même règle
+aux URLs publiques résolues par slug ou domaine.
+
 Les boutiques par domaine personnalisé doivent résoudre l’entreprise depuis le
 Host réel de la requête et non depuis un `X-Forwarded-Host` fourni par le client.
 

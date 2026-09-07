@@ -50,5 +50,15 @@ final class CompanyRegistry
             'updated_at' => now(),
         ]);
         DB::table('maximus_company_modules')->where('company_id', $companyId)->delete();
+
+        if (DB::getSchemaBuilder()->hasTable('ecommerce_customer_sessions')) {
+            DB::table('ecommerce_customer_sessions')->where('company_id', $companyId)->delete();
+        }
+        if (DB::getSchemaBuilder()->hasTable('ecommerce_customers')) {
+            DB::table('ecommerce_customers')->where('company_id', $companyId)->update([
+                'status' => 'SUSPENDU',
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

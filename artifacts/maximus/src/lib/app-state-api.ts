@@ -6,6 +6,16 @@ type AppStateResponse = {
   data: Partial<StoreData>;
 };
 
+export class AppStateRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = 'AppStateRequestError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -17,7 +27,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(typeof body.error === 'string' ? body.error : 'Les données métier sont indisponibles.');
+    throw new AppStateRequestError(
+      typeof body.error === 'string' ? body.error : 'Les données métier sont indisponibles.',
+      response.status,
+    );
   }
   return body as T;
 }
