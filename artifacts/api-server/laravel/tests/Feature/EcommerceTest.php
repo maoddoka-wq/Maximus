@@ -100,6 +100,48 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_categories', ['id' => $category['id']]);
     }
 
+    public function test_product_and_category_slugs_are_generated_and_scoped_to_the_company(): void
+    {
+        $request = $this->asActor();
+        $category = $request->postJson('/api/ecommerce/categories?companyId=kora', [
+            'name' => 'Accessoires',
+        ])->assertCreated()->assertJsonPath('slug', 'accessoires')->json();
+
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Sac Atlas',
+            'sku' => 'ATLAS-01',
+            'categoryId' => $category['id'],
+            'price' => 12000,
+            'stock' => 3,
+        ])->assertCreated()->assertJsonPath('slug', 'sac-atlas');
+
+        DB::table('ecommerce_products')->insert([
+            'id' => 'other-company-product',
+            'company_id' => 'other-company',
+            'name' => 'Sac Atlas',
+            'slug' => 'sac-atlas',
+            'sku' => 'OTHER-ATLAS-01',
+            'description' => '',
+            'category' => 'Général',
+            'price' => 12000,
+            'compare_at_price' => null,
+            'stock' => 3,
+            'image_url' => '',
+            'featured' => false,
+            'status' => 'DRAFT',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Sac Atlas entreprise',
+            'sku' => 'ATLAS-02',
+            'slug' => 'sac-atlas',
+            'price' => 12000,
+            'stock' => 3,
+        ])->assertCreated()->assertJsonPath('slug', 'sac-atlas-2');
+    }
+
     public function test_published_shop_recalculates_total_and_decrements_stock_transactionally(): void
     {
         $request = $this->asActor();
