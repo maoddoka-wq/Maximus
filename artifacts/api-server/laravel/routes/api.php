@@ -35,8 +35,13 @@ Route::middleware('maximus.auth')->prefix('company-requests')->group(function ()
 
 Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
     Route::patch('/{companyId}', [CompanyController::class, 'update']);
+    Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);
+    Route::delete('/{companyId}/profile-photo', [CompanyController::class, 'deleteProfilePhoto']);
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
+
+Route::get('/company-profile-images/{companyId}/{filename}', [CompanyController::class, 'serveProfilePhoto'])
+    ->where(['companyId' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
 Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {
     Route::post('/', [AuthController::class, 'createAccount']);

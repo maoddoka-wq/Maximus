@@ -25,6 +25,10 @@ class Company extends Model
         'requested_module_pack_ids',
         'requested_module_features',
         'requested_module_permissions',
+        'profile_photo',
+        'primary_color',
+        'accent_color',
+        'sidebar_color',
         'rejection_reason',
         'deleted_at',
     ];

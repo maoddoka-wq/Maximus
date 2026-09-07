@@ -10,10 +10,11 @@ export type CompanyRequest = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const response = await fetch(`/api${path}`, {
     ...init,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: isFormData ? { ...(init?.headers ?? {}) } : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -50,10 +51,23 @@ export const companyRequestApi = {
       `/company-requests/${encodeURIComponent(companyId)}/reject`,
       { method: 'POST', body: JSON.stringify({ reason: reason ?? '' }) },
     ),
-  update: (companyId: string, input: Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'>) =>
+  update: (companyId: string, input: Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & Partial<Pick<Company, 'primaryColor' | 'accentColor' | 'sidebarColor'>>) =>
     request<{ ok: true; company: Company }>(`/companies/${encodeURIComponent(companyId)}`, {
       method: 'PATCH',
       body: JSON.stringify(input),
+    }),
+  uploadProfilePhoto: (companyId: string, photo: File) => {
+    const body = new FormData();
+    body.append('photo', photo);
+    return request<{ ok: true; company: Company }>(`/companies/${encodeURIComponent(companyId)}/profile-photo`, {
+      method: 'POST',
+      headers: {},
+      body,
+    });
+  },
+  deleteProfilePhoto: (companyId: string) =>
+    request<{ ok: true; company: Company }>(`/companies/${encodeURIComponent(companyId)}/profile-photo`, {
+      method: 'DELETE',
     }),
   remove: (companyId: string) =>
     request<{ ok: true }>(`/companies/${encodeURIComponent(companyId)}`, { method: 'DELETE' }),

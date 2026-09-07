@@ -13,6 +13,7 @@ use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -219,6 +220,9 @@ class CompanyController extends Controller
             'phone' => ['nullable', 'string', 'max:40'],
             'country' => ['nullable', 'string', 'max:100'],
             'sector' => ['nullable', 'string', 'max:120'],
+            'primaryColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'accentColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'sidebarColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ])->validate();
 
         $email = Str::lower(trim($input['email']));
@@ -232,14 +236,24 @@ class CompanyController extends Controller
 
         try {
             $updated = DB::transaction(function () use ($company, $input, $email): Company {
-                $company->update([
+                $changes = [
                     'name' => trim($input['name']),
                     'manager' => trim($input['manager']),
                     'email' => $email,
                     'phone' => trim((string) ($input['phone'] ?? '')),
                     'country' => trim((string) ($input['country'] ?? '')),
                     'sector' => trim((string) ($input['sector'] ?? '')),
-                ]);
+                ];
+                foreach ([
+                    'primaryColor' => 'primary_color',
+                    'accentColor' => 'accent_color',
+                    'sidebarColor' => 'sidebar_color',
+                ] as $inputKey => $column) {
+                    if (array_key_exists($inputKey, $input)) {
+                        $changes[$column] = strtoupper((string) $input[$inputKey]);
+                    }
+                }
+                $company->update($changes);
                 AuthUser::query()
                     ->where('company_id', $company->id)
                     ->where('role', 'company_admin')
@@ -279,6 +293,82 @@ class CompanyController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function uploadProfilePhoto(Request $request, string $companyId): JsonResponse
+    {
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) !== 'maximus_admin' && ($actor['companyId'] ?? null) !== $companyId) {
+            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        }
+
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if (! $company) {
+            return response()->json(['error' => 'Entreprise introuvable ou inactive.'], 404);
+        }
+
+        $input = Validator::make($request->all(), [
+            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ])->validate();
+
+        $path = $input['photo']->store('companies/'.$companyId, 'public');
+        if (! is_string($path) || $path === '') {
+            return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
+        }
+
+        $photoUrl = '/api/company-profile-images/'.rawurlencode($companyId).'/'.rawurlencode(basename($path));
+        $previousUrl = $company->profile_photo;
+        $company->update(['profile_photo' => $photoUrl]);
+        $this->removeStoredProfilePhoto($previousUrl, $photoUrl);
+
+        return response()->json(['ok' => true, 'company' => $this->companyPayload($company->fresh())]);
+    }
+
+    public function deleteProfilePhoto(Request $request, string $companyId): JsonResponse
+    {
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) !== 'maximus_admin' && ($actor['companyId'] ?? null) !== $companyId) {
+            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        }
+
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if (! $company) {
+            return response()->json(['error' => 'Entreprise introuvable ou inactive.'], 404);
+        }
+
+        $previousUrl = $company->profile_photo;
+        $company->update(['profile_photo' => null]);
+        $this->removeStoredProfilePhoto($previousUrl, null);
+
+        return response()->json(['ok' => true, 'company' => $this->companyPayload($company->fresh())]);
+    }
+
+    public function serveProfilePhoto(string $companyId, string $filename)
+    {
+        if (! preg_match('/^[A-Za-z0-9_-]+$/', $companyId) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
+            abort(404);
+        }
+
+        $path = 'companies/'.$companyId.'/'.$filename;
+        if (! Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk('public')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
+    }
+
+    private function removeStoredProfilePhoto(?string $photoUrl, ?string $replacement): void
+    {
+        if (! is_string($photoUrl) || $photoUrl === '' || $photoUrl === $replacement) {
+            return;
+        }
+        $parts = explode('/', trim($photoUrl, '/'));
+        $filename = end($parts);
+        if (count($parts) === 4 && $parts[0] === 'api' && $parts[1] === 'company-profile-images') {
+            Storage::disk('public')->delete('companies/'.$parts[2].'/'.$filename);
+        }
+    }
+
     private function companyPayload(Company $company): array
     {
         return [
@@ -297,6 +387,10 @@ class CompanyController extends Controller
             'allowedModules' => $company->status === 'ACTIF' ? ($company->requested_modules ?? []) : [],
             'refusedModules' => [],
             'createdAt' => optional($company->created_at)->toISOString(),
+            'profilePhoto' => $company->profile_photo,
+            'primaryColor' => $company->primary_color,
+            'accentColor' => $company->accent_color,
+            'sidebarColor' => $company->sidebar_color,
         ];
     }
 

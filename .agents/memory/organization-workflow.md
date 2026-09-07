@@ -38,3 +38,9 @@ Les fiches `companies` sont filtrées par leur champ `id`, contrairement aux aut
 **Why:** Un filtre uniforme sur `companyId` renvoie un état vide aux comptes entreprise et masque simultanément leurs modules, fonctionnalités et employés.
 
 **How to apply:** Centraliser la résolution du périmètre entreprise dans un helper partagé par bootstrap et sauvegarde, puis couvrir séparément une session entreprise et une session employé.
+
+La personnalisation de l’entreprise doit être persistée sur la fiche Laravel `companies` : les couleurs sont des attributs de l’entreprise et la photo doit être téléversée comme fichier, puis référencée par une URL, plutôt que conservée en base64 dans l’état métier.
+
+**Why:** L’état métier est soumis à des fusions et à des limites de payload ; y placer une image pouvait faire échouer la sauvegarde ou perdre la personnalisation après actualisation.
+
+**How to apply:** Faire retourner les champs de branding par le bootstrap entreprise, utiliser une route dédiée pour le fichier, et ne mettre dans l’état frontend que l’URL persistée.

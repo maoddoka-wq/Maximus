@@ -8,6 +8,8 @@ use App\Models\CompanyRequest;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CompanyRequestTest extends TestCase
@@ -126,6 +128,52 @@ class CompanyRequestTest extends TestCase
             'name' => 'Atelier Renommé',
             'email' => 'new-owner@atelier.test',
         ]);
+    }
+
+    public function test_company_admin_can_persist_branding_and_profile_photo(): void
+    {
+        Storage::fake('public');
+        $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
+        $companyId = Company::query()->where('email', 'owner@atelier.test')->value('id');
+        $maximusToken = $this->issueMaximusSession();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->postJson('/api/company-requests/'.$companyId.'/approve')
+            ->assertOk();
+
+        $admin = AuthUser::query()->whereKey('company-admin:'.$companyId)->firstOrFail();
+        $companyToken = MaximusAuth::issueSession($admin);
+        $this->withCredentials()->withUnencryptedCookie(MaximusAuth::COOKIE, $companyToken);
+
+        $this->patchJson('/api/companies/'.$companyId, [
+            'name' => 'Atelier Exemple',
+            'manager' => 'Responsable Atelier',
+            'email' => 'owner@atelier.test',
+            'phone' => '',
+            'country' => 'Sénégal',
+            'sector' => 'Production',
+            'primaryColor' => '#123456',
+            'accentColor' => '#ABCDEF',
+            'sidebarColor' => '#101820',
+        ])
+            ->assertOk()
+            ->assertJsonPath('company.primaryColor', '#123456')
+            ->assertJsonPath('company.accentColor', '#ABCDEF')
+            ->assertJsonPath('company.sidebarColor', '#101820');
+
+        $upload = $this->post('/api/companies/'.$companyId.'/profile-photo', [
+            'photo' => UploadedFile::fake()->image('profile.png'),
+        ]);
+        $upload->assertOk();
+        $photoUrl = (string) $upload->json('company.profilePhoto');
+        $filename = basename(parse_url($photoUrl, PHP_URL_PATH) ?: '');
+        Storage::disk('public')->assertExists('companies/'.$companyId.'/'.$filename);
+
+        $this->deleteJson('/api/companies/'.$companyId.'/profile-photo')
+            ->assertOk()
+            ->assertJsonPath('company.profilePhoto', null);
+        Storage::disk('public')->assertMissing('companies/'.$companyId.'/'.$filename);
     }
 
     public function test_archiving_a_company_revokes_sessions_and_blocks_the_tenant(): void

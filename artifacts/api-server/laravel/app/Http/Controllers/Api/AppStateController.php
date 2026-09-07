@@ -91,6 +91,10 @@ class AppStateController extends Controller
                     'allowedModules' => $company->status === 'ACTIF' ? ($company->requested_modules ?? []) : [],
                     'refusedModules' => [],
                     'createdAt' => optional($company->created_at)->toISOString(),
+                    'profilePhoto' => $company->profile_photo,
+                    'primaryColor' => $company->primary_color,
+                    'accentColor' => $company->accent_color,
+                    'sidebarColor' => $company->sidebar_color,
                 ];
             },
         );
@@ -120,6 +124,7 @@ class AppStateController extends Controller
         $companyIds = $users->pluck('company_id')->filter()->unique()->values();
 
         $companies = $companyIds->map(function (string $companyId) use ($users, $accessRows): array {
+            $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
             $admin = $users->first(
                 fn (AuthUser $user): bool => $user->company_id === $companyId && $user->role === 'company_admin',
             );
@@ -133,17 +138,21 @@ class AppStateController extends Controller
 
             return [
                 'id' => $companyId,
-                'name' => $displayName !== '' ? $displayName : $companyId,
+                'name' => $company?->name ?? ($displayName !== '' ? $displayName : $companyId),
                 'manager' => $displayName !== '' ? $displayName : 'Administrateur',
-                'email' => (string) ($admin?->email ?? ''),
-                'phone' => '',
-                'country' => '',
-                'sector' => '',
-                'status' => 'ACTIF',
-                'requestedModules' => $allowedModules,
+                'email' => (string) ($company?->email ?? $admin?->email ?? ''),
+                'phone' => (string) ($company?->phone ?? ''),
+                'country' => (string) ($company?->country ?? ''),
+                'sector' => (string) ($company?->sector ?? ''),
+                'status' => (string) ($company?->status ?? 'ACTIF'),
+                'requestedModules' => $company?->requested_modules ?? $allowedModules,
                 'allowedModules' => $allowedModules,
                 'refusedModules' => [],
                 'createdAt' => $createdAt,
+                'profilePhoto' => $company?->profile_photo,
+                'primaryColor' => $company?->primary_color,
+                'accentColor' => $company?->accent_color,
+                'sidebarColor' => $company?->sidebar_color,
             ];
         })->values()->all();
 

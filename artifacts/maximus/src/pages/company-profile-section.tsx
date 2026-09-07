@@ -10,6 +10,15 @@ import {
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 
+function dataUrlToFile(dataUrl: string): File {
+  const [metadata, encoded] = dataUrl.split(',');
+  const mime = metadata.match(/^data:(.*?);base64$/)?.[1] ?? 'image/png';
+  const binary = atob(encoded);
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const extension = mime.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+  return new File([bytes], `company-profile.${extension}`, { type: mime });
+}
+
 export function CompanyProfileSection({
   company,
   data,
@@ -129,20 +138,31 @@ export function CompanyProfileSection({
       setError('Les couleurs doivent être au format hexadécimal, par exemple #F2B705.');
       return;
     }
+    let savedCompany: Company | null = null;
     try {
-      await companyRequestApi.update(company.id, {
+      const previousPhoto = company.profilePhoto ?? '';
+      savedCompany = (await companyRequestApi.update(company.id, {
         name,
         manager,
         email,
         phone: form.phone.trim(),
         country: form.country.trim(),
         sector: form.sector.trim(),
-      });
+        primaryColor,
+        accentColor,
+        sidebarColor,
+      })).company;
+      if (form.profilePhoto !== previousPhoto) {
+        savedCompany = form.profilePhoto
+          ? (await companyRequestApi.uploadProfilePhoto(company.id, dataUrlToFile(form.profilePhoto))).company
+          : (await companyRequestApi.deleteProfilePhoto(company.id)).company;
+      }
       if (password) await authApi.updateCompanyPassword(company.id, password);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Le mot de passe n’a pas pu être mis à jour.');
       return;
     }
+    if (!savedCompany) return;
 
     mutate(draft => {
       const target = draft.companies.find(item => item.id === company.id);
@@ -153,10 +173,10 @@ export function CompanyProfileSection({
       target.phone = form.phone.trim();
       target.country = form.country.trim();
       target.sector = form.sector.trim();
-      target.profilePhoto = form.profilePhoto;
-      target.primaryColor = primaryColor;
-      target.accentColor = accentColor;
-      target.sidebarColor = sidebarColor;
+      target.profilePhoto = savedCompany.profilePhoto;
+      target.primaryColor = savedCompany.primaryColor ?? primaryColor;
+      target.accentColor = savedCompany.accentColor ?? accentColor;
+      target.sidebarColor = savedCompany.sidebarColor ?? sidebarColor;
     }, password ? 'Profil, couleurs, photo et mot de passe mis à jour.' : 'Profil, couleurs et photo mis à jour.');
     setNewPassword('');
     setPasswordConfirm('');
