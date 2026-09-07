@@ -10,10 +10,6 @@ import {
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 
-function textValue(value: string | null | undefined): string {
-  return value ?? '';
-}
-
 function dataUrlToFile(dataUrl: string): File {
   const [metadata, encoded] = dataUrl.split(',');
   const mime = metadata.match(/^data:(.*?);base64$/)?.[1] ?? 'image/png';
@@ -42,16 +38,16 @@ export function CompanyProfileSection({
     sidebarColor: string;
   };
   const [form, setForm] = useState<ProfileForm>({
-    name: textValue(company.name),
-    manager: textValue(company.manager),
-    email: textValue(company.email),
-    phone: textValue(company.phone),
-    country: textValue(company.country),
-    sector: textValue(company.sector),
-    profilePhoto: textValue(company.profilePhoto),
-    primaryColor: textValue(company.primaryColor) || defaultCompanyTheme.primaryColor,
-    accentColor: textValue(company.accentColor) || defaultCompanyTheme.accentColor,
-    sidebarColor: textValue(company.sidebarColor) || defaultCompanyTheme.sidebarColor,
+    name: company.name,
+    manager: company.manager,
+    email: company.email,
+    phone: company.phone,
+    country: company.country,
+    sector: company.sector,
+    profilePhoto: company.profilePhoto ?? '',
+    primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor,
+    accentColor: company.accentColor ?? defaultCompanyTheme.accentColor,
+    sidebarColor: company.sidebarColor ?? defaultCompanyTheme.sidebarColor,
   });
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -61,16 +57,16 @@ export function CompanyProfileSection({
 
   useEffect(() => {
     setForm({
-      name: textValue(company.name),
-      manager: textValue(company.manager),
-      email: textValue(company.email),
-      phone: textValue(company.phone),
-      country: textValue(company.country),
-      sector: textValue(company.sector),
-      profilePhoto: textValue(company.profilePhoto),
-      primaryColor: textValue(company.primaryColor) || defaultCompanyTheme.primaryColor,
-      accentColor: textValue(company.accentColor) || defaultCompanyTheme.accentColor,
-      sidebarColor: textValue(company.sidebarColor) || defaultCompanyTheme.sidebarColor,
+      name: company.name,
+      manager: company.manager,
+      email: company.email,
+      phone: company.phone,
+      country: company.country,
+      sector: company.sector,
+      profilePhoto: company.profilePhoto ?? '',
+      primaryColor: company.primaryColor ?? defaultCompanyTheme.primaryColor,
+      accentColor: company.accentColor ?? defaultCompanyTheme.accentColor,
+      sidebarColor: company.sidebarColor ?? defaultCompanyTheme.sidebarColor,
     });
     setNewPassword('');
     setPasswordConfirm('');
@@ -110,13 +106,13 @@ export function CompanyProfileSection({
   };
 
   const save = async () => {
-    const name = textValue(form.name).trim();
-    const manager = textValue(form.manager).trim();
-    const email = textValue(form.email).trim().toLowerCase();
+    const name = form.name.trim();
+    const manager = form.manager.trim();
+    const email = form.email.trim().toLowerCase();
     const password = newPassword.trim();
-    const primaryColor = textValue(form.primaryColor).trim().toUpperCase();
-    const accentColor = textValue(form.accentColor).trim().toUpperCase();
-    const sidebarColor = textValue(form.sidebarColor).trim().toUpperCase();
+    const primaryColor = form.primaryColor.trim().toUpperCase();
+    const accentColor = form.accentColor.trim().toUpperCase();
+    const sidebarColor = form.sidebarColor.trim().toUpperCase();
 
     if (!name || !manager || !email) {
       setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
@@ -126,7 +122,7 @@ export function CompanyProfileSection({
       setError('Saisissez une adresse email valide.');
       return;
     }
-    if (data.companies.some(item => item.id !== company.id && textValue(item.email).toLowerCase() === email)) {
+    if (data.companies.some(item => item.id !== company.id && item.email.toLowerCase() === email)) {
       setError('Une autre entreprise utilise déjà cette adresse email.');
       return;
     }
@@ -149,9 +145,9 @@ export function CompanyProfileSection({
         name,
         manager,
         email,
-        phone: textValue(form.phone).trim(),
-        country: textValue(form.country).trim(),
-        sector: textValue(form.sector).trim(),
+        phone: form.phone.trim(),
+        country: form.country.trim(),
+        sector: form.sector.trim(),
         primaryColor,
         accentColor,
         sidebarColor,
@@ -174,9 +170,9 @@ export function CompanyProfileSection({
       target.name = name;
       target.manager = manager;
       target.email = email;
-      target.phone = textValue(form.phone).trim();
-      target.country = textValue(form.country).trim();
-      target.sector = textValue(form.sector).trim();
+      target.phone = form.phone.trim();
+      target.country = form.country.trim();
+      target.sector = form.sector.trim();
       target.profilePhoto = savedCompany.profilePhoto;
       target.primaryColor = savedCompany.primaryColor ?? primaryColor;
       target.accentColor = savedCompany.accentColor ?? accentColor;
@@ -198,7 +194,7 @@ export function CompanyProfileSection({
             </div>
             <div className="mb-7 flex flex-wrap items-center gap-5 rounded-xl border border-dashed p-4">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--primary)/.1)] text-xl font-black text-[hsl(var(--primary))]">
-                {form.profilePhoto ? <img src={form.profilePhoto} alt={`Photo de profil de ${form.name}`} className="h-full w-full object-cover" /> : textValue(form.name).slice(0, 2).toUpperCase()}
+                {form.profilePhoto ? <img src={form.profilePhoto} alt={`Photo de profil de ${form.name}`} className="h-full w-full object-cover" /> : company.name.slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1 sm:min-w-[220px]">
                 <h3 className="font-bold">Photo de profil</h3>
