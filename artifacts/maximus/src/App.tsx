@@ -1200,7 +1200,7 @@ function Signup({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [sector, setSector] = useState(initialPreset.name);
+  const [sector, setSector] = useState('');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(
@@ -1470,13 +1470,14 @@ function Signup({
                 testId="input-company-email"
               />
               <label className="block text-sm font-semibold">
-                Secteur
+                Secteur <span className="font-normal text-[hsl(var(--muted-foreground))]">(optionnel)</span>
                 <select
                   data-testid="select-company-sector"
                   value={sector}
                   onChange={(e) => changeSector(e.target.value)}
                   className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
                 >
+                  <option value="">Je préciserai plus tard</option>
                   {data.sectorPresets.map((preset) => (
                     <option key={preset.id} value={preset.name}>
                       {preset.name}
@@ -1484,7 +1485,7 @@ function Signup({
                   ))}
                 </select>
                 <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-                  Le secteur détermine la configuration de départ proposée à votre entreprise.
+                  Vous pourrez le définir depuis votre espace.
                 </span>
               </label>
               <Field
@@ -1514,7 +1515,7 @@ function Signup({
             </p>
             <button
               type="submit"
-              disabled={!name || !manager || !email || !sector || password.length < 8 || password !== passwordConfirm}
+              disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm}
               data-testid="button-next-signup"
               className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
             >
