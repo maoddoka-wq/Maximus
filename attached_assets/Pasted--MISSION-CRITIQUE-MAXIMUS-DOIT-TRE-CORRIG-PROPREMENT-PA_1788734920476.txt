@@ -1,0 +1,829 @@
+# MISSION CRITIQUE — MAXIMUS DOIT ÊTRE CORRIGÉ PROPREMENT, PAS BRICOLÉ
+
+Tu travailles sur **MAXIMUS**, une véritable application SaaS multi-entreprises destinée à être utilisée en production.
+
+Je ne veux plus de corrections superficielles, de faux correctifs, de données fictives, de contournements temporaires ou de modifications faites sans comprendre l’architecture.
+
+**TON OBJECTIF EST DE TROUVER LES CAUSES RÉELLES DES PROBLÈMES, DE LES CORRIGER DANS LE CODE ET LA BASE DE DONNÉES, PUIS DE PROUVER QUE LES CORRECTIONS FONCTIONNENT ET NE CASSERONT PAS À NOUVEAU.**
+
+---
+
+# 1. RÈGLE ABSOLUE : NE PAS BRICOLER
+
+Avant de modifier le code :
+
+1. Analyse toute l’architecture existante.
+2. Identifie frontend, backend, API, modèles, migrations, middleware, authentification, permissions, routes, services, contrôleurs, cache et base de données.
+3. Identifie comment les entreprises, utilisateurs, administrations, modules, rôles, unités et données e-commerce sont liés.
+4. Recherche les vrais flux de données.
+5. Reproduis chaque problème.
+6. Suis le chemin complet :
+
+Frontend → requête API → route → contrôleur → service → modèle/ORM → base de données → réponse API → état frontend → affichage.
+
+**Ne corrige jamais uniquement l’écran si le problème vient du backend ou de la base de données.**
+
+Si tu ne comprends pas la cause, continue l’analyse avant de modifier.
+
+Interdiction de dire :
+
+* « c’est probablement Replit »
+* « ça fonctionne chez moi »
+* « on peut mettre un délai »
+* « on peut simplement cacher l’élément »
+* « on peut simuler la réponse »
+* « ce n’est qu’un problème d’interface »
+
+Tu dois déterminer précisément si le problème vient du code, de la base de données, du cache, de l’authentification, de l’état frontend, de l’environnement ou de plusieurs éléments.
+
+---
+
+# 2. REPLIT ≠ PRODUCTION
+
+Respecte strictement cette architecture :
+
+* **Replit = environnement de développement**
+* **GitHub = source/version du code**
+* **Render = environnement de production**
+
+Ne modifie jamais le comportement de production pour contourner un problème uniquement présent dans Replit.
+
+Ne crée aucune condition du type :
+
+* if Replit
+* if development → comportement différent
+* if Render → comportement différent
+
+sauf nécessité technique réelle et explicitement justifiée.
+
+Si un problème semble venir de l’environnement, démontre-le avec des vérifications concrètes.
+
+Les corrections doivent être compatibles avec le code réellement destiné à être déployé sur Render.
+
+---
+
+# 3. PROBLÈME N°1 — CRÉATION D’ENTREPRISE DEPUIS LA PAGE PUBLIQUE
+
+Actuellement, lorsqu’une entreprise est créée depuis la page publique/accueil, elle **n’apparaît pas dans MAXIMUS → Demandes**.
+
+Corrige définitivement ce flux.
+
+Flux attendu :
+
+PAGE PUBLIQUE
+↓
+formulaire création entreprise
+↓
+validation frontend
+↓
+API/backend
+↓
+création réelle de la demande dans la base de données
+↓
+statut = PENDING
+↓
+MAXIMUS → DEMANDES
+↓
+la demande apparaît
+↓
+super administrateur peut APPROUVER ou REFUSER
+↓
+si APPROUVÉE → entreprise active
+↓
+si REFUSÉE → entreprise refusée avec statut cohérent
+
+Audit obligatoire :
+
+* formulaire
+* validation
+* API
+* route
+* contrôleur
+* service
+* modèle
+* migration
+* statut
+* relations
+* permissions
+* requête de MAXIMUS → Demandes
+* filtres
+* pagination
+* cache
+* état React
+* éventuel React Query/SWR
+* doublons
+* gestion des erreurs.
+
+La création publique doit utiliser la même logique métier fiable que les autres mécanismes de création.
+
+**Ne simule jamais une demande dans le frontend.**
+
+La demande doit exister réellement dans la base.
+
+Ajoute une protection contre les doubles soumissions.
+
+Une entreprise créée depuis la page publique doit être visible dans MAXIMUS après actualisation complète de la page et nouvelle session.
+
+---
+
+# 4. APPROBATION / REFUS
+
+Vérifie entièrement le workflow.
+
+APPROUVER doit :
+
+* modifier réellement le statut en base ;
+* activer correctement l’entreprise ;
+* conserver les relations ;
+* respecter les permissions ;
+* mettre à jour les écrans concernés ;
+* ne pas créer de doublons.
+
+REFUSER doit :
+
+* modifier réellement le statut ;
+* conserver éventuellement la raison du refus si le modèle le prévoit ;
+* empêcher l’entreprise d’être considérée comme active.
+
+Aucune action ne doit afficher « succès » si la base de données n’a pas réellement été modifiée.
+
+---
+
+# 5. PROBLÈME N°2 — ENTREPRISE SUPPRIMÉE MAIS ENCORE ACCESSIBLE
+
+C’est un **problème de sécurité critique**.
+
+Lorsqu’une entreprise est supprimée, une ancienne session, ancienne URL ou ancien contexte peut encore permettre d’ouvrir son administration.
+
+Cela doit être impossible.
+
+Après suppression :
+
+* ancienne URL → accès refusé
+* ancienne session → accès refusé
+* ancien token → accès refusé
+* refresh token → invalidé si nécessaire
+* ancien company_id → refusé
+* API → refusée
+* dashboard → refusé
+* modules → refusés
+* administration → refusée
+* bouton navigateur « retour » → aucune donnée protégée accessible
+* accès direct à une route → refusé
+* tentative via API → refusée.
+
+Ne te contente surtout pas de rediriger côté React.
+
+**La sécurité doit être appliquée côté backend.**
+
+Audit :
+
+* sessions
+* JWT
+* refresh tokens
+* cookies
+* localStorage
+* sessionStorage
+* middleware
+* guards
+* permissions
+* contexte entreprise
+* routes
+* API
+* cache
+* relations DB
+* suppression/soft delete éventuel.
+
+Après suppression, chaque requête protégée doit vérifier que l’entreprise existe encore et qu’elle est accessible.
+
+Si nécessaire, invalide les sessions/tokens liés à l’entreprise.
+
+Empêche également les accès à des données orphelines.
+
+---
+
+# 6. MULTI-TENANT — PRIORITÉ ABSOLUE
+
+MAXIMUS est multi-tenant.
+
+**AUCUNE entreprise ne doit pouvoir accéder aux données d’une autre entreprise.**
+
+Vérifie toutes les ressources :
+
+* utilisateurs
+* administrations
+* rôles
+* permissions
+* modules
+* produits
+* catégories
+* stocks
+* ventes
+* achats
+* clients
+* fournisseurs
+* dépenses
+* finances
+* présences
+* commandes
+* paramètres
+* e-commerce
+* unités
+* données diverses.
+
+Ne fais jamais confiance à un `company_id` envoyé par le frontend.
+
+Le backend doit déterminer et vérifier le contexte de l’entreprise.
+
+Une entreprise A ne doit jamais pouvoir récupérer les données de B simplement en modifiant un ID dans une URL ou une requête API.
+
+Teste explicitement ce scénario.
+
+---
+
+# 7. PROBLÈME N°3 — ENTREPRISE FICTIVE « KORA »
+
+Supprime complètement toute dépendance à l’entreprise fictive **Kora**.
+
+Recherche dans TOUT le projet :
+
+* Kora
+* IDs hardcodés
+* company_id hardcodés
+* seeders
+* factories
+* fixtures
+* migrations
+* scripts
+* services
+* contrôleurs
+* routes
+* frontend
+* tests
+* configuration
+* SQL
+* données initiales.
+
+Le système de création/activation des modules ne doit dépendre d’aucune entreprise fictive.
+
+Une nouvelle entreprise réelle doit pouvoir utiliser les modules sans Kora.
+
+Après installation/redémarrage/déploiement, Kora ne doit pas réapparaître.
+
+**Ne remplace pas simplement Kora par une autre entreprise fictive.**
+
+Les données de démonstration ne doivent pas être injectées automatiquement dans la production.
+
+---
+
+# 8. DONNÉES DE TEST
+
+Ne remplis pas automatiquement les entreprises avec de fausses données pour faire croire que le système fonctionne.
+
+Pas de :
+
+* faux clients
+* faux produits
+* faux utilisateurs
+* fausses ventes
+* fausses commandes
+* fausses entreprises
+* faux rôles
+* fausses unités
+* fausses données e-commerce
+
+dans l’environnement de production.
+
+Les testeurs doivent pouvoir créer leurs données manuellement.
+
+Tu peux conserver une infrastructure de tests automatisés isolée si nécessaire, mais elle ne doit jamais polluer la production.
+
+---
+
+# 9. PROBLÈME N°4 — ADMINISTRATIONS IMMÉDIATES MAIS MODULES LENTS
+
+Actuellement, après une opération, les administrations apparaissent rapidement alors que les modules mettent du temps à apparaître.
+
+**INTERDICTION ABSOLUE d’utiliser `setTimeout` pour masquer le problème.**
+
+Cherche la cause réelle.
+
+Audit :
+
+* appels API
+* requêtes parallèles
+* transactions
+* ordre des opérations
+* cache
+* invalidation
+* React state
+* React Query/SWR
+* refetch
+* loading states
+* lazy loading
+* dépendances des composants
+* appels API multiples
+* race conditions
+* synchronisation backend/frontend.
+
+Si une création retourne un succès, le frontend doit disposer d’un état cohérent avec la base.
+
+Utilise une vraie stratégie :
+
+* invalidation correcte du cache
+* refetch ciblé
+* mise à jour d’état fiable
+* réponse backend complète
+* transaction lorsque nécessaire
+* événement ou mécanisme de synchronisation approprié.
+
+Après création/activation d’un module, il doit apparaître correctement sans attendre artificiellement plusieurs secondes.
+
+---
+
+# 10. SYSTÈME DE MODULES
+
+Le système doit être réellement dynamique.
+
+Une entreprise autorisée doit pouvoir :
+
+* voir les modules disponibles ;
+* activer un module ;
+* désactiver un module si les règles le permettent ;
+* accéder au module ;
+* conserver son état ;
+* retrouver le module après reconnexion.
+
+Vérifie :
+
+* structure DB
+* relations
+* statuts
+* permissions
+* middleware
+* API
+* frontend
+* cache
+* concurrence
+* doublons.
+
+Utilise des contraintes d’unicité lorsque nécessaire.
+
+Une activation répétée ne doit jamais créer plusieurs fois la même relation.
+
+---
+
+# 11. E-COMMERCE — RÔLES ET UNITÉS CRÉÉS AUTOMATIQUEMENT
+
+L’activation du module e-commerce crée actuellement des rôles et/ou unités dans certaines entreprises.
+
+Trouve exactement pourquoi.
+
+Si ces éléments ne sont pas indispensables :
+→ supprime cette création automatique.
+
+S’ils sont réellement nécessaires :
+→ création uniquement dans l’entreprise concernée ;
+→ jamais dans une autre entreprise ;
+→ création idempotente ;
+→ aucune duplication ;
+→ aucune pollution de l’organisation ;
+→ aucune dépendance à Kora.
+
+L’activation d’un module ne doit pas modifier silencieusement l’organisation de l’entreprise sans justification fonctionnelle.
+
+---
+
+# 12. E-COMMERCE — PARAMÈTRES QUI NE SE SAUVEGARDENT PAS
+
+Le changement du nom de la boutique ne persiste actuellement pas correctement.
+
+Ne te contente pas de modifier l’affichage.
+
+Trace :
+
+FORMULAIRE
+→ état frontend
+→ validation
+→ requête HTTP
+→ route API
+→ contrôleur
+→ service
+→ modèle
+→ DB
+→ réponse API
+→ cache
+→ état frontend
+→ affichage.
+
+Teste réellement après sauvegarde :
+
+1. modifier le nom ;
+2. sauvegarder ;
+3. vérifier la réponse API ;
+4. vérifier la DB ;
+5. actualiser la page ;
+6. fermer/réouvrir la session ;
+7. vérifier que le nouveau nom est toujours présent.
+
+Fais la même vérification pour les paramètres existants :
+
+* nom
+* description
+* logo
+* coordonnées
+* devise
+* commandes
+* livraison
+* paiement
+* autres paramètres réellement présents dans l’application.
+
+Aucun bouton « Enregistrer » ne doit afficher un faux succès.
+
+---
+
+# 13. URL E-COMMERCE — NE PAS EXPOSER L’URL TECHNIQUE
+
+Le client final ne doit pas voir une URL technique du type Render/Replit ou une URL interne de backend.
+
+Sépare conceptuellement :
+
+1. URL technique/infrastructure
+2. URL administration
+3. URL boutique publique
+4. future URL personnalisée / domaine personnalisé.
+
+La boutique publique doit avoir une architecture propre et professionnelle.
+
+Ne montre jamais :
+
+* URL Render
+* URL Replit
+* endpoint API
+* IDs techniques
+* company_id
+* informations d’infrastructure.
+
+Prépare l’architecture pour permettre ultérieurement :
+
+* sous-domaines
+* domaines personnalisés
+* mapping domaine → entreprise
+* résolution sécurisée du tenant.
+
+---
+
+# 14. INTERFACE PUBLIQUE E-COMMERCE
+
+Audit complet de l’expérience client.
+
+Vérifie :
+
+* accueil
+* header
+* navigation
+* catégories
+* recherche
+* filtres
+* catalogue
+* cartes produits
+* images
+* prix
+* disponibilité
+* détail produit
+* panier
+* quantité
+* suppression
+* checkout
+* informations client
+* livraison
+* paiement
+* confirmation
+* erreurs
+* chargement
+* états vides
+* responsive mobile
+* responsive desktop.
+
+Le client ne doit jamais voir :
+
+* interface admin
+* données internes
+* IDs techniques
+* company_id
+* données d’une autre entreprise
+* données de test
+* endpoints API
+* URL technique.
+
+L’interface doit être cohérente avec les paramètres de la boutique.
+
+---
+
+# 15. CODE PROPRE — OBLIGATOIRE
+
+Profite de cet audit pour identifier les problèmes structurels.
+
+Recherche :
+
+* code dupliqué
+* fonctions énormes
+* composants React énormes
+* contrôleurs surchargés
+* logique métier dans les composants UI
+* requêtes DB répétées
+* services incohérents
+* noms incohérents
+* imports inutilisés
+* variables inutilisées
+* fichiers morts
+* routes mortes
+* console.log de debug
+* IDs hardcodés
+* URLs hardcodées
+* conditions temporaires
+* logique Kora
+* hacks spécifiques à Replit
+* faux délais
+* réponses API incohérentes.
+
+Ne refactore pas aveuglément.
+
+Chaque refactor doit préserver le comportement fonctionnel existant.
+
+---
+
+# 16. BASE DE DONNÉES
+
+Vérifie :
+
+* foreign keys
+* relations
+* contraintes
+* unicité
+* index
+* nullabilité
+* suppressions
+* soft deletes
+* données orphelines
+* cohérence des statuts
+* intégrité multi-tenant.
+
+Lorsqu’une contrainte DB peut empêcher un bug, préfère une protection DB + backend plutôt qu’une simple vérification frontend.
+
+---
+
+# 17. GESTION DES ERREURS
+
+Une erreur backend doit produire une vraie erreur côté frontend.
+
+Interdiction de :
+
+* afficher « succès » après un échec ;
+* avaler les exceptions ;
+* retourner HTTP 200 pour une opération échouée ;
+* masquer une erreur ;
+* faire croire qu’une donnée existe alors qu’elle n’existe pas.
+
+Les erreurs doivent être :
+
+* compréhensibles ;
+* cohérentes ;
+* exploitables ;
+* correctement journalisées côté serveur sans exposer de secrets.
+
+---
+
+# 18. TESTS DE RÉGRESSION — OBLIGATOIRES
+
+Après correction, crée ou complète les tests nécessaires.
+
+Teste au minimum :
+
+### Entreprise
+
+* création publique ;
+* demande créée en DB ;
+* demande visible dans MAXIMUS ;
+* approbation ;
+* refus ;
+* doublon ;
+* permissions.
+
+### Suppression
+
+* suppression entreprise ;
+* ancienne session ;
+* ancienne URL ;
+* ancien token ;
+* ancienne API ;
+* accès direct ;
+* accès après reconnexion.
+
+### Multi-tenant
+
+* entreprise A ne peut pas accéder à B ;
+* modification A ne modifie pas B ;
+* API avec ID d’une autre entreprise refusée.
+
+### Modules
+
+* création ;
+* activation ;
+* désactivation ;
+* affichage ;
+* absence de doublons ;
+* absence de Kora.
+
+### E-commerce
+
+* activation ;
+* rôles/unités ;
+* paramètres ;
+* sauvegarde ;
+* persistance après reload ;
+* boutique publique ;
+* séparation admin/public ;
+* isolation tenant.
+
+**Ne déclare pas une correction terminée uniquement parce qu’un écran semble fonctionner.**
+
+---
+
+# 19. MÉTHODE OBLIGATOIRE POUR CHAQUE BUG
+
+Pour chaque problème :
+
+### ÉTAPE 1
+
+Reproduire.
+
+### ÉTAPE 2
+
+Identifier le comportement attendu.
+
+### ÉTAPE 3
+
+Tracer le flux complet.
+
+### ÉTAPE 4
+
+Identifier la cause racine.
+
+### ÉTAPE 5
+
+Corriger la cause racine.
+
+### ÉTAPE 6
+
+Tester le scénario normal.
+
+### ÉTAPE 7
+
+Tester les erreurs.
+
+### ÉTAPE 8
+
+Tester les permissions.
+
+### ÉTAPE 9
+
+Tester l’isolation multi-tenant.
+
+### ÉTAPE 10
+
+Tester la régression.
+
+### ÉTAPE 11
+
+Vérifier qu’aucun hack temporaire n’a été ajouté.
+
+### ÉTAPE 12
+
+Vérifier que la correction fonctionne après actualisation/reconnexion lorsque pertinent.
+
+---
+
+# 20. INTERDICTIONS ABSOLUES
+
+NE FAIS PAS :
+
+❌ setTimeout pour masquer un problème
+❌ données fictives pour simuler une fonctionnalité
+❌ Kora ou autre entreprise fictive
+❌ IDs hardcodés
+❌ company_id provenant du frontend sans vérification
+❌ faux succès
+❌ simple redirection frontend pour une faille de sécurité
+❌ duplication de logique métier
+❌ modification uniquement visuelle lorsque le backend est en cause
+❌ modification spécifique à Replit pour cacher un problème
+❌ suppression d’un test simplement parce qu’il échoue
+❌ désactivation d’une sécurité pour faire fonctionner une fonctionnalité
+❌ création automatique inutile de rôles/unités
+❌ exposition d’URLs techniques
+❌ correction temporaire destinée à « faire marcher la démo ».
+
+---
+
+# 21. AVANT DE TERMINER
+
+Fais un dernier scan global du projet.
+
+Recherche notamment :
+
+Kora
+company_id hardcodé
+IDs hardcodés
+URLs Render
+URLs Replit
+setTimeout
+console.log
+données fictives
+seeders de production
+fausses entreprises
+fausses données
+routes inutilisées
+code mort
+doublons
+permissions faibles
+requêtes sans filtrage tenant.
+
+Ne supprime pas automatiquement quelque chose d’utile : vérifie son rôle avant suppression.
+
+---
+
+# 22. CRITÈRE DE FIN
+
+Tu n’as PAS terminé si :
+
+* le problème est seulement caché ;
+* l’interface semble fonctionner mais la DB est incorrecte ;
+* la DB est correcte mais l’API renvoie une mauvaise information ;
+* l’API fonctionne mais le frontend affiche un ancien état ;
+* l’entreprise supprimée reste accessible ;
+* Kora peut réapparaître ;
+* une entreprise peut accéder aux données d’une autre ;
+* les paramètres e-commerce ne persistent pas ;
+* l’URL technique est exposée ;
+* les modules apparaissent avec un délai artificiel ;
+* des données fictives sont injectées ;
+* les tests n’ont pas été effectués.
+
+**La correction doit être complète du frontend jusqu’à la base de données.**
+
+---
+
+# 23. RAPPORT FINAL OBLIGATOIRE
+
+À la fin, donne-moi un rapport clair contenant :
+
+1. Liste des problèmes trouvés.
+2. Cause racine de chaque problème.
+3. Fichiers modifiés.
+4. Modifications backend.
+5. Modifications frontend.
+6. Modifications DB/migrations.
+7. Modifications sécurité.
+8. Modifications multi-tenant.
+9. Suppression de Kora.
+10. Suppression des données fictives de production.
+11. Corrections e-commerce.
+12. Corrections de synchronisation/cache.
+13. Tests réalisés.
+14. Résultats des tests.
+15. Éventuels problèmes restant à traiter.
+
+Pour chaque correction importante, explique **pourquoi l’ancienne implémentation était incorrecte et pourquoi la nouvelle implémentation règle réellement le problème.**
+
+---
+
+# CONSIGNE FINALE
+
+**NE TE PRESSE PAS.**
+
+Je préfère que tu analyses profondément le projet avant de modifier 20 fichiers au hasard.
+
+Je ne veux pas une application qui « semble fonctionner ».
+
+Je veux une application dont :
+
+* le backend est cohérent ;
+* le frontend est cohérent ;
+* la base de données est cohérente ;
+* la sécurité est réelle ;
+* le multi-tenant est réellement isolé ;
+* les modules sont dynamiques ;
+* les données sont persistantes ;
+* les suppressions sont réellement sécurisées ;
+* l’e-commerce est correctement séparé de l’administration ;
+* le code est maintenable ;
+* les tests empêchent le retour des mêmes bugs.
+
+**Toute correction doit résoudre la cause racine et non le symptôme.**
+
+Si tu découvres un problème connexe pendant l’analyse et qu’il peut provoquer l’un des bugs ci-dessus, corrige-le également au lieu de le laisser volontairement en place.
+
+**Ne me demande pas de confirmer chaque petite correction. Analyse, corrige, teste et vérifie l’ensemble.**
+
+MAXIMUS doit être traité comme un **produit SaaS réel destiné à la production**, et non comme un prototype Replit.
