@@ -559,10 +559,39 @@ class EcommerceController extends Controller
                 $payment = $existing->payment_id
                     ? app(PaymentService::class)->getForTenant((string) $store->company_id, (string) $existing->payment_id)
                     : null;
+                $paymentPayload = $payment ? app(PaymentService::class)->payload($payment) : null;
+                if (! $payment) {
+                    $payment = app(PaymentService::class)->create([
+                        'tenant_id' => (string) $store->company_id,
+                        'customer_id' => $existing->customer_id,
+                        'seller_id' => (string) $store->company_id,
+                        'source_module' => 'ecommerce',
+                        'source_type' => 'ecommerce_order',
+                        'source_id' => $existing->id,
+                        'amount' => (int) $existing->total,
+                        'currency' => (string) $store->currency,
+                        'payment_method' => $input['paymentMethod'],
+                        'description' => 'Commande '.$existing->reference,
+                        'metadata' => ['order_reference' => $existing->reference],
+                        'idempotency_key' => 'order-payment:'.$existing->id,
+                        'customer' => [
+                            'name' => $existing->customer_name,
+                            'email' => $existing->customer_email,
+                            'phone' => $existing->customer_phone,
+                        ],
+                        'request_id' => $request->header('X-Request-Id'),
+                    ]);
+                    DB::table('ecommerce_orders')->where('id', $existing->id)->update([
+                        'payment_id' => $payment['id'],
+                        'payment_status' => $payment['status'],
+                        'updated_at' => now(),
+                    ]);
+                    $paymentPayload = $payment;
+                }
                 return response()->json([
                     'reference' => $existing->reference,
                     'total' => (int) $existing->total,
-                    'payment' => $payment ? app(PaymentService::class)->payload($payment) : null,
+                    'payment' => $paymentPayload,
                 ]);
             }
         }

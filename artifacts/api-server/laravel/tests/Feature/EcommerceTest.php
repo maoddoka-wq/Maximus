@@ -255,6 +255,62 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-transition', 'stock' => 3]);
     }
 
+    public function test_idempotent_order_recovers_when_previous_payment_is_missing(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique reprise paiement',
+            'slug' => 'reprise-paiement-test',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit reprise',
+            'slug' => 'produit-reprise',
+            'sku' => 'REPRISE-01',
+            'price' => 2200,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        $payload = [
+            'customerName' => 'Client reprise',
+            'customerEmail' => 'reprise@example.test',
+            'paymentMethod' => 'WAVE',
+            'shippingAddress' => 'Dakar',
+            'items' => [['productSlug' => 'produit-reprise', 'quantity' => 1]],
+        ];
+        $first = $this->withHeader('Idempotency-Key', 'checkout-reprise-1')
+            ->postJson('/api/shop/reprise-paiement-test/orders', $payload)
+            ->assertCreated()
+            ->json();
+        $order = DB::table('ecommerce_orders')->where('reference', $first['reference'])->first();
+        $this->assertNotNull($order);
+
+        DB::table('payments')->where('id', $order->payment_id)->delete();
+        DB::table('ecommerce_orders')->where('id', $order->id)->update([
+            'payment_id' => null,
+            'payment_status' => 'À CONFIRMER',
+        ]);
+
+        $second = $this->withHeader('Idempotency-Key', 'checkout-reprise-1')
+            ->postJson('/api/shop/reprise-paiement-test/orders', $payload)
+            ->assertOk()
+            ->json();
+
+        $this->assertSame($first['reference'], $second['reference']);
+        $this->assertNotNull($second['payment']);
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => $order->id,
+            'payment_id' => $second['payment']['id'],
+        ]);
+        $this->assertDatabaseCount('ecommerce_orders', 1);
+        $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-reprise', 'stock' => 1]);
+    }
+
     public function test_public_order_by_slug_rejects_an_inactive_company(): void
     {
         CompanyRegistry::ensureActive('kora', 'Entreprise KORA');
