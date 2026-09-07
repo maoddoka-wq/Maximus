@@ -37,12 +37,23 @@ export interface EcommerceProduct {
   sku: string;
   description: string;
   category: string;
+  categoryId: string | null;
   price: number;
   compareAtPrice: number | null;
   stock: number;
   imageUrl: string;
   featured: boolean;
   status: EcommerceProductStatus;
+}
+
+export interface EcommerceCategory {
+  id: string;
+  companyId: string;
+  name: string;
+  slug: string;
+  description: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export interface EcommerceOrderItem {
@@ -73,6 +84,7 @@ export interface EcommerceOrder {
 export interface EcommerceBootstrap {
   store: EcommerceStore;
   domains: EcommerceDomain[];
+  categories: EcommerceCategory[];
   products: EcommerceProduct[];
   orders: EcommerceOrder[];
 }
@@ -160,6 +172,9 @@ export const createEcommerceApi = (companyId: string) => {
   return {
     bootstrap: () => request<EcommerceBootstrap>(withCompany('/ecommerce/bootstrap')),
     updateStore: (body: Partial<Omit<EcommerceStore, 'id' | 'companyId'>>) => request<EcommerceStore>(withCompany('/ecommerce/store'), { method: 'PATCH', body: JSON.stringify(body) }),
+    createCategory: (body: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) => request<EcommerceCategory>(withCompany('/ecommerce/categories'), json(body)),
+    updateCategory: (id: string, body: Partial<Omit<EcommerceCategory, 'id' | 'companyId'>>) => request<EcommerceCategory>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
+    deleteCategory: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createDomain: (domain: string) => request<EcommerceDomain>(withCompany('/ecommerce/domains'), { method: 'POST', body: JSON.stringify({ domain }) }),
     verifyDomain: (id: string) => request<EcommerceDomain>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}/verify`), { method: 'POST' }),
     deleteDomain: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}`), { method: 'DELETE' }),
@@ -185,8 +200,8 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const createCustomerApi = (slug?: string) => {

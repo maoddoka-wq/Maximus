@@ -18,6 +18,14 @@ class EcommerceController extends Controller
 {
     private const STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
     private const ORDER_STATUSES = ['NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'EXPÉDIÉE', 'LIVRÉE', 'ANNULÉE'];
+    private const ORDER_TRANSITIONS = [
+        'NOUVELLE' => ['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'],
+        'CONFIRMÉE' => ['CONFIRMÉE', 'EN PRÉPARATION', 'ANNULÉE'],
+        'EN PRÉPARATION' => ['EN PRÉPARATION', 'EXPÉDIÉE', 'ANNULÉE'],
+        'EXPÉDIÉE' => ['EXPÉDIÉE', 'LIVRÉE'],
+        'LIVRÉE' => ['LIVRÉE'],
+        'ANNULÉE' => ['ANNULÉE'],
+    ];
 
     public function bootstrap(Request $request): JsonResponse
     {
@@ -31,6 +39,7 @@ class EcommerceController extends Controller
         return response()->json([
             'store' => $this->store($store),
             'domains' => $this->domains($company),
+            'categories' => $this->categories($company),
             'products' => DB::table('ecommerce_products')
                 ->where('company_id', $company)
                 ->where('status', '!=', 'ARCHIVED')
@@ -60,7 +69,7 @@ class EcommerceController extends Controller
             'logoUrl' => ['nullable', 'string', 'max:500'],
         ])->validate();
         $company = $this->company($request);
-        $existing = DB::table('ecommerce_stores')->where('company_id', $company)->where('id', '!=', 'ecommerce-store-'.$company)->where('slug', $input['slug'])->exists();
+        $existing = DB::table('ecommerce_stores')->where('id', '!=', 'ecommerce-store-'.$company)->where('slug', $input['slug'])->exists();
         if ($existing) {
             return response()->json(['error' => 'Ce slug de boutique est déjà utilisé.'], 422);
         }
@@ -88,6 +97,96 @@ class EcommerceController extends Controller
         }
 
         return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $row->id)->first()));
+    }
+
+    public function createCategory(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'create', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $input = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'min:2', 'max:80'],
+            'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'description' => ['nullable', 'string', 'max:300'],
+            'isActive' => ['sometimes', 'boolean'],
+            'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+        ])->validate();
+        $company = $this->company($request);
+        $slug = $this->categorySlug($input['slug'] ?? $input['name']);
+        if (DB::table('ecommerce_categories')->where('company_id', $company)->where('slug', $slug)->exists()) {
+            return response()->json(['error' => 'Cette catégorie existe déjà.'], 422);
+        }
+
+        $row = [
+            'id' => $this->id('category'),
+            'company_id' => $company,
+            'name' => trim($input['name']),
+            'slug' => $slug,
+            'description' => trim((string) ($input['description'] ?? '')),
+            'is_active' => (bool) ($input['isActive'] ?? true),
+            'sort_order' => (int) ($input['sortOrder'] ?? 0),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('ecommerce_categories')->insert($row);
+
+        return response()->json($this->category((object) $row), 201);
+    }
+
+    public function updateCategory(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $existing = DB::table('ecommerce_categories')->where('id', $id)->where('company_id', $company)->first();
+        if (! $existing) {
+            return response()->json(['error' => 'Catégorie introuvable.'], 404);
+        }
+        $input = Validator::make($request->all(), [
+            'name' => ['sometimes', 'string', 'min:2', 'max:80'],
+            'slug' => ['sometimes', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'description' => ['nullable', 'string', 'max:300'],
+            'isActive' => ['sometimes', 'boolean'],
+            'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:100000'],
+        ])->validate();
+        $slug = isset($input['slug']) ? $this->categorySlug($input['slug']) : $existing->slug;
+        if (DB::table('ecommerce_categories')->where('company_id', $company)->where('slug', $slug)->where('id', '!=', $id)->exists()) {
+            return response()->json(['error' => 'Cette catégorie existe déjà.'], 422);
+        }
+        $changes = [];
+        if (array_key_exists('name', $input)) $changes['name'] = trim($input['name']);
+        if (array_key_exists('slug', $input)) $changes['slug'] = $slug;
+        if (array_key_exists('description', $input)) $changes['description'] = trim((string) ($input['description'] ?? ''));
+        if (array_key_exists('isActive', $input)) $changes['is_active'] = (bool) $input['isActive'];
+        if (array_key_exists('sortOrder', $input)) $changes['sort_order'] = (int) $input['sortOrder'];
+        $changes['updated_at'] = now();
+        DB::table('ecommerce_categories')->where('id', $id)->update($changes);
+
+        return response()->json($this->category(DB::table('ecommerce_categories')->where('id', $id)->first()));
+    }
+
+    public function deleteCategory(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'delete', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $category = DB::table('ecommerce_categories')->where('id', $id)->where('company_id', $company)->first();
+        if (! $category) {
+            return response()->json(['error' => 'Catégorie introuvable.'], 404);
+        }
+        DB::table('ecommerce_products')->where('category_id', $id)->update([
+            'category_id' => null,
+            'category' => 'Général',
+            'updated_at' => now(),
+        ]);
+        DB::table('ecommerce_categories')->where('id', $id)->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     public function createDomain(Request $request): JsonResponse
@@ -204,13 +303,18 @@ class EcommerceController extends Controller
 
         $input = $this->productInput($request);
         $company = $this->company($request);
+        $input = $this->normalizeProductCategory($input, $company);
         if (DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
+        }
+        if (DB::table('ecommerce_products')->where('slug', $input['slug'])->exists()) {
+            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
 
         $row = array_merge([
             'description' => '',
             'category' => 'Général',
+            'category_id' => null,
             'compare_at_price' => null,
             'image_url' => '',
             'featured' => false,
@@ -237,8 +341,12 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         $input = $this->productInput($request, true);
+        $input = $this->normalizeProductCategory($input, $company);
         if (isset($input['sku']) && DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->where('id', '!=', $id)->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
+        }
+        if (isset($input['slug']) && DB::table('ecommerce_products')->where('slug', $input['slug'])->where('id', '!=', $id)->exists()) {
+            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
         $changes = $this->snake($input);
         $changes['updated_at'] = now();
@@ -319,8 +427,12 @@ class EcommerceController extends Controller
         $input = Validator::make($request->all(), ['status' => ['required', 'in:'.implode(',', self::ORDER_STATUSES)]])->validate();
         $company = $this->company($request);
         $query = DB::table('ecommerce_orders')->where('id', $id)->where('company_id', $company);
-        if (! $query->exists()) {
+        $order = $query->first();
+        if (! $order) {
             return response()->json(['error' => 'Commande e-commerce introuvable.'], 404);
+        }
+        if (! in_array($input['status'], self::ORDER_TRANSITIONS[$order->status] ?? [], true)) {
+            return response()->json(['error' => 'Cette transition de commande n’est pas autorisée.'], 422);
         }
         $query->update(['status' => $input['status'], 'updated_at' => now()]);
 
@@ -337,7 +449,9 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
-        return response()->json($this->publicStore($store));
+        return response()->json($this->publicStore($store))
+            ->header('Cache-Control', 'private, no-store')
+            ->header('Vary', 'Host');
     }
 
     public function publicBootstrapByDomain(Request $request): JsonResponse
@@ -347,7 +461,9 @@ class EcommerceController extends Controller
             return response()->json(['available' => false]);
         }
 
-        return response()->json($this->publicStore($store));
+        return response()->json($this->publicStore($store))
+            ->header('Cache-Control', 'private, no-store')
+            ->header('Vary', 'Host');
     }
 
     public function createPublicDomainOrder(Request $request): JsonResponse
@@ -408,7 +524,7 @@ class EcommerceController extends Controller
     public function createPublicOrder(Request $request, string $slug): JsonResponse
     {
         $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
-        if (! $store) {
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
         return $this->createOrderForStore($request, $store);
@@ -428,13 +544,40 @@ class EcommerceController extends Controller
         ])->validate();
 
         $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
+        $idempotencyKey = trim((string) ($request->header('Idempotency-Key') ?: $request->input('idempotencyKey', '')));
+        if ($idempotencyKey !== '' && strlen($idempotencyKey) > 120) {
+            return response()->json(['error' => 'La clé de commande est invalide.'], 422);
+        }
+        if ($idempotencyKey !== '') {
+            $existing = DB::table('ecommerce_orders')
+                ->where('company_id', $store->company_id)
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
+            if ($existing) {
+                return response()->json(['reference' => $existing->reference, 'total' => (int) $existing->total]);
+            }
+        }
         if ($customer) {
             $input['customerName'] = $customer->name;
             $input['customerEmail'] = $customer->email;
             $input['customerPhone'] = $customer->phone;
+            $cartItems = DB::table('ecommerce_customer_cart_items as cart')
+                ->join('ecommerce_products as product', 'product.id', '=', 'cart.product_id')
+                ->where('cart.customer_id', $customer->id)
+                ->where('cart.company_id', $store->company_id)
+                ->where('product.company_id', $store->company_id)
+                ->where('product.status', 'PUBLISHED')
+                ->orderBy('cart.created_at')
+                ->get(['product.slug as productSlug', 'cart.quantity']);
+            if ($cartItems->isNotEmpty()) {
+                $input['items'] = $cartItems->map(fn (object $item): array => [
+                    'productSlug' => $item->productSlug,
+                    'quantity' => (int) $item->quantity,
+                ])->all();
+            }
         }
         try {
-            $order = DB::transaction(function () use ($input, $store, $customer): array {
+            $order = DB::transaction(function () use ($input, $store, $customer, $idempotencyKey): array {
                 $lines = [];
                 $total = 0;
                 foreach ($input['items'] as $item) {
@@ -474,6 +617,7 @@ class EcommerceController extends Controller
                     'id' => $id,
                     'company_id' => $store->company_id,
                     'customer_id' => $customer?->id,
+                    'idempotency_key' => $idempotencyKey !== '' ? $idempotencyKey : null,
                     'reference' => $reference,
                     'customer_name' => $input['customerName'],
                     'customer_email' => $input['customerEmail'],
@@ -488,6 +632,12 @@ class EcommerceController extends Controller
                 ]);
                 foreach ($lines as $line) {
                     DB::table('ecommerce_order_items')->insert(array_merge($line, ['order_id' => $id]));
+                }
+                if ($customer) {
+                    DB::table('ecommerce_customer_cart_items')
+                        ->where('customer_id', $customer->id)
+                        ->where('company_id', $store->company_id)
+                        ->delete();
                 }
 
                 return ['reference' => $reference, 'total' => $total];
@@ -632,6 +782,7 @@ class EcommerceController extends Controller
             'sku' => $row->sku,
             'description' => $row->description,
             'category' => $row->category,
+            'categoryId' => $row->category_id ?? null,
             'price' => (int) $row->price,
             'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
             'stock' => (int) $row->stock,
@@ -677,6 +828,7 @@ class EcommerceController extends Controller
             'sku' => array_merge($required, ['string', 'min:1', 'max:80']),
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['nullable', 'string', 'max:80'],
+            'categoryId' => ['nullable', 'string', 'max:100'],
             'price' => array_merge($required, ['integer', 'min:0']),
             'compareAtPrice' => ['nullable', 'integer', 'min:0'],
             'stock' => array_merge($required, ['integer', 'min:0']),
@@ -684,6 +836,61 @@ class EcommerceController extends Controller
             'featured' => ['sometimes', 'boolean'],
             'status' => ['sometimes', 'in:'.implode(',', self::STATUSES)],
         ])->validate();
+    }
+
+    private function categories(string $company): array
+    {
+        return DB::table('ecommerce_categories')
+            ->where('company_id', $company)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (object $row): array => $this->category($row))
+            ->values()
+            ->all();
+    }
+
+    private function normalizeProductCategory(array $input, string $company): array
+    {
+        if (! array_key_exists('categoryId', $input)) {
+            return $input;
+        }
+
+        $categoryId = $input['categoryId'];
+        if ($categoryId === null || $categoryId === '') {
+            $input['categoryId'] = null;
+            return $input;
+        }
+
+        $category = DB::table('ecommerce_categories')
+            ->where('id', $categoryId)
+            ->where('company_id', $company)
+            ->where('is_active', true)
+            ->first();
+        if (! $category) {
+            abort(response()->json(['error' => 'La catégorie sélectionnée est introuvable ou inactive.'], 422));
+        }
+
+        $input['category'] = $category->name;
+        return $input;
+    }
+
+    private function category(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'companyId' => $row->company_id,
+            'name' => $row->name,
+            'slug' => $row->slug,
+            'description' => $row->description,
+            'isActive' => (bool) $row->is_active,
+            'sortOrder' => (int) $row->sort_order,
+        ];
+    }
+
+    private function categorySlug(string $value): string
+    {
+        return Str::slug(trim($value));
     }
 
     private function ensureStore(string $company): object
@@ -694,10 +901,17 @@ class EcommerceController extends Controller
             return $existing;
         }
 
+        $baseSlug = Str::slug($company).'-boutique';
+        $slug = $baseSlug;
+        $suffix = 2;
+        while (DB::table('ecommerce_stores')->where('slug', $slug)->exists()) {
+            $slug = $baseSlug.'-'.$suffix++;
+        }
+
         return (object) [
             'id' => $id,
             'company_id' => $company,
-            'slug' => Str::slug($company).'-boutique',
+            'slug' => $slug,
             'name' => 'Boutique '.Str::headline($company),
             'description' => 'Découvrez notre sélection et commandez en ligne.',
             'status' => 'DRAFT',

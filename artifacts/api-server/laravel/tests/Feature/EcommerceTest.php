@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Support\CompanyRegistry;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -54,6 +55,49 @@ class EcommerceTest extends TestCase
         ])->assertForbidden();
 
         $this->assertDatabaseMissing('ecommerce_products', ['sku' => 'FORBIDDEN-01']);
+    }
+
+    public function test_categories_are_persistent_and_products_are_linked_to_them(): void
+    {
+        $request = $this->asActor();
+        $category = $request->postJson('/api/ecommerce/categories?companyId=kora', [
+            'name' => 'Épicerie fine',
+            'description' => 'Produits sélectionnés',
+            'sortOrder' => 2,
+        ])->assertCreated()
+            ->assertJsonPath('name', 'Épicerie fine')
+            ->assertJsonPath('slug', 'epicerie-fine')
+            ->json();
+
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('categories.0.id', $category['id']);
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Coffret dégustation',
+            'slug' => 'coffret-degustation',
+            'sku' => 'COFFRET-01',
+            'categoryId' => $category['id'],
+            'price' => 15000,
+            'stock' => 4,
+        ])->assertCreated()
+            ->assertJsonPath('categoryId', $category['id'])
+            ->assertJsonPath('category', 'Épicerie fine')
+            ->json();
+
+        $request->patchJson('/api/ecommerce/categories/'.$category['id'].'?companyId=kora', [
+            'name' => 'Épicerie premium',
+        ])->assertOk();
+
+        $request->deleteJson('/api/ecommerce/categories/'.$category['id'].'?companyId=kora')
+            ->assertOk();
+
+        $this->assertDatabaseHas('ecommerce_products', [
+            'id' => $product['id'],
+            'category_id' => null,
+            'category' => 'Général',
+        ]);
+        $this->assertDatabaseMissing('ecommerce_categories', ['id' => $category['id']]);
     }
 
     public function test_published_shop_recalculates_total_and_decrements_stock_transactionally(): void
@@ -155,6 +199,89 @@ class EcommerceTest extends TestCase
         ])->assertStatus(400);
 
         $this->assertDatabaseCount('ecommerce_orders', 0);
+    }
+
+    public function test_public_order_is_idempotent_and_order_status_follows_allowed_transitions(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique commandes',
+            'slug' => 'commandes-transition-test',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit transition',
+            'slug' => 'produit-transition',
+            'sku' => 'TRANSITION-01',
+            'price' => 1800,
+            'stock' => 4,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        $payload = [
+            'customerName' => 'Client Transition',
+            'customerEmail' => 'transition@example.test',
+            'shippingAddress' => 'Dakar, Sénégal',
+            'items' => [['productSlug' => 'produit-transition', 'quantity' => 1]],
+        ];
+        $first = $this->withHeader('Idempotency-Key', 'checkout-transition-1')
+            ->postJson('/api/shop/commandes-transition-test/orders', $payload)
+            ->assertCreated()
+            ->assertJsonPath('total', 1800);
+        $this->withHeader('Idempotency-Key', 'checkout-transition-1')
+            ->postJson('/api/shop/commandes-transition-test/orders', $payload)
+            ->assertOk()
+            ->assertJson($first->json());
+
+        $order = DB::table('ecommerce_orders')->where('reference', $first->json('reference'))->first();
+        $this->assertNotNull($order);
+        $this->assertDatabaseCount('ecommerce_orders', 1);
+        $request->patchJson('/api/ecommerce/orders/'.$order->id.'/status?companyId=kora', ['status' => 'CONFIRMÉE'])
+            ->assertOk()
+            ->assertJsonPath('status', 'CONFIRMÉE');
+        $request->patchJson('/api/ecommerce/orders/'.$order->id.'/status?companyId=kora', ['status' => 'LIVRÉE'])
+            ->assertStatus(422);
+        $request->patchJson('/api/ecommerce/orders/'.$order->id.'/status?companyId=kora', ['status' => 'ANNULÉE'])
+            ->assertOk()
+            ->assertJsonPath('status', 'ANNULÉE');
+        $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-transition', 'stock' => 3]);
+    }
+
+    public function test_public_order_by_slug_rejects_an_inactive_company(): void
+    {
+        CompanyRegistry::ensureActive('kora', 'Entreprise KORA');
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique inactive',
+            'slug' => 'boutique-inactive-test',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit inactif',
+            'slug' => 'produit-inactif',
+            'sku' => 'INACTIVE-01',
+            'price' => 1000,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        DB::table('companies')->where('id', 'kora')->update(['status' => 'SUSPENDU']);
+
+        $this->getJson('/api/shop/boutique-inactive-test')->assertNotFound();
+        $this->postJson('/api/shop/boutique-inactive-test/orders', [
+            'customerName' => 'Client Inactif',
+            'customerEmail' => 'inactive@example.test',
+            'shippingAddress' => 'Dakar',
+            'items' => [['productSlug' => 'produit-inactif', 'quantity' => 1]],
+        ])->assertNotFound();
     }
 
     public function test_company_admin_can_upload_and_replace_a_product_image(): void

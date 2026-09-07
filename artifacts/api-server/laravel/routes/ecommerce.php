@@ -9,6 +9,9 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
+        Route::post('/categories', [EcommerceController::class, 'createCategory']);
+        Route::patch('/categories/{id}', [EcommerceController::class, 'updateCategory']);
+        Route::delete('/categories/{id}', [EcommerceController::class, 'deleteCategory']);
         Route::post('/domains', [EcommerceController::class, 'createDomain']);
         Route::post('/domains/{id}/verify', [EcommerceController::class, 'verifyDomain']);
         Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);

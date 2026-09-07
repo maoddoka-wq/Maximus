@@ -89,6 +89,41 @@ class EcommerceCustomerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_customer_checkout_consumes_the_persistent_cart(): void
+    {
+        $this->createStore('kora', 'kora-cart');
+        $productId = $this->createProduct('kora', 'cart-product', 1400, 3);
+        $customer = $this->createCustomer('customer-cart', 'kora', 'cart@example.test');
+        DB::table('ecommerce_customer_cart_items')->insert([
+            'id' => 'cart-item-test',
+            'customer_id' => $customer->id,
+            'company_id' => 'kora',
+            'product_id' => $productId,
+            'quantity' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $token = EcommerceCustomerAuth::issueSession($customer);
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->postJson('/api/shop/kora-cart/orders', [
+                'customerName' => 'Valeur ignorée',
+                'customerEmail' => 'usurpation@example.test',
+                'shippingAddress' => 'Dakar, Sénégal',
+                'items' => [['productSlug' => 'cart-product', 'quantity' => 1]],
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'customer_email' => $customer->email,
+            'total' => 2800,
+        ]);
+        $this->assertDatabaseHas('ecommerce_products', ['id' => $productId, 'stock' => 1]);
+        $this->assertDatabaseMissing('ecommerce_customer_cart_items', ['customer_id' => $customer->id]);
+    }
+
     private function createStore(string $companyId, string $slug): void
     {
         DB::table('ecommerce_stores')->insert([
