@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\EcommerceCustomerAuth;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -422,8 +423,14 @@ class EcommerceController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ])->validate();
 
+        $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
+        if ($customer) {
+            $input['customerName'] = $customer->name;
+            $input['customerEmail'] = $customer->email;
+            $input['customerPhone'] = $customer->phone;
+        }
         try {
-            $order = DB::transaction(function () use ($input, $store): array {
+            $order = DB::transaction(function () use ($input, $store, $customer): array {
                 $lines = [];
                 $total = 0;
                 foreach ($input['items'] as $item) {
@@ -462,6 +469,7 @@ class EcommerceController extends Controller
                 DB::table('ecommerce_orders')->insert([
                     'id' => $id,
                     'company_id' => $store->company_id,
+                    'customer_id' => $customer?->id,
                     'reference' => $reference,
                     'customer_name' => $input['customerName'],
                     'customer_email' => $input['customerEmail'],

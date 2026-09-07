@@ -84,6 +84,63 @@ export interface PublicShopBootstrap {
 
 export type PublicDomainBootstrap = PublicShopBootstrap | { available: false };
 
+export interface EcommerceCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface EcommerceCustomerAddress {
+  id: string;
+  label: string;
+  recipientName: string;
+  phone: string;
+  line1: string;
+  line2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  isDefault: boolean;
+}
+
+export interface EcommerceCustomerCartLine {
+  productId: string;
+  productSlug: string;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  compareAtPrice: number | null;
+  stock: number;
+  imageUrl: string;
+  quantity: number;
+}
+
+export interface EcommerceCustomerOrder {
+  id: string;
+  reference: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  shippingAddress: string;
+  note: string;
+  total: number;
+  status: EcommerceOrderStatus;
+  paymentStatus: string;
+  createdAt: string;
+  items: EcommerceOrderItem[];
+}
+
+export interface EcommerceCustomerBootstrap {
+  customer: EcommerceCustomer;
+  addresses: EcommerceCustomerAddress[];
+  favoriteProductSlugs: string[];
+  cart: EcommerceCustomerCartLine[];
+  orders: EcommerceCustomerOrder[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -130,4 +187,36 @@ export const publicEcommerceApi = {
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
   createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+};
+
+export const createCustomerApi = (slug?: string) => {
+  const prefix = slug ? `/shop/${encodeURIComponent(slug)}/customer` : '/shop-domain/customer';
+  const endpoint = (path: string) => `${prefix}${path}`;
+
+  return {
+    session: () => request<{ customer: EcommerceCustomer | null }>(endpoint('/session')),
+    register: (body: { name: string; email: string; phone?: string; password: string }) =>
+      request<{ customer: EcommerceCustomer }>(endpoint('/register'), { method: 'POST', body: JSON.stringify(body) }),
+    login: (body: { email: string; password: string }) =>
+      request<{ customer: EcommerceCustomer }>(endpoint('/login'), { method: 'POST', body: JSON.stringify(body) }),
+    logout: () => request<void>(endpoint('/logout'), { method: 'POST' }),
+    bootstrap: () => request<EcommerceCustomerBootstrap>(endpoint('/bootstrap')),
+    updateProfile: (body: { name: string; phone?: string }) =>
+      request<EcommerceCustomer>(endpoint('/profile'), { method: 'PATCH', body: JSON.stringify(body) }),
+    changePassword: (body: { currentPassword: string; newPassword: string }) =>
+      request<{ ok: true }>(endpoint('/password'), { method: 'PATCH', body: JSON.stringify(body) }),
+    createAddress: (body: Omit<EcommerceCustomerAddress, 'id'>) =>
+      request<EcommerceCustomerAddress>(endpoint('/addresses'), { method: 'POST', body: JSON.stringify(body) }),
+    updateAddress: (id: string, body: Partial<Omit<EcommerceCustomerAddress, 'id'>>) =>
+      request<EcommerceCustomerAddress>(endpoint(`/addresses/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
+    deleteAddress: (id: string) =>
+      request<{ ok: true }>(endpoint(`/addresses/${encodeURIComponent(id)}`), { method: 'DELETE' }),
+    toggleFavorite: (productSlug: string) =>
+      request<{ favoriteProductSlugs: string[] }>(endpoint(`/favorites/${encodeURIComponent(productSlug)}`), { method: 'POST' }),
+    putCartItem: (productSlug: string, quantity: number) =>
+      request<{ cart: EcommerceCustomerCartLine[] }>(endpoint('/cart'), { method: 'PUT', body: JSON.stringify({ productSlug, quantity }) }),
+    clearCart: () => request<{ cart: EcommerceCustomerCartLine[] }>(endpoint('/cart'), { method: 'DELETE' }),
+    orders: () => request<{ orders: EcommerceCustomerOrder[] }>(endpoint('/orders')),
+    order: (id: string) => request<EcommerceCustomerOrder>(endpoint(`/orders/${encodeURIComponent(id)}`)),
+  };
 };

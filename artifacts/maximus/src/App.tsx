@@ -318,7 +318,13 @@ function AppContent() {
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>(
-    () => (window.location.pathname === '/' ? 'checking' : 'none'),
+    () => (window.location.pathname === '/'
+      || window.location.pathname === '/connexion'
+      || window.location.pathname === '/inscription-client'
+      || window.location.pathname === '/panier'
+      || window.location.pathname.startsWith('/compte'))
+      ? 'checking'
+      : 'none',
   );
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
@@ -344,7 +350,12 @@ function AppContent() {
     return () => window.clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    if (pathname !== '/' || session) {
+    const isPotentialCustomShopPath = pathname === '/'
+      || pathname === '/connexion'
+      || pathname === '/inscription-client'
+      || pathname === '/panier'
+      || pathname.startsWith('/compte');
+    if (!isPotentialCustomShopPath || session) {
       setCustomDomainState('none');
       return undefined;
     }
@@ -728,14 +739,19 @@ function AppContent() {
         }}
       />
     );
-  const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)$/);
+  const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
-  if (pathname === '/' && !session && customDomainState === 'checking') {
+  const isPotentialCustomShopPath = pathname === '/'
+    || pathname === '/connexion'
+    || pathname === '/inscription-client'
+    || pathname === '/panier'
+    || pathname.startsWith('/compte');
+  if (isPotentialCustomShopPath && !session && customDomainState === 'checking') {
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de la boutique…</div>;
   }
-  if (pathname === '/' && !session && customDomainState === 'shop') {
+  if (isPotentialCustomShopPath && !session && customDomainState === 'shop') {
     return <PublicShopPage domain />;
   }
   const loginEmployees = [
