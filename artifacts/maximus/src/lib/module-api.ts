@@ -18,7 +18,9 @@ type ModuleBootstrap = {
 };
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`/api${path}`);
+  const response = await fetch(`/api${path}`, {
+    credentials: 'include',
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(typeof body.error === 'string' ? body.error : 'Les accès modules sont indisponibles.');

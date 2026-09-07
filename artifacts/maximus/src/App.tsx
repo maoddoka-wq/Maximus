@@ -207,7 +207,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   },
   '/entreprise/organisation': {
     kicker: 'Espace entreprise',
-    title: 'Organisation',
+    title: 'Organisation & accès',
     description: 'Structure, rôles, sous-autorisations, comptes et managers au même endroit.',
   },
   '/entreprise/acces': {

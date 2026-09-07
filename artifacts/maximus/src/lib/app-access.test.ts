@@ -78,6 +78,25 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
+test('affiche les modules dans le menu de l’administrateur d’entreprise', () => {
+  const { data, company } = createAccessFixture();
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.allowed, ['commerce']);
+  assert.equal(access.verticalModuleNavigation, true);
+  assert.equal(access.sidebarFeatureGroups[0]?.label, 'Gestion commerciale');
+  assert.ok(access.sidebarFeatureGroups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
+});
+
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {
   const { data, company, employee } = createAccessFixture();
   const foreignCompany = { ...company, id: 'foreign-company' };

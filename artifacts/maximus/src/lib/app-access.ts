@@ -163,13 +163,15 @@ export function buildAppAccessContext({
     canViewModule,
     selectedCommercialTabIds,
   );
+  const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    employee && allowed.length >= 1
+    (employee || companyAdmin) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
           employeeRole: accessRole,
           employeeNode,
+          companyAdmin,
           commerceTabIds,
           stockPermissions,
         })
@@ -189,7 +191,11 @@ export function buildAppAccessContext({
     stockPermissions,
     commerceTabIds,
     sidebarFeatureGroups,
-    verticalModuleNavigation: Boolean(employee && allowed.length >= 1 && sidebarFeatureGroups.length),
+    verticalModuleNavigation: Boolean(
+      (employee || companyAdmin)
+      && allowed.length >= 1
+      && sidebarFeatureGroups.length,
+    ),
     sectorManager,
     canManagePeople: session.startsWith('company:') || sectorManager,
   };

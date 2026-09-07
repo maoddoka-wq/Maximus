@@ -70,7 +70,7 @@ export function Sidebar({
   const companyCoreItems = nav.filter(item => item.module === null);
   const companyModuleItems = nav.filter(item => item.module !== null);
   const verticalModuleMenu = Boolean(
-    employee && !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
+    !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
   );
   const compact = collapsed && !mobileOpen;
   const active = (href: string) =>

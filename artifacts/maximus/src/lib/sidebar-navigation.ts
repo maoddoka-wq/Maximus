@@ -79,6 +79,7 @@ type SidebarNavigationInput = {
   configuredModules: Module[];
   employeeRole: Role | null;
   employeeNode: OrgNode | null;
+  companyAdmin?: boolean;
   commerceTabIds?: string[];
   stockPermissions?: Record<string, string[]>;
 };
@@ -88,29 +89,38 @@ export function buildSidebarFeatureGroups({
   configuredModules,
   employeeRole,
   employeeNode,
+  companyAdmin = false,
   commerceTabIds,
   stockPermissions,
 }: SidebarNavigationInput): SidebarFeatureGroup[] {
   return allowed.flatMap(moduleId => {
     const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];
-    const selectedFeatureIds = getSelectedFeatureIds(
-      employeeRole,
-      module,
-      employeeNode?.moduleFeatures?.[module.id],
-    );
+    const selectedFeatureIds = companyAdmin && !employeeRole
+      ? new Set(module.features.map(feature => featureSlug(feature)))
+      : getSelectedFeatureIds(
+          employeeRole,
+          module,
+          employeeNode?.moduleFeatures?.[module.id],
+        );
 
     const items = moduleId === 'commerce'
-      ? commerceTabDefinitions
-        .filter(tab => commerceTabIds?.includes(tab.id))
+      ? (commerceTabIds
+        ? commerceTabDefinitions.filter(tab => commerceTabIds.includes(tab.id))
+        : companyAdmin
+          ? commerceTabDefinitions
+          : [])
         .map(tab => ({
           href: `/entreprise/commerce?tab=${tab.id}`,
           label: tab.label,
           icon: commerceTabIcons[tab.id],
         }))
       : moduleId === 'stocks'
-        ? stockSubmodules
-          .filter(submodule => stockPermissions?.[submodule.id]?.includes('voir'))
+        ? (stockPermissions
+          ? stockSubmodules.filter(submodule => stockPermissions[submodule.id]?.includes('voir'))
+          : companyAdmin
+            ? stockSubmodules
+            : [])
           .map(submodule => ({
             href: `/entreprise/stocks?tab=${submodule.id}`,
             label: submodule.name,

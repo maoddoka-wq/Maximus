@@ -177,6 +177,7 @@ export function CompanyRouter({
   screens: CompanyRouteScreens;
 }) {
   const routePath = location.split('?')[0];
+  const query = new URLSearchParams(location.split('?')[1] ?? '');
   const requiredModule = moduleIdForPath(routePath);
   const maintenanceModule: ModuleId | 'controle' | undefined =
     routePath === '/entreprise/controle' ? 'controle' : requiredModule;
@@ -230,7 +231,16 @@ export function CompanyRouter({
   }
   if (routePath === '/entreprise/organisation' || routePath === '/entreprise/acces' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/employes' || routePath === '/entreprise/roles') {
     const company = data.companies.find(item => item.id === companyId);
-    const initialTab = routePath === '/entreprise/acces' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/roles' ? 'roles' : routePath === '/entreprise/employes' ? 'employees' : 'structure';
+    const initialTab =
+      routePath === '/entreprise/acces'
+      || routePath === '/entreprise/autorisations'
+      || routePath === '/entreprise/roles'
+      || (routePath === '/entreprise/organisation' && query.get('tab') === 'roles')
+        ? 'roles'
+        : routePath === '/entreprise/employes'
+          || (routePath === '/entreprise/organisation' && query.get('tab') === 'employees')
+            ? 'employees'
+            : 'structure';
     return company && (companyAdmin || sectorManager) ? (
       renderScreen(screens.organization, {
         company,

@@ -41,3 +41,20 @@ test('le menu Stock utilise les identifiants des sous-modules', () => {
     '/entreprise/stocks?tab=products',
   ]);
 });
+
+test('un administrateur d’entreprise voit les fonctionnalités de ses modules', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['commerce', 'stocks'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+  });
+
+  assert.deepEqual(groups.map(group => group.label), [
+    'Gestion commerciale',
+    'Gestion de stock',
+  ]);
+  assert.ok(groups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
+  assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
+});
