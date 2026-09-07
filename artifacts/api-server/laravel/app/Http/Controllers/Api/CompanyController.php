@@ -373,12 +373,12 @@ class CompanyController extends Controller
     {
         return [
             'id' => $company->id,
-            'name' => $company->name,
-            'manager' => $company->manager,
-            'email' => $company->email,
-            'phone' => $company->phone,
-            'country' => $company->country,
-            'sector' => $company->sector,
+            'name' => (string) ($company->name ?? ''),
+            'manager' => (string) ($company->manager ?? ''),
+            'email' => (string) ($company->email ?? ''),
+            'phone' => (string) ($company->phone ?? ''),
+            'country' => (string) ($company->country ?? ''),
+            'sector' => (string) ($company->sector ?? ''),
             'status' => $company->status,
             'requestedModules' => $company->requested_modules ?? [],
             'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],

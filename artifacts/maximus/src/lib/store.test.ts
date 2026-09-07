@@ -24,6 +24,40 @@ test('reconstruit les collections métier quand une sauvegarde partielle contien
   assert.deepEqual(normalized.moduleOverrides, {});
 });
 
+test('normalise les champs textuels optionnels d’une entreprise avant le formulaire', () => {
+  const normalized = normalizeStoreData({
+    companies: [{
+      id: 'company-null-fields',
+      name: 'Entreprise test',
+      manager: 'Responsable',
+      email: 'owner@test.local',
+      phone: null,
+      country: null,
+      sector: null,
+      status: 'ACTIF',
+      requestedModules: ['commerce'],
+      allowedModules: ['commerce'],
+      refusedModules: [],
+      createdAt: '2026-09-07',
+    } as never],
+  });
+
+  assert.deepEqual(normalized.companies[0], {
+    id: 'company-null-fields',
+    name: 'Entreprise test',
+    manager: 'Responsable',
+    email: 'owner@test.local',
+    phone: '',
+    country: '',
+    sector: '',
+    status: 'ACTIF',
+    requestedModules: ['commerce'],
+    allowedModules: ['commerce'],
+    refusedModules: [],
+    createdAt: '2026-09-07',
+  });
+});
+
 test('conserve les données valides pendant le nettoyage des credentials', () => {
   const data = emptyStoreData();
   data.companies.push({

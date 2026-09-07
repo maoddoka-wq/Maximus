@@ -231,6 +231,16 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
       normalized[key] = defaults[key] as never;
     }
   }
+  const companyText = (value: unknown) => typeof value === 'string' ? value : '';
+  normalized.companies = normalized.companies.map(company => ({
+    ...company,
+    name: companyText(company.name),
+    manager: companyText(company.manager),
+    email: companyText(company.email),
+    phone: companyText(company.phone),
+    country: companyText(company.country),
+    sector: companyText(company.sector),
+  }));
   if (!source.commerceStates || Array.isArray(source.commerceStates) || typeof source.commerceStates !== 'object') {
     normalized.commerceStates = defaults.commerceStates;
   }
