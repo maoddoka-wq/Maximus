@@ -50,5 +50,10 @@ export const authApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   }),
+  updateCompanyPassword: (companyId: string, password: string) => request<{ ok: true }>('/auth/company-password', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, password }),
+  }),
   revokeAccount: (employeeId: string) => request<void>(`/auth/accounts/${encodeURIComponent(employeeId)}`, { method: 'DELETE' }),
 };

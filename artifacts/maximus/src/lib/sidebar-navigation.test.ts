@@ -22,7 +22,7 @@ test('le menu latéral générique respecte les fonctionnalités sélectionnées
   });
 
   assert.deepEqual(groups[0]?.items.map(item => item.href), [
-    '/kora/commerce?tab=sales',
+    '/entreprise/commerce?tab=sales',
   ]);
 });
 
@@ -38,6 +38,6 @@ test('le menu Stock utilise les identifiants des sous-modules', () => {
   });
 
   assert.deepEqual(groups[0]?.items.map(item => item.href), [
-    '/kora/stocks?tab=products',
+    '/entreprise/stocks?tab=products',
   ]);
 });

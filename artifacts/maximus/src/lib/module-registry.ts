@@ -31,7 +31,7 @@ export type ModuleDescriptor = {
   id: ModuleId;
   name: string;
   description: string;
-  path: `/kora/${ModuleId}`;
+  path: `/entreprise/${ModuleId}`;
   icon: LucideIcon;
   routeKind: ModuleRouteKind;
 };
@@ -60,7 +60,7 @@ const moduleRouteConfig: Record<
 export const moduleRegistry: readonly ModuleDescriptor[] = modules.map(module => ({
   ...module,
   ...moduleRouteConfig[module.id],
-  path: `/kora/${module.id}` as `/kora/${ModuleId}`,
+  path: `/entreprise/${module.id}` as `/entreprise/${ModuleId}`,
 }));
 
 export const moduleDescriptorById = Object.fromEntries(
@@ -77,7 +77,7 @@ export const modulePageMeta = Object.fromEntries(
   moduleRegistry.map(module => [
     module.path,
     {
-      kicker: 'Espace KORA',
+      kicker: 'Espace entreprise',
       title: module.name,
       description: module.description,
     },

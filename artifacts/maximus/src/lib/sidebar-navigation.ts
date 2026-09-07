@@ -104,7 +104,7 @@ export function buildSidebarFeatureGroups({
       ? commerceTabDefinitions
         .filter(tab => commerceTabIds?.includes(tab.id))
         .map(tab => ({
-          href: `/kora/commerce?tab=${tab.id}`,
+          href: `/entreprise/commerce?tab=${tab.id}`,
           label: tab.label,
           icon: commerceTabIcons[tab.id],
         }))
@@ -112,7 +112,7 @@ export function buildSidebarFeatureGroups({
         ? stockSubmodules
           .filter(submodule => stockPermissions?.[submodule.id]?.includes('voir'))
           .map(submodule => ({
-            href: `/kora/stocks?tab=${submodule.id}`,
+            href: `/entreprise/stocks?tab=${submodule.id}`,
             label: submodule.name,
             icon: stockFeatureIcons[submodule.id] ?? Warehouse,
           }))
@@ -121,7 +121,7 @@ export function buildSidebarFeatureGroups({
             .map(feature => featureSlug(feature))
             .filter(featureId => selectedFeatureIds.has(featureId))
             .map(featureId => ({
-              href: `/kora/ecommerce?tab=${featureId}`,
+              href: `/entreprise/ecommerce?tab=${featureId}`,
               label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
               icon: ecommerceFeatureIcons[featureId] ?? ShoppingBag,
             }))
@@ -133,7 +133,7 @@ export function buildSidebarFeatureGroups({
             }))
             .filter(({ feature, definition }) => Boolean(definition && selectedFeatureIds.has(featureSlug(feature))))
             .map(({ feature, definition }) => ({
-              href: `/kora/presences?tab=${definition?.tab ?? 'dashboard'}`,
+              href: `/entreprise/presences?tab=${definition?.tab ?? 'dashboard'}`,
               label: feature,
               icon: CalendarDays,
             }))
@@ -141,7 +141,7 @@ export function buildSidebarFeatureGroups({
             .filter(feature => selectedFeatureIds.has(featureSlug(feature)))
             .map(feature => featureSlug(feature))
             .map(featureId => ({
-              href: `/kora/${moduleId}?feature=${featureId}`,
+            href: `/entreprise/${moduleId}?feature=${featureId}`,
               label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
               icon: moduleId === 'ventes'
                 ? ShoppingCart

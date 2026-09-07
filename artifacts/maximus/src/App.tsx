@@ -78,6 +78,7 @@ import {
   type SectorPreset,
   type StoreData,
   subscriptionPlans,
+  sanitizeStoreData,
 } from '@/lib/store';
 import { appStateApi } from '@/lib/app-state-api';
 import {
@@ -91,7 +92,7 @@ import {
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { type Session } from '@/lib/navigation';
-import { AdminRouter, KoraRouter } from '@/routes/app-routes';
+import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
@@ -194,94 +195,94 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     title: 'Journal d’activité',
     description: 'Chaque action importante, horodatée et attribuée.',
   },
-  '/kora/dashboard': {
+  '/entreprise/dashboard': {
     kicker: 'Espace entreprise',
     title: 'Votre activité, en un regard.',
     description: 'Pilotez vos opérations depuis un espace unifié.',
   },
-  '/kora/controle': {
+  '/entreprise/controle': {
     kicker: 'Espace entreprise',
     title: 'Contrôle & coordination',
     description: 'Les décisions, tâches et événements de votre périmètre.',
   },
-  '/kora/organisation': {
-    kicker: 'Espace KORA',
+  '/entreprise/organisation': {
+    kicker: 'Espace entreprise',
     title: 'Organisation',
     description: 'Structure, rôles, sous-autorisations, comptes et managers au même endroit.',
   },
-  '/kora/profil': {
+  '/entreprise/profil': {
     kicker: 'Espace entreprise',
     title: 'Mon profil',
     description: 'Mettez à jour les informations et les accès de votre entreprise.',
   },
-  '/kora/roles': {
-    kicker: 'Espace KORA',
+  '/entreprise/roles': {
+    kicker: 'Espace entreprise',
     title: 'Rôles',
     description: 'Des accès précis, pour travailler sereinement.',
   },
-  '/kora/stocks': {
-    kicker: 'Espace KORA',
+  '/entreprise/stocks': {
+    kicker: 'Espace entreprise',
     title: 'Gestion de stock',
     description: 'Pilotez vos articles, entrées, sorties et inventaires.',
   },
-  '/kora/finance': {
-    kicker: 'Espace KORA',
+  '/entreprise/finance': {
+    kicker: 'Espace entreprise',
     title: 'Finance',
     description: 'Une lecture simple des encaissements et de la trésorerie.',
   },
-  '/kora/commerce': {
-    kicker: 'Espace KORA',
+  '/entreprise/commerce': {
+    kicker: 'Espace entreprise',
     title: 'Gestion commerciale',
     description: 'Clients, commandes et activité commerciale en temps réel.',
   },
-  '/kora/ventes': {
-    kicker: 'Espace KORA',
+  '/entreprise/ventes': {
+    kicker: 'Espace entreprise',
     title: 'Ventes',
     description: 'Devis, ventes et validation des opérations clients.',
   },
-  '/kora/achats': {
-    kicker: 'Espace KORA',
+  '/entreprise/achats': {
+    kicker: 'Espace entreprise',
     title: 'Achats',
     description: 'Demandes, commandes fournisseurs et réceptions.',
   },
-  '/kora/comptabilite': {
-    kicker: 'Espace KORA',
+  '/entreprise/comptabilite': {
+    kicker: 'Espace entreprise',
     title: 'Comptabilité',
     description: 'Écritures, journaux et rapprochements comptables.',
   },
-  '/kora/rh': {
-    kicker: 'Espace KORA',
+  '/entreprise/rh': {
+    kicker: 'Espace entreprise',
     title: 'Ressources humaines',
     description: 'Organisation, employés, rôles et permissions.',
   },
-  '/kora/presences': { kicker: 'Espace KORA', title: 'Présences', description: 'Le suivi quotidien de vos équipes.' },
-  '/kora/paie': {
-    kicker: 'Espace KORA',
+  '/entreprise/presences': { kicker: 'Espace entreprise', title: 'Présences', description: 'Le suivi quotidien de vos équipes.' },
+  '/entreprise/paie': {
+    kicker: 'Espace entreprise',
     title: 'Paie',
     description: 'Périodes, bulletins et validation des salaires.',
   },
-  '/kora/crm': {
-    kicker: 'Espace KORA',
+  '/entreprise/crm': {
+    kicker: 'Espace entreprise',
     title: 'CRM / Clients',
     description: 'Fiches clients, opportunités et relances.',
   },
-  '/kora/fournisseurs': {
-    kicker: 'Espace KORA',
+  '/entreprise/fournisseurs': {
+    kicker: 'Espace entreprise',
     title: 'Fournisseurs',
     description: 'Référentiel, évaluation et suivi des partenaires.',
   },
-  '/kora/logistique': {
-    kicker: 'Espace KORA',
+  '/entreprise/logistique': {
+    kicker: 'Espace entreprise',
     title: 'Logistique',
     description: 'Entrepôts, livraisons et acheminement.',
   },
-  '/kora/documents': {
-    kicker: 'Espace KORA',
+  '/entreprise/documents': {
+    kicker: 'Espace entreprise',
     title: 'Documents',
     description: 'Classement, partage et suivi des versions.',
   },
-  '/kora/rapports': {
-    kicker: 'Espace KORA',
+  '/entreprise/rapports': {
+    kicker: 'Espace entreprise',
     title: 'Rapports',
     description: 'Des synthèses actionnables pour décider plus vite.',
   },
@@ -289,26 +290,26 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
 
 const routesWithModuleHeaders = new Set([
   '/maximus/controle',
-  '/kora/controle',
-  '/kora/dashboard',
-  '/kora/stocks',
-  '/kora/commerce',
-  '/kora/ventes',
-  '/kora/finance',
-  '/kora/rh',
-  '/kora/achats',
-  '/kora/comptabilite',
-  '/kora/paie',
-  '/kora/crm',
-  '/kora/fournisseurs',
-  '/kora/logistique',
-  '/kora/documents',
-  '/kora/presences',
-  '/kora/rapports',
-  '/kora/organisation',
-  '/kora/autorisations',
-  '/kora/employes',
-  '/kora/roles',
+  '/entreprise/controle',
+  '/entreprise/dashboard',
+  '/entreprise/stocks',
+  '/entreprise/commerce',
+  '/entreprise/ventes',
+  '/entreprise/finance',
+  '/entreprise/rh',
+  '/entreprise/achats',
+  '/entreprise/comptabilite',
+  '/entreprise/paie',
+  '/entreprise/crm',
+  '/entreprise/fournisseurs',
+  '/entreprise/logistique',
+  '/entreprise/documents',
+  '/entreprise/presences',
+  '/entreprise/rapports',
+  '/entreprise/organisation',
+  '/entreprise/autorisations',
+  '/entreprise/employes',
+  '/entreprise/roles',
   ...modulePaths,
 ]);
 
@@ -398,7 +399,7 @@ function AppContent() {
     void appStateApi.bootstrap()
       .then(({ data: remoteData, version }) => {
         if (cancelled) return;
-        setData({ ...emptyStoreData(), ...remoteData } as StoreData);
+        setData(sanitizeStoreData({ ...emptyStoreData(), ...remoteData } as StoreData));
         setAppStateVersion(version);
       })
       .catch((error) => {
@@ -412,16 +413,9 @@ function AppContent() {
   }, [session]);
   useEffect(() => {
     if (session !== 'admin') return;
-    const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF' && company.adminPassword);
+    const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF');
     void Promise.all(
       activeCompanies.flatMap((company) => [
-        authApi.provisionCompanyAdmin({
-          id: `company-admin:${company.id}`,
-          email: company.email,
-          displayName: company.manager,
-          companyId: company.id,
-          password: company.adminPassword as string,
-        }),
         synchronizeCompanyModuleAccess(company.id, company.allowedModules),
       ]),
     ).catch((error) => {
@@ -438,17 +432,18 @@ function AppContent() {
     const previous = data;
     const next = structuredClone(data) as StoreData;
     fn(next);
-    setData(next);
+    const safeNext = sanitizeStoreData(next);
+    setData(safeNext);
     if (session) {
       appStateSaveQueue.current = appStateSaveQueue.current
         .catch(() => undefined)
         .then(async () => {
-          const { version } = await appStateApi.save(next, appStateVersionRef.current);
+          const { version } = await appStateApi.save(safeNext, appStateVersionRef.current);
           appStateVersionRef.current = version;
           setAppStateVersion(version);
         })
         .catch((error) => {
-          setData((current) => current === next ? previous : current);
+          setData((current) => current === safeNext ? previous : current);
           setToast(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.');
           throw error;
         });
@@ -719,8 +714,8 @@ function AppContent() {
         data={data}
         mutate={mutate}
         onComplete={() => {
-          setToast('Entreprise créée et activée.');
-          setLocation('/maximus/entreprises');
+          setToast('Demande d’entreprise enregistrée. Validez-la pour activer le compte.');
+          setLocation('/maximus/demandes');
         }}
         onCancel={() => setLocation('/maximus/entreprises')}
       />
@@ -745,22 +740,6 @@ function AppContent() {
   }
   const loginEmployees = [
     ...data.employees,
-    ...data.companies
-      .filter((company) => company.status === 'ACTIF' && company.adminPassword)
-      .map((company) => ({
-        id: `company-admin:${company.id}`,
-        firstName: company.manager.split(' ')[0] ?? company.name,
-        lastName: company.manager.split(' ').slice(1).join(' ') || 'Administrateur',
-        email: company.email,
-        phone: company.phone,
-        position: 'Administrateur',
-        department: '',
-        subDepartment: '',
-        role: 'Administrateur entreprise',
-        status: 'ACTIF' as const,
-        loginPassword: company.adminPassword,
-        companyId: company.id,
-      })),
   ];
   if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
@@ -795,19 +774,19 @@ function AppContent() {
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
   const baseMeta =
-    pageMeta[location.split('?')[0].replace(/^\/entreprise(?=\/|$)/, '/kora')] ??
-    modulePageMeta[location.split('?')[0].replace(/^\/entreprise(?=\/|$)/, '/kora')] ??
+    pageMeta[canonicalCompanyPath(location.split('?')[0])] ??
+    modulePageMeta[canonicalCompanyPath(location.split('?')[0])] ??
     (location.startsWith('/maximus/entreprises/')
       ? {
           kicker: 'Administration',
           title: 'Détail entreprise',
           description: 'Consultez et ajustez l’espace client sélectionné.',
         }
-      : pageMeta[isAdmin ? '/maximus/dashboard' : '/kora/dashboard']);
-  const companyRoutePath = location.split('?')[0].replace(/^\/entreprise(?=\/|$)/, '/kora');
+      : pageMeta[isAdmin ? '/maximus/dashboard' : '/entreprise/dashboard']);
+  const companyRoutePath = canonicalCompanyPath(location.split('?')[0]);
   const currentMeta =
     !isAdmin && currentCompany
-      ? companyRoutePath === '/kora/dashboard'
+      ? companyRoutePath === '/entreprise/dashboard'
         ? {
             kicker: currentCompany.name,
             title: `Le rythme de ${currentCompany.name}, en un regard.`,
@@ -940,7 +919,7 @@ function AppContent() {
                   }}
                 />
               ) : (
-                <KoraRouter
+                <CompanyRouter
                   location={location}
                   mutate={mutate}
                   data={data}
@@ -963,7 +942,7 @@ function AppContent() {
                   moduleStatuses={serverModuleStatuses ?? {}}
                   singleModuleNavigation={verticalModuleNavigation}
                   screens={{
-                    dashboard: RoleAwareKoraDashboard,
+                    dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,
                     notifications: NotificationsPage,
                     organization: CompanyOrganizationAdmin,
@@ -1829,7 +1808,7 @@ function CompanyProfilePage({
     setError('');
   }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector]);
 
-  const save = () => {
+  const save = async () => {
     const name = form.name.trim();
     const manager = form.manager.trim();
     const email = form.email.trim().toLowerCase();
@@ -1854,6 +1833,12 @@ function CompanyProfilePage({
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
+    try {
+      if (password) await authApi.updateCompanyPassword(company.id, password);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Le mot de passe n’a pas pu être mis à jour.');
+      return;
+    }
     mutate(
       (draft) => {
         const target = draft.companies.find((item) => item.id === company.id);
@@ -1864,7 +1849,6 @@ function CompanyProfilePage({
           target.phone = form.phone.trim();
           target.country = form.country.trim();
           target.sector = form.sector.trim();
-          if (password) target.adminPassword = password;
         }
       },
       password ? 'Profil et mot de passe mis à jour.' : 'Profil entreprise mis à jour.',
@@ -1959,7 +1943,7 @@ function CompanyProfilePage({
           <div>
             <p className="text-xs text-[hsl(var(--muted-foreground))]">Connexion</p>
             <p className="mt-1 leading-6">
-              Utilisez l’email administrateur et votre mot de passe depuis « Espace KORA ».
+              Utilisez l’email administrateur et votre mot de passe depuis « Espace entreprise ».
             </p>
           </div>
           <div>
@@ -1997,7 +1981,7 @@ function CompanyEditModal({
   const [error, setError] = useState('');
   const setField = (field: keyof CompanyForm) => (value: string) =>
     setForm((current) => ({ ...current, [field]: value }));
-  const save = () => {
+  const save = async () => {
     const name = form.name.trim();
     const manager = form.manager.trim();
     const email = form.email.trim().toLowerCase();
@@ -2022,6 +2006,20 @@ function CompanyEditModal({
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
+    try {
+      await companyRequestApi.update(company.id, {
+        name,
+        manager,
+        email,
+        phone: form.phone.trim(),
+        country: form.country.trim(),
+        sector: form.sector.trim(),
+      });
+      if (nextPassword) await authApi.updateCompanyPassword(company.id, nextPassword);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Le mot de passe n’a pas pu être mis à jour.');
+      return;
+    }
     mutate(
       (draft) => {
         const target = draft.companies.find((item) => item.id === company.id);
@@ -2034,7 +2032,6 @@ function CompanyEditModal({
             phone: form.phone.trim(),
             country: form.country.trim(),
             sector: form.sector.trim(),
-            ...(nextPassword ? { adminPassword: nextPassword } : {}),
           });
         }
       },
@@ -2198,7 +2195,7 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
     </div>
   );
 }
-function RoleAwareKoraDashboard({
+function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
@@ -2251,14 +2248,14 @@ function RoleAwareKoraDashboard({
     ) : null,
   ].filter(Boolean);
   const primaryPath = canStocks
-    ? '/kora/stocks'
+    ? '/entreprise/stocks'
     : canCommerce
-      ? '/kora/commerce'
+      ? '/entreprise/commerce'
       : canFinance
-        ? '/kora/finance'
+        ? '/entreprise/finance'
         : canPresences
-          ? '/kora/presences'
-          : '/kora/organisation';
+          ? '/entreprise/presences'
+          : '/entreprise/organisation';
   const primaryLabel = canStocks
     ? 'Ouvrir Gestion de stock'
     : canCommerce
@@ -2321,7 +2318,7 @@ function RoleAwareKoraDashboard({
               </p>
             </div>
             <button
-              onClick={() => onNavigate('/kora/commerce')}
+              onClick={() => onNavigate('/entreprise/commerce')}
               className="text-xs font-bold text-[hsl(var(--primary))]"
             >
               Tout voir
@@ -2351,7 +2348,7 @@ function RoleAwareKoraDashboard({
               </p>
             </div>
             <button
-              onClick={() => onNavigate('/kora/stocks')}
+              onClick={() => onNavigate('/entreprise/stocks')}
               className="rounded-lg border px-3 py-2 text-xs font-bold"
             >
               Voir le stock
@@ -2363,7 +2360,7 @@ function RoleAwareKoraDashboard({
   );
 }
 
-function KoraDashboard({
+function CompanyDashboard({
   data,
   onNavigate,
   allowed,
@@ -2421,7 +2418,7 @@ function KoraDashboard({
               </div>
               <button
                 data-testid="button-open-commerce"
-                onClick={() => onNavigate('/kora/commerce')}
+                onClick={() => onNavigate('/entreprise/commerce')}
                 className="rounded-lg border px-3 py-2 text-xs font-bold"
               >
                 Ouvrir Commerce
@@ -2460,7 +2457,7 @@ function KoraDashboard({
                     {low} produits sous leur seuil recommandé.
                   </p>
                   <button
-                    onClick={() => onNavigate('/kora/stocks')}
+                    onClick={() => onNavigate('/entreprise/stocks')}
                     className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"
                   >
                     Voir les stocks
@@ -2476,7 +2473,7 @@ function KoraDashboard({
                   Votre synthèse de la semaine est disponible.
                 </p>
                 <button
-                  onClick={() => onNavigate('/kora/rapports')}
+                  onClick={() => onNavigate('/entreprise/rapports')}
                   className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"
                 >
                   Consulter
@@ -2494,7 +2491,7 @@ function KoraDashboard({
               <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui et hier</p>
             </div>
             <button
-              onClick={() => onNavigate('/kora/commerce')}
+              onClick={() => onNavigate('/entreprise/commerce')}
               className="text-xs font-bold text-[hsl(var(--primary))]"
             >
               Tout voir
@@ -2836,7 +2833,7 @@ function RequestsPage({
       mutate((d) => {
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
-          Object.assign(target, { ...result.company, adminPassword: undefined });
+          Object.assign(target, result.company);
         }
       }, 'Entreprise activée et compte administrateur synchronisé.');
       setRequests((current) => current.filter((item) => item.id !== company.id));
@@ -4378,7 +4375,7 @@ function EmployeesPage({
     </div>
   );
 }
-function KoraRolesPage({
+function CompanyRolesPage({
   data,
   mutate,
 }: {
@@ -4403,13 +4400,13 @@ function KoraRolesPage({
           const target = d.roles.find((role) => role.id === modal.id);
           if (target) {
             target.name = name.trim();
-            target.description = description.trim() || 'Rôle personnalisé KORA.';
+            target.description = description.trim() || 'Rôle personnalisé entreprise.';
           }
         } else
           d.roles.push({
             id: uid('role'),
             name: name.trim(),
-            description: description.trim() || 'Rôle personnalisé KORA.',
+            description: description.trim() || 'Rôle personnalisé entreprise.',
             modulePermissions: permissions,
           });
       },
@@ -4445,20 +4442,20 @@ function KoraRolesPage({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <ActionButton primary testId="button-add-kora-role" onClick={() => open()}>
+        <ActionButton primary testId="button-add-company-role" onClick={() => open()}>
           Ajouter un rôle
         </ActionButton>
       </div>
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         {data.roles.map((r) => (
-          <section data-testid={`card-kora-role-${r.id}`} key={r.id} className="card-surface rounded-2xl p-5">
+          <section data-testid={`card-company-role-${r.id}`} key={r.id} className="card-surface rounded-2xl p-5">
             <div className="flex items-start justify-between">
               <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]">
                 <ShieldCheck size={18} />
               </span>
               <div className="flex flex-wrap gap-1">
                 <button
-                  data-testid={`button-edit-kora-role-${r.id}`}
+                  data-testid={`button-edit-company-role-${r.id}`}
                   aria-label={`Modifier le rôle ${r.name}`}
                   title="Modifier"
                   onClick={() => open(r)}
@@ -4468,7 +4465,7 @@ function KoraRolesPage({
                   <span>Modifier</span>
                 </button>
                 <button
-                  data-testid={`button-delete-kora-role-${r.id}`}
+                  data-testid={`button-delete-company-role-${r.id}`}
                   aria-label={`Supprimer le rôle ${r.name}`}
                   title="Supprimer"
                   onClick={() => remove(r)}
@@ -4582,7 +4579,7 @@ function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreD
         <Metric
           label="Références actives"
           value={String(data.products.length)}
-          detail="dans le catalogue KORA"
+          detail="dans le catalogue entreprise"
           icon={Package}
           accent
         />
@@ -5125,7 +5122,7 @@ function ReportsPage({ data }: { data: StoreData }) {
       />
       <ReportCard
         title="Rapport d’activité"
-        text="L’historique des actions importantes de l’espace KORA."
+        text="L’historique des actions importantes de l’espace entreprise."
         date="Dernières 30 jours"
       />
     </div>
@@ -6346,41 +6343,21 @@ function AdminCreateCompanyPage({
     }
     setSaving(true);
     try {
-      const companyId = uid('company');
-      await synchronizeCompanyModuleAccess(companyId, selectedModules);
-      mutate((draft) => {
-        const preset = data.sectorPresets.find((item) => item.name === sector);
-        const newCompany: Company = {
-          id: companyId,
-          name: name.trim(),
-          manager: manager.trim(),
-          email: normalizedEmail,
-          adminPassword: password,
-          phone: '',
-          country: 'Sénégal',
-          sector,
-          status: 'ACTIF',
-          requestedModules: [...selectedModules],
-          allowedModules: [...selectedModules],
-          requestedModulePackIds: Object.fromEntries(
-            Object.entries(preset?.modulePackIds ?? {})
-              .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
-              .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
-          ),
-          refusedModules: [],
-          createdAt: new Date().toISOString().slice(0, 10),
-        };
-        draft.companies.push(newCompany);
-        provisionCompanyAccess(draft, newCompany, {
-          moduleIds: [...selectedModules],
-          modulePackIds: newCompany.requestedModulePackIds,
-          root: {
-            name: orgName.trim(),
-            code: orgCode.trim().toUpperCase(),
-            type: orgType,
-          },
-        });
-      }, 'Entreprise créée et activée.');
+      const preset = data.sectorPresets.find((item) => item.name === sector);
+      await companyRequestApi.create({
+        name: name.trim(),
+        manager: manager.trim(),
+        email: normalizedEmail,
+        password,
+        country: 'Sénégal',
+        sector,
+        requestedModules: [...selectedModules],
+        requestedModulePackIds: Object.fromEntries(
+          Object.entries(preset?.modulePackIds ?? {})
+            .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
+            .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
+      });
       onComplete();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'La synchronisation des modules a échoué.');

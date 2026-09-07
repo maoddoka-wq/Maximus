@@ -51,19 +51,19 @@ Le routage est assuré par Wouter :
 - `/` : connexion ;
 - `/inscription` : inscription ou création administrative d’une entreprise ;
 - `/maximus/...` : espace d’administration MAXIMUS ;
-- `/kora/...` : espace entreprise et employés.
+- `/entreprise/...` : espace entreprise et employés. Les anciennes URLs `/kora/...` sont uniquement des alias de compatibilité.
 
 Les routes sont centralisées dans `artifacts/maximus/src/routes/app-routes.tsx` :
 
 - `AdminRouter` sélectionne les écrans MAXIMUS ;
-- `KoraRouter` sélectionne les écrans d’entreprise ;
+- `CompanyRouter` sélectionne les écrans d’entreprise ;
 - les routes sont filtrées par session, modules autorisés et permissions.
 
 Les paramètres d’onglet sont transmis dans la query string, par exemple :
 
 ```text
-/kora/commerce?tab=products
-/kora/stocks?tab=inventory
+/entreprise/commerce?tab=products
+/entreprise/stocks?tab=inventory
 ```
 
 Les routeurs comparent le chemin sans la query string. Les écrans utilisent `src/lib/query-tab.ts` pour lire l’onglet actif et gérer les alias historiques.
@@ -111,7 +111,7 @@ La synchronisation entre onglets repose sur l’événement navigateur `storage`
 Le centre **Contrôle & coordination** est accessible depuis MAXIMUS et depuis les espaces entreprise :
 
 - `/maximus/controle` : vue transverse pour l’administration MAXIMUS ;
-- `/kora/controle` : vue limitée au périmètre de l’entreprise, de l’unité ou de l’employé.
+- `/entreprise/controle` : vue limitée au périmètre de l’entreprise, de l’unité ou de l’employé.
 
 Le store conserve trois flux complémentaires :
 

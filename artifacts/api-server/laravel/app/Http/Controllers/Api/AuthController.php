@@ -176,6 +176,42 @@ class AuthController extends Controller
         return response()->json(['ok' => true], $existing ? 200 : 201);
     }
 
+    public function updateCompanyPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'companyId' => ['sometimes', 'string', 'min:1'],
+            'password' => ['required', 'string', 'min:8', 'max:200'],
+        ]);
+        $actor = $request->attributes->get('authActor');
+        $companyId = ($actor['role'] ?? null) === 'maximus_admin'
+            ? ($data['companyId'] ?? null)
+            : ($actor['companyId'] ?? null);
+        if (!is_string($companyId) || $companyId === '') {
+            return response()->json(['error' => 'Aucune entreprise valide n’est associée à cet acteur.'], 403);
+        }
+        if (($actor['role'] ?? null) !== 'maximus_admin' && isset($data['companyId']) && $data['companyId'] !== $companyId) {
+            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        }
+
+        $admin = AuthUser::query()
+            ->where('company_id', $companyId)
+            ->where('role', 'company_admin')
+            ->where('status', 'ACTIF')
+            ->orderBy('created_at')
+            ->first();
+        if (!$admin) {
+            return response()->json(['error' => 'Compte administrateur entreprise introuvable.'], 404);
+        }
+
+        $admin->update([
+            'password_hash' => MaximusPassword::hash($data['password']),
+            'updated_at' => now(),
+        ]);
+        AuthSession::query()->where('user_id', $admin->id)->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
     public function deleteAccount(Request $request, string $employeeId): Response|JsonResponse
     {
         $actor = $request->attributes->get('authActor');

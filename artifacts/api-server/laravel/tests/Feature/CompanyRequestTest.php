@@ -86,6 +86,48 @@ class CompanyRequestTest extends TestCase
             ->assertStatus(409);
     }
 
+    public function test_company_admin_updates_persisted_profile_and_password_without_returning_plaintext(): void
+    {
+        $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
+        $companyId = Company::query()->where('email', 'owner@atelier.test')->value('id');
+        $maximusToken = $this->issueMaximusSession();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->postJson('/api/company-requests/'.$companyId.'/approve')
+            ->assertOk();
+
+        $admin = AuthUser::query()->whereKey('company-admin:'.$companyId)->firstOrFail();
+        $companyToken = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $companyToken)
+            ->patchJson('/api/companies/'.$companyId, [
+                'name' => 'Atelier Renommé',
+                'manager' => 'Nouvelle Responsable',
+                'email' => 'new-owner@atelier.test',
+                'phone' => '+221 77 000 00 00',
+                'country' => 'Sénégal',
+                'sector' => 'Production',
+            ])
+            ->assertOk()
+            ->assertJsonPath('company.name', 'Atelier Renommé');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $companyToken)
+            ->patchJson('/api/auth/company-password', ['password' => 'NewSecret2026!'])
+            ->assertOk();
+
+        $updatedAdmin = AuthUser::query()->findOrFail($admin->id);
+        $this->assertTrue(MaximusPassword::check('NewSecret2026!', $updatedAdmin->password_hash));
+        $this->assertNotSame('NewSecret2026!', $updatedAdmin->password_hash);
+        $this->assertDatabaseHas('companies', [
+            'id' => $companyId,
+            'name' => 'Atelier Renommé',
+            'email' => 'new-owner@atelier.test',
+        ]);
+    }
+
     public function test_archiving_a_company_revokes_sessions_and_blocks_the_tenant(): void
     {
         $company = Company::query()->create([

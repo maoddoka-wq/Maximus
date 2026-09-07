@@ -189,7 +189,7 @@ export function ControlCenterPage({
         audience: task.companyId ? 'company' : 'admin',
         module: task.moduleId,
         severity: refused ? 'error' : granted ? 'success' : 'info',
-        href: task.companyId ? '/kora/controle' : '/maximus/controle',
+        href: task.companyId ? '/entreprise/controle' : '/maximus/controle',
       });
     }, 'La tâche et son audit ont été mis à jour.');
   };
@@ -272,7 +272,7 @@ export function ControlCenterPage({
             audience: 'company',
             module: task.moduleId,
             severity: task.priority === 'CRITIQUE' || task.priority === 'HAUTE' ? 'warning' : 'info',
-            href: '/kora/controle',
+            href: '/entreprise/controle',
           });
         }, 'La tâche a été créée localement et sera resynchronisée.');
         setSyncError(error instanceof Error ? `${error.message} Repli local activé.` : 'La tâche reste enregistrée localement.');

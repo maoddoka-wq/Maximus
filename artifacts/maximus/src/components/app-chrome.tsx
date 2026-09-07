@@ -14,7 +14,7 @@ import { Link } from 'wouter';
 import type { ModuleId, StoreData } from '@/lib/store';
 import {
   adminNav,
-  koraNav,
+  companyNav,
   type Icon,
   type Session,
   type SidebarFeature,
@@ -62,7 +62,7 @@ export function Sidebar({
   const companyAdmin = session.startsWith('company:');
   const nav = isAdmin
     ? adminNav
-    : koraNav.filter(
+    : companyNav.filter(
         item =>
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
           (item.module === null || allowed.includes(item.module as ModuleId)),

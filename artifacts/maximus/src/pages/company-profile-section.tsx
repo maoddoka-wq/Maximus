@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { UserRound } from 'lucide-react';
 import type { Company, StoreData } from '@/lib/store';
+import { authApi } from '@/lib/auth-api';
+import { companyRequestApi } from '@/lib/company-request-api';
 import { companyThemePresets, defaultCompanyTheme, isHexColor } from './organization-shared-utils';
 import {
   Field,
@@ -94,7 +96,7 @@ export function CompanyProfileSection({
     reader.readAsDataURL(file);
   };
 
-  const save = () => {
+  const save = async () => {
     const name = form.name.trim();
     const manager = form.manager.trim();
     const email = form.email.trim().toLowerCase();
@@ -127,6 +129,20 @@ export function CompanyProfileSection({
       setError('Les couleurs doivent être au format hexadécimal, par exemple #F2B705.');
       return;
     }
+    try {
+      await companyRequestApi.update(company.id, {
+        name,
+        manager,
+        email,
+        phone: form.phone.trim(),
+        country: form.country.trim(),
+        sector: form.sector.trim(),
+      });
+      if (password) await authApi.updateCompanyPassword(company.id, password);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Le mot de passe n’a pas pu être mis à jour.');
+      return;
+    }
 
     mutate(draft => {
       const target = draft.companies.find(item => item.id === company.id);
@@ -141,7 +157,6 @@ export function CompanyProfileSection({
       target.primaryColor = primaryColor;
       target.accentColor = accentColor;
       target.sidebarColor = sidebarColor;
-      if (password) target.adminPassword = password;
     }, password ? 'Profil, couleurs, photo et mot de passe mis à jour.' : 'Profil, couleurs et photo mis à jour.');
     setNewPassword('');
     setPasswordConfirm('');

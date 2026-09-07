@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { modules } from './store';
-import { koraNav } from './navigation';
+import { companyNav } from './navigation';
 import {
   moduleDescriptorById,
   moduleIdForPath,
@@ -11,7 +11,7 @@ import {
 test('chaque module du catalogue possède une route et une navigation', () => {
   const catalogIds = modules.map(module => module.id).sort();
   const registryIds = moduleRegistry.map(module => module.id).sort();
-  const navigableIds = koraNav
+   const navigableIds = companyNav
     .map(item => item.module)
     .filter((moduleId): moduleId is string => typeof moduleId === 'string')
     .sort();

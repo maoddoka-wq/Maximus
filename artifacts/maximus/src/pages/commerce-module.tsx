@@ -296,7 +296,7 @@ function SalesPageComplete({ data, query, mutate, canCreate, canModify, companyI
           product.stock -= item.quantity;
           draft.movements.unshift({ id: uid('movement'), product: product.name, quantity: item.quantity, type: 'SORTIE', date: 'À l’instant', user: 'Utilisateur actuel', location: 'Boutique principale', companyId });
           if (product.stock <= product.threshold) {
-            addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/kora/stocks?tab=products' });
+            addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/entreprise/stocks?tab=products' });
           }
         }
       });
@@ -312,7 +312,7 @@ function SalesPageComplete({ data, query, mutate, canCreate, canModify, companyI
         moduleId: 'commerce',
         severity: 'success',
       });
-      addNotification(draft, { title: 'Vente validée', text: `La vente ${sale.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/kora/commerce?tab=sales' });
+      addNotification(draft, { title: 'Vente validée', text: `La vente ${sale.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/entreprise/commerce?tab=sales' });
     }, 'Vente validée et stock mis à jour.');
   };
   const remove = async (sale: Sale) => {
@@ -511,7 +511,7 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
         if (product) {
           product.stock -= item.quantity;
         draft.movements.unshift({ id: uid('movement'), product: product.name, quantity: item.quantity, type: 'SORTIE', date: 'À l’instant', user: 'Utilisateur actuel', location: 'Boutique principale', companyId });
-          if (product.stock <= product.threshold) addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/kora/stocks?tab=products' });
+          if (product.stock <= product.threshold) addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/entreprise/stocks?tab=products' });
         }
       });
       if ((target.paidAmount ?? 0) > 0) draft.payments.unshift({ id: uid('payment'), reference: `PAY-${Date.now().toString().slice(-6)}`, invoice: `FAC-${target.reference.replace('VTE-', '')}`, amount: target.paidAmount ?? 0, status: 'CONFIRMÉ', date: 'À l’instant', companyId });
@@ -527,7 +527,7 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
         moduleId: 'commerce',
         severity: 'success',
       });
-      addNotification(draft, { title: 'Vente validée', text: `La vente ${target.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/kora/commerce?tab=sales' });
+          addNotification(draft, { title: 'Vente validée', text: `La vente ${target.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/entreprise/commerce?tab=sales' });
     }, 'Vente validée, encaissement enregistré et stock mis à jour.');
   };
   const remove = async (sale: Sale) => { if (!await confirm({ title: 'Supprimer ce brouillon ?', description: `Le brouillon ${sale.reference} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' })) return; mutate(draft => { draft.sales = draft.sales.filter(item => item.id !== sale.id); }, 'Vente supprimée.'); };
@@ -668,7 +668,7 @@ function ActivityPage({ data, query }: { data: StoreData; query: string }) {
 
 function TeamPage({ data, query, canModify, onToast, onNavigate }: { data: StoreData; query: string; canModify: boolean; onToast: (message: string) => void; onNavigate?: (path: string) => void }) {
   const employees = data.employees.filter(item => `${item.firstName} ${item.lastName} ${item.email} ${item.role}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-5"><Panel title="Équipe & droits" description="Consultez les collaborateurs et les rôles qui leur sont attribués." action={canModify ? <Button primary onClick={() => onNavigate ? onNavigate('/kora/organisation?tab=roles') : onToast('Les rôles se configurent dans Organisation & accès.')}><Settings size={15} />Configurer les droits</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Collaborateurs" value={String(employees.length)} detail="Dans cette entreprise" icon={Users} /><Metric label="Rôles actifs" value={String(new Set(employees.map(item => item.role)).size)} detail="Profils utilisés" icon={BriefcaseBusiness} /><Metric label="Accès commerciaux" value={String(employees.filter(item => item.role.toLowerCase().includes('vendeur') || item.role.toLowerCase().includes('manager')).length)} detail="Rôles à surveiller" icon={UserRound} /></div></Panel><Panel title="Membres de l’équipe"><DataTable headers={['Collaborateur', 'Email', 'Poste', 'Service', 'Rôle', 'Statut']} rows={employees.map(item => [<strong key={item.id}>{item.firstName} {item.lastName}</strong>, item.email, item.position, item.department || '—', item.role, <StatusBadge key={`${item.id}-status`} status={item.status} />])} /></Panel></div>;
+  return <div className="space-y-5"><Panel title="Équipe & droits" description="Consultez les collaborateurs et les rôles qui leur sont attribués." action={canModify ? <Button primary onClick={() => onNavigate ? onNavigate('/entreprise/organisation?tab=roles') : onToast('Les rôles se configurent dans Organisation & accès.')}><Settings size={15} />Configurer les droits</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Collaborateurs" value={String(employees.length)} detail="Dans cette entreprise" icon={Users} /><Metric label="Rôles actifs" value={String(new Set(employees.map(item => item.role)).size)} detail="Profils utilisés" icon={BriefcaseBusiness} /><Metric label="Accès commerciaux" value={String(employees.filter(item => item.role.toLowerCase().includes('vendeur') || item.role.toLowerCase().includes('manager')).length)} detail="Rôles à surveiller" icon={UserRound} /></div></Panel><Panel title="Membres de l’équipe"><DataTable headers={['Collaborateur', 'Email', 'Poste', 'Service', 'Rôle', 'Statut']} rows={employees.map(item => [<strong key={item.id}>{item.firstName} {item.lastName}</strong>, item.email, item.position, item.department || '—', item.role, <StatusBadge key={`${item.id}-status`} status={item.status} />])} /></Panel></div>;
 }
 
 function SettingsPage({ state, canModify, onUpdate }: { state: CommerceState; canModify: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {

@@ -37,14 +37,14 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
 ];
 
-const koraCoreNav: NavigationItem[] = [
-  { href: '/kora/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/kora/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
-  { href: '/kora/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
+const companyCoreNav: NavigationItem[] = [
+  { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
+  { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
+  { href: '/entreprise/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
 ];
 
-export const koraNav: NavigationItem[] = [
-  ...koraCoreNav,
+export const companyNav: NavigationItem[] = [
+  ...companyCoreNav,
   ...moduleRegistry.map(module => ({
     href: module.path,
     label: module.name,

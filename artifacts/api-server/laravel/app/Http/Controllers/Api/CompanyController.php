@@ -206,6 +206,61 @@ class CompanyController extends Controller
         return response()->json(['ok' => true, 'company' => $this->companyPayload($company)]);
     }
 
+    public function update(Request $request, string $companyId): JsonResponse
+    {
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) !== 'maximus_admin' && ($actor['companyId'] ?? null) !== $companyId) {
+            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        }
+        $input = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'min:2', 'max:160'],
+            'manager' => ['required', 'string', 'min:2', 'max:180'],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'sector' => ['nullable', 'string', 'max:120'],
+        ])->validate();
+
+        $email = Str::lower(trim($input['email']));
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if (!$company) {
+            return response()->json(['error' => 'Entreprise introuvable ou inactive.'], 404);
+        }
+        if (Company::query()->where('email', $email)->where('id', '!=', $companyId)->whereNull('deleted_at')->exists()) {
+            return response()->json(['error' => 'Une autre entreprise utilise déjà cette adresse email.'], 409);
+        }
+
+        try {
+            $updated = DB::transaction(function () use ($company, $input, $email): Company {
+                $company->update([
+                    'name' => trim($input['name']),
+                    'manager' => trim($input['manager']),
+                    'email' => $email,
+                    'phone' => trim((string) ($input['phone'] ?? '')),
+                    'country' => trim((string) ($input['country'] ?? '')),
+                    'sector' => trim((string) ($input['sector'] ?? '')),
+                ]);
+                AuthUser::query()
+                    ->where('company_id', $company->id)
+                    ->where('role', 'company_admin')
+                    ->update([
+                        'email' => $email,
+                        'display_name' => trim($input['manager']),
+                        'updated_at' => now(),
+                    ]);
+
+                return $company->fresh();
+            });
+        } catch (\Illuminate\Database\QueryException $exception) {
+            if (str_contains($exception->getMessage(), 'unique')) {
+                return response()->json(['error' => 'Cette adresse email est déjà utilisée.'], 409);
+            }
+            throw $exception;
+        }
+
+        return response()->json(['ok' => true, 'company' => $this->companyPayload($updated)]);
+    }
+
     public function destroy(Request $request, string $companyId): JsonResponse
     {
         if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {

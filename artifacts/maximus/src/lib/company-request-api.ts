@@ -50,6 +50,11 @@ export const companyRequestApi = {
       `/company-requests/${encodeURIComponent(companyId)}/reject`,
       { method: 'POST', body: JSON.stringify({ reason: reason ?? '' }) },
     ),
+  update: (companyId: string, input: Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'>) =>
+    request<{ ok: true; company: Company }>(`/companies/${encodeURIComponent(companyId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
   remove: (companyId: string) =>
     request<{ ok: true }>(`/companies/${encodeURIComponent(companyId)}`, { method: 'DELETE' }),
 };

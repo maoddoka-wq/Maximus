@@ -55,9 +55,7 @@ export function AdminRouter({
   screens: AdminRouteScreens;
 }) {
   const rawRoutePath = location.split('?')[0];
-  const routePath = rawRoutePath.startsWith('/entreprise')
-    ? `/kora${rawRoutePath.slice('/entreprise'.length)}`
-    : rawRoutePath;
+  const routePath = rawRoutePath.replace(/^\/kora(?=\/|$)/, '/entreprise');
   if (routePath === '/maximus/dashboard') {
     return renderScreen(screens.dashboard, { data, onNavigate });
   }
@@ -115,7 +113,7 @@ export function AdminRouter({
   });
 }
 
-export type KoraRouteScreens = {
+export type CompanyRouteScreens = {
   dashboard: Screen;
   control: Screen;
   notifications: Screen;
@@ -131,7 +129,7 @@ export type KoraRouteScreens = {
   reports: Screen;
 };
 
-export function KoraRouter({
+export function CompanyRouter({
   location,
   data,
   mutate,
@@ -176,30 +174,30 @@ export function KoraRouter({
   commerceTabIds?: string[];
   moduleStatuses: Record<string, ModuleAvailability>;
   singleModuleNavigation?: boolean;
-  screens: KoraRouteScreens;
+  screens: CompanyRouteScreens;
 }) {
   const routePath = location.split('?')[0];
   const requiredModule = moduleIdForPath(routePath);
   const maintenanceModule: ModuleId | 'controle' | undefined =
-    routePath === '/kora/controle' ? 'controle' : requiredModule;
+    routePath === '/entreprise/controle' ? 'controle' : requiredModule;
   if (maintenanceModule && moduleStatuses[maintenanceModule] === 'MAINTENANCE') {
     return renderScreen(screens.empty, {
       title: 'Module en maintenance',
       text: 'Ce module est temporairement indisponible pendant une opération de maintenance. Les autres modules restent accessibles.',
-      action: () => onBack('/kora/dashboard'),
+      action: () => onBack('/entreprise/dashboard'),
     });
   }
   if (requiredModule && !allowed.includes(requiredModule)) {
     return renderScreen(screens.empty, {
       title: 'Accès non autorisé',
       text: 'Votre rôle ne possède pas la permission Consulter pour ce module.',
-      action: () => onBack('/kora/dashboard'),
+      action: () => onBack('/entreprise/dashboard'),
     });
   }
-  if (routePath === '/kora/dashboard') {
+  if (routePath === '/entreprise/dashboard') {
     return renderScreen(screens.dashboard, { data, onNavigate, allowed });
   }
-  if (routePath === '/kora/controle') {
+  if (routePath === '/entreprise/controle') {
     return renderScreen(screens.control, {
       data,
       mutate,
@@ -215,10 +213,10 @@ export function KoraRouter({
       sectorManager,
     });
   }
-  if (routePath === '/kora/notifications') {
+  if (routePath === '/entreprise/notifications') {
     return renderScreen(screens.notifications, { data, mutate, context: { isAdmin: false, companyId } });
   }
-  if (routePath === '/kora/profil') {
+  if (routePath === '/entreprise/profil') {
     const company = data.companies.find(item => item.id === companyId);
     return companyAdmin && company ? (
       renderScreen(screens.organization, { company, data, mutate, initialTab: 'profile' })
@@ -226,13 +224,13 @@ export function KoraRouter({
       renderScreen(screens.empty, {
         title: 'Accès réservé à l’administrateur',
         text: 'Le profil de l’entreprise est géré par son administrateur.',
-        action: () => onBack('/kora/dashboard'),
+        action: () => onBack('/entreprise/dashboard'),
       })
     );
   }
-  if (routePath === '/kora/organisation' || routePath === '/kora/autorisations' || routePath === '/kora/employes' || routePath === '/kora/roles') {
+  if (routePath === '/entreprise/organisation' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/employes' || routePath === '/entreprise/roles') {
     const company = data.companies.find(item => item.id === companyId);
-    const initialTab = routePath === '/kora/autorisations' || routePath === '/kora/roles' ? 'roles' : routePath === '/kora/employes' ? 'employees' : 'structure';
+    const initialTab = routePath === '/entreprise/autorisations' || routePath === '/entreprise/roles' ? 'roles' : routePath === '/entreprise/employes' ? 'employees' : 'structure';
     return company && (companyAdmin || sectorManager) ? (
       renderScreen(screens.organization, {
         company,
@@ -246,11 +244,11 @@ export function KoraRouter({
       renderScreen(screens.empty, {
         title: 'Accès réservé',
         text: 'L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur.',
-        action: () => onBack('/kora/dashboard'),
+        action: () => onBack('/entreprise/dashboard'),
       })
     );
   }
-  if (routePath === '/kora/stocks') {
+  if (routePath === '/entreprise/stocks') {
     return renderScreen(screens.stocks, {
       companyId,
       companyUsers: data.employees.filter(item => item.companyId === companyId),
@@ -261,7 +259,7 @@ export function KoraRouter({
       singleModuleNavigation,
     });
   }
-  if (routePath === '/kora/ecommerce') {
+  if (routePath === '/entreprise/ecommerce') {
     return renderScreen(screens.ecommerce, {
       companyId,
       canCreate: hasPermission('ecommerce', 'créer'),
@@ -270,10 +268,10 @@ export function KoraRouter({
       singleModuleNavigation,
     });
   }
-  if (routePath === '/kora/finance') {
+  if (routePath === '/entreprise/finance') {
     return renderScreen(screens.finance, { data, mutate });
   }
-  if (routePath === '/kora/commerce' || routePath === '/kora/ventes') {
+  if (routePath === '/entreprise/commerce' || routePath === '/entreprise/ventes') {
     return renderScreen(screens.commerce, {
       companyId,
       data,
@@ -282,7 +280,7 @@ export function KoraRouter({
       canModify: hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier'),
       allowedTabs: commerceTabIds,
       singleModuleNavigation,
-      initialTab: routePath === '/kora/ventes' ? 'sales' : 'dashboard',
+      initialTab: routePath === '/entreprise/ventes' ? 'sales' : 'dashboard',
       onNavigate,
     });
   }
@@ -299,10 +297,10 @@ export function KoraRouter({
       canModify: hasPermission(operationalModule, 'modifier'),
     });
   }
-  if (routePath === '/kora/rh') {
+  if (routePath === '/entreprise/rh') {
     return renderScreen(screens.humanResources, { data, mutate, companyAdmin, employee, companyId });
   }
-  if (routePath === '/kora/presences') {
+  if (routePath === '/entreprise/presences') {
     return renderScreen(screens.presence, {
       companyId,
       employees: presenceEmployees,
@@ -320,12 +318,12 @@ export function KoraRouter({
       singleModuleNavigation,
     });
   }
-  if (routePath === '/kora/rapports') {
+  if (routePath === '/entreprise/rapports') {
     return renderScreen(screens.reports, { data });
   }
   return renderScreen(screens.empty, {
     title: 'Module non autorisé',
-    text: `Cette vue n’est pas disponible pour KORA (${allowed.length} modules autorisés).`,
-    action: () => onBack('/kora/dashboard'),
+    text: `Cette vue n’est pas disponible pour cet espace (${allowed.length} modules autorisés).`,
+    action: () => onBack('/entreprise/dashboard'),
   });
 }

@@ -40,7 +40,6 @@ export interface Company {
   allowedModules: ModuleId[];
   refusedModules: ModuleId[];
   createdAt: string;
-  adminPassword?: string;
   profilePhoto?: string;
   primaryColor?: string;
   accentColor?: string;
@@ -181,6 +180,19 @@ export function emptyStoreData(): StoreData {
     moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
     moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
+}
+
+export function sanitizeStoreData(data: StoreData): StoreData {
+  const safe = structuredClone(data) as StoreData;
+  const stripCredentials = <T extends object>(value: T): T => {
+    const copy = { ...value } as Record<string, unknown>;
+    delete copy.loginPassword;
+    delete copy.adminPassword;
+    return copy as T;
+  };
+  safe.companies = safe.companies.map(company => stripCredentials(company));
+  safe.employees = safe.employees.map(employee => stripCredentials(employee));
+  return safe;
 }
 
 export function seedData(): StoreData { return emptyStoreData(); }

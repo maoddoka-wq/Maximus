@@ -7,7 +7,7 @@ configurer ses unités, ses rôles, ses employés, ses modules et ses permission
 Le produit couvre actuellement :
 
 - l’administration globale MAXIMUS ;
-- les espaces entreprise et employés KORA ;
+- les espaces entreprise et employés ;
 - les modules Commerce, Gestion de stock, Présences et Contrôle & coordination ;
 - l’organisation hiérarchique par secteurs et unités ;
 - les rôles, permissions détaillées et dépendances entre fonctionnalités ;
@@ -140,7 +140,7 @@ artifacts/maximus/src/
 │   ├── control-center.tsx
 │   └── organization-*.tsx
 ├── routes/
-│   └── app-routes.tsx         # routes protégées MAXIMUS et KORA
+│   └── app-routes.tsx         # routes protégées MAXIMUS et entreprise
 ├── hooks/                     # état React réutilisable
 └── lib/
     ├── app-access.ts          # contexte d’accès effectif

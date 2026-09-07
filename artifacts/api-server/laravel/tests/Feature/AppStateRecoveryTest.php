@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,5 +72,58 @@ class AppStateRecoveryTest extends TestCase
 
         $this->assertDatabaseHas('maximus_app_states', ['scope' => 'workspace']);
         $this->assertNotNull(DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'));
+    }
+
+    public function test_maximus_bootstrap_discards_records_for_companies_absent_from_the_registry(): void
+    {
+        Company::query()->create([
+            'id' => 'active-company',
+            'name' => 'Entreprise active',
+            'manager' => 'Responsable',
+            'email' => 'active@example.test',
+            'status' => 'ACTIF',
+        ]);
+        Company::query()->create([
+            'id' => 'archived-company',
+            'name' => 'Entreprise archivée',
+            'manager' => 'Ancienne responsable',
+            'email' => 'archived@example.test',
+            'status' => 'ARCHIVÉ',
+            'deleted_at' => now(),
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'registry-admin',
+            'email' => 'registry.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'companies' => [
+                    ['id' => 'active-company', 'name' => 'Entreprise active'],
+                    ['id' => 'archived-company', 'name' => 'Entreprise archivée'],
+                ],
+                'employees' => [
+                    ['id' => 'active-employee', 'companyId' => 'active-company'],
+                    ['id' => 'archived-employee', 'companyId' => 'archived-company'],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk();
+
+        $this->assertSame(['active-company'], collect($response->json('data.companies'))->pluck('id')->all());
+        $this->assertSame(['active-employee'], collect($response->json('data.employees'))->pluck('id')->all());
     }
 }

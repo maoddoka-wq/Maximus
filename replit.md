@@ -1,6 +1,6 @@
 # MAXIMUS ERP
 
-Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec administration des espaces, modules activables, dépendances, organisation, rôles, permissions et opérations KORA.
+Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec administration des espaces, modules activables, dépendances, organisation, rôles, permissions et opérations d’entreprise.
 
 ## Run & Operate
 
@@ -36,7 +36,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 
 - Le prototype utilise `localStorage` pour rendre les parcours de démonstration persistants sans service externe.
 - Les modules disponibles et les dépendances sont définis comme des données structurées afin de préparer l’ajout de futurs modules.
-- L’espace KORA calcule son menu à partir des modules autorisés et, pour un employé, des permissions de son rôle.
+- L’espace entreprise calcule son menu à partir des modules autorisés et, pour un employé, des permissions de son rôle.
 - Le périmètre entreprise est résolu à partir de la session serveur ; un `companyId` fourni par le navigateur ne peut pas élargir celui d’un acteur non MAXIMUS.
 - Laravel reste la couche active tant que la parité PostgreSQL avec Express n’est pas prouvée par des tests de comportement et de données.
 
@@ -137,7 +137,7 @@ Les fonctionnalités d’un même module peuvent aussi avoir des prérequis. Ell
 2. Ajouter une entrée complète dans `modules` avec nom, description, fonctionnalités et statut.
 3. Définir les dépendances éventuelles du module et de ses fonctionnalités dans le contrat du catalogue ; ne pas les coder en dur dans un composant.
 4. Ajouter l’entrée d’administration et la configuration de statut si le module doit être activable ou désactivable.
-5. Ajouter l’entrée de navigation KORA avec son `module`.
+5. Ajouter l’entrée de navigation entreprise avec son `module`.
 6. Créer l’écran du module et le brancher au registre de `App.tsx` et à `app-routes.tsx`.
 7. Vérifier que l’entreprise peut autoriser le module et que l’unité peut le sélectionner uniquement dans ce périmètre.
 8. Ajouter les sous-fonctionnalités dans le catalogue et générer leurs clés via `permissionFeatureKey`.

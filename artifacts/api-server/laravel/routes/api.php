@@ -34,6 +34,7 @@ Route::middleware('maximus.auth')->prefix('company-requests')->group(function ()
 });
 
 Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
+    Route::patch('/{companyId}', [CompanyController::class, 'update']);
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
 
@@ -45,6 +46,8 @@ Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): v
 Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {
     Route::post('/', [AuthController::class, 'provisionCompanyAdmin']);
 });
+
+Route::middleware('maximus.auth')->patch('/auth/company-password', [AuthController::class, 'updateCompanyPassword']);
 
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);

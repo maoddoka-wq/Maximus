@@ -49,6 +49,7 @@ class AppStateController extends Controller
         } else {
             $state = $this->mergeRegistryCompanies($state);
         }
+        $state = $this->stripCredentials($state);
 
         return response()->json([
             'scope' => ($actor['role'] ?? null) === 'maximus_admin'
@@ -61,8 +62,11 @@ class AppStateController extends Controller
 
     private function mergeRegistryCompanies(array $state): array
     {
+        $activeCompanies = Company::query()->whereNull('deleted_at')->orderBy('created_at')->get();
+        $activeCompanyIds = array_fill_keys($activeCompanies->pluck('id')->all(), true);
+        $state = $this->restrictToActiveCompanies($state, $activeCompanyIds);
         $known = collect($state['companies'] ?? [])->keyBy('id');
-        Company::query()->whereNull('deleted_at')->orderBy('created_at')->get()->each(
+        $activeCompanies->each(
             function (Company $company) use (&$state, $known): void {
                 if ($known->has($company->id)) {
                     return;
@@ -227,6 +231,7 @@ class AppStateController extends Controller
             : ($current?->payload ?? []);
         $currentPayload = is_array($currentPayload) ? $currentPayload : [];
 
+        $incomingState = $this->stripCredentials($data['data']);
         if (($actor['role'] ?? null) !== 'maximus_admin') {
             if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager'], true)) {
                 return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
@@ -237,10 +242,11 @@ class AppStateController extends Controller
                 return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
             }
 
-            $currentPayload = $this->mergeCompanyState($currentPayload, $data['data'], $companyId);
+            $currentPayload = $this->mergeCompanyState($currentPayload, $incomingState, $companyId);
         } else {
-            $currentPayload = $data['data'];
+            $currentPayload = $incomingState;
         }
+        $currentPayload = $this->stripCredentials($currentPayload);
 
         $expectedVersion = array_key_exists('version', $data) ? (int) $data['version'] : null;
         if ($current && $expectedVersion !== null && (int) $current->version !== $expectedVersion) {
@@ -263,6 +269,80 @@ class AppStateController extends Controller
         );
 
         return response()->json(['ok' => true, 'version' => $nextVersion]);
+    }
+
+    private function stripCredentials(array $state): array
+    {
+        foreach (['companies' => 'adminPassword', 'employees' => 'loginPassword'] as $collection => $credentialKey) {
+            if (!isset($state[$collection]) || !is_array($state[$collection])) {
+                continue;
+            }
+            $state[$collection] = array_map(
+                static function (mixed $item) use ($credentialKey): mixed {
+                    if (!is_array($item)) {
+                        return $item;
+                    }
+                    unset($item[$credentialKey]);
+                    return $item;
+                },
+                $state[$collection],
+            );
+        }
+
+        return $state;
+    }
+
+    private function restrictToActiveCompanies(array $state, array $activeCompanyIds): array
+    {
+        $state['companies'] = array_values(array_filter(
+            $state['companies'] ?? [],
+            static fn (mixed $item): bool => is_array($item)
+                && isset($item['id'])
+                && isset($activeCompanyIds[(string) $item['id']]),
+        ));
+
+        foreach ([
+            'employees',
+            'roles',
+            'orgNodes',
+            'subscriptions',
+            'controlTasks',
+            'domainEvents',
+            'auditEntries',
+            'notifications',
+            'products',
+            'movements',
+            'sales',
+            'payments',
+            'activities',
+            'purchaseOrders',
+            'supplierRecords',
+            'deliveries',
+            'businessDocuments',
+            'accountingEntries',
+            'payrollSlips',
+            'crmOpportunities',
+        ] as $key) {
+            if (!isset($state[$key]) || !is_array($state[$key])) {
+                continue;
+            }
+            $state[$key] = array_values(array_filter(
+                $state[$key],
+                static function (mixed $item) use ($activeCompanyIds): bool {
+                    if (!is_array($item)) {
+                        return false;
+                    }
+                    $companyId = $item['companyId'] ?? $item['company_id'] ?? null;
+                    return $companyId === null || isset($activeCompanyIds[(string) $companyId]);
+                },
+            ));
+        }
+
+        if (isset($state['commerceStates']) && is_array($state['commerceStates'])) {
+            $state['commerceStates'] = array_intersect_key($state['commerceStates'], $activeCompanyIds);
+        }
+
+        return $state;
     }
 
     /**
