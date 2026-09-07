@@ -14,11 +14,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
     credentials: 'include',
-    headers: isFormData ? { ...(init?.headers ?? {}) } : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: isFormData
+      ? { Accept: 'application/json', ...(init?.headers ?? {}) }
+      : { Accept: 'application/json', 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(typeof body.error === 'string' ? body.error : 'La demande d’entreprise est indisponible.');
+    const validationMessage = body.errors && typeof body.errors === 'object'
+      ? Object.values(body.errors as Record<string, unknown>)
+        .flatMap(value => Array.isArray(value) ? value : [value])
+        .find(value => typeof value === 'string')
+      : undefined;
+    const message = typeof body.error === 'string'
+      ? body.error
+      : typeof body.message === 'string'
+        ? body.message
+        : typeof validationMessage === 'string'
+          ? validationMessage
+          : `La demande d’entreprise est indisponible (HTTP ${response.status}).`;
+    throw new Error(message);
   }
   return body as T;
 }
