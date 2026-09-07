@@ -3,6 +3,7 @@ import type { ModuleAvailability, ModuleId, SectorPreset, StoreData } from '@/li
 import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
 import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
+import { normalizeRoutePath } from '@/lib/navigation';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -54,8 +55,7 @@ export function AdminRouter({
   onTestSector: (preset: SectorPreset) => void;
   screens: AdminRouteScreens;
 }) {
-  const rawRoutePath = location.split('?')[0];
-  const routePath = rawRoutePath.replace(/^\/kora(?=\/|$)/, '/entreprise');
+  const routePath = normalizeRoutePath(location);
   if (routePath === '/maximus/dashboard') {
     return renderScreen(screens.dashboard, { data, onNavigate });
   }
@@ -176,7 +176,7 @@ export function CompanyRouter({
   singleModuleNavigation?: boolean;
   screens: CompanyRouteScreens;
 }) {
-  const routePath = location.split('?')[0];
+  const routePath = normalizeRoutePath(location);
   const query = new URLSearchParams(location.split('?')[1] ?? '');
   const requiredModule = moduleIdForPath(routePath);
   const maintenanceModule: ModuleId | 'controle' | undefined =

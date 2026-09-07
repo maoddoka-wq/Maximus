@@ -25,6 +25,21 @@ export type NavigationItem = {
   peopleAdminOnly?: boolean;
 };
 
+export function normalizeRoutePath(path: string): string {
+  const pathOnly = path.split(/[?#]/, 1)[0] || '/';
+  const withoutTrailingSlash = pathOnly.length > 1
+    ? pathOnly.replace(/\/+$/, '')
+    : pathOnly;
+  return withoutTrailingSlash.replace(/^\/kora(?=\/|$)/, '/entreprise');
+}
+
+export function canonicalAppPath(path: string): string {
+  const suffixIndex = path.search(/[?#]/);
+  const pathPart = suffixIndex === -1 ? path : path.slice(0, suffixIndex);
+  const suffix = suffixIndex === -1 ? '' : path.slice(suffixIndex);
+  return `${normalizeRoutePath(pathPart)}${suffix}`;
+}
+
 export const adminNav: NavigationItem[] = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
   { href: '/maximus/controle', label: 'Contrôle & coordination', icon: ListChecks },

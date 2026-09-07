@@ -92,7 +92,7 @@ import {
 } from '@/lib/catalog-workflow';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
-import { type Session } from '@/lib/navigation';
+import { canonicalAppPath, normalizeRoutePath, type Session } from '@/lib/navigation';
 import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
@@ -121,7 +121,6 @@ import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
 
 const queryClient = new QueryClient();
-const canonicalCompanyPath = (path: string) => path.replace(/^\/kora(?=\/|$)/, '/entreprise');
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
@@ -710,7 +709,7 @@ function AppContent() {
   const navigate = (path: string) => {
     const state = window.history.state as { maximusIndex?: number } | null;
     const currentIndex = typeof state?.maximusIndex === 'number' ? state.maximusIndex : 0;
-    const nextPath = canonicalCompanyPath(path);
+    const nextPath = canonicalAppPath(path);
     setLocation(nextPath);
     window.history.replaceState(
       { ...(window.history.state ?? {}), maximus: true, maximusIndex: currentIndex + 1 },
@@ -799,8 +798,8 @@ function AppContent() {
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
   const baseMeta =
-    pageMeta[canonicalCompanyPath(location.split('?')[0])] ??
-    modulePageMeta[canonicalCompanyPath(location.split('?')[0])] ??
+    pageMeta[normalizeRoutePath(location)] ??
+    modulePageMeta[normalizeRoutePath(location)] ??
     (location.startsWith('/maximus/entreprises/')
       ? {
           kicker: 'Administration',
@@ -808,7 +807,7 @@ function AppContent() {
           description: 'Consultez et ajustez l’espace client sélectionné.',
         }
       : pageMeta[isAdmin ? '/maximus/dashboard' : '/entreprise/dashboard']);
-  const companyRoutePath = canonicalCompanyPath(location.split('?')[0]);
+  const companyRoutePath = normalizeRoutePath(location);
   const currentMeta =
     !isAdmin && currentCompany
       ? companyRoutePath === '/entreprise/dashboard'

@@ -7,4 +7,4 @@ Les routeurs d’espace doivent extraire le chemin avant de comparer une route. 
 
 **Why:** Le banc de test administratif réutilise les composants Commerce, qui écrivent `?tab=...` dans l’URL courante. Un routeur qui compare l’URL complète renvoie alors une 404 dès qu’un onglet est ouvert.
 
-**How to apply:** Utiliser une valeur équivalente à `location.split('?')[0]` pour sélectionner la vue, tout en laissant le composant concerné lire les paramètres nécessaires.
+**How to apply:** Utiliser une valeur équivalente à `location.split('?')[0]` pour sélectionner la vue, tout en laissant le composant concerné lire les paramètres nécessaires. Retirer aussi les slashs finaux avant la comparaison, car une actualisation peut préserver une URL profonde sous la forme `/route/`.
