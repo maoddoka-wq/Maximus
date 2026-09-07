@@ -6,7 +6,7 @@ return [
     'callback_url' => env('DIAMANOPAY_CALLBACK_URL', ''),
     'webhook_url' => env('DIAMANOPAY_WEBHOOK_URL', ''),
     'diamanopay' => [
-        'base_url' => rtrim((string) env('DIAMANOPAY_BASE_URL', 'https://api.diamanopay.com'), '/'),
+        'base_url' => rtrim((string) env('DIAMANOPAY_BASE_URL', ''), '/'),
         'client_id' => env('DIAMANOPAY_CLIENT_ID'),
         'client_secret' => env('DIAMANOPAY_CLIENT_SECRET'),
         'access_token' => env('DIAMANOPAY_ACCESS_TOKEN'),
@@ -15,7 +15,6 @@ return [
         'verify_path' => env('DIAMANOPAY_VERIFY_PATH', '/api/transaction/{providerTransactionId}'),
         'refund_path' => env('DIAMANOPAY_REFUND_PATH', '/api/payout/refund/{providerTransactionId}'),
         'payout_path' => env('DIAMANOPAY_PAYOUT_PATH', '/api/payout'),
-        'connect_timeout' => (int) env('DIAMANOPAY_CONNECT_TIMEOUT', 5),
-        'timeout' => (int) env('DIAMANOPAY_TIMEOUT', 30),
+        'timeout' => (int) env('DIAMANOPAY_TIMEOUT', 15),
     ],
 ];

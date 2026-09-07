@@ -26,9 +26,6 @@ while ! php artisan migrate --force --no-interaction; do
     sleep 2
 done
 
-php artisan config:clear --no-interaction
-php artisan config:cache --no-interaction
-
 php artisan maximus:provision-admin --no-interaction
 
 exec php -S "0.0.0.0:${PORT:-10000}" -t public server.php

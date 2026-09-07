@@ -3,7 +3,6 @@
 namespace App\Services\Payments;
 
 use App\Contracts\PaymentProviderInterface;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -21,7 +20,6 @@ class PaymentService
     {
         $tenantId = (string) $data['tenant_id'];
         $idempotencyKey = trim((string) ($data['idempotency_key'] ?? ''));
-        $requestId = trim((string) ($data['request_id'] ?? '')) ?: (string) Str::uuid();
         if ($idempotencyKey !== '') {
             $existing = DB::table('payments')
                 ->where('tenant_id', $tenantId)
@@ -36,47 +34,29 @@ class PaymentService
 
         $id = 'payment-'.Str::uuid();
         $reference = 'MAX-PAY-'.strtoupper(Str::substr(str_replace('-', '', $id), -12));
-        try {
-            DB::table('payments')->insert([
-                'id' => $id,
-                'public_reference' => $reference,
-                'tenant_id' => $tenantId,
-                'customer_id' => $data['customer_id'] ?? null,
-                'seller_id' => $data['seller_id'] ?? null,
-                'source_module' => $data['source_module'],
-                'source_type' => $data['source_type'],
-                'source_id' => $data['source_id'],
-                'provider' => $data['provider'] ?? config('payments.provider', 'diamanopay'),
-                'provider_transaction_id' => null,
-                'amount' => (int) $data['amount'],
-                'currency' => strtoupper((string) $data['currency']),
-                'payment_method' => $data['payment_method'] ?? null,
-                'status' => 'PENDING',
-                'description' => $data['description'] ?? '',
-                'metadata' => json_encode($data['metadata'] ?? [], JSON_THROW_ON_ERROR),
-                'idempotency_key' => $idempotencyKey !== '' ? $idempotencyKey : null,
-                'request_id' => $requestId,
-                'initiated_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        } catch (QueryException $exception) {
-            if ($idempotencyKey === '' || ! $this->isUniqueViolation($exception)) {
-                throw $exception;
-            }
-
-            $existing = DB::table('payments')
-                ->where('tenant_id', $tenantId)
-                ->where('source_type', $data['source_type'])
-                ->where('source_id', $data['source_id'])
-                ->where('idempotency_key', $idempotencyKey)
-                ->first();
-            if ($existing) {
-                return $this->payload($existing);
-            }
-
-            throw $exception;
-        }
+        DB::table('payments')->insert([
+            'id' => $id,
+            'public_reference' => $reference,
+            'tenant_id' => $tenantId,
+            'customer_id' => $data['customer_id'] ?? null,
+            'seller_id' => $data['seller_id'] ?? null,
+            'source_module' => $data['source_module'],
+            'source_type' => $data['source_type'],
+            'source_id' => $data['source_id'],
+            'provider' => $data['provider'] ?? config('payments.provider', 'diamanopay'),
+            'provider_transaction_id' => null,
+            'amount' => (int) $data['amount'],
+            'currency' => strtoupper((string) $data['currency']),
+            'payment_method' => $data['payment_method'] ?? null,
+            'status' => 'PENDING',
+            'description' => $data['description'] ?? '',
+            'metadata' => json_encode($data['metadata'] ?? [], JSON_THROW_ON_ERROR),
+            'idempotency_key' => $idempotencyKey !== '' ? $idempotencyKey : null,
+            'request_id' => $data['request_id'] ?? null,
+            'initiated_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $payment = DB::table('payments')->where('id', $id)->first();
         try {
@@ -88,7 +68,6 @@ class PaymentService
                 'payment_method' => $payment->payment_method,
                 'customer' => $data['customer'] ?? [],
                 'metadata' => $data['metadata'] ?? [],
-                'request_id' => $requestId,
             ]);
         } catch (\Throwable $exception) {
             report($exception);
@@ -130,7 +109,7 @@ class PaymentService
             $updates['failed_at'] = now();
         }
         DB::table('payments')->where('id', $id)->update($updates);
-        Log::debug('[DIAMANOPAY] Final payment status', [
+        Log::info('[DIAMANOPAY] Final payment status', [
             'reference' => $reference,
             'payment_id' => $id,
             'status' => $updates['status'],
@@ -146,7 +125,7 @@ class PaymentService
         $reference = $this->firstString($payload, ['clientReference', 'public_reference', 'reference', 'merchant_reference']);
         $reference ??= $this->firstString($payload, ['extraData.clientReference', 'extraData.publicReference']);
         $status = $this->normalizeStatus($this->firstString($payload, ['status', 'payment_status', 'state']) ?? 'PENDING');
-        Log::debug('[DIAMANOPAY] Webhook received', [
+        Log::info('[DIAMANOPAY] Webhook received', [
             'status' => $status,
             'transaction_id' => $providerTransactionId,
             'payment_request_id' => $providerRequestId,
@@ -231,7 +210,7 @@ class PaymentService
                 ->where('provider_event_id', $eventId)
                 ->update(['processing_status' => 'PROCESSED', 'processed_at' => now(), 'updated_at' => now()]);
         });
-        Log::debug('[DIAMANOPAY] Final payment status', [
+        Log::info('[DIAMANOPAY] Final payment status', [
             'payment_id' => $payment->id,
             'reference' => $payment->public_reference,
             'status' => $status,
@@ -295,11 +274,5 @@ class PaymentService
         }
 
         return null;
-    }
-
-    private function isUniqueViolation(QueryException $exception): bool
-    {
-        return in_array((string) $exception->getCode(), ['23000', '23505'], true)
-            || str_contains(strtolower($exception->getMessage()), 'unique');
     }
 }

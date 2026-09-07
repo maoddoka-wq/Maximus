@@ -24,14 +24,12 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
 
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
 Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
-Route::get('/shop-domain/orders/{reference}/payment-status', [EcommerceController::class, 'publicDomainOrderPaymentStatus']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/', [EcommerceController::class, 'publicBootstrap']);
     Route::post('/orders', [EcommerceController::class, 'createPublicOrder'])->middleware('throttle:orders');
-    Route::get('/orders/{reference}/payment-status', [EcommerceController::class, 'publicOrderPaymentStatus']);
     Route::get('/customer/session', [EcommerceCustomerController::class, 'session']);
     Route::post('/customer/register', [EcommerceCustomerController::class, 'register'])->middleware('throttle:login');
     Route::post('/customer/login', [EcommerceCustomerController::class, 'login'])->middleware('throttle:login');

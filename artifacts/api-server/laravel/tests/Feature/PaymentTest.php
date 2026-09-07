@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Contracts\PaymentProviderInterface;
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,145 +13,6 @@ use Tests\TestCase;
 class PaymentTest extends TestCase
 {
     use RefreshDatabase;
-
-    public function test_valid_credentials_are_not_reported_as_missing_and_provider_is_singleton(): void
-    {
-        Config::set([
-            'payments.diamanopay.base_url' => 'https://api.diamanopay.com',
-            'payments.diamanopay.access_token' => 'access-token-test',
-            'payments.diamanopay.client_id' => null,
-            'payments.diamanopay.client_secret' => null,
-            'payments.callback_url' => '',
-            'payments.webhook_url' => '',
-        ]);
-        Http::fake([
-            'https://api.diamanopay.com/api/charges' => Http::response([
-                'chargeId' => 'charge-configured-test',
-                'status' => 'PENDING',
-                'paymentUrl' => 'https://pay.diamanopay.com/checkout/configured-test',
-            ], 201),
-        ]);
-
-        $first = $this->app->make(PaymentProviderInterface::class);
-        $second = $this->app->make(PaymentProviderInterface::class);
-        $result = $first->initialize([
-            'public_reference' => 'MAX-CONFIGURED-TEST',
-            'amount' => 1000,
-            'currency' => 'XOF',
-            'description' => 'Configuration stable',
-            'payment_method' => 'WAVE',
-            'metadata' => [],
-        ]);
-
-        $this->assertSame($first, $second);
-        $this->assertTrue($result['ok']);
-        $this->assertNotSame('DIAMANOPAY_NOT_CONFIGURED', $result['error_code'] ?? null);
-    }
-
-    public function test_checkout_url_variants_are_accepted_and_correlated_without_exposing_credentials(): void
-    {
-        Config::set([
-            'payments.diamanopay.base_url' => 'https://api.diamanopay.com',
-            'payments.diamanopay.access_token' => 'access-token-test',
-            'payments.diamanopay.client_id' => null,
-            'payments.diamanopay.client_secret' => null,
-        ]);
-        Http::fake([
-            'https://api.diamanopay.com/api/charges' => Http::response([
-                'data' => [
-                    'id' => 'charge-checkout-url-test',
-                    'status' => 'PENDING',
-                    'checkout_url' => 'https://pay.diamanopay.com/checkout/variant-test',
-                ],
-            ], 201),
-        ]);
-
-        $this->asActor()->withHeader('X-Request-Id', 'checkout-correlation-test')
-            ->postJson('/api/payments', [
-                'sourceModule' => 'ecommerce',
-                'sourceType' => 'ecommerce_order',
-                'sourceId' => 'order-checkout-url-test',
-                'amount' => 1500,
-                'currency' => 'XOF',
-                'paymentMethod' => 'WAVE',
-                'idempotencyKey' => 'checkout-url-test-1',
-            ])
-            ->assertCreated()
-            ->assertJsonPath('status', 'PENDING')
-            ->assertJsonPath('checkoutUrl', 'https://pay.diamanopay.com/checkout/variant-test');
-
-        Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://api.diamanopay.com/api/charges'
-                && $request->header('X-Request-Id')[0] === 'checkout-correlation-test';
-        });
-    }
-
-    public function test_token_only_configuration_uses_the_official_base_url_and_accepts_optional_bearer_prefix(): void
-    {
-        Config::set([
-            'payments.diamanopay.base_url' => '',
-            'payments.diamanopay.access_token' => 'Bearer access-token-test',
-            'payments.diamanopay.client_id' => null,
-            'payments.diamanopay.client_secret' => null,
-        ]);
-        Http::fake([
-            'https://api.diamanopay.com/api/charges' => Http::response([
-                'id' => 'charge-token-only-test',
-                'status' => 'PENDING',
-                'checkout_url' => 'https://pay.diamanopay.com/checkout/token-only-test',
-            ], 201),
-        ]);
-
-        $this->asActor()
-            ->postJson('/api/payments', [
-                'sourceModule' => 'ecommerce',
-                'sourceType' => 'ecommerce_order',
-                'sourceId' => 'order-token-only-test',
-                'amount' => 10,
-                'currency' => 'XOF',
-                'paymentMethod' => 'WAVE',
-                'idempotencyKey' => 'token-only-test-1',
-            ])
-            ->assertCreated()
-            ->assertJsonPath('status', 'PENDING')
-            ->assertJsonPath('checkoutUrl', 'https://pay.diamanopay.com/checkout/token-only-test');
-
-        Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://api.diamanopay.com/api/charges'
-                && $request->header('Authorization')[0] === 'Bearer access-token-test';
-        });
-    }
-
-    public function test_expired_access_token_is_reported_without_reusing_it_or_retrying_the_charge(): void
-    {
-        Config::set([
-            'payments.diamanopay.base_url' => 'https://api.diamanopay.com',
-            'payments.diamanopay.access_token' => 'expired-access-token',
-            'payments.diamanopay.client_id' => null,
-            'payments.diamanopay.client_secret' => null,
-        ]);
-        Http::fake([
-            'https://api.diamanopay.com/api/charges' => Http::response([
-                'message' => 'Access token expired',
-            ], 401),
-        ]);
-
-        $this->asActor()
-            ->postJson('/api/payments', [
-                'sourceModule' => 'ecommerce',
-                'sourceType' => 'ecommerce_order',
-                'sourceId' => 'order-expired-token-test',
-                'amount' => 1500,
-                'currency' => 'XOF',
-                'paymentMethod' => 'WAVE',
-                'idempotencyKey' => 'expired-token-test-1',
-            ])
-            ->assertCreated()
-            ->assertJsonPath('status', 'FAILED')
-            ->assertJsonPath('providerMessage', 'Access token expired');
-
-        Http::assertSentCount(1);
-    }
 
     public function test_missing_diamanopay_configuration_is_reported_as_a_failed_payment(): void
     {
@@ -263,7 +123,6 @@ class PaymentTest extends TestCase
             'description' => 'Commande de test',
             'idempotencyKey' => 'payment-test-1',
         ])->assertCreated()->assertJson($first->json());
-        Http::assertSentCount(1);
 
         $reference = $first->json('publicReference');
         $raw = json_encode([

@@ -202,8 +202,6 @@ export const publicEcommerceApi = {
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
   createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; paymentMethod: 'WAVE' | 'ORANGE_MONEY'; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<PublicOrderResult>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; paymentMethod: 'WAVE' | 'ORANGE_MONEY'; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<PublicOrderResult>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
-  paymentStatus: (slug: string, reference: string) => request<PublicOrderPaymentStatus>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(reference)}/payment-status`),
-  domainPaymentStatus: (reference: string) => request<PublicOrderPaymentStatus>(`/shop-domain/orders/${encodeURIComponent(reference)}/payment-status`),
 };
 
 export interface PublicOrderResult {
@@ -215,18 +213,6 @@ export interface PublicOrderResult {
     status: string;
     amount: number;
     currency: string;
-    checkoutUrl: string | null;
-    providerMessage: string | null;
-  } | null;
-}
-
-export interface PublicOrderPaymentStatus {
-  reference: string;
-  total: number;
-  orderStatus: string;
-  paymentStatus: string;
-  payment: {
-    status: string;
     checkoutUrl: string | null;
     providerMessage: string | null;
   } | null;

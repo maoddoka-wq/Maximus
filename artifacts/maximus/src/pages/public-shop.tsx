@@ -33,11 +33,6 @@ const addressText = (address: EcommerceCustomerAddress) =>
 export default function PublicShopPage({ slug, domain = false }: { slug?: string; domain?: boolean }) {
   const [location, setLocation] = useLocation();
   const routePath = location.split('?')[0];
-  const paymentReturnReferences = useMemo(() => {
-    const params = new URLSearchParams(location.split('?')[1] ?? '');
-    const keys = ['order', 'reference', 'clientReference', 'publicReference', 'paymentRequestId', 'payment_request_id', 'transactionId', 'chargeId', 'paymentId'];
-    return [...new Set(keys.map(key => params.get(key)?.trim()).filter((value): value is string => Boolean(value)))];
-  }, [location]);
   const [data, setData] = useState<PublicShopBootstrap | null>(null);
   const [customer, setCustomer] = useState<EcommerceCustomer | null>(null);
   const [customerData, setCustomerData] = useState<EcommerceCustomerBootstrap | null>(null);
@@ -87,7 +82,6 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   }, [routePath]);
   const isAuthRoute = routePath.endsWith('/connexion') || routePath.endsWith('/inscription-client');
   const isCartRoute = routePath.endsWith('/panier');
-  const isPaymentReturnRoute = routePath.endsWith('/paiement/retour');
   const isAccountRoute = routePath.includes('/compte');
   const productDetailSlug = useMemo(() => {
     const match = routePath.match(/\/produit\/([^/]+)$/);
@@ -141,36 +135,6 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
       .then(async result => {
         if (cancelled) return;
         setData(result);
-        if (paymentReturnReferences.length > 0) {
-          let paymentStatus: Awaited<ReturnType<typeof publicEcommerceApi.paymentStatus>> | null = null;
-          let lastPaymentStatusError: unknown = null;
-          for (const reference of paymentReturnReferences) {
-            try {
-              paymentStatus = domain
-                ? await publicEcommerceApi.domainPaymentStatus(reference)
-                : await publicEcommerceApi.paymentStatus(slug ?? '', reference);
-              break;
-            } catch (cause) {
-              lastPaymentStatusError = cause;
-              if (!(cause instanceof Error) || !cause.message.toLowerCase().includes('commande introuvable')) throw cause;
-            }
-          }
-          if (!paymentStatus) throw lastPaymentStatusError instanceof Error ? lastPaymentStatusError : new Error('Commande introuvable.');
-          if (cancelled) return;
-          setSubmitted({
-            reference: paymentStatus.reference,
-            total: paymentStatus.total,
-            payment: paymentStatus.payment ? {
-              id: `return-${paymentStatus.reference}`,
-              publicReference: paymentStatus.reference,
-              status: paymentStatus.payment.status,
-              amount: paymentStatus.total,
-              currency: result.store.currency,
-              checkoutUrl: paymentStatus.payment.checkoutUrl,
-              providerMessage: paymentStatus.payment.providerMessage,
-            } : null,
-          });
-        }
         const session = await api.session();
         if (cancelled) return;
         setCustomer(session.customer);
@@ -195,7 +159,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Boutique indisponible.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [api, domain, paymentReturnReferences, slug]);
+  }, [api, domain, slug]);
 
   useEffect(() => {
     if (customer || !data) return;
@@ -262,47 +226,23 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     const currentKey = checkoutKey ?? crypto.randomUUID();
     setCheckoutKey(currentKey);
     try {
-      const createdOrder = domain
+      const order = domain
         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
-      let order = createdOrder;
-      if (!order.payment) {
-        const paymentStatus = domain
-          ? await publicEcommerceApi.domainPaymentStatus(order.reference)
-          : await publicEcommerceApi.paymentStatus(slug ?? '', order.reference);
-        if (!paymentStatus.payment) {
-          throw new Error('Le serveur n’a pas renvoyé les informations du paiement DiamanoPay.');
-        }
-        order = {
-          ...order,
-          payment: {
-            id: '',
-            publicReference: '',
-            status: paymentStatus.payment.status,
-            amount: order.total,
-            currency: data.store.currency,
-            checkoutUrl: paymentStatus.payment.checkoutUrl,
-            providerMessage: paymentStatus.payment.providerMessage,
-          },
-        };
-      }
-      const payment = order.payment;
-      if (!payment) {
-        throw new Error('Le serveur n’a pas renvoyé les informations du paiement DiamanoPay.');
-      }
-      if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(payment.status)) {
-        throw new Error(payment.providerMessage ?? 'DiamanoPay n’a pas pu initialiser le paiement.');
+      if (!order.payment) throw new Error('Le paiement DiamanoPay n’a pas été initialisé.');
+      if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(order.payment.status)) {
+        throw new Error(order.payment.providerMessage ?? 'DiamanoPay n’a pas pu initialiser le paiement.');
       }
       setCheckoutKey(null);
       setCart([]);
       if (customer) {
         void api.clearCart().then(() => api.bootstrap()).then(setCustomerData).catch(() => undefined);
       }
-      if (payment.checkoutUrl) {
-        window.location.assign(payment.checkoutUrl);
+      if (order.payment.checkoutUrl) {
+        window.location.assign(order.payment.checkoutUrl);
         return;
       }
-      if (payment.status !== 'PAID') throw new Error('DiamanoPay n’a pas retourné d’URL de paiement.');
+      if (order.payment.status !== 'PAID') throw new Error('DiamanoPay n’a pas retourné d’URL de paiement.');
       setSubmitted(order);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La commande n’a pas pu être envoyée.');
@@ -376,9 +316,6 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   const { store, products } = data;
   const selectedOrder = customerData?.orders.find(order => order.id === orderDetailId);
   const selectedProduct = productDetailSlug ? products.find(product => product.slug === productDetailSlug) : undefined;
-  const submittedStatus = submitted?.payment?.status ?? 'PENDING';
-  const submittedPaid = submittedStatus === 'PAID';
-  const submittedFailed = ['FAILED', 'CANCELLED', 'EXPIRED'].includes(submittedStatus);
   const categories = [...new Set(products.map(product => product.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
   const visibleProducts = products.filter(product => categoryFilter === 'ALL' || product.category === categoryFilter).filter(product => {
     const needle = searchQuery.trim().toLocaleLowerCase('fr-FR');
@@ -404,7 +341,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     <main className="mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
       {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><Check size={16} /><span>{notice}</span><button type="button" className="ml-auto" onClick={() => setNotice('')} aria-label="Fermer"><X size={16} /></button></div>}
-      {submitted ? <section className="mx-auto max-w-xl rounded-3xl border bg-[hsl(var(--card))] p-8 text-center shadow-sm sm:p-10"><span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${submittedFailed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{submittedFailed ? <X size={26} /> : <Check size={26} />}</span><h1 className="mt-5 text-2xl font-bold">{submittedPaid ? 'Commande confirmée' : submittedFailed ? 'Paiement non abouti' : 'Retour du paiement'}</h1><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Votre commande est enregistrée sous la référence <strong className="text-[hsl(var(--foreground))]">{submitted.reference}</strong>.</p><p className="mt-4 text-lg font-bold" style={{ color: 'var(--shop-primary)' }}>{money(submitted.total, store.currency)}</p><div className="mt-5 rounded-2xl bg-[hsl(var(--muted)/.5)] p-4 text-left text-sm"><p className="font-bold">Paiement : {submitted.payment?.status ?? 'EN ATTENTE'}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{submitted.payment?.providerMessage ?? (submittedPaid ? 'Le paiement a été confirmé.' : submittedFailed ? 'Le paiement n’a pas été confirmé.' : 'Le statut du paiement est en cours de vérification.')}</p>{submitted.payment?.checkoutUrl && !submittedPaid && !submittedFailed && <a href={submitted.payment.checkoutUrl} className="mt-3 inline-flex rounded-xl px-4 py-2 font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Reprendre le paiement</a>}</div><button type="button" onClick={() => { setSubmitted(null); go(''); }} className="mt-7 rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Continuer mes achats</button></section>
+      {submitted ? <section className="mx-auto max-w-xl rounded-3xl border bg-[hsl(var(--card))] p-8 text-center shadow-sm sm:p-10"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={26} /></span><h1 className="mt-5 text-2xl font-bold">Commande enregistrée</h1><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Votre commande est enregistrée sous la référence <strong className="text-[hsl(var(--foreground))]">{submitted.reference}</strong>.</p><p className="mt-4 text-lg font-bold" style={{ color: 'var(--shop-primary)' }}>{money(submitted.total, store.currency)}</p><div className="mt-5 rounded-2xl bg-[hsl(var(--muted)/.5)] p-4 text-left text-sm"><p className="font-bold">Paiement : {submitted.payment?.status ?? 'NON INITIALISÉ'}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{submitted.payment?.providerMessage ?? 'Aucun paiement n’a été initialisé.'}</p>{submitted.payment?.checkoutUrl && <a href={submitted.payment.checkoutUrl} className="mt-3 inline-flex rounded-xl px-4 py-2 font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Payer maintenant</a>}</div><button type="button" onClick={() => { setSubmitted(null); go(''); }} className="mt-7 rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Continuer mes achats</button></section>
         : isAuthRoute ? <AuthPanel mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
         : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} submitting={submitting} onChange={change} onSubmit={() => void submitOrder()} onBack={() => go('')} />
         : isAccountRoute && customer ? <AccountPanel section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => { setMobileMenu(false); setLocation(shopPath(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')); }} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
