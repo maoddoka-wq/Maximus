@@ -107,6 +107,48 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_categories', ['id' => $category['id']]);
     }
 
+    public function test_product_slugs_are_generated_and_scoped_to_the_company(): void
+    {
+        $first = $this->asActor()->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Café local',
+            'sku' => 'CAFE-AUTO-01',
+            'price' => 2500,
+            'stock' => 2,
+        ])->assertCreated();
+
+        $second = $this->asActor()->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Café local',
+            'sku' => 'CAFE-AUTO-02',
+            'price' => 2600,
+            'stock' => 3,
+        ])->assertCreated();
+
+        ModuleCatalog::ensureCompanyAccess('other-company');
+        $other = $this->asActorForCompany('other-company')->postJson('/api/ecommerce/products?companyId=other-company', [
+            'name' => 'Café local',
+            'sku' => 'CAFE-AUTO-01',
+            'price' => 2700,
+            'stock' => 4,
+        ])->assertCreated();
+
+        $this->assertSame('cafe-local', $first->json('slug'));
+        $this->assertSame('cafe-local-2', $second->json('slug'));
+        $this->assertSame('cafe-local', $other->json('slug'));
+    }
+
+    public function test_category_slugs_are_generated_and_suffixed_within_the_company(): void
+    {
+        $first = $this->asActor()->postJson('/api/ecommerce/categories?companyId=kora', [
+            'name' => 'Épicerie fine',
+        ])->assertCreated();
+        $second = $this->asActor()->postJson('/api/ecommerce/categories?companyId=kora', [
+            'name' => 'Épicerie fine',
+        ])->assertCreated();
+
+        $this->assertSame('epicerie-fine', $first->json('slug'));
+        $this->assertSame('epicerie-fine-2', $second->json('slug'));
+    }
+
     public function test_published_shop_recalculates_total_and_decrements_stock_transactionally(): void
     {
         $request = $this->asActor();
@@ -477,13 +519,22 @@ class EcommerceTest extends TestCase
 
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
+        return $this->asActorForCompany('kora', $role, $permissions);
+    }
+
+    private function asActorForCompany(string $companyId, string $role = 'company_admin', array $permissions = []): self
+    {
+        static $actorSequence = 0;
+        $actorSequence++;
+        $identity = 'ecommerce-'.strtolower($role).'-'.$companyId.'-'.$actorSequence;
+
         $user = AuthUser::query()->create([
-            'id' => 'ecommerce-'.strtolower($role),
-            'email' => 'ecommerce-'.strtolower($role).'@kora.demo',
+            'id' => $identity,
+            'email' => $identity.'@demo.test',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Gestionnaire E-commerce',
             'role' => $role,
-            'company_id' => 'kora',
+            'company_id' => $companyId,
             'employee_id' => $role === 'employee' ? 'ecommerce-employee' : null,
             'sector_ids' => [],
             'permissions' => $permissions,

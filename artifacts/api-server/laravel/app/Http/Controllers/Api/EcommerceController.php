@@ -114,10 +114,7 @@ class EcommerceController extends Controller
             'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:100000'],
         ])->validate();
         $company = $this->company($request);
-        $slug = $this->categorySlug($input['slug'] ?? $input['name']);
-        if (DB::table('ecommerce_categories')->where('company_id', $company)->where('slug', $slug)->exists()) {
-            return response()->json(['error' => 'Cette catégorie existe déjà.'], 422);
-        }
+        $slug = $this->uniqueCategorySlug($input['slug'] ?? $input['name'], $company);
 
         $row = [
             'id' => $this->id('category'),
@@ -153,10 +150,9 @@ class EcommerceController extends Controller
             'isActive' => ['sometimes', 'boolean'],
             'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:100000'],
         ])->validate();
-        $slug = isset($input['slug']) ? $this->categorySlug($input['slug']) : $existing->slug;
-        if (DB::table('ecommerce_categories')->where('company_id', $company)->where('slug', $slug)->where('id', '!=', $id)->exists()) {
-            return response()->json(['error' => 'Cette catégorie existe déjà.'], 422);
-        }
+        $slug = isset($input['slug'])
+            ? $this->uniqueCategorySlug($input['slug'], $company, $id)
+            : $existing->slug;
         $changes = [];
         if (array_key_exists('name', $input)) $changes['name'] = trim($input['name']);
         if (array_key_exists('slug', $input)) $changes['slug'] = $slug;
@@ -305,11 +301,9 @@ class EcommerceController extends Controller
         $input = $this->productInput($request);
         $company = $this->company($request);
         $input = $this->normalizeProductCategory($input, $company);
+        $input['slug'] = $this->uniqueProductSlug($input['slug'] ?? $input['name'], $company);
         if (DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
-        }
-        if (DB::table('ecommerce_products')->where('slug', $input['slug'])->exists()) {
-            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
 
         $row = array_merge([
@@ -343,11 +337,11 @@ class EcommerceController extends Controller
         }
         $input = $this->productInput($request, true);
         $input = $this->normalizeProductCategory($input, $company);
+        if (isset($input['slug'])) {
+            $input['slug'] = $this->uniqueProductSlug($input['slug'], $company, $id);
+        }
         if (isset($input['sku']) && DB::table('ecommerce_products')->where('company_id', $company)->where('sku', $input['sku'])->where('id', '!=', $id)->exists()) {
             return response()->json(['error' => 'Ce SKU existe déjà dans cette boutique.'], 422);
-        }
-        if (isset($input['slug']) && DB::table('ecommerce_products')->where('slug', $input['slug'])->where('id', '!=', $id)->exists()) {
-            return response()->json(['error' => 'Ce slug de produit est déjà utilisé.'], 422);
         }
         $changes = $this->snake($input);
         $changes['updated_at'] = now();
@@ -891,7 +885,7 @@ class EcommerceController extends Controller
 
         return Validator::make($request->all(), [
             'name' => array_merge($required, ['string', 'min:2', 'max:160']),
-            'slug' => array_merge($required, ['string', 'min:2', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/']),
+            'slug' => array_merge($partial ? ['sometimes', 'nullable'] : ['nullable'], ['string', 'min:2', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/']),
             'sku' => array_merge($required, ['string', 'min:1', 'max:80']),
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['nullable', 'string', 'max:80'],
@@ -958,6 +952,50 @@ class EcommerceController extends Controller
     private function categorySlug(string $value): string
     {
         return Str::slug(trim($value));
+    }
+
+    private function uniqueProductSlug(string $value, string $company, ?string $ignoreId = null): string
+    {
+        $base = $this->categorySlug($value);
+        if ($base === '') {
+            $base = 'produit';
+        }
+        $base = substr($base, 0, 160);
+        $candidate = $base;
+        $suffix = 2;
+
+        while (DB::table('ecommerce_products')
+            ->where('company_id', $company)
+            ->where('slug', $candidate)
+            ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $suffixText = '-'.$suffix++;
+            $candidate = substr($base, 0, 160 - strlen($suffixText)).$suffixText;
+        }
+
+        return $candidate;
+    }
+
+    private function uniqueCategorySlug(string $value, string $company, ?string $ignoreId = null): string
+    {
+        $base = $this->categorySlug($value);
+        if ($base === '') {
+            $base = 'categorie';
+        }
+        $base = substr($base, 0, 100);
+        $candidate = $base;
+        $suffix = 2;
+
+        while (DB::table('ecommerce_categories')
+            ->where('company_id', $company)
+            ->where('slug', $candidate)
+            ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $suffixText = '-'.$suffix++;
+            $candidate = substr($base, 0, 100 - strlen($suffixText)).$suffixText;
+        }
+
+        return $candidate;
     }
 
     private function ensureStore(string $company): object

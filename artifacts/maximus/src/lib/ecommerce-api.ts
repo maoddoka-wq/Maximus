@@ -178,7 +178,7 @@ export const createEcommerceApi = (companyId: string) => {
     createDomain: (domain: string) => request<EcommerceDomain>(withCompany('/ecommerce/domains'), { method: 'POST', body: JSON.stringify({ domain }) }),
     verifyDomain: (id: string) => request<EcommerceDomain>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}/verify`), { method: 'POST' }),
     deleteDomain: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}`), { method: 'DELETE' }),
-    createProduct: (body: Omit<EcommerceProduct, 'id' | 'companyId'>) => request<EcommerceProduct>(withCompany('/ecommerce/products'), json(body)),
+    createProduct: (body: Omit<EcommerceProduct, 'id' | 'companyId' | 'slug'> & { slug?: string }) => request<EcommerceProduct>(withCompany('/ecommerce/products'), json(body)),
     updateProduct: (id: string, body: Partial<Omit<EcommerceProduct, 'id' | 'companyId'>>) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'PATCH', body: JSON.stringify(body) }),
     uploadProductImage: async (id: string, file: File) => {
       const formData = new FormData();

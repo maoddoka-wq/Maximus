@@ -68,7 +68,7 @@ test('ignore les anciens identifiants de modules sans masquer les modules actifs
       ],
     });
 
-  const access = await loadCompanyModuleAccess('ana', ['stocks', 'rapports']);
+  const access = await loadCompanyModuleAccess('ana', ['stocks', 'legacy-rapports']);
 
   assert.deepEqual(access.map(module => module.id), ['stocks']);
 });
