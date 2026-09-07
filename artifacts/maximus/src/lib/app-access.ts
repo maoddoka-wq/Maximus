@@ -85,12 +85,10 @@ export function buildAppAccessContext({
     : employeeRoleMatchesUnit(accessRole, employee, employeeAncestry);
   const canViewModule = (moduleId: ModuleId) => roleHasPermission(accessRole, employeeNode, moduleId, 'voir');
   const allowed =
-    session.startsWith('company:')
+    session.startsWith('company:') && !sectorTestCompanyId
       ? companyAllowed
-      : session.startsWith('company:')
-        ? sectorTestCompanyId && accessRole && accessRoleMatchesScope
-          ? companyAllowed.filter(moduleId => canViewModule(moduleId))
-          : companyAllowed
+      : sectorTestCompanyId && accessRole && accessRoleMatchesScope
+        ? companyAllowed.filter(moduleId => canViewModule(moduleId))
         : accessRole && accessRoleMatchesScope
           ? companyAllowed.filter(moduleId => canViewModule(moduleId))
           : [];

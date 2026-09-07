@@ -228,9 +228,9 @@ export function CompanyRouter({
       })
     );
   }
-  if (routePath === '/entreprise/organisation' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/employes' || routePath === '/entreprise/roles') {
+  if (routePath === '/entreprise/organisation' || routePath === '/entreprise/acces' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/employes' || routePath === '/entreprise/roles') {
     const company = data.companies.find(item => item.id === companyId);
-    const initialTab = routePath === '/entreprise/autorisations' || routePath === '/entreprise/roles' ? 'roles' : routePath === '/entreprise/employes' ? 'employees' : 'structure';
+    const initialTab = routePath === '/entreprise/acces' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/roles' ? 'roles' : routePath === '/entreprise/employes' ? 'employees' : 'structure';
     return company && (companyAdmin || sectorManager) ? (
       renderScreen(screens.organization, {
         company,

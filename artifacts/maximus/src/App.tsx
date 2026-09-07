@@ -210,6 +210,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     title: 'Organisation',
     description: 'Structure, rôles, sous-autorisations, comptes et managers au même endroit.',
   },
+  '/entreprise/acces': {
+    kicker: 'Espace entreprise',
+    title: 'Accès',
+    description: 'Gérez les rôles, permissions et comptes autorisés de votre entreprise.',
+  },
   '/entreprise/profil': {
     kicker: 'Espace entreprise',
     title: 'Mon profil',
@@ -307,6 +312,7 @@ const routesWithModuleHeaders = new Set([
   '/entreprise/presences',
   '/entreprise/rapports',
   '/entreprise/organisation',
+  '/entreprise/acces',
   '/entreprise/autorisations',
   '/entreprise/employes',
   '/entreprise/roles',

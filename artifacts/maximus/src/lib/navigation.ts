@@ -41,6 +41,7 @@ const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/entreprise/organisation', label: 'Organisation', icon: GitBranch, module: null, peopleAdminOnly: true },
+  { href: '/entreprise/acces', label: 'Accès', icon: GitBranch, module: null, peopleAdminOnly: true },
 ];
 
 export const companyNav: NavigationItem[] = [

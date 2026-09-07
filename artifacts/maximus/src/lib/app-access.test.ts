@@ -95,3 +95,46 @@ test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () 
   assert.deepEqual(access.allowed, []);
   assert.equal(access.hasPermission('finance', 'voir'), false);
 });
+
+test('applique les permissions du rôle pendant un test réel de secteur', () => {
+  const { data, company, employee } = createAccessFixture();
+  const testCompanyId = 'sector-test-company';
+  const testNodeId = 'sector-test-node';
+  const testRoleId = 'sector-test-role';
+  const testCompany = {
+    ...company,
+    id: testCompanyId,
+    allowedModules: ['commerce', 'stocks'] as const,
+    managerRoleId: testRoleId,
+  };
+  const testNode = {
+    ...data.orgNodes[0],
+    id: testNodeId,
+    companyId: testCompanyId,
+  };
+  const testRole = {
+    ...data.roles[0],
+    id: testRoleId,
+    companyId: testCompanyId,
+    sectorId: testNodeId,
+  };
+  data.companies = [testCompany];
+  data.orgNodes = [testNode];
+  data.roles = [testRole];
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${testCompanyId}`,
+    employee: null,
+    activeCompanyId: testCompanyId,
+    activeCompany: testCompany,
+    sectorTestCompanyId: testCompanyId,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.allowed, ['commerce']);
+  assert.equal(access.hasPermission('commerce', 'créer'), true);
+  assert.equal(access.hasPermission('stocks', 'voir'), false);
+  assert.equal(access.sectorManager, false);
+  assert.equal(employee.companyId, company.id);
+});
