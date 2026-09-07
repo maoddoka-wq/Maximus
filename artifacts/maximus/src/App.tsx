@@ -412,7 +412,9 @@ function AppContent() {
       });
   }, []);
   useEffect(() => {
-    if (!session) return undefined;
+    if (!session || session.startsWith('company:sector-test-')) {
+      return undefined;
+    }
     let cancelled = false;
     void appStateApi.bootstrap()
       .then(({ data: remoteData, version }) => {
@@ -446,13 +448,13 @@ function AppContent() {
   useEffect(() => {
     appStateVersionRef.current = appStateVersion;
   }, [appStateVersion]);
-  const mutate = (fn: (draft: StoreData) => void, message?: string) => {
+  const mutate = (fn: (draft: StoreData) => void, message?: string, persist = true) => {
     const previous = data;
     const next = structuredClone(data) as StoreData;
     fn(next);
     const safeNext = sanitizeStoreData(next);
     setData(safeNext);
-    if (session) {
+    if (session && persist) {
       appStateSaveQueue.current = appStateSaveQueue.current
         .catch(() => undefined)
         .then(async () => {
@@ -670,7 +672,7 @@ function AppContent() {
         sectorId: testNodeId,
         modulePermissions,
       });
-    });
+    }, undefined, false);
     localStorage.setItem('maximus-sector-test-company', testCompanyId);
     const nextSession = `company:${testCompanyId}` as Session;
     setSession(nextSession);
@@ -685,7 +687,7 @@ function AppContent() {
       draft.orgNodes = draft.orgNodes.filter((node) => node.companyId !== sectorTestCompanyId);
       draft.employees = draft.employees.filter((employee) => employee.companyId !== sectorTestCompanyId);
       draft.roles = draft.roles.filter((role) => role.companyId !== sectorTestCompanyId);
-    });
+    }, undefined, false);
     localStorage.removeItem('maximus-sector-test-company');
     setSession('admin');
     localStorage.setItem('maximus-session', 'admin');
