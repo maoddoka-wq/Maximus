@@ -200,8 +200,8 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<PublicOrderResult>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<PublicOrderResult>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; paymentMethod: 'WAVE' | 'ORANGE_MONEY'; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<PublicOrderResult>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; paymentMethod: 'WAVE' | 'ORANGE_MONEY'; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<PublicOrderResult>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export interface PublicOrderResult {

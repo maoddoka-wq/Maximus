@@ -19,6 +19,12 @@ class RefundService
         if (! in_array($payment->status, ['PAID', 'PARTIALLY_REFUNDED'], true)) {
             throw new \RuntimeException('PAYMENT_NOT_REFUNDABLE');
         }
+        if ($amount !== (int) $payment->amount) {
+            throw new \RuntimeException('DIAMANOPAY_FULL_REFUND_ONLY');
+        }
+        if (strtoupper((string) $payment->payment_method) !== 'WAVE') {
+            throw new \RuntimeException('DIAMANOPAY_REFUND_WAVE_ONLY');
+        }
         $existing = DB::table('refunds')
             ->where('tenant_id', $payment->tenant_id)
             ->where('payment_id', $payment->id)

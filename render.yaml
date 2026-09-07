@@ -46,7 +46,7 @@ services:
         sync: false
       - key: DIAMANOPAY_ACCESS_TOKEN
         sync: false
-      - key: DIAMANOPAY_WEBHOOK_SECRET
+      - key: DIAMANOPAY_WEBHOOK_URL
         sync: false
       - key: DIAMANOPAY_CALLBACK_URL
         sync: false

@@ -10,10 +10,10 @@ Ajouter les variables suivantes dans l’environnement **Production** du service
 - `PAYMENT_DEFAULT_CURRENCY=XOF`
 - `DIAMANOPAY_BASE_URL`
 - `DIAMANOPAY_CLIENT_ID` et `DIAMANOPAY_CLIENT_SECRET`, ou `DIAMANOPAY_ACCESS_TOKEN`
-- `DIAMANOPAY_WEBHOOK_SECRET`
 - `DIAMANOPAY_CALLBACK_URL`
+- `DIAMANOPAY_WEBHOOK_URL`
 
-Les identifiants ne doivent jamais être ajoutés au dépôt, au frontend ou aux logs. Les entrées `sync: false` correspondantes sont déjà déclarées dans `render.yaml`.
+Avec `CLIENT_ID` et `CLIENT_SECRET`, MAXIMUS obtient automatiquement un Bearer Token via `/oauth2/token`. Les identifiants ne doivent jamais être ajoutés au dépôt, au frontend ou aux logs. Les entrées `sync: false` correspondantes sont déjà déclarées dans `render.yaml`.
 
 ## Webhook
 
@@ -21,13 +21,17 @@ Déclarer dans DiamanoPay l’URL publique Render suivante, avec le domaine rée
 
 `https://<domaine-public-render>/api/webhooks/diamanopay`
 
-Le endpoint exige :
+L’URL est aussi envoyée dans le champ `webhook` de chaque charge. DiamanoPay envoie un payload contenant `status`, `paymentService`, `transactionId` et `paymentRequestId`. MAXIMUS vérifie ensuite la transaction avec `GET /api/transaction/{id}` avant de confirmer le paiement.
 
-- `X-DiamanoPay-Signature` calculée en HMAC-SHA256 avec `DIAMANOPAY_WEBHOOK_SECRET` ;
-- `X-DiamanoPay-Event-Id` unique ;
-- une référence de paiement MAXIMUS, un montant et une devise cohérents.
+Les événements répétés sont acceptés sans double crédit. Les événements inconnus et les transactions non vérifiables sont refusés.
 
-Les événements répétés sont acceptés sans double crédit. Les événements inconnus, les montants incohérents et les signatures invalides sont refusés.
+## API DiamanoPay utilisée
+
+- Token : `POST /oauth2/token` avec `application/x-www-form-urlencoded`
+- Charge : `POST /api/charges`
+- Transaction : `GET /api/transaction/{id}`
+- Retrait : `POST /api/payout`
+- Remboursement total Wave : `POST /api/payout/refund/{transactionId}`
 
 ## Déploiement
 

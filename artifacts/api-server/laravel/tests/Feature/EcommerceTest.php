@@ -138,6 +138,7 @@ class EcommerceTest extends TestCase
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
             'customerPhone' => '+221700000000',
+            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => $product->json('slug'), 'quantity' => 2]],
         ])->assertCreated()
@@ -153,6 +154,7 @@ class EcommerceTest extends TestCase
         $this->postJson('/api/shop/kora-boutique-test/orders', [
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
+            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => $product->json('slug'), 'quantity' => 2]],
         ])->assertStatus(409);
@@ -194,6 +196,7 @@ class EcommerceTest extends TestCase
         $this->postJson('/api/shop/kora-isolation-test/orders', [
             'customerName' => 'Client Test',
             'customerEmail' => 'client@example.test',
+            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => 'produit-autre', 'quantity' => 1]],
         ])->assertStatus(400);
@@ -225,6 +228,7 @@ class EcommerceTest extends TestCase
         $payload = [
             'customerName' => 'Client Transition',
             'customerEmail' => 'transition@example.test',
+            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar, Sénégal',
             'items' => [['productSlug' => 'produit-transition', 'quantity' => 1]],
         ];
@@ -279,6 +283,7 @@ class EcommerceTest extends TestCase
         $this->postJson('/api/shop/boutique-inactive-test/orders', [
             'customerName' => 'Client Inactif',
             'customerEmail' => 'inactive@example.test',
+            'paymentMethod' => 'WAVE',
             'shippingAddress' => 'Dakar',
             'items' => [['productSlug' => 'produit-inactif', 'quantity' => 1]],
         ])->assertNotFound();
@@ -383,6 +388,7 @@ class EcommerceTest extends TestCase
         $this->postJson('http://boutique-active.kora.test/api/shop-domain/orders', [
                 'customerName' => 'Client Domaine',
                 'customerEmail' => 'domain@example.test',
+                'paymentMethod' => 'WAVE',
                 'shippingAddress' => 'Dakar, Sénégal',
                 'items' => [['productSlug' => $product->json('slug'), 'quantity' => 1]],
             ])

@@ -14,23 +14,33 @@ class DiamanoPayProvider implements PaymentProviderInterface
             return $this->unavailable();
         }
 
+        $provider = $this->providerName($payment['payment_method'] ?? null);
+        if ($provider === null) {
+            return [
+                'ok' => false,
+                'status' => 'FAILED',
+                'provider_transaction_id' => null,
+                'provider_request_id' => null,
+                'checkout_url' => null,
+                'message' => 'Le moyen de paiement doit être WAVE ou ORANGE_MONEY.',
+                'raw' => [],
+            ];
+        }
+
         $response = $this->client()->post($this->path('payment_path'), [
-            'reference' => $payment['public_reference'],
             'amount' => $payment['amount'],
-            'currency' => $payment['currency'],
+            'provider' => $provider,
             'description' => $payment['description'],
-            'payment_method' => $payment['payment_method'],
-            'customer' => $payment['customer'] ?? [],
-            'callback_url' => config('payments.callback_url'),
-            'metadata' => $payment['metadata'] ?? [],
+            'clientReference' => $payment['public_reference'],
+            'redirectUrl' => config('payments.callback_url'),
+            'webhook' => config('payments.webhook_url'),
+            'feeOnCustomer' => false,
+            'extraData' => array_merge([
+                'currency' => $payment['currency'],
+            ], $payment['metadata'] ?? []),
         ]);
 
-        return $this->normalize($response, [
-            'provider_transaction_id',
-            'transaction_id',
-            'id',
-            'reference',
-        ]);
+        return $this->normalize($response, ['chargeId'], true);
     }
 
     public function verify(string $providerTransactionId, array $context = []): array
@@ -40,7 +50,13 @@ class DiamanoPayProvider implements PaymentProviderInterface
         }
 
         $path = str_replace('{providerTransactionId}', rawurlencode($providerTransactionId), $this->path('verify_path'));
-        return $this->normalize($this->client()->get($path), ['provider_transaction_id', 'transaction_id', 'id']);
+        $result = $this->normalize($this->client()->get($path), ['transactionId', 'id'], false);
+        $result['verified'] = $result['ok']
+            && $result['provider_transaction_id'] === $providerTransactionId
+            && $this->matchesExpectedAmount($result, $context['expected_amount'] ?? null)
+            && $this->matchesExpectedReference($result, $context['expected_reference'] ?? null);
+
+        return $result;
     }
 
     public function refund(string $providerTransactionId, int $amount, string $currency, string $reference, string $reason = ''): array
@@ -49,13 +65,13 @@ class DiamanoPayProvider implements PaymentProviderInterface
             return $this->unavailable();
         }
 
-        return $this->normalize($this->client()->post($this->path('refund_path'), [
-            'reference' => $reference,
-            'provider_transaction_id' => $providerTransactionId,
-            'amount' => $amount,
-            'currency' => $currency,
-            'reason' => $reason,
-        ]), ['provider_transaction_id', 'transaction_id', 'id']);
+        $path = str_replace('{providerTransactionId}', rawurlencode($providerTransactionId), $this->path('refund_path'));
+        $result = $this->normalize($this->client()->post($path), ['transactionId', 'providerTransactionId', 'id'], false);
+        if ($result['ok'] && (($result['raw']['success'] ?? false) === true)) {
+            $result['status'] = 'PAID';
+        }
+
+        return $result;
     }
 
     public function payout(array $withdrawal): array
@@ -64,23 +80,32 @@ class DiamanoPayProvider implements PaymentProviderInterface
             return $this->unavailable();
         }
 
-        return $this->normalize($this->client()->post($this->path('payout_path'), $withdrawal), [
-            'provider_reference',
-            'provider_transaction_id',
-            'transaction_id',
-            'id',
-        ]);
+        $provider = $this->providerName($withdrawal['operator'] ?? $withdrawal['provider'] ?? null);
+        if ($provider === null) {
+            return [
+                'ok' => false,
+                'status' => 'FAILED',
+                'provider_transaction_id' => null,
+                'provider_request_id' => null,
+                'checkout_url' => null,
+                'message' => 'L’opérateur de retrait doit être WAVE ou ORANGE_MONEY.',
+                'raw' => [],
+            ];
+        }
+
+        return $this->normalize($this->client()->post($this->path('payout_path'), [
+            'amount' => $withdrawal['amount'],
+            'mobile' => $withdrawal['account_number'],
+            'provider' => $provider,
+            'name' => $withdrawal['beneficiary_name'],
+            'description' => $withdrawal['description'] ?? 'Retrait MAXIMUS',
+            'clientReference' => $withdrawal['reference'],
+        ]), ['transactionId', 'providerTransactionId', 'id'], false);
     }
 
     public function verifyWebhook(string $payload, ?string $signature): bool
     {
-        $secret = (string) config('payments.diamanopay.webhook_secret');
-        if ($secret === '' || ! is_string($signature) || $signature === '') {
-            return false;
-        }
-
-        $provided = str_starts_with($signature, 'sha256=') ? substr($signature, 7) : $signature;
-        return hash_equals(hash_hmac('sha256', $payload, $secret), $provided);
+        return is_array(json_decode($payload, true));
     }
 
     private function configured(): bool
@@ -106,14 +131,19 @@ class DiamanoPayProvider implements PaymentProviderInterface
             ->asForm()
             ->acceptJson()
             ->timeout((int) config('payments.diamanopay.timeout', 15))
-            ->withBasicAuth(
-                (string) config('payments.diamanopay.client_id'),
-                (string) config('payments.diamanopay.client_secret'),
-            )
-            ->post((string) config('payments.diamanopay.auth_path'), ['grant_type' => 'client_credentials']);
+            ->post((string) config('payments.diamanopay.auth_path'), [
+                'grant_type' => 'client_credentials',
+                'client_id' => (string) config('payments.diamanopay.client_id'),
+                'client_secret' => (string) config('payments.diamanopay.client_secret'),
+            ]);
         $auth->throw();
 
-        return $client->withToken((string) ($auth->json('access_token') ?? ''));
+        $accessToken = (string) ($auth->json('accessToken') ?? $auth->json('access_token') ?? '');
+        if ($accessToken === '') {
+            throw new \RuntimeException('DIAMANOPAY_ACCESS_TOKEN_MISSING');
+        }
+
+        return $client->withToken($accessToken);
     }
 
     private function path(string $key): string
@@ -121,14 +151,14 @@ class DiamanoPayProvider implements PaymentProviderInterface
         return (string) config('payments.diamanopay.'.$key);
     }
 
-    private function normalize(Response $response, array $idKeys): array
+    private function normalize(Response $response, array $idKeys, bool $chargeResponse = false): array
     {
         $payload = $response->json();
         $payload = is_array($payload) ? $payload : [];
         $providerTransactionId = null;
         foreach ($idKeys as $key) {
             $candidate = data_get($payload, $key) ?? data_get($payload, 'data.'.$key) ?? data_get($payload, 'payment.'.$key);
-            if (is_string($candidate) && trim($candidate) !== '') {
+            if (is_scalar($candidate) && trim((string) $candidate) !== '') {
                 $providerTransactionId = trim($candidate);
                 break;
             }
@@ -148,10 +178,36 @@ class DiamanoPayProvider implements PaymentProviderInterface
             'ok' => $response->successful(),
             'status' => $status,
             'provider_transaction_id' => $providerTransactionId,
-            'checkout_url' => data_get($payload, 'checkout_url') ?? data_get($payload, 'data.checkout_url'),
-            'message' => $response->successful() ? null : ((string) (data_get($payload, 'message') ?? 'Le prestataire de paiement a refusé la demande.')),
+            'provider_request_id' => $chargeResponse ? $providerTransactionId : null,
+            'checkout_url' => data_get($payload, 'paymentUrl') ?? data_get($payload, 'data.paymentUrl'),
+            'amount' => data_get($payload, 'totalAmount') ?? data_get($payload, 'amount'),
+            'reference' => data_get($payload, 'clientReference') ?? data_get($payload, 'reference'),
+            'message' => $response->successful() ? null : ((string) (data_get($payload, 'message') ?? data_get($payload, 'error') ?? 'Le prestataire de paiement a refusé la demande.')),
             'raw' => $payload,
         ];
+    }
+
+    private function providerName(?string $value): ?string
+    {
+        return match (strtoupper(trim((string) $value))) {
+            'WAVE' => 'WAVE',
+            'ORANGE', 'ORANGE MONEY', 'ORANGE_MONEY' => 'ORANGE_MONEY',
+            default => null,
+        };
+    }
+
+    private function matchesExpectedAmount(array $result, mixed $expected): bool
+    {
+        if ($expected === null || $result['amount'] === null) {
+            return true;
+        }
+
+        return abs((int) $result['amount']) === (int) $expected;
+    }
+
+    private function matchesExpectedReference(array $result, ?string $expected): bool
+    {
+        return $expected === null || $result['reference'] === null || (string) $result['reference'] === $expected;
     }
 
     private function unavailable(): array
@@ -160,6 +216,7 @@ class DiamanoPayProvider implements PaymentProviderInterface
             'ok' => false,
             'status' => 'PENDING',
             'provider_transaction_id' => null,
+            'provider_request_id' => null,
             'checkout_url' => null,
             'message' => 'DiamanoPay n’est pas encore configuré côté serveur.',
             'raw' => [],

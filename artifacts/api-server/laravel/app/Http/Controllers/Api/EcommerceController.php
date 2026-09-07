@@ -537,7 +537,7 @@ class EcommerceController extends Controller
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
             'customerEmail' => ['required', 'email', 'max:160'],
             'customerPhone' => ['nullable', 'string', 'max:40'],
-            'paymentMethod' => ['nullable', 'string', 'max:80'],
+            'paymentMethod' => ['required', 'string', 'in:WAVE,ORANGE_MONEY'],
             'shippingAddress' => ['required', 'string', 'min:5', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:50'],

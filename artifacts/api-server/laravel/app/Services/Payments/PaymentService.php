@@ -83,6 +83,7 @@ class PaymentService
             'metadata' => json_encode(array_merge($data['metadata'] ?? [], [
                 'checkout_url' => $providerResult['checkout_url'] ?? null,
                 'provider_message' => $providerResult['message'] ?? null,
+                'provider_charge_id' => $providerResult['provider_request_id'] ?? $providerResult['provider_transaction_id'] ?? null,
             ]), JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ];
@@ -97,16 +98,27 @@ class PaymentService
 
     public function confirmFromWebhook(array $payload, string $provider, string $eventId, ?string $signature = null): array
     {
-        $providerTransactionId = $this->firstString($payload, ['provider_transaction_id', 'transaction_id', 'payment_id', 'id']);
-        $reference = $this->firstString($payload, ['public_reference', 'reference', 'merchant_reference']);
+        $providerTransactionId = $this->firstString($payload, ['transactionId', 'provider_transaction_id', 'transaction_id', 'payment_id', 'id']);
+        $providerRequestId = $this->firstString($payload, ['paymentRequestId', 'payment_request_id']);
+        $reference = $this->firstString($payload, ['clientReference', 'public_reference', 'reference', 'merchant_reference']);
+        $reference ??= $this->firstString($payload, ['extraData.clientReference', 'extraData.publicReference']);
         $status = $this->normalizeStatus($this->firstString($payload, ['status', 'payment_status', 'state']) ?? 'PENDING');
         $payment = $reference
             ? DB::table('payments')->where('public_reference', $reference)->first()
-            : ($providerTransactionId ? DB::table('payments')->where('provider_transaction_id', $providerTransactionId)->first() : null);
+            : null;
+        $payment ??= $providerTransactionId
+            ? DB::table('payments')->where('provider_transaction_id', $providerTransactionId)->first()
+            : null;
+        $payment ??= $providerRequestId
+            ? DB::table('payments')->where('provider_transaction_id', $providerRequestId)->first()
+            : null;
         if (! $payment) {
             throw new \RuntimeException('PAYMENT_NOT_FOUND');
         }
-        if ($providerTransactionId && $payment->provider_transaction_id && $providerTransactionId !== $payment->provider_transaction_id) {
+        if (! $providerTransactionId) {
+            throw new \RuntimeException('PROVIDER_REFERENCE_MISSING');
+        }
+        if ($providerTransactionId && $payment->provider_transaction_id && $providerTransactionId !== $payment->provider_transaction_id && $providerRequestId !== $payment->provider_transaction_id) {
             throw new \RuntimeException('PROVIDER_REFERENCE_MISMATCH');
         }
         if (isset($payload['amount']) && (int) $payload['amount'] !== (int) $payment->amount) {
@@ -119,6 +131,13 @@ class PaymentService
         $event = DB::table('payment_events')->where('provider', $provider)->where('provider_event_id', $eventId)->first();
         if ($event && $event->processing_status === 'PROCESSED') {
             return $this->payload($payment);
+        }
+        $verification = $this->provider->verify($providerTransactionId, [
+            'expected_amount' => (int) $payment->amount,
+            'expected_reference' => (string) $payment->public_reference,
+        ]);
+        if (! ($verification['verified'] ?? false)) {
+            throw new \RuntimeException('PAYMENT_PROVIDER_VERIFICATION_FAILED');
         }
         if (! $event) {
             DB::table('payment_events')->insert([

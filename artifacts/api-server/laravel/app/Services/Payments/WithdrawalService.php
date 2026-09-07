@@ -107,6 +107,7 @@ class WithdrawalService
             'operator' => $account->operator,
             'account_number' => Crypt::decryptString($account->account_number_encrypted),
             'beneficiary_name' => $account->beneficiary_name,
+            'description' => 'Retrait MAXIMUS '.$id,
         ]);
         $status = $providerResult['status'] === 'PAID' ? 'COMPLETED' : ($providerResult['status'] === 'FAILED' ? 'FAILED' : 'PROCESSING');
         DB::table('withdrawals')->where('id', $id)->update([

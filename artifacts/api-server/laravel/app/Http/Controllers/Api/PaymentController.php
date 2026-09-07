@@ -233,6 +233,8 @@ class PaymentController extends Controller
         return match ($code) {
             'PAYMENT_NOT_REFUNDABLE' => 'Ce paiement ne peut pas être remboursé.',
             'REFUND_AMOUNT_EXCEEDED' => 'Le montant remboursé dépasserait le montant payé.',
+            'DIAMANOPAY_FULL_REFUND_ONLY' => 'DiamanoPay accepte uniquement le remboursement total de ce paiement.',
+            'DIAMANOPAY_REFUND_WAVE_ONLY' => 'Le remboursement DiamanoPay est disponible uniquement pour un paiement Wave.',
             'PAYOUT_ACCOUNT_NOT_AVAILABLE' => 'Le compte de retrait est introuvable ou inactif.',
             'INSUFFICIENT_WALLET_BALANCE' => 'Le solde disponible est insuffisant.',
             default => 'L’opération financière ne peut pas être exécutée.',
