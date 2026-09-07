@@ -60,6 +60,7 @@ import {
 } from '@/components/app-ui';
 import {
   getConfiguredModules,
+  getCompanyDirectoryCompanies,
   getVisibleNotifications,
   emptyStoreData,
   modules,
@@ -2124,7 +2125,21 @@ function CompanyEditModal({
 }
 
 function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
-  const pending = data.companies.filter((c) => c.status === 'EN ATTENTE').length;
+  const [pendingRequests, setPendingRequests] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    void companyRequestApi.list()
+      .then((result) => {
+        if (active) setPendingRequests(result.requests.length);
+      })
+      .catch(() => {
+        if (active) setPendingRequests(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
   return (
     <div className="space-y-6">
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
@@ -2549,11 +2564,12 @@ function CompaniesPage({
   const { alert, confirm } = useAppDialog();
   const [search, setSearch] = useState(() => sessionStorage.getItem('maximus-company-search') ?? '');
   const [filter, setFilter] = useState('Toutes');
+  const directoryCompanies = getCompanyDirectoryCompanies(data.companies);
   const [selected, setSelected] = useState<Company | null>(
-    detail ? (data.companies[0] ?? null) : null,
+    detail ? (directoryCompanies[0] ?? null) : null,
   );
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
-  const list = data.companies
+  const list = directoryCompanies
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     .filter(
       (c) =>
@@ -2615,7 +2631,7 @@ function CompaniesPage({
           </ActionButton>
         </Toolbar>
         <div className="flex gap-2 overflow-x-auto">
-          {['Toutes', 'Actives', 'En attente', 'Suspendues'].map((label) => (
+          {['Toutes', 'Actives', 'Suspendues'].map((label) => (
             <FilterChip key={label} label={label} active={filter === label} onClick={() => setFilter(label)} />
           ))}
         </div>
@@ -2856,6 +2872,8 @@ function RequestsPage({
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
           Object.assign(target, result.company);
+        } else {
+          d.companies.push(result.company);
         }
       }, 'Entreprise activée et compte administrateur synchronisé.');
       setRequests((current) => current.filter((item) => item.id !== company.id));

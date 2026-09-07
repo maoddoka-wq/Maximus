@@ -62,7 +62,11 @@ class AppStateController extends Controller
 
     private function mergeRegistryCompanies(array $state): array
     {
-        $activeCompanies = Company::query()->whereNull('deleted_at')->orderBy('created_at')->get();
+        $activeCompanies = Company::query()
+            ->whereNull('deleted_at')
+            ->where('status', 'ACTIF')
+            ->orderBy('created_at')
+            ->get();
         $activeCompanyIds = array_fill_keys($activeCompanies->pluck('id')->all(), true);
         $state = $this->restrictToActiveCompanies($state, $activeCompanyIds);
         $known = collect($state['companies'] ?? [])->keyBy('id');

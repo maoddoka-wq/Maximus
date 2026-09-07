@@ -126,4 +126,38 @@ class AppStateRecoveryTest extends TestCase
         $this->assertSame(['active-company'], collect($response->json('data.companies'))->pluck('id')->all());
         $this->assertSame(['active-employee'], collect($response->json('data.employees'))->pluck('id')->all());
     }
+
+    public function test_maximus_bootstrap_does_not_publish_pending_requests_as_companies(): void
+    {
+        Company::query()->create([
+            'id' => 'pending-company',
+            'name' => 'Demande en attente',
+            'manager' => 'Responsable',
+            'email' => 'pending@example.test',
+            'status' => 'EN ATTENTE',
+        ]);
+        Company::query()->create([
+            'id' => 'active-company',
+            'name' => 'Entreprise active',
+            'manager' => 'Responsable',
+            'email' => 'active@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'pending-filter-admin',
+            'email' => 'pending.filter.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk();
+
+        $this->assertSame(['active-company'], collect($response->json('data.companies'))->pluck('id')->all());
+    }
 }

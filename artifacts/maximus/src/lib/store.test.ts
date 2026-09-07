@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { emptyStoreData, normalizeStoreData, sanitizeStoreData } from './store';
+import { emptyStoreData, getCompanyDirectoryCompanies, normalizeStoreData, sanitizeStoreData } from './store';
 
 test('reconstruit les collections métier quand une sauvegarde partielle contient null', () => {
   const normalized = normalizeStoreData({
@@ -102,4 +102,39 @@ test('rétablit les packs des presets intégrés dans une sauvegarde ancienne', 
     commerce: ['commerce-consultation'],
     presences: ['presence-consultation'],
   });
+});
+
+test('retire les demandes en attente de l’annuaire des entreprises', () => {
+  const companies = emptyStoreData().companies.concat([
+    {
+      id: 'pending-company',
+      name: 'Demande en attente',
+      manager: 'Responsable',
+      email: 'pending@example.test',
+      phone: '',
+      country: 'Sénégal',
+      sector: 'Services',
+      status: 'EN ATTENTE',
+      requestedModules: ['commerce'],
+      allowedModules: [],
+      refusedModules: [],
+      createdAt: '2026-09-07',
+    },
+    {
+      id: 'active-company',
+      name: 'Entreprise active',
+      manager: 'Responsable',
+      email: 'active@example.test',
+      phone: '',
+      country: 'Sénégal',
+      sector: 'Services',
+      status: 'ACTIF',
+      requestedModules: ['commerce'],
+      allowedModules: ['commerce'],
+      refusedModules: [],
+      createdAt: '2026-09-07',
+    },
+  ]);
+
+  assert.deepEqual(getCompanyDirectoryCompanies(companies).map(company => company.id), ['active-company']);
 });
