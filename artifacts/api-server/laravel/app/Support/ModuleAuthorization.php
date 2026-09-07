@@ -44,6 +44,10 @@ final class ModuleAuthorization
             return self::allowsEcommerce($permissions, $action, $feature);
         }
 
+        if ($module === 'finance') {
+            return self::allowsFinance($permissions, $action, $feature);
+        }
+
         return false;
     }
 
@@ -125,6 +129,16 @@ final class ModuleAuthorization
         }
 
         return self::contains($permissions['ecommerce'] ?? [], $required);
+    }
+
+    private static function allowsFinance(array $permissions, string $action, ?string $feature): bool
+    {
+        $required = self::stockAction($action);
+        if ($feature && array_key_exists('finance:'.$feature, $permissions)) {
+            return self::contains($permissions['finance:'.$feature], $required);
+        }
+
+        return self::contains($permissions['finance'] ?? ($permissions['comptabilite'] ?? []), $required);
     }
 
     private static function stockAction(string $action): string

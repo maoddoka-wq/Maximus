@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
+use App\Services\Payments\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -536,6 +537,7 @@ class EcommerceController extends Controller
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
             'customerEmail' => ['required', 'email', 'max:160'],
             'customerPhone' => ['nullable', 'string', 'max:40'],
+            'paymentMethod' => ['nullable', 'string', 'max:80'],
             'shippingAddress' => ['required', 'string', 'min:5', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
@@ -554,7 +556,14 @@ class EcommerceController extends Controller
                 ->where('idempotency_key', $idempotencyKey)
                 ->first();
             if ($existing) {
-                return response()->json(['reference' => $existing->reference, 'total' => (int) $existing->total]);
+                $payment = $existing->payment_id
+                    ? app(PaymentService::class)->getForTenant((string) $store->company_id, (string) $existing->payment_id)
+                    : null;
+                return response()->json([
+                    'reference' => $existing->reference,
+                    'total' => (int) $existing->total,
+                    'payment' => $payment ? app(PaymentService::class)->payload($payment) : null,
+                ]);
             }
         }
         if ($customer) {
@@ -640,10 +649,40 @@ class EcommerceController extends Controller
                         ->delete();
                 }
 
-                return ['reference' => $reference, 'total' => $total];
+                return ['id' => $id, 'reference' => $reference, 'total' => $total];
             });
 
-            return response()->json($order, 201);
+            $payment = app(PaymentService::class)->create([
+                'tenant_id' => (string) $store->company_id,
+                'customer_id' => $customer?->id,
+                'seller_id' => (string) $store->company_id,
+                'source_module' => 'ecommerce',
+                'source_type' => 'ecommerce_order',
+                'source_id' => $order['id'],
+                'amount' => $order['total'],
+                'currency' => (string) $store->currency,
+                'payment_method' => $input['paymentMethod'] ?? null,
+                'description' => 'Commande '.$order['reference'],
+                'metadata' => ['order_reference' => $order['reference']],
+                'idempotency_key' => 'order-payment:'.$order['id'],
+                'customer' => [
+                    'name' => $input['customerName'],
+                    'email' => $input['customerEmail'],
+                    'phone' => $input['customerPhone'] ?? '',
+                ],
+                'request_id' => $request->header('X-Request-Id'),
+            ]);
+            DB::table('ecommerce_orders')->where('id', $order['id'])->update([
+                'payment_id' => $payment['id'],
+                'payment_status' => $payment['status'],
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'reference' => $order['reference'],
+                'total' => $order['total'],
+                'payment' => $payment,
+            ], 201);
         } catch (Throwable $error) {
             return response()->json([
                 'error' => $error->getMessage() === 'STOCK_INSUFFICIENT'

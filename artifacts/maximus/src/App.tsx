@@ -102,6 +102,7 @@ import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
+import { createPaymentsApi, type FinancialPayment, type FinancialWallet } from '@/lib/payments-api';
 import {
   loadCompanyModuleAccess,
   setCompanyModuleAccess,
@@ -4744,9 +4745,11 @@ function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreD
 function FinancePage({
   data,
   mutate,
+  companyId,
 }: {
   data: StoreData;
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  companyId: string;
 }) {
   const { confirm } = useAppDialog();
   const confirmed = data.payments.filter((p) => p.status === 'CONFIRMÉ');
@@ -4786,6 +4789,7 @@ function FinancePage({
   };
   return (
     <div className="space-y-5">
+      <FinancialOpsPanel companyId={companyId} />
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         <Metric
           label="Revenus encaissés"
@@ -4886,6 +4890,98 @@ function FinancePage({
         </Modal>
       )}
     </div>
+  );
+}
+
+function FinancialOpsPanel({ companyId }: { companyId: string }) {
+  const [payments, setPayments] = useState<FinancialPayment[]>([]);
+  const [wallet, setWallet] = useState<FinancialWallet | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    setLoading(true);
+    setError('');
+    const api = createPaymentsApi(companyId);
+    Promise.all([api.payments(), api.wallet()])
+      .then(([paymentResult, walletResult]) => {
+        if (!active) return;
+        setPayments(paymentResult.payments);
+        setWallet(walletResult.wallet);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Les données financières sont indisponibles.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
+
+  const paid = payments.filter((payment) => payment.status === 'PAID');
+  const pending = payments.filter((payment) => ['PENDING', 'PROCESSING'].includes(payment.status));
+  const totalPaid = paid.reduce((total, payment) => total + payment.amount, 0);
+  const currency = wallet?.currency ?? 'XOF';
+
+  return (
+    <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.22)] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Ledger financier</p>
+          <h2 className="mt-1 font-bold">Paiements DiamanoPay et portefeuille vendeur</h2>
+          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+            Données persistées côté Laravel/PostgreSQL, isolées par entreprise.
+          </p>
+        </div>
+        <span className="rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-[10px] font-bold">DiamanoPay-ready</span>
+      </div>
+      {loading ? (
+        <p className="mt-5 text-sm text-[hsl(var(--muted-foreground))]">Chargement du journal financier…</p>
+      ) : error ? (
+        <p className="mt-5 rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.06)] p-3 text-sm text-[hsl(var(--destructive))]">
+          {error}
+        </p>
+      ) : (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <Metric label="Encaissements confirmés" value={shortMoney(totalPaid)} suffix={` ${currency}`} detail={`${paid.length} paiement(s)`} icon={WalletCards} accent />
+            <Metric label="Paiements en attente" value={shortMoney(pending.reduce((total, payment) => total + payment.amount, 0))} suffix={` ${currency}`} detail={`${pending.length} à suivre`} icon={CreditCard} />
+            <Metric label="Solde disponible" value={shortMoney(wallet?.availableBalance ?? 0)} suffix={` ${currency}`} detail="wallet vendeur courant" icon={ArrowUpFromLine} />
+          </div>
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead>
+                <tr className="border-b text-[10px] uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                  <th className="px-3 py-2">Référence</th>
+                  <th className="px-3 py-2">Source</th>
+                  <th className="px-3 py-2">Montant</th>
+                  <th className="px-3 py-2">Statut</th>
+                  <th className="px-3 py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.slice(0, 8).map((payment) => (
+                  <tr key={payment.id} className="border-b last:border-0">
+                    <td className="px-3 py-3 font-bold">{payment.publicReference}</td>
+                    <td className="px-3 py-3">{payment.sourceModule}</td>
+                    <td className="px-3 py-3">{money(payment.amount)}</td>
+                    <td className="px-3 py-3"><StatusBadge status={payment.status} /></td>
+                    <td className="px-3 py-3 text-[hsl(var(--muted-foreground))]">{payment.createdAt}</td>
+                  </tr>
+                ))}
+                {!payments.length && (
+                  <tr><td colSpan={5} className="px-3 py-5 text-center text-[hsl(var(--muted-foreground))]">Aucun paiement persistant.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 function CommercePage({
@@ -6129,7 +6225,7 @@ function ModulePackTestWorkbench({
               initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')}
             />
           )}
-          {module.id === 'finance' && <FinancePage data={data} mutate={mutate} />}
+          {module.id === 'finance' && <FinancePage data={data} mutate={mutate} companyId={previewCompanyId} />}
           {module.id === 'rh' && previewCompany && (
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}

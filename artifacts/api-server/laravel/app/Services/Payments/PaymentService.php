@@ -58,18 +58,32 @@ class PaymentService
         ]);
 
         $payment = DB::table('payments')->where('id', $id)->first();
-        $providerResult = $this->provider->initialize([
-            'public_reference' => $reference,
-            'amount' => (int) $payment->amount,
-            'currency' => $payment->currency,
-            'description' => $payment->description,
-            'payment_method' => $payment->payment_method,
-            'customer' => $data['customer'] ?? [],
-            'metadata' => $data['metadata'] ?? [],
-        ]);
+        try {
+            $providerResult = $this->provider->initialize([
+                'public_reference' => $reference,
+                'amount' => (int) $payment->amount,
+                'currency' => $payment->currency,
+                'description' => $payment->description,
+                'payment_method' => $payment->payment_method,
+                'customer' => $data['customer'] ?? [],
+                'metadata' => $data['metadata'] ?? [],
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $providerResult = [
+                'status' => 'PENDING',
+                'provider_transaction_id' => null,
+                'checkout_url' => null,
+                'message' => 'Le prestataire sera réessayé après configuration.',
+            ];
+        }
         $updates = [
             'status' => $providerResult['status'] === 'PROCESSING' ? 'PROCESSING' : 'PENDING',
             'provider_transaction_id' => $providerResult['provider_transaction_id'],
+            'metadata' => json_encode(array_merge($data['metadata'] ?? [], [
+                'checkout_url' => $providerResult['checkout_url'] ?? null,
+                'provider_message' => $providerResult['message'] ?? null,
+            ]), JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ];
         if ($providerResult['status'] === 'FAILED') {
@@ -78,10 +92,7 @@ class PaymentService
         }
         DB::table('payments')->where('id', $id)->update($updates);
 
-        return array_merge($this->payload(DB::table('payments')->where('id', $id)->first()), [
-            'checkout_url' => $providerResult['checkout_url'] ?? null,
-            'provider_message' => $providerResult['message'] ?? null,
-        ]);
+        return $this->payload(DB::table('payments')->where('id', $id)->first());
     }
 
     public function confirmFromWebhook(array $payload, string $provider, string $eventId, ?string $signature = null): array
@@ -124,7 +135,7 @@ class PaymentService
             ]);
         }
 
-        DB::transaction(function () use ($payment, $status, $providerTransactionId, $payload, $eventId): void {
+        DB::transaction(function () use ($payment, $status, $providerTransactionId, $payload, $eventId, $provider): void {
             $locked = DB::table('payments')->where('id', $payment->id)->lockForUpdate()->first();
             $updates = [
                 'status' => $status,
@@ -185,6 +196,8 @@ class PaymentService
             'paidAt' => $payment->paid_at,
             'failedAt' => $payment->failed_at,
             'createdAt' => $payment->created_at,
+            'checkoutUrl' => is_string($payment->metadata) ? (json_decode($payment->metadata, true)['checkout_url'] ?? null) : ($payment->metadata['checkout_url'] ?? null),
+            'providerMessage' => is_string($payment->metadata) ? (json_decode($payment->metadata, true)['provider_message'] ?? null) : ($payment->metadata['provider_message'] ?? null),
         ];
     }
 
