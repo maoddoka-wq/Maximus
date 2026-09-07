@@ -22,3 +22,4 @@
 - [Séparation production et démonstration](production-demo-separation.md) — les fixtures KORA restent locales et le fallback production ne doit contenir aucune donnée fictive.
 - [Espace client e-commerce](ecommerce-customer-space.md) — les sessions, commandes, adresses, favoris et paniers sont toujours bornés par client et entreprise.
 - [Intégration DiamanoPay](diamanopay-integration.md) — vérifier chaque webhook avec la transaction officielle avant tout crédit, sans dépendre d’une signature HMAC non documentée.
+- [Aperçus sociaux publics](public-social-previews.md) — rendre les métadonnées et les images de partage côté serveur, sans dépendre de React ou d’une session.

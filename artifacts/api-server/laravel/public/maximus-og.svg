@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">MAXIMUS ERP</title>
+  <desc id="desc">Gestion d’entreprise et boutique en ligne avec MAXIMUS ERP.</desc>
+  <rect width="1200" height="630" fill="#151c2b"/>
+  <circle cx="1040" cy="90" r="280" fill="#d6a52c" opacity=".16"/>
+  <circle cx="1040" cy="90" r="190" fill="none" stroke="#d6a52c" stroke-width="18" opacity=".6"/>
+  <path d="M145 175 235 130l90 45v115c0 86-90 143-90 143s-90-57-90-143V175Z" fill="none" stroke="#f1b51c" stroke-width="12"/>
+  <path d="m183 220 52 47 52-47v103l-52 34-52-34V220Z" fill="#f1b51c"/>
+  <text x="145" y="500" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700" letter-spacing="8">MAXIMUS</text>
+  <text x="150" y="554" fill="#d6a52c" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" letter-spacing="7">GESTION D’ENTREPRISE</text>
+</svg>
