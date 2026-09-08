@@ -95,7 +95,7 @@ const blankProduct: ProductForm = {
   imageUrl: '',
   imageFile: null,
   featured: false,
-  status: 'DRAFT',
+  status: 'PUBLISHED',
 };
 
 export default function EcommerceModulePage({

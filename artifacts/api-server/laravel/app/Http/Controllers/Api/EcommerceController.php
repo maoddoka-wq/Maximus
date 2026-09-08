@@ -298,6 +298,9 @@ class EcommerceController extends Controller
         }
 
         $input = $this->productInput($request);
+        if (array_key_exists('imageUrl', $input)) {
+            $input['imageUrl'] = $input['imageUrl'] ?? '';
+        }
         $company = $this->company($request);
         $input = $this->normalizeProductCategory($input, $company);
         $input['slug'] = $this->uniqueProductSlug(
@@ -336,10 +339,14 @@ class EcommerceController extends Controller
 
         $company = $this->company($request);
         $query = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $company);
-        if (! $query->exists()) {
+        $existing = $query->first();
+        if (! $existing) {
             return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         $input = $this->productInput($request, true);
+        if (array_key_exists('imageUrl', $input)) {
+            $input['imageUrl'] = $input['imageUrl'] ?? '';
+        }
         $input = $this->normalizeProductCategory($input, $company);
         if (array_key_exists('slug', $input)) {
             $input['slug'] = $this->uniqueProductSlug(

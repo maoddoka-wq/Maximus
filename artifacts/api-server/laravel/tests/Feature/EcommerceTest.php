@@ -243,6 +243,40 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseCount('ecommerce_orders', 0);
     }
 
+    public function test_catalogue_accepts_the_complete_product_form_payload_and_updates_a_product(): void
+    {
+        $request = $this->asActor();
+        $payload = [
+            'name' => 'Sacoche Atlas',
+            'sku' => 'ATLAS-FORM-01',
+            'description' => 'Une sacoche de démonstration.',
+            'category' => 'Divers',
+            'categoryId' => null,
+            'price' => 12500,
+            'compareAtPrice' => 15000,
+            'stock' => 8,
+            'imageUrl' => '',
+            'featured' => true,
+            'status' => 'PUBLISHED',
+        ];
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', $payload)
+            ->assertCreated()
+            ->assertJsonPath('name', 'Sacoche Atlas')
+            ->assertJsonPath('price', 12500)
+            ->assertJsonPath('compareAtPrice', 15000)
+            ->assertJsonPath('status', 'PUBLISHED')
+            ->json();
+
+        $request->patchJson('/api/ecommerce/products/'.$product['id'].'?companyId=kora', [
+            ...$payload,
+            'name' => 'Sacoche Atlas Premium',
+            'sku' => 'ATLAS-FORM-02',
+        ])->assertOk()
+            ->assertJsonPath('name', 'Sacoche Atlas Premium')
+            ->assertJsonPath('sku', 'ATLAS-FORM-02');
+    }
+
     public function test_public_order_is_idempotent_and_order_status_follows_allowed_transitions(): void
     {
         $request = $this->asActor();
