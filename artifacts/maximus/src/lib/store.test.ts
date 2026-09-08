@@ -174,6 +174,7 @@ test('isole les écrans de fonctionnalités des overrides de modules incomplets'
   assert.deepEqual(ecommerce?.featurePacks, [{
     id: 'legacy-pack',
     name: 'Pack historique',
+    description: '',
     featureIds: [],
     featurePermissions: {},
   }]);

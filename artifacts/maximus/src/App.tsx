@@ -1271,8 +1271,7 @@ function Signup({
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const configuredModule = (moduleId: ModuleId) => {
-    const base = modules.find((item) => item.id === moduleId);
-    return base ? { ...base, ...(data.moduleOverrides?.[moduleId] ?? {}) } : undefined;
+    return getConfiguredModules(data).find((module) => module.id === moduleId);
   };
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find((item) => item.name === nextSector);
@@ -3188,8 +3187,7 @@ function SectorPresetsPage({
   const catalog = getCatalogSnapshot(data);
   const sectorPresets = catalog.sectorPresets;
   const moduleForSector = (id: ModuleId) => {
-    const base = modules.find((module) => module.id === id);
-    return base ? { ...base, ...(catalog.moduleOverrides[id] ?? {}) } : undefined;
+    return getConfiguredModules(catalog).find((module) => module.id === id);
   };
   const moduleName = (id: ModuleId) => moduleForSector(id)?.name ?? id;
 
@@ -5209,9 +5207,7 @@ function InteractiveModulesPage({
   const [category, setCategory] = useState('Toutes');
   const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
   const catalog = getCatalogSnapshot(data);
-  const moduleDefinitions = modules
-    .filter((module) => !catalog.removedModules.includes(module.id))
-    .map((module) => ({ ...module, ...(catalog.moduleOverrides[module.id] ?? {}) }));
+  const moduleDefinitions = getConfiguredModules(catalog);
   useEffect(() => {
     const requested = readSelectedModule(search);
     if (pendingSelection.current !== undefined) {
