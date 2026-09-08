@@ -310,6 +310,7 @@ class EcommerceController extends Controller
         }
         $company = $this->company($request);
         $input = $this->normalizeProductCategory($input, $company);
+        $input = $this->requireProductCategory($input);
         $input['slug'] = $this->uniqueProductSlug(
             (string) ($input['slug'] ?? ''),
             (string) $input['name'],
@@ -358,6 +359,11 @@ class EcommerceController extends Controller
             $input['imageUrl'] = $input['imageUrl'] ?? '';
         }
         $input = $this->normalizeProductCategory($input, $company);
+        $input = $this->requireProductCategory(
+            $input,
+            (string) ($existing->category ?? ''),
+            (string) ($existing->product_type ?? 'SALE'),
+        );
         if (array_key_exists('slug', $input)) {
             $input['slug'] = $this->uniqueProductSlug(
                 (string) ($input['slug'] ?? ''),
@@ -471,6 +477,7 @@ class EcommerceController extends Controller
         $input = $this->rentalInput($request);
         $company = $this->company($request);
         $input = $this->normalizeRentalCategory($input, $company);
+        $input = $this->requireRentalCategory($input);
         if (DB::table('ecommerce_rentals')->where('company_id', $company)->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($input['name']))])->exists()) {
             return response()->json(['error' => 'Une location porte déjà ce nom dans cette boutique.'], 422);
         }
@@ -511,6 +518,7 @@ class EcommerceController extends Controller
 
         $input = $this->rentalInput($request, true);
         $input = $this->normalizeRentalCategory($input, $company);
+        $input = $this->requireRentalCategory($input, (string) ($existing->category ?? ''));
         if (array_key_exists('name', $input) && DB::table('ecommerce_rentals')
             ->where('company_id', $company)
             ->where('id', '!=', $id)
@@ -825,18 +833,27 @@ class EcommerceController extends Controller
 
     private function publicStore(object $store): array
     {
+        $publishedProducts = DB::table('ecommerce_products')
+            ->where('company_id', $store->company_id)
+            ->where('status', 'PUBLISHED')
+            ->where('stock', '>', 0)
+            ->orderByDesc('featured')
+            ->orderBy('name')
+            ->get();
+
         return response()->json([
             'store' => $this->publicStorePayload($store),
-            'products' => DB::table('ecommerce_products')
-                ->where('company_id', $store->company_id)
-                ->where('status', 'PUBLISHED')
-                ->where('stock', '>', 0)
-                ->orderByDesc('featured')
-                ->orderBy('name')
-                ->get()
+            'products' => $publishedProducts
+                ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'SALE')
                 ->map(fn ($row) => $this->publicProduct($row))
                 ->values(),
-            'rentals' => $this->listRentals((string) $store->company_id),
+            'rentals' => collect($this->listRentals((string) $store->company_id))
+                ->concat(
+                    $publishedProducts
+                        ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'RENTAL')
+                        ->map(fn ($row) => $this->publicRentalProduct($row))
+                )
+                ->values(),
         ])->getData(true);
     }
 
@@ -910,13 +927,30 @@ class EcommerceController extends Controller
         return [
             'name' => $row->name,
             'description' => $row->description,
-            'category' => $row->category,
+            'category' => trim((string) ($row->category ?? '')) ?: 'Général',
             'categoryId' => $row->category_id ?? null,
             'imageUrl' => $row->image_url ?? '',
             'price' => (int) $row->price,
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
             'isAvailable' => (int) $row->availability > 0,
+            'createdAt' => $row->created_at,
+            'updatedAt' => $row->updated_at,
+        ];
+    }
+
+    private function publicRentalProduct(object $row): array
+    {
+        return [
+            'name' => $row->name,
+            'description' => $row->description,
+            'category' => trim((string) ($row->category ?? '')) ?: 'Général',
+            'categoryId' => $row->category_id ?? null,
+            'imageUrl' => $row->image_url ?? '',
+            'price' => (int) $row->price,
+            'billingUnit' => $row->rental_period ?: 'JOUR',
+            'availability' => (int) $row->stock,
+            'isAvailable' => (int) $row->stock > 0,
             'createdAt' => $row->created_at,
             'updatedAt' => $row->updated_at,
         ];
@@ -981,6 +1015,36 @@ class EcommerceController extends Controller
         }
 
         $input['category'] = $category->name;
+        return $input;
+    }
+
+    private function requireRentalCategory(array $input, ?string $existingCategory = null): array
+    {
+        if (! array_key_exists('category', $input) && ! array_key_exists('categoryId', $input) && trim((string) $existingCategory) === '') {
+            return $input;
+        }
+        $category = trim((string) ($input['category'] ?? $existingCategory ?? ''));
+        if ($category === '') {
+            abort(response()->json(['error' => 'Une catégorie est obligatoire pour une location.'], 422));
+        }
+        $input['category'] = $category;
+
+        return $input;
+    }
+
+    private function requireProductCategory(array $input, ?string $existingCategory = null, ?string $existingType = null): array
+    {
+        $productType = $input['productType'] ?? ($existingType ?? 'SALE');
+        if ($productType !== 'RENTAL') {
+            return $input;
+        }
+
+        $category = trim((string) ($input['category'] ?? $existingCategory ?? ''));
+        if ($category === '') {
+            abort(response()->json(['error' => 'Une catégorie est obligatoire pour un produit de location.'], 422));
+        }
+        $input['category'] = $category;
+
         return $input;
     }
 

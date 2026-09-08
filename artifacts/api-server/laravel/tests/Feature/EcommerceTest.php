@@ -537,6 +537,7 @@ class EcommerceTest extends TestCase
             'sku' => 'RENTAL-01',
             'price' => 15000,
             'stock' => 2,
+            'category' => 'Événement',
             'status' => 'PUBLISHED',
             'productType' => 'RENTAL',
             'rentalPeriod' => 'JOUR',
@@ -546,7 +547,9 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseHas('ecommerce_products', ['id' => $rental['id'], 'product_type' => 'RENTAL', 'rental_period' => 'JOUR']);
         $this->getJson('/api/shop/boutique-types')
             ->assertOk()
-            ->assertJsonFragment(['slug' => $rental['slug'], 'productType' => 'RENTAL', 'rentalPeriod' => 'JOUR'])
+            ->assertJsonPath('products.0.slug', $sale['slug'])
+            ->assertJsonMissingPath('products.1')
+            ->assertJsonFragment(['name' => 'Tente à louer', 'category' => 'Événement', 'billingUnit' => 'JOUR'])
             ->assertJsonFragment(['slug' => $sale['slug'], 'productType' => 'SALE', 'rentalPeriod' => null]);
     }
 

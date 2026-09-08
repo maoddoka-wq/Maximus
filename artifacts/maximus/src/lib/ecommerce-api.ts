@@ -193,7 +193,19 @@ export interface SellerWalletBootstrap {
 export interface PublicShopBootstrap {
   store: Omit<EcommerceStore, 'id' | 'companyId'> & { enabledFeatures: PublicShopFeatures };
   products: Array<Omit<EcommerceProduct, 'id' | 'companyId' | 'sku' | 'status'>>;
-  rentals: Array<Omit<EcommerceRental, 'id' | 'companyId' | 'status'>>;
+  rentals: Array<{
+    name: string;
+    description: string;
+    category: string;
+    categoryId: string | null;
+    imageUrl: string;
+    price: number;
+    billingUnit: EcommerceRentalPeriod;
+    availability: number;
+    isAvailable: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 export type PublicDomainBootstrap = PublicShopBootstrap | { available: false };

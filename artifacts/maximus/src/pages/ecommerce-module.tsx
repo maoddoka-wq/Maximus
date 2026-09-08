@@ -319,12 +319,12 @@ function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBoots
     event.preventDefault();
     const price = Number(form.price);
     const availability = Number(form.availability);
-    if (!form.name.trim() || !Number.isInteger(price) || price < 0 || !Number.isInteger(availability) || availability < 0) {
+    if (!form.name.trim() || (!form.categoryId && !form.category.trim()) || !Number.isInteger(price) || price < 0 || !Number.isInteger(availability) || availability < 0) {
       await alert({ title: 'Informations incomplètes', description: 'Renseignez un nom, un tarif et une disponibilité valides.', confirmLabel: 'Compris' });
       return;
     }
     const category = data.categories.find(item => item.id === form.categoryId);
-    const body = { name: form.name.trim(), description: form.description.trim(), category: category?.name ?? (form.category.trim() || 'Général'), categoryId: form.categoryId || null, price, billingUnit: form.billingUnit, availability, status: form.status };
+    const body = { name: form.name.trim(), description: form.description.trim(), category: category?.name ?? form.category.trim(), categoryId: form.categoryId || null, price, billingUnit: form.billingUnit, availability, status: form.status };
     const result = editing === 'new'
       ? await run(() => createEcommerceApi(data.store.companyId).createRental(body), 'Location ajoutée.')
       : editing ? await run(() => createEcommerceApi(data.store.companyId).updateRental(editing.id, body), 'Location mise à jour.') : undefined;
@@ -450,6 +450,10 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
     const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
     if (!form.name.trim() || !form.sku.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0 || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0))) {
       await alert({ title: 'Informations incomplètes', description: 'Renseignez un nom, une référence, un prix et un stock valides.', confirmLabel: 'Compris' });
+      return;
+    }
+    if (form.productType === 'RENTAL' && !form.categoryId && !form.category.trim()) {
+      await alert({ title: 'Catégorie obligatoire', description: 'Choisissez ou saisissez une catégorie pour ce produit de location.', confirmLabel: 'Compris' });
       return;
     }
     const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType: form.productType, rentalPeriod: form.productType === 'RENTAL' ? form.rentalPeriod : null, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
