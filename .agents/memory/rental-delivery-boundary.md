@@ -10,3 +10,9 @@ Les livraisons demandées par un client sont une entité séparée des commandes
 **Pourquoi:** une location et une livraison ont des cycles de vie différents d’une vente classique; les déduire d’un texte ou les mélanger aux commandes rend les droits, la persistance et le suivi ambigus.
 
 **Comment appliquer:** conserver les types explicites dans les contrats API, les migrations, les formulaires internes et les vues publiques; filtrer les capacités publiques côté serveur avant toute création ou affichage.
+
+Les locations autonomes restent séparées des produits dans le catalogue, mais peuvent désormais devenir des lignes de commande avec leur propre `rental_id`. Leur disponibilité est réservée lors de la création de commande et leur montant utilise le même checkout et le même suivi de paiement que les ventes.
+
+**Pourquoi:** séparer le modèle métier ne doit pas empêcher une location publiée d’être payée dans le parcours e-commerce commun.
+
+**Comment appliquer:** ne pas fabriquer de produit miroir pour une location autonome; transmettre son identifiant de location dans la commande, vérifier l’entreprise, le statut publié et la disponibilité côté serveur, puis laisser le service de paiement traiter le total de la commande.
