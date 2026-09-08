@@ -518,11 +518,9 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
       await alert({ title: 'Informations incomplètes', description: 'Renseignez un nom, une référence, un prix et un stock valides.', confirmLabel: 'Compris' });
       return;
     }
-    if (form.productType === 'RENTAL' && !form.categoryId && !form.category.trim()) {
-      await alert({ title: 'Catégorie obligatoire', description: 'Choisissez ou saisissez une catégorie pour ce produit de location.', confirmLabel: 'Compris' });
-      return;
-    }
-    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType: form.productType, rentalPeriod: form.productType === 'RENTAL' ? form.rentalPeriod : null, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
+    const productType = modal !== 'new' && modal ? modal.productType : 'SALE';
+    const rentalPeriod = modal !== 'new' && modal ? modal.rentalPeriod : null;
+    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
     const api = createEcommerceApi(data.store.companyId);
     const saved = modal === 'new'
       ? await run(() => api.createProduct(body), 'Produit ajouté au catalogue.')
@@ -562,15 +560,9 @@ function ProductModal({ modal, form, categories, setForm, onClose, onSave }: { m
           <select value={form.categoryId} onChange={event => { const categoryId = event.target.value; const category = categories.find(item => item.id === categoryId); patch({ categoryId, category: category?.name ?? form.category }); }} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sans catégorie</option>{categories.filter(category => category.isActive).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         </label>
         <Field label="Slug public (optionnel)" value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} placeholder="généré automatiquement si vide" />
-        <label className="block text-xs font-bold">Type de produit
-          <select value={form.productType} onChange={event => patch({ productType: event.target.value as EcommerceProductType })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="SALE">Vente</option><option value="RENTAL">Location</option></select>
-        </label>
-        <label className="block text-xs font-bold">Unité de location
-          <select value={form.rentalPeriod} disabled={form.productType !== 'RENTAL'} onChange={event => patch({ rentalPeriod: event.target.value as EcommerceRentalPeriod })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm disabled:opacity-50"><option value="JOUR">Par jour</option><option value="SEMAINE">Par semaine</option><option value="MOIS">Par mois</option></select>
-        </label>
-        <Field label={form.productType === 'RENTAL' ? 'Tarif de location' : 'Prix de vente'} required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
+        <Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
         <Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" />
-        <Field label={form.productType === 'RENTAL' ? 'Unités disponibles' : 'Stock disponible'} required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" />
+        <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" />
         <label className="block text-xs font-bold">Photo du produit<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum · envoyée à l’enregistrement</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label>
       </div>
       <label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur ou le locataire..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
