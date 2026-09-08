@@ -49,7 +49,7 @@ const customerCartToLines = (items: EcommerceCustomerCartLine[], products: Publi
   });
 
 const rentalToCartProduct = (rental: PublicRental): CartProduct => ({
-  slug: `rental:${rental.id}`,
+  slug: rental.productSlug || `rental:${rental.id}`,
   name: rental.name,
   description: rental.description,
   category: rental.category,
@@ -61,7 +61,7 @@ const rentalToCartProduct = (rental: PublicRental): CartProduct => ({
   featured: false,
   productType: 'RENTAL',
   rentalPeriod: rental.billingUnit,
-  rentalId: rental.id,
+  rentalId: rental.productSlug ? undefined : rental.id,
 });
 
 const restoreGuestCart = (
@@ -289,7 +289,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     if (!customer) return;
     try {
       const previous = customerData?.cart ?? [];
-      const productLines = next.filter(line => !line.product.rentalId);
+      const productLines = next.filter(line => !line.product.rentalId && line.product.productType !== 'RENTAL');
       const nextSlugs = new Set(productLines.map(line => line.product.slug));
       for (const line of previous) {
         if (!nextSlugs.has(line.productSlug)) await api.putCartItem(line.productSlug, 0);

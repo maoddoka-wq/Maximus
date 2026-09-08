@@ -16,3 +16,9 @@ Les locations autonomes restent séparées des produits dans le catalogue, mais 
 **Pourquoi:** séparer le modèle métier ne doit pas empêcher une location publiée d’être payée dans le parcours e-commerce commun.
 
 **Comment appliquer:** ne pas fabriquer de produit miroir pour une location autonome; transmettre son identifiant de location dans la commande, vérifier l’entreprise, le statut publié et la disponibilité côté serveur, puis laisser le service de paiement traiter le total de la commande.
+
+Dans la réponse publique fusionnée, une location autonome doit rester identifiable par `id`/`rentalId`, tandis qu’un produit catalogue de type location doit conserver son `productSlug`.
+
+**Pourquoi:** les deux entités partagent l’affichage public mais ne sont pas stockées dans la même table; perdre ce discriminant fait échouer la création de commande ou la réservation.
+
+**Comment appliquer:** conserver `productSlug` lors de la transformation d’une location catalogue en ligne de panier et réserver `rentalId` aux lignes issues de `ecommerce_rentals`.
