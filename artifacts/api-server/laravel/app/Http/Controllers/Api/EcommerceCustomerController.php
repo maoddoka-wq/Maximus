@@ -119,6 +119,7 @@ class EcommerceCustomerController extends Controller
             'favoriteProductSlugs' => $this->favoriteProductSlugs($customer),
             'cart' => $this->cartLines($customer),
             'orders' => $this->customerOrders($customer),
+            'deliveryRequests' => $this->customerDeliveryRequests($customer),
         ]);
     }
 
@@ -351,6 +352,13 @@ class EcommerceCustomerController extends Controller
         });
     }
 
+    public function deliveryRequests(Request $request, ?string $slug = null): JsonResponse
+    {
+        return $this->withCustomer($request, $slug, fn (object $store, object $customer): JsonResponse => response()->json([
+            'deliveryRequests' => $this->customerDeliveryRequests($customer),
+        ]));
+    }
+
     private function withCustomer(Request $request, ?string $slug, callable $callback): JsonResponse
     {
         $store = $this->publishedStore($request, $slug);
@@ -532,6 +540,8 @@ class EcommerceCustomerController extends Controller
                 'product.compare_at_price',
                 'product.stock',
                 'product.image_url',
+                'product.product_type',
+                'product.rental_period',
             ])
             ->map(fn (object $row): array => [
                 'productId' => $row->product_id,
@@ -543,6 +553,8 @@ class EcommerceCustomerController extends Controller
                 'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
                 'stock' => (int) $row->stock,
                 'imageUrl' => $row->image_url,
+                'productType' => $row->product_type ?? 'SALE',
+                'rentalPeriod' => $row->rental_period,
                 'quantity' => (int) $row->quantity,
             ])
             ->values()
@@ -559,6 +571,19 @@ class EcommerceCustomerController extends Controller
             ->get();
 
         return $rows->map(fn (object $row): array => $this->orderPayload($row))->values()->all();
+    }
+
+    private function customerDeliveryRequests(object $customer): array
+    {
+        return DB::table('ecommerce_delivery_requests')
+            ->where('company_id', $customer->company_id)
+            ->where('customer_id', $customer->id)
+            ->orderByDesc('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (object $row): array => $this->deliveryRequest($row))
+            ->values()
+            ->all();
     }
 
     private function orderPayload(object $row): array
@@ -584,7 +609,24 @@ class EcommerceCustomerController extends Controller
                 'unitPrice' => (int) $item->unit_price,
                 'quantity' => (int) $item->quantity,
                 'lineTotal' => (int) $item->line_total,
+                'productType' => $item->product_type ?? 'SALE',
+                'rentalPeriod' => $item->rental_period,
             ])->values()->all(),
+        ];
+    }
+
+    private function deliveryRequest(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'reference' => $row->reference,
+            'address' => $row->address,
+            'serviceType' => $row->service_type,
+            'desiredDate' => $row->desired_date,
+            'note' => $row->note,
+            'status' => $row->status,
+            'createdAt' => $row->created_at,
+            'updatedAt' => $row->updated_at,
         ];
     }
 

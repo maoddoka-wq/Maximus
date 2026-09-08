@@ -123,6 +123,48 @@ class EcommerceCustomerTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_customer_cart_items', ['customer_id' => $customer->id]);
     }
 
+    public function test_customer_can_retrieve_only_its_delivery_requests(): void
+    {
+        $this->createStore('kora', 'kora-delivery');
+        $customer = $this->createCustomer('customer-delivery', 'kora', 'delivery@example.test');
+        $otherCustomer = $this->createCustomer('other-delivery', 'kora', 'other-delivery@example.test');
+        $token = EcommerceCustomerAuth::issueSession($customer);
+
+        $created = $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->postJson('/api/shop/kora-delivery/delivery-requests', [
+                'requesterName' => 'Nom ignoré',
+                'requesterEmail' => 'ignored@example.test',
+                'requesterPhone' => '770000000',
+                'address' => 'Dakar, Sénégal',
+                'serviceType' => 'STANDARD',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('customerId', $customer->id);
+
+        DB::table('ecommerce_delivery_requests')->insert([
+            'id' => 'delivery-other-customer',
+            'company_id' => 'kora',
+            'customer_id' => $otherCustomer->id,
+            'reference' => 'LIV-OTHER-CUSTOMER',
+            'requester_name' => $otherCustomer->name,
+            'requester_email' => $otherCustomer->email,
+            'requester_phone' => '',
+            'address' => 'Autre adresse',
+            'service_type' => 'STANDARD',
+            'desired_date' => null,
+            'note' => '',
+            'status' => 'DEMANDEE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->getJson('/api/shop/kora-delivery/customer/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('deliveryRequests.0.id', $created->json('id'))
+            ->assertJsonMissing(['reference' => 'LIV-OTHER-CUSTOMER']);
+    }
+
     private function createStore(string $companyId, string $slug): void
     {
         DB::table('ecommerce_stores')->insert([

@@ -18,6 +18,9 @@ class EcommerceController extends Controller
 {
     private const STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
     private const ORDER_STATUSES = ['NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'EXPÉDIÉE', 'LIVRÉE', 'ANNULÉE'];
+    private const PRODUCT_TYPES = ['SALE', 'RENTAL'];
+    private const RENTAL_PERIODS = ['JOUR', 'SEMAINE', 'MOIS'];
+    private const DELIVERY_REQUEST_STATUSES = ['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'];
     private const ORDER_TRANSITIONS = [
         'NOUVELLE' => ['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'],
         'CONFIRMÉE' => ['CONFIRMÉE', 'EN PRÉPARATION', 'ANNULÉE'],
@@ -49,6 +52,7 @@ class EcommerceController extends Controller
                 ->map(fn ($row) => $this->product($row))
                 ->values(),
             'orders' => $this->orders($company),
+            'deliveryRequests' => $this->listDeliveryRequests($company),
         ]);
     }
 
@@ -298,6 +302,7 @@ class EcommerceController extends Controller
         }
 
         $input = $this->productInput($request);
+        $input = $this->normalizeProductType($input);
         if (array_key_exists('imageUrl', $input)) {
             $input['imageUrl'] = $input['imageUrl'] ?? '';
         }
@@ -320,6 +325,8 @@ class EcommerceController extends Controller
             'compare_at_price' => null,
             'image_url' => '',
             'featured' => false,
+            'product_type' => 'SALE',
+            'rental_period' => null,
             'status' => 'DRAFT',
             'id' => $this->id('product'),
             'company_id' => $company,
@@ -344,6 +351,7 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         $input = $this->productInput($request, true);
+        $input = $this->normalizeProductType($input, true);
         if (array_key_exists('imageUrl', $input)) {
             $input['imageUrl'] = $input['imageUrl'] ?? '';
         }
@@ -492,6 +500,40 @@ class EcommerceController extends Controller
         return response()->json($this->order(DB::table('ecommerce_orders')->where('id', $id)->first()));
     }
 
+    public function deliveryRequests(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'view', 'livraisons')) {
+            return $this->forbidden();
+        }
+
+        return response()->json(['deliveryRequests' => $this->listDeliveryRequests($this->company($request))]);
+    }
+
+    public function updateDeliveryRequestStatus(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'livraisons')) {
+            return $this->forbidden();
+        }
+
+        $input = Validator::make($request->all(), [
+            'status' => ['required', 'in:'.implode(',', self::DELIVERY_REQUEST_STATUSES)],
+        ])->validate();
+        $requestRow = DB::table('ecommerce_delivery_requests')
+            ->where('id', $id)
+            ->where('company_id', $this->company($request))
+            ->first();
+        if (! $requestRow) {
+            return response()->json(['error' => 'Demande de livraison introuvable.'], 404);
+        }
+
+        DB::table('ecommerce_delivery_requests')->where('id', $id)->update([
+            'status' => $input['status'],
+            'updated_at' => now(),
+        ]);
+
+        return response()->json($this->deliveryRequest(DB::table('ecommerce_delivery_requests')->where('id', $id)->first()));
+    }
+
     public function publicBootstrap(string $slug): JsonResponse
     {
         $store = DB::table('ecommerce_stores')
@@ -527,6 +569,73 @@ class EcommerceController extends Controller
         }
 
         return $this->createOrderForStore($request, $store);
+    }
+
+    public function createPublicDeliveryRequest(Request $request, string $slug): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->createDeliveryRequestForStore($request, $store);
+    }
+
+    public function createPublicDomainDeliveryRequest(Request $request): JsonResponse
+    {
+        $store = $this->publishedStoreByDomain($request->getHost());
+        if (! $store) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+
+        return $this->createDeliveryRequestForStore($request, $store);
+    }
+
+    private function createDeliveryRequestForStore(Request $request, object $store): JsonResponse
+    {
+        $features = $this->publicEnabledFeatures((string) $store->company_id);
+        if (! $features['livraisons']) {
+            return response()->json(['error' => 'Le service de livraison n’est pas activé pour cette boutique.'], 403);
+        }
+
+        $input = Validator::make($request->all(), [
+            'requesterName' => ['required', 'string', 'min:2', 'max:120'],
+            'requesterEmail' => ['required', 'email', 'max:160'],
+            'requesterPhone' => ['nullable', 'string', 'max:40'],
+            'address' => ['required', 'string', 'min:5', 'max:500'],
+            'serviceType' => ['required', 'in:STANDARD,URGENT'],
+            'desiredDate' => ['nullable', 'date', 'after_or_equal:today'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ])->validate();
+        $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
+        if ($customer) {
+            $input['requesterName'] = $customer->name;
+            $input['requesterEmail'] = $customer->email;
+            $input['requesterPhone'] = $customer->phone;
+        }
+
+        $id = $this->id('delivery');
+        $reference = 'LIV-'.strtoupper(Str::substr(str_replace('-', '', $id), -8));
+        $row = [
+            'id' => $id,
+            'company_id' => $store->company_id,
+            'customer_id' => $customer?->id,
+            'order_id' => null,
+            'reference' => $reference,
+            'requester_name' => trim($input['requesterName']),
+            'requester_email' => Str::lower(trim($input['requesterEmail'])),
+            'requester_phone' => trim((string) ($input['requesterPhone'] ?? '')),
+            'address' => trim($input['address']),
+            'service_type' => $input['serviceType'],
+            'desired_date' => $input['desiredDate'] ?? null,
+            'note' => trim((string) ($input['note'] ?? '')),
+            'status' => 'DEMANDEE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('ecommerce_delivery_requests')->insert($row);
+
+        return response()->json($this->deliveryRequest((object) $row), 201);
     }
 
     private function publicStore(object $store): array
@@ -590,6 +699,8 @@ class EcommerceController extends Controller
             'stock' => (int) $row->stock,
             'imageUrl' => $row->image_url,
             'featured' => (bool) $row->featured,
+            'productType' => $row->product_type ?? 'SALE',
+            'rentalPeriod' => $row->rental_period,
         ];
     }
 
@@ -680,6 +791,8 @@ class EcommerceController extends Controller
                         'unit_price' => $product->price,
                         'quantity' => $item['quantity'],
                         'line_total' => $lineTotal,
+                        'product_type' => $product->product_type ?? 'SALE',
+                        'rental_period' => $product->rental_period,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
@@ -866,6 +979,8 @@ class EcommerceController extends Controller
             'imageUrl' => $row->image_url,
             'featured' => (bool) $row->featured,
             'status' => $row->status,
+            'productType' => $row->product_type ?? 'SALE',
+            'rentalPeriod' => $row->rental_period,
         ];
     }
 
@@ -892,6 +1007,8 @@ class EcommerceController extends Controller
                 'unitPrice' => (int) $item->unit_price,
                 'quantity' => (int) $item->quantity,
                 'lineTotal' => (int) $item->line_total,
+                'productType' => $item->product_type ?? 'SALE',
+                'rentalPeriod' => $item->rental_period,
             ], $items),
         ];
     }
@@ -913,7 +1030,57 @@ class EcommerceController extends Controller
             'imageUrl' => ['nullable', 'string', 'max:500'],
             'featured' => ['sometimes', 'boolean'],
             'status' => ['sometimes', 'in:'.implode(',', self::STATUSES)],
+            'productType' => array_merge($partial ? ['sometimes'] : ['nullable'], ['in:'.implode(',', self::PRODUCT_TYPES)]),
+            'rentalPeriod' => ['nullable', 'in:'.implode(',', self::RENTAL_PERIODS)],
         ])->validate();
+    }
+
+    private function normalizeProductType(array $input, bool $partial = false): array
+    {
+        if (! $partial && ! array_key_exists('productType', $input)) {
+            $input['productType'] = 'SALE';
+        }
+        if (! $partial && ! array_key_exists('rentalPeriod', $input)) {
+            $input['rentalPeriod'] = null;
+        }
+        if (array_key_exists('productType', $input) && $input['productType'] === 'SALE') {
+            $input['rentalPeriod'] = null;
+        }
+
+        return $input;
+    }
+
+    private function listDeliveryRequests(string $company): array
+    {
+        return DB::table('ecommerce_delivery_requests')
+            ->where('company_id', $company)
+            ->orderByDesc('created_at')
+            ->limit(250)
+            ->get()
+            ->map(fn ($row) => $this->deliveryRequest($row))
+            ->values()
+            ->all();
+    }
+
+    private function deliveryRequest(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'companyId' => $row->company_id,
+            'customerId' => $row->customer_id,
+            'orderId' => $row->order_id,
+            'reference' => $row->reference,
+            'requesterName' => $row->requester_name,
+            'requesterEmail' => $row->requester_email,
+            'requesterPhone' => $row->requester_phone,
+            'address' => $row->address,
+            'serviceType' => $row->service_type,
+            'desiredDate' => $row->desired_date,
+            'note' => $row->note,
+            'status' => $row->status,
+            'createdAt' => $row->created_at,
+            'updatedAt' => $row->updated_at,
+        ];
     }
 
     private function categories(string $company): array

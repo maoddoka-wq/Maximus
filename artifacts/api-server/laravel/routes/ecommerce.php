@@ -27,10 +27,13 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
+        Route::get('/delivery-requests', [EcommerceController::class, 'deliveryRequests']);
+        Route::patch('/delivery-requests/{id}/status', [EcommerceController::class, 'updateDeliveryRequestStatus']);
     });
 
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
 Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
+Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
@@ -38,6 +41,7 @@ Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/', [EcommerceController::class, 'publicBootstrap']);
     Route::post('/orders', [EcommerceController::class, 'createPublicOrder'])->middleware('throttle:orders');
+    Route::post('/delivery-requests', [EcommerceController::class, 'createPublicDeliveryRequest'])->middleware('throttle:orders');
     Route::post('/orders/{orderId}/payment', [EcommercePaymentController::class, 'create'])->middleware('throttle:orders');
     Route::get('/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'status']);
     Route::get('/customer/session', [EcommerceCustomerController::class, 'session']);
@@ -57,6 +61,7 @@ Route::prefix('shop/{slug}')->group(function (): void {
     Route::delete('/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
     Route::get('/customer/orders', [EcommerceCustomerController::class, 'orders']);
     Route::get('/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+    Route::get('/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 });
 
 Route::get('/shop-domain/customer/session', [EcommerceCustomerController::class, 'session']);
@@ -76,6 +81,7 @@ Route::put('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'p
 Route::delete('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
 Route::get('/shop-domain/customer/orders', [EcommerceCustomerController::class, 'orders']);
 Route::get('/shop-domain/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+Route::get('/shop-domain/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
 Route::post('/shop-domain/customer/logout', [EcommerceCustomerController::class, 'logout']);
 Route::post('/shop/{slug}/customer/logout', [EcommerceCustomerController::class, 'logout']);

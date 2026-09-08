@@ -1,6 +1,10 @@
 export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type EcommerceProductType = 'SALE' | 'RENTAL';
+export type EcommerceRentalPeriod = 'JOUR' | 'SEMAINE' | 'MOIS';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
+export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COURS' | 'LIVREE' | 'ANNULEE';
+export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 
 export interface EcommerceStore {
@@ -50,6 +54,8 @@ export interface EcommerceProduct {
   imageUrl: string;
   featured: boolean;
   status: EcommerceProductStatus;
+  productType: EcommerceProductType;
+  rentalPeriod: EcommerceRentalPeriod | null;
 }
 
 export interface EcommerceCategory {
@@ -69,6 +75,26 @@ export interface EcommerceOrderItem {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  productType: EcommerceProductType;
+  rentalPeriod: EcommerceRentalPeriod | null;
+}
+
+export interface EcommerceDeliveryRequest {
+  id: string;
+  companyId?: string;
+  customerId?: string | null;
+  orderId?: string | null;
+  reference: string;
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterPhone?: string;
+  address: string;
+  serviceType: EcommerceDeliveryServiceType;
+  desiredDate: string | null;
+  note: string;
+  status: EcommerceDeliveryRequestStatus;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface EcommerceOrder {
@@ -94,6 +120,7 @@ export interface EcommerceBootstrap {
   categories: EcommerceCategory[];
   products: EcommerceProduct[];
   orders: EcommerceOrder[];
+  deliveryRequests: EcommerceDeliveryRequest[];
 }
 
 export interface SellerWallet {
@@ -184,6 +211,8 @@ export interface EcommerceCustomerCartLine {
   name: string;
   description: string;
   category: string;
+  productType: EcommerceProductType;
+  rentalPeriod: EcommerceRentalPeriod | null;
   price: number;
   compareAtPrice: number | null;
   stock: number;
@@ -212,6 +241,7 @@ export interface EcommerceCustomerBootstrap {
   favoriteProductSlugs: string[];
   cart: EcommerceCustomerCartLine[];
   orders: EcommerceCustomerOrder[];
+  deliveryRequests: EcommerceDeliveryRequest[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -265,6 +295,8 @@ export const createEcommerceApi = (companyId: string) => {
     },
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
     updateOrderStatus: (id: string, status: EcommerceOrderStatus) => request<EcommerceOrder>(withCompany(`/ecommerce/orders/${id}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
+    deliveryRequests: () => request<{ deliveryRequests: EcommerceDeliveryRequest[] }>(withCompany('/ecommerce/delivery-requests')),
+    updateDeliveryRequestStatus: (id: string, status: EcommerceDeliveryRequestStatus) => request<EcommerceDeliveryRequest>(withCompany(`/ecommerce/delivery-requests/${encodeURIComponent(id)}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
   };
 };
 
@@ -273,6 +305,8 @@ export const publicEcommerceApi = {
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
   createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
   createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   createDomainPayment: (orderId: string, body?: { redirectUrl?: string }) =>
@@ -312,5 +346,6 @@ export const createCustomerApi = (slug?: string) => {
     clearCart: () => request<{ cart: EcommerceCustomerCartLine[] }>(endpoint('/cart'), { method: 'DELETE' }),
     orders: () => request<{ orders: EcommerceCustomerOrder[] }>(endpoint('/orders')),
     order: (id: string) => request<EcommerceCustomerOrder>(endpoint(`/orders/${encodeURIComponent(id)}`)),
+    deliveryRequests: () => request<{ deliveryRequests: EcommerceDeliveryRequest[] }>(endpoint('/delivery-requests')),
   };
 };

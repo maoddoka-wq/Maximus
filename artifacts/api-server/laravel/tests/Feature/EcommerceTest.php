@@ -478,6 +478,132 @@ class EcommerceTest extends TestCase
             ->assertJson(['available' => false]);
     }
 
+    public function test_sale_and_rental_products_keep_an_explicit_public_distinction(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique types',
+            'slug' => 'boutique-types',
+            'description' => 'Ventes et locations',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $sale = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Sac à vendre',
+            'sku' => 'SALE-01',
+            'price' => 5000,
+            'stock' => 3,
+            'status' => 'PUBLISHED',
+            'productType' => 'SALE',
+        ])->assertCreated()->assertJsonPath('productType', 'SALE')->json();
+        $rental = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Tente à louer',
+            'sku' => 'RENTAL-01',
+            'price' => 15000,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+            'productType' => 'RENTAL',
+            'rentalPeriod' => 'JOUR',
+        ])->assertCreated()->assertJsonPath('productType', 'RENTAL')->assertJsonPath('rentalPeriod', 'JOUR')->json();
+
+        $this->assertDatabaseHas('ecommerce_products', ['id' => $sale['id'], 'product_type' => 'SALE', 'rental_period' => null]);
+        $this->assertDatabaseHas('ecommerce_products', ['id' => $rental['id'], 'product_type' => 'RENTAL', 'rental_period' => 'JOUR']);
+        $this->getJson('/api/shop/boutique-types')
+            ->assertOk()
+            ->assertJsonFragment(['slug' => $rental['slug'], 'productType' => 'RENTAL', 'rentalPeriod' => 'JOUR'])
+            ->assertJsonFragment(['slug' => $sale['slug'], 'productType' => 'SALE', 'rentalPeriod' => null]);
+    }
+
+    public function test_delivery_requests_are_scoped_and_status_can_be_managed_by_the_company(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique livraison',
+            'slug' => 'boutique-livraison',
+            'description' => 'Services de livraison',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $created = $this->postJson('/api/shop/boutique-livraison/delivery-requests', [
+            'requesterName' => 'Client Livraison',
+            'requesterEmail' => 'livraison@example.test',
+            'requesterPhone' => '770000000',
+            'address' => 'Dakar, Sénégal',
+            'serviceType' => 'STANDARD',
+            'desiredDate' => now()->addDay()->toDateString(),
+            'note' => 'Appeler avant de passer',
+        ])->assertCreated()
+            ->assertJsonPath('status', 'DEMANDEE')
+            ->assertJsonPath('serviceType', 'STANDARD');
+
+        $requestId = $created->json('id');
+        $this->assertDatabaseHas('ecommerce_delivery_requests', [
+            'id' => $requestId,
+            'company_id' => 'kora',
+            'requester_email' => 'livraison@example.test',
+        ]);
+
+        DB::table('ecommerce_delivery_requests')->insert([
+            'id' => 'delivery-other-company',
+            'company_id' => 'other-company',
+            'reference' => 'LIV-OTHER',
+            'requester_name' => 'Autre entreprise',
+            'requester_email' => 'other@example.test',
+            'requester_phone' => '',
+            'address' => 'Autre adresse',
+            'service_type' => 'STANDARD',
+            'desired_date' => null,
+            'note' => '',
+            'status' => 'DEMANDEE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('deliveryRequests.0.id', $requestId)
+            ->assertJsonMissing(['reference' => 'LIV-OTHER']);
+        $request->patchJson('/api/ecommerce/delivery-requests/'.$requestId.'/status?companyId=kora', ['status' => 'CONFIRMEE'])
+            ->assertOk()
+            ->assertJsonPath('status', 'CONFIRMEE');
+        $this->assertDatabaseHas('ecommerce_delivery_requests', ['id' => $requestId, 'status' => 'CONFIRMEE']);
+    }
+
+    public function test_public_delivery_service_is_hidden_and_blocked_without_the_company_feature(): void
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'ecommerce')
+            ->update(['feature_ids' => json_encode(['location'])]);
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique sans livraison',
+            'slug' => 'boutique-sans-livraison',
+            'description' => 'Boutique',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $this->getJson('/api/shop/boutique-sans-livraison')
+            ->assertOk()
+            ->assertJsonPath('store.enabledFeatures.livraisons', false)
+            ->assertJsonPath('store.enabledFeatures.location', true);
+        $this->postJson('/api/shop/boutique-sans-livraison/delivery-requests', [
+            'requesterName' => 'Client',
+            'requesterEmail' => 'client@example.test',
+            'address' => 'Dakar',
+            'serviceType' => 'STANDARD',
+        ])->assertForbidden();
+    }
+
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([
