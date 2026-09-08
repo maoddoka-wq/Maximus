@@ -2,13 +2,20 @@
 
 set -eu
 
-required_variables="APP_KEY ADMIN_USER ADMIN_PASSWORD DATABASE_URL DIAMANOPAY_CLIENT_ID DIAMANOPAY_CLIENT_SECRET DIAMANOPAY_WEBHOOK_SECRET"
+required_variables="APP_KEY ADMIN_USER ADMIN_PASSWORD DATABASE_URL"
 
 for variable in $required_variables; do
     eval "value=\${$variable:-}"
     if [ -z "$value" ]; then
         echo "Render startup error: $variable is required." >&2
         exit 1
+    fi
+done
+
+for variable in DIAMANOPAY_CLIENT_ID DIAMANOPAY_CLIENT_SECRET DIAMANOPAY_WEBHOOK_SECRET; do
+    eval "value=\${$variable:-}"
+    if [ -z "$value" ]; then
+        echo "Render startup warning: $variable is not configured; DiamanoPay features remain disabled." >&2
     fi
 done
 
