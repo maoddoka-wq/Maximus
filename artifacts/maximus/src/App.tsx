@@ -5048,7 +5048,7 @@ function RHPage({ data, companyId }: { data: StoreData; companyId: string }) {
     </div>
   );
 }
-function PresencesPage({ data, companyId, visibleFeatureIds }: { data: StoreData; companyId: string; visibleFeatureIds?: string[] }) {
+function PresencesPage({ data, companyId, visibleFeatureIds, preview = false }: { data: StoreData; companyId: string; visibleFeatureIds?: string[]; preview?: boolean }) {
   const employees = data.employees.filter((employee) => employee.companyId === companyId);
   return (
     <PresenceModulePage
@@ -5057,14 +5057,15 @@ function PresencesPage({ data, companyId, visibleFeatureIds }: { data: StoreData
       nodes={data.orgNodes.filter((node) => node.companyId === companyId)}
       currentEmployee={null}
       canView
-      canCreate
-      canEdit
-      canCorrect
-      canValidate
-      canManage
+      canCreate={!preview}
+      canEdit={!preview}
+      canCorrect={!preview}
+      canValidate={!preview}
+      canManage={!preview}
       canExport
-      canDelete
+      canDelete={!preview}
       visibleFeatureIds={visibleFeatureIds}
+      preview={preview}
     />
   );
 }
@@ -6035,8 +6036,19 @@ function ModulePackTestWorkbench({
               : 'Le parcours complet du module est ouvert avec toutes ses fonctionnalités.'}
           </p>
         </div>
+        <div className="mt-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] px-4 py-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          Aperçu administratif isolé : les données de production ne sont pas sollicitées et les actions d’écriture sont désactivées.
+        </div>
         <div className="mt-5">
-          {module.id === 'stocks' && <StockModulePage companyId={previewCompanyId} stockPermissions={stockPermissions} />}
+          {module.id === 'stocks' && (
+            <StockModulePage
+              companyId={previewCompanyId || 'module-preview'}
+              stockPermissions={stockPermissions}
+              canCreate={false}
+              canModify={false}
+              preview
+            />
+          )}
           {(module.id === 'commerce' || module.id === 'ventes') && (
             <CommerceModulePage
               companyId={previewCompanyId}
@@ -6051,8 +6063,15 @@ function ModulePackTestWorkbench({
           {module.id === 'rh' && previewCompany && (
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
-          {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={testFeatureIds} />}
-           {module.id === 'ecommerce' && <EcommerceModulePage companyId={previewCompanyId} canCreate canModify />}
+           {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={testFeatureIds} preview />}
+           {module.id === 'ecommerce' && (
+             <EcommerceModulePage
+               companyId={previewCompanyId || 'module-preview'}
+               canCreate={false}
+               canModify={false}
+               preview
+             />
+           )}
           {operationalModules.includes(module.id) && (
             <OperationalModulePage
               moduleId={module.id}

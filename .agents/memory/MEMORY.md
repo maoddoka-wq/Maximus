@@ -28,3 +28,4 @@
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
 - [Capacités vitrine e-commerce](public-commerce-capabilities.md) — Location et Livraisons ne sont visibles publiquement que si l’accès e-commerce actif les autorise.
 - [Frontière vente/location/livraison](rental-delivery-boundary.md) — les locations sont typées explicitement et les demandes de livraison restent un service séparé et isolé.
+- [Isolation des aperçus de modules](module-preview-isolation.md) — les tests administratifs restent autonomes, sans entreprise réelle ni appel d’écriture en production.

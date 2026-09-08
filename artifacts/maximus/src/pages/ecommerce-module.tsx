@@ -146,12 +146,14 @@ export default function EcommerceModulePage({
   canModify = true,
   allowedFeatureIds,
   singleModuleNavigation = false,
+  preview = false,
 }: {
   companyId: string;
   canCreate?: boolean;
   canModify?: boolean;
   allowedFeatureIds?: string[];
   singleModuleNavigation?: boolean;
+  preview?: boolean;
 }) {
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
@@ -167,6 +169,33 @@ export default function EcommerceModulePage({
   const load = async (silent = false) => {
     if (silent) setRefreshing(true);
     else setLoading(true);
+    if (preview) {
+      setData({
+        store: {
+          id: `preview-store-${companyId || 'module'}`,
+          companyId: companyId || 'module-preview',
+          slug: 'aperçu-boutique',
+          name: 'Aperçu boutique',
+          description: 'Aperçu administratif sans données de production.',
+          status: 'DRAFT',
+          currency: 'XOF',
+          primaryColor: '#D69E2E',
+          accentColor: '#172033',
+          logoUrl: '',
+        },
+        domains: [],
+        categories: [],
+        products: [],
+        rentals: [],
+        orders: [],
+        deliveryRequests: [],
+      });
+      setWalletData(null);
+      setError('');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const nextData = await api.bootstrap();
       setData(nextData);
@@ -182,7 +211,7 @@ export default function EcommerceModulePage({
 
   useEffect(() => {
     void load();
-  }, [companyId]);
+  }, [companyId, preview]);
 
   useEffect(() => {
     if (!toast) return undefined;

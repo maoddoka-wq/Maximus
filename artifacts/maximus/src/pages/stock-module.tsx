@@ -39,7 +39,7 @@ const useStockApi = () => {
 };
 const useStockAccess = () => useContext(StockAccessContext);
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(([id]) => id),
@@ -58,7 +58,15 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger le module Stocks.'); }
     finally { setLoading(false); setRefreshing(false); }
   };
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (preview) {
+      setData({ products: [], warehouses: [], locations: [], suppliers: [], balances: [], movements: [], requests: [], inventories: [], inventoryLines: [] });
+      setError('');
+      setLoading(false);
+      return;
+    }
+    void load();
+  }, [companyId, preview]);
   const run = async (action: () => Promise<unknown>, success: string) => {
     try { await action(); await load(true); setToast(success); window.setTimeout(() => setToast(''), 3200); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Opération impossible.'); }

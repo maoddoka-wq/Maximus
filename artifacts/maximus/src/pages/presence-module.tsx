@@ -94,7 +94,7 @@ function Panel({ title, children, action }: { title: string; children: React.Rea
 }
 function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { text?: string }) { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }
 
-export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, visibleFeatureIds, singleModuleNavigation = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; singleModuleNavigation?: boolean }) {
+export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, visibleFeatureIds, singleModuleNavigation = false, preview = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; singleModuleNavigation?: boolean; preview?: boolean }) {
   const { confirm } = useAppDialog();
   const api = useMemo(() => createPresenceApi(companyId), [companyId]);
   const [items, setItems] = useState<PresenceItem[]>([]);
@@ -118,7 +118,15 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [selectedEmployee, setSelectedEmployee] = useState(currentEmployee?.id ?? employees[0]?.id ?? '');
   const [selected, setSelected] = useState<PresenceItem | null>(null);
   const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
-  useEffect(() => { void refresh(); }, [api]);
+  useEffect(() => {
+    if (preview) {
+      setItems([]);
+      setError('');
+      setLoading(false);
+      return;
+    }
+    void refresh();
+  }, [api, preview]);
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
   const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
