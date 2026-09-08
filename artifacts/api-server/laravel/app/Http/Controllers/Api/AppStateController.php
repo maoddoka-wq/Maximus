@@ -44,6 +44,11 @@ class AppStateController extends Controller
             $stateVersion = $nextVersion;
         }
 
+        // Company branding is persisted in the companies registry. The shared
+        // app-state payload may have been written by an older browser, so it
+        // must not be the source of truth for logos and theme colors.
+        $state = $this->hydrateCompanyBranding($state);
+
         if (($actor['role'] ?? null) !== 'maximus_admin') {
             $state = $this->restrictToCompany($state, (string) ($actor['companyId'] ?? ''));
         } else {
@@ -353,6 +358,54 @@ class AppStateController extends Controller
         if (isset($state['commerceStates']) && is_array($state['commerceStates'])) {
             $state['commerceStates'] = array_intersect_key($state['commerceStates'], $activeCompanyIds);
         }
+
+        return $state;
+    }
+
+    private function hydrateCompanyBranding(array $state): array
+    {
+        if (!isset($state['companies']) || !is_array($state['companies'])) {
+            return $state;
+        }
+
+        $companyIds = collect($state['companies'])
+            ->filter(fn (mixed $company): bool => is_array($company) && isset($company['id']))
+            ->map(fn (array $company): string => (string) $company['id'])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($companyIds === []) {
+            return $state;
+        }
+
+        $companies = Company::query()
+            ->whereNull('deleted_at')
+            ->whereIn('id', $companyIds)
+            ->get()
+            ->keyBy('id');
+
+        $state['companies'] = array_map(
+            function (mixed $item) use ($companies): mixed {
+                if (!is_array($item)) {
+                    return $item;
+                }
+
+                $company = $companies->get((string) ($item['id'] ?? ''));
+                if (!$company) {
+                    return $item;
+                }
+
+                return array_replace($item, [
+                    'profilePhoto' => $company->profile_photo,
+                    'primaryColor' => $company->primary_color,
+                    'accentColor' => $company->accent_color,
+                    'sidebarColor' => $company->sidebar_color,
+                ]);
+            },
+            $state['companies'],
+        );
 
         return $state;
     }
