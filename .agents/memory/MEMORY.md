@@ -30,3 +30,4 @@
 - [Frontière vente/location/livraison](rental-delivery-boundary.md) — les locations sont typées explicitement et les demandes de livraison restent un service séparé et isolé.
 - [Isolation des aperçus de modules](module-preview-isolation.md) — les tests administratifs restent autonomes, sans entreprise réelle ni appel d’écriture en production.
 - [Normalisation des réponses E-commerce](ecommerce-response-boundary.md) — protéger les vues contre les commandes et collections historiques incomplètes avant rendu.
+- [Overrides de catalogue tolérants](catalogue-override-normalization.md) — nettoyer les modules, packs et permissions persistés avant tout rendu administratif.

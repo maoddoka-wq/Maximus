@@ -5,7 +5,7 @@ import type {
   SectorPreset,
   StoreData,
 } from './store';
-import { modules } from './store';
+import { getConfiguredModules, modules } from './store';
 
 export interface CatalogDraft {
   moduleOverrides: ModuleOverrides;
@@ -73,6 +73,10 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   const warnings: string[] = [];
   const moduleIds = new Set(modules.map(module => module.id));
   const availableModuleIds = new Set(modules.filter(module => !snapshot.removedModules.includes(module.id)).map(module => module.id));
+  const configuredModules = getConfiguredModules({
+    moduleOverrides: snapshot.moduleOverrides,
+    removedModules: [],
+  });
 
   snapshot.sectorPresets.forEach(sector => {
     if (!sector.name.trim()) errors.push('Un secteur ne possède pas de nom.');
@@ -80,10 +84,8 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
     sector.moduleIds.forEach(moduleId => {
       if (!moduleIds.has(moduleId)) errors.push(`Le secteur « ${sector.name} » référence un module inconnu.`);
       if (!availableModuleIds.has(moduleId)) errors.push(`Le secteur « ${sector.name} » utilise un module inactif.`);
-      const module = {
-        ...modules.find(candidate => candidate.id === moduleId),
-        ...(snapshot.moduleOverrides[moduleId] ?? {}),
-      };
+      const module = configuredModules.find(candidate => candidate.id === moduleId);
+      if (!module) return;
       const availablePackIds = new Set((module.featurePacks ?? []).map(pack => pack.id));
       const selectedPackIds = sector.modulePackIds?.[moduleId] ?? [];
       selectedPackIds.forEach(packId => {
@@ -94,15 +96,24 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   });
 
   Object.entries(snapshot.moduleOverrides).forEach(([moduleId, override]) => {
-    if (override?.description !== undefined && !override.description.trim()) {
+    if (override?.description !== undefined && (typeof override.description !== 'string' || !override.description.trim())) {
       errors.push(`Le module « ${moduleId} » doit avoir une description compréhensible.`);
     }
-    const packNames = (override?.featurePacks ?? []).map(pack => pack.name.trim().toLowerCase()).filter(Boolean);
+    const featurePacks = Array.isArray(override?.featurePacks) ? override.featurePacks : [];
+    const packNames = featurePacks
+      .map(pack => typeof pack?.name === 'string' ? pack.name.trim().toLowerCase() : '')
+      .filter(Boolean);
     if (new Set(packNames).size !== packNames.length) errors.push(`Le module « ${moduleId} » contient des packs portant le même nom.`);
-    if ((override?.features ?? []).length === 0 && override?.features) errors.push(`Le module « ${moduleId} » ne contient aucune fonctionnalité.`);
-    (override?.featurePacks ?? []).forEach(pack => {
-      if (pack.featureIds.length === 0) errors.push(`Le pack « ${pack.name || pack.id} » ne contient aucune fonctionnalité.`);
-      if (!pack.description?.trim()) errors.push(`Le pack « ${pack.name || pack.id} » doit avoir une description compréhensible.`);
+    if (Array.isArray(override?.features) && override.features.length === 0) {
+      errors.push(`Le module « ${moduleId} » ne contient aucune fonctionnalité.`);
+    }
+    featurePacks.forEach(pack => {
+      const featureIds = Array.isArray(pack?.featureIds) ? pack.featureIds : [];
+      const packName = typeof pack?.name === 'string' ? pack.name : pack?.id ?? moduleId;
+      if (featureIds.length === 0) errors.push(`Le pack « ${packName} » ne contient aucune fonctionnalité.`);
+      if (typeof pack?.description !== 'string' || !pack.description.trim()) {
+        errors.push(`Le pack « ${packName} » doit avoir une description compréhensible.`);
+      }
     });
   });
 

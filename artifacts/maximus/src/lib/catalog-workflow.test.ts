@@ -102,6 +102,29 @@ test('bloque la publication d’un catalogue incohérent', () => {
   assert.ok(validation.errors.some(error => error.includes('pack absent')));
 });
 
+test('signale un brouillon de catalogue ancien sans faire planter sa validation', () => {
+  const data = fixture();
+  updateCatalogDraft(data, draft => {
+    draft.moduleOverrides.ecommerce = {
+      description: null as never,
+      features: null as never,
+      featurePacks: [
+        {
+          id: 'legacy-pack',
+          name: null as never,
+          featureIds: null as never,
+          description: null as never,
+        },
+      ],
+    };
+  });
+
+  const validation = validateCatalogDraft(data);
+
+  assert.ok(validation.errors.some(error => error.includes('description')));
+  assert.ok(validation.errors.some(error => error.includes('fonctionnalité')));
+});
+
 test('publie un catalogue et nettoie les accès aux modules retirés', () => {
   const data = fixture();
   updateCatalogDraft(data, draft => {
