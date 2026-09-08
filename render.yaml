@@ -36,6 +36,8 @@ services:
         value: warning
       - key: DIAMANOPAY_BASE_URL
         value: https://api.diamanopay.com
+      - key: DIAMANOPAY_ACCESS_TOKEN
+        sync: false
       - key: DIAMANOPAY_CLIENT_ID
         sync: false
       - key: DIAMANOPAY_CLIENT_SECRET

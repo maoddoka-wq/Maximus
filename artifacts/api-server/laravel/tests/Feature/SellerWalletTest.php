@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Services\DiamanoPayService;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -243,9 +244,33 @@ class SellerWalletTest extends TestCase
         ]);
     }
 
+    public function test_configured_access_token_is_used_before_oauth(): void
+    {
+        config([
+            'services.diamanopay.access_token' => 'static-test-token',
+            'services.diamanopay.webhook_secret' => 'test-webhook-secret',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'id' => 'charge-static-token',
+                'checkout_url' => 'https://checkout.example.test/static-token',
+            ], 200),
+        ]);
+
+        $charge = app(DiamanoPayService::class)->createCharge([
+            'amount' => 2500,
+            'currency' => 'XOF',
+        ], 'order:static-token');
+
+        $this->assertSame('charge-static-token', $charge['id']);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://api.diamanopay.com/api/charges');
+    }
+
     private function configureDiamano(): void
     {
         config([
+            'services.diamanopay.access_token' => null,
             'services.diamanopay.client_id' => 'test-client',
             'services.diamanopay.client_secret' => 'test-secret',
             'services.diamanopay.webhook_secret' => 'test-webhook-secret',

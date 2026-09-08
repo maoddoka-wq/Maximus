@@ -17,8 +17,11 @@ final class DiamanoPayService
 
     public function isConfigured(): bool
     {
-        return (string) config('services.diamanopay.client_id') !== ''
-            && (string) config('services.diamanopay.client_secret') !== ''
+        $hasStaticToken = trim((string) config('services.diamanopay.access_token')) !== '';
+        $hasOAuthCredentials = trim((string) config('services.diamanopay.client_id')) !== ''
+            && trim((string) config('services.diamanopay.client_secret')) !== '';
+
+        return ($hasStaticToken || $hasOAuthCredentials)
             && (string) config('services.diamanopay.webhook_secret') !== '';
     }
 
@@ -71,6 +74,11 @@ final class DiamanoPayService
 
     private function accessToken(): string
     {
+        $configuredToken = trim((string) config('services.diamanopay.access_token'));
+        if ($configuredToken !== '') {
+            return $configuredToken;
+        }
+
         return (string) Cache::remember('diamanopay.access_token', now()->addMinutes(50), function (): string {
             $response = Http::asForm()
                 ->retry(2, 250)
@@ -82,7 +90,7 @@ final class DiamanoPayService
                 ]);
 
             if ($response->failed() || ! is_string($response->json('access_token'))) {
-                throw new RuntimeException('Impossible d’obtenir un token DiamanoPay.');
+                throw new RuntimeException('DiamanoPay a refusé le token OAuth (HTTP '.$response->status().').');
             }
 
             return $response->json('access_token');
