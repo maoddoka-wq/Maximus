@@ -294,6 +294,28 @@ class SellerWalletTest extends TestCase
         });
     }
 
+    public function test_public_payment_falls_back_to_wave_when_provider_is_empty(): void
+    {
+        $this->createStore('kora', 'kora-charge-fallback');
+        $this->createOrder('order-charge-fallback', 'kora', 2500, '');
+        config([
+            'services.diamanopay.access_token' => 'static-test-token',
+            'services.diamanopay.provider' => '',
+            'services.diamanopay.webhook_secret' => 'test-webhook-secret',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'id' => 'charge-provider-fallback',
+                'checkout_url' => 'https://checkout.example.test/provider-fallback',
+            ], 200),
+        ]);
+
+        $this->postJson('/api/shop/kora-charge-fallback/orders/order-charge-fallback/payment')
+            ->assertCreated();
+
+        Http::assertSent(fn ($request): bool => $request['provider'] === 'WAVE');
+    }
+
     private function configureDiamano(): void
     {
         config([

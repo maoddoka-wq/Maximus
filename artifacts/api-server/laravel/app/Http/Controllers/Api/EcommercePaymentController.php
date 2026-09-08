@@ -85,10 +85,11 @@ final class EcommercePaymentController extends Controller
         }
 
         try {
+            $provider = trim((string) config('services.diamanopay.provider', ''));
             $charge = $this->diamanoPay->createCharge([
                 'amount' => (int) $order->total,
                 'currency' => (string) $store->currency,
-                'provider' => strtoupper(trim((string) config('services.diamanopay.provider', 'WAVE'))),
+                'provider' => strtoupper($provider !== '' ? $provider : 'WAVE'),
                 'description' => 'Commande '.$order->reference,
                 'clientReference' => $order->reference,
                 'successUrl' => $request->input('successUrl'),
