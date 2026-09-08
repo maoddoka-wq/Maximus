@@ -1,8 +1,10 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import {
   ArrowLeft,
   Bell,
   CircleHelp,
+  ChevronDown,
+  ChevronRight,
   LogIn,
   Menu,
   PanelLeftClose,
@@ -75,6 +77,19 @@ export function Sidebar({
   const compact = collapsed && !mobileOpen;
   const active = (href: string) =>
     location === href || location.startsWith(`${href}?`);
+  const activeFeatureGroupLabel =
+    sidebarFeatureGroups?.find(group => group.items.some(item => active(item.href)))?.label ?? '';
+  const [expandedMobileGroups, setExpandedMobileGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!mobileOpen || !activeFeatureGroupLabel) return;
+    setExpandedMobileGroups(current => (
+      current[activeFeatureGroupLabel]
+        ? current
+        : { ...current, [activeFeatureGroupLabel]: true }
+    ));
+  }, [activeFeatureGroupLabel, mobileOpen]);
+
   const link = (item: SidebarFeature) => {
     const isActive = active(item.href);
     const className = `nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${compact ? 'justify-center' : ''} ${isActive ? 'active' : 'text-[hsl(var(--sidebar-foreground)/.7)]'}`;
@@ -132,7 +147,7 @@ export function Sidebar({
         className={`sidebar shrink-0 flex-col overscroll-contain overflow-y-auto transition-[width] duration-200 md:relative md:flex md:h-[100dvh] ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}
       >
         <div
-          className={`flex items-center ${compact ? 'gap-1 px-2' : 'justify-between px-4'} py-6`}
+          className={`sticky top-0 z-10 flex items-center border-b border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/.96)] backdrop-blur ${compact ? 'gap-1 px-2' : 'justify-between px-4'} py-4 md:border-b-0 md:bg-transparent md:py-6`}
         >
           {isAdmin ? (
             <div
@@ -207,7 +222,7 @@ export function Sidebar({
           </button>
         </div>
         <nav
-          className={`${isAdmin ? 'flex-none' : 'min-h-0 flex-1'} space-y-1 overflow-hidden px-3`}
+          className={`${isAdmin ? 'flex-none' : 'min-h-0 flex-1'} space-y-1 overflow-hidden px-3 pb-4`}
         >
           {verticalModuleMenu ? (
             <>
@@ -226,23 +241,57 @@ export function Sidebar({
                 </>
               )}
               {sidebarFeatureGroups?.map((group, groupIndex) => (
-                <section
-                  key={group.label}
-                  aria-label={group.label}
-                  className={`${!compact && (groupIndex > 0 || employeeAdministrationItems.length > 0) ? 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
-                >
-                  {!compact && (
-                    <div
-                      data-testid={`module-section-${group.label}`}
-                      className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2"
+                (() => {
+                  const groupIsActive = group.label === activeFeatureGroupLabel;
+                  const hasManualMobileState = Object.prototype.hasOwnProperty.call(
+                    expandedMobileGroups,
+                    group.label,
+                  );
+                  const groupIsOpen = compact
+                    || !mobileOpen
+                    || groupIsActive
+                    || expandedMobileGroups[group.label]
+                    || (!activeFeatureGroupLabel && groupIndex === 0 && !hasManualMobileState);
+
+                  return (
+                    <section
+                      key={group.label}
+                      aria-label={group.label}
+                      className={`${!compact && (groupIndex > 0 || employeeAdministrationItems.length > 0) ? 'mt-3 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
                     >
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                        {group.label}
+                  {!compact && (
+                    <button
+                      type="button"
+                      data-testid={`module-section-${group.label}`}
+                      aria-expanded={groupIsOpen}
+                      onClick={() => {
+                        if (!mobileOpen) return;
+                        setExpandedMobileGroups(current => ({
+                          ...current,
+                          [group.label]: !groupIsOpen,
+                        }));
+                      }}
+                      className="mb-2 flex w-full items-center justify-between border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2 text-left md:cursor-default"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                          {group.label}
+                        </span>
+                        <span className="rounded-full bg-[hsl(var(--sidebar-foreground)/.1)] px-1.5 py-0.5 text-[9px] font-bold text-[hsl(var(--sidebar-foreground)/.58)] md:hidden">
+                          {group.items.length}
+                        </span>
                       </span>
-                    </div>
+                      <span className="text-[hsl(var(--sidebar-foreground)/.5)] md:hidden">
+                        {groupIsOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      </span>
+                    </button>
                   )}
-                  <div className="space-y-1">{group.items.map(item => link(item))}</div>
-                </section>
+                      <div className={`${compact || groupIsOpen ? 'block' : 'hidden md:block'} space-y-1`}>
+                        {group.items.map(item => link(item))}
+                      </div>
+                    </section>
+                  );
+                })()
               ))}
             </>
           ) : isAdmin ? (
