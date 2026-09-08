@@ -213,7 +213,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
         : await api.register(authForm);
       await loadCustomer(result.customer);
       setNotice('Vous êtes connecté.');
-      go('/compte');
+      go('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La connexion n’a pas abouti.');
     }

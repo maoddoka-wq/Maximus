@@ -478,11 +478,11 @@ body {
 }
 
 .shop-main article > div > div:last-child {
-  margin-top: .6rem !important;
+  margin-top: .35rem !important;
 }
 
 .shop-main article > div > div + p {
-  min-height: 2rem !important;
+  min-height: 0 !important;
 }
 
 @media (min-width: 768px) {
@@ -496,7 +496,7 @@ body {
   }
 
   .shop-main article > div > div:last-child {
-    margin-top: .8rem !important;
+    margin-top: .5rem !important;
   }
 }
 
