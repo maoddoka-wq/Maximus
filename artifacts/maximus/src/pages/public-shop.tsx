@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Heart, LockKeyhole, LogIn, MapPin, Menu, Minus, Package, Plus, Search, ShoppingBag, Store, UserRound, X } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
   publicEcommerceApi,
@@ -34,6 +34,7 @@ const addressText = (address: EcommerceCustomerAddress) =>
 
 export default function PublicShopPage({ slug, domain = false }: { slug?: string; domain?: boolean }) {
   const [location, setLocation] = useLocation();
+  const search = useSearch();
   const routePath = location.split('?')[0];
   const [data, setData] = useState<PublicShopBootstrap | null>(null);
   const [customer, setCustomer] = useState<EcommerceCustomer | null>(null);
@@ -68,13 +69,13 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const paymentReturn = useMemo(() => {
-    const query = new URLSearchParams(location.split('?')[1] ?? '');
+    const query = new URLSearchParams(search);
     const result = query.get('payment');
     const orderId = query.get('order');
     return result && orderId && ['success', 'error'].includes(result)
       ? { result: result as 'success' | 'error', orderId }
       : null;
-  }, [location]);
+  }, [search]);
 
   const api = useMemo(() => createCustomerApi(slug), [slug]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0), [cart]);
@@ -192,6 +193,10 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
             paymentStatus: status.paymentStatus,
             failureReason: status.failureReason,
           });
+          if (customer) {
+            setLocation(shopPath(`/compte/commandes/${encodeURIComponent(paymentReturn.orderId)}`));
+            return;
+          }
           if (['PAID', 'FAILED', 'REFUNDED'].includes(status.paymentStatus)) return;
         } catch (cause) {
           if (!cancelled) setError(cause instanceof Error ? cause.message : 'Le statut du paiement est indisponible.');
@@ -202,7 +207,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     };
     void loadPaymentStatus();
     return () => { cancelled = true; };
-  }, [data, domain, loading, paymentReturn, slug]);
+  }, [customer, data, domain, loading, paymentReturn, slug]);
 
   useEffect(() => {
     if (isAccountRoute && !customer && !loading) go('/connexion');
