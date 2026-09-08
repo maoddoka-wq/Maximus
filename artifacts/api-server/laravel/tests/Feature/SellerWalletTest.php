@@ -29,6 +29,34 @@ class SellerWalletTest extends TestCase
         $this->getJson('/api/ecommerce/wallet?companyId=other-company')->assertForbidden();
     }
 
+    public function test_maturity_settings_are_reserved_for_maximus_and_support_all_modes(): void
+    {
+        $this->asActor()
+            ->getJson('/api/platform-settings/seller-wallet-maturity')
+            ->assertForbidden();
+
+        $this->asMaximusAdmin();
+        $this
+            ->getJson('/api/platform-settings/seller-wallet-maturity')
+            ->assertOk()
+            ->assertJsonPath('mode', 'AUTOMATIC')
+            ->assertJsonPath('value', null);
+
+        $this
+            ->putJson('/api/platform-settings/seller-wallet-maturity', ['mode' => 'WEEKS', 'value' => 2])
+            ->assertOk()
+            ->assertJsonPath('mode', 'WEEKS')
+            ->assertJsonPath('value', 2)
+            ->assertJsonPath('label', 'Après 2 semaines, ou dès la livraison.');
+
+        $this
+            ->putJson('/api/platform-settings/seller-wallet-maturity', ['mode' => 'AUTOMATIC'])
+            ->assertOk()
+            ->assertJsonPath('mode', 'AUTOMATIC')
+            ->assertJsonPath('value', null)
+            ->assertJsonPath('label', 'Libération automatique à la livraison.');
+    }
+
     public function test_paid_webhook_credits_once_and_keeps_funds_pending(): void
     {
         $this->configureDiamano();
@@ -51,15 +79,18 @@ class SellerWalletTest extends TestCase
         $this->assertDatabaseCount('seller_wallet_ledger', 1);
     }
 
-    public function test_pending_funds_become_available_after_seven_days(): void
+    public function test_pending_funds_become_available_after_configured_days(): void
     {
         $this->configureDiamano();
+        $this->asMaximusAdmin()
+            ->putJson('/api/platform-settings/seller-wallet-maturity', ['mode' => 'DAYS', 'value' => 3])
+            ->assertOk();
         $this->createOrder('order-matures', 'kora', 7000, 'charge-matures');
 
         $this->postSignedWebhook(['data' => ['id' => 'charge-matures', 'status' => 'SUCCEEDED']])->assertOk();
         $this->assertDatabaseHas('seller_wallets', ['company_id' => 'kora', 'pending_balance' => 7000, 'available_balance' => 0]);
 
-        $this->travel(8)->days();
+        $this->travel(4)->days();
         $this->asActor()->getJson('/api/ecommerce/wallet?companyId=kora')
             ->assertOk()
             ->assertJsonPath('wallet.pendingBalance', 0)
@@ -68,6 +99,47 @@ class SellerWalletTest extends TestCase
             'company_id' => 'kora',
             'type' => 'SALE_RELEASE',
         ]);
+    }
+
+    public function test_pending_funds_follow_a_configured_number_of_weeks(): void
+    {
+        $this->configureDiamano();
+        $this->asMaximusAdmin()
+            ->putJson('/api/platform-settings/seller-wallet-maturity', ['mode' => 'WEEKS', 'value' => 2])
+            ->assertOk();
+        $this->createOrder('order-matures-weeks', 'kora', 7100, 'charge-matures-weeks');
+
+        $this->postSignedWebhook(['data' => ['id' => 'charge-matures-weeks', 'status' => 'SUCCEEDED']])->assertOk();
+        $this->travel(13)->days();
+        $this->asActor();
+        $this->getJson('/api/ecommerce/wallet?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('wallet.pendingBalance', 7100)
+            ->assertJsonPath('wallet.availableBalance', 0);
+
+        $this->travel(2)->days();
+        $this->asActor();
+        $this->getJson('/api/ecommerce/wallet?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('wallet.pendingBalance', 0)
+            ->assertJsonPath('wallet.availableBalance', 7100);
+    }
+
+    public function test_automatic_mode_waits_for_delivery_instead_of_using_a_fixed_delay(): void
+    {
+        $this->configureDiamano();
+        $this->asMaximusAdmin()
+            ->putJson('/api/platform-settings/seller-wallet-maturity', ['mode' => 'AUTOMATIC'])
+            ->assertOk();
+        $this->createOrder('order-automatic', 'kora', 7200, 'charge-automatic');
+
+        $this->postSignedWebhook(['data' => ['id' => 'charge-automatic', 'status' => 'SUCCEEDED']])->assertOk();
+        $this->travel(30)->days();
+        $this->asActor()->getJson('/api/ecommerce/wallet?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('wallet.pendingBalance', 7200)
+            ->assertJsonPath('wallet.availableBalance', 0)
+            ->assertJsonPath('maturityPolicy.mode', 'AUTOMATIC');
     }
 
     public function test_payment_for_an_already_delivered_order_is_available_immediately(): void
@@ -564,13 +636,33 @@ class SellerWalletTest extends TestCase
 
     private function asActor(): self
     {
-        $user = AuthUser::query()->create([
+        $user = AuthUser::query()->updateOrCreate(['id' => 'wallet-company-admin'], [
             'id' => 'wallet-company-admin',
             'email' => 'wallet-admin@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Gestionnaire financier',
             'role' => 'company_admin',
             'company_id' => 'kora',
+            'employee_id' => null,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        return $this
+            ->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    private function asMaximusAdmin(): self
+    {
+        $user = AuthUser::query()->updateOrCreate(['id' => 'wallet-maximus-admin'], [
+            'id' => 'wallet-maximus-admin',
+            'email' => 'wallet-maximus-admin@maximus.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'company_id' => null,
             'employee_id' => null,
             'sector_ids' => [],
             'permissions' => [],

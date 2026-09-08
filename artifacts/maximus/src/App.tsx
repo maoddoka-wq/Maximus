@@ -139,6 +139,7 @@ const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
 );
+const PlatformSettingsPage = lazy(() => import('@/pages/platform-settings'));
 function sessionFromAuthUser(user: AuthUser): Session {
   return user.role === 'maximus_admin'
     ? 'admin'
@@ -196,6 +197,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Traçabilité',
     title: 'Journal d’activité',
     description: 'Chaque action importante, horodatée et attribuée.',
+  },
+  '/maximus/parametres/portefeuille': {
+    kicker: 'Configuration',
+    title: 'Paramètres plateforme',
+    description: 'Définissez les règles globales appliquées aux espaces clients.',
   },
   '/entreprise/dashboard': {
     kicker: 'Espace entreprise',
@@ -959,6 +965,7 @@ function AppContent() {
                     subscriptions: SubscriptionsPage,
                     notifications: NotificationsPage,
                     journal: JournalPage,
+                    platformSettings: PlatformSettingsPage,
                     empty: EmptyState,
                   }}
                 />

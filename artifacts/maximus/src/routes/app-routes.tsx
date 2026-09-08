@@ -31,6 +31,7 @@ export type AdminRouteScreens = {
   subscriptions: Screen;
   notifications: Screen;
   journal: Screen;
+  platformSettings: Screen;
   empty: Screen;
 };
 
@@ -105,6 +106,9 @@ export function AdminRouter({
   }
   if (routePath === '/maximus/journal') {
     return renderScreen(screens.journal, { data });
+  }
+  if (routePath === '/maximus/parametres/portefeuille') {
+    return renderScreen(screens.platformSettings, {});
   }
   return renderScreen(screens.empty, {
     title: 'Cette vue n’existe pas encore',

@@ -155,6 +155,12 @@ export interface SellerWallet {
   payoutName: string;
 }
 
+export type SellerWalletMaturityPolicy = {
+  mode: 'AUTOMATIC' | 'DAYS' | 'WEEKS';
+  value: number | null;
+  label: string;
+};
+
 export interface SellerWithdrawal {
   id: string;
   amount: number;
@@ -188,6 +194,7 @@ export interface SellerWalletBootstrap {
   wallet: SellerWallet;
   withdrawals: SellerWithdrawal[];
   ledger: SellerWalletLedgerEntry[];
+  maturityPolicy: SellerWalletMaturityPolicy;
 }
 
 export interface PublicShopBootstrap {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
+use App\Services\SellerWalletMaturityPolicy;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,10 @@ final class SellerWalletController extends Controller
 
     private const PAYMENT_FAILURE_STATUSES = ['FAILED', 'CANCELLED', 'CANCELED', 'DECLINED', 'REJECTED', 'EXPIRED', 'ERROR', 'DENIED'];
 
-    public function __construct(private readonly DiamanoPayService $diamanoPay)
-    {
-    }
+    public function __construct(
+        private readonly DiamanoPayService $diamanoPay,
+        private readonly SellerWalletMaturityPolicy $maturityPolicy,
+    ) {}
 
     public function bootstrap(Request $request): JsonResponse
     {
@@ -36,6 +38,7 @@ final class SellerWalletController extends Controller
             'wallet' => $this->walletPayload($wallet),
             'withdrawals' => $this->withdrawals($company),
             'ledger' => $this->ledger($company),
+            'maturityPolicy' => $this->maturityPolicy->payload(),
         ]);
     }
 
@@ -235,6 +238,7 @@ final class SellerWalletController extends Controller
                 $this->applyWithdrawalProviderStatus($withdrawal->id, $data);
             } catch (Throwable $error) {
                 report($error);
+
                 return response()->json(['error' => 'Le webhook de retrait n’a pas pu être traité.'], 500);
             }
 
@@ -250,6 +254,7 @@ final class SellerWalletController extends Controller
             $this->applyPaymentProviderStatus($order->id, $data);
         } catch (Throwable $error) {
             report($error);
+
             return response()->json(['error' => 'Le webhook n’a pas pu être traité.'], 500);
         }
 
@@ -286,6 +291,7 @@ final class SellerWalletController extends Controller
                     'processed_at' => now(),
                     'updated_at' => now(),
                 ]);
+
                 return;
             }
 
@@ -298,6 +304,7 @@ final class SellerWalletController extends Controller
                     'processed_at' => now(),
                     'updated_at' => now(),
                 ]);
+
                 return;
             }
 
@@ -324,14 +331,17 @@ final class SellerWalletController extends Controller
             }
 
             if (in_array($status, self::PAYMENT_SUCCESS_STATUSES, true) && ! in_array($locked->payment_status, ['PAID', 'REFUNDED'], true)) {
-                $this->creditPaidOrder($locked, $data);
+                $paidAt = $locked->paid_at ?? now();
+                $availableAt = $this->maturityPolicy->availableAt($locked->status, $paidAt);
+                $this->creditPaidOrder($locked, $data, $availableAt);
                 DB::table('ecommerce_orders')->where('id', $locked->id)->update([
                     'payment_status' => 'PAID',
-                    'paid_at' => $locked->paid_at ?? now(),
-                    'funds_available_at' => $locked->funds_available_at ?? ($locked->status === 'LIVRÉE' ? now() : now()->addDays(7)),
+                    'paid_at' => $paidAt,
+                    'funds_available_at' => $locked->funds_available_at ?? $availableAt,
                     'payment_failure_reason' => '',
                     'updated_at' => now(),
                 ]);
+
                 return;
             }
 
@@ -504,7 +514,7 @@ final class SellerWalletController extends Controller
         DB::table('ecommerce_orders')->where('id', $order->id)->update(['stock_restored_at' => now(), 'updated_at' => now()]);
     }
 
-    private function creditPaidOrder(object $order, array $data): void
+    private function creditPaidOrder(object $order, array $data, mixed $availableAt = null): void
     {
         $key = 'sale:'.$order->id;
         if (DB::table('seller_wallet_ledger')->where('company_id', $order->company_id)->where('idempotency_key', $key)->exists()) {
@@ -517,7 +527,7 @@ final class SellerWalletController extends Controller
             'total_credited' => DB::raw('total_credited + '.(int) $order->total),
             'updated_at' => now(),
         ]);
-        $this->ledgerInsert($wallet, 'SALE_CREDIT', $available ? 'AVAILABLE' : 'PENDING', 'CREDIT', (int) $order->total, $order->id, $key, $available ? now() : now()->addDays(7), $data);
+        $this->ledgerInsert($wallet, 'SALE_CREDIT', $available ? 'AVAILABLE' : 'PENDING', 'CREDIT', (int) $order->total, $order->id, $key, $availableAt, $data);
     }
 
     private function releaseMaturedFunds(string $company): void
@@ -632,6 +642,7 @@ final class SellerWalletController extends Controller
         if (! $row) {
             return null;
         }
+
         return [
             'id' => $row->id,
             'amount' => (int) $row->amount,
@@ -668,12 +679,14 @@ final class SellerWalletController extends Controller
     private function canView(Request $request): bool
     {
         $actor = $request->attributes->get('authActor');
+
         return is_array($actor) && ModuleAuthorization::allows($actor, 'ecommerce', 'view', 'finances');
     }
 
     private function canModify(Request $request): bool
     {
         $actor = $request->attributes->get('authActor');
+
         return is_array($actor) && ModuleAuthorization::allows($actor, 'ecommerce', 'modify', 'finances');
     }
 

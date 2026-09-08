@@ -399,10 +399,13 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
     </section>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <WalletMetric label="Solde disponible" value={money(data.wallet.availableBalance, currency)} detail="Retirable maintenant" icon={Wallet} accent />
-      <WalletMetric label="Solde en attente" value={money(data.wallet.pendingBalance, currency)} detail="Livraison ou délai de sécurité" icon={Clock3} />
+       <WalletMetric label="Solde en attente" value={money(data.wallet.pendingBalance, currency)} detail={data.maturityPolicy.label} icon={Clock3} />
       <WalletMetric label="Retraits réservés" value={money(data.wallet.reservedBalance, currency)} detail="En cours de traitement" icon={ArrowDownToLine} />
       <WalletMetric label="Total crédité" value={money(data.wallet.totalCredited, currency)} detail="Ventes confirmées" icon={CircleDollarSign} />
     </div>
+     <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.06)] px-4 py-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+       Règle de maturation active : <strong className="text-[hsl(var(--foreground))]">{data.maturityPolicy.label}</strong>
+     </div>
     <div className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
       <Panel title="Demander un retrait" description="Les retraits sont envoyés vers un compte Wave vérifié. Minimum : 1 000 XOF.">
         <form onSubmit={withdraw} className="space-y-4">

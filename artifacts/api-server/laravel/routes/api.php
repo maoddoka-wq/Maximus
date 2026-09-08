@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ModuleController;
+use App\Http\Controllers\Api\PlatformSettingsController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
@@ -62,6 +63,11 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group
 Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);
     Route::put('/', [AppStateController::class, 'save']);
+});
+
+Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (): void {
+    Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);
+    Route::put('/seller-wallet-maturity', [PlatformSettingsController::class, 'updateSellerWalletMaturity']);
 });
 
 require __DIR__.'/control.php';
