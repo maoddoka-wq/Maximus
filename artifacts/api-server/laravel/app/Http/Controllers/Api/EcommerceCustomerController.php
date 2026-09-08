@@ -588,7 +588,17 @@ class EcommerceCustomerController extends Controller
 
     private function orderPayload(object $row): array
     {
-        $items = DB::table('ecommerce_order_items')->where('order_id', $row->id)->orderBy('created_at')->get();
+        $items = DB::table('ecommerce_order_items')
+            ->leftJoin('ecommerce_products as product', function ($join) use ($row): void {
+                $join->on('product.id', '=', 'ecommerce_order_items.product_id')
+                    ->where('product.company_id', '=', $row->company_id);
+            })
+            ->where('ecommerce_order_items.order_id', $row->id)
+            ->orderBy('ecommerce_order_items.created_at')
+            ->get([
+                'ecommerce_order_items.*',
+                'product.image_url',
+            ]);
 
         return [
             'id' => $row->id,
@@ -611,6 +621,7 @@ class EcommerceCustomerController extends Controller
                 'lineTotal' => (int) $item->line_total,
                 'productType' => $item->product_type ?? 'SALE',
                 'rentalPeriod' => $item->rental_period,
+                'imageUrl' => $item->image_url ?? '',
             ])->values()->all(),
         ];
     }

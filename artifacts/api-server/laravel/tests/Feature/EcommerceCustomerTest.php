@@ -17,6 +17,9 @@ class EcommerceCustomerTest extends TestCase
     {
         $this->createStore('kora', 'kora-client');
         $productId = $this->createProduct('kora', 'cafe-client', 2500, 3);
+        DB::table('ecommerce_products')->where('id', $productId)->update([
+            'image_url' => '/api/product-images/kora/cafe-client.jpg',
+        ]);
 
         $registered = $this->postJson('/api/shop/kora-client/customer/register', [
             'name' => 'Client KORA',
@@ -33,14 +36,21 @@ class EcommerceCustomerTest extends TestCase
             ->assertJsonPath('customer.name', 'Client KORA')
             ->assertJsonPath('addresses', []);
 
-        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $cookie)
+        $order = $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $cookie)
             ->postJson('/api/shop/kora-client/orders', [
                 'customerName' => 'Nom fourni au checkout',
                 'customerEmail' => 'checkout@example.test',
                 'shippingAddress' => 'Dakar, Sénégal',
                 'items' => [['productSlug' => 'cafe-client', 'quantity' => 1]],
             ])
-            ->assertCreated();
+            ->assertCreated()
+            ->json();
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $cookie)
+            ->getJson('/api/shop/kora-client/customer/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.id', $order['id'])
+            ->assertJsonPath('orders.0.items.0.imageUrl', '/api/product-images/kora/cafe-client.jpg');
 
         $customer = DB::table('ecommerce_customers')->where('email', 'client@example.test')->first();
         $this->assertNotNull($customer);

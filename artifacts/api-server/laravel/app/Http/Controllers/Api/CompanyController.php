@@ -262,6 +262,7 @@ class CompanyController extends Controller
                         'display_name' => trim($input['manager']),
                         'updated_at' => now(),
                     ]);
+                $this->synchronizeCompanyModules($company->fresh());
 
                 return $company->fresh();
             });
@@ -392,6 +393,32 @@ class CompanyController extends Controller
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
         ];
+    }
+
+    private function synchronizeCompanyModules(Company $company): void
+    {
+        if ($company->status !== 'ACTIF') {
+            return;
+        }
+
+        ModuleCatalog::ensureCatalog();
+        foreach ($company->requested_modules ?? [] as $moduleId) {
+            $existing = DB::table('maximus_company_modules')
+                ->where('company_id', $company->id)
+                ->where('module_id', $moduleId)
+                ->first();
+            DB::table('maximus_company_modules')->updateOrInsert(
+                ['company_id' => $company->id, 'module_id' => $moduleId],
+                [
+                    'id' => $existing?->id ?? 'company-module-'.Str::slug($company->id.'-'.$moduleId),
+                    'status' => $existing?->status ?? 'ACTIF',
+                    'feature_ids' => json_encode($company->requested_module_features[$moduleId] ?? [], JSON_UNESCAPED_UNICODE),
+                    'configuration' => json_encode($company->requested_module_permissions[$moduleId] ?? [], JSON_UNESCAPED_UNICODE),
+                    'updated_at' => now(),
+                    'created_at' => $existing?->created_at ?? now(),
+                ],
+            );
+        }
     }
 
     private function requestPayload(CompanyRequest $request): array

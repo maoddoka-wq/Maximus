@@ -27,7 +27,8 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
-         Route::post('/rentals', [EcommerceController::class, 'createRental']);
+          Route::post('/rentals', [EcommerceController::class, 'createRental']);
+          Route::post('/rentals/{id}/image', [EcommerceController::class, 'uploadRentalImage']);
          Route::patch('/rentals/{id}', [EcommerceController::class, 'updateRental']);
          Route::patch('/rentals/{id}/availability', [EcommerceController::class, 'setRentalAvailability']);
          Route::delete('/rentals/{id}', [EcommerceController::class, 'archiveRental']);
@@ -41,6 +42,8 @@ Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDom
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
+    ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, 'serveRentalImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
 Route::prefix('shop/{slug}')->group(function (): void {

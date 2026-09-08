@@ -546,7 +546,18 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeCompanyId, activeCompany?.allowedModules.join(','), sectorTestCompanyId, session]);
+  }, [
+    activeCompanyId,
+    activeCompany?.allowedModules.join(','),
+    activeCompany?.name,
+    activeCompany?.manager,
+    activeCompany?.primaryColor,
+    activeCompany?.accentColor,
+    activeCompany?.sidebarColor,
+    activeCompany?.profilePhoto,
+    sectorTestCompanyId,
+    session,
+  ]);
   const activeCompanyTheme = companyThemeVariables(activeCompany);
   const activeNavStyle: CSSProperties | undefined = activeCompany
     ? {

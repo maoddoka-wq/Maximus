@@ -396,6 +396,39 @@ class EcommerceTest extends TestCase
         ]);
     }
 
+    public function test_company_admin_can_upload_a_rental_image_and_keep_its_category(): void
+    {
+        Storage::fake('public');
+        $request = $this->asActor();
+        $category = $request->postJson('/api/ecommerce/categories?companyId=kora', [
+            'name' => 'Habitat',
+        ])->assertCreated()->json();
+        $rental = $request->postJson('/api/ecommerce/rentals?companyId=kora', [
+            'name' => 'Maison avec photo',
+            'categoryId' => $category['id'],
+            'price' => 18000,
+            'billingUnit' => 'SEMAINE',
+            'availability' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated()
+            ->assertJsonPath('categoryId', $category['id'])
+            ->assertJsonPath('category', 'Habitat')
+            ->json();
+
+        $response = $request->post('/api/ecommerce/rentals/'.$rental['id'].'/image?companyId=kora', [
+            'image' => UploadedFile::fake()->image('maison.jpg'),
+        ])->assertOk();
+
+        $imageUrl = $response->json('imageUrl');
+        $this->assertStringStartsWith('/api/rental-images/kora/', $imageUrl);
+        $this->assertDatabaseHas('ecommerce_rentals', [
+            'id' => $rental['id'],
+            'category_id' => $category['id'],
+            'image_url' => $imageUrl,
+        ]);
+        $this->getJson($imageUrl)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    }
+
     public function test_company_admin_can_register_verify_and_remove_a_custom_domain(): void
     {
         $request = $this->asActor();

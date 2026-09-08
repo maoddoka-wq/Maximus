@@ -75,6 +75,8 @@ export interface EcommerceRental {
   name: string;
   description: string;
   category: string;
+  categoryId: string | null;
+  imageUrl: string;
   price: number;
   billingUnit: EcommerceRentalPeriod;
   availability: number;
@@ -93,6 +95,7 @@ export interface EcommerceOrderItem {
   lineTotal: number;
   productType: EcommerceProductType;
   rentalPeriod: EcommerceRentalPeriod | null;
+  imageUrl: string;
 }
 
 export interface EcommerceDeliveryRequest {
@@ -313,9 +316,21 @@ export const createEcommerceApi = (companyId: string) => {
       return body as EcommerceProduct;
     },
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
-     createRental: (body: { name: string; description?: string; category?: string; price: number; billingUnit: EcommerceRentalPeriod; availability: number; status?: EcommerceRentalStatus }) =>
+      uploadRentalImage: async (id: string, file: File) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await fetch(`/api${withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/image`)}`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error ?? 'La photo n’a pas pu être envoyée.');
+        return body as EcommerceRental;
+      },
+      createRental: (body: { name: string; description?: string; category?: string; categoryId?: string | null; price: number; billingUnit: EcommerceRentalPeriod; availability: number; status?: EcommerceRentalStatus }) =>
        request<EcommerceRental>(withCompany('/ecommerce/rentals'), json(body)),
-     updateRental: (id: string, body: Partial<Omit<EcommerceRental, 'id' | 'companyId' | 'createdAt' | 'updatedAt' | 'isAvailable'>>) =>
+      updateRental: (id: string, body: Partial<Omit<EcommerceRental, 'id' | 'companyId' | 'createdAt' | 'updatedAt' | 'isAvailable' | 'imageUrl'>>) =>
        request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
      updateRentalAvailability: (id: string, availability: number) =>
        request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/availability`), { method: 'PATCH', body: JSON.stringify({ availability }) }),

@@ -470,6 +470,7 @@ class EcommerceController extends Controller
 
         $input = $this->rentalInput($request);
         $company = $this->company($request);
+        $input = $this->normalizeRentalCategory($input, $company);
         if (DB::table('ecommerce_rentals')->where('company_id', $company)->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($input['name']))])->exists()) {
             return response()->json(['error' => 'Une location porte déjà ce nom dans cette boutique.'], 422);
         }
@@ -480,6 +481,10 @@ class EcommerceController extends Controller
             'name' => trim($input['name']),
             'description' => trim((string) ($input['description'] ?? '')),
             'category' => trim((string) ($input['category'] ?? 'Général')) ?: 'Général',
+            'category_id' => $input['categoryId'] ?? null,
+            'image_url' => '',
+            'image_data' => null,
+            'image_mime' => null,
             'price' => (int) $input['price'],
             'billing_unit' => $input['billingUnit'],
             'availability' => (int) $input['availability'],
@@ -505,6 +510,7 @@ class EcommerceController extends Controller
         }
 
         $input = $this->rentalInput($request, true);
+        $input = $this->normalizeRentalCategory($input, $company);
         if (array_key_exists('name', $input) && DB::table('ecommerce_rentals')
             ->where('company_id', $company)
             ->where('id', '!=', $id)
@@ -519,6 +525,7 @@ class EcommerceController extends Controller
                 $changes[$field] = trim((string) $input[$field]);
             }
         }
+        if (array_key_exists('categoryId', $input)) $changes['category_id'] = $input['categoryId'];
         if (array_key_exists('price', $input)) $changes['price'] = (int) $input['price'];
         if (array_key_exists('billingUnit', $input)) $changes['billing_unit'] = $input['billingUnit'];
         if (array_key_exists('availability', $input)) $changes['availability'] = (int) $input['availability'];
@@ -527,6 +534,76 @@ class EcommerceController extends Controller
         DB::table('ecommerce_rentals')->where('id', $id)->update($changes);
 
         return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
+    public function uploadRentalImage(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'location') && ! $this->allowed($request, 'create', 'location')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $rental = DB::table('ecommerce_rentals')
+            ->where('id', $id)
+            ->where('company_id', $company)
+            ->first();
+        if (! $rental) {
+            return response()->json(['error' => 'Location introuvable.'], 404);
+        }
+
+        $input = Validator::make($request->all(), [
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ])->validate();
+        $path = $input['image']->store('ecommerce/rentals/'.$company, 'public');
+        if (! is_string($path) || $path === '') {
+            return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
+        }
+        $contents = file_get_contents($input['image']->getRealPath());
+        if ($contents === false) {
+            return response()->json(['error' => 'La photo n’a pas pu être lue après son envoi.'], 500);
+        }
+
+        $imageUrl = '/api/rental-images/'.rawurlencode($company).'/'.rawurlencode(basename($path));
+        DB::table('ecommerce_rentals')->where('id', $id)->update([
+            'image_url' => $imageUrl,
+            'image_data' => base64_encode($contents),
+            'image_mime' => $input['image']->getMimeType() ?: 'application/octet-stream',
+            'updated_at' => now(),
+        ]);
+        $this->deleteStoredImage($rental->image_url ?? '', $imageUrl);
+
+        return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
+    public function serveRentalImage(string $company, string $filename)
+    {
+        if (! preg_match('/^[A-Za-z0-9_-]+$/', $company) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
+            abort(404);
+        }
+
+        $imageUrl = '/api/rental-images/'.$company.'/'.$filename;
+        $rental = DB::table('ecommerce_rentals')
+            ->where('company_id', $company)
+            ->where('image_url', $imageUrl)
+            ->first(['image_data', 'image_mime']);
+        if ($rental && is_string($rental->image_data) && $rental->image_data !== '') {
+            $contents = base64_decode($rental->image_data, true);
+            if ($contents !== false) {
+                return response($contents, 200, [
+                    'Content-Type' => $rental->image_mime ?: 'application/octet-stream',
+                    'Cache-Control' => 'public, max-age=31536000, immutable',
+                ]);
+            }
+        }
+
+        $path = 'ecommerce/rentals/'.$company.'/'.$filename;
+        if (! Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk('public')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
     }
 
     public function setRentalAvailability(Request $request, string $id): JsonResponse
@@ -834,6 +911,8 @@ class EcommerceController extends Controller
             'name' => $row->name,
             'description' => $row->description,
             'category' => $row->category,
+            'categoryId' => $row->category_id ?? null,
+            'imageUrl' => $row->image_url ?? '',
             'price' => (int) $row->price,
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
@@ -851,6 +930,8 @@ class EcommerceController extends Controller
             'name' => $row->name,
             'description' => $row->description,
             'category' => $row->category,
+            'categoryId' => $row->category_id ?? null,
+            'imageUrl' => $row->image_url ?? '',
             'price' => (int) $row->price,
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
@@ -869,11 +950,38 @@ class EcommerceController extends Controller
             'name' => array_merge($required, ['string', 'min:2', 'max:160']),
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['nullable', 'string', 'max:80'],
+            'categoryId' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'imageUrl' => ['sometimes', 'nullable', 'string', 'max:500'],
             'price' => array_merge($required, ['integer', 'min:0']),
             'billingUnit' => array_merge($required, ['in:'.implode(',', self::RENTAL_PERIODS)]),
             'availability' => array_merge($required, ['integer', 'min:0', 'max:1000000']),
             'status' => ['sometimes', 'in:'.implode(',', self::RENTAL_STATUSES)],
         ])->validate();
+    }
+
+    private function normalizeRentalCategory(array $input, string $company): array
+    {
+        if (! array_key_exists('categoryId', $input)) {
+            return $input;
+        }
+
+        $categoryId = $input['categoryId'];
+        if ($categoryId === null || $categoryId === '') {
+            $input['categoryId'] = null;
+            return $input;
+        }
+
+        $category = DB::table('ecommerce_categories')
+            ->where('id', $categoryId)
+            ->where('company_id', $company)
+            ->where('is_active', true)
+            ->first();
+        if (! $category) {
+            abort(response()->json(['error' => 'La catégorie sélectionnée est introuvable ou inactive.'], 422));
+        }
+
+        $input['category'] = $category->name;
+        return $input;
     }
 
     public function createPublicOrder(Request $request, string $slug): JsonResponse
@@ -1093,6 +1201,12 @@ class EcommerceController extends Controller
             $parts = explode('/', trim($imageUrl, '/'));
             if (count($parts) === 4) {
                 $path = 'ecommerce/products/'.$parts[2].'/'.$parts[3];
+            }
+        }
+        if (str_starts_with($imageUrl, '/api/rental-images/')) {
+            $parts = explode('/', trim($imageUrl, '/'));
+            if (count($parts) === 4) {
+                $path = 'ecommerce/rentals/'.$parts[2].'/'.$parts[3];
             }
         }
         if ($path) {
