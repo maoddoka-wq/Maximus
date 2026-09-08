@@ -438,6 +438,52 @@ class EcommerceTest extends TestCase
         $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
     }
 
+    public function test_public_shop_exposes_all_published_sale_products_with_stock(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique multi-produits',
+            'slug' => 'boutique-multi-produits',
+            'description' => 'Plusieurs références publiées',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit public un',
+            'slug' => 'produit-public-un',
+            'sku' => 'PUBLIC-01',
+            'price' => 1200,
+            'stock' => 4,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit public deux',
+            'slug' => 'produit-public-deux',
+            'sku' => 'PUBLIC-02',
+            'price' => 2400,
+            'stock' => 7,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit brouillon',
+            'slug' => 'produit-brouillon',
+            'sku' => 'PUBLIC-03',
+            'price' => 3600,
+            'stock' => 7,
+            'status' => 'DRAFT',
+        ])->assertCreated();
+
+        $this->getJson('/api/shop/boutique-multi-produits')
+            ->assertOk()
+            ->assertJsonCount(2, 'products')
+            ->assertJsonFragment(['slug' => 'produit-public-un'])
+            ->assertJsonFragment(['slug' => 'produit-public-deux'])
+            ->assertJsonMissing(['slug' => 'produit-brouillon']);
+    }
+
     public function test_company_admin_can_upload_a_rental_image_and_keep_its_category(): void
     {
         Storage::fake('public');

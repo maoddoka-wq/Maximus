@@ -684,7 +684,12 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
   const publicUrl = `${window.location.origin}/shop/${encodeURIComponent(slugify(form.slug || form.name) || 'boutique')}`;
   const save = (event: FormEvent) => {
     event.preventDefault();
-    void run(() => createEcommerceApi(store.companyId).updateStore(form), 'Paramètres de la boutique enregistrés.');
+    const selectedLogo = logoFile;
+    const api = createEcommerceApi(store.companyId);
+    void run(async () => {
+      await api.updateStore(form);
+      if (selectedLogo) await api.uploadStoreLogo(selectedLogo);
+    }, selectedLogo ? 'Paramètres et logo de la boutique enregistrés.' : 'Paramètres de la boutique enregistrés.');
   };
   const copyPublicUrl = async () => {
     try {
