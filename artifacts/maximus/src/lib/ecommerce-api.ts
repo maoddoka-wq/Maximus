@@ -2,6 +2,7 @@ export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceProductType = 'SALE' | 'RENTAL';
 export type EcommerceRentalPeriod = 'JOUR' | 'SEMAINE' | 'MOIS';
+export type EcommerceRentalStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
 export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COURS' | 'LIVREE' | 'ANNULEE';
 export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
@@ -68,6 +69,21 @@ export interface EcommerceCategory {
   sortOrder: number;
 }
 
+export interface EcommerceRental {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  billingUnit: EcommerceRentalPeriod;
+  availability: number;
+  isAvailable: boolean;
+  status: EcommerceRentalStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EcommerceOrderItem {
   id: string;
   productId: string | null;
@@ -119,6 +135,7 @@ export interface EcommerceBootstrap {
   domains: EcommerceDomain[];
   categories: EcommerceCategory[];
   products: EcommerceProduct[];
+  rentals: EcommerceRental[];
   orders: EcommerceOrder[];
   deliveryRequests: EcommerceDeliveryRequest[];
 }
@@ -173,6 +190,7 @@ export interface SellerWalletBootstrap {
 export interface PublicShopBootstrap {
   store: Omit<EcommerceStore, 'id' | 'companyId'> & { enabledFeatures: PublicShopFeatures };
   products: Array<Omit<EcommerceProduct, 'id' | 'companyId' | 'sku' | 'status'>>;
+  rentals: Array<Omit<EcommerceRental, 'id' | 'companyId' | 'status'>>;
 }
 
 export type PublicDomainBootstrap = PublicShopBootstrap | { available: false };
@@ -294,6 +312,13 @@ export const createEcommerceApi = (companyId: string) => {
       return body as EcommerceProduct;
     },
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
+     createRental: (body: { name: string; description?: string; category?: string; price: number; billingUnit: EcommerceRentalPeriod; availability: number; status?: EcommerceRentalStatus }) =>
+       request<EcommerceRental>(withCompany('/ecommerce/rentals'), json(body)),
+     updateRental: (id: string, body: Partial<Omit<EcommerceRental, 'id' | 'companyId' | 'createdAt' | 'updatedAt' | 'isAvailable'>>) =>
+       request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
+     updateRentalAvailability: (id: string, availability: number) =>
+       request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/availability`), { method: 'PATCH', body: JSON.stringify({ availability }) }),
+     archiveRental: (id: string) => request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     updateOrderStatus: (id: string, status: EcommerceOrderStatus) => request<EcommerceOrder>(withCompany(`/ecommerce/orders/${id}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
     deliveryRequests: () => request<{ deliveryRequests: EcommerceDeliveryRequest[] }>(withCompany('/ecommerce/delivery-requests')),
     updateDeliveryRequestStatus: (id: string, status: EcommerceDeliveryRequestStatus) => request<EcommerceDeliveryRequest>(withCompany(`/ecommerce/delivery-requests/${encodeURIComponent(id)}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),

@@ -604,6 +604,112 @@ class EcommerceTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_rentals_are_autonomous_persistent_and_exposed_only_when_published(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique locations',
+            'slug' => 'boutique-locations',
+            'description' => 'Locations autonomes',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Maison catalogue',
+            'sku' => 'SALE-RENTAL-BOUNDARY',
+            'price' => 1000,
+            'stock' => 1,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+        $rental = $request->postJson('/api/ecommerce/rentals?companyId=kora', [
+            'name' => 'Maison autonome',
+            'description' => 'Une offre indépendante.',
+            'category' => 'Habitat',
+            'price' => 25000,
+            'billingUnit' => 'SEMAINE',
+            'availability' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated()
+            ->assertJsonPath('isAvailable', true)
+            ->assertJsonPath('billingUnit', 'SEMAINE')
+            ->json();
+        $draft = $request->postJson('/api/ecommerce/rentals?companyId=kora', [
+            'name' => 'Brouillon privé',
+            'price' => 3000,
+            'billingUnit' => 'JOUR',
+            'availability' => 1,
+            'status' => 'DRAFT',
+        ])->assertCreated()->json();
+
+        $request->patchJson('/api/ecommerce/rentals/'.$rental['id'].'?companyId=kora', [
+            'description' => 'Description modifiée.',
+            'price' => 27000,
+        ])->assertOk()->assertJsonPath('price', 27000);
+        $request->patchJson('/api/ecommerce/rentals/'.$rental['id'].'/availability?companyId=kora', [
+            'availability' => 0,
+        ])->assertOk()->assertJsonPath('isAvailable', false);
+
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $rental['id'], 'name' => 'Maison autonome', 'availability' => 0])
+            ->assertJsonFragment(['id' => $draft['id'], 'status' => 'DRAFT']);
+        $this->assertDatabaseHas('ecommerce_rentals', [
+            'id' => $rental['id'],
+            'company_id' => 'kora',
+            'price' => 27000,
+            'availability' => 0,
+        ]);
+
+        $this->getJson('/api/shop/boutique-locations')
+            ->assertOk()
+            ->assertJsonCount(1, 'rentals')
+            ->assertJsonPath('rentals.0.name', 'Maison autonome')
+            ->assertJsonPath('rentals.0.availability', 0)
+            ->assertJsonMissingPath('rentals.0.id')
+            ->assertJsonMissingPath('rentals.0.companyId');
+    }
+
+    public function test_rentals_are_isolated_by_company_and_archiving_hides_them_publicly(): void
+    {
+        $request = $this->asActor();
+        $rental = $request->postJson('/api/ecommerce/rentals?companyId=kora', [
+            'name' => 'Location KORA',
+            'price' => 5000,
+            'billingUnit' => 'JOUR',
+            'availability' => 4,
+            'status' => 'PUBLISHED',
+        ])->assertCreated()->json();
+
+        DB::table('ecommerce_rentals')->insert([
+            'id' => 'rental-other-company',
+            'company_id' => 'other-company',
+            'name' => 'Location autre entreprise',
+            'description' => '',
+            'category' => 'Général',
+            'price' => 9000,
+            'billing_unit' => 'JOUR',
+            'availability' => 3,
+            'status' => 'PUBLISHED',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->patchJson('/api/ecommerce/rentals/rental-other-company?companyId=kora', ['price' => 1])
+            ->assertNotFound();
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $rental['id'], 'name' => 'Location KORA'])
+            ->assertJsonMissing(['id' => 'rental-other-company']);
+
+        $request->deleteJson('/api/ecommerce/rentals/'.$rental['id'].'?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('status', 'ARCHIVED');
+        $this->assertDatabaseHas('ecommerce_rentals', ['id' => $rental['id'], 'status' => 'ARCHIVED']);
+    }
+
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([

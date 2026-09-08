@@ -26,6 +26,10 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
+         Route::post('/rentals', [EcommerceController::class, 'createRental']);
+         Route::patch('/rentals/{id}', [EcommerceController::class, 'updateRental']);
+         Route::patch('/rentals/{id}/availability', [EcommerceController::class, 'setRentalAvailability']);
+         Route::delete('/rentals/{id}', [EcommerceController::class, 'archiveRental']);
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
         Route::get('/delivery-requests', [EcommerceController::class, 'deliveryRequests']);
         Route::patch('/delivery-requests/{id}/status', [EcommerceController::class, 'updateDeliveryRequestStatus']);

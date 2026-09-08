@@ -38,7 +38,9 @@ import {
   type EcommerceOrderStatus,
   type EcommerceProduct,
   type EcommerceProductType,
+  type EcommerceRental,
   type EcommerceRentalPeriod,
+  type EcommerceRentalStatus,
   type EcommerceStore,
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
@@ -94,6 +96,26 @@ type ProductForm = {
   imageFile: File | null;
   featured: boolean;
   status: EcommerceProduct['status'];
+};
+
+type RentalForm = {
+  name: string;
+  description: string;
+  category: string;
+  price: string;
+  billingUnit: EcommerceRentalPeriod;
+  availability: string;
+  status: EcommerceRentalStatus;
+};
+
+const blankRental: RentalForm = {
+  name: '',
+  description: '',
+  category: 'Général',
+  price: '',
+  billingUnit: 'JOUR',
+  availability: '0',
+  status: 'PUBLISHED',
 };
 
 const blankProduct: ProductForm = {
@@ -227,7 +249,7 @@ export default function EcommerceModulePage({
       {tab === 'commandes' && <Orders data={data} canModify={canModify} run={run} />}
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
-      {tab === 'location' && <RentalPanel data={data} onTab={navigate} />}
+       {tab === 'location' && <RentalPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
       {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} />}
       {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
@@ -279,35 +301,57 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
   </div>;
 }
 
-function RentalPanel({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: EcommerceTab) => void }) {
-  const rentalKeywords = ['location', 'maison', 'bâche', 'vehicule', 'véhicule', 'voiture', 'auto', 'utilitaire'];
-  const products = data.products.filter(product =>
-    product.status !== 'ARCHIVED'
-    && rentalKeywords.some(keyword => `${product.category} ${product.name}`.toLocaleLowerCase('fr-FR').includes(keyword)),
-  );
+function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const { confirm, alert } = useAppDialog();
+  const [editing, setEditing] = useState<EcommerceRental | 'new' | null>(null);
+  const [form, setForm] = useState<RentalForm>(blankRental);
+  const rentals = data.rentals;
+  const activeRentals = rentals.filter(rental => rental.status !== 'ARCHIVED');
+  const open = (rental?: EcommerceRental) => {
+    setEditing(rental ?? 'new');
+    setForm(rental ? { name: rental.name, description: rental.description, category: rental.category, price: String(rental.price), billingUnit: rental.billingUnit, availability: String(rental.availability), status: rental.status } : blankRental);
+  };
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    const price = Number(form.price);
+    const availability = Number(form.availability);
+    if (!form.name.trim() || !Number.isInteger(price) || price < 0 || !Number.isInteger(availability) || availability < 0) {
+      await alert({ title: 'Informations incomplètes', description: 'Renseignez un nom, un tarif et une disponibilité valides.', confirmLabel: 'Compris' });
+      return;
+    }
+    const body = { name: form.name.trim(), description: form.description.trim(), category: form.category.trim() || 'Général', price, billingUnit: form.billingUnit, availability, status: form.status };
+    const result = editing === 'new'
+      ? await run(() => createEcommerceApi(data.store.companyId).createRental(body), 'Location ajoutée.')
+      : editing ? await run(() => createEcommerceApi(data.store.companyId).updateRental(editing.id, body), 'Location mise à jour.') : undefined;
+    if (result) setEditing(null);
+  };
+  const archive = async (rental: EcommerceRental) => {
+    if (!await confirm({ title: 'Archiver cette location ?', description: `« ${rental.name} » ne sera plus affichée dans la vitrine.`, confirmLabel: 'Archiver', tone: 'danger' })) return;
+    await run(() => createEcommerceApi(data.store.companyId).archiveRental(rental.id), 'Location archivée.');
+  };
+  const setAvailability = async (rental: EcommerceRental, value: string) => {
+    const availability = Number(value);
+    if (Number.isInteger(availability) && availability >= 0) await run(() => createEcommerceApi(data.store.companyId).updateRentalAvailability(rental.id, availability), 'Disponibilité mise à jour.');
+  };
 
   return <div className="space-y-5 fade-up">
     <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--card))_55%)] p-5 sm:p-7">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Location & réservation</span>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-.04em]">Transformez votre catalogue en offres à réserver.</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Les produits classés Maison, Bâche, Voiture ou Location apparaissent automatiquement dans l’espace Location de votre boutique.</p>
-        </div>
-        <button type="button" onClick={() => onTab('catalogue')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Package size={15} />Gérer le catalogue</button>
+        <div><span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Location & réservation</span><h2 className="mt-2 text-2xl font-bold tracking-[-.04em]">Gérez vos offres indépendamment du catalogue.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Chaque location possède ses propres tarifs, disponibilités et statuts. Elle ne crée ni ne modifie aucun produit vendu.</p></div>
+        {canCreate && <button type="button" onClick={() => open()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter une location</button>}
       </div>
     </section>
-    <div className="grid gap-4 sm:grid-cols-3">
-      <Metric label="Offres détectées" value={String(products.length)} detail="Catégories de location" icon={House} accent />
-      <Metric label="Disponibles" value={String(products.filter(product => product.stock > 0).length)} detail="Stock ou disponibilités" icon={CheckCircle2} />
-      <Metric label="À mettre en avant" value={String(products.filter(product => product.featured).length)} detail="Produits vedettes" icon={Megaphone} />
-    </div>
-    <Panel title="Offres de location" description="La vitrine publique réutilise les fiches de votre catalogue.">
-      {products.length === 0
-        ? <Empty icon={House} title="Aucune offre de location détectée" text="Créez une catégorie ou un produit contenant Maison, Bâche, Voiture ou Location pour l’afficher ici." action={<button type="button" onClick={() => onTab('catalogue')} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter une offre</button>} />
-        : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{products.map(product => <div key={product.id} className="flex items-center gap-3 rounded-xl border p-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-full w-full object-cover" /> : <House size={19} />}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{product.category} · {money(product.price, data.store.currency)}</p></div><StatusPill value={product.stock > 0 ? 'Disponible' : 'Rupture'} /></div>)}</div>}
+    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Offres actives" value={String(activeRentals.length)} detail="Brouillons et publiées" icon={House} accent /><Metric label="Disponibles" value={String(activeRentals.filter(rental => rental.isAvailable).length)} detail="Avec une capacité positive" icon={CheckCircle2} /><Metric label="Visibles en ligne" value={String(activeRentals.filter(rental => rental.status === 'PUBLISHED').length)} detail="Statut publié" icon={Megaphone} /></div>
+    <Panel title="Offres de location" description="Les fiches restent indépendantes du catalogue produit et se conservent après actualisation.">
+      {activeRentals.length === 0 ? <Empty icon={House} title="Aucune location" text="Créez votre première offre autonome pour l’afficher dans la rubrique Location." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter une location</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Location</th><th className="px-4">Tarif</th><th className="px-4">Disponibilité</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{activeRentals.map(rental => <tr key={rental.id}><td className="px-4 py-3"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><House size={17} /></span><span className="min-w-0"><strong className="block truncate">{rental.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{rental.category} · par {rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}</small></span></div></td><td className="px-4 py-3 font-bold">{money(rental.price, data.store.currency)}</td><td className="px-4 py-3"><input aria-label={`Disponibilité de ${rental.name}`} type="number" min="0" value={rental.availability} disabled={!canModify} onChange={event => void setAvailability(rental, event.target.value)} className="w-24 rounded-lg border bg-transparent px-2.5 py-2 text-sm font-bold disabled:opacity-50" /></td><td className="px-4 py-3"><StatusPill value={rental.status === 'PUBLISHED' && rental.isAvailable ? 'Disponible' : rental.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && <button type="button" onClick={() => open(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModify && <button type="button" onClick={() => void archive(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
+    {editing && <RentalModal editing={editing} form={form} setForm={setForm} onClose={() => setEditing(null)} onSave={save} />}
   </div>;
+}
+
+function RentalModal({ editing, form, setForm, onClose, onSave }: { editing: EcommerceRental | 'new'; form: RentalForm; setForm: (value: RentalForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
+  const patch = (updates: Partial<RentalForm>) => setForm({ ...form, ...updates });
+  return <Modal title={editing === 'new' ? 'Ajouter une location' : `Modifier ${editing.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la location" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Maison familiale" /><Field label="Catégorie" value={form.category} onChange={value => patch({ category: value })} placeholder="Ex. Habitat" /><Field label="Tarif" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><label className="block text-xs font-bold">Unité de facturation<select value={form.billingUnit} onChange={event => patch({ billingUnit: event.target.value as EcommerceRentalPeriod })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="JOUR">Par jour</option><option value="SEMAINE">Par semaine</option><option value="MOIS">Par mois</option></select></label><Field label="Disponibilité" required type="number" value={form.availability} onChange={value => patch({ availability: value })} placeholder="0" /><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as EcommerceRentalStatus })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} placeholder="Décrivez ce qui est loué et les conditions utiles." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
 }
 
 function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBootstrap; currency: EcommerceStore['currency']; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {

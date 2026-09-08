@@ -20,6 +20,7 @@ class EcommerceController extends Controller
     private const ORDER_STATUSES = ['NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'EXPÉDIÉE', 'LIVRÉE', 'ANNULÉE'];
     private const PRODUCT_TYPES = ['SALE', 'RENTAL'];
     private const RENTAL_PERIODS = ['JOUR', 'SEMAINE', 'MOIS'];
+    private const RENTAL_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
     private const DELIVERY_REQUEST_STATUSES = ['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'];
     private const ORDER_TRANSITIONS = [
         'NOUVELLE' => ['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'],
@@ -51,6 +52,7 @@ class EcommerceController extends Controller
                 ->get()
                 ->map(fn ($row) => $this->product($row))
                 ->values(),
+            'rentals' => $this->listRentals($company, true),
             'orders' => $this->orders($company),
             'deliveryRequests' => $this->listDeliveryRequests($company),
         ]);
@@ -460,6 +462,112 @@ class EcommerceController extends Controller
         return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
     }
 
+    public function createRental(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'create', 'location')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->rentalInput($request);
+        $company = $this->company($request);
+        if (DB::table('ecommerce_rentals')->where('company_id', $company)->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($input['name']))])->exists()) {
+            return response()->json(['error' => 'Une location porte déjà ce nom dans cette boutique.'], 422);
+        }
+
+        $row = [
+            'id' => $this->id('rental'),
+            'company_id' => $company,
+            'name' => trim($input['name']),
+            'description' => trim((string) ($input['description'] ?? '')),
+            'category' => trim((string) ($input['category'] ?? 'Général')) ?: 'Général',
+            'price' => (int) $input['price'],
+            'billing_unit' => $input['billingUnit'],
+            'availability' => (int) $input['availability'],
+            'status' => $input['status'] ?? 'DRAFT',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('ecommerce_rentals')->insert($row);
+
+        return response()->json($this->rental((object) $row), 201);
+    }
+
+    public function updateRental(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'location')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $existing = DB::table('ecommerce_rentals')->where('id', $id)->where('company_id', $company)->first();
+        if (! $existing) {
+            return response()->json(['error' => 'Location introuvable.'], 404);
+        }
+
+        $input = $this->rentalInput($request, true);
+        if (array_key_exists('name', $input) && DB::table('ecommerce_rentals')
+            ->where('company_id', $company)
+            ->where('id', '!=', $id)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($input['name']))])
+            ->exists()) {
+            return response()->json(['error' => 'Une location porte déjà ce nom dans cette boutique.'], 422);
+        }
+
+        $changes = [];
+        foreach (['name', 'description', 'category'] as $field) {
+            if (array_key_exists($field, $input)) {
+                $changes[$field] = trim((string) $input[$field]);
+            }
+        }
+        if (array_key_exists('price', $input)) $changes['price'] = (int) $input['price'];
+        if (array_key_exists('billingUnit', $input)) $changes['billing_unit'] = $input['billingUnit'];
+        if (array_key_exists('availability', $input)) $changes['availability'] = (int) $input['availability'];
+        if (array_key_exists('status', $input)) $changes['status'] = $input['status'];
+        $changes['updated_at'] = now();
+        DB::table('ecommerce_rentals')->where('id', $id)->update($changes);
+
+        return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
+    public function setRentalAvailability(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'location')) {
+            return $this->forbidden();
+        }
+
+        $input = Validator::make($request->all(), [
+            'availability' => ['required', 'integer', 'min:0', 'max:1000000'],
+        ])->validate();
+        $company = $this->company($request);
+        $updated = DB::table('ecommerce_rentals')
+            ->where('id', $id)
+            ->where('company_id', $company)
+            ->update(['availability' => (int) $input['availability'], 'updated_at' => now()]);
+        if (! $updated) {
+            return response()->json(['error' => 'Location introuvable.'], 404);
+        }
+
+        return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
+    public function archiveRental(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'delete', 'location')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $updated = DB::table('ecommerce_rentals')
+            ->where('id', $id)
+            ->where('company_id', $company)
+            ->update(['status' => 'ARCHIVED', 'updated_at' => now()]);
+        if (! $updated) {
+            return response()->json(['error' => 'Location introuvable.'], 404);
+        }
+
+        return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
     public function updateOrderStatus(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'commandes')) {
@@ -651,6 +759,7 @@ class EcommerceController extends Controller
                 ->get()
                 ->map(fn ($row) => $this->publicProduct($row))
                 ->values(),
+            'rentals' => $this->listRentals((string) $store->company_id),
         ])->getData(true);
     }
 
@@ -702,6 +811,69 @@ class EcommerceController extends Controller
             'productType' => $row->product_type ?? 'SALE',
             'rentalPeriod' => $row->rental_period,
         ];
+    }
+
+    private function listRentals(string $company, bool $includeDrafts = false): array
+    {
+        $query = DB::table('ecommerce_rentals')->where('company_id', $company);
+        if ($includeDrafts) {
+            $query->where('status', '!=', 'ARCHIVED');
+        } else {
+            $query->where('status', 'PUBLISHED');
+        }
+
+        return $query->orderByDesc('availability')->orderBy('name')->get()
+            ->map(fn ($row) => $includeDrafts ? $this->rental($row) : $this->publicRental($row))
+            ->values()
+            ->all();
+    }
+
+    private function publicRental(object $row): array
+    {
+        return [
+            'name' => $row->name,
+            'description' => $row->description,
+            'category' => $row->category,
+            'price' => (int) $row->price,
+            'billingUnit' => $row->billing_unit,
+            'availability' => (int) $row->availability,
+            'isAvailable' => (int) $row->availability > 0,
+            'createdAt' => $row->created_at,
+            'updatedAt' => $row->updated_at,
+        ];
+    }
+
+    private function rental(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'companyId' => $row->company_id,
+            'name' => $row->name,
+            'description' => $row->description,
+            'category' => $row->category,
+            'price' => (int) $row->price,
+            'billingUnit' => $row->billing_unit,
+            'availability' => (int) $row->availability,
+            'isAvailable' => (int) $row->availability > 0,
+            'status' => $row->status,
+            'createdAt' => $row->created_at,
+            'updatedAt' => $row->updated_at,
+        ];
+    }
+
+    private function rentalInput(Request $request, bool $partial = false): array
+    {
+        $required = $partial ? ['sometimes'] : ['required'];
+
+        return Validator::make($request->all(), [
+            'name' => array_merge($required, ['string', 'min:2', 'max:160']),
+            'description' => ['nullable', 'string', 'max:2000'],
+            'category' => ['nullable', 'string', 'max:80'],
+            'price' => array_merge($required, ['integer', 'min:0']),
+            'billingUnit' => array_merge($required, ['in:'.implode(',', self::RENTAL_PERIODS)]),
+            'availability' => array_merge($required, ['integer', 'min:0', 'max:1000000']),
+            'status' => ['sometimes', 'in:'.implode(',', self::RENTAL_STATUSES)],
+        ])->validate();
     }
 
     public function createPublicOrder(Request $request, string $slug): JsonResponse
