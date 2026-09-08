@@ -17,7 +17,7 @@ export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userA
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
-export function mountClientManifest(storeName: string) {
+export function mountClientManifest(storeName: string, storeLogoUrl?: string) {
   const manifest = {
     name: storeName,
     short_name: storeName.trim().slice(0, 12) || 'Boutique',
@@ -31,7 +31,7 @@ export function mountClientManifest(storeName: string) {
     lang: 'fr',
     icons: [
       {
-        src: '/admin-logo.png',
+        src: storeLogoUrl?.trim() || '/admin-logo.png',
         sizes: '1024x1024',
         type: 'image/png',
         purpose: 'any maskable',

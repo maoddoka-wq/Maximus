@@ -164,8 +164,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 
   useEffect(() => {
     if (!data?.store.name.trim()) return undefined;
-    return mountClientManifest(data.store.name);
-  }, [data?.store.name]);
+    return mountClientManifest(data.store.name, data.store.logoUrl);
+  }, [data?.store.logoUrl, data?.store.name]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
