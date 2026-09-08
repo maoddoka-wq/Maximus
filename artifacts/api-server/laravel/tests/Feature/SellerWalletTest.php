@@ -267,6 +267,33 @@ class SellerWalletTest extends TestCase
         Http::assertSent(fn ($request): bool => $request->url() === 'https://api.diamanopay.com/api/charges');
     }
 
+    public function test_public_payment_sends_the_configured_provider(): void
+    {
+        $this->createStore('kora', 'kora-charge');
+        $this->createOrder('order-charge-provider', 'kora', 2500, '');
+        config([
+            'services.diamanopay.access_token' => 'static-test-token',
+            'services.diamanopay.provider' => 'WAVE',
+            'services.diamanopay.webhook_secret' => 'test-webhook-secret',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'id' => 'charge-provider',
+                'checkout_url' => 'https://checkout.example.test/provider',
+            ], 200),
+        ]);
+
+        $this->postJson('/api/shop/kora-charge/orders/order-charge-provider/payment', [
+            'successUrl' => 'https://maximus-erp.onrender.com/boutique/kora-charge/paiement/success',
+            'errorUrl' => 'https://maximus-erp.onrender.com/boutique/kora-charge/paiement/error',
+        ])->assertCreated();
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'https://api.diamanopay.com/api/charges'
+                && $request['provider'] === 'WAVE';
+        });
+    }
+
     private function configureDiamano(): void
     {
         config([
