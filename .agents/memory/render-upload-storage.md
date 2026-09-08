@@ -9,8 +9,8 @@ Les fichiers utilisateurs destinés à rester visibles publiquement doivent êtr
 
 **How to apply:** Pour toute nouvelle image produit ou autre ressource publique, prévoir une copie durable et garder le disque local seulement comme compatibilité ou cache.
 
-Le logo d’entreprise est une exception déjà traitée par le stockage PostgreSQL : les octets et le type MIME sont conservés en base, tandis que l’URL publique reste stable. La boutique utilise ce logo comme repli lorsqu’aucun logo spécifique de boutique n’est configuré.
+Les logos d’entreprise et de boutique sont traités comme deux ressources indépendantes dans PostgreSQL : les octets et le type MIME sont conservés en base, tandis que chaque URL publique reste stable. Une boutique ne doit jamais utiliser automatiquement le logo de son entreprise.
 
-**Why:** Le profil entreprise et la vitrine doivent afficher la même identité visuelle après redémarrage, changement d’instance ou changement de machine.
+**Why:** Le profil entreprise et la vitrine peuvent avoir des identités visuelles différentes, et les fichiers doivent rester disponibles après redémarrage, changement d’instance ou changement de machine.
 
-**How to apply:** Pour les logos d’entreprise, servir d’abord la copie en base et ne garder le disque local que pour lire les anciennes images déjà enregistrées.
+**How to apply:** Pour chaque logo, servir d’abord la copie en base et ne garder le disque local que pour lire les anciennes images déjà enregistrées; ne jamais réintroduire un fallback entre entreprise et boutique.

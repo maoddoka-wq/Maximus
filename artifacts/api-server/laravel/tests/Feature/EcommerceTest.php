@@ -396,6 +396,48 @@ class EcommerceTest extends TestCase
         ]);
     }
 
+    public function test_company_admin_can_upload_a_store_logo_without_using_the_company_logo(): void
+    {
+        Storage::fake('public');
+        DB::table('companies')->where('id', 'kora')->update(['profile_photo' => '/api/company-images/kora/entreprise.jpg']);
+        $request = $this->asActor();
+
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('store.logoUrl', '');
+
+        $response = $request->post('/api/ecommerce/store/logo?companyId=kora', [
+            'image' => UploadedFile::fake()->image('logo-boutique.png'),
+        ])->assertOk();
+
+        $logoUrl = $response->json('logoUrl');
+        $this->assertStringStartsWith('/api/store-logos/kora/', $logoUrl);
+        $this->assertDatabaseHas('ecommerce_stores', [
+            'id' => 'ecommerce-store-kora',
+            'logo_url' => $logoUrl,
+        ]);
+
+        $logoPath = 'ecommerce/stores/kora/'.basename($logoUrl);
+        Storage::disk('public')->assertExists($logoPath);
+        $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
+
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique Kora',
+            'slug' => 'kora-boutique',
+            'description' => 'Boutique publique',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $this->getJson('/api/shop/kora-boutique')
+            ->assertOk()
+            ->assertJsonPath('store.logoUrl', $logoUrl);
+
+        Storage::disk('public')->delete($logoPath);
+        $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
+    }
+
     public function test_company_admin_can_upload_a_rental_image_and_keep_its_category(): void
     {
         Storage::fake('public');

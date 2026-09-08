@@ -17,6 +17,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);
         Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
+        Route::post('/store/logo', [EcommerceController::class, 'uploadStoreLogo']);
         Route::post('/categories', [EcommerceController::class, 'createCategory']);
         Route::patch('/categories/{id}', [EcommerceController::class, 'updateCategory']);
         Route::delete('/categories/{id}', [EcommerceController::class, 'deleteCategory']);
@@ -42,6 +43,8 @@ Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDom
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
+    ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, 'serveRentalImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);

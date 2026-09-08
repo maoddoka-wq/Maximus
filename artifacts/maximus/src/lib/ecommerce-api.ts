@@ -317,6 +317,18 @@ export const createEcommerceApi = (companyId: string) => {
     requestWithdrawal: (body: { amount: number; provider?: 'WAVE'; mobile?: string; beneficiaryName?: string; idempotencyKey?: string }) =>
       request<{ withdrawal: SellerWithdrawal }>(withCompany('/ecommerce/wallet/withdrawals'), { method: 'POST', body: JSON.stringify(body), headers: { 'Idempotency-Key': body.idempotencyKey ?? crypto.randomUUID() } }),
     updateStore: (body: Partial<Omit<EcommerceStore, 'id' | 'companyId'>>) => request<EcommerceStore>(withCompany('/ecommerce/store'), { method: 'PATCH', body: JSON.stringify(body) }),
+    uploadStoreLogo: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await fetch(`/api${withCompany('/ecommerce/store/logo')}`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? 'Le logo de la boutique n’a pas pu être envoyé.');
+      return body as EcommerceStore;
+    },
     createCategory: (body: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) => request<EcommerceCategory>(withCompany('/ecommerce/categories'), json(body)),
     updateCategory: (id: string, body: Partial<Omit<EcommerceCategory, 'id' | 'companyId'>>) => request<EcommerceCategory>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
     deleteCategory: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'DELETE' }),
