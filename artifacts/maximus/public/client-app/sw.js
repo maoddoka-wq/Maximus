@@ -1,16 +1,17 @@
-const CACHE_NAME = 'maximus-client-shell-v1';
+const CACHE_NAME = 'maximus-client-shell-v2';
 
-const shellPath = () => new URL('index.html', self.registration.scope).pathname;
+const scopeUrl = () => new URL(self.registration.scope);
+const shellPath = () => new URL('index.html', scopeUrl()).pathname;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll([
         shellPath(),
-        new URL('manifest.webmanifest', self.registration.scope).pathname,
-        new URL('favicon.svg', self.registration.scope).pathname,
-        new URL('maximus-mark.svg', self.registration.scope).pathname,
-        new URL('admin-logo.png', self.registration.scope).pathname,
+        new URL('../manifest.webmanifest', scopeUrl()).pathname,
+        new URL('../favicon.svg', scopeUrl()).pathname,
+        new URL('../maximus-mark.svg', scopeUrl()).pathname,
+        new URL('../admin-logo.png', scopeUrl()).pathname,
       ]))
       .then(() => self.skipWaiting()),
   );

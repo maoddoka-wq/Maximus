@@ -80,7 +80,7 @@ const restoreGuestCart = (
 const addressText = (address: EcommerceCustomerAddress) =>
   [address.line1, address.line2, address.postalCode, address.city, address.region, address.country].filter(Boolean).join(', ');
 
-export default function PublicShopPage({ slug, domain = false }: { slug?: string; domain?: boolean }) {
+export default function PublicShopPage({ slug, domain = false, clientApp = false }: { slug?: string; domain?: boolean; clientApp?: boolean }) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const routePath = location.split('?')[0];
@@ -163,11 +163,22 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   }, [domain, slug]);
 
   useEffect(() => {
+    const manifest = document.createElement('link');
+    manifest.rel = 'manifest';
+    manifest.href = `${import.meta.env.BASE_URL}manifest.webmanifest`;
+    manifest.dataset.maximusClientManifest = 'true';
+    document.head.appendChild(manifest);
+    return () => manifest.remove();
+  }, []);
+
+  useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
     if (routePath.endsWith('/connexion')) setAuthMode('login');
   }, [routePath]);
 
-  const shopPath = (suffix = '') => slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
+  const shopPath = (suffix = '') => clientApp
+    ? `/client-app${suffix}`
+    : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
   const go = (suffix: string) => {
     setMobileMenu(false);
     setLocation(shopPath(suffix));

@@ -32,11 +32,18 @@ export function initializePwa() {
   });
 
   if ('serviceWorker' in navigator) {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
-      scope: import.meta.env.BASE_URL,
-    }).catch((error: unknown) => {
-      console.warn('Le service worker MAXIMUS n’a pas pu être enregistré.', error);
-    });
+    const clientScope = `${import.meta.env.BASE_URL}client-app/`;
+    const clientServiceWorker = `${clientScope}sw.js`;
+    void navigator.serviceWorker.getRegistrations()
+      .then((registrations) => Promise.all(
+        registrations
+          .filter((registration) => registration.active?.scriptURL.endsWith('/sw.js') && registration.scope.endsWith('/'))
+          .map((registration) => registration.unregister()),
+      ))
+      .then(() => navigator.serviceWorker.register(clientServiceWorker, { scope: clientScope }))
+      .catch((error: unknown) => {
+        console.warn('Le service worker client MAXIMUS n’a pas pu être enregistré.', error);
+      });
   }
 }
 
