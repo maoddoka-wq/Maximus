@@ -5975,6 +5975,7 @@ function ModulePackTestWorkbench({
         Object.fromEntries(fullFeatureIds.map((featureId) => [featureId, ['voir', 'créer', 'modifier']])),
       );
   const authorizedFeatures = testFeatureIds.filter((featureId) => configuredPermissions[featureId]?.length);
+  const featureLabelById = new Map(featureOptions.map((feature) => [feature.id, feature.label]));
   const canCreate = authorizedFeatures.some((featureId) => configuredPermissions[featureId]?.includes('créer'));
   const canModify = authorizedFeatures.some((featureId) => configuredPermissions[featureId]?.includes('modifier'));
   const stockPermissions = Object.fromEntries(
@@ -6039,6 +6040,29 @@ function ModulePackTestWorkbench({
         <div className="mt-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] px-4 py-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
           Aperçu administratif isolé : les données de production ne sont pas sollicitées et les actions d’écriture sont désactivées.
         </div>
+        <div className="mt-4 rounded-xl border bg-[hsl(var(--muted)/.18)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold">Périmètre testé</p>
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+                Seules les fonctionnalités autorisées par ce pack sont affichées ci-dessous.
+              </p>
+            </div>
+            <span className="rounded-full border px-2.5 py-1 text-[10px] font-bold">
+              {authorizedFeatures.length} fonctionnalité{authorizedFeatures.length > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {authorizedFeatures.map((featureId) => (
+              <span key={featureId} className="rounded-lg border bg-[hsl(var(--card))] px-2.5 py-1.5 text-[10px] font-semibold">
+                {featureLabelById.get(featureId) ?? featureId}
+                <span className="ml-1.5 text-[hsl(var(--muted-foreground))]">
+                  · {(configuredPermissions[featureId] ?? []).join(' · ')}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="mt-5">
           {module.id === 'stocks' && (
             <StockModulePage
@@ -6063,12 +6087,13 @@ function ModulePackTestWorkbench({
           {module.id === 'rh' && previewCompany && (
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
-           {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={testFeatureIds} preview />}
+            {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
            {module.id === 'ecommerce' && (
              <EcommerceModulePage
                companyId={previewCompanyId || 'module-preview'}
                canCreate={false}
                canModify={false}
+                allowedFeatureIds={authorizedFeatures}
                preview
              />
            )}
