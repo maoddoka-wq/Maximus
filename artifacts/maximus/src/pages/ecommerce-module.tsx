@@ -190,7 +190,6 @@ export default function EcommerceModulePage({
               <button type="button" onClick={() => void load(true)} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))]" title="Actualiser">
                 <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser
               </button>
-              <button type="button" onClick={() => navigate('parametres')} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Settings size={14} />Configurer la boutique</button>
             </div>
           </div>
         </div>
