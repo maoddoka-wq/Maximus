@@ -58,6 +58,26 @@ test('normalise les champs textuels optionnels d’une entreprise avant le formu
   });
 });
 
+test('répare les tableaux de droits absents des anciennes fiches entreprise', () => {
+  const normalized = normalizeStoreData({
+    companies: [{
+      id: 'legacy-company',
+      name: 'Entreprise historique',
+      manager: 'Responsable',
+      email: 'owner@test.local',
+      phone: '',
+      country: 'Sénégal',
+      sector: 'Services',
+      status: 'ACTIF',
+      createdAt: '2026-09-07',
+    } as never],
+  });
+
+  assert.deepEqual(normalized.companies[0]?.requestedModules, []);
+  assert.deepEqual(normalized.companies[0]?.allowedModules, []);
+  assert.deepEqual(normalized.companies[0]?.refusedModules, []);
+});
+
 test('conserve les données valides pendant le nettoyage des credentials', () => {
   const data = emptyStoreData();
   data.companies.push({

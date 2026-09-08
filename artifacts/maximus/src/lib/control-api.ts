@@ -8,6 +8,17 @@ export type ControlBootstrap = {
   auditEntries: AuditEntry[];
 };
 
+function normalizeBootstrap(payload: unknown): ControlBootstrap {
+  const value = payload && typeof payload === 'object'
+    ? payload as Record<string, unknown>
+    : {};
+  return {
+    tasks: Array.isArray(value.tasks) ? value.tasks as ControlTask[] : [],
+    events: Array.isArray(value.events) ? value.events as DomainEvent[] : [],
+    auditEntries: Array.isArray(value.auditEntries) ? value.auditEntries as AuditEntry[] : [],
+  };
+}
+
 type NewTaskInput = Omit<ControlTask, 'status' | 'createdAt' | 'updatedAt'>;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -26,10 +37,10 @@ const json = (body: unknown, method = 'POST'): RequestInit => ({
 });
 
 export const controlApi = {
-  bootstrap: (input: { companyId?: string; scope: ControlScope }) => {
+  bootstrap: async (input: { companyId?: string; scope: ControlScope }) => {
     const query = new URLSearchParams({ scope: input.scope });
     if (input.companyId) query.set('companyId', input.companyId);
-    return request<ControlBootstrap>(`/control/bootstrap?${query.toString()}`);
+    return normalizeBootstrap(await request<unknown>(`/control/bootstrap?${query.toString()}`));
   },
   createTask: (input: NewTaskInput) => request<ControlTask>('/control/tasks', json(input)),
   updateTaskStatus: (task: ControlTask, status: ControlTask['status']) =>

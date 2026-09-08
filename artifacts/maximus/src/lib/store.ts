@@ -264,6 +264,19 @@ const storeArrayKeys = [
   'sectorPresets',
 ] as const;
 
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+function normalizeStringArrayMap(value: unknown): Partial<Record<string, string[]>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).map(([key, items]) => [key, normalizeStringArray(items)]),
+  );
+}
+
 export function normalizeStoreData(input: Partial<StoreData> | null | undefined): StoreData {
   const defaults = emptyStoreData();
   const source = input && typeof input === 'object' ? input : {};
@@ -276,15 +289,30 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
     }
   }
   const companyText = (value: unknown) => typeof value === 'string' ? value : '';
-  normalized.companies = normalized.companies.map(company => ({
-    ...company,
-    name: companyText(company.name),
-    manager: companyText(company.manager),
-    email: companyText(company.email),
-    phone: companyText(company.phone),
-    country: companyText(company.country),
-    sector: companyText(company.sector),
-  }));
+  normalized.companies = normalized.companies
+    .filter((company): company is NonNullable<typeof company> => Boolean(company && typeof company === 'object'))
+    .map(company => {
+      const raw = company as Company & Record<string, unknown>;
+      const normalizedCompany: Company = {
+        ...company,
+        name: companyText(raw.name),
+        manager: companyText(raw.manager),
+        email: companyText(raw.email),
+        phone: companyText(raw.phone),
+        country: companyText(raw.country),
+        sector: companyText(raw.sector),
+        requestedModules: normalizeStringArray(raw.requestedModules) as ModuleId[],
+        allowedModules: normalizeStringArray(raw.allowedModules) as ModuleId[],
+        refusedModules: normalizeStringArray(raw.refusedModules) as ModuleId[],
+      };
+      if (raw.requestedModulePackIds !== undefined) {
+        normalizedCompany.requestedModulePackIds = normalizeStringArrayMap(raw.requestedModulePackIds) as Partial<Record<ModuleId, string[]>>;
+      }
+      if (raw.requestedModuleFeatures !== undefined) {
+        normalizedCompany.requestedModuleFeatures = normalizeStringArrayMap(raw.requestedModuleFeatures) as Partial<Record<ModuleId, string[]>>;
+      }
+      return normalizedCompany;
+    });
   if (!source.commerceStates || Array.isArray(source.commerceStates) || typeof source.commerceStates !== 'object') {
     normalized.commerceStates = defaults.commerceStates;
   }
