@@ -494,6 +494,56 @@ function ProductDetail({ product, store, onBack, onAdd }: { product: PublicProdu
   return <section className="mx-auto max-w-4xl"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour à la boutique</button><div className="mt-6 grid gap-6 rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:grid-cols-2 sm:p-8"><div className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--muted)/.5)]">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain p-5" /> : <Package size={54} className="text-[hsl(var(--muted-foreground))]" />}</div><div className="flex flex-col justify-center"><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>{isRental ? `LOCATION · ${rentalUnit}` : 'VENTE'} · {product.category}</p><h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">{product.name}</h1><p className="mt-4 text-2xl font-bold" style={{ color: 'var(--shop-accent)' }}>{money(product.price, store.currency)}{isRental && <span className="ml-1 text-sm font-semibold">/ {rentalUnit}</span>}</p>{product.compareAtPrice && product.compareAtPrice > product.price && <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))] line-through">{money(product.compareAtPrice, store.currency)}</p>}<p className="mt-5 whitespace-pre-line text-sm leading-7 text-[hsl(var(--muted-foreground))]">{product.description || 'Une référence sélectionnée par votre boutique.'}</p><p className="mt-5 text-xs font-semibold text-emerald-700">{product.stock} unité{product.stock > 1 ? 's' : ''} disponible{product.stock > 1 ? 's' : ''}</p><button type="button" onClick={onAdd} className="mt-6 rounded-xl px-4 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>{isRental ? 'Ajouter une demande de location' : 'Ajouter au panier'}</button></div></div></section>;
 }
 
+function PublicOfferCard({
+  imageUrl,
+  icon: Icon,
+  badge,
+  name,
+  description,
+  price,
+  priceSuffix,
+  availability,
+  store,
+  onOpen,
+  onAdd,
+  onFavorite,
+  favorite = false,
+}: {
+  imageUrl: string;
+  icon: typeof Package;
+  badge: string;
+  name: string;
+  description: string;
+  price: string;
+  priceSuffix?: string;
+  availability?: string;
+  store: PublicShopBootstrap['store'];
+  onOpen?: () => void;
+  onAdd?: () => void;
+  onFavorite?: () => void;
+  favorite?: boolean;
+}) {
+  return <article className="min-w-0 overflow-hidden rounded-2xl border border-[#e8e0d4] bg-white shadow-sm">
+    <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#fbfaf7] disabled:cursor-default">
+      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover" /> : <Icon size={38} className="text-[hsl(var(--muted-foreground))]" />}
+    </button>
+    <div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-3 sm:p-4">
+      <p className="truncate text-[10px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{badge}</p>
+      <div className="mt-2 flex min-w-0 items-start justify-between gap-3">
+        {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-base font-bold leading-tight text-[#20252f]">{name}</button> : <h3 className="min-w-0 break-words text-base font-bold leading-tight text-[#20252f]">{name}</h3>}
+        <p className="shrink-0 text-sm font-bold text-[#20252f]">{price}</p>
+      </div>
+      {priceSuffix && <p className="mt-0.5 text-right text-[10px] text-[#655e55]">{priceSuffix}</p>}
+      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[#655e55]">{description || `Une offre proposée par ${store.name}.`}</p>
+      {availability && <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${availability === 'Indisponible' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{availability}</span>}
+      {(onAdd || onFavorite) && <div className="mt-4 flex items-center gap-2">
+        {onFavorite && <button type="button" onClick={onFavorite} className="rounded-lg border p-2" aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-red-600' : ''} /></button>}
+        {onAdd && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-3 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
+      </div>}
+    </div>
+  </article>;
+}
+
 function CatalogSections({
   products,
   rentals,
@@ -521,8 +571,8 @@ function CatalogSections({
       return <section key={category}>
         <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
         <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
-          {categoryProducts.map(product => <article key={`product-${product.slug}`} className="min-w-0 overflow-hidden rounded-2xl border border-[#e8e0d4] bg-white shadow-sm"><button type="button" onClick={() => onProduct(product)} className="relative flex aspect-square w-full items-center justify-center bg-[#fbfaf7] sm:aspect-[16/9]">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain p-2 sm:p-5" /> : <Package size={30} className="text-[hsl(var(--muted-foreground))] sm:h-[38px] sm:w-[38px]" />}</button><div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-2.5 sm:p-4"><p className="truncate text-[9px] font-bold uppercase tracking-[.12em] text-[#8c6c37] sm:text-[11px] sm:tracking-[.14em]">Produit</p><div className="mt-1 flex min-w-0 items-start justify-between gap-1.5 sm:mt-2 sm:gap-3"><button type="button" onClick={() => onProduct(product)} className="min-w-0 break-words text-left text-sm font-bold leading-tight text-[#20252f] sm:text-base">{product.name}</button><p className="shrink-0 text-xs font-bold sm:text-base" style={{ color: 'var(--shop-accent)' }}>{money(product.price, store.currency)}</p></div><p className="mt-1.5 line-clamp-2 min-h-10 text-xs leading-4 text-[#655e55] sm:mt-2 sm:text-sm sm:leading-5">{product.description || 'Une référence sélectionnée par votre boutique.'}</p><div className="mt-3 flex items-center justify-between gap-2 sm:mt-5"><button type="button" onClick={() => onFavorite(product)} className="rounded-lg border p-2" aria-label={isFavorite(product) ? 'Retirer des favoris' : 'Ajouter aux favoris'}><Heart size={15} fill={isFavorite(product) ? 'currentColor' : 'none'} className={isFavorite(product) ? 'text-red-600' : ''} /></button><button type="button" onClick={() => onAdd(product)} className="flex-1 rounded-lg px-2 py-2 text-[11px] font-bold text-white sm:flex-none sm:px-3.5 sm:py-2.5 sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button></div></div></article>)}
-          {categoryRentals.map(rental => <article key={`rental-${rental.name}`} className="min-w-0 overflow-hidden rounded-2xl border border-[#e8e0d4] bg-white shadow-sm"><div className="flex aspect-square w-full items-center justify-center bg-[#fbfaf7] sm:aspect-[16/9]">{rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-cover" /> : <Home size={30} className="text-[hsl(var(--muted-foreground))] sm:h-[38px] sm:w-[38px]" />}</div><div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-2.5 sm:p-4"><p className="truncate text-[9px] font-bold uppercase tracking-[.12em] text-[#8c6c37] sm:text-[11px] sm:tracking-[.14em]">Location · {rental.billingUnit}</p><div className="mt-1 flex min-w-0 items-start justify-between gap-1.5 sm:mt-2 sm:gap-3"><h3 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{rental.name}</h3><p className="shrink-0 text-xs font-bold sm:text-base" style={{ color: 'var(--shop-accent)' }}>{money(rental.price, store.currency)}</p></div><p className="mt-1.5 line-clamp-2 min-h-10 text-xs leading-4 text-[#655e55] sm:mt-2 sm:text-sm sm:leading-5">{rental.description || 'Une offre proposée par cette boutique.'}</p><span className={`mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${rental.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'}</span></div></article>)}
+          {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
+          {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
         </div>
       </section>;
     })}
@@ -578,7 +628,7 @@ function RentalPage({ rentals, store, onBack }: { rentals: PublicRental[]; store
             const categoryRentals = rentals.filter(rental => (rental.category || 'Général') === category);
             return <section key={category}>
               <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h3 className="mt-1 text-xl font-bold">{category}</h3></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} offre{categoryRentals.length > 1 ? 's' : ''}</span></div>
-              <div className="grid gap-3 sm:grid-cols-2">{categoryRentals.map(rental => <article key={`${category}-${rental.name}-${rental.billingUnit}`} className="overflow-hidden rounded-2xl border bg-white"><div className="flex aspect-[16/9] items-center justify-center bg-[hsl(var(--muted)/.5)]">{rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-cover" /> : <Home size={28} className="text-[hsl(var(--muted-foreground))]" />}</div><div className="p-4"><p className="text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: store.primaryColor }}>LOCATION · {rental.billingUnit}</p><h4 className="mt-2 font-bold">{rental.name}</h4><p className="mt-2 text-sm font-bold" style={{ color: store.accentColor }}>{money(rental.price, store.currency)} <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">/ {rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}</span></p><p className="mt-2 line-clamp-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{rental.description || 'Une offre proposée par cette boutique.'}</p><span className={`mt-4 inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${rental.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'}</span></div></article>)}</div>
+               <div className="grid gap-3 sm:grid-cols-2">{categoryRentals.map(rental => <PublicOfferCard key={`${category}-${rental.name}-${rental.billingUnit}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}</div>
             </section>;
           })}</div>}
       </div>
