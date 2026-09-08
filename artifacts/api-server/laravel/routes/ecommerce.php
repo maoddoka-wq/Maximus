@@ -39,6 +39,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
     });
 
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
+Route::get('/shop-domain/manifest.webmanifest', [EcommerceController::class, 'publicManifestByDomain']);
 Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
@@ -50,6 +51,7 @@ Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, '
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
 Route::prefix('shop/{slug}')->group(function (): void {
+    Route::get('/manifest.webmanifest', [EcommerceController::class, 'publicManifest']);
     Route::get('/', [EcommerceController::class, 'publicBootstrap']);
     Route::post('/orders', [EcommerceController::class, 'createPublicOrder'])->middleware('throttle:orders');
     Route::post('/delivery-requests', [EcommerceController::class, 'createPublicDeliveryRequest'])->middleware('throttle:orders');

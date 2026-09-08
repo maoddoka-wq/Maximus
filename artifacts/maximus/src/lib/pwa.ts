@@ -17,36 +17,15 @@ export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userA
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
-export function mountClientManifest(storeName: string, storeLogoUrl?: string) {
-  const manifest = {
-    name: storeName,
-    short_name: storeName.trim().slice(0, 12) || 'Boutique',
-    description: `La vitrine et l’espace client de ${storeName}.`,
-    start_url: '/client-app/',
-    scope: '/client-app/',
-    display: 'standalone',
-    orientation: 'portrait-primary',
-    background_color: '#f8f5ed',
-    theme_color: '#0b1b2b',
-    lang: 'fr',
-    icons: [
-      {
-        src: storeLogoUrl?.trim() || '/admin-logo.png',
-        sizes: '1024x1024',
-        type: 'image/png',
-        purpose: 'any maskable',
-      },
-    ],
-  };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+export function mountClientManifest(manifestUrl: string, storeName: string, storeLogoUrl?: string) {
+  const version = encodeURIComponent(`${storeName}|${storeLogoUrl ?? ''}`);
   const link = document.createElement('link');
   link.rel = 'manifest';
-  link.href = url;
+  link.href = `${manifestUrl}${manifestUrl.includes('?') ? '&' : '?'}v=${version}`;
   link.dataset.maximusClientManifest = 'true';
   document.head.appendChild(link);
 
   return () => {
-    URL.revokeObjectURL(url);
     link.remove();
   };
 }

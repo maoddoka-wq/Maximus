@@ -835,6 +835,29 @@ class EcommerceController extends Controller
             ->header('Vary', 'Host');
     }
 
+    public function publicManifest(string $slug): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->manifestResponse($store);
+    }
+
+    public function publicManifestByDomain(Request $request): JsonResponse
+    {
+        $store = $this->publishedStoreByDomain($request->getHost());
+        if (! $store) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+
+        return $this->manifestResponse($store);
+    }
+
     public function createPublicDomainOrder(Request $request): JsonResponse
     {
         $store = $this->publishedStoreByDomain($request->getHost());
@@ -951,6 +974,31 @@ class EcommerceController extends Controller
             'logoUrl' => $row->logo_url ?? '',
             'enabledFeatures' => $this->publicEnabledFeatures((string) $row->company_id),
         ];
+    }
+
+    private function manifestResponse(object $store): JsonResponse
+    {
+        $storeName = trim((string) $store->name);
+        $logoUrl = trim((string) ($store->logo_url ?? ''));
+
+        return response()->json([
+            'name' => $storeName,
+            'short_name' => Str::substr($storeName ?: 'Boutique', 0, 12),
+            'description' => 'La vitrine et l’espace client de '.($storeName ?: 'cette boutique').'.',
+            'start_url' => '/client-app/',
+            'scope' => '/client-app/',
+            'display' => 'standalone',
+            'orientation' => 'portrait-primary',
+            'background_color' => '#f8f5ed',
+            'theme_color' => $store->accent_color ?: '#0b1b2b',
+            'lang' => 'fr',
+            'icons' => [[
+                'src' => $logoUrl !== '' ? $logoUrl : '/admin-logo.png',
+                'sizes' => '1024x1024',
+                'purpose' => 'any maskable',
+            ]],
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Vary', 'Host');
     }
 
     private function publicEnabledFeatures(string $companyId): array

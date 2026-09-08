@@ -164,8 +164,11 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 
   useEffect(() => {
     if (!data?.store.name.trim()) return undefined;
-    return mountClientManifest(data.store.name, data.store.logoUrl);
-  }, [data?.store.logoUrl, data?.store.name]);
+    const manifestUrl = domain
+      ? '/api/shop-domain/manifest.webmanifest'
+      : `/api/shop/${encodeURIComponent(slug ?? data.store.slug)}/manifest.webmanifest`;
+    return mountClientManifest(manifestUrl, data.store.name, data.store.logoUrl);
+  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, slug]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
