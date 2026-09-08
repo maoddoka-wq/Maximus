@@ -80,6 +80,37 @@ const dateLabel = (value: string) => {
 const slugify = (value: string) =>
   value.trim().toLocaleLowerCase('fr-FR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: string): EcommerceBootstrap {
+  const payload = value && typeof value === 'object' ? value : {} as EcommerceBootstrap;
+  const orders = Array.isArray(payload.orders)
+    ? payload.orders
+        .filter(order => Boolean(order && typeof order === 'object'))
+        .map(order => ({ ...order, items: Array.isArray(order.items) ? order.items : [] }))
+    : [];
+
+  return {
+    ...payload,
+    store: payload.store ?? {
+      id: `store-${companyId || 'unknown'}`,
+      companyId,
+      slug: '',
+      name: 'Votre boutique',
+      description: '',
+      status: 'DRAFT',
+      currency: 'XOF',
+      primaryColor: '#D69E2E',
+      accentColor: '#172033',
+      logoUrl: '',
+    },
+    domains: Array.isArray(payload.domains) ? payload.domains : [],
+    categories: Array.isArray(payload.categories) ? payload.categories : [],
+    products: Array.isArray(payload.products) ? payload.products : [],
+    rentals: Array.isArray(payload.rentals) ? payload.rentals : [],
+    orders,
+    deliveryRequests: Array.isArray(payload.deliveryRequests) ? payload.deliveryRequests : [],
+  };
+}
+
 type ProductForm = {
   name: string;
   slug: string;
@@ -197,7 +228,7 @@ export default function EcommerceModulePage({
       return;
     }
     try {
-      const nextData = await api.bootstrap();
+      const nextData = normalizeEcommerceBootstrap(await api.bootstrap(), companyId);
       setData(nextData);
       setWalletData(visibleTabIds.includes('finances') ? await api.wallet() : null);
       setError('');
@@ -582,9 +613,10 @@ function CategoryManager({ data, canCreate, canModify, run }: { data: EcommerceB
 function Orders({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | EcommerceOrderStatus>('ALL');
-  const orders = data.orders.filter(order => (filter === 'ALL' || order.status === filter) && `${order.reference} ${order.customerName} ${order.customerEmail}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
+  const allOrders = Array.isArray(data.orders) ? data.orders : [];
+  const orders = allOrders.filter(order => (filter === 'ALL' || order.status === filter) && `${order.reference ?? ''} ${order.customerName ?? ''} ${order.customerEmail ?? ''}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
   const changeStatus = (order: EcommerceOrder, status: EcommerceOrderStatus) => run(() => createEcommerceApi(data.store.companyId).updateOrderStatus(order.id, status), 'Statut de commande mis à jour.');
-  return <div className="space-y-5 fade-up"><Panel title="Commandes" description="Suivez chaque vente, du premier clic à la livraison."><div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par référence, nom ou e-mail" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={filter} onChange={event => setFilter(event.target.value as typeof filter)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option>{orderStatuses.map(item => <option key={item} value={item}>{item}</option>)}</select></div>{orders.length === 0 ? <Empty icon={ClipboardList} title={data.orders.length ? 'Aucune commande trouvée' : 'Aucune commande pour le moment'} text={data.orders.length ? 'Modifiez votre recherche ou le filtre de statut.' : 'Les ventes de votre boutique apparaîtront ici dès la première vente.'} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Commande</th><th className="px-4">Client</th><th className="px-4">Articles</th><th className="px-4">Total</th><th className="px-4">Statut</th><th className="px-4">Mise à jour</th></tr></thead><tbody className="divide-y">{orders.map(order => <tr key={order.id}><td className="px-4 py-4"><strong className="block">{order.reference}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(order.createdAt)}</small></td><td className="px-4 py-4"><strong className="block">{order.customerName}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{order.customerEmail}</small></td><td className="px-4 py-4 text-xs">{order.items.reduce((sum, item) => sum + item.quantity, 0)} article{order.items.length > 1 ? 's' : ''}</td><td className="px-4 py-4 font-bold">{money(order.total, data.store.currency)}</td><td className="px-4 py-4"><StatusPill value={order.status} /></td><td className="px-4 py-4">{canModify ? <select aria-label={`Changer le statut de ${order.reference}`} value={order.status} onChange={event => void changeStatus(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{allowedNextStatuses(order.status).map(item => <option key={item} value={item}>{item}</option>)}</select> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Lecture seule</span>}</td></tr>)}</tbody></table></div>}</Panel></div>;
+  return <div className="space-y-5 fade-up"><Panel title="Commandes" description="Suivez chaque vente, du premier clic à la livraison."><div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par référence, nom ou e-mail" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={filter} onChange={event => setFilter(event.target.value as typeof filter)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option>{orderStatuses.map(item => <option key={item} value={item}>{item}</option>)}</select></div>{orders.length === 0 ? <Empty icon={ClipboardList} title={allOrders.length ? 'Aucune commande trouvée' : 'Aucune commande pour le moment'} text={allOrders.length ? 'Modifiez votre recherche ou le filtre de statut.' : 'Les ventes de votre boutique apparaîtront ici dès la première vente.'} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Commande</th><th className="px-4">Client</th><th className="px-4">Articles</th><th className="px-4">Total</th><th className="px-4">Statut</th><th className="px-4">Mise à jour</th></tr></thead><tbody className="divide-y">{orders.map(order => { const items = Array.isArray(order.items) ? order.items : []; return <tr key={order.id}><td className="px-4 py-4"><strong className="block">{order.reference}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(order.createdAt)}</small></td><td className="px-4 py-4"><strong className="block">{order.customerName}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{order.customerEmail}</small></td><td className="px-4 py-4 text-xs">{items.reduce((sum, item) => sum + item.quantity, 0)} article{items.length > 1 ? 's' : ''}</td><td className="px-4 py-4 font-bold">{money(order.total, data.store.currency)}</td><td className="px-4 py-4"><StatusPill value={order.status} /></td><td className="px-4 py-4">{canModify ? <select aria-label={`Changer le statut de ${order.reference}`} value={order.status} onChange={event => void changeStatus(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{allowedNextStatuses(order.status).map(item => <option key={item} value={item}>{item}</option>)}</select> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Lecture seule</span>}</td></tr>; })}</tbody></table></div>}</Panel></div>;
 }
 
 function Clients({ data }: { data: EcommerceBootstrap }) {
