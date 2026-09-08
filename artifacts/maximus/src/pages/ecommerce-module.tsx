@@ -146,12 +146,14 @@ export default function EcommerceModulePage({
   canModify = true,
   allowedFeatureIds,
   singleModuleNavigation = false,
+  onStoreNameChange,
 }: {
   companyId: string;
   canCreate?: boolean;
   canModify?: boolean;
   allowedFeatureIds?: string[];
   singleModuleNavigation?: boolean;
+  onStoreNameChange?: (name: string) => void;
 }) {
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
@@ -170,6 +172,7 @@ export default function EcommerceModulePage({
     try {
       const nextData = await api.bootstrap();
       setData(nextData);
+      onStoreNameChange?.(nextData.store.name);
       setWalletData(visibleTabIds.includes('finances') ? await api.wallet() : null);
       setError('');
     } catch (cause) {
@@ -189,6 +192,8 @@ export default function EcommerceModulePage({
     const timeout = window.setTimeout(() => setToast(''), 3000);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  useEffect(() => () => onStoreNameChange?.(''), [onStoreNameChange]);
 
   const run = async <T,>(action: () => Promise<T>, success: string): Promise<T | undefined> => {
     try {
@@ -214,36 +219,18 @@ export default function EcommerceModulePage({
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button type="button" aria-label="Fermer le message" onClick={() => setError('')}><X size={16} /></button></div>}
       {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-bold text-[hsl(var(--sidebar-foreground))] shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
 
-      <section className="mobile-hero card-surface overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.2)]">
-        <div className="relative p-5 sm:p-7">
-          <div className="pointer-events-none absolute right-[-4rem] top-[-5rem] h-52 w-52 rounded-full border-[18px] border-[hsl(var(--primary)/.08)]" />
-          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Commerce cockpit</span>
-                <StatusPill value={store.status} />
-              </div>
-              <h1 className="mt-2 text-2xl font-bold tracking-[-.045em] sm:text-3xl">{store.name || 'Votre boutique en ligne'}</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{store.description || 'Un espace de vente clair, prêt à transformer votre catalogue en commandes.'}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
-                <span className="inline-flex items-center gap-1.5"><Store size={14} className="text-[hsl(var(--primary))]" />/{store.slug || 'boutique'}</span>
-                <span className="h-1 w-1 rounded-full bg-[hsl(var(--border))]" />
-                <span>{data.products.filter(product => product.status !== 'ARCHIVED').length} références actives</span>
-              </div>
-            </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <button type="button" onClick={() => void load(true)} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))]" title="Actualiser">
-                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser
-              </button>
-            </div>
-          </div>
-        </div>
-        {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="module-tabs flex min-w-0 gap-1.5 overflow-x-auto border-t px-4 py-3 sm:px-6">
+      <section className="card-surface rounded-2xl border border-[hsl(var(--border))]">
+        <div className="flex min-w-0 flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
           {visibleTabs.map(item => {
             const Icon = item.icon;
             return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>;
           })}
-        </nav>}
+          </nav>}
+          <button type="button" onClick={() => void load(true)} className="btn inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-lg border px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))] sm:self-auto" title="Actualiser">
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser
+          </button>
+        </div>
       </section>
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>

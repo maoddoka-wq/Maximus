@@ -345,6 +345,7 @@ function AppContent() {
   );
   const [toast, setToast] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [ecommerceStoreName, setEcommerceStoreName] = useState('');
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
   const [serverModuleAccessReady, setServerModuleAccessReady] = useState(false);
   const [serverModuleAccessCompanyId, setServerModuleAccessCompanyId] = useState<string | null>(null);
@@ -846,6 +847,9 @@ function AppContent() {
       : baseMeta;
   const currentPath = companyRoutePath;
   const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
+  useEffect(() => {
+    if (currentPath !== '/entreprise/ecommerce') setEcommerceStoreName('');
+  }, [currentPath]);
   const companyInitials =
     currentCompany?.name
       .split(/\s+/)
@@ -881,6 +885,7 @@ function AppContent() {
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Topbar
           title={currentMeta.title}
+          contextLabel={!isAdmin && currentPath === '/entreprise/ecommerce' ? ecommerceStoreName : undefined}
           isAdmin={isAdmin}
           onNavigate={navigate}
           onToggleMenu={() => setMobileOpen(true)}
@@ -992,6 +997,7 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                   singleModuleNavigation={verticalModuleNavigation}
+                   onEcommerceStoreNameChange={setEcommerceStoreName}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,
