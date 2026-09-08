@@ -288,12 +288,6 @@ export default function EcommerceModulePage({
             >
               <ArrowUpRight size={14} />Ouvrir
             </a>
-            {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-              {visibleTabs.map(item => {
-                const Icon = item.icon;
-                return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.75)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={15} />{item.label}</button>;
-              })}
-            </nav>}
           </div>
           <div className="order-1 flex min-w-0 justify-center px-2 sm:order-2 sm:col-start-2">
             <span className="truncate text-center text-xl font-black tracking-[-.04em] text-white drop-shadow-sm sm:text-2xl lg:text-3xl">
@@ -305,6 +299,15 @@ export default function EcommerceModulePage({
           </button>
         </div>
       </section>
+
+      {!singleModuleNavigation && <section className="rounded-2xl border bg-[hsl(var(--card))] p-2 shadow-sm">
+        <nav aria-label="Fonctionnalités e-commerce" className="flex flex-wrap gap-1.5">
+          {visibleTabs.map(item => {
+            const Icon = item.icon;
+            return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/.45)] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>;
+          })}
+        </nav>
+      </section>}
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
