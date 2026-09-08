@@ -53,6 +53,7 @@ const rentalToCartProduct = (rental: PublicRental): CartProduct => ({
   name: rental.name,
   description: rental.description,
   category: rental.category,
+  categoryId: rental.categoryId,
   price: rental.price,
   compareAtPrice: null,
   stock: rental.availability,

@@ -704,7 +704,7 @@ class EcommerceTest extends TestCase
             ->assertJsonCount(1, 'rentals')
             ->assertJsonPath('rentals.0.name', 'Maison autonome')
             ->assertJsonPath('rentals.0.availability', 0)
-            ->assertJsonMissingPath('rentals.0.id')
+            ->assertJsonPath('rentals.0.id', $rental['id'])
             ->assertJsonMissingPath('rentals.0.companyId');
     }
 
