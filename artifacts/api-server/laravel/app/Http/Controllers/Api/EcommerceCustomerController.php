@@ -615,6 +615,7 @@ class EcommerceCustomerController extends Controller
             'items' => $items->map(fn (object $item): array => [
                 'id' => $item->id,
                 'productId' => $item->product_id,
+                 'rentalId' => $item->rental_id ?? null,
                 'productName' => $item->product_name,
                 'unitPrice' => (int) $item->unit_price,
                 'quantity' => (int) $item->quantity,

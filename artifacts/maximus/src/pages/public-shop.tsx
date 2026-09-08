@@ -16,7 +16,8 @@ import {
 
 type PublicProduct = PublicShopBootstrap['products'][number];
 type PublicRental = PublicShopBootstrap['rentals'][number];
-type CartLine = { product: PublicProduct; quantity: number };
+type CartProduct = PublicProduct & { rentalId?: string };
+type CartLine = { product: CartProduct; quantity: number };
 type AccountSection = 'dashboard' | 'orders' | 'profile' | 'addresses' | 'favorites';
 type PaymentSummary = Pick<PublicPaymentStatus, 'reference' | 'total' | 'paymentStatus' | 'failureReason'>;
 
@@ -46,6 +47,33 @@ const customerCartToLines = (items: EcommerceCustomerCartLine[], products: Publi
     const product = products.find(candidate => candidate.slug === item.productSlug);
     return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
   });
+
+const rentalToCartProduct = (rental: PublicRental): CartProduct => ({
+  slug: `rental:${rental.id}`,
+  name: rental.name,
+  description: rental.description,
+  category: rental.category,
+  price: rental.price,
+  compareAtPrice: null,
+  stock: rental.availability,
+  imageUrl: rental.imageUrl,
+  featured: false,
+  productType: 'RENTAL',
+  rentalPeriod: rental.billingUnit,
+  rentalId: rental.id,
+});
+
+const restoreGuestCart = (
+  saved: Array<{ productSlug?: string; rentalId?: string; quantity: number }>,
+  shop: PublicShopBootstrap,
+): CartLine[] => saved.flatMap(item => {
+  if (item.rentalId) {
+    const rental = shop.rentals.find(candidate => candidate.id === item.rentalId);
+    return rental ? [{ product: rentalToCartProduct(rental), quantity: Math.min(item.quantity, rental.availability) }] : [];
+  }
+  const product = item.productSlug ? shop.products.find(candidate => candidate.slug === item.productSlug) : undefined;
+  return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
+});
 
 const addressText = (address: EcommerceCustomerAddress) =>
   [address.line1, address.line2, address.postalCode, address.city, address.region, address.country].filter(Boolean).join(', ');
@@ -182,11 +210,8 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
           setCustomerData(null);
           setError('La boutique est disponible, mais la session client n’a pas pu être restaurée.');
           try {
-            const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug: string; quantity: number }>;
-            setCart(saved.flatMap(item => {
-              const product = result.products.find(candidate => candidate.slug === item.productSlug);
-              return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
-            }));
+             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
+             setCart(restoreGuestCart(saved, result));
           } catch {
             setCart([]);
           }
@@ -202,11 +227,8 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
           setProfileForm({ name: bootstrap.customer.name, phone: bootstrap.customer.phone });
         } else {
           try {
-            const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug: string; quantity: number }>;
-            setCart(saved.flatMap(item => {
-              const product = result.products.find(candidate => candidate.slug === item.productSlug);
-              return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
-            }));
+             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
+             setCart(restoreGuestCart(saved, result));
           } catch {
             setCart([]);
           }
@@ -219,7 +241,9 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
 
   useEffect(() => {
     if (customer || !data) return;
-    localStorage.setItem(`ecommerce-cart:${slug ?? 'domain'}`, JSON.stringify(cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity }))));
+    localStorage.setItem(`ecommerce-cart:${slug ?? 'domain'}`, JSON.stringify(cart.map(line => line.product.rentalId
+      ? { rentalId: line.product.rentalId, quantity: line.quantity }
+      : { productSlug: line.product.slug, quantity: line.quantity })));
   }, [cart, customer, data, slug]);
 
   useEffect(() => {
@@ -264,11 +288,12 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     if (!customer) return;
     try {
       const previous = customerData?.cart ?? [];
-      const nextSlugs = new Set(next.map(line => line.product.slug));
+      const productLines = next.filter(line => !line.product.rentalId);
+      const nextSlugs = new Set(productLines.map(line => line.product.slug));
       for (const line of previous) {
         if (!nextSlugs.has(line.productSlug)) await api.putCartItem(line.productSlug, 0);
       }
-      for (const line of next) await api.putCartItem(line.product.slug, line.quantity);
+      for (const line of productLines) await api.putCartItem(line.product.slug, line.quantity);
       const refreshed = await api.bootstrap();
       setCustomerData(refreshed);
     } catch (cause) {
@@ -276,7 +301,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     }
   };
 
-  const add = (product: PublicProduct) => {
+  const add = (product: CartProduct) => {
     const existing = cart.find(line => line.product.slug === product.slug);
     const next = existing
       ? cart.map(line => line.product.slug === product.slug ? { ...line, quantity: Math.min(product.stock, line.quantity + 1) } : line)
@@ -284,6 +309,8 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     setCartNotice(`${product.name} a été ajouté au panier.`);
     void syncCart(next);
   };
+
+  const addRental = (rental: PublicRental) => add(rentalToCartProduct(rental));
 
   const change = (productSlug: string, delta: number) => {
     const next = cart.flatMap(line => {
@@ -315,8 +342,8 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     setCheckoutKey(currentKey);
     try {
        const order = domain
-        ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
-        : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
+         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => line.product.rentalId ? { rentalId: line.product.rentalId, quantity: line.quantity } : { productSlug: line.product.slug, quantity: line.quantity }) })
+         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => line.product.rentalId ? { rentalId: line.product.rentalId, quantity: line.quantity } : { productSlug: line.product.slug, quantity: line.quantity }) });
       const returnUrl = () => {
         const returnPath = customer
           ? shopPath(`/compte/commandes/${encodeURIComponent(order.id)}`)
@@ -455,7 +482,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
         : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} onChange={change} onSubmit={() => void submitOrder()} onBack={() => go('')} />
          : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => { setMobileMenu(false); setLocation(shopPath(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')); }} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
           : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
-         : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
+          : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} onAdd={addRental} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
           : <><section className="mb-8 flex min-w-0 flex-col justify-between gap-5 sm:flex-row sm:items-end"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Sélection de la boutique</p><h1 className="mt-2 text-3xl font-bold tracking-[-.04em] sm:text-4xl">Trouvez ce qu’il vous faut.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Commandez en ligne et retrouvez vos commandes dans votre espace client.</p></div><button type="button" onClick={() => go('/compte/favoris')} className="inline-flex items-center gap-2 self-start rounded-xl border px-3 py-2.5 text-sm font-bold sm:self-auto"><Heart size={16} />Favoris</button></section><div className="mb-7 grid gap-3 sm:grid-cols-[1fr_auto_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher dans la boutique" className="w-full rounded-xl border bg-[hsl(var(--card))] py-3 pl-10 pr-3 text-sm" /></label><select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-xl border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select><button type="button" onClick={() => go('/compte/favoris')} className="inline-flex items-center justify-center gap-2 rounded-xl border bg-[hsl(var(--card))] px-4 py-3 text-sm font-bold"><Heart size={16} fill={customer ? 'currentColor' : 'none'} className={customer ? 'text-red-600' : ''} />{customerData?.favoriteProductSlugs.length ?? 0}</button></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onFavorite={product => void toggleFavorite(product)} isFavorite={isFavorite} />}</>}
     </main>
@@ -571,7 +598,7 @@ function CatalogSections({
       return <section key={category}>
         <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
+           {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? 'Disponible' : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
           {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
         </div>
       </section>;
@@ -608,7 +635,7 @@ function DeliveryPage({ store, customer, requests, form, setForm, submitted, onS
   </section>;
 }
 
-function RentalProductCard({ rental, store }: { rental: PublicRental; store: PublicShopBootstrap['store'] }) {
+function RentalProductCard({ rental, store, onAdd }: { rental: PublicRental; store: PublicShopBootstrap['store']; onAdd: () => void }) {
   const unit = rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour';
   return <article className="overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
     <div className="relative flex aspect-[2/1] items-center justify-center overflow-hidden bg-[#fbfaf7]">
@@ -621,16 +648,17 @@ function RentalProductCard({ rental, store }: { rental: PublicRental; store: Pub
         <h2 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{rental.name}</h2>
         <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{money(rental.price, store.currency)}<span className="block text-[10px] font-medium text-[#655e55]">/ {unit}</span></p>
       </div>
-      <div className="mt-4 flex items-center gap-2 border-t border-[#eee7dc] pt-3 text-[11px] font-semibold text-[#655e55]">
+      <div className="mt-3 flex items-center gap-2 border-t border-[#eee7dc] pt-2 text-[11px] font-semibold text-[#655e55]">
         <Home size={14} className="shrink-0 text-[#8c6c37]" />
         <span>{rental.availability} disponible{rental.availability > 1 ? 's' : ''}</span>
         <span className="ml-auto truncate">{rental.category || 'Général'}</span>
       </div>
+      <button type="button" onClick={onAdd} disabled={!rental.isAvailable} className="mt-3 w-full rounded-lg px-2.5 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter au panier</button>
     </div>
   </article>;
 }
 
-function RentalPage({ rentals, store, onBack }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; onBack: () => void }) {
+function RentalPage({ rentals, store, onBack, onAdd }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; onBack: () => void; onAdd: (rental: PublicRental) => void }) {
   const categories = [...new Set(rentals.map(rental => rental.category || 'Général'))].sort((a, b) => a.localeCompare(b, 'fr'));
 
   return <section className="mx-auto max-w-6xl">
@@ -645,7 +673,7 @@ function RentalPage({ rentals, store, onBack }: { rentals: PublicRental[]; store
         const categoryRentals = rentals.filter(rental => (rental.category || 'Général') === category);
         return <section key={category}>
           <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h2 className="mt-1 text-xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} offre{categoryRentals.length > 1 ? 's' : ''}</span></div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} />)}</div>
+           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} onAdd={() => onAdd(rental)} />)}</div>
         </section>;
       })}</div>}
   </section>;

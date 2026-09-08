@@ -925,6 +925,7 @@ class EcommerceController extends Controller
     private function publicRental(object $row): array
     {
         return [
+            'id' => $row->id,
             'name' => $row->name,
             'description' => $row->description,
             'category' => trim((string) ($row->category ?? '')) ?: 'Général',
@@ -942,6 +943,8 @@ class EcommerceController extends Controller
     private function publicRentalProduct(object $row): array
     {
         return [
+            'id' => $row->id,
+            'productSlug' => $row->slug,
             'name' => $row->name,
             'description' => $row->description,
             'category' => trim((string) ($row->category ?? '')) ?: 'Général',
@@ -1066,7 +1069,8 @@ class EcommerceController extends Controller
             'shippingAddress' => ['required', 'string', 'min:5', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
-            'items.*.productSlug' => ['required', 'string', 'min:2', 'max:160'],
+            'items.*.productSlug' => ['nullable', 'string', 'min:2', 'max:160'],
+            'items.*.rentalId' => ['nullable', 'string', 'min:2', 'max:160'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ])->validate();
 
@@ -1102,7 +1106,7 @@ class EcommerceController extends Controller
                 ->where('product.status', 'PUBLISHED')
                 ->orderBy('cart.created_at')
                 ->get(['product.slug as productSlug', 'cart.quantity']);
-            if ($cartItems->isNotEmpty()) {
+            if ($cartItems->isNotEmpty() && collect($input['items'])->every(fn (array $item): bool => empty($item['rentalId']))) {
                 $input['items'] = $cartItems->map(fn (object $item): array => [
                     'productSlug' => $item->productSlug,
                     'quantity' => (int) $item->quantity,
@@ -1114,6 +1118,43 @@ class EcommerceController extends Controller
                 $lines = [];
                 $total = 0;
                 foreach ($input['items'] as $item) {
+                    if (! empty($item['rentalId'])) {
+                        $rental = DB::table('ecommerce_rentals')
+                            ->where('id', $item['rentalId'])
+                            ->where('company_id', $store->company_id)
+                            ->where('status', 'PUBLISHED')
+                            ->lockForUpdate()
+                            ->first();
+                        if (! $rental) {
+                            throw new \RuntimeException('RENTAL_NOT_FOUND');
+                        }
+                        if ((int) $rental->availability < $item['quantity']) {
+                            throw new \RuntimeException('RENTAL_UNAVAILABLE');
+                        }
+                        $lineTotal = $rental->price * $item['quantity'];
+                        $total += $lineTotal;
+                        $lines[] = [
+                            'id' => $this->id('order-line'),
+                            'product_id' => null,
+                            'rental_id' => $rental->id,
+                            'product_name' => $rental->name,
+                            'unit_price' => $rental->price,
+                            'quantity' => $item['quantity'],
+                            'line_total' => $lineTotal,
+                            'product_type' => 'RENTAL',
+                            'rental_period' => $rental->billing_unit,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                        DB::table('ecommerce_rentals')->where('id', $rental->id)->update([
+                            'availability' => $rental->availability - $item['quantity'],
+                            'updated_at' => now(),
+                        ]);
+                        continue;
+                    }
+                    if (empty($item['productSlug'])) {
+                        throw new \RuntimeException('PRODUCT_NOT_FOUND');
+                    }
                     $product = DB::table('ecommerce_products')
                         ->where('slug', $item['productSlug'])
                         ->where('company_id', $store->company_id)
@@ -1131,6 +1172,7 @@ class EcommerceController extends Controller
                     $lines[] = [
                         'id' => $this->id('order-line'),
                         'product_id' => $product->id,
+                        'rental_id' => null,
                         'product_name' => $product->name,
                         'unit_price' => $product->price,
                         'quantity' => $item['quantity'],
@@ -1182,8 +1224,10 @@ class EcommerceController extends Controller
             return response()->json([
                 'error' => $error->getMessage() === 'STOCK_INSUFFICIENT'
                     ? 'Un article n’est plus disponible dans la quantité demandée.'
-                    : 'La commande n’a pas pu être enregistrée.',
-            ], $error->getMessage() === 'STOCK_INSUFFICIENT' ? 409 : 400);
+                    : ($error->getMessage() === 'RENTAL_UNAVAILABLE'
+                        ? 'Cette location n’est plus disponible dans la quantité demandée.'
+                        : 'La commande n’a pas pu être enregistrée.'),
+            ], in_array($error->getMessage(), ['STOCK_INSUFFICIENT', 'RENTAL_UNAVAILABLE'], true) ? 409 : 400);
         }
     }
 
