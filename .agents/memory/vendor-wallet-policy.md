@@ -8,3 +8,9 @@ Le vendeur est l’entreprise qui possède le module E-commerce, pas le client a
 **Why:** Cette réserve protège MAXIMUS contre les annulations, remboursements et litiges après paiement tout en donnant au vendeur une visibilité immédiate sur ses ventes.
 
 **How to apply:** Séparer solde confirmé, solde en attente, solde disponible et solde réservé ; traiter les crédits et retraits de façon idempotente et atomique ; conserver un registre financier auditable par entreprise.
+
+Un payout DiamanoPay dont le statut est intermédiaire conserve les fonds en réserve ; seuls un succès terminal ou un échec terminal modifient cette réserve.
+
+**Why:** Un retour HTTP accepté par le prestataire ne signifie pas nécessairement que le transfert Wave est finalisé.
+
+**How to apply:** Traiter `PENDING` et les statuts équivalents comme `PROCESSING`, attendre le webhook final, et ne restituer les fonds qu’en cas d’échec explicite.

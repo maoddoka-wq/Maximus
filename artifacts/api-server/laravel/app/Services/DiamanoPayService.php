@@ -22,14 +22,14 @@ final class DiamanoPayService
             && (string) config('services.diamanopay.webhook_secret') !== '';
     }
 
-    public function createCharge(array $payload): array
+    public function createCharge(array $payload, ?string $idempotencyKey = null): array
     {
-        return $this->requestWithToken('POST', '/api/charges', $payload);
+        return $this->requestWithToken('POST', '/api/charges', $payload, $idempotencyKey);
     }
 
-    public function payout(array $payload): array
+    public function payout(array $payload, ?string $idempotencyKey = null): array
     {
-        return $this->requestWithToken('POST', '/api/payout', $payload);
+        return $this->requestWithToken('POST', '/api/payout', $payload, $idempotencyKey);
     }
 
     public function verifyWebhook(string $body, ?string $signature): bool
@@ -42,17 +42,20 @@ final class DiamanoPayService
         return hash_equals(hash_hmac('sha256', $body, $secret), trim($signature));
     }
 
-    private function requestWithToken(string $method, string $path, array $payload): array
+    private function requestWithToken(string $method, string $path, array $payload, ?string $idempotencyKey = null): array
     {
         if (! $this->isConfigured()) {
             throw new RuntimeException('DiamanoPay n’est pas encore configuré pour cette application.');
         }
 
-        $response = Http::retry(2, 250)
+        $request = Http::retry(2, 250)
             ->timeout(15)
             ->withToken($this->accessToken())
-            ->acceptJson()
-            ->post($this->baseUrl.$path, $payload);
+            ->acceptJson();
+        if ($idempotencyKey !== null && trim($idempotencyKey) !== '') {
+            $request = $request->withHeaders(['Idempotency-Key' => trim($idempotencyKey)]);
+        }
+        $response = $request->post($this->baseUrl.$path, $payload);
 
         if ($response->failed()) {
             throw new RuntimeException('DiamanoPay a refusé la demande (HTTP '.$response->status().').');

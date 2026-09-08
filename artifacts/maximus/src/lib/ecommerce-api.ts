@@ -144,6 +144,13 @@ export interface PublicShopBootstrap {
 }
 
 export type PublicDomainBootstrap = PublicShopBootstrap | { available: false };
+export interface PublicPaymentStatus {
+  reference: string;
+  total: number;
+  paymentStatus: EcommerceOrder['paymentStatus'];
+  orderStatus: EcommerceOrderStatus;
+  failureReason: string;
+}
 
 export interface EcommerceCustomer {
   id: string;
@@ -189,6 +196,7 @@ export interface EcommerceCustomerOrder {
   note: string;
   total: number;
   status: EcommerceOrderStatus;
+  paymentStatus: EcommerceOrder['paymentStatus'];
   createdAt: string;
   items: EcommerceOrderItem[];
 }
@@ -264,6 +272,10 @@ export const publicEcommerceApi = {
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   createDomainPayment: (orderId: string, body?: { successUrl?: string; errorUrl?: string }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
+  paymentStatus: (slug: string, orderId: string) =>
+    request<PublicPaymentStatus>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment-status`),
+  domainPaymentStatus: (orderId: string) =>
+    request<PublicPaymentStatus>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment-status`),
 };
 
 export const createCustomerApi = (slug?: string) => {

@@ -34,6 +34,14 @@ services:
         value: stderr
       - key: LOG_LEVEL
         value: warning
+      - key: DIAMANOPAY_BASE_URL
+        value: https://api.diamanopay.com
+      - key: DIAMANOPAY_CLIENT_ID
+        sync: false
+      - key: DIAMANOPAY_CLIENT_SECRET
+        sync: false
+      - key: DIAMANOPAY_WEBHOOK_SECRET
+        sync: false
 
 databases:
   - name: maximus-postgres

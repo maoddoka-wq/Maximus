@@ -39,6 +39,28 @@ final class EcommercePaymentController extends Controller
         return $this->createForOrder($request, $store, $orderId);
     }
 
+    public function status(Request $request, string $slug, string $orderId): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->statusForOrder($store, $orderId);
+    }
+
+    public function statusByDomain(Request $request, string $orderId): JsonResponse
+    {
+        $host = strtolower(trim($request->getHost()));
+        $domain = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE')->first();
+        $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)->where('status', 'PUBLISHED')->first() : null;
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->statusForOrder($store, $orderId);
+    }
+
     private function createForOrder(Request $request, object $store, string $orderId): JsonResponse
     {
         Validator::make($request->all(), [
@@ -71,7 +93,7 @@ final class EcommercePaymentController extends Controller
                 'successUrl' => $request->input('successUrl'),
                 'errorUrl' => $request->input('errorUrl'),
                 'feeOnCustomer' => false,
-            ]);
+            ], 'order:'.$order->id);
             $chargeId = trim((string) ($charge['id'] ?? ''));
             $checkoutUrl = trim((string) ($charge['checkout_url'] ?? ''));
             if ($chargeId === '' || $checkoutUrl === '') {
@@ -95,5 +117,24 @@ final class EcommercePaymentController extends Controller
             report($error);
             return response()->json(['error' => $error->getMessage()], 503);
         }
+    }
+
+    private function statusForOrder(object $store, string $orderId): JsonResponse
+    {
+        $order = DB::table('ecommerce_orders')
+            ->where('id', $orderId)
+            ->where('company_id', $store->company_id)
+            ->first();
+        if (! $order) {
+            return response()->json(['error' => 'Commande introuvable.'], 404);
+        }
+
+        return response()->json([
+            'reference' => $order->reference,
+            'total' => (int) $order->total,
+            'paymentStatus' => $order->payment_status ?? 'UNPAID',
+            'orderStatus' => $order->status,
+            'failureReason' => $order->payment_failure_reason ?? '',
+        ])->header('Cache-Control', 'private, no-store');
     }
 }

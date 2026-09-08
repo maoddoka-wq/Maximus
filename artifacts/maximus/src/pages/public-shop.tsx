@@ -8,12 +8,14 @@ import {
   type EcommerceCustomerAddress,
   type EcommerceCustomerBootstrap,
   type EcommerceCustomerCartLine,
+  type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
 type CartLine = { product: PublicProduct; quantity: number };
 type AccountSection = 'dashboard' | 'orders' | 'profile' | 'addresses' | 'favorites';
+type PaymentSummary = Pick<PublicPaymentStatus, 'reference' | 'total' | 'paymentStatus' | 'failureReason'>;
 
 const money = (value: number, currency: PublicShopBootstrap['store']['currency']) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: currency === 'XOF' ? 0 : 2 }).format(value) + ` ${currency}`;
@@ -43,7 +45,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   const [notice, setNotice] = useState('');
   const [cartNotice, setCartNotice] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [submitted, setSubmitted] = useState<{ reference: string; total: number } | null>(null);
+  const [submitted, setSubmitted] = useState<PaymentSummary | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -65,6 +67,14 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     isDefault: true,
   });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const paymentReturn = useMemo(() => {
+    const query = new URLSearchParams(location.split('?')[1] ?? '');
+    const result = query.get('payment');
+    const orderId = query.get('order');
+    return result && orderId && ['success', 'error'].includes(result)
+      ? { result: result as 'success' | 'error', orderId }
+      : null;
+  }, [location]);
 
   const api = useMemo(() => createCustomerApi(slug), [slug]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0), [cart]);
@@ -167,6 +177,34 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   }, [cart, customer, data, slug]);
 
   useEffect(() => {
+    if (loading || !data || !paymentReturn) return;
+    let cancelled = false;
+    const loadPaymentStatus = async () => {
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        try {
+          const status = domain
+            ? await publicEcommerceApi.domainPaymentStatus(paymentReturn.orderId)
+            : await publicEcommerceApi.paymentStatus(slug ?? '', paymentReturn.orderId);
+          if (cancelled) return;
+          setSubmitted({
+            reference: status.reference,
+            total: status.total,
+            paymentStatus: status.paymentStatus,
+            failureReason: status.failureReason,
+          });
+          if (['PAID', 'FAILED', 'REFUNDED'].includes(status.paymentStatus)) return;
+        } catch (cause) {
+          if (!cancelled) setError(cause instanceof Error ? cause.message : 'Le statut du paiement est indisponible.');
+          return;
+        }
+        await new Promise(resolve => window.setTimeout(resolve, 1000));
+      }
+    };
+    void loadPaymentStatus();
+    return () => { cancelled = true; };
+  }, [data, domain, loading, paymentReturn, slug]);
+
+  useEffect(() => {
     if (isAccountRoute && !customer && !loading) go('/connexion');
   }, [customer, isAccountRoute, loading]);
 
@@ -225,13 +263,20 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     const currentKey = checkoutKey ?? crypto.randomUUID();
     setCheckoutKey(currentKey);
     try {
-      const order = domain
+       const order = domain
         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
-      setSubmitted(order);
+      const returnUrl = (result: 'success' | 'error') => {
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.hash = '';
+        url.searchParams.set('payment', result);
+        url.searchParams.set('order', order.id);
+        return url.toString();
+      };
       const payment = domain
-        ? await publicEcommerceApi.createDomainPayment(order.id, { successUrl: window.location.href, errorUrl: window.location.href })
-        : await publicEcommerceApi.createPayment(slug ?? '', order.id, { successUrl: window.location.href, errorUrl: window.location.href });
+        ? await publicEcommerceApi.createDomainPayment(order.id, { successUrl: returnUrl('success'), errorUrl: returnUrl('error') })
+        : await publicEcommerceApi.createPayment(slug ?? '', order.id, { successUrl: returnUrl('success'), errorUrl: returnUrl('error') });
       setCheckoutKey(null);
       setCart([]);
       if (customer) {
@@ -331,10 +376,10 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
         </nav>
       </div>
     </header>
-    <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
+     <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
       {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><Check size={16} /><span>{notice}</span><button type="button" className="ml-auto" onClick={() => setNotice('')} aria-label="Fermer"><X size={16} /></button></div>}
-      {submitted ? <section className="mx-auto max-w-xl rounded-3xl border bg-[hsl(var(--card))] p-8 text-center shadow-sm sm:p-10"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={26} /></span><h1 className="mt-5 text-2xl font-bold">Commande confirmée</h1><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Votre commande est enregistrée sous la référence <strong className="text-[hsl(var(--foreground))]">{submitted.reference}</strong>.</p><p className="mt-4 text-lg font-bold" style={{ color: 'var(--shop-primary)' }}>{money(submitted.total, store.currency)}</p><button type="button" onClick={() => { setSubmitted(null); go(''); }} className="mt-7 rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Continuer mes achats</button></section>
+       {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
         : isAuthRoute ? <AuthPanel mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
         : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} onChange={change} onSubmit={() => void submitOrder()} onBack={() => go('')} />
         : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => { setMobileMenu(false); setLocation(shopPath(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')); }} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
@@ -343,6 +388,31 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     </main>
      {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-4 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
+}
+
+function PaymentResultPanel({ summary, currency, onContinue, onOrders }: { summary: PaymentSummary; currency: PublicShopBootstrap['store']['currency']; onContinue: () => void; onOrders?: () => void }) {
+  const paid = summary.paymentStatus === 'PAID';
+  const failed = ['FAILED', 'REFUNDED'].includes(summary.paymentStatus);
+  const title = paid ? 'Paiement confirmé' : failed ? 'Paiement non confirmé' : 'Paiement en cours de confirmation';
+  const message = paid
+    ? 'Votre commande est enregistrée. Le vendeur va maintenant la préparer.'
+    : failed
+      ? (summary.failureReason || 'Le paiement n’a pas été confirmé. Vous pouvez retourner à la boutique et réessayer.')
+      : 'Le paiement a été transmis. Cette page se met à jour dès que DiamanoPay confirme la transaction.';
+
+  return <section className="mx-auto max-w-xl rounded-3xl border bg-[hsl(var(--card))] p-8 text-center shadow-sm sm:p-10">
+    <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${paid ? 'bg-emerald-100 text-emerald-700' : failed ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+      {paid ? <Check size={26} /> : failed ? <X size={26} /> : <span className="text-xl font-bold">…</span>}
+    </span>
+    <h1 className="mt-5 text-2xl font-bold">{title}</h1>
+    <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{message}</p>
+    <p className="mt-4 text-sm font-semibold">Référence : <strong className="text-[hsl(var(--foreground))]">{summary.reference}</strong></p>
+    <p className="mt-2 text-lg font-bold" style={{ color: 'var(--shop-primary)' }}>{money(summary.total, currency)}</p>
+    <div className="mt-7 flex flex-wrap justify-center gap-3">
+      <button type="button" onClick={onContinue} className="rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Retour à la boutique</button>
+      {onOrders && <button type="button" onClick={onOrders} className="rounded-xl border px-5 py-3 text-sm font-bold">Voir mes commandes</button>}
+    </div>
+  </section>;
 }
 
 function ProductDetail({ product, store, onBack, onAdd }: { product: PublicProduct; store: PublicShopBootstrap['store']; onBack: () => void; onAdd: () => void }) {
@@ -373,7 +443,7 @@ function FavoriteSection({ products, favoriteSlugs, onToggle, onNavigate }: { pr
 }
 
 function OrderSection({ orders, selectedOrder, onOrder }: { orders: EcommerceCustomerBootstrap['orders']; selectedOrder?: EcommerceCustomerBootstrap['orders'][number]; onOrder: (id: string) => void }) {
-  return <><div className="flex items-end justify-between gap-3"><div><h1 className="text-2xl font-bold">Vos commandes</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Le statut de préparation et de livraison communiqué par la boutique.</p></div></div>{selectedOrder ? <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-5 shadow-sm"><button type="button" onClick={() => onOrder('')} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={15} />Toutes les commandes</button><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-[hsl(var(--muted-foreground))]">{readableDate(selectedOrder.createdAt)}</p><h2 className="mt-1 text-xl font-bold">{selectedOrder.reference}</h2></div><div className="text-right"><p className="text-sm font-bold">{selectedOrder.status}</p></div></div><div className="mt-6 divide-y border-y">{selectedOrder.items.map(item => <div key={item.id} className="flex justify-between gap-4 py-4 text-sm"><span>{item.productName} × {item.quantity}</span><strong>{item.lineTotal}</strong></div>)}</div><div className="mt-5 flex justify-between font-bold"><span>Total</span><span>{money(selectedOrder.total, 'XOF')}</span></div><p className="mt-5 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-sm">{selectedOrder.shippingAddress}</p></div> : orders.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune commande liée à ce compte.</div> : <div className="mt-6 grid gap-3">{orders.map(order => <button type="button" key={order.id} onClick={() => onOrder(order.id)} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-[hsl(var(--card))] p-5 text-left shadow-sm hover:border-[var(--shop-primary)]"><div><p className="text-sm font-bold">{order.reference}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{readableDate(order.createdAt)} · {order.items.length} article(s)</p></div><div className="text-right"><p className="text-sm font-bold">{order.total}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{order.status}</p></div></button>)}</div>}</>;
+  return <><div className="flex items-end justify-between gap-3"><div><h1 className="text-2xl font-bold">Vos commandes</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Le statut du paiement, de la préparation et de la livraison communiqué par la boutique.</p></div></div>{selectedOrder ? <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-5 shadow-sm"><button type="button" onClick={() => onOrder('')} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={15} />Toutes les commandes</button><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-[hsl(var(--muted-foreground))]">{readableDate(selectedOrder.createdAt)}</p><h2 className="mt-1 text-xl font-bold">{selectedOrder.reference}</h2></div><div className="text-right"><p className="text-sm font-bold">{selectedOrder.status}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Paiement : {selectedOrder.paymentStatus}</p></div></div><div className="mt-6 divide-y border-y">{selectedOrder.items.map(item => <div key={item.id} className="flex justify-between gap-4 py-4 text-sm"><span>{item.productName} × {item.quantity}</span><strong>{item.lineTotal}</strong></div>)}</div><div className="mt-5 flex justify-between font-bold"><span>Total</span><span>{money(selectedOrder.total, 'XOF')}</span></div><p className="mt-5 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-sm">{selectedOrder.shippingAddress}</p></div> : orders.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed p-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune commande liée à ce compte.</div> : <div className="mt-6 grid gap-3">{orders.map(order => <button type="button" key={order.id} onClick={() => onOrder(order.id)} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-[hsl(var(--card))] p-5 text-left shadow-sm hover:border-[var(--shop-primary)]"><div><p className="text-sm font-bold">{order.reference}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{readableDate(order.createdAt)} · {order.items.length} article(s)</p></div><div className="text-right"><p className="text-sm font-bold">{order.total}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{order.status} · Paiement {order.paymentStatus}</p></div></button>)}</div>}</>;
 }
 
 function ProfileSection({ customer, profileForm, setProfileForm, passwordForm, setPasswordForm, onProfile, onPassword }: { customer: EcommerceCustomer; profileForm: { name: string; phone: string }; setProfileForm: (form: { name: string; phone: string }) => void; passwordForm: { currentPassword: string; newPassword: string }; setPasswordForm: (form: { currentPassword: string; newPassword: string }) => void; onProfile: () => void; onPassword: () => void }) {

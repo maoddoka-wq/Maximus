@@ -80,9 +80,10 @@ final class SellerWalletController extends Controller
         $this->releaseMaturedFunds($company);
         $idempotencyKey = trim((string) ($request->header('Idempotency-Key') ?: ($input['idempotencyKey'] ?? '')));
         $created = null;
+        $createdFresh = false;
 
         try {
-            $created = DB::transaction(function () use ($company, $input, $idempotencyKey): object {
+            $created = DB::transaction(function () use ($company, $input, $idempotencyKey, &$createdFresh): object {
                 $wallet = DB::table('seller_wallets')->where('company_id', $company)->lockForUpdate()->first();
                 $existing = $idempotencyKey === ''
                     ? null
@@ -120,6 +121,7 @@ final class SellerWalletController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                $createdFresh = true;
                 DB::table('seller_wallets')->where('id', $wallet->id)->update([
                     'available_balance' => DB::raw('available_balance - '.(int) $input['amount']),
                     'reserved_balance' => DB::raw('reserved_balance + '.(int) $input['amount']),
@@ -140,7 +142,7 @@ final class SellerWalletController extends Controller
             ], in_array($error->getMessage(), ['SOLDE_INSUFFISANT', 'COMPTE_RETRAIT_INCOMPLET'], true) ? 422 : 400);
         }
 
-        if ($created === null || $created->status === 'SUCCEEDED') {
+        if ($created === null || ! $createdFresh) {
             return response()->json(['withdrawal' => $this->withdrawal($created)], 200);
         }
 
@@ -150,41 +152,8 @@ final class SellerWalletController extends Controller
                 'provider' => $created->provider,
                 'mobile' => $created->mobile,
                 'name' => $created->beneficiary_name,
-            ]);
-            $providerStatus = strtoupper((string) ($providerResponse['status'] ?? 'PENDING'));
-            $success = in_array($providerStatus, ['SUCCESS', 'SUCCEEDED'], true);
-
-            DB::transaction(function () use ($created, $providerResponse, $success): void {
-                $withdrawal = DB::table('seller_withdrawals')->where('id', $created->id)->lockForUpdate()->first();
-                if (! $withdrawal || $withdrawal->status !== 'PROCESSING') {
-                    return;
-                }
-                $wallet = DB::table('seller_wallets')->where('id', $withdrawal->wallet_id)->lockForUpdate()->first();
-                if (! $wallet) {
-                    throw new \RuntimeException('WALLET_NOT_FOUND');
-                }
-                $providerId = (string) ($providerResponse['id'] ?? '');
-                if ($success) {
-                    DB::table('seller_wallets')->where('id', $wallet->id)->update([
-                        'reserved_balance' => DB::raw('reserved_balance - '.(int) $withdrawal->amount),
-                        'updated_at' => now(),
-                    ]);
-                    $this->ledgerInsert($wallet, 'WITHDRAWAL_PAID', 'RESERVED', 'DEBIT', (int) $withdrawal->amount, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':paid');
-                    DB::table('seller_withdrawals')->where('id', $withdrawal->id)->update([
-                        'status' => 'SUCCEEDED',
-                        'provider_payout_id' => $providerId !== '' ? $providerId : null,
-                        'processed_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                } else {
-                    $this->releaseReservedWithdrawal($wallet, $withdrawal, 'DiamanoPay traite encore ce retrait.');
-                    DB::table('seller_withdrawals')->where('id', $withdrawal->id)->update([
-                        'status' => 'PROCESSING',
-                        'provider_payout_id' => $providerId !== '' ? $providerId : null,
-                        'updated_at' => now(),
-                    ]);
-                }
-            });
+            ], 'withdrawal:'.$created->id);
+            $this->applyWithdrawalProviderStatus($created->id, $providerResponse);
         } catch (Throwable $error) {
             DB::transaction(function () use ($created): void {
                 $withdrawal = DB::table('seller_withdrawals')->where('id', $created->id)->lockForUpdate()->first();
@@ -219,13 +188,25 @@ final class SellerWalletController extends Controller
             return response()->json(['error' => 'Payload webhook invalide.'], 422);
         }
         $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
-        $chargeId = trim((string) ($data['id'] ?? ''));
+        $providerId = trim((string) ($data['id'] ?? $data['payout_id'] ?? $data['payoutId'] ?? ''));
         $status = strtoupper((string) ($data['status'] ?? ''));
-        if ($chargeId === '') {
+        if ($providerId === '') {
             return response()->json(['received' => true]);
         }
 
-        $order = DB::table('ecommerce_orders')->where('payment_charge_id', $chargeId)->first();
+        $withdrawal = DB::table('seller_withdrawals')->where('provider_payout_id', $providerId)->first();
+        if ($withdrawal) {
+            try {
+                $this->applyWithdrawalProviderStatus($withdrawal->id, $data);
+            } catch (Throwable $error) {
+                report($error);
+                return response()->json(['error' => 'Le webhook de retrait n’a pas pu être traité.'], 500);
+            }
+
+            return response()->json(['received' => true]);
+        }
+
+        $order = DB::table('ecommerce_orders')->where('payment_charge_id', $providerId)->first();
         if (! $order) {
             return response()->json(['received' => true]);
         }
@@ -260,6 +241,58 @@ final class SellerWalletController extends Controller
         }
 
         return response()->json(['received' => true]);
+    }
+
+    private function applyWithdrawalProviderStatus(string $withdrawalId, array $providerResponse): void
+    {
+        $providerStatus = strtoupper((string) ($providerResponse['status'] ?? 'PENDING'));
+        $providerId = trim((string) ($providerResponse['id'] ?? $providerResponse['payout_id'] ?? $providerResponse['payoutId'] ?? ''));
+        $success = in_array($providerStatus, ['SUCCESS', 'SUCCEEDED', 'COMPLETED'], true);
+        $failure = in_array($providerStatus, ['FAILED', 'CANCELLED', 'CANCELED', 'REJECTED', 'ERROR'], true);
+
+        DB::transaction(function () use ($withdrawalId, $providerId, $success, $failure, $providerStatus): void {
+            $withdrawal = DB::table('seller_withdrawals')->where('id', $withdrawalId)->lockForUpdate()->first();
+            if (! $withdrawal || $withdrawal->status !== 'PROCESSING') {
+                return;
+            }
+            $wallet = DB::table('seller_wallets')->where('id', $withdrawal->wallet_id)->lockForUpdate()->first();
+            if (! $wallet) {
+                throw new \RuntimeException('WALLET_NOT_FOUND');
+            }
+
+            if ($success) {
+                DB::table('seller_wallets')->where('id', $wallet->id)->update([
+                    'reserved_balance' => DB::raw('reserved_balance - '.(int) $withdrawal->amount),
+                    'updated_at' => now(),
+                ]);
+                $this->ledgerInsert($wallet, 'WITHDRAWAL_PAID', 'RESERVED', 'DEBIT', (int) $withdrawal->amount, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':paid');
+                DB::table('seller_withdrawals')->where('id', $withdrawal->id)->update([
+                    'status' => 'SUCCEEDED',
+                    'provider_payout_id' => $providerId !== '' ? $providerId : $withdrawal->provider_payout_id,
+                    'processed_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                return;
+            }
+
+            if ($failure) {
+                $this->releaseReservedWithdrawal($wallet, $withdrawal, 'Le retrait DiamanoPay a échoué.');
+                DB::table('seller_withdrawals')->where('id', $withdrawal->id)->update([
+                    'status' => 'FAILED',
+                    'provider_payout_id' => $providerId !== '' ? $providerId : $withdrawal->provider_payout_id,
+                    'failure_reason' => 'Le retrait DiamanoPay a échoué ('.$providerStatus.').',
+                    'processed_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                return;
+            }
+
+            DB::table('seller_withdrawals')->where('id', $withdrawal->id)->update([
+                'status' => 'PROCESSING',
+                'provider_payout_id' => $providerId !== '' ? $providerId : $withdrawal->provider_payout_id,
+                'updated_at' => now(),
+            ]);
+        });
     }
 
     public function releaseOrderFunds(object $order): void
