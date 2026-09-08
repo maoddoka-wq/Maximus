@@ -551,19 +551,25 @@ function PublicOfferCard({
   onFavorite?: () => void;
   favorite?: boolean;
 }) {
+  const isAvailable = availability !== 'Indisponible';
+  const availabilityLabel = availability ? (isAvailable ? 'Disponible' : 'Indisponible') : undefined;
   return <article className="min-w-0 overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
     <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[2/1] w-full items-center justify-center overflow-hidden bg-[#fbfaf7] disabled:cursor-default">
-      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-contain p-1.5" /> : <Icon size={32} className="text-[hsl(var(--muted-foreground))]" />}
+      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover" /> : <Icon size={32} className="text-[hsl(var(--muted-foreground))]" />}
+      {availabilityLabel && <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{availabilityLabel}</span>}
     </button>
-    <div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-2.5 sm:p-3">
-      <p className="truncate text-[9px] font-bold uppercase tracking-[.12em] text-[#8c6c37]">{badge}</p>
-      <div className="mt-1.5 flex min-w-0 items-start justify-between gap-2">
-        {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-sm font-bold leading-tight text-[#20252f]">{name}</button> : <h3 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f]">{name}</h3>}
-        <p className="shrink-0 text-xs font-bold text-[#20252f]">{price}</p>
+    <div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-3.5 sm:p-4">
+      <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{badge}</p>
+      <div className="mt-1.5 flex min-w-0 items-start justify-between gap-3">
+        {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-sm font-bold leading-tight text-[#20252f] sm:text-base">{name}</button> : <h3 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{name}</h3>}
+        <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{price}{priceSuffix && <span className="block text-[10px] font-medium text-[#655e55]">{priceSuffix}</span>}</p>
       </div>
-      {priceSuffix && <p className="mt-0.5 text-right text-[10px] text-[#655e55]">{priceSuffix}</p>}
-      <p className="mt-1.5 line-clamp-2 min-h-8 text-[11px] leading-4 text-[#655e55]">{description || `Une offre proposée par ${store.name}.`}</p>
-      {availability && <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${availability === 'Indisponible' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{availability}</span>}
+      {description && <p className="mt-2 line-clamp-2 min-h-8 text-[11px] leading-4 text-[#655e55]">{description || `Une offre proposée par ${store.name}.`}</p>}
+      {availability && <div className="mt-3 flex items-center gap-2 border-t border-[#eee7dc] pt-2 text-[11px] font-semibold text-[#655e55]">
+        <Package size={14} className="shrink-0 text-[#8c6c37]" />
+        <span>{availability}</span>
+        <span className="ml-auto truncate">{badge.split(' · ')[1] || badge}</span>
+      </div>}
       {(onAdd || onFavorite) && <div className="mt-3 flex items-center gap-1.5">
         {onFavorite && <button type="button" onClick={onFavorite} className="rounded-lg border p-1.5" aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}><Heart size={14} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-red-600' : ''} /></button>}
         {onAdd && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2.5 py-2 text-[11px] font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
