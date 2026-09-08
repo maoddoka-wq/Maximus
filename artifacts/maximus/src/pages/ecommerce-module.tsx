@@ -146,14 +146,12 @@ export default function EcommerceModulePage({
   canModify = true,
   allowedFeatureIds,
   singleModuleNavigation = false,
-  onStoreNameChange,
 }: {
   companyId: string;
   canCreate?: boolean;
   canModify?: boolean;
   allowedFeatureIds?: string[];
   singleModuleNavigation?: boolean;
-  onStoreNameChange?: (name: string) => void;
 }) {
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
@@ -172,7 +170,6 @@ export default function EcommerceModulePage({
     try {
       const nextData = await api.bootstrap();
       setData(nextData);
-      onStoreNameChange?.(nextData.store.name);
       setWalletData(visibleTabIds.includes('finances') ? await api.wallet() : null);
       setError('');
     } catch (cause) {
@@ -192,8 +189,6 @@ export default function EcommerceModulePage({
     const timeout = window.setTimeout(() => setToast(''), 3000);
     return () => window.clearTimeout(timeout);
   }, [toast]);
-
-  useEffect(() => () => onStoreNameChange?.(''), [onStoreNameChange]);
 
   const run = async <T,>(action: () => Promise<T>, success: string): Promise<T | undefined> => {
     try {
@@ -220,14 +215,19 @@ export default function EcommerceModulePage({
       {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-bold text-[hsl(var(--sidebar-foreground))] shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
 
       <section className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))]">
-        <div className="flex min-w-0 flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-          {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-          {visibleTabs.map(item => {
-            const Icon = item.icon;
+        <div className="grid min-w-0 gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:px-4">
+          {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="order-2 module-tabs flex min-w-0 gap-1.5 overflow-x-auto sm:order-1 sm:col-start-1">
+            {visibleTabs.map(item => {
+              const Icon = item.icon;
               return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.75)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={15} />{item.label}</button>;
-          })}
+            })}
           </nav>}
-          <button type="button" onClick={() => void load(true)} className="btn inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-lg border border-[hsl(var(--sidebar-border))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--sidebar-foreground)/.8)] hover:bg-[hsl(var(--sidebar-accent))] sm:self-auto" title="Actualiser">
+          <div className="order-1 flex min-w-0 justify-center px-2 sm:order-2 sm:col-start-2">
+            <span className="truncate text-center text-xl font-black tracking-[-.04em] text-white drop-shadow-sm sm:text-2xl lg:text-3xl">
+              {store.name || 'Votre boutique'}
+            </span>
+          </div>
+          <button type="button" onClick={() => void load(true)} className="order-3 inline-flex shrink-0 items-center justify-center gap-2 justify-self-end rounded-lg border border-[hsl(var(--sidebar-border))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--sidebar-foreground)/.8)] hover:bg-[hsl(var(--sidebar-accent))] sm:col-start-3" title="Actualiser">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser
           </button>
         </div>

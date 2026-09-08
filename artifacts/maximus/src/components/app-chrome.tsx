@@ -354,7 +354,6 @@ export function Sidebar({
 
 type TopbarProps = {
   title: string;
-  contextLabel?: string;
   isAdmin: boolean;
   onNavigate: (path: string) => void;
   onToggleMenu: () => void;
@@ -365,7 +364,6 @@ type TopbarProps = {
 
 export function Topbar({
   title,
-  contextLabel,
   isAdmin,
   onNavigate,
   onToggleMenu,
@@ -376,7 +374,7 @@ export function Topbar({
   const [search, setSearch] = useState('');
 
   return (
-    <header className="topbar relative flex min-h-[78px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="topbar flex min-h-[78px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <button
           data-testid="button-mobile-menu"
@@ -398,16 +396,10 @@ export function Topbar({
               className="truncate text-base font-black leading-tight tracking-[-.035em] sm:text-xl"
             >
               {title}
-              {contextLabel && <span className="ml-2 text-base font-black text-[hsl(var(--foreground))] sm:hidden">· {contextLabel}</span>}
             </div>
           </div>
         </div>
       </div>
-      {contextLabel && (
-        <div className="pointer-events-none absolute left-1/2 hidden max-w-[35%] -translate-x-1/2 truncate text-center text-lg font-black tracking-[-.025em] text-[hsl(var(--foreground))] sm:block lg:text-xl">
-          {contextLabel}
-        </div>
-      )}
       <div className="flex items-center gap-1.5 sm:gap-2.5">
         {isAdmin && (
           <div className="relative hidden lg:block">

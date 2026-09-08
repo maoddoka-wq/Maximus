@@ -155,7 +155,6 @@ export function CompanyRouter({
   commerceTabIds,
   moduleStatuses,
   singleModuleNavigation,
-  onEcommerceStoreNameChange,
   screens,
 }: {
   location: string;
@@ -179,7 +178,6 @@ export function CompanyRouter({
   commerceTabIds?: string[];
   moduleStatuses: Record<string, ModuleAvailability>;
   singleModuleNavigation?: boolean;
-  onEcommerceStoreNameChange?: (name: string) => void;
   screens: CompanyRouteScreens;
 }) {
   const routePath = normalizeRoutePath(location);
@@ -282,7 +280,6 @@ export function CompanyRouter({
       canModify: hasPermission('ecommerce', 'modifier'),
       allowedFeatureIds: ecommerceFeatureIds,
       singleModuleNavigation,
-      onStoreNameChange: onEcommerceStoreNameChange,
     });
   }
   if (routePath === '/entreprise/finance') {
