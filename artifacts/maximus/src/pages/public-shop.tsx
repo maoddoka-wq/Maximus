@@ -608,31 +608,46 @@ function DeliveryPage({ store, customer, requests, form, setForm, submitted, onS
   </section>;
 }
 
+function RentalProductCard({ rental, store }: { rental: PublicRental; store: PublicShopBootstrap['store'] }) {
+  const unit = rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour';
+  return <article className="overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
+    <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#fbfaf7]">
+      {rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-cover" /> : <Home size={36} className="text-[hsl(var(--muted-foreground))]" />}
+      <span className={`absolute right-2.5 top-2.5 rounded-md px-2 py-1 text-[10px] font-bold ${rental.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{rental.isAvailable ? 'Disponible' : 'Indisponible'}</span>
+    </div>
+    <div className="p-3.5 sm:p-4">
+      <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{rental.category || 'Général'} · Location</p>
+      <div className="mt-1.5 flex items-start justify-between gap-3">
+        <h2 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{rental.name}</h2>
+        <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{money(rental.price, store.currency)}<span className="block text-[10px] font-medium text-[#655e55]">/ {unit}</span></p>
+      </div>
+      <div className="mt-4 flex items-center gap-2 border-t border-[#eee7dc] pt-3 text-[11px] font-semibold text-[#655e55]">
+        <Home size={14} className="shrink-0 text-[#8c6c37]" />
+        <span>{rental.availability} disponible{rental.availability > 1 ? 's' : ''}</span>
+        <span className="ml-auto truncate">{rental.category || 'Général'}</span>
+      </div>
+    </div>
+  </article>;
+}
+
 function RentalPage({ rentals, store, onBack }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; onBack: () => void }) {
   const categories = [...new Set(rentals.map(rental => rental.category || 'Général'))].sort((a, b) => a.localeCompare(b, 'fr'));
 
-  return <section className="mx-auto max-w-5xl">
+  return <section className="mx-auto max-w-6xl">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour à la boutique</button>
-    <div className="mt-5 grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
-      <div className="rounded-3xl p-6 text-white shadow-lg sm:p-8" style={{ background: `linear-gradient(145deg, ${store.accentColor}, ${store.primaryColor})` }}>
-        <span className="relative mono text-[10px] font-bold uppercase tracking-[.2em] text-white/70">Location & réservation</span>
-        <h1 className="mt-4 text-3xl font-bold tracking-[-.05em]">Des locations pour vos projets.</h1>
-        <p className="mt-4 text-sm leading-7 text-white/75">Retrouvez ici uniquement les offres disponibles à la location, classées par catégorie et séparées des produits de la boutique.</p>
-        <div className="mt-8 grid grid-cols-3 gap-2">{[['Maison', Home], ['Bâche', Sparkles], ['Voiture', Truck]].map(([label, Icon]) => <div key={label as string} className="rounded-xl bg-white/10 p-3 text-center"><Icon size={18} className="mx-auto" /><span className="mt-2 block text-[11px] font-bold">{label as string}</span></div>)}</div>
-      </div>
-      <div className="rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:p-7">
-        <div className="flex items-start justify-between gap-3"><div><span className="mono text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: store.primaryColor }}>Offres disponibles</span><h2 className="mt-2 text-2xl font-bold">Trouvez votre prochaine location</h2></div><Home size={22} style={{ color: store.accentColor }} /></div>
-        {rentals.length === 0
-          ? <div className="mt-8 rounded-2xl border border-dashed p-8 text-center"><p className="text-sm font-semibold">Les offres de location arrivent bientôt.</p><p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Aucune location publiée n’est disponible dans cette boutique.</p></div>
-          : <div className="mt-6 space-y-8">{categories.map(category => {
-            const categoryRentals = rentals.filter(rental => (rental.category || 'Général') === category);
-            return <section key={category}>
-              <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h3 className="mt-1 text-xl font-bold">{category}</h3></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} offre{categoryRentals.length > 1 ? 's' : ''}</span></div>
-               <div className="grid gap-3 sm:grid-cols-2">{categoryRentals.map(rental => <PublicOfferCard key={`${category}-${rental.name}-${rental.billingUnit}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}</div>
-            </section>;
-          })}</div>}
-      </div>
-    </div>
+    <header className="mt-6 flex flex-col justify-between gap-3 border-b pb-5 sm:flex-row sm:items-end">
+      <div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: store.primaryColor }}>Offres disponibles</p><h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Trouvez votre prochaine location</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Des offres séparées des produits de la boutique, avec leur tarif et leur disponibilité.</p></div>
+      <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{rentals.length} offre{rentals.length > 1 ? 's' : ''}</span>
+    </header>
+    {rentals.length === 0
+      ? <div className="mt-6 rounded-2xl border border-dashed p-10 text-center"><p className="text-sm font-semibold">Les offres de location arrivent bientôt.</p><p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Aucune location publiée n’est disponible dans cette boutique.</p></div>
+      : <div className="mt-6 space-y-8">{categories.map(category => {
+        const categoryRentals = rentals.filter(rental => (rental.category || 'Général') === category);
+        return <section key={category}>
+          <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h2 className="mt-1 text-xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} offre{categoryRentals.length > 1 ? 's' : ''}</span></div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} />)}</div>
+        </section>;
+      })}</div>}
   </section>;
 }
 
