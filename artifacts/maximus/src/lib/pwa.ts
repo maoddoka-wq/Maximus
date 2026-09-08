@@ -34,10 +34,11 @@ export function initializePwa() {
   if ('serviceWorker' in navigator) {
     const clientScope = `${import.meta.env.BASE_URL}client-app/`;
     const clientServiceWorker = `${clientScope}sw.js`;
+    const rootScope = new URL(import.meta.env.BASE_URL, window.location.origin).href;
     void navigator.serviceWorker.getRegistrations()
       .then((registrations) => Promise.all(
         registrations
-          .filter((registration) => registration.active?.scriptURL.endsWith('/sw.js') && registration.scope.endsWith('/'))
+          .filter((registration) => registration.scope === rootScope && registration.active?.scriptURL.endsWith('/sw.js'))
           .map((registration) => registration.unregister()),
       ))
       .then(() => navigator.serviceWorker.register(clientServiceWorker, { scope: clientScope }))
