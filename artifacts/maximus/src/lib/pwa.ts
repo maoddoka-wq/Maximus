@@ -1,0 +1,59 @@
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+};
+
+let deferredInstallPrompt: InstallPromptEvent | null = null;
+let initialized = false;
+const subscribers = new Set<() => void>();
+
+const notify = () => subscribers.forEach((listener) => listener());
+
+export const isStandalonePwa = () =>
+  window.matchMedia('(display-mode: standalone)').matches
+  || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+
+export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+
+export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
+
+export function initializePwa() {
+  if (initialized || typeof window === 'undefined') return;
+  initialized = true;
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event as InstallPromptEvent;
+    notify();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    notify();
+  });
+
+  if ('serviceWorker' in navigator) {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
+      scope: import.meta.env.BASE_URL,
+    }).catch((error: unknown) => {
+      console.warn('Le service worker MAXIMUS n’a pas pu être enregistré.', error);
+    });
+  }
+}
+
+export function subscribeToPwaInstall(listener: () => void) {
+  subscribers.add(listener);
+  listener();
+  return () => {
+    subscribers.delete(listener);
+  };
+}
+
+export async function promptPwaInstall() {
+  if (!deferredInstallPrompt || isStandalonePwa()) return false;
+  const event = deferredInstallPrompt;
+  await event.prompt();
+  const choice = await event.userChoice;
+  deferredInstallPrompt = null;
+  notify();
+  return choice.outcome === 'accepted';
+}

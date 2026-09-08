@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Clock3, Heart, Home, LockKeyhole, LogIn, MapPin, Menu, Minus, Package, Plus, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, MapPin, Menu, Minus, Package, Plus, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -13,6 +13,7 @@ import {
   type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
+import { canInstallPwa, isIosDevice, isStandalonePwa, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
 type PublicRental = PublicShopBootstrap['rentals'][number];
@@ -117,6 +118,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     isDefault: true,
   });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [installAvailable, setInstallAvailable] = useState(false);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
     const result = query.get('payment');
@@ -149,6 +151,16 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     const match = routePath.match(/\/produit\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
   }, [routePath]);
+
+  useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('maximus-client-pwa-entry', JSON.stringify({ slug: slug ?? null, domain }));
+    } catch {
+      // L’installation reste possible même si le navigateur bloque le stockage local.
+    }
+  }, [domain, slug]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
@@ -443,6 +455,12 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     }
   };
 
+  const installClientApp = async () => {
+    if (isIosDevice()) return;
+    const installed = await promptPwaInstall();
+    if (installed) setNotice('MAXIMUS est maintenant installé sur votre appareil.');
+  };
+
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
   if (!data) return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6"><section className="card-surface max-w-md rounded-2xl p-8 text-center"><Store className="mx-auto text-[hsl(var(--primary))]" size={30} /><h1 className="mt-4 text-xl font-bold">Boutique indisponible</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p></section></div>;
 
@@ -478,6 +496,20 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
      <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
       {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><Check size={16} /><span>{notice}</span><button type="button" className="ml-auto" onClick={() => setNotice('')} aria-label="Fermer"><X size={16} /></button></div>}
+      {!isStandalonePwa() && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><Download size={18} /></span>
+          <div>
+            <p className="text-sm font-bold">Installez cette boutique</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              {isIosDevice() ? 'Touchez Partager, puis « Sur l’écran d’accueil » pour retrouver rapidement votre espace client.' : 'Retrouvez la boutique et vos commandes plus rapidement depuis votre écran d’accueil.'}
+            </p>
+          </div>
+        </div>
+        {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>
+          <Download size={15} />Installer l’application
+        </button>}
+      </div>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
         : isAuthRoute ? <AuthPanel mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
         : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} onChange={change} onSubmit={() => void submitOrder()} onBack={() => go('')} />

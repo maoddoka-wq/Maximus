@@ -1,0 +1,20 @@
+{
+  "name": "MAXIMUS Client",
+  "short_name": "MAXIMUS",
+  "description": "La boutique et l’espace client MAXIMUS.",
+  "start_url": "/?pwa=client",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8f5ed",
+  "theme_color": "#0b1b2b",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/admin-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

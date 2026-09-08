@@ -773,6 +773,15 @@ function AppContent() {
         }}
       />
     );
+  if (new URLSearchParams(search).get('pwa') === 'client') {
+    try {
+      const savedEntry = JSON.parse(localStorage.getItem('maximus-client-pwa-entry') ?? 'null') as { slug?: string | null; domain?: boolean } | null;
+      if (savedEntry?.slug) return <PublicShopPage slug={savedEntry.slug} />;
+      if (savedEntry?.domain) return <PublicShopPage domain />;
+    } catch {
+      // Le lancement PWA retombe sur le routage normal si l’entrée enregistrée est invalide.
+    }
+  }
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
