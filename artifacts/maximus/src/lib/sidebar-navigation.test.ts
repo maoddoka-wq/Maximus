@@ -58,3 +58,22 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   assert.ok(groups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
   assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
 });
+
+test('le menu e-commerce expose les catégories avec le catalogue', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['ecommerce'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+    selectedFeatureIdsByModule: {
+      ecommerce: ['dashboard', 'catalogue'],
+    },
+  });
+
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
+    '/entreprise/ecommerce?tab=dashboard',
+    '/entreprise/ecommerce?tab=catalogue',
+    '/entreprise/ecommerce?tab=categories',
+  ]);
+});

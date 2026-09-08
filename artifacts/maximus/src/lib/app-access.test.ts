@@ -299,6 +299,7 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
     [
       '/entreprise/ecommerce?tab=dashboard',
       '/entreprise/ecommerce?tab=catalogue',
+      '/entreprise/ecommerce?tab=categories',
       '/entreprise/ecommerce?tab=parametres',
     ],
   );

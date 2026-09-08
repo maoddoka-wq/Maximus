@@ -12,6 +12,7 @@ import {
   Settings,
   ShoppingCart,
   ShoppingBag,
+  Tags,
   Store,
   Users,
   WalletCards,
@@ -68,6 +69,7 @@ const stockFeatureIcons: Record<string, Icon> = {
 const ecommerceFeatureIcons: Record<string, Icon> = {
   dashboard: Gauge,
   catalogue: Package,
+  categories: Tags,
   commandes: ShoppingCart,
   clients: Users,
   promotions: CreditCard,
@@ -135,13 +137,29 @@ export function buildSidebarFeatureGroups({
             icon: stockFeatureIcons[submodule.id] ?? Warehouse,
           }))
         : moduleId === 'ecommerce'
-          ? getModuleFeatureOptions(module)
-              .filter(feature => selectedFeatureIds.has(feature.id))
-              .map(feature => ({
+          ? (() => {
+              const featureItems = getModuleFeatureOptions(module)
+                .filter(feature => selectedFeatureIds.has(feature.id))
+                .map(feature => ({
                 href: `/entreprise/ecommerce?tab=${feature.id}`,
                 label: feature.label,
                 icon: ecommerceFeatureIcons[feature.id] ?? ShoppingBag,
-              }))
+                }));
+              if (!selectedFeatureIds.has('catalogue') || featureItems.some(item => item.href.endsWith('?tab=categories'))) {
+                return featureItems;
+              }
+              const catalogueIndex = featureItems.findIndex(item => item.href.endsWith('?tab=catalogue'));
+              if (catalogueIndex < 0) return featureItems;
+              return [
+                ...featureItems.slice(0, catalogueIndex + 1),
+                {
+                  href: '/entreprise/ecommerce?tab=categories',
+                  label: 'Catégories',
+                  icon: Tags,
+                },
+                ...featureItems.slice(catalogueIndex + 1),
+              ];
+            })()
         : moduleId === 'presences'
           ? module.features
             .map(feature => ({
