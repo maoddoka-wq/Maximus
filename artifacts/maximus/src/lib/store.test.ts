@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { emptyStoreData, getCompanyDirectoryCompanies, normalizeStoreData, sanitizeStoreData } from './store';
+import { emptyStoreData, getCompanyDirectoryCompanies, getConfiguredModules, normalizeStoreData, sanitizeStoreData } from './store';
 
 test('reconstruit les collections métier quand une sauvegarde partielle contient null', () => {
   const normalized = normalizeStoreData({
@@ -136,6 +136,49 @@ test('rétablit les packs des presets intégrés dans une sauvegarde ancienne', 
     commerce: ['commerce-consultation'],
     presences: ['presence-consultation'],
   });
+});
+
+test('isole les écrans de fonctionnalités des overrides de modules incomplets', () => {
+  const configured = getConfiguredModules({
+    removedModules: [],
+    moduleOverrides: {
+      ecommerce: {
+        name: null as never,
+        features: null as never,
+        featurePacks: [
+          {
+            id: 'legacy-pack',
+            name: 'Pack historique',
+            featureIds: null as never,
+            featurePermissions: null as never,
+          },
+          {
+            id: null as never,
+            name: 'Pack sans identifiant',
+            featureIds: ['catalog'],
+          },
+        ],
+      },
+      presences: {
+        features: null as never,
+        featurePacks: null as never,
+      },
+    },
+  });
+
+  const ecommerce = configured.find(module => module.id === 'ecommerce');
+  const presences = configured.find(module => module.id === 'presences');
+
+  assert.equal(ecommerce?.name, 'E-commerce');
+  assert.ok(Array.isArray(ecommerce?.features));
+  assert.deepEqual(ecommerce?.featurePacks, [{
+    id: 'legacy-pack',
+    name: 'Pack historique',
+    featureIds: [],
+    featurePermissions: {},
+  }]);
+  assert.ok(Array.isArray(presences?.features));
+  assert.ok(Array.isArray(presences?.featurePacks));
 });
 
 test('retire les demandes en attente de l’annuaire des entreprises', () => {

@@ -18,7 +18,7 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
   if (module.id === 'ecommerce') {
     return ecommerceFeatureDefinitions.map(feature => ({ id: feature.id, label: feature.label }));
   }
-  return module.features.map(feature => ({ id: featureSlug(feature), label: feature }));
+  return (Array.isArray(module.features) ? module.features : []).map(feature => ({ id: featureSlug(feature), label: feature }));
 }
 
 export function getModuleFeatureDependencies(module: Module, featureId: string) {
@@ -33,7 +33,7 @@ export function getModuleFeatureDependencies(module: Module, featureId: string) 
 
 export function getEffectiveModuleFeatureIds(module: Module, allowedFeatureIds?: string[]) {
   const allFeatureIds = getModuleFeatureOptions(module).map(feature => feature.id);
-  if (!allowedFeatureIds) return new Set(allFeatureIds);
+  if (!Array.isArray(allowedFeatureIds)) return new Set(allFeatureIds);
 
   const effectiveIds = new Set(allowedFeatureIds.filter(featureId => allFeatureIds.includes(featureId)));
   [...effectiveIds].forEach(featureId => {

@@ -165,7 +165,53 @@ export const sectorPresets: SectorPreset[] = [
 export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
   return modules
     .filter(module => !data.removedModules?.includes(module.id))
-    .map(module => ({ ...module, ...(data.moduleOverrides?.[module.id] ?? {}) }));
+    .map(module => {
+      const override = data.moduleOverrides?.[module.id];
+      if (!override || typeof override !== 'object') return module;
+
+      const featurePacks = Array.isArray(override.featurePacks)
+        ? override.featurePacks
+            .filter((pack): pack is ModuleFeaturePack => Boolean(pack && typeof pack === 'object'))
+            .map(pack => ({
+              ...pack,
+              id: typeof pack.id === 'string' ? pack.id : '',
+              name: typeof pack.name === 'string' ? pack.name : '',
+              description: typeof pack.description === 'string' ? pack.description : '',
+              featureIds: Array.isArray(pack.featureIds)
+                ? pack.featureIds.filter((featureId): featureId is string => typeof featureId === 'string')
+                : [],
+              featurePermissions:
+                pack.featurePermissions && typeof pack.featurePermissions === 'object' && !Array.isArray(pack.featurePermissions)
+                  ? Object.fromEntries(
+                      Object.entries(pack.featurePermissions).map(([featureId, permissions]) => [
+                        featureId,
+                        Array.isArray(permissions)
+                          ? permissions.filter((permission): permission is string => typeof permission === 'string')
+                          : [],
+                      ]),
+                    )
+                  : {},
+            }))
+            .filter(pack => pack.id.length > 0)
+        : module.featurePacks;
+
+      return {
+        ...module,
+        ...override,
+        name: typeof override.name === 'string' ? override.name : module.name,
+        description: typeof override.description === 'string' ? override.description : module.description,
+        features: Array.isArray(override.features)
+          ? override.features.filter((feature): feature is string => typeof feature === 'string')
+          : module.features,
+        featureDependencies:
+          override.featureDependencies &&
+          typeof override.featureDependencies === 'object' &&
+          !Array.isArray(override.featureDependencies)
+            ? override.featureDependencies
+            : module.featureDependencies,
+        featurePacks,
+      };
+    });
 }
 
 function restoreBuiltInSectorPackSelections(presets: SectorPreset[]): SectorPreset[] {
