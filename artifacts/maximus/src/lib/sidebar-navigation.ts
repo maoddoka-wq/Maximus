@@ -77,6 +77,38 @@ const ecommerceFeatureIcons: Record<string, Icon> = {
   parametres: Settings,
 };
 
+function buildEcommerceNavigationItems(
+  module: Module,
+  selectedFeatureIds: Set<string>,
+) {
+  const featureItems = getModuleFeatureOptions(module)
+    .filter(feature => selectedFeatureIds.has(feature.id))
+    .map(feature => ({
+      href: `/entreprise/ecommerce?tab=${feature.id}`,
+      label: feature.label,
+      icon: ecommerceFeatureIcons[feature.id] ?? ShoppingBag,
+    }));
+
+  // Les catégories font partie de la gestion du catalogue : elles suivent
+  // donc son autorisation sans devenir une permission indépendante.
+  if (!selectedFeatureIds.has('catalogue') || featureItems.some(item => item.href.endsWith('?tab=categories'))) {
+    return featureItems;
+  }
+
+  const catalogueIndex = featureItems.findIndex(item => item.href.endsWith('?tab=catalogue'));
+  if (catalogueIndex < 0) return featureItems;
+
+  return [
+    ...featureItems.slice(0, catalogueIndex + 1),
+    {
+      href: '/entreprise/ecommerce?tab=categories',
+      label: 'Catégories',
+      icon: Tags,
+    },
+    ...featureItems.slice(catalogueIndex + 1),
+  ];
+}
+
 type SidebarNavigationInput = {
   allowed: ModuleId[];
   configuredModules: Module[];
@@ -137,29 +169,7 @@ export function buildSidebarFeatureGroups({
             icon: stockFeatureIcons[submodule.id] ?? Warehouse,
           }))
         : moduleId === 'ecommerce'
-          ? (() => {
-              const featureItems = getModuleFeatureOptions(module)
-                .filter(feature => selectedFeatureIds.has(feature.id))
-                .map(feature => ({
-                href: `/entreprise/ecommerce?tab=${feature.id}`,
-                label: feature.label,
-                icon: ecommerceFeatureIcons[feature.id] ?? ShoppingBag,
-                }));
-              if (!selectedFeatureIds.has('catalogue') || featureItems.some(item => item.href.endsWith('?tab=categories'))) {
-                return featureItems;
-              }
-              const catalogueIndex = featureItems.findIndex(item => item.href.endsWith('?tab=catalogue'));
-              if (catalogueIndex < 0) return featureItems;
-              return [
-                ...featureItems.slice(0, catalogueIndex + 1),
-                {
-                  href: '/entreprise/ecommerce?tab=categories',
-                  label: 'Catégories',
-                  icon: Tags,
-                },
-                ...featureItems.slice(catalogueIndex + 1),
-              ];
-            })()
+          ? buildEcommerceNavigationItems(module, selectedFeatureIds)
         : moduleId === 'presences'
           ? module.features
             .map(feature => ({
