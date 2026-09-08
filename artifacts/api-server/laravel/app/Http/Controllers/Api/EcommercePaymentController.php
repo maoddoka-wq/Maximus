@@ -96,8 +96,22 @@ final class EcommercePaymentController extends Controller
                 'errorUrl' => $request->input('errorUrl'),
                 'feeOnCustomer' => false,
             ], 'order:'.$order->id);
-            $chargeId = trim((string) ($charge['id'] ?? ''));
-            $checkoutUrl = trim((string) ($charge['checkout_url'] ?? ''));
+            $chargeData = is_array($charge['data'] ?? null)
+                ? array_merge($charge, $charge['data'])
+                : $charge;
+            $chargeId = trim((string) (
+                $chargeData['id']
+                ?? $chargeData['charge_id']
+                ?? $chargeData['chargeId']
+                ?? ''
+            ));
+            $checkoutUrl = trim((string) (
+                $chargeData['checkout_url']
+                ?? $chargeData['checkoutUrl']
+                ?? $chargeData['payment_url']
+                ?? $chargeData['paymentUrl']
+                ?? ''
+            ));
             if ($chargeId === '' || $checkoutUrl === '') {
                 return response()->json(['error' => 'DiamanoPay n’a pas retourné de checkout valide.'], 502);
             }

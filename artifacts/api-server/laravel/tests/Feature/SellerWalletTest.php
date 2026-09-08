@@ -316,6 +316,37 @@ class SellerWalletTest extends TestCase
         Http::assertSent(fn ($request): bool => $request['provider'] === 'WAVE');
     }
 
+    public function test_public_payment_accepts_nested_diamanopay_checkout_response(): void
+    {
+        $this->createStore('kora', 'kora-charge-nested');
+        $this->createOrder('order-charge-nested', 'kora', 2500, '');
+        config([
+            'services.diamanopay.access_token' => 'static-test-token',
+            'services.diamanopay.provider' => 'WAVE',
+            'services.diamanopay.webhook_secret' => 'test-webhook-secret',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'success' => true,
+                'statusCode' => 201,
+                'data' => [
+                    'chargeId' => 'charge-provider-nested',
+                    'checkoutUrl' => 'https://checkout.example.test/provider-nested',
+                ],
+            ], 201),
+        ]);
+
+        $this->postJson('/api/shop/kora-charge-nested/orders/order-charge-nested/payment')
+            ->assertCreated()
+            ->assertJsonPath('checkoutUrl', 'https://checkout.example.test/provider-nested');
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => 'order-charge-nested',
+            'payment_charge_id' => 'charge-provider-nested',
+            'payment_checkout_url' => 'https://checkout.example.test/provider-nested',
+        ]);
+    }
+
     private function configureDiamano(): void
     {
         config([
