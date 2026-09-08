@@ -465,9 +465,38 @@ body {
   box-shadow: 0 6px 16px hsl(var(--foreground) / .08);
 }
 
+.shop-main > section.grid > aside {
+  align-self: start;
+}
+
+.shop-main > section.grid > aside nav {
+  gap: .35rem;
+}
+
+.shop-main > section.grid > aside nav button {
+  min-height: 2.7rem;
+}
+
+.shop-main article > div > div:last-child {
+  margin-top: .6rem !important;
+}
+
+.shop-main article > div > div + p {
+  min-height: 2rem !important;
+}
+
 @media (min-width: 768px) {
   .page-content {
     padding-top: 1.75rem;
+  }
+
+  .shop-main > section.grid > aside {
+    position: sticky;
+    top: 1.5rem;
+  }
+
+  .shop-main article > div > div:last-child {
+    margin-top: .8rem !important;
   }
 }
 
@@ -494,6 +523,26 @@ body {
 
   .mobile-kpi-grid > * .text-3xl {
     font-size: 1.65rem;
+  }
+
+  .shop-main > section.grid > aside {
+    padding: .75rem;
+  }
+
+  .shop-main > section.grid > aside nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+  }
+
+  .shop-main > section.grid > aside nav button {
+    min-width: 0;
+    padding-inline: .65rem;
+  }
+
+  .shop-main > section.grid > aside nav button:last-child {
+    grid-column: 1 / -1;
+    margin-top: .15rem;
+    border-top: 1px solid hsl(var(--border));
   }
 
   .mobile-hero {
