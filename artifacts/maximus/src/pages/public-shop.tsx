@@ -72,8 +72,8 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     const query = new URLSearchParams(search);
     const result = query.get('payment');
     const orderId = query.get('order');
-    return result && orderId && ['success', 'error'].includes(result)
-      ? { result: result as 'success' | 'error', orderId }
+    return result && orderId && ['success', 'error', 'return'].includes(result)
+      ? { result: result as 'success' | 'error' | 'return', orderId }
       : null;
   }, [search]);
 
@@ -271,17 +271,17 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
        const order = domain
         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
-      const returnUrl = (result: 'success' | 'error') => {
+      const returnUrl = () => {
         const url = new URL(window.location.href);
         url.search = '';
         url.hash = '';
-        url.searchParams.set('payment', result);
+        url.searchParams.set('payment', 'return');
         url.searchParams.set('order', order.id);
         return url.toString();
       };
       const payment = domain
-        ? await publicEcommerceApi.createDomainPayment(order.id, { successUrl: returnUrl('success'), errorUrl: returnUrl('error') })
-        : await publicEcommerceApi.createPayment(slug ?? '', order.id, { successUrl: returnUrl('success'), errorUrl: returnUrl('error') });
+        ? await publicEcommerceApi.createDomainPayment(order.id, { redirectUrl: returnUrl() })
+        : await publicEcommerceApi.createPayment(slug ?? '', order.id, { redirectUrl: returnUrl() });
       setCheckoutKey(null);
       setCart([]);
       if (customer) {

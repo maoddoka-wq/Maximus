@@ -39,6 +39,7 @@ return [
         'base_url' => env('DIAMANOPAY_BASE_URL', 'https://api.diamanopay.com'),
         'access_token' => env('DIAMANOPAY_ACCESS_TOKEN'),
         'provider' => env('PAYMENT_PROVIDER', 'WAVE'),
+        'webhook_url' => env('DIAMANOPAY_WEBHOOK_URL'),
         'client_id' => env('DIAMANOPAY_CLIENT_ID'),
         'client_secret' => env('DIAMANOPAY_CLIENT_SECRET'),
         'webhook_secret' => env('DIAMANOPAY_WEBHOOK_SECRET'),

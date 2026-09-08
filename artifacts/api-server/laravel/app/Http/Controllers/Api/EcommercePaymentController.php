@@ -64,8 +64,7 @@ final class EcommercePaymentController extends Controller
     private function createForOrder(Request $request, object $store, string $orderId): JsonResponse
     {
         Validator::make($request->all(), [
-            'successUrl' => ['nullable', 'url', 'max:500'],
-            'errorUrl' => ['nullable', 'url', 'max:500'],
+            'redirectUrl' => ['nullable', 'url', 'max:500'],
         ])->validate();
 
         $order = DB::table('ecommerce_orders')->where('id', $orderId)->where('company_id', $store->company_id)->first();
@@ -75,7 +74,7 @@ final class EcommercePaymentController extends Controller
         if ($order->payment_status === 'PAID') {
             return response()->json(['error' => 'Cette commande est déjà payée.'], 422);
         }
-        if ($order->payment_charge_id && $order->payment_checkout_url) {
+        if ($order->payment_status === 'PENDING' && $order->payment_charge_id && $order->payment_checkout_url) {
             return response()->json([
                 'reference' => $order->reference,
                 'total' => (int) $order->total,
@@ -86,16 +85,28 @@ final class EcommercePaymentController extends Controller
 
         try {
             $provider = trim((string) config('services.diamanopay.provider', ''));
+            $webhookUrl = trim((string) config('services.diamanopay.webhook_url', ''));
+            if ($webhookUrl === '') {
+                $webhookUrl = rtrim((string) config('app.url', ''), '/');
+                if ($webhookUrl === '' || str_contains($webhookUrl, 'localhost')) {
+                    $webhookUrl = rtrim($request->getSchemeAndHttpHost(), '/');
+                }
+            }
+            $webhookUrl .= '/api/payments/diamanopay/webhook';
+            $idempotencyKey = 'order:'.$order->id;
+            if ($order->payment_status !== 'PENDING' && $order->payment_charge_id) {
+                $idempotencyKey .= ':retry:'.$order->payment_charge_id;
+            }
             $charge = $this->diamanoPay->createCharge([
                 'amount' => (int) $order->total,
                 'currency' => (string) $store->currency,
                 'provider' => strtoupper($provider !== '' ? $provider : 'WAVE'),
                 'description' => 'Commande '.$order->reference,
                 'clientReference' => $order->reference,
-                'successUrl' => $request->input('successUrl'),
-                'errorUrl' => $request->input('errorUrl'),
+                'redirectUrl' => $request->input('redirectUrl'),
+                'webhook' => $webhookUrl,
                 'feeOnCustomer' => false,
-            ], 'order:'.$order->id);
+            ], $idempotencyKey);
             $chargeData = is_array($charge['data'] ?? null)
                 ? array_merge($charge, $charge['data'])
                 : $charge;

@@ -268,9 +268,9 @@ export const publicEcommerceApi = {
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
   createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
-  createPayment: (slug: string, orderId: string, body?: { successUrl?: string; errorUrl?: string }) =>
+  createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
-  createDomainPayment: (orderId: string, body?: { successUrl?: string; errorUrl?: string }) =>
+  createDomainPayment: (orderId: string, body?: { redirectUrl?: string }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   paymentStatus: (slug: string, orderId: string) =>
     request<PublicPaymentStatus>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment-status`),

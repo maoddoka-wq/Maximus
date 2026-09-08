@@ -284,13 +284,14 @@ class SellerWalletTest extends TestCase
         ]);
 
         $this->postJson('/api/shop/kora-charge/orders/order-charge-provider/payment', [
-            'successUrl' => 'https://maximus-erp.onrender.com/boutique/kora-charge/paiement/success',
-            'errorUrl' => 'https://maximus-erp.onrender.com/boutique/kora-charge/paiement/error',
+            'redirectUrl' => 'https://maximus-erp.onrender.com/shop/kora-charge?payment=return&order=order-charge-provider',
         ])->assertCreated();
 
         Http::assertSent(function ($request): bool {
             return $request->url() === 'https://api.diamanopay.com/api/charges'
-                && $request['provider'] === 'WAVE';
+                && $request['provider'] === 'WAVE'
+                && $request['redirectUrl'] === 'https://maximus-erp.onrender.com/shop/kora-charge?payment=return&order=order-charge-provider'
+                && str_ends_with((string) $request['webhook'], '/api/payments/diamanopay/webhook');
         });
     }
 
@@ -344,6 +345,39 @@ class SellerWalletTest extends TestCase
             'id' => 'order-charge-nested',
             'payment_charge_id' => 'charge-provider-nested',
             'payment_checkout_url' => 'https://checkout.example.test/provider-nested',
+        ]);
+    }
+
+    public function test_public_payment_creates_a_new_charge_after_a_failed_attempt(): void
+    {
+        $this->createStore('kora', 'kora-charge-retry');
+        $this->createOrder('order-charge-retry', 'kora', 2500, 'charge-old');
+        DB::table('ecommerce_orders')->where('id', 'order-charge-retry')->update([
+            'payment_status' => 'FAILED',
+        ]);
+        config([
+            'services.diamanopay.access_token' => 'static-test-token',
+            'services.diamanopay.provider' => 'WAVE',
+            'services.diamanopay.webhook_secret' => 'test-webhook-secret',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'chargeId' => 'charge-retry',
+                'paymentUrl' => 'https://checkout.example.test/retry',
+            ], 201),
+        ]);
+
+        $this->postJson('/api/shop/kora-charge-retry/orders/order-charge-retry/payment', [
+            'redirectUrl' => 'https://maximus-erp.onrender.com/shop/kora-charge-retry?payment=return&order=order-charge-retry',
+        ])->assertCreated();
+
+        Http::assertSent(fn ($request): bool => $request['clientReference'] === 'CMD-ORDER-CHARGE-RETRY'
+            && $request['redirectUrl'] === 'https://maximus-erp.onrender.com/shop/kora-charge-retry?payment=return&order=order-charge-retry'
+            && $request->header('Idempotency-Key') === ['order:order-charge-retry:retry:charge-old']);
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => 'order-charge-retry',
+            'payment_status' => 'PENDING',
+            'payment_charge_id' => 'charge-retry',
         ]);
     }
 
