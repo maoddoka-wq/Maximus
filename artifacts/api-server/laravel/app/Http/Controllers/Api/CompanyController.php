@@ -310,14 +310,20 @@ class CompanyController extends Controller
             'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ])->validate();
 
-        $path = $input['photo']->store('companies/'.$companyId, 'public');
-        if (! is_string($path) || $path === '') {
+        $contents = $input['photo']->get();
+        if (! is_string($contents) || $contents === '') {
             return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
         }
 
-        $photoUrl = '/api/company-profile-images/'.rawurlencode($companyId).'/'.rawurlencode(basename($path));
+        $extension = strtolower($input['photo']->getClientOriginalExtension() ?: 'bin');
+        $filename = Str::uuid()->toString().'.'.$extension;
+        $photoUrl = '/api/company-profile-images/'.rawurlencode($companyId).'/'.rawurlencode($filename);
         $previousUrl = $company->profile_photo;
-        $company->update(['profile_photo' => $photoUrl]);
+        $company->update([
+            'profile_photo' => $photoUrl,
+            'profile_photo_data' => base64_encode($contents),
+            'profile_photo_mime' => $input['photo']->getMimeType() ?: 'application/octet-stream',
+        ]);
         $this->removeStoredProfilePhoto($previousUrl, $photoUrl);
 
         return response()->json(['ok' => true, 'company' => $this->companyPayload($company->fresh())]);
@@ -336,7 +342,11 @@ class CompanyController extends Controller
         }
 
         $previousUrl = $company->profile_photo;
-        $company->update(['profile_photo' => null]);
+        $company->update([
+            'profile_photo' => null,
+            'profile_photo_data' => null,
+            'profile_photo_mime' => null,
+        ]);
         $this->removeStoredProfilePhoto($previousUrl, null);
 
         return response()->json(['ok' => true, 'company' => $this->companyPayload($company->fresh())]);
@@ -346,6 +356,17 @@ class CompanyController extends Controller
     {
         if (! preg_match('/^[A-Za-z0-9_-]+$/', $companyId) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
             abort(404);
+        }
+
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if ($company && is_string($company->profile_photo_data) && $company->profile_photo_data !== '') {
+            $contents = base64_decode($company->profile_photo_data, true);
+            if (is_string($contents)) {
+                return response($contents, 200, [
+                    'Content-Type' => $company->profile_photo_mime ?: 'application/octet-stream',
+                    'Cache-Control' => 'public, max-age=31536000, immutable',
+                ]);
+            }
         }
 
         $path = 'companies/'.$companyId.'/'.$filename;

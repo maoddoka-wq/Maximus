@@ -9,7 +9,7 @@ use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CompanyRequestTest extends TestCase
@@ -132,7 +132,6 @@ class CompanyRequestTest extends TestCase
 
     public function test_company_admin_can_persist_branding_and_profile_photo(): void
     {
-        Storage::fake('public');
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
         $companyId = Company::query()->where('email', 'owner@atelier.test')->value('id');
         $maximusToken = $this->issueMaximusSession();
@@ -168,12 +167,23 @@ class CompanyRequestTest extends TestCase
         $upload->assertOk();
         $photoUrl = (string) $upload->json('company.profilePhoto');
         $filename = basename(parse_url($photoUrl, PHP_URL_PATH) ?: '');
-        Storage::disk('public')->assertExists('companies/'.$companyId.'/'.$filename);
+        $this->assertNotSame('', $filename);
+        $this->assertDatabaseHas('companies', [
+            'id' => $companyId,
+            'profile_photo' => $photoUrl,
+            'profile_photo_mime' => 'image/png',
+        ]);
+        $this->assertNotEmpty(DB::table('companies')->where('id', $companyId)->value('profile_photo_data'));
+        $this->get($photoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
 
         $this->deleteJson('/api/companies/'.$companyId.'/profile-photo')
             ->assertOk()
             ->assertJsonPath('company.profilePhoto', null);
-        Storage::disk('public')->assertMissing('companies/'.$companyId.'/'.$filename);
+        $this->assertDatabaseHas('companies', [
+            'id' => $companyId,
+            'profile_photo_data' => null,
+            'profile_photo_mime' => null,
+        ]);
     }
 
     public function test_archiving_a_company_revokes_sessions_and_blocks_the_tenant(): void

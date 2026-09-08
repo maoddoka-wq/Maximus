@@ -26,6 +26,8 @@ class Company extends Model
         'requested_module_features',
         'requested_module_permissions',
         'profile_photo',
+        'profile_photo_data',
+        'profile_photo_mime',
         'primary_color',
         'accent_color',
         'sidebar_color',

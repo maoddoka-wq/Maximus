@@ -859,6 +859,7 @@ class EcommerceController extends Controller
 
     private function publicStorePayload(object $row): array
     {
+        $companyLogo = DB::table('companies')->where('id', $row->company_id)->value('profile_photo');
         return [
             'slug' => $row->slug,
             'name' => $row->name,
@@ -867,7 +868,7 @@ class EcommerceController extends Controller
             'currency' => $row->currency,
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
-            'logoUrl' => $row->logo_url,
+            'logoUrl' => $row->logo_url ?: ($companyLogo ?: ''),
             'enabledFeatures' => $this->publicEnabledFeatures((string) $row->company_id),
         ];
     }
@@ -1342,6 +1343,7 @@ class EcommerceController extends Controller
 
     private function store(object $row): array
     {
+        $companyLogo = DB::table('companies')->where('id', $row->company_id)->value('profile_photo');
         return [
             'id' => $row->id,
             'companyId' => $row->company_id,
@@ -1352,7 +1354,7 @@ class EcommerceController extends Controller
             'currency' => $row->currency,
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
-            'logoUrl' => $row->logo_url,
+            'logoUrl' => $row->logo_url ?: ($companyLogo ?: ''),
         ];
     }
 
