@@ -305,49 +305,6 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
   </div>;
 }
 
-function AdminCatalogCard({
-  imageUrl,
-  fallbackIcon: FallbackIcon,
-  badge,
-  title,
-  subtitle,
-  price,
-  priceSuffix,
-  availability,
-  status,
-  actions,
-}: {
-  imageUrl: string;
-  fallbackIcon: typeof Package;
-  badge: string;
-  title: string;
-  subtitle: string;
-  price: string;
-  priceSuffix?: string;
-  availability: ReactNode;
-  status: string;
-  actions?: ReactNode;
-}) {
-  return <article className="min-w-0 overflow-hidden rounded-xl border bg-[hsl(var(--card))] shadow-sm transition hover:-translate-y-0.5 hover:border-[hsl(var(--primary)/.35)]">
-    <div className="relative flex aspect-[2/1] items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.45)]">
-      {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-contain p-1.5" /> : <FallbackIcon size={34} className="text-[hsl(var(--muted-foreground))]" />}
-      <div className="absolute right-2 top-2"><StatusPill value={status} /></div>
-    </div>
-    <div className="space-y-2 p-3">
-      <div className="min-w-0">
-        <p className="truncate text-[9px] font-bold uppercase tracking-[.12em] text-[hsl(var(--primary))]">{badge}</p>
-        <h3 className="mt-1 truncate text-sm font-bold">{title}</h3>
-        <p className="mt-0.5 truncate text-[11px] text-[hsl(var(--muted-foreground))]">{subtitle}</p>
-      </div>
-      <div className="flex items-end justify-between gap-3">
-        <div><p className="text-sm font-bold">{price}</p>{priceSuffix && <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{priceSuffix}</p>}</div>
-        <div className="text-right text-[11px] font-semibold">{availability}</div>
-      </div>
-      {actions && <div className="flex flex-wrap gap-1.5 border-t pt-2">{actions}</div>}
-    </div>
-  </article>;
-}
-
 function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const { confirm, alert } = useAppDialog();
   const [editing, setEditing] = useState<EcommerceRental | 'new' | null>(null);
@@ -394,7 +351,7 @@ function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBoots
     </section>
     <div className="grid gap-4 sm:grid-cols-3"><Metric label="Offres actives" value={String(activeRentals.length)} detail="Brouillons et publiées" icon={House} accent /><Metric label="Disponibles" value={String(activeRentals.filter(rental => rental.isAvailable).length)} detail="Avec une capacité positive" icon={CheckCircle2} /><Metric label="Visibles en ligne" value={String(activeRentals.filter(rental => rental.status === 'PUBLISHED').length)} detail="Statut publié" icon={Megaphone} /></div>
     <Panel title="Offres de location" description="Les fiches restent indépendantes du catalogue produit et se conservent après actualisation.">
-       {activeRentals.length === 0 ? <Empty icon={House} title="Aucune location" text="Créez votre première offre autonome pour l’afficher dans la rubrique Location." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter une location</button> : undefined} /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{activeRentals.map(rental => <AdminCatalogCard key={rental.id} imageUrl={rental.imageUrl} fallbackIcon={House} badge={`Location · ${rental.category}`} title={rental.name} subtitle={`Tarif par ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} price={money(rental.price, data.store.currency)} priceSuffix={`par ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} status={rental.status === 'PUBLISHED' && rental.isAvailable ? 'Disponible' : rental.status} availability={<label className="inline-flex items-center gap-1"><span className="text-[hsl(var(--muted-foreground))]">Disponibles</span><input aria-label={`Disponibilité de ${rental.name}`} type="number" min="0" value={rental.availability} disabled={!canModify} onChange={event => void setAvailability(rental, event.target.value)} className="w-14 rounded-lg border bg-transparent px-1.5 py-1 text-right font-bold disabled:opacity-50" /></label>} actions={<>{canModify && <button type="button" onClick={() => open(rental)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold"><Pencil size={12} />Modifier</button>}{canModify && <button type="button" onClick={() => void archive(rental)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Archive size={12} />Archiver</button>}</>} />)}</div>}
+        {activeRentals.length === 0 ? <Empty icon={House} title="Aucune location" text="Créez votre première offre autonome pour l’afficher dans la rubrique Location." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter une location</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Location</th><th className="px-4">Tarif</th><th className="px-4">Disponibilité</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{activeRentals.map(rental => <tr key={rental.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{rental.imageUrl ? <img src={rental.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><House size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{rental.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{rental.category} · par {rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}</small></span></div></td><td className="px-4 py-3 font-bold">{money(rental.price, data.store.currency)}</td><td className="px-4 py-3"><input aria-label={`Disponibilité de ${rental.name}`} type="number" min="0" value={rental.availability} disabled={!canModify} onChange={event => void setAvailability(rental, event.target.value)} className="w-24 rounded-lg border bg-transparent px-2.5 py-2 text-sm font-bold disabled:opacity-50" /></td><td className="px-4 py-3"><StatusPill value={rental.status === 'PUBLISHED' && rental.isAvailable ? 'Disponible' : rental.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && <button type="button" onClick={() => open(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModify && <button type="button" onClick={() => void archive(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
      {editing && <RentalModal editing={editing} form={form} categories={data.categories} setForm={setForm} onClose={() => setEditing(null)} onSave={save} />}
   </div>;
@@ -523,7 +480,7 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
   return <div className="space-y-5 fade-up">
     <Panel title="Catalogue en ligne" description="Organisez les références qui alimentent directement votre vitrine." action={canCreate ? <button type="button" onClick={() => open()} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un produit</button> : undefined}>
       <div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par nom, référence ou catégorie" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option><option value="PUBLISHED">Publié</option><option value="DRAFT">Brouillon</option><option value="ARCHIVED">Archivé</option></select></div>
-       {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreate && !query ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{filtered.map(product => <AdminCatalogCard key={product.id} imageUrl={product.imageUrl} fallbackIcon={Package} badge={`${product.productType === 'RENTAL' ? 'Location' : 'Produit'} · ${product.category}${product.featured ? ' · Vedette' : ''}`} title={product.name} subtitle={`Réf. ${product.sku}`} price={money(product.price, data.store.currency)} priceSuffix={product.productType === 'RENTAL' ? `par ${product.rentalPeriod === 'MOIS' ? 'mois' : product.rentalPeriod === 'SEMAINE' ? 'semaine' : 'jour'}` : undefined} status={product.status} availability={<span className={product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}>{product.productType === 'RENTAL' ? 'Disponibilité' : 'Stock'} : {product.stock}</span>} actions={<>{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={12} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={12} />Archiver</button>}</>} />)}</div>}
+        {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreate && !query ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Produit</th><th className="px-4">Référence</th><th className="px-4">Prix</th><th className="px-4">Stock</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{filtered.map(product => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.category}{product.featured ? ' · Vedette' : ''}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}</td><td className="px-4 py-3 font-bold">{money(product.price, data.store.currency)}</td><td className={`px-4 py-3 font-bold ${product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}`}>{product.stock}</td><td className="px-4 py-3"><StatusPill value={product.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={13} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
     {modal && <ProductModal modal={modal} form={form} categories={data.categories} setForm={setForm} onClose={() => setModal(null)} onSave={save} />}
   </div>;
