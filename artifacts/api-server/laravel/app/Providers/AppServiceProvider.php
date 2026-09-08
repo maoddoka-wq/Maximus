@@ -35,5 +35,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('orders', function (Request $request): Limit {
             return Limit::perMinute(20)->by($request->ip());
         });
+
+        RateLimiter::for('withdrawals', function (Request $request): Limit {
+            return Limit::perMinute(5)->by((string) $request->attributes->get('companyId').'|'.$request->ip());
+        });
     }
 }

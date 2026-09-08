@@ -229,6 +229,9 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
       setSubmitted(order);
+      const payment = domain
+        ? await publicEcommerceApi.createDomainPayment(order.id, { successUrl: window.location.href, errorUrl: window.location.href })
+        : await publicEcommerceApi.createPayment(slug ?? '', order.id, { successUrl: window.location.href, errorUrl: window.location.href });
       setCheckoutKey(null);
       setCart([]);
       if (customer) {
@@ -236,6 +239,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
         const refreshed = await api.bootstrap();
         setCustomerData(refreshed);
       }
+      window.location.assign(payment.checkoutUrl);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La commande n’a pas pu être envoyée.');
     }

@@ -575,6 +575,7 @@ class EcommerceCustomerController extends Controller
             'note' => $row->note,
             'total' => (int) $row->total,
             'status' => $row->status,
+            'paymentStatus' => $row->payment_status ?? 'UNPAID',
             'createdAt' => $row->created_at,
             'items' => $items->map(fn (object $item): array => [
                 'id' => $item->id,

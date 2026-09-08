@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'diamanopay' => [
+        'base_url' => env('DIAMANOPAY_BASE_URL', 'https://api.diamanopay.com'),
+        'client_id' => env('DIAMANOPAY_CLIENT_ID'),
+        'client_secret' => env('DIAMANOPAY_CLIENT_SECRET'),
+        'webhook_secret' => env('DIAMANOPAY_WEBHOOK_SECRET'),
+    ],
+
 ];

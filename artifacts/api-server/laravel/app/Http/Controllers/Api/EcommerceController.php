@@ -467,7 +467,27 @@ class EcommerceController extends Controller
         if (! in_array($input['status'], self::ORDER_TRANSITIONS[$order->status] ?? [], true)) {
             return response()->json(['error' => 'Cette transition de commande n’est pas autorisée.'], 422);
         }
-        $query->update(['status' => $input['status'], 'updated_at' => now()]);
+        DB::transaction(function () use ($query, $id, $input): void {
+            $locked = DB::table('ecommerce_orders')->where('id', $id)->lockForUpdate()->first();
+            if (! $locked) {
+                return;
+            }
+            DB::table('ecommerce_orders')->where('id', $id)->update(['status' => $input['status'], 'updated_at' => now()]);
+            $wallet = app(\App\Http\Controllers\Api\SellerWalletController::class);
+            $updated = DB::table('ecommerce_orders')->where('id', $id)->first();
+            if ($input['status'] === 'LIVRÉE') {
+                $wallet->releaseOrderFunds($updated);
+            }
+            if ($input['status'] === 'ANNULÉE') {
+                if ($updated->payment_status === 'PAID') {
+                    $wallet->reverseOrderFunds($updated);
+                    DB::table('ecommerce_orders')->where('id', $id)->update(['payment_status' => 'REFUNDED', 'updated_at' => now()]);
+                }
+                if (in_array($updated->payment_status, ['PENDING', 'FAILED'], true)) {
+                    $wallet->restoreOrderStock($updated);
+                }
+            }
+        });
 
         return response()->json($this->order(DB::table('ecommerce_orders')->where('id', $id)->first()));
     }
@@ -587,7 +607,13 @@ class EcommerceController extends Controller
                 ->where('idempotency_key', $idempotencyKey)
                 ->first();
             if ($existing) {
-                return response()->json(['reference' => $existing->reference, 'total' => (int) $existing->total]);
+                return response()->json([
+                    'id' => $existing->id,
+                    'reference' => $existing->reference,
+                    'total' => (int) $existing->total,
+                    'paymentStatus' => $existing->payment_status ?? 'UNPAID',
+                    'paymentCheckoutUrl' => $existing->payment_checkout_url ?? null,
+                ]);
             }
         }
         if ($customer) {
@@ -672,7 +698,7 @@ class EcommerceController extends Controller
                         ->delete();
                 }
 
-                return ['reference' => $reference, 'total' => $total];
+                return ['id' => $id, 'reference' => $reference, 'total' => $total, 'paymentStatus' => 'UNPAID'];
             });
 
             return response()->json($order, 201);
@@ -837,6 +863,8 @@ class EcommerceController extends Controller
             'note' => $row->note,
             'total' => (int) $row->total,
             'status' => $row->status,
+            'paymentStatus' => $row->payment_status ?? 'UNPAID',
+            'paymentCheckoutUrl' => $row->payment_checkout_url ?? null,
             'createdAt' => $row->created_at,
             'items' => array_map(fn ($item) => [
                 'id' => $item->id,

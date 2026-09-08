@@ -2,12 +2,19 @@
 
 use App\Http\Controllers\Api\EcommerceController;
 use App\Http\Controllers\Api\EcommerceCustomerController;
+use App\Http\Controllers\Api\EcommercePaymentController;
+use App\Http\Controllers\Api\SellerWalletController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/payments/diamanopay/webhook', [SellerWalletController::class, 'webhook']);
 
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'])
     ->prefix('ecommerce')
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
+        Route::get('/wallet', [SellerWalletController::class, 'bootstrap']);
+        Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);
+        Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
         Route::post('/categories', [EcommerceController::class, 'createCategory']);
         Route::patch('/categories/{id}', [EcommerceController::class, 'updateCategory']);
@@ -30,6 +37,7 @@ Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/', [EcommerceController::class, 'publicBootstrap']);
     Route::post('/orders', [EcommerceController::class, 'createPublicOrder'])->middleware('throttle:orders');
+    Route::post('/orders/{orderId}/payment', [EcommercePaymentController::class, 'create'])->middleware('throttle:orders');
     Route::get('/customer/session', [EcommerceCustomerController::class, 'session']);
     Route::post('/customer/register', [EcommerceCustomerController::class, 'register'])->middleware('throttle:login');
     Route::post('/customer/login', [EcommerceCustomerController::class, 'login'])->middleware('throttle:login');
@@ -66,5 +74,6 @@ Route::put('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'p
 Route::delete('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
 Route::get('/shop-domain/customer/orders', [EcommerceCustomerController::class, 'orders']);
 Route::get('/shop-domain/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
 Route::post('/shop-domain/customer/logout', [EcommerceCustomerController::class, 'logout']);
 Route::post('/shop/{slug}/customer/logout', [EcommerceCustomerController::class, 'logout']);

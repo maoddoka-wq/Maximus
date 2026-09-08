@@ -1,6 +1,7 @@
 export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
+export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 
 export interface EcommerceStore {
   id: string;
@@ -76,6 +77,8 @@ export interface EcommerceOrder {
   note: string;
   total: number;
   status: EcommerceOrderStatus;
+  paymentStatus: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  paymentCheckoutUrl: string | null;
   createdAt: string;
   items: EcommerceOrderItem[];
 }
@@ -86,6 +89,53 @@ export interface EcommerceBootstrap {
   categories: EcommerceCategory[];
   products: EcommerceProduct[];
   orders: EcommerceOrder[];
+}
+
+export interface SellerWallet {
+  companyId: string;
+  currency: 'XOF' | 'EUR' | 'USD';
+  pendingBalance: number;
+  availableBalance: number;
+  reservedBalance: number;
+  totalCredited: number;
+  payoutProvider: 'WAVE';
+  payoutMobile: string;
+  payoutName: string;
+}
+
+export interface SellerWithdrawal {
+  id: string;
+  amount: number;
+  fee: number;
+  netAmount: number;
+  provider: 'WAVE';
+  mobile: string;
+  beneficiaryName: string;
+  status: SellerWithdrawalStatus;
+  providerPayoutId: string | null;
+  failureReason: string;
+  requestedAt: string;
+  processedAt: string | null;
+}
+
+export interface SellerWalletLedgerEntry {
+  id: string;
+  type: string;
+  bucket: string;
+  direction: 'CREDIT' | 'DEBIT';
+  amount: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  availableAt: string | null;
+  releasedAt: string | null;
+  reversedAt: string | null;
+  createdAt: string;
+}
+
+export interface SellerWalletBootstrap {
+  wallet: SellerWallet;
+  withdrawals: SellerWithdrawal[];
+  ledger: SellerWalletLedgerEntry[];
 }
 
 export interface PublicShopBootstrap {
@@ -174,6 +224,11 @@ export const createEcommerceApi = (companyId: string) => {
 
   return {
     bootstrap: () => request<EcommerceBootstrap>(withCompany('/ecommerce/bootstrap')),
+    wallet: () => request<SellerWalletBootstrap>(withCompany('/ecommerce/wallet')),
+    updatePayoutAccount: (body: { provider: 'WAVE'; mobile: string; beneficiaryName: string }) =>
+      request<SellerWallet>(withCompany('/ecommerce/wallet/payout-account'), { method: 'PATCH', body: JSON.stringify(body) }),
+    requestWithdrawal: (body: { amount: number; provider?: 'WAVE'; mobile?: string; beneficiaryName?: string; idempotencyKey?: string }) =>
+      request<{ withdrawal: SellerWithdrawal }>(withCompany('/ecommerce/wallet/withdrawals'), { method: 'POST', body: JSON.stringify(body), headers: { 'Idempotency-Key': body.idempotencyKey ?? crypto.randomUUID() } }),
     updateStore: (body: Partial<Omit<EcommerceStore, 'id' | 'companyId'>>) => request<EcommerceStore>(withCompany('/ecommerce/store'), { method: 'PATCH', body: JSON.stringify(body) }),
     createCategory: (body: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) => request<EcommerceCategory>(withCompany('/ecommerce/categories'), json(body)),
     updateCategory: (id: string, body: Partial<Omit<EcommerceCategory, 'id' | 'companyId'>>) => request<EcommerceCategory>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
@@ -203,8 +258,12 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ reference: string; total: number }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createPayment: (slug: string, orderId: string, body?: { successUrl?: string; errorUrl?: string }) =>
+    request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
+  createDomainPayment: (orderId: string, body?: { successUrl?: string; errorUrl?: string }) =>
+    request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
 };
 
 export const createCustomerApi = (slug?: string) => {

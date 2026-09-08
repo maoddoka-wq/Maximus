@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import {
   Archive,
   ArrowUpRight,
+  ArrowDownToLine,
+  Clock3,
   Check,
+  CheckCircle2,
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
@@ -20,6 +23,7 @@ import {
   Tags,
   Truck,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import {
@@ -31,11 +35,12 @@ import {
   type EcommerceOrderStatus,
   type EcommerceProduct,
   type EcommerceStore,
+  type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 
-type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'livraisons' | 'parametres';
+type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -45,6 +50,7 @@ const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] 
   { id: 'clients', label: 'Clients', icon: Users },
   { id: 'promotions', label: 'Promotions', icon: Megaphone },
   { id: 'livraisons', label: 'Livraisons', icon: Truck },
+  { id: 'finances', label: 'Finances & retraits', icon: Wallet },
   { id: 'parametres', label: 'Paramètres', icon: Settings },
 ];
 
@@ -112,6 +118,7 @@ export default function EcommerceModulePage({
   singleModuleNavigation?: boolean;
 }) {
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
+  const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
   const visibleTabs = allowedFeatureIds ? tabs.filter(item => allowedFeatureIds.includes(item.id) || (item.id === 'categories' && allowedFeatureIds.includes('catalogue'))) : tabs;
   const visibleTabIds = visibleTabs.map(item => item.id);
   const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
@@ -125,7 +132,9 @@ export default function EcommerceModulePage({
     if (silent) setRefreshing(true);
     else setLoading(true);
     try {
-      setData(await api.bootstrap());
+      const nextData = await api.bootstrap();
+      setData(nextData);
+      setWalletData(visibleTabIds.includes('finances') ? await api.wallet() : null);
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace e-commerce.');
@@ -209,6 +218,7 @@ export default function EcommerceModulePage({
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
       {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
+      {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} />}
       {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
       </>}
     </div>
@@ -256,6 +266,65 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
       </div>
     </Panel>
   </div>;
+}
+
+function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBootstrap; currency: EcommerceStore['currency']; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [account, setAccount] = useState({ mobile: data.wallet.payoutMobile, beneficiaryName: data.wallet.payoutName });
+  const [amount, setAmount] = useState('');
+  const [savingAccount, setSavingAccount] = useState(false);
+  const api = createEcommerceApi(data.wallet.companyId);
+  const available = data.wallet.availableBalance;
+
+  const saveAccount = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!account.mobile.trim() || !account.beneficiaryName.trim()) return;
+    setSavingAccount(true);
+    await run(() => api.updatePayoutAccount({ provider: 'WAVE', mobile: account.mobile.trim(), beneficiaryName: account.beneficiaryName.trim() }), 'Compte de retrait enregistré.');
+    setSavingAccount(false);
+  };
+
+  const withdraw = async (event: FormEvent) => {
+    event.preventDefault();
+    const value = Number(amount);
+    if (!Number.isInteger(value) || value < 1000 || value > available) return;
+    const result = await run(() => api.requestWithdrawal({ amount: value, provider: 'WAVE', mobile: account.mobile.trim(), beneficiaryName: account.beneficiaryName.trim() }), 'Demande de retrait envoyée.');
+    if (result) setAmount('');
+  };
+
+  return <div className="space-y-5 fade-up">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <WalletMetric label="Solde disponible" value={money(data.wallet.availableBalance, currency)} detail="Retirable maintenant" icon={Wallet} accent />
+      <WalletMetric label="Solde en attente" value={money(data.wallet.pendingBalance, currency)} detail="Livraison ou délai de sécurité" icon={Clock3} />
+      <WalletMetric label="Retraits réservés" value={money(data.wallet.reservedBalance, currency)} detail="En cours de traitement" icon={ArrowDownToLine} />
+      <WalletMetric label="Total crédité" value={money(data.wallet.totalCredited, currency)} detail="Ventes confirmées" icon={CircleDollarSign} />
+    </div>
+    <div className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
+      <Panel title="Demander un retrait" description="Les retraits sont envoyés vers un compte Wave vérifié. Minimum : 1 000 XOF.">
+        <form onSubmit={withdraw} className="space-y-4">
+          <Field label="Montant à retirer" type="number" value={amount} onChange={setAmount} placeholder="Ex. 25000" />
+          <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.06)] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+            Disponible : <strong className="text-[hsl(var(--foreground))]">{money(available, currency)}</strong>. Le montant est réservé dès la demande et restitué automatiquement si le transfert échoue.
+          </div>
+          <button type="submit" disabled={!canModify || !Number.isInteger(Number(amount)) || Number(amount) < 1000 || Number(amount) > available || !account.mobile.trim() || !account.beneficiaryName.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowDownToLine size={15} />Demander le retrait</button>
+        </form>
+      </Panel>
+      <Panel title="Compte de retrait" description="Ces coordonnées sont utilisées uniquement pour les payouts de cette entreprise.">
+        <form onSubmit={saveAccount} className="space-y-4">
+          <div className="rounded-xl border bg-[hsl(var(--muted)/.35)] p-3 text-xs font-semibold"><span className="inline-flex items-center gap-2"><CheckCircle2 size={15} className="text-emerald-600" />Fournisseur : Wave</span></div>
+          <Field label="Nom du bénéficiaire" value={account.beneficiaryName} onChange={value => setAccount(current => ({ ...current, beneficiaryName: value }))} placeholder="Nom affiché sur le compte mobile" />
+          <Field label="Numéro mobile Wave" value={account.mobile} onChange={value => setAccount(current => ({ ...current, mobile: value }))} placeholder="+221 77 000 00 00" />
+          <button type="submit" disabled={!canModify || savingAccount || !account.mobile.trim() || !account.beneficiaryName.trim()} className="rounded-lg border px-4 py-3 text-xs font-bold disabled:opacity-50">{savingAccount ? 'Enregistrement…' : 'Enregistrer le compte'}</button>
+        </form>
+      </Panel>
+    </div>
+    <Panel title="Historique des retraits" description="Les dernières demandes de retrait de cette entreprise.">
+      {data.withdrawals.length === 0 ? <Empty icon={ArrowDownToLine} title="Aucun retrait" text="Les demandes de retrait apparaîtront ici." /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Date</th><th className="px-4">Montant</th><th className="px-4">Compte</th><th className="px-4">Statut</th></tr></thead><tbody className="divide-y">{data.withdrawals.map(withdrawal => <tr key={withdrawal.id}><td className="px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(withdrawal.requestedAt)}</td><td className="px-4 py-3 font-bold">{money(withdrawal.amount, currency)}</td><td className="px-4 py-3 text-xs">{withdrawal.mobile}</td><td className="px-4 py-3"><StatusPill value={withdrawal.status} /></td></tr>)}</tbody></table></div>}
+    </Panel>
+  </div>;
+}
+
+function WalletMetric({ label, value, detail, icon: Icon, accent = false }: { label: string; value: string; detail: string; icon: typeof Wallet; accent?: boolean }) {
+  return <div className={`card-surface rounded-2xl border p-4 ${accent ? 'border-[hsl(var(--primary)/.3)]' : ''}`}><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${accent ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}><Icon size={17} /></span><p className="mt-4 text-xs font-bold text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-xl font-bold tracking-tight">{value}</p><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{detail}</p></div>;
 }
 
 function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {

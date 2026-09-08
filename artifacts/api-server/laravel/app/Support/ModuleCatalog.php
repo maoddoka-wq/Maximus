@@ -24,11 +24,11 @@ final class ModuleCatalog
                 'id' => 'ecommerce',
                 'name' => 'E-commerce',
                 'description' => 'Boutique en ligne, catalogue public et commandes clients.',
-                'features' => ['Tableau de bord', 'Catalogue', 'Commandes', 'Clients', 'Promotions', 'Livraisons', 'Paramètres'],
+                'features' => ['Tableau de bord', 'Catalogue', 'Commandes', 'Clients', 'Promotions', 'Livraisons', 'Finances', 'Paramètres'],
                 'feature_packs' => [
-                    ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'parametres']],
-                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les commandes et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'commandes', 'clients', 'parametres']],
-                    ['id' => 'ecommerce-supervision', 'name' => 'Supervision boutique', 'description' => 'Superviser la boutique, les promotions et les livraisons.', 'feature_ids' => ['dashboard', 'catalogue', 'commandes', 'clients', 'promotions', 'livraisons', 'parametres']],
+                    ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les commandes et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'commandes', 'clients', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-supervision', 'name' => 'Supervision boutique', 'description' => 'Superviser la boutique, les promotions, les livraisons et les retraits.', 'feature_ids' => ['dashboard', 'catalogue', 'commandes', 'clients', 'promotions', 'livraisons', 'finances', 'parametres']],
                 ],
                 'feature_dependencies' => [
                     'commandes' => ['catalogue'],

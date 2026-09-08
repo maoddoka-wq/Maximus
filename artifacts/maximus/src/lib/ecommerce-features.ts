@@ -5,6 +5,7 @@ export const ecommerceFeatureDefinitions = [
   { id: 'clients', label: 'Clients' },
   { id: 'promotions', label: 'Promotions' },
   { id: 'livraisons', label: 'Livraisons' },
+  { id: 'finances', label: 'Finances & retraits' },
   { id: 'parametres', label: 'Paramètres' },
 ] as const;
 
@@ -19,10 +20,11 @@ export const ecommerceFeaturePacks = [
     id: 'ecommerce-catalogue',
     name: 'Catalogue en ligne',
     description: 'Publier une boutique et présenter vos produits.',
-    featureIds: ['dashboard', 'catalogue', 'parametres'],
+    featureIds: ['dashboard', 'catalogue', 'finances', 'parametres'],
     featurePermissions: {
       dashboard: ['voir'],
       catalogue: ['voir', 'créer', 'modifier'],
+      finances: ['voir', 'modifier'],
       parametres: ['voir', 'modifier'],
     },
   },
@@ -30,12 +32,13 @@ export const ecommerceFeaturePacks = [
     id: 'ecommerce-gestion',
     name: 'Gestion e-commerce',
     description: 'Piloter le catalogue, les commandes et les clients.',
-    featureIds: ['dashboard', 'catalogue', 'commandes', 'clients', 'parametres'],
+    featureIds: ['dashboard', 'catalogue', 'commandes', 'clients', 'finances', 'parametres'],
     featurePermissions: {
       dashboard: ['voir'],
       catalogue: ['voir', 'créer', 'modifier'],
       commandes: ['voir', 'modifier'],
       clients: ['voir'],
+      finances: ['voir', 'modifier'],
       parametres: ['voir', 'modifier'],
     },
   },
