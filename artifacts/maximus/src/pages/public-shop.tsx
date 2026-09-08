@@ -523,22 +523,22 @@ function PublicOfferCard({
   onFavorite?: () => void;
   favorite?: boolean;
 }) {
-  return <article className="min-w-0 overflow-hidden rounded-2xl border border-[#e8e0d4] bg-white shadow-sm">
-    <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#fbfaf7] disabled:cursor-default">
-      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover" /> : <Icon size={38} className="text-[hsl(var(--muted-foreground))]" />}
+  return <article className="min-w-0 overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
+    <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[2/1] w-full items-center justify-center overflow-hidden bg-[#fbfaf7] disabled:cursor-default">
+      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-contain p-1.5" /> : <Icon size={32} className="text-[hsl(var(--muted-foreground))]" />}
     </button>
-    <div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-3 sm:p-4">
-      <p className="truncate text-[10px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{badge}</p>
-      <div className="mt-2 flex min-w-0 items-start justify-between gap-3">
-        {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-base font-bold leading-tight text-[#20252f]">{name}</button> : <h3 className="min-w-0 break-words text-base font-bold leading-tight text-[#20252f]">{name}</h3>}
-        <p className="shrink-0 text-sm font-bold text-[#20252f]">{price}</p>
+    <div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-2.5 sm:p-3">
+      <p className="truncate text-[9px] font-bold uppercase tracking-[.12em] text-[#8c6c37]">{badge}</p>
+      <div className="mt-1.5 flex min-w-0 items-start justify-between gap-2">
+        {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-sm font-bold leading-tight text-[#20252f]">{name}</button> : <h3 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f]">{name}</h3>}
+        <p className="shrink-0 text-xs font-bold text-[#20252f]">{price}</p>
       </div>
       {priceSuffix && <p className="mt-0.5 text-right text-[10px] text-[#655e55]">{priceSuffix}</p>}
-      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[#655e55]">{description || `Une offre proposée par ${store.name}.`}</p>
-      {availability && <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-bold ${availability === 'Indisponible' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{availability}</span>}
-      {(onAdd || onFavorite) && <div className="mt-4 flex items-center gap-2">
-        {onFavorite && <button type="button" onClick={onFavorite} className="rounded-lg border p-2" aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}><Heart size={15} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-red-600' : ''} /></button>}
-        {onAdd && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-3 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
+      <p className="mt-1.5 line-clamp-2 min-h-8 text-[11px] leading-4 text-[#655e55]">{description || `Une offre proposée par ${store.name}.`}</p>
+      {availability && <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${availability === 'Indisponible' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{availability}</span>}
+      {(onAdd || onFavorite) && <div className="mt-3 flex items-center gap-1.5">
+        {onFavorite && <button type="button" onClick={onFavorite} className="rounded-lg border p-1.5" aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}><Heart size={14} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-red-600' : ''} /></button>}
+        {onAdd && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2.5 py-2 text-[11px] font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
       </div>}
     </div>
   </article>;
@@ -570,7 +570,7 @@ function CatalogSections({
       if (categoryProducts.length === 0 && categoryRentals.length === 0) return null;
       return <section key={category}>
         <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
+         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
           {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
         </div>
@@ -611,9 +611,9 @@ function DeliveryPage({ store, customer, requests, form, setForm, submitted, onS
 function RentalProductCard({ rental, store }: { rental: PublicRental; store: PublicShopBootstrap['store'] }) {
   const unit = rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour';
   return <article className="overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
-    <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#fbfaf7]">
-      {rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-cover" /> : <Home size={36} className="text-[hsl(var(--muted-foreground))]" />}
-      <span className={`absolute right-2.5 top-2.5 rounded-md px-2 py-1 text-[10px] font-bold ${rental.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{rental.isAvailable ? 'Disponible' : 'Indisponible'}</span>
+    <div className="relative flex aspect-[2/1] items-center justify-center overflow-hidden bg-[#fbfaf7]">
+      {rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-contain p-1.5" /> : <Home size={32} className="text-[hsl(var(--muted-foreground))]" />}
+      <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${rental.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{rental.isAvailable ? 'Disponible' : 'Indisponible'}</span>
     </div>
     <div className="p-3.5 sm:p-4">
       <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{rental.category || 'Général'} · Location</p>
@@ -645,7 +645,7 @@ function RentalPage({ rentals, store, onBack }: { rentals: PublicRental[]; store
         const categoryRentals = rentals.filter(rental => (rental.category || 'Général') === category);
         return <section key={category}>
           <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h2 className="mt-1 text-xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} offre{categoryRentals.length > 1 ? 's' : ''}</span></div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} />)}</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} />)}</div>
         </section>;
       })}</div>}
   </section>;
