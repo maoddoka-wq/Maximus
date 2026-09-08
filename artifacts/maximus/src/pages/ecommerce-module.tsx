@@ -10,6 +10,7 @@ import {
   CircleDollarSign,
   ClipboardList,
   Copy,
+  House,
   LayoutDashboard,
   Megaphone,
   Package,
@@ -40,7 +41,7 @@ import {
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 
-type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'livraisons' | 'finances' | 'parametres';
+type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -49,6 +50,7 @@ const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] 
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
   { id: 'clients', label: 'Clients', icon: Users },
   { id: 'promotions', label: 'Promotions', icon: Megaphone },
+  { id: 'location', label: 'Location', icon: House },
   { id: 'livraisons', label: 'Livraisons', icon: Truck },
   { id: 'finances', label: 'Finances & retraits', icon: Wallet },
   { id: 'parametres', label: 'Paramètres', icon: Settings },
@@ -217,6 +219,7 @@ export default function EcommerceModulePage({
       {tab === 'commandes' && <Orders data={data} canModify={canModify} run={run} />}
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
+      {tab === 'location' && <RentalPanel data={data} onTab={navigate} />}
       {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
       {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} />}
       {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
@@ -264,6 +267,37 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
         <Insight label="Produits vedettes" value={activeProducts.filter(product => product.featured).length} detail="Mis en avant" />
         <Insight label="Catégories" value={new Set(activeProducts.map(product => product.category)).size} detail="Dans le catalogue" />
       </div>
+    </Panel>
+  </div>;
+}
+
+function RentalPanel({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: EcommerceTab) => void }) {
+  const rentalKeywords = ['location', 'maison', 'bâche', 'vehicule', 'véhicule', 'voiture', 'auto', 'utilitaire'];
+  const products = data.products.filter(product =>
+    product.status !== 'ARCHIVED'
+    && rentalKeywords.some(keyword => `${product.category} ${product.name}`.toLocaleLowerCase('fr-FR').includes(keyword)),
+  );
+
+  return <div className="space-y-5 fade-up">
+    <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--card))_55%)] p-5 sm:p-7">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Location & réservation</span>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-.04em]">Transformez votre catalogue en offres à réserver.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Les produits classés Maison, Bâche, Voiture ou Location apparaissent automatiquement dans l’espace Location de votre boutique.</p>
+        </div>
+        <button type="button" onClick={() => onTab('catalogue')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Package size={15} />Gérer le catalogue</button>
+      </div>
+    </section>
+    <div className="grid gap-4 sm:grid-cols-3">
+      <Metric label="Offres détectées" value={String(products.length)} detail="Catégories de location" icon={House} accent />
+      <Metric label="Disponibles" value={String(products.filter(product => product.stock > 0).length)} detail="Stock ou disponibilités" icon={CheckCircle2} />
+      <Metric label="À mettre en avant" value={String(products.filter(product => product.featured).length)} detail="Produits vedettes" icon={Megaphone} />
+    </div>
+    <Panel title="Offres de location" description="La vitrine publique réutilise les fiches de votre catalogue.">
+      {products.length === 0
+        ? <Empty icon={House} title="Aucune offre de location détectée" text="Créez une catégorie ou un produit contenant Maison, Bâche, Voiture ou Location pour l’afficher ici." action={<button type="button" onClick={() => onTab('catalogue')} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter une offre</button>} />
+        : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{products.map(product => <div key={product.id} className="flex items-center gap-3 rounded-xl border p-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-full w-full object-cover" /> : <House size={19} />}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{product.category} · {money(product.price, data.store.currency)}</p></div><StatusPill value={product.stock > 0 ? 'Disponible' : 'Rupture'} /></div>)}</div>}
     </Panel>
   </div>;
 }

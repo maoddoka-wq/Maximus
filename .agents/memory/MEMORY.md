@@ -26,3 +26,4 @@
 - [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
+- [Capacités vitrine e-commerce](public-commerce-capabilities.md) — Location et Livraisons ne sont visibles publiquement que si l’accès e-commerce actif les autorise.

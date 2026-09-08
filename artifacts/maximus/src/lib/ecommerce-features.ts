@@ -4,6 +4,7 @@ export const ecommerceFeatureDefinitions = [
   { id: 'commandes', label: 'Commandes' },
   { id: 'clients', label: 'Clients' },
   { id: 'promotions', label: 'Promotions' },
+  { id: 'location', label: 'Location' },
   { id: 'livraisons', label: 'Livraisons' },
   { id: 'finances', label: 'Finances & retraits' },
   { id: 'parametres', label: 'Paramètres' },
@@ -12,6 +13,7 @@ export const ecommerceFeatureDefinitions = [
 export const ecommerceFeatureDependencies: Partial<Record<string, string[]>> = {
   commandes: ['catalogue'],
   promotions: ['catalogue'],
+  location: ['catalogue'],
   livraisons: ['commandes'],
 };
 
@@ -39,6 +41,20 @@ export const ecommerceFeaturePacks = [
       commandes: ['voir', 'modifier'],
       clients: ['voir'],
       finances: ['voir', 'modifier'],
+      parametres: ['voir', 'modifier'],
+    },
+  },
+  {
+    id: 'ecommerce-location',
+    name: 'Location & réservation',
+    description: 'Présenter et gérer les offres de location de maisons, bâches, véhicules et équipements.',
+    featureIds: ['dashboard', 'catalogue', 'location', 'commandes', 'clients', 'parametres'],
+    featurePermissions: {
+      dashboard: ['voir'],
+      catalogue: ['voir', 'créer', 'modifier'],
+      location: ['voir', 'créer', 'modifier'],
+      commandes: ['voir', 'modifier'],
+      clients: ['voir'],
       parametres: ['voir', 'modifier'],
     },
   },

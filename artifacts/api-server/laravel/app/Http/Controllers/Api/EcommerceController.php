@@ -556,6 +556,25 @@ class EcommerceController extends Controller
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url,
+            'enabledFeatures' => $this->publicEnabledFeatures((string) $row->company_id),
+        ];
+    }
+
+    private function publicEnabledFeatures(string $companyId): array
+    {
+        $access = DB::table('maximus_company_modules')
+            ->where('company_id', $companyId)
+            ->where('module_id', 'ecommerce')
+            ->first();
+        $status = (string) ($access->status ?? 'INACTIF');
+        $featureIds = $access ? json_decode($access->feature_ids ?? '[]', true) : [];
+        $featureIds = is_array($featureIds) ? $featureIds : [];
+        $unrestricted = $featureIds === [];
+        $enabled = in_array($status, ['ACTIF', 'BETA'], true);
+
+        return [
+            'location' => $enabled && ($unrestricted || in_array('location', $featureIds, true)),
+            'livraisons' => $enabled && ($unrestricted || in_array('livraisons', $featureIds, true)),
         ];
     }
 

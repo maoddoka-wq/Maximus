@@ -16,6 +16,11 @@ export interface EcommerceStore {
   logoUrl: string;
 }
 
+export interface PublicShopFeatures {
+  location: boolean;
+  livraisons: boolean;
+}
+
 export type EcommerceDomainStatus = 'PENDING' | 'ACTIVE';
 
 export interface EcommerceDomain {
@@ -139,7 +144,7 @@ export interface SellerWalletBootstrap {
 }
 
 export interface PublicShopBootstrap {
-  store: Omit<EcommerceStore, 'id' | 'companyId'>;
+  store: Omit<EcommerceStore, 'id' | 'companyId'> & { enabledFeatures: PublicShopFeatures };
   products: Array<Omit<EcommerceProduct, 'id' | 'companyId' | 'sku' | 'status'>>;
 }
 
