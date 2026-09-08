@@ -398,13 +398,13 @@ export function Topbar({
               className="truncate text-base font-black leading-tight tracking-[-.035em] sm:text-xl"
             >
               {title}
-              {contextLabel && <span className="ml-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] sm:hidden">· {contextLabel}</span>}
+              {contextLabel && <span className="ml-2 text-base font-black text-[hsl(var(--foreground))] sm:hidden">· {contextLabel}</span>}
             </div>
           </div>
         </div>
       </div>
       {contextLabel && (
-        <div className="pointer-events-none absolute left-1/2 hidden max-w-[35%] -translate-x-1/2 truncate text-center text-sm font-bold text-[hsl(var(--foreground))] sm:block lg:text-base">
+        <div className="pointer-events-none absolute left-1/2 hidden max-w-[35%] -translate-x-1/2 truncate text-center text-lg font-black tracking-[-.025em] text-[hsl(var(--foreground))] sm:block lg:text-xl">
           {contextLabel}
         </div>
       )}

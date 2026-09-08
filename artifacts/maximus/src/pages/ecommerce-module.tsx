@@ -219,15 +219,15 @@ export default function EcommerceModulePage({
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button type="button" aria-label="Fermer le message" onClick={() => setError('')}><X size={16} /></button></div>}
       {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-bold text-[hsl(var(--sidebar-foreground))] shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
 
-      <section className="card-surface rounded-2xl border border-[hsl(var(--border))]">
+      <section className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))]">
         <div className="flex min-w-0 flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           {!singleModuleNavigation && <nav aria-label="Menu e-commerce" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
           {visibleTabs.map(item => {
             const Icon = item.icon;
-            return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>;
+              return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.75)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={15} />{item.label}</button>;
           })}
           </nav>}
-          <button type="button" onClick={() => void load(true)} className="btn inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-lg border px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))] sm:self-auto" title="Actualiser">
+          <button type="button" onClick={() => void load(true)} className="btn inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-lg border border-[hsl(var(--sidebar-border))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--sidebar-foreground)/.8)] hover:bg-[hsl(var(--sidebar-accent))] sm:self-auto" title="Actualiser">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser
           </button>
         </div>
