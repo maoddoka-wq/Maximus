@@ -605,7 +605,7 @@ function CatalogSections({
       return <section key={category}>
         <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-           {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? 'Disponible' : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
+            {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? `${product.stock} disponible${product.stock > 1 ? 's' : ''}` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
           {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
         </div>
       </section>;
@@ -646,7 +646,7 @@ function RentalProductCard({ rental, store, onAdd }: { rental: PublicRental; sto
   const unit = rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour';
   return <article className="overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
     <div className="relative flex aspect-[2/1] items-center justify-center overflow-hidden bg-[#fbfaf7]">
-      {rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-contain p-1.5" /> : <Home size={32} className="text-[hsl(var(--muted-foreground))]" />}
+       {rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-cover" /> : <Home size={32} className="text-[hsl(var(--muted-foreground))]" />}
       <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${rental.isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{rental.isAvailable ? 'Disponible' : 'Indisponible'}</span>
     </div>
     <div className="p-3.5 sm:p-4">
