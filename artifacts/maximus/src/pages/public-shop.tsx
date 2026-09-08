@@ -558,7 +558,7 @@ function PublicOfferCard({
       {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover" /> : <Icon size={32} className="text-[hsl(var(--muted-foreground))]" />}
       {availabilityLabel && <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{availabilityLabel}</span>}
     </button>
-    <div className="border-t border-[#e8e0d4] bg-[#f7f2ea] p-3.5 sm:p-4">
+     <div className="border-t border-[#e8e0d4] bg-white p-3.5 sm:p-4">
       <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{badge}</p>
       <div className="mt-1.5 flex min-w-0 items-start justify-between gap-3">
         {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-sm font-bold leading-tight text-[#20252f] sm:text-base">{name}</button> : <h3 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{name}</h3>}
