@@ -222,6 +222,34 @@ class SellerWalletTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_public_payment_status_reconciles_a_paid_charge_when_webhook_is_missing(): void
+    {
+        $this->configureDiamano();
+        $this->createStore('kora', 'kora-payment-refresh');
+        $this->createOrder('order-public-refresh', 'kora', 200, 'charge-public-refresh');
+        Cache::flush();
+        Http::fake([
+            'https://api.diamanopay.com/oauth2/token' => Http::response(['access_token' => 'test-token'], 200),
+            'https://api.diamanopay.com/api/charges/charge-public-refresh' => Http::response([
+                'success' => true,
+                'data' => ['id' => 'charge-public-refresh', 'status' => 'COMPLETED'],
+            ], 200),
+        ]);
+
+        $this->getJson('/api/shop/kora-payment-refresh/orders/order-public-refresh/payment-status')
+            ->assertOk()
+            ->assertJsonPath('paymentStatus', 'PAID')
+            ->assertJsonPath('total', 200);
+
+        $this->assertDatabaseHas('seller_wallets', [
+            'company_id' => 'kora',
+            'pending_balance' => 200,
+            'available_balance' => 0,
+            'total_credited' => 200,
+        ]);
+        $this->assertDatabaseCount('seller_wallet_ledger', 1);
+    }
+
     public function test_withdrawal_rejects_an_insufficient_available_balance(): void
     {
         $this->configureDiamano();

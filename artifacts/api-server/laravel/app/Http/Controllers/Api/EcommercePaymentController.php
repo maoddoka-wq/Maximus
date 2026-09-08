@@ -13,7 +13,10 @@ use Throwable;
 
 final class EcommercePaymentController extends Controller
 {
-    public function __construct(private readonly DiamanoPayService $diamanoPay)
+    public function __construct(
+        private readonly DiamanoPayService $diamanoPay,
+        private readonly SellerWalletController $sellerWallet,
+    )
     {
     }
 
@@ -155,6 +158,12 @@ final class EcommercePaymentController extends Controller
         if (! $order) {
             return response()->json(['error' => 'Commande introuvable.'], 404);
         }
+
+        $this->sellerWallet->refreshOrderPaymentStatus($order);
+        $order = DB::table('ecommerce_orders')
+            ->where('id', $orderId)
+            ->where('company_id', $store->company_id)
+            ->first() ?? $order;
 
         return response()->json([
             'reference' => $order->reference,

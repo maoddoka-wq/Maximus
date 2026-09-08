@@ -78,6 +78,23 @@ final class SellerWalletController extends Controller
         ]);
     }
 
+    public function refreshOrderPaymentStatus(object $order): void
+    {
+        if ($order->payment_status !== 'PENDING' || trim((string) ($order->payment_charge_id ?? '')) === '') {
+            return;
+        }
+        if (! $this->diamanoPay->isConfigured()) {
+            return;
+        }
+
+        try {
+            $providerResponse = $this->diamanoPay->chargeStatus((string) $order->payment_charge_id);
+            $this->applyPaymentProviderStatus($order->id, $providerResponse);
+        } catch (Throwable $error) {
+            report($error);
+        }
+    }
+
     public function requestWithdrawal(Request $request): JsonResponse
     {
         if (! $this->canModify($request)) {

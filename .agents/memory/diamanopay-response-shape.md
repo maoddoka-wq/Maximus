@@ -10,3 +10,9 @@ Le contrat développeur actuel attend un unique `redirectUrl` pour le retour nav
 **Why:** Le premier payload valide a franchi l’authentification et la validation `provider`, mais l’application renvoyait ensuite 502 parce qu’elle ne lisait que `id` et `checkout_url` à la racine.
 
 **How to apply:** Lors d’une évolution de l’intégration DiamanoPay, normaliser d’abord l’enveloppe `data`, accepter les variantes de nommage, puis valider que l’identifiant et l’URL de checkout sont non vides avant de persister la commande.
+
+Un retour client avec une commande `PENDING` doit aussi déclencher une consultation du statut DiamanoPay. Le webhook peut être manqué alors que le paiement est finalisé; cette consultation doit réutiliser le crédit idempotent du portefeuille.
+
+**Why:** Une commande réelle de 200 XOF est restée `PENDING` sans aucune écriture `SALE_CREDIT`, malgré un checkout terminé côté acheteur.
+
+**How to apply:** Réconcilier une charge `PENDING` depuis l’endpoint public de statut, sans créditer tant que DiamanoPay ne renvoie pas un statut terminal de succès.
