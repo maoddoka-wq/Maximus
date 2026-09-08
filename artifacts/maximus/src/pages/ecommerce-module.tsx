@@ -270,7 +270,7 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
   const activeProducts = data.products.filter(product => product.status !== 'ARCHIVED');
   const published = activeProducts.filter(product => product.status === 'PUBLISHED').length;
   const pending = data.orders.filter(order => !['LIVRÉE', 'ANNULÉE'].includes(order.status)).length;
-  const revenue = data.orders.filter(order => order.status !== 'ANNULÉE').reduce((sum, order) => sum + order.total, 0);
+   const revenue = data.orders.filter(order => order.status !== 'ANNULÉE' && order.paymentStatus === 'PAID').reduce((sum, order) => sum + order.total, 0);
   const lowStock = activeProducts.filter(product => product.stock <= 5);
   return <div className="space-y-5 fade-up">
     <div className="mobile-kpi-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -378,6 +378,17 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
   };
 
   return <div className="space-y-5 fade-up">
+    <section className="flex flex-col gap-4 rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[hsl(var(--primary)/.06)] p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Contrôle des paiements</p>
+        <h2 className="mt-1 text-lg font-bold">Ne comptabiliser que l’argent confirmé</h2>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le solde est crédité uniquement après confirmation DiamanoPay. Cette vérification récupère aussi les paiements confirmés dont le webhook n’est pas arrivé.</p>
+      </div>
+      <button type="button" disabled={!canModify} onClick={() => void run(async () => {
+        const result = await api.reconcilePayments();
+        return result;
+      }, 'Paiements vérifiés auprès de DiamanoPay.')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border bg-[hsl(var(--background))] px-4 py-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw size={15} />Vérifier les paiements</button>
+    </section>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <WalletMetric label="Solde disponible" value={money(data.wallet.availableBalance, currency)} detail="Retirable maintenant" icon={Wallet} accent />
       <WalletMetric label="Solde en attente" value={money(data.wallet.pendingBalance, currency)} detail="Livraison ou délai de sécurité" icon={Clock3} />

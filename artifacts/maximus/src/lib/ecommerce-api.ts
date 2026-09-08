@@ -286,6 +286,7 @@ export const createEcommerceApi = (companyId: string) => {
   return {
     bootstrap: () => request<EcommerceBootstrap>(withCompany('/ecommerce/bootstrap')),
     wallet: () => request<SellerWalletBootstrap>(withCompany('/ecommerce/wallet')),
+    reconcilePayments: () => request<{ sync: { checked: number; updated: number; failed: number }; wallet: SellerWallet }>(withCompany('/ecommerce/wallet/reconcile'), { method: 'POST' }),
     updatePayoutAccount: (body: { provider: 'WAVE'; mobile: string; beneficiaryName: string }) =>
       request<SellerWallet>(withCompany('/ecommerce/wallet/payout-account'), { method: 'PATCH', body: JSON.stringify(body) }),
     requestWithdrawal: (body: { amount: number; provider?: 'WAVE'; mobile?: string; beneficiaryName?: string; idempotencyKey?: string }) =>

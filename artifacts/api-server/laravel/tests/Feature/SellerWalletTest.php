@@ -130,6 +130,81 @@ class SellerWalletTest extends TestCase
             'id' => 'product-failed-payment',
             'stock' => 2,
         ]);
+        $this->assertDatabaseCount('seller_wallet_ledger', 0);
+        $this->assertDatabaseMissing('seller_wallets', ['company_id' => 'kora']);
+    }
+
+    public function test_flat_success_webhook_and_provider_status_alias_credit_once(): void
+    {
+        $this->configureDiamano();
+        $this->createOrder('order-flat-success', 'kora', 6500, 'charge-flat-success');
+
+        $this->postSignedWebhook(['id' => 'charge-flat-success', 'status' => 'SUCCESS'])->assertOk();
+        $this->postSignedWebhook(['data' => ['chargeId' => 'charge-flat-success', 'status' => 'SUCCESSFUL']])->assertOk();
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => 'order-flat-success',
+            'payment_status' => 'PAID',
+        ]);
+        $this->assertDatabaseHas('seller_wallets', [
+            'company_id' => 'kora',
+            'pending_balance' => 6500,
+            'available_balance' => 0,
+            'total_credited' => 6500,
+        ]);
+        $this->assertDatabaseCount('seller_wallet_ledger', 1);
+    }
+
+    public function test_declined_payment_is_failed_without_financial_credit(): void
+    {
+        $this->configureDiamano();
+        $this->createOrder('order-declined', 'kora', 8900, 'charge-declined');
+
+        $this->postSignedWebhook([
+            'data' => [
+                'chargeId' => 'charge-declined',
+                'status' => 'DECLINED',
+                'reason' => 'Solde insuffisant',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => 'order-declined',
+            'payment_status' => 'FAILED',
+            'payment_failure_reason' => 'Solde insuffisant',
+        ]);
+        $this->assertDatabaseCount('seller_wallet_ledger', 0);
+        $this->assertDatabaseMissing('seller_wallets', ['company_id' => 'kora']);
+    }
+
+    public function test_reconcile_checks_provider_status_when_webhook_is_missing(): void
+    {
+        $this->configureDiamano();
+        $this->createOrder('order-reconcile', 'kora', 7300, 'charge-reconcile');
+        Cache::flush();
+        Http::fake([
+            'https://api.diamanopay.com/oauth2/token' => Http::response(['access_token' => 'test-token'], 200),
+            'https://api.diamanopay.com/api/charges/charge-reconcile' => Http::response([
+                'success' => true,
+                'data' => ['id' => 'charge-reconcile', 'status' => 'COMPLETED'],
+            ], 200),
+        ]);
+
+        $this->asActor()
+            ->postJson('/api/ecommerce/wallet/reconcile?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('sync.checked', 1)
+            ->assertJsonPath('sync.updated', 1)
+            ->assertJsonPath('sync.failed', 0)
+            ->assertJsonPath('wallet.pendingBalance', 7300);
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => 'order-reconcile',
+            'payment_status' => 'PAID',
+        ]);
+        $this->assertDatabaseCount('seller_wallet_ledger', 1);
+        Http::assertSent(fn ($request): bool => $request->method() === 'GET'
+            && $request->url() === 'https://api.diamanopay.com/api/charges/charge-reconcile');
     }
 
     public function test_public_payment_status_returns_only_the_selected_store_order(): void

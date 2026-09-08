@@ -14,6 +14,10 @@ use Throwable;
 
 final class SellerWalletController extends Controller
 {
+    private const PAYMENT_SUCCESS_STATUSES = ['SUCCESS', 'SUCCEEDED', 'SUCCESSFUL', 'COMPLETED', 'PAID', 'SETTLED'];
+
+    private const PAYMENT_FAILURE_STATUSES = ['FAILED', 'CANCELLED', 'CANCELED', 'DECLINED', 'REJECTED', 'EXPIRED', 'ERROR', 'DENIED'];
+
     public function __construct(private readonly DiamanoPayService $diamanoPay)
     {
     }
@@ -57,6 +61,21 @@ final class SellerWalletController extends Controller
         ]);
 
         return response()->json($this->walletPayload($this->wallet($company)));
+    }
+
+    public function reconcilePayments(Request $request): JsonResponse
+    {
+        if (! $this->canModify($request)) {
+            return response()->json(['error' => 'Cette action n’est pas autorisée pour votre rôle.'], 403);
+        }
+        if (! $this->diamanoPay->isConfigured()) {
+            return response()->json(['error' => 'La vérification DiamanoPay n’est pas encore configurée.'], 503);
+        }
+
+        return response()->json([
+            'sync' => $this->reconcilePendingPayments($this->company($request)),
+            'wallet' => $this->walletPayload($this->wallet($this->company($request))),
+        ]);
     }
 
     public function requestWithdrawal(Request $request): JsonResponse
@@ -187,9 +206,8 @@ final class SellerWalletController extends Controller
         if (! is_array($payload)) {
             return response()->json(['error' => 'Payload webhook invalide.'], 422);
         }
-        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
-        $providerId = trim((string) ($data['id'] ?? $data['payout_id'] ?? $data['payoutId'] ?? ''));
-        $status = strtoupper((string) ($data['status'] ?? ''));
+        $data = $this->providerData($payload);
+        $providerId = $this->providerId($data);
         if ($providerId === '') {
             return response()->json(['received' => true]);
         }
@@ -212,29 +230,7 @@ final class SellerWalletController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($order, $status, $data): void {
-                $locked = DB::table('ecommerce_orders')->where('id', $order->id)->lockForUpdate()->first();
-                if (! $locked) {
-                    return;
-                }
-                if ($status === 'SUCCEEDED' && $locked->payment_status !== 'PAID') {
-                    $this->creditPaidOrder($locked, $data);
-                    DB::table('ecommerce_orders')->where('id', $locked->id)->update([
-                        'payment_status' => 'PAID',
-                        'paid_at' => now(),
-                        'funds_available_at' => $locked->status === 'LIVRÉE' ? now() : now()->addDays(7),
-                        'payment_failure_reason' => '',
-                        'updated_at' => now(),
-                    ]);
-                } elseif (in_array($status, ['FAILED', 'CANCELLED'], true) && ! in_array($locked->payment_status, ['PAID', 'REFUNDED'], true)) {
-                    DB::table('ecommerce_orders')->where('id', $locked->id)->update([
-                        'payment_status' => 'FAILED',
-                        'payment_failure_reason' => 'Le paiement DiamanoPay a échoué.',
-                        'updated_at' => now(),
-                    ]);
-                    $this->restoreOrderStock($locked);
-                }
-            });
+            $this->applyPaymentProviderStatus($order->id, $data);
         } catch (Throwable $error) {
             report($error);
             return response()->json(['error' => 'Le webhook n’a pas pu être traité.'], 500);
@@ -245,10 +241,11 @@ final class SellerWalletController extends Controller
 
     private function applyWithdrawalProviderStatus(string $withdrawalId, array $providerResponse): void
     {
-        $providerStatus = strtoupper((string) ($providerResponse['status'] ?? 'PENDING'));
-        $providerId = trim((string) ($providerResponse['id'] ?? $providerResponse['payout_id'] ?? $providerResponse['payoutId'] ?? ''));
-        $success = in_array($providerStatus, ['SUCCESS', 'SUCCEEDED', 'COMPLETED'], true);
-        $failure = in_array($providerStatus, ['FAILED', 'CANCELLED', 'CANCELED', 'REJECTED', 'ERROR'], true);
+        $providerResponse = $this->providerData($providerResponse);
+        $providerStatus = $this->providerStatus($providerResponse, 'PENDING');
+        $providerId = $this->providerId($providerResponse);
+        $success = in_array($providerStatus, ['SUCCESS', 'SUCCEEDED', 'SUCCESSFUL', 'COMPLETED', 'SETTLED', 'PAID'], true);
+        $failure = in_array($providerStatus, ['FAILED', 'CANCELLED', 'CANCELED', 'DECLINED', 'REJECTED', 'EXPIRED', 'ERROR', 'DENIED'], true);
 
         DB::transaction(function () use ($withdrawalId, $providerId, $success, $failure, $providerStatus): void {
             $withdrawal = DB::table('seller_withdrawals')->where('id', $withdrawalId)->lockForUpdate()->first();
@@ -293,6 +290,126 @@ final class SellerWalletController extends Controller
                 'updated_at' => now(),
             ]);
         });
+    }
+
+    private function applyPaymentProviderStatus(string $orderId, array $providerResponse): void
+    {
+        $data = $this->providerData($providerResponse);
+        $status = $this->providerStatus($data);
+        if (! in_array($status, [...self::PAYMENT_SUCCESS_STATUSES, ...self::PAYMENT_FAILURE_STATUSES], true)) {
+            return;
+        }
+
+        DB::transaction(function () use ($orderId, $status, $data): void {
+            $locked = DB::table('ecommerce_orders')->where('id', $orderId)->lockForUpdate()->first();
+            if (! $locked) {
+                return;
+            }
+
+            if (in_array($status, self::PAYMENT_SUCCESS_STATUSES, true) && ! in_array($locked->payment_status, ['PAID', 'REFUNDED'], true)) {
+                $this->creditPaidOrder($locked, $data);
+                DB::table('ecommerce_orders')->where('id', $locked->id)->update([
+                    'payment_status' => 'PAID',
+                    'paid_at' => $locked->paid_at ?? now(),
+                    'funds_available_at' => $locked->funds_available_at ?? ($locked->status === 'LIVRÉE' ? now() : now()->addDays(7)),
+                    'payment_failure_reason' => '',
+                    'updated_at' => now(),
+                ]);
+                return;
+            }
+
+            if (in_array($status, self::PAYMENT_FAILURE_STATUSES, true) && ! in_array($locked->payment_status, ['PAID', 'REFUNDED'], true)) {
+                $reason = $this->providerFailureReason($data);
+                DB::table('ecommerce_orders')->where('id', $locked->id)->update([
+                    'payment_status' => 'FAILED',
+                    'payment_failure_reason' => $reason,
+                    'updated_at' => now(),
+                ]);
+                $this->restoreOrderStock($locked);
+            }
+        });
+    }
+
+    private function reconcilePendingPayments(string $company): array
+    {
+        $orders = DB::table('ecommerce_orders')
+            ->where('company_id', $company)
+            ->where('payment_status', 'PENDING')
+            ->whereNotNull('payment_charge_id')
+            ->where('payment_charge_id', '<>', '')
+            ->orderBy('updated_at')
+            ->limit(25)
+            ->get();
+        $checked = 0;
+        $updated = 0;
+        $failed = 0;
+
+        foreach ($orders as $order) {
+            $checked++;
+            try {
+                $before = (string) $order->payment_status;
+                $providerResponse = $this->diamanoPay->chargeStatus((string) $order->payment_charge_id);
+                $this->applyPaymentProviderStatus($order->id, $providerResponse);
+                $after = (string) (DB::table('ecommerce_orders')->where('id', $order->id)->value('payment_status') ?? $before);
+                if ($after !== $before) {
+                    $updated++;
+                }
+            } catch (Throwable $error) {
+                $failed++;
+                report($error);
+            }
+        }
+
+        return [
+            'checked' => $checked,
+            'updated' => $updated,
+            'failed' => $failed,
+        ];
+    }
+
+    private function providerData(array $payload): array
+    {
+        $nested = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        return array_merge($payload, $nested);
+    }
+
+    private function providerId(array $payload): string
+    {
+        return trim((string) (
+            $payload['id']
+            ?? $payload['charge_id']
+            ?? $payload['chargeId']
+            ?? $payload['payout_id']
+            ?? $payload['payoutId']
+            ?? $payload['transaction_id']
+            ?? $payload['transactionId']
+            ?? ''
+        ));
+    }
+
+    private function providerStatus(array $payload, string $fallback = ''): string
+    {
+        return strtoupper(trim((string) (
+            $payload['status']
+            ?? $payload['payment_status']
+            ?? $payload['paymentStatus']
+            ?? $payload['state']
+            ?? $fallback
+        )));
+    }
+
+    private function providerFailureReason(array $payload): string
+    {
+        $reason = trim((string) (
+            $payload['failure_reason']
+            ?? $payload['failureReason']
+            ?? $payload['reason']
+            ?? $payload['message']
+            ?? ''
+        ));
+
+        return $reason !== '' ? $reason : 'Le paiement DiamanoPay a échoué.';
     }
 
     public function releaseOrderFunds(object $order): void

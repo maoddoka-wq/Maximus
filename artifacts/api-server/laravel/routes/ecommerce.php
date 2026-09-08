@@ -13,6 +13,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
         Route::get('/wallet', [SellerWalletController::class, 'bootstrap']);
+        Route::post('/wallet/reconcile', [SellerWalletController::class, 'reconcilePayments']);
         Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);
         Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
