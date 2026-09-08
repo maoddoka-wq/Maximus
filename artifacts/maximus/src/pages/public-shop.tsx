@@ -13,7 +13,7 @@ import {
   type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
-import { canInstallPwa, isIosDevice, isStandalonePwa, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
+import { canInstallPwa, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
 type PublicRental = PublicShopBootstrap['rentals'][number];
@@ -163,13 +163,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   }, [domain, slug]);
 
   useEffect(() => {
-    const manifest = document.createElement('link');
-    manifest.rel = 'manifest';
-    manifest.href = `${import.meta.env.BASE_URL}manifest.webmanifest`;
-    manifest.dataset.maximusClientManifest = 'true';
-    document.head.appendChild(manifest);
-    return () => manifest.remove();
-  }, []);
+    if (!data?.store.name.trim()) return undefined;
+    return mountClientManifest(data.store.name);
+  }, [data?.store.name]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');

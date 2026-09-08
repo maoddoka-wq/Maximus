@@ -17,6 +17,40 @@ export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userA
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
+export function mountClientManifest(storeName: string) {
+  const manifest = {
+    name: storeName,
+    short_name: storeName.trim().slice(0, 12) || 'Boutique',
+    description: `La vitrine et l’espace client de ${storeName}.`,
+    start_url: '/client-app/',
+    scope: '/client-app/',
+    display: 'standalone',
+    orientation: 'portrait-primary',
+    background_color: '#f8f5ed',
+    theme_color: '#0b1b2b',
+    lang: 'fr',
+    icons: [
+      {
+        src: '/admin-logo.png',
+        sizes: '1024x1024',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+    ],
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = url;
+  link.dataset.maximusClientManifest = 'true';
+  document.head.appendChild(link);
+
+  return () => {
+    URL.revokeObjectURL(url);
+    link.remove();
+  };
+}
+
 export function initializePwa() {
   if (initialized || typeof window === 'undefined') return;
   initialized = true;
