@@ -23,6 +23,21 @@ const money = (value: number, currency: PublicShopBootstrap['store']['currency']
 const readableDate = (value: string) =>
   new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value));
 
+async function retryRequest<T>(request: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await request();
+    } catch (cause) {
+      lastError = cause;
+      if (attempt < attempts - 1) {
+        await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('La requête a échoué.');
+}
+
 const customerCartToLines = (items: EcommerceCustomerCartLine[], products: PublicProduct[]): CartLine[] =>
   items.flatMap(item => {
     const product = products.find(candidate => candidate.slug === item.productSlug);
@@ -136,21 +151,43 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const shopLoad = domain
-      ? publicEcommerceApi.bootstrapDomain().then(result => {
-          if (!('store' in result)) throw new Error('Aucune boutique publiée ne correspond à ce domaine.');
-          return result;
-        })
-      : publicEcommerceApi.bootstrap(slug ?? '');
+    const shopLoad = retryRequest(
+      async () => {
+        const result = domain
+          ? await publicEcommerceApi.bootstrapDomain()
+          : await publicEcommerceApi.bootstrap(slug ?? '');
+        if (domain && !('store' in result)) throw new Error('Aucune boutique publiée ne correspond à ce domaine.');
+        return result as PublicShopBootstrap;
+      },
+      3,
+    );
     void shopLoad
       .then(async result => {
         if (cancelled) return;
         setData(result);
-        const session = await api.session();
+        let session: { customer: EcommerceCustomer | null };
+        try {
+          session = await retryRequest(() => api.session(), 2);
+        } catch {
+          if (cancelled) return;
+          setCustomer(null);
+          setCustomerData(null);
+          setError('La boutique est disponible, mais la session client n’a pas pu être restaurée.');
+          try {
+            const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug: string; quantity: number }>;
+            setCart(saved.flatMap(item => {
+              const product = result.products.find(candidate => candidate.slug === item.productSlug);
+              return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
+            }));
+          } catch {
+            setCart([]);
+          }
+          return;
+        }
         if (cancelled) return;
         setCustomer(session.customer);
         if (session.customer) {
-          const bootstrap = await api.bootstrap();
+          const bootstrap = await retryRequest(() => api.bootstrap(), 2);
           if (cancelled) return;
           setCustomerData(bootstrap);
           setCart(customerCartToLines(bootstrap.cart, result.products));
