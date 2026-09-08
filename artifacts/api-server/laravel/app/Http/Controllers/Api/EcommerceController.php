@@ -382,10 +382,16 @@ class EcommerceController extends Controller
         if (! is_string($path) || $path === '') {
             return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
         }
+        $contents = file_get_contents($input['image']->getRealPath());
+        if ($contents === false) {
+            return response()->json(['error' => 'La photo n’a pas pu être lue après son envoi.'], 500);
+        }
 
         $imageUrl = '/api/product-images/'.rawurlencode($company).'/'.rawurlencode(basename($path));
         DB::table('ecommerce_products')->where('id', $id)->update([
             'image_url' => $imageUrl,
+            'image_data' => base64_encode($contents),
+            'image_mime' => $input['image']->getMimeType() ?: 'application/octet-stream',
             'updated_at' => now(),
         ]);
         $this->deleteStoredImage($product->image_url, $imageUrl);
@@ -397,6 +403,21 @@ class EcommerceController extends Controller
     {
         if (! preg_match('/^[A-Za-z0-9_-]+$/', $company) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
             abort(404);
+        }
+
+        $imageUrl = '/api/product-images/'.$company.'/'.$filename;
+        $product = DB::table('ecommerce_products')
+            ->where('company_id', $company)
+            ->where('image_url', $imageUrl)
+            ->first(['image_data', 'image_mime']);
+        if ($product && is_string($product->image_data) && $product->image_data !== '') {
+            $contents = base64_decode($product->image_data, true);
+            if ($contents !== false) {
+                return response($contents, 200, [
+                    'Content-Type' => $product->image_mime ?: 'application/octet-stream',
+                    'Cache-Control' => 'public, max-age=31536000, immutable',
+                ]);
+            }
         }
 
         $path = 'ecommerce/products/'.$company.'/'.$filename;

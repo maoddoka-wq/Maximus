@@ -346,6 +346,8 @@ class EcommerceTest extends TestCase
         $firstPath = 'ecommerce/products/kora/'.basename($firstUrl);
         Storage::disk('public')->assertExists($firstPath);
         $this->getJson($firstUrl)->assertOk();
+        Storage::disk('public')->delete($firstPath);
+        $this->get($firstUrl)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
 
         $second = $request->post('/api/ecommerce/products/'.$product->json('id').'/image?companyId=kora', [
             'image' => UploadedFile::fake()->image('seconde-photo.png'),
