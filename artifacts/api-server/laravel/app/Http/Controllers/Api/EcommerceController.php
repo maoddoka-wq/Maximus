@@ -940,7 +940,6 @@ class EcommerceController extends Controller
         $publishedProducts = DB::table('ecommerce_products')
             ->where('company_id', $store->company_id)
             ->where('status', 'PUBLISHED')
-            ->where('stock', '>', 0)
             ->orderByDesc('featured')
             ->orderBy('name')
             ->get();

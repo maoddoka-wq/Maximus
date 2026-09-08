@@ -438,7 +438,7 @@ class EcommerceTest extends TestCase
         $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
     }
 
-    public function test_public_shop_exposes_all_published_sale_products_with_stock(): void
+    public function test_public_shop_exposes_all_published_sale_products_including_out_of_stock_items(): void
     {
         $request = $this->asActor();
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
@@ -475,12 +475,21 @@ class EcommerceTest extends TestCase
             'stock' => 7,
             'status' => 'DRAFT',
         ])->assertCreated();
+        $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit temporairement indisponible',
+            'slug' => 'produit-indisponible',
+            'sku' => 'PUBLIC-04',
+            'price' => 4800,
+            'stock' => 0,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
 
         $this->getJson('/api/shop/boutique-multi-produits')
             ->assertOk()
-            ->assertJsonCount(2, 'products')
+            ->assertJsonCount(3, 'products')
             ->assertJsonFragment(['slug' => 'produit-public-un'])
             ->assertJsonFragment(['slug' => 'produit-public-deux'])
+            ->assertJsonFragment(['slug' => 'produit-indisponible', 'stock' => 0])
             ->assertJsonMissing(['slug' => 'produit-brouillon']);
     }
 
