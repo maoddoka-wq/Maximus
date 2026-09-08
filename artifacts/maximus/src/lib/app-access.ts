@@ -203,7 +203,7 @@ export function buildAppAccessContext({
     selectedCommercialTabIds,
   );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    (employee || sectorTestCompanyId) && allowed.length >= 1
+    (employee || sectorTestCompanyId || companyAdmin) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
@@ -231,7 +231,7 @@ export function buildAppAccessContext({
     commerceTabIds,
     sidebarFeatureGroups,
     verticalModuleNavigation: Boolean(
-      (employee || sectorTestCompanyId)
+      (employee || sectorTestCompanyId || companyAdmin)
       && allowed.length >= 1
       && sidebarFeatureGroups.length,
     ),

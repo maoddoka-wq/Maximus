@@ -99,6 +99,8 @@ export function buildSidebarFeatureGroups({
   return allowed.flatMap(moduleId => {
     const module = configuredModules.find(item => item.id === moduleId);
     if (!module) return [];
+    const hasExplicitCompanySelection =
+      companyAdmin && Object.prototype.hasOwnProperty.call(selectedFeatureIdsByModule ?? {}, module.id);
     const selectedFeatureIds = companyAdmin && !employeeRole
       ? new Set(
           selectedFeatureIdsByModule?.[module.id]
@@ -114,7 +116,7 @@ export function buildSidebarFeatureGroups({
       ? (commerceTabIds
         ? commerceTabDefinitions.filter(tab => commerceTabIds.includes(tab.id))
         : companyAdmin
-          ? commerceTabDefinitions
+          ? commerceTabDefinitions.filter(tab => !hasExplicitCompanySelection || selectedFeatureIds.has(tab.id))
           : [])
         .map(tab => ({
           href: `/entreprise/commerce?tab=${tab.id}`,
@@ -125,7 +127,7 @@ export function buildSidebarFeatureGroups({
         ? (stockPermissions
           ? stockSubmodules.filter(submodule => stockPermissions[submodule.id]?.includes('voir'))
           : companyAdmin
-            ? stockSubmodules
+            ? stockSubmodules.filter(submodule => !hasExplicitCompanySelection || selectedFeatureIds.has(submodule.id))
             : [])
           .map(submodule => ({
             href: `/entreprise/stocks?tab=${submodule.id}`,

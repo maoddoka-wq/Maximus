@@ -92,8 +92,33 @@ test('affiche les modules dans le menu de l’administrateur d’entreprise', ()
   });
 
   assert.deepEqual(access.allowed, ['commerce']);
-  assert.equal(access.verticalModuleNavigation, false);
-  assert.deepEqual(access.sidebarFeatureGroups, []);
+  assert.equal(access.verticalModuleNavigation, true);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
+  assert.ok(access.sidebarFeatureGroups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
+});
+
+test('affiche les fonctionnalités de tous les modules autorisés dans le menu entreprise', () => {
+  const { data, company } = createAccessFixture();
+  company.requestedModules = ['commerce', 'stocks', 'presences'];
+  company.allowedModules = ['commerce', 'stocks', 'presences'];
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
+    'Gestion commerciale',
+    'Gestion de stock',
+    'Présences',
+  ]);
+  assert.ok(access.sidebarFeatureGroups.every(group => group.items.length > 0));
+  assert.equal(access.verticalModuleNavigation, true);
 });
 
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {
@@ -267,6 +292,14 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
   });
 
   assert.deepEqual(access.selectedEcommerceFeatureIds, ['dashboard', 'catalogue', 'parametres']);
-  assert.equal(access.verticalModuleNavigation, false);
-  assert.deepEqual(access.sidebarFeatureGroups, []);
+  assert.equal(access.verticalModuleNavigation, true);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale', 'E-commerce']);
+  assert.deepEqual(
+    access.sidebarFeatureGroups.find(group => group.label === 'E-commerce')?.items.map(item => item.href),
+    [
+      '/entreprise/ecommerce?tab=dashboard',
+      '/entreprise/ecommerce?tab=catalogue',
+      '/entreprise/ecommerce?tab=parametres',
+    ],
+  );
 });
