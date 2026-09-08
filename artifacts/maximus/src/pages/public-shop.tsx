@@ -181,6 +181,11 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     if (loading || !data || !paymentReturn) return;
     let cancelled = false;
     const loadPaymentStatus = async () => {
+      if (customer) {
+        const customerOrderPath = shopPath(`/compte/commandes/${encodeURIComponent(paymentReturn.orderId)}`);
+        if (routePath !== customerOrderPath) setLocation(customerOrderPath);
+        return;
+      }
       for (let attempt = 0; attempt < 6; attempt += 1) {
         try {
           const status = domain
@@ -193,10 +198,6 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
             paymentStatus: status.paymentStatus,
             failureReason: status.failureReason,
           });
-          if (customer) {
-            setLocation(shopPath(`/compte/commandes/${encodeURIComponent(paymentReturn.orderId)}`));
-            return;
-          }
           if (['PAID', 'FAILED', 'REFUNDED'].includes(status.paymentStatus)) return;
         } catch (cause) {
           if (!cancelled) setError(cause instanceof Error ? cause.message : 'Le statut du paiement est indisponible.');
@@ -207,7 +208,7 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
     };
     void loadPaymentStatus();
     return () => { cancelled = true; };
-  }, [customer, data, domain, loading, paymentReturn, slug]);
+  }, [customer, data, domain, loading, paymentReturn, routePath, slug]);
 
   useEffect(() => {
     if (isAccountRoute && !customer && !loading) go('/connexion');
@@ -272,9 +273,10 @@ export default function PublicShopPage({ slug, domain = false }: { slug?: string
         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) })
         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => ({ productSlug: line.product.slug, quantity: line.quantity })) });
       const returnUrl = () => {
-        const url = new URL(window.location.href);
-        url.search = '';
-        url.hash = '';
+        const returnPath = customer
+          ? shopPath(`/compte/commandes/${encodeURIComponent(order.id)}`)
+          : shopPath('');
+        const url = new URL(returnPath, window.location.origin);
         url.searchParams.set('payment', 'return');
         url.searchParams.set('order', order.id);
         return url.toString();
