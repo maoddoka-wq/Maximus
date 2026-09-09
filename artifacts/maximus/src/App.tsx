@@ -1272,7 +1272,7 @@ function Signup({
 }) {
   const fallbackPreset: SectorPreset = {
     id: 'default',
-    name: 'Distribution',
+    name: 'Configuration manuelle',
     moduleIds: ['commerce', 'stocks', 'presences'],
   };
   const initialPreset = fallbackPreset;
@@ -1469,6 +1469,19 @@ function Signup({
       return { ...current, [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
     });
   };
+  const selectedPreset = data.sectorPresets.find((preset) => preset.name === sector);
+  const selectedModuleSet = new Set(selectedModules);
+  const selectedPackCount = Object.values(selectedModulePackIds).reduce(
+    (total, packIds) => total + (packIds?.length ?? 0),
+    0,
+  );
+  const selectedFeatureCount = selectedModules.reduce(
+    (total, moduleId) => total + (selectedModuleFeatures[moduleId]?.length ?? 0),
+    0,
+  );
+  const orderedModules = [...modules].sort(
+    (left, right) => Number(selectedModuleSet.has(right.id)) - Number(selectedModuleSet.has(left.id)),
+  );
   if (submitted) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6">
@@ -1621,73 +1634,121 @@ function Signup({
             </button>
           </form>
         ) : (
-          <div className="card-surface rounded-2xl p-6 sm:p-8">
-            <section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
-              <h2 className="font-bold">Choisissez les fonctionnalités dont votre entreprise a besoin</h2>
-              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                {sector
-                  ? `La sélection proposée correspond au secteur ${sector}. `
-                  : 'Une sélection de départ vous est proposée. '}
-                Sélectionnez les fonctionnalités à activer au démarrage. Vous pourrez modifier vos choix plus tard.
-              </p>
+          <div className="card-surface rounded-2xl p-5 sm:p-8">
+            <section className="border-b border-[hsl(var(--border))] pb-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
+                    Étape 2 sur 2
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Choisissez vos modules</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                    Activez uniquement les espaces utiles à votre entreprise. Vous pourrez ajuster les détails
+                    après l’activation de votre compte.
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
+                  <Check size={14} />
+                  {selectedModules.length} module{selectedModules.length > 1 ? 's' : ''} activé{selectedModules.length > 1 ? 's' : ''}
+                </span>
+              </div>
             </section>
-            {data.sectorPresets.find((preset) => preset.name === sector)?.modulePackIds && (
-              <section className="mb-6 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
-                <h2 className="font-bold">Packs proposés par ce secteur</h2>
-                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                  Les packs déjà configurés dans les modules sont proposés automatiquement. Vous pourrez encore ajuster
-                  les fonctionnalités ci-dessous.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {Object.entries(
-                    data.sectorPresets.find((preset) => preset.name === sector)?.modulePackIds ?? {},
-                  ).flatMap(([moduleId, packIds]) =>
-                    (packIds ?? []).map((packId) => (
-                      <span
-                        key={`${moduleId}-${packId}`}
-                        className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-semibold"
-                      >
-                        {configuredModule(moduleId as ModuleId)?.featurePacks?.find((pack) => pack.id === packId)
-                          ?.name ?? packId}
-                      </span>
-                    )),
+
+            <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Résumé de la sélection">
+              {[
+                { label: 'Modules activés', value: selectedModules.length, detail: 'espaces de travail' },
+                { label: 'Packs sélectionnés', value: selectedPackCount, detail: 'configurations prêtes à l’emploi' },
+                { label: 'Fonctionnalités', value: selectedFeatureCount, detail: 'droits inclus au démarrage' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.28)] px-4 py-3">
+                  <p className="mono text-[10px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{item.label}</p>
+                  <p className="mt-1 text-xl font-bold">{item.value}</p>
+                  <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">{item.detail}</p>
+                </div>
+              ))}
+            </section>
+
+            <section className="mt-6 rounded-xl border border-[hsl(var(--accent)/.3)] bg-[hsl(var(--accent)/.06)] p-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.15)] text-[hsl(var(--accent))]">
+                  <Sparkles size={16} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-[hsl(var(--accent))]">
+                    {sector ? `Suggestion pour le secteur ${sector}` : 'Configuration manuelle'}
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">
+                    {selectedPreset
+                      ? 'Les packs ci-dessous ont été préparés pour ce secteur. Vous pouvez les retirer ou les compléter.'
+                      : 'Une sélection de départ est affichée. Choisissez les modules et les packs adaptés à votre activité.'}
+                  </p>
+                  {selectedPreset?.modulePackIds && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {Object.entries(selectedPreset.modulePackIds).flatMap(([moduleId, packIds]) =>
+                        (packIds ?? []).map((packId) => (
+                          <span
+                            key={`${moduleId}-${packId}`}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--card))] px-2.5 py-1 text-[11px] font-semibold"
+                          >
+                            <Check size={12} className="text-[hsl(var(--primary))]" />
+                            {configuredModule(moduleId as ModuleId)?.featurePacks?.find((pack) => pack.id === packId)?.name ?? packId}
+                          </span>
+                        )),
+                      )}
+                    </div>
                   )}
                 </div>
-              </section>
-            )}
+              </div>
+            </section>
+
             {moduleError && (
               <p
                 data-testid="signup-module-error"
-                className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+                className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
               >
                 {moduleError}
               </p>
             )}
-            <div className="grid gap-3">
-              {modules.map((baseModule) => {
+            <div className="mt-6 space-y-3">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold">Modules disponibles</h3>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    Cliquez sur un module pour l’activer ou afficher sa configuration.
+                  </p>
+                </div>
+                <span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{modules.length} au total</span>
+              </div>
+              {orderedModules.map((baseModule) => {
                 const mod = configuredModule(baseModule.id) ?? baseModule;
                 const enabled = selectedModules.includes(mod.id);
                 const featureOptions = getModuleFeatureOptions(mod);
                 const selectedFeatureIds = getEffectiveModuleFeatureIds(mod, selectedModuleFeatures[mod.id]);
+                const ModuleIcon = moduleIconById[mod.id];
                 return (
                   <div
                     key={mod.id}
-                    className={`rounded-xl border p-3 transition ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}
+                    className={`overflow-hidden rounded-xl border transition ${enabled ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--primary)/.035)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/.35)]'}`}
                   >
                     <button
                       type="button"
                       data-testid={`button-module-${mod.id}`}
                       onClick={() => toggle(mod.id)}
-                      className="flex w-full items-start gap-3 text-left"
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
                     >
                       <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${enabled ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${enabled ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}
                       >
-                        {enabled && <Check size={13} />}
+                        {ModuleIcon ? <ModuleIcon size={17} /> : <LayoutGrid size={17} />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <strong className="block text-sm">{mod.name}</strong>
-                        <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <strong className="text-sm">{mod.name}</strong>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${enabled ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                            {enabled ? 'Activé' : 'Disponible'}
+                          </span>
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
                           {mod.description}
                         </span>
                       </span>
@@ -1697,37 +1758,41 @@ function Signup({
                       />
                     </button>
                     {enabled && (
-                      <div className="mt-3 border-t border-[hsl(var(--primary)/.16)] pt-3">
+                      <div className="border-t border-[hsl(var(--primary)/.16)] px-4 pb-4 pt-4">
                         {(mod.featurePacks?.length ?? 0) > 0 && (
                           <div className="mb-3">
-                            <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                              Packs disponibles
-                            </p>
-                            <div className="grid gap-1 sm:grid-cols-2">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-bold">Packs disponibles</p>
+                                <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Un pack active plusieurs fonctionnalités en une fois.</p>
+                              </div>
+                              <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                {selectedModulePackIds[mod.id]?.length ?? 0}/{mod.featurePacks?.length ?? 0}
+                              </span>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2">
                               {mod.featurePacks?.map((pack) => {
                                 const selected = selectedModulePackIds[mod.id]?.includes(pack.id) ?? false;
                                 return (
                                   <label
                                     key={pack.id}
-                                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[hsl(var(--card)/.7)]"
+                                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${selected ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--primary)/.08)]' : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--card))]'}`}
                                   >
                                     <input
                                       data-testid={`checkbox-signup-pack-${mod.id}-${pack.id}`}
                                       type="checkbox"
                                       checked={selected}
                                       onChange={() => togglePack(mod.id, pack.id)}
-                                      className="mt-0.5 accent-[hsl(var(--primary))]"
+                                      className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
                                     />
-                                    <span>
-                                      <strong className="block">{pack.name}</strong>
-                                      <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                        {pack.description ?? `${pack.featureIds.length} fonctionnalité(s)`}
+                                    <span className="min-w-0">
+                                      <strong className="block text-xs">{pack.name}</strong>
+                                      <span className="mt-1 block text-[11px] leading-4 text-[hsl(var(--muted-foreground))]">
+                                        {pack.description ?? `${pack.featureIds.length} fonctionnalité(s) incluses`}
                                       </span>
-                                        <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">
-                                          {pack.featureIds
-                                            .map(featureId => getModuleFeatureOptions(mod).find(feature => feature.id === featureId)?.label ?? featureId)
-                                            .join(' · ')}
-                                        </span>
+                                      <span className="mt-1.5 block text-[10px] font-semibold text-[hsl(var(--primary))]">
+                                        {pack.featureIds.length} fonctionnalité{pack.featureIds.length > 1 ? 's' : ''} incluse{pack.featureIds.length > 1 ? 's' : ''}
+                                      </span>
                                     </span>
                                   </label>
                                 );
@@ -1737,12 +1802,13 @@ function Signup({
                         )}
                         {((mod.featurePacks?.length ?? 0) === 0 ||
                           (selectedModulePackIds[mod.id]?.length ?? 0) > 0) && (
-                          <>
+                          <div className="rounded-lg bg-[hsl(var(--muted)/.38)] p-3">
                             <div className="mb-2 flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                                Fonctionnalités à activer
-                              </span>
-                              <span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">
+                              <div>
+                                <p className="text-xs font-bold">Fonctionnalités à activer</p>
+                                <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Affinez le contenu de ce module si nécessaire.</p>
+                              </div>
+                              <span className="mono shrink-0 rounded-full bg-[hsl(var(--card))] px-2 py-1 text-[10px] text-[hsl(var(--muted-foreground))]">
                                 {selectedFeatureIds.size}/{featureOptions.length}
                               </span>
                             </div>
@@ -1752,23 +1818,24 @@ function Signup({
                                 return (
                                   <label
                                     key={feature.id}
-                                    className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs cursor-pointer hover:bg-[hsl(var(--card)/.7)]"
+                                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-xs transition hover:bg-[hsl(var(--card)/.8)]"
                                   >
                                     <input
                                       data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`}
                                       type="checkbox"
                                       checked={included}
                                       onChange={() => toggleFeature(mod.id, feature.id)}
-                                      className="mt-0.5 accent-[hsl(var(--primary))]"
+                                      className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
                                     />
-                                    <span>{feature.label}</span>
+                                    <span className={included ? 'font-semibold' : 'text-[hsl(var(--muted-foreground))]'}>{feature.label}</span>
                                   </label>
                                 );
                               })}
                             </div>
-                          </>
+                          </div>
                         )}
-                        <p className="mt-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">
+                        <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">
+                          <Check size={12} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
                           Les fonctionnalités nécessaires sont ajoutées automatiquement.
                         </p>
                       </div>
