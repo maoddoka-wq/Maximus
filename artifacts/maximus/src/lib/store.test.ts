@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { emptyStoreData, getCompanyDirectoryCompanies, getConfiguredModules, normalizeStoreData, sanitizeStoreData } from './store';
+import { emptyStoreData, getCompanyDirectoryCompanies, getConfiguredModules, normalizeStoreData, sanitizeStoreData, sectorPresets } from './store';
 
 test('reconstruit les collections métier quand une sauvegarde partielle contient null', () => {
   const normalized = normalizeStoreData({
@@ -106,6 +106,32 @@ test('ne repropose plus les secteurs intégrés retirés dans l’état initial'
   assert.equal(data.sectorPresets.some(preset =>
     ['distribution', 'agroalimentaire', 'services', 'commerce'].includes(preset.id),
   ), false);
+});
+
+test('propose les huit profils d’activité de départ pour le Sénégal', () => {
+  const data = emptyStoreData();
+  assert.equal(data.sectorPresets.length, 8);
+  assert.deepEqual(
+    data.sectorPresets.map(preset => preset.id),
+    sectorPresets.map(preset => preset.id),
+  );
+  assert.ok(data.sectorPresets.every(preset => preset.moduleIds.length > 0));
+  assert.ok(data.sectorPresets.every(preset =>
+    preset.moduleIds.every(moduleId => ['commerce', 'ecommerce', 'stocks', 'presences'].includes(moduleId)),
+  ));
+});
+
+test('réinjecte les profils de départ dans une ancienne sauvegarde vide', () => {
+  const normalized = normalizeStoreData({
+    sectorPresets: [],
+    catalogVersion: 1,
+  });
+
+  assert.equal(normalized.catalogVersion, 2);
+  assert.deepEqual(
+    normalized.sectorPresets.map(preset => preset.id),
+    sectorPresets.map(preset => preset.id),
+  );
 });
 
 test('nettoie les secteurs intégrés retirés des anciennes sauvegardes', () => {

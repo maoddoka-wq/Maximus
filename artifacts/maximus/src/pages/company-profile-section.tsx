@@ -214,7 +214,7 @@ export function CompanyProfileSection({
               <Field label="Email administrateur *" value={form.email} onChange={setField('email')} type="email" testId="input-profile-email" help="Adresse utilisée pour la connexion du compte entreprise." />
               <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" help="Numéro de contact professionnel de l’entreprise." />
               <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" help="Pays dans lequel l’entreprise exerce principalement." />
-              <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" help="Secteur d’activité utilisé pour contextualiser l’espace." />
+              <Field label="Profil d’activité" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" help="Profil utilisé pour contextualiser les fonctions proposées à l’entreprise." />
             </div>
           </section>
           <section className="card-surface rounded-2xl p-6">

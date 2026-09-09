@@ -156,10 +156,86 @@ export const stockSubmoduleDependencies: Partial<Record<string, string[]>> = {
 };
 
 export const sectorPresets: SectorPreset[] = [
-  { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
-  { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
-  { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'presences'], modulePackIds: { stocks: ['stock-consultation'], commerce: ['commerce-consultation'], presences: ['presence-consultation'] } },
-  { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'stocks', 'ecommerce'], modulePackIds: { commerce: ['commerce-gestion'], stocks: ['stock-gestion'], ecommerce: ['ecommerce-gestion'] } },
+  {
+    id: 'senegal-commerce-distribution',
+    name: 'Commerce et distribution',
+    moduleIds: ['commerce', 'stocks', 'ecommerce', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-gestion'],
+      ecommerce: ['ecommerce-gestion'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-agriculture-elevage-peche',
+    name: 'Agriculture, élevage et pêche',
+    moduleIds: ['commerce', 'stocks', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-gestion'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-production-transformation-artisanat',
+    name: 'Production, transformation et artisanat',
+    moduleIds: ['commerce', 'stocks', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-gestion'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-services',
+    name: 'Services et professions',
+    moduleIds: ['commerce', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-consultation'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-restauration-hebergement-tourisme',
+    name: 'Restauration, hébergement et tourisme',
+    moduleIds: ['commerce', 'stocks', 'ecommerce', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-gestion'],
+      ecommerce: ['ecommerce-gestion'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-transport-logistique',
+    name: 'Transport et logistique',
+    moduleIds: ['commerce', 'stocks', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-consultation'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-btp-immobilier',
+    name: 'BTP et immobilier',
+    moduleIds: ['commerce', 'stocks', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-consultation'],
+      presences: ['presence-gestion'],
+    },
+  },
+  {
+    id: 'senegal-sante-education-associations',
+    name: 'Santé, éducation et associations',
+    moduleIds: ['commerce', 'presences'],
+    modulePackIds: {
+      commerce: ['commerce-consultation'],
+      presences: ['presence-gestion'],
+    },
+  },
 ];
 
 // These legacy presets are intentionally no longer offered for new companies.
@@ -243,7 +319,7 @@ export function emptyStoreData(): StoreData {
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
     sectorPresets: structuredClone(sectorPresets.filter((preset) => !isRetiredSectorPreset(preset))),
     moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
-    moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
+    moduleOverrides: {}, removedModules: [], catalogVersion: 2, organizationVersion: 1,
   };
 }
 
@@ -335,6 +411,15 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
   if (Array.isArray(source.sectorPresets)) {
     normalized.sectorPresets = restoreBuiltInSectorPackSelections(normalized.sectorPresets)
       .filter((preset) => !isRetiredSectorPreset(preset));
+    if (
+      normalized.sectorPresets.length === 0
+      && typeof source.catalogVersion === 'number'
+      && source.catalogVersion < 2
+      && !source.catalogDraft
+    ) {
+      normalized.sectorPresets = structuredClone(defaults.sectorPresets);
+      normalized.catalogVersion = 2;
+    }
   }
   if (normalized.catalogDraft?.sectorPresets) {
     normalized.catalogDraft = {
