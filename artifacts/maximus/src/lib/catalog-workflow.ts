@@ -46,6 +46,15 @@ export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
   };
 }
 
+export function getPublishedCatalogSnapshot(data: StoreData): CatalogSnapshot {
+  return {
+    moduleOverrides: clone(data.moduleOverrides ?? {}),
+    moduleStatuses: clone(data.moduleStatuses ?? {}),
+    removedModules: clone(data.removedModules ?? []),
+    sectorPresets: clone(data.sectorPresets ?? []),
+  };
+}
+
 export function ensureCatalogDraft(data: StoreData): CatalogDraft {
   if (!data.catalogDraft) {
     const published = getCatalogSnapshot(data);

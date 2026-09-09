@@ -120,6 +120,7 @@ class AppStateController extends Controller
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
+                    'onboardingCompleted' => false,
                 ];
             },
         );
@@ -437,6 +438,41 @@ class AppStateController extends Controller
     {
         if ($companyId === '') {
             return [];
+        }
+
+        $hasCompany = collect($state['companies'] ?? [])
+            ->contains(fn (mixed $item): bool => is_array($item) && (string) ($item['id'] ?? '') === $companyId);
+        if (!$hasCompany) {
+            $company = Company::query()
+                ->whereKey($companyId)
+                ->whereNull('deleted_at')
+                ->where('status', 'ACTIF')
+                ->first();
+            if ($company) {
+                $state['companies'] = is_array($state['companies'] ?? null) ? $state['companies'] : [];
+                $state['companies'][] = [
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'manager' => $company->manager,
+                    'email' => $company->email,
+                    'phone' => (string) ($company->phone ?? ''),
+                    'country' => (string) ($company->country ?? ''),
+                    'sector' => (string) ($company->sector ?? ''),
+                    'status' => $company->status,
+                    'requestedModules' => $company->requested_modules ?? [],
+                    'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],
+                    'requestedModuleFeatures' => $company->requested_module_features ?? [],
+                    'requestedModulePermissions' => $company->requested_module_permissions ?? [],
+                    'allowedModules' => $company->requested_modules ?? [],
+                    'refusedModules' => [],
+                    'createdAt' => optional($company->created_at)->toISOString(),
+                    'profilePhoto' => $company->profile_photo,
+                    'primaryColor' => $company->primary_color,
+                    'accentColor' => $company->accent_color,
+                    'sidebarColor' => $company->sidebar_color,
+                    'onboardingCompleted' => false,
+                ];
+            }
         }
 
         foreach ([

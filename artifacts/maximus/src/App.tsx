@@ -136,6 +136,9 @@ const OperationalModulePage = lazy(() =>
 const CompanyOrganizationAdmin = lazy(() =>
   import('@/pages/company-organization').then((module) => ({ default: module.CompanyOrganizationAdmin })),
 );
+const CompanyOnboardingPage = lazy(() =>
+  import('@/pages/company-onboarding').then((module) => ({ default: module.CompanyOnboardingPage })),
+);
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
@@ -891,6 +894,31 @@ function AppContent() {
         : { ...baseMeta, kicker: currentCompany.name }
       : baseMeta;
   const currentPath = companyRoutePath;
+  const shouldShowOnboarding =
+    !isAdmin
+    && session.startsWith('company:')
+    && Boolean(currentCompany)
+    && currentCompany?.onboardingCompleted === false
+    && (currentPath === '/entreprise/dashboard' || currentPath === '/entreprise/demarrage');
+  if (shouldShowOnboarding && currentCompany) {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">
+            Préparation de votre espace…
+          </div>
+        }
+      >
+        <CompanyOnboardingPage
+          data={data}
+          company={currentCompany}
+          mutate={mutate}
+          onComplete={() => navigate('/entreprise/dashboard')}
+          onExit={() => navigate('/entreprise/organisation')}
+        />
+      </Suspense>
+    );
+  }
   const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
   const companyInitials =
     currentCompany?.name
@@ -2961,8 +2989,10 @@ function RequestsPage({
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
           Object.assign(target, result.company);
+          target.onboardingCompleted = false;
+          target.onboardingStep = 1;
         } else {
-          d.companies.push(result.company);
+          d.companies.push({ ...result.company, onboardingCompleted: false, onboardingStep: 1 });
         }
       }, 'Entreprise activée et compte administrateur synchronisé.');
       setRequests((current) => current.filter((item) => item.id !== company.id));

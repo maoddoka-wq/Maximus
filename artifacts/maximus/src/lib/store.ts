@@ -45,6 +45,13 @@ export interface Company {
   accentColor?: string;
   sidebarColor?: string;
   managerRoleId?: string;
+  onboardingCompleted?: boolean;
+  onboardingStep?: number;
+  onboardingSelectedModuleIds?: ModuleId[];
+  onboardingModulePackIds?: Partial<Record<ModuleId, string[]>>;
+  onboardingRootName?: string;
+  onboardingRootCode?: string;
+  onboardingRootType?: OrgNode['type'];
 }
 
 export interface ModuleFeaturePack {
@@ -305,6 +312,21 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
         allowedModules: normalizeStringArray(raw.allowedModules) as ModuleId[],
         refusedModules: normalizeStringArray(raw.refusedModules) as ModuleId[],
       };
+      if (typeof raw.onboardingCompleted === 'boolean') {
+        normalizedCompany.onboardingCompleted = raw.onboardingCompleted;
+      }
+      if (typeof raw.onboardingStep === 'number') normalizedCompany.onboardingStep = raw.onboardingStep;
+      if (raw.onboardingSelectedModuleIds !== undefined) {
+        normalizedCompany.onboardingSelectedModuleIds = normalizeStringArray(raw.onboardingSelectedModuleIds) as ModuleId[];
+      }
+      if (raw.onboardingModulePackIds !== undefined) {
+        normalizedCompany.onboardingModulePackIds = normalizeStringArrayMap(raw.onboardingModulePackIds) as Partial<Record<ModuleId, string[]>>;
+      }
+      if (typeof raw.onboardingRootName === 'string') normalizedCompany.onboardingRootName = raw.onboardingRootName;
+      if (typeof raw.onboardingRootCode === 'string') normalizedCompany.onboardingRootCode = raw.onboardingRootCode;
+      if (raw.onboardingRootType === 'direction' || raw.onboardingRootType === 'department' || raw.onboardingRootType === 'sector' || raw.onboardingRootType === 'service') {
+        normalizedCompany.onboardingRootType = raw.onboardingRootType;
+      }
       if (raw.requestedModulePackIds !== undefined) {
         normalizedCompany.requestedModulePackIds = normalizeStringArrayMap(raw.requestedModulePackIds) as Partial<Record<ModuleId, string[]>>;
       }
