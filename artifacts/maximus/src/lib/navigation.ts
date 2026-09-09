@@ -8,6 +8,7 @@ import {
   GitBranch,
   LayoutGrid,
   ListChecks,
+  ShieldAlert,
   Settings,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -44,6 +45,7 @@ export function canonicalAppPath(path: string): string {
 export const adminNav: NavigationItem[] = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
   { href: '/maximus/controle', label: 'Contrôle & coordination', icon: ListChecks },
+  { href: '/maximus/surveillance', label: 'Détecteur de problèmes', icon: ShieldAlert },
   { href: '/maximus/entreprises', label: 'Entreprises', icon: Building2 },
   { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
   { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },

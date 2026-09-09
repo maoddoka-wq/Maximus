@@ -158,6 +158,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     title: 'Contrôle & coordination',
     description: 'Les décisions, tâches et événements qui structurent les opérations.',
   },
+  '/maximus/surveillance': {
+    kicker: 'Surveillance MAXIMUS',
+    title: 'Détecteur de problèmes',
+    description: 'Vérifiez la disponibilité de l’application, de PostgreSQL et de son schéma.',
+  },
   '/maximus/entreprises': {
     kicker: 'Administration',
     title: 'Entreprises',
@@ -303,6 +308,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
 
 const routesWithModuleHeaders = new Set([
   '/maximus/controle',
+  '/maximus/surveillance',
   '/entreprise/controle',
   '/entreprise/dashboard',
   '/entreprise/stocks',

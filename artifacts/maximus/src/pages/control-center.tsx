@@ -82,6 +82,7 @@ export function ControlCenterPage({
   employeeId,
   scopeNodeId,
   actorName,
+  focusHealth = false,
 }: {
   data: StoreData;
   mutate: Mutate;
@@ -92,6 +93,7 @@ export function ControlCenterPage({
   employeeId?: string;
   scopeNodeId?: string;
   actorName: string;
+  focusHealth?: boolean;
 }) {
   const canSeeAll = isAdmin || Boolean(companyAdmin);
   const [statusFilter, setStatusFilter] = useState<'TOUS' | ControlTaskStatus>('TOUS');
@@ -162,6 +164,14 @@ export function ControlCenterPage({
       window.clearInterval(interval);
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!focusHealth || !isAdmin) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector('[data-testid="system-health"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusHealth, isAdmin]);
 
   const controlTasks = useMemo(() => {
     const byId = new Map(data.controlTasks.map(task => [task.id, task]));

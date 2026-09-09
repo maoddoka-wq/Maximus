@@ -63,6 +63,9 @@ export function AdminRouter({
   if (routePath === '/maximus/controle') {
     return renderScreen(screens.control, { data, mutate, isAdmin: true, actorName: 'MAXIMUS' });
   }
+  if (routePath === '/maximus/surveillance') {
+    return renderScreen(screens.control, { data, mutate, isAdmin: true, actorName: 'MAXIMUS', focusHealth: true });
+  }
   if (routePath === '/maximus/entreprises/organisation') {
     return renderScreen(screens.organization, { data, mutate, onNavigate });
   }
