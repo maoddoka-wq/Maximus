@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { AlertTriangle, Check, Clock3, Copy, KeyRound, RefreshCw, Settings2, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, Banknote, Check, Clock3, Copy, KeyRound, RefreshCw, Settings2, ShieldCheck, Trash2 } from 'lucide-react';
 import {
   platformSettingsApi,
   type DiagnosticTokenSummary,
   type IssuedDiagnosticToken,
   type SellerWalletMaturityMode,
   type SellerWalletMaturityPolicy,
+  type SellerWalletWithdrawalFeePolicy,
 } from '@/lib/platform-settings-api';
 
 const modeOptions: Array<{
@@ -32,10 +33,13 @@ const modeOptions: Array<{
 
 export default function PlatformSettingsPage() {
   const [policy, setPolicy] = useState<SellerWalletMaturityPolicy | null>(null);
+  const [feePolicy, setFeePolicy] = useState<SellerWalletWithdrawalFeePolicy | null>(null);
   const [mode, setMode] = useState<SellerWalletMaturityMode>('DAYS');
   const [value, setValue] = useState('7');
+  const [feeAmount, setFeeAmount] = useState('100');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingFee, setSavingFee] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [diagnosticTokens, setDiagnosticTokens] = useState<DiagnosticTokenSummary[]>([]);
@@ -48,11 +52,14 @@ export default function PlatformSettingsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [nextPolicy, tokenResponse] = await Promise.all([
+      const [nextPolicy, nextFeePolicy, tokenResponse] = await Promise.all([
         platformSettingsApi.sellerWalletMaturity(),
+        platformSettingsApi.sellerWalletWithdrawalFee(),
         platformSettingsApi.diagnosticTokens(),
       ]);
       setPolicy(nextPolicy);
+      setFeePolicy(nextFeePolicy);
+      setFeeAmount(String(nextFeePolicy.amount));
       setMode(nextPolicy.mode);
       setValue(nextPolicy.value === null ? '' : String(nextPolicy.value));
       setDiagnosticTokens(tokenResponse.tokens);
@@ -141,6 +148,28 @@ export default function PlatformSettingsPage() {
       setError(cause instanceof Error ? cause.message : 'La règle n’a pas pu être enregistrée.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveFee = async (event: FormEvent) => {
+    event.preventDefault();
+    const numericAmount = Number(feeAmount);
+    if (!Number.isInteger(numericAmount) || numericAmount < 0 || numericAmount > 1_000_000) {
+      setError('Indiquez un frais entier compris entre 0 et 1 000 000 XOF.');
+      return;
+    }
+
+    setSavingFee(true);
+    try {
+      const nextFeePolicy = await platformSettingsApi.updateSellerWalletWithdrawalFee({ amount: numericAmount });
+      setFeePolicy(nextFeePolicy);
+      setFeeAmount(String(nextFeePolicy.amount));
+      setNotice('Le frais de retrait a été enregistré.');
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Le frais de retrait n’a pas pu être enregistré.');
+    } finally {
+      setSavingFee(false);
     }
   };
 
@@ -252,6 +281,45 @@ export default function PlatformSettingsPage() {
           </p>
         </aside>
       </div>
+
+      <section className="card-surface rounded-2xl border p-5 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)]">
+              <Banknote size={17} />
+            </span>
+            <div>
+              <h2 className="font-bold">Frais de retrait vendeur</h2>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                Ce frais est calculé uniquement par le serveur et ajouté au montant réservé. Un vendeur ne peut pas retirer plus que son solde disponible moins ce frais.
+              </p>
+            </div>
+          </div>
+          <strong className="text-lg">{feePolicy?.label ?? 'Non configuré'}</strong>
+        </div>
+        <form onSubmit={saveFee} className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="block max-w-xs text-sm font-semibold">
+            Montant fixe par retrait
+            <span className="relative mt-2 block">
+              <input
+                data-testid="input-withdrawal-fee"
+                type="number"
+                min="0"
+                max="1000000"
+                step="1"
+                value={feeAmount}
+                onChange={event => setFeeAmount(event.target.value)}
+                className="w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 pr-16 text-sm font-normal"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-bold text-[hsl(var(--muted-foreground))]">XOF</span>
+            </span>
+          </label>
+          <button type="submit" disabled={savingFee} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">
+            {savingFee ? <RefreshCw size={15} className="animate-spin" /> : <Check size={15} />}
+            {savingFee ? 'Enregistrement…' : 'Enregistrer le frais'}
+          </button>
+        </form>
+      </section>
 
       <section className="card-surface rounded-2xl border p-5 sm:p-7" data-testid="diagnostic-access-settings">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

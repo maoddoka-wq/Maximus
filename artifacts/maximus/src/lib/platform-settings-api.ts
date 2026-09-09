@@ -6,6 +6,11 @@ export type SellerWalletMaturityPolicy = {
   label: string;
 };
 
+export type SellerWalletWithdrawalFeePolicy = {
+  amount: number;
+  label: string;
+};
+
 export type DiagnosticTokenStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
 
 export type DiagnosticTokenSummary = {
@@ -64,6 +69,12 @@ export const platformSettingsApi = {
     value?: number;
   }) =>
     request<SellerWalletMaturityPolicy>('/platform-settings/seller-wallet-maturity', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  sellerWalletWithdrawalFee: () => request<SellerWalletWithdrawalFeePolicy>('/platform-settings/seller-wallet-withdrawal-fee'),
+  updateSellerWalletWithdrawalFee: (payload: { amount: number }) =>
+    request<SellerWalletWithdrawalFeePolicy>('/platform-settings/seller-wallet-withdrawal-fee', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),

@@ -167,6 +167,7 @@ export interface SellerWithdrawal {
   amount: number;
   fee: number;
   netAmount: number;
+  totalDebit: number;
   provider: 'WAVE';
   mobile: string;
   beneficiaryName: string;
@@ -196,6 +197,10 @@ export interface SellerWalletBootstrap {
   withdrawals: SellerWithdrawal[];
   ledger: SellerWalletLedgerEntry[];
   maturityPolicy: SellerWalletMaturityPolicy;
+  withdrawalFee: {
+    amount: number;
+    label: string;
+  };
 }
 
 export interface PublicShopBootstrap {

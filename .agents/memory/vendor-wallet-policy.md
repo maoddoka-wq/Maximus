@@ -20,3 +20,9 @@ Un payout DiamanoPay dont le statut est intermédiaire conserve les fonds en ré
 **Why:** Un retour HTTP accepté par le prestataire ne signifie pas nécessairement que le transfert Wave est finalisé.
 
 **How to apply:** Traiter `PENDING` et les statuts équivalents comme `PROCESSING`, attendre le webhook final, et ne restituer les fonds qu’en cas d’échec explicite.
+
+Un retrait demande un montant reçu par le vendeur et ajoute un frais fixe configuré par MAXIMUS ; le débit total est `montant + frais`, doit être couvert par le solde disponible et est réservé atomiquement.
+
+**Why:** Un solde disponible de 1 000 XOF ne doit pas permettre un retrait de 1 000 XOF si le prestataire facture 100 XOF : les frais ne doivent jamais créer un solde négatif.
+
+**How to apply:** Calculer et contrôler le frais uniquement côté serveur, exposer le maximum retirable, enregistrer séparément le frais dans le registre, puis restituer le montant total réservé en cas d’échec du payout.

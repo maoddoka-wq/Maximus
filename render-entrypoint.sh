@@ -2,7 +2,7 @@
 
 set -eu
 
-required_variables="APP_KEY ADMIN_USER ADMIN_PASSWORD DATABASE_URL"
+required_variables="APP_KEY ADMIN_USER ADMIN_PASSWORD DATABASE_URL APP_URL"
 
 for variable in $required_variables; do
     eval "value=\${$variable:-}"

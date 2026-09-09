@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class PlatformSettingsController extends Controller
 {
-    public function __construct(private readonly SellerWalletMaturityPolicy $maturityPolicy) {}
+    public function __construct(
+        private readonly SellerWalletMaturityPolicy $maturityPolicy,
+        private readonly SellerWalletFeePolicy $feePolicy,
+    ) {}
 
     public function sellerWalletMaturity(Request $request): JsonResponse
     {
@@ -38,6 +42,31 @@ final class PlatformSettingsController extends Controller
         return response()->json($this->maturityPolicy->payloadFor(
             $this->maturityPolicy->update($input['mode'], $input['value'] ?? null),
         ));
+    }
+
+    public function sellerWalletWithdrawalFee(Request $request): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Cette configuration est réservée à l’administration MAXIMUS.'], 403);
+        }
+
+        return response()->json($this->feePolicy->payload());
+    }
+
+    public function updateSellerWalletWithdrawalFee(Request $request): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Cette configuration est réservée à l’administration MAXIMUS.'], 403);
+        }
+
+        $input = $request->validate([
+            'amount' => ['required', 'integer', 'min:0', 'max:1000000'],
+        ]);
+
+        return response()->json([
+            ...$this->feePolicy->update((int) $input['amount']),
+            'label' => sprintf('Frais de retrait : %d XOF par opération.', (int) $input['amount']),
+        ]);
     }
 
     private function isMaximusAdmin(Request $request): bool

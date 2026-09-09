@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
+use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ final class SellerWalletController extends Controller
 
     public function __construct(
         private readonly DiamanoPayService $diamanoPay,
+        private readonly SellerWalletFeePolicy $feePolicy,
         private readonly SellerWalletMaturityPolicy $maturityPolicy,
     ) {}
 
@@ -39,6 +41,7 @@ final class SellerWalletController extends Controller
             'withdrawals' => $this->withdrawals($company),
             'ledger' => $this->ledger($company),
             'maturityPolicy' => $this->maturityPolicy->payload(),
+            'withdrawalFee' => $this->feePolicy->payload(),
         ]);
     }
 
@@ -117,20 +120,27 @@ final class SellerWalletController extends Controller
 
         $company = $this->company($request);
         $this->releaseMaturedFunds($company);
+        $requestedAmount = (int) $input['amount'];
+        $withdrawalFee = $this->feePolicy->feeFor($requestedAmount);
         $idempotencyKey = trim((string) ($request->header('Idempotency-Key') ?: ($input['idempotencyKey'] ?? '')));
         $created = null;
         $createdFresh = false;
 
         try {
-            $created = DB::transaction(function () use ($company, $input, $idempotencyKey, &$createdFresh): object {
+            $created = DB::transaction(function () use ($company, $input, $requestedAmount, $withdrawalFee, $idempotencyKey, &$createdFresh): object {
                 $wallet = DB::table('seller_wallets')->where('company_id', $company)->lockForUpdate()->first();
                 $existing = $idempotencyKey === ''
                     ? null
                     : DB::table('seller_withdrawals')->where('company_id', $company)->where('idempotency_key', $idempotencyKey)->first();
                 if ($existing) {
+                    if ((int) $existing->amount !== $requestedAmount || (int) $existing->fee !== $withdrawalFee) {
+                        throw new \RuntimeException('IDEMPOTENCY_CONFLICT');
+                    }
+
                     return $existing;
                 }
-                if (! $wallet || (int) $wallet->available_balance < (int) $input['amount']) {
+                $totalDebit = $requestedAmount + $withdrawalFee;
+                if (! $wallet || (int) $wallet->available_balance < $totalDebit) {
                     throw new \RuntimeException('SOLDE_INSUFFISANT');
                 }
 
@@ -146,9 +156,9 @@ final class SellerWalletController extends Controller
                     'id' => $id,
                     'wallet_id' => $wallet->id,
                     'company_id' => $company,
-                    'amount' => $input['amount'],
-                    'fee' => 0,
-                    'net_amount' => $input['amount'],
+                    'amount' => $requestedAmount,
+                    'fee' => $withdrawalFee,
+                    'net_amount' => $requestedAmount,
                     'provider' => $provider,
                     'mobile' => $mobile,
                     'beneficiary_name' => $name,
@@ -162,23 +172,32 @@ final class SellerWalletController extends Controller
                 ]);
                 $createdFresh = true;
                 DB::table('seller_wallets')->where('id', $wallet->id)->update([
-                    'available_balance' => DB::raw('available_balance - '.(int) $input['amount']),
-                    'reserved_balance' => DB::raw('reserved_balance + '.(int) $input['amount']),
+                    'available_balance' => DB::raw('available_balance - '.$totalDebit),
+                    'reserved_balance' => DB::raw('reserved_balance + '.$totalDebit),
                     'updated_at' => now(),
                 ]);
-                $this->ledgerInsert($wallet, 'WITHDRAWAL_RESERVED', 'AVAILABLE', 'DEBIT', (int) $input['amount'], $id, 'withdrawal:'.$id.':available');
-                $this->ledgerInsert($wallet, 'WITHDRAWAL_RESERVED', 'RESERVED', 'CREDIT', (int) $input['amount'], $id, 'withdrawal:'.$id.':reserved');
+                $this->ledgerInsert($wallet, 'WITHDRAWAL_RESERVED', 'AVAILABLE', 'DEBIT', $totalDebit, $id, 'withdrawal:'.$id.':available');
+                $this->ledgerInsert($wallet, 'WITHDRAWAL_RESERVED', 'RESERVED', 'CREDIT', $totalDebit, $id, 'withdrawal:'.$id.':reserved');
 
                 return DB::table('seller_withdrawals')->where('id', $id)->first();
             });
         } catch (Throwable $error) {
+            $insufficient = $error->getMessage() === 'SOLDE_INSUFFISANT';
+            $fee = $this->feePolicy->feeFor($requestedAmount);
+            $available = (int) (DB::table('seller_wallets')->where('company_id', $company)->value('available_balance') ?? 0);
+
             return response()->json([
                 'error' => match ($error->getMessage()) {
-                    'SOLDE_INSUFFISANT' => 'Le solde disponible est insuffisant.',
+                    'SOLDE_INSUFFISANT' => 'Le solde disponible ne couvre pas le montant demandé et les frais de retrait.',
+                    'IDEMPOTENCY_CONFLICT' => 'Cette clé de demande a déjà été utilisée pour un autre retrait.',
                     'COMPTE_RETRAIT_INCOMPLET' => 'Configurez le nom et le numéro mobile de retrait avant de demander un retrait.',
                     default => 'La demande de retrait n’a pas pu être créée.',
                 },
-            ], in_array($error->getMessage(), ['SOLDE_INSUFFISANT', 'COMPTE_RETRAIT_INCOMPLET'], true) ? 422 : 400);
+                'fee' => $insufficient ? $fee : null,
+                'requestedAmount' => $insufficient ? $requestedAmount : null,
+                'totalDebit' => $insufficient ? $requestedAmount + $fee : null,
+                'maximumAmount' => $insufficient ? max(0, $available - $fee) : null,
+            ], in_array($error->getMessage(), ['SOLDE_INSUFFISANT', 'COMPTE_RETRAIT_INCOMPLET'], true) ? 422 : ($error->getMessage() === 'IDEMPOTENCY_CONFLICT' ? 409 : 400));
         }
 
         if ($created === null || ! $createdFresh) {
@@ -281,10 +300,13 @@ final class SellerWalletController extends Controller
 
             if ($success) {
                 DB::table('seller_wallets')->where('id', $wallet->id)->update([
-                    'reserved_balance' => DB::raw('reserved_balance - '.(int) $withdrawal->amount),
+                    'reserved_balance' => DB::raw('reserved_balance - '.$this->withdrawalTotal($withdrawal)),
                     'updated_at' => now(),
                 ]);
                 $this->ledgerInsert($wallet, 'WITHDRAWAL_PAID', 'RESERVED', 'DEBIT', (int) $withdrawal->amount, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':paid');
+                if ((int) $withdrawal->fee > 0) {
+                    $this->ledgerInsert($wallet, 'WITHDRAWAL_FEE', 'RESERVED', 'DEBIT', (int) $withdrawal->fee, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':fee');
+                }
                 DB::table('seller_withdrawals')->where('id', $withdrawal->id)->update([
                     'status' => 'SUCCEEDED',
                     'provider_payout_id' => $providerId !== '' ? $providerId : $withdrawal->provider_payout_id,
@@ -559,12 +581,13 @@ final class SellerWalletController extends Controller
     private function releaseReservedWithdrawal(object $wallet, object $withdrawal, string $reason): void
     {
         DB::table('seller_wallets')->where('id', $wallet->id)->update([
-            'reserved_balance' => DB::raw('reserved_balance - '.(int) $withdrawal->amount),
-            'available_balance' => DB::raw('available_balance + '.(int) $withdrawal->amount),
+            'reserved_balance' => DB::raw('reserved_balance - '.$this->withdrawalTotal($withdrawal)),
+            'available_balance' => DB::raw('available_balance + '.$this->withdrawalTotal($withdrawal)),
             'updated_at' => now(),
         ]);
-        $this->ledgerInsert($wallet, 'WITHDRAWAL_RELEASED', 'RESERVED', 'DEBIT', (int) $withdrawal->amount, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':release');
-        $this->ledgerInsert($wallet, 'WITHDRAWAL_RELEASED', 'AVAILABLE', 'CREDIT', (int) $withdrawal->amount, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':available');
+        $totalDebit = $this->withdrawalTotal($withdrawal);
+        $this->ledgerInsert($wallet, 'WITHDRAWAL_RELEASED', 'RESERVED', 'DEBIT', $totalDebit, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':release');
+        $this->ledgerInsert($wallet, 'WITHDRAWAL_RELEASED', 'AVAILABLE', 'CREDIT', $totalDebit, $withdrawal->id, 'withdrawal:'.$withdrawal->id.':available');
     }
 
     private function ledgerInsert(object $wallet, string $type, string $bucket, string $direction, int $amount, string $referenceId, string $idempotencyKey, mixed $availableAt = null, ?array $metadata = null): void
@@ -648,6 +671,7 @@ final class SellerWalletController extends Controller
             'amount' => (int) $row->amount,
             'fee' => (int) $row->fee,
             'netAmount' => (int) $row->net_amount,
+            'totalDebit' => (int) $row->amount + (int) $row->fee,
             'provider' => $row->provider,
             'mobile' => $row->mobile,
             'beneficiaryName' => $row->beneficiary_name,
@@ -693,5 +717,10 @@ final class SellerWalletController extends Controller
     private function company(Request $request): string
     {
         return (string) $request->attributes->get('companyId');
+    }
+
+    private function withdrawalTotal(object $withdrawal): int
+    {
+        return max(0, (int) $withdrawal->amount + (int) $withdrawal->fee);
     }
 }

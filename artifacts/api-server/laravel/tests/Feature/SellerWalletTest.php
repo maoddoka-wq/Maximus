@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Services\DiamanoPayService;
+use App\Services\SellerWalletFeePolicy;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -55,6 +56,28 @@ class SellerWalletTest extends TestCase
             ->assertJsonPath('mode', 'AUTOMATIC')
             ->assertJsonPath('value', null)
             ->assertJsonPath('label', 'Libération automatique à la livraison.');
+    }
+
+    public function test_withdrawal_fee_settings_are_reserved_for_maximus_and_default_to_one_hundred_xof(): void
+    {
+        $this->asActor()
+            ->getJson('/api/platform-settings/seller-wallet-withdrawal-fee')
+            ->assertForbidden();
+
+        $this->asMaximusAdmin()
+            ->getJson('/api/platform-settings/seller-wallet-withdrawal-fee')
+            ->assertOk()
+            ->assertJsonPath('amount', 100)
+            ->assertJsonPath('label', 'Frais de retrait : 100 XOF par opération.');
+
+        $this
+            ->putJson('/api/platform-settings/seller-wallet-withdrawal-fee', ['amount' => 150])
+            ->assertOk()
+            ->assertJsonPath('amount', 150);
+
+        $this->assertDatabaseHas('maximus_platform_settings', [
+            'key' => SellerWalletFeePolicy::SETTING_KEY,
+        ]);
     }
 
     public function test_paid_webhook_credits_once_and_keeps_funds_pending(): void
@@ -333,8 +356,37 @@ class SellerWalletTest extends TestCase
                 'idempotencyKey' => 'withdrawal-insufficient',
             ])
             ->assertStatus(422)
-            ->assertJsonPath('error', 'Le solde disponible est insuffisant.');
+            ->assertJsonPath('error', 'Le solde disponible ne couvre pas le montant demandé et les frais de retrait.')
+            ->assertJsonPath('fee', 100)
+            ->assertJsonPath('maximumAmount', 800);
 
+        $this->assertDatabaseCount('seller_withdrawals', 0);
+    }
+
+    public function test_one_thousand_xof_cannot_be_withdrawn_when_the_fee_would_exceed_the_main_balance(): void
+    {
+        $this->configureDiamano();
+        DB::table('seller_wallets')->insert([
+            ...$this->walletRow('wallet-kora', 'kora', 1000),
+            'payout_mobile' => '+221770000000',
+            'payout_name' => 'Entreprise KORA',
+        ]);
+
+        $this->asActor()
+            ->postJson('/api/ecommerce/wallet/withdrawals?companyId=kora', [
+                'amount' => 1000,
+                'idempotencyKey' => 'withdrawal-fee-exceeds-balance',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('fee', 100)
+            ->assertJsonPath('totalDebit', 1100)
+            ->assertJsonPath('maximumAmount', 900);
+
+        $this->assertDatabaseHas('seller_wallets', [
+            'company_id' => 'kora',
+            'available_balance' => 1000,
+            'reserved_balance' => 0,
+        ]);
         $this->assertDatabaseCount('seller_withdrawals', 0);
     }
 
@@ -360,7 +412,9 @@ class SellerWalletTest extends TestCase
         $first = $request
             ->postJson('/api/ecommerce/wallet/withdrawals?companyId=kora', $payload)
             ->assertCreated()
-            ->assertJsonPath('withdrawal.status', 'PROCESSING');
+            ->assertJsonPath('withdrawal.status', 'PROCESSING')
+            ->assertJsonPath('withdrawal.fee', 100)
+            ->assertJsonPath('withdrawal.totalDebit', 6100);
         $request
             ->postJson('/api/ecommerce/wallet/withdrawals?companyId=kora', $payload)
             ->assertOk()
@@ -368,8 +422,8 @@ class SellerWalletTest extends TestCase
 
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
-            'available_balance' => 4000,
-            'reserved_balance' => 6000,
+            'available_balance' => 3900,
+            'reserved_balance' => 6100,
         ]);
         $this->assertDatabaseCount('seller_withdrawals', 1);
         Http::assertSentCount(2);
@@ -414,8 +468,26 @@ class SellerWalletTest extends TestCase
 
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
-            'available_balance' => 7000,
+            'available_balance' => 6900,
             'reserved_balance' => 0,
+        ]);
+        $this->postSignedWebhook([
+            'data' => ['id' => 'payout-success', 'status' => 'SUCCEEDED'],
+            'type' => 'payout.updated',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('seller_wallet_ledger', [
+            'company_id' => 'kora',
+            'type' => 'WITHDRAWAL_FEE',
+            'amount' => 100,
+        ]);
+        $this->assertDatabaseCount('seller_wallet_ledger', 4);
+        $this->assertDatabaseHas('seller_withdrawals', [
+            'company_id' => 'kora',
+            'amount' => 3000,
+            'fee' => 100,
+            'net_amount' => 3000,
+            'status' => 'SUCCEEDED',
         ]);
     }
 

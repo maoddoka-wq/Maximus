@@ -431,6 +431,8 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
   const [savingAccount, setSavingAccount] = useState(false);
   const api = createEcommerceApi(data.wallet.companyId);
   const available = data.wallet.availableBalance;
+  const fee = data.withdrawalFee.amount;
+  const maximumAmount = Math.max(0, available - fee);
 
   const saveAccount = async (event: FormEvent) => {
     event.preventDefault();
@@ -443,7 +445,7 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
   const withdraw = async (event: FormEvent) => {
     event.preventDefault();
     const value = Number(amount);
-    if (!Number.isInteger(value) || value < 1000 || value > available) return;
+    if (!Number.isInteger(value) || value < 1000 || value + fee > available) return;
     const result = await run(() => api.requestWithdrawal({ amount: value, provider: 'WAVE', mobile: account.mobile.trim(), beneficiaryName: account.beneficiaryName.trim() }), 'Demande de retrait envoyée.');
     if (result) setAmount('');
   };
@@ -470,13 +472,14 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
        Règle de maturation active : <strong className="text-[hsl(var(--foreground))]">{data.maturityPolicy.label}</strong>
      </div>
     <div className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
-      <Panel title="Demander un retrait" description="Les retraits sont envoyés vers un compte Wave vérifié. Minimum : 1 000 XOF.">
+       <Panel title="Demander un retrait" description="Les retraits sont envoyés vers un compte Wave vérifié. Les frais sont ajoutés au montant débité. Minimum : 1 000 XOF.">
         <form onSubmit={withdraw} className="space-y-4">
           <Field label="Montant à retirer" type="number" value={amount} onChange={setAmount} placeholder="Ex. 25000" />
           <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.06)] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-            Disponible : <strong className="text-[hsl(var(--foreground))]">{money(available, currency)}</strong>. Le montant est réservé dès la demande et restitué automatiquement si le transfert échoue.
+             Disponible : <strong className="text-[hsl(var(--foreground))]">{money(available, currency)}</strong>. Frais : <strong className="text-[hsl(var(--foreground))]">{money(fee, currency)}</strong>. Le montant demandé et les frais doivent être couverts par le solde disponible. Retrait maximal actuel : <strong className="text-[hsl(var(--foreground))]">{money(maximumAmount, currency)}</strong>.
           </div>
-          <button type="submit" disabled={!canModify || !Number.isInteger(Number(amount)) || Number(amount) < 1000 || Number(amount) > available || !account.mobile.trim() || !account.beneficiaryName.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowDownToLine size={15} />Demander le retrait</button>
+           {Number.isInteger(Number(amount)) && Number(amount) >= 1000 && Number(amount) + fee > available && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-xs font-semibold text-[hsl(var(--destructive))]">Ce retrait est impossible : le solde ne couvre pas le montant demandé et les frais.</p>}
+           <button type="submit" disabled={!canModify || !Number.isInteger(Number(amount)) || Number(amount) < 1000 || Number(amount) + fee > available || !account.mobile.trim() || !account.beneficiaryName.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowDownToLine size={15} />Demander le retrait</button>
         </form>
       </Panel>
       <Panel title="Compte de retrait" description="Ces coordonnées sont utilisées uniquement pour les payouts de cette entreprise.">
@@ -489,7 +492,7 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
       </Panel>
     </div>
     <Panel title="Historique des retraits" description="Les dernières demandes de retrait de cette entreprise.">
-      {data.withdrawals.length === 0 ? <Empty icon={ArrowDownToLine} title="Aucun retrait" text="Les demandes de retrait apparaîtront ici." /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Date</th><th className="px-4">Montant</th><th className="px-4">Compte</th><th className="px-4">Statut</th></tr></thead><tbody className="divide-y">{data.withdrawals.map(withdrawal => <tr key={withdrawal.id}><td className="px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(withdrawal.requestedAt)}</td><td className="px-4 py-3 font-bold">{money(withdrawal.amount, currency)}</td><td className="px-4 py-3 text-xs">{withdrawal.mobile}</td><td className="px-4 py-3"><StatusPill value={withdrawal.status} /></td></tr>)}</tbody></table></div>}
+       {data.withdrawals.length === 0 ? <Empty icon={ArrowDownToLine} title="Aucun retrait" text="Les demandes de retrait apparaîtront ici." /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Date</th><th className="px-4">Reçu</th><th className="px-4">Frais</th><th className="px-4">Débité</th><th className="px-4">Compte</th><th className="px-4">Statut</th></tr></thead><tbody className="divide-y">{data.withdrawals.map(withdrawal => <tr key={withdrawal.id}><td className="px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(withdrawal.requestedAt)}</td><td className="px-4 py-3 font-bold">{money(withdrawal.netAmount, currency)}</td><td className="px-4 py-3">{money(withdrawal.fee, currency)}</td><td className="px-4 py-3 font-bold">{money(withdrawal.totalDebit, currency)}</td><td className="px-4 py-3 text-xs">{withdrawal.mobile}</td><td className="px-4 py-3"><StatusPill value={withdrawal.status} /></td></tr>)}</tbody></table></div>}
     </Panel>
   </div>;
 }

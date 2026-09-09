@@ -79,6 +79,8 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
 Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (): void {
     Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);
     Route::put('/seller-wallet-maturity', [PlatformSettingsController::class, 'updateSellerWalletMaturity']);
+    Route::get('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'sellerWalletWithdrawalFee']);
+    Route::put('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'updateSellerWalletWithdrawalFee']);
     Route::get('/diagnostic-tokens', [DiagnosticTokenController::class, 'index']);
     Route::post('/diagnostic-tokens', [DiagnosticTokenController::class, 'store']);
     Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);
