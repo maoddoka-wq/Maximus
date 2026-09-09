@@ -1954,7 +1954,7 @@ function OrganizationAdminPage({
           ))}
         </select>
       </label>
-      <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} />
+       <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} isMaximusAdmin />
     </div>
   );
 }
@@ -6447,9 +6447,6 @@ function AdminCreateCompanyPage({
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState('');
-  const [orgName, setOrgName] = useState('');
-  const [orgCode, setOrgCode] = useState('');
-  const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -6475,10 +6472,8 @@ function AdminCreateCompanyPage({
       !country.trim() ||
       password.length < 8 ||
       password !== passwordConfirm ||
-      !orgName.trim() ||
-      !orgCode.trim()
     ) {
-      setError('Complétez l’entreprise, sa première unité organisationnelle et vérifiez le mot de passe.');
+       setError('Complétez les informations de l’entreprise et vérifiez le mot de passe.');
       return;
     }
     if (selectedModules.length === 0) {
@@ -6597,41 +6592,8 @@ function AdminCreateCompanyPage({
             testId="input-admin-company-password-confirm"
           />
         </div>
-        <div className="mt-8 border-t pt-6">
-          <h3 className="font-bold">Organisation obligatoire</h3>
-          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-            Créez la première unité de l’entreprise. La hiérarchie pourra ensuite être étendue librement.
-          </p>
-          <div className="mt-4 grid gap-5 sm:grid-cols-3">
-            <Field
-              label="Nom de l’unité *"
-              value={orgName}
-              onChange={setOrgName}
-              placeholder="Ex. Direction générale"
-              testId="input-admin-org-name"
-            />
-            <Field
-              label="Code *"
-              value={orgCode}
-              onChange={setOrgCode}
-              placeholder="Ex. DG-01"
-              testId="input-admin-org-code"
-            />
-            <label className="block text-sm font-semibold">
-              Type
-              <select
-                data-testid="select-admin-org-type"
-                value={orgType}
-                onChange={(event) => setOrgType(event.target.value as OrgNode['type'])}
-                className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
-              >
-                <option value="direction">Direction</option>
-                <option value="department">Département</option>
-                <option value="sector">Secteur</option>
-                <option value="service">Service</option>
-              </select>
-            </label>
-          </div>
+        <div className="mt-8 rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+          L’organisation sera configurée après la création de l’entreprise. MAXIMUS ou l’entreprise pourra créer ses propres types d’unités, puis construire sa hiérarchie depuis la page Organisation.
         </div>
         <div className="mt-8 border-t pt-6">
           <h3 className="font-bold">Modules autorisés</h3>

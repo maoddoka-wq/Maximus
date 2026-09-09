@@ -70,11 +70,12 @@ export interface SectorBusinessProfile { id: string; name: string; description?:
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
+export interface OrganizationType { id: string; name: string; companyId?: string; createdBy: 'MAXIMUS' | 'ENTREPRISE'; }
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; companyId?: string; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; companyId?: string; }
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; companyId?: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; companyId?: string; }
-export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: 'direction' | 'sector' | 'service' | 'department'; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; managerEmployeeId?: string; }
+export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type: string; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; managerEmployeeId?: string; }
 export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; productId?: string; quantity?: number; companyId?: string; }
 export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; }
 export interface PayrollSlip { id: string; reference: string; employee: string; period: string; gross: number; net: number; status: Status; }
@@ -97,6 +98,7 @@ export interface StoreData {
   companies: Company[];
   employees: Employee[];
   roles: Role[];
+  organizationTypes: OrganizationType[];
   products: Product[];
   movements: Movement[];
   sales: Sale[];
@@ -237,7 +239,7 @@ function restoreBuiltInSectorPackSelections(presets: SectorPreset[]): SectorPres
 
 export function emptyStoreData(): StoreData {
   return {
-    companies: [], employees: [], roles: [], products: [], movements: [], sales: [],
+    companies: [], employees: [], roles: [], organizationTypes: [], products: [], movements: [], sales: [],
     activities: [], controlTasks: [], domainEvents: [], auditEntries: [], orgNodes: [], notifications: [],
     purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
@@ -251,6 +253,7 @@ const storeArrayKeys = [
   'companies',
   'employees',
   'roles',
+  'organizationTypes',
   'products',
   'movements',
   'sales',
@@ -320,6 +323,15 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
       }
       return normalizedCompany;
     });
+  normalized.organizationTypes = normalized.organizationTypes
+    .filter((item): item is OrganizationType => Boolean(item && typeof item === 'object'))
+    .map(item => ({
+      id: typeof item.id === 'string' && item.id.trim() ? item.id : uid('org-type'),
+      name: typeof item.name === 'string' ? item.name.trim() : '',
+      companyId: typeof item.companyId === 'string' && item.companyId.trim() ? item.companyId : undefined,
+      createdBy: item.createdBy === 'ENTREPRISE' ? 'ENTREPRISE' : 'MAXIMUS',
+    }))
+    .filter(item => item.name.length > 0);
   if (!source.commerceStates || Array.isArray(source.commerceStates) || typeof source.commerceStates !== 'object') {
     normalized.commerceStates = defaults.commerceStates;
   }
