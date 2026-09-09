@@ -5,7 +5,7 @@ export type PresenceItem = { id: string; companyId: string; type: PresenceItemTy
 export type PresenceItemInput = { type: PresenceWriteType; companyId?: string; employeeId?: string | null; workDate?: string | null; startDate?: string | null; endDate?: string | null; status: string; payload: PresencePayload; actor?: string };
 const json = (body: unknown) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, options);
+  const response = await fetch(`/api${path}`, { ...options, cache: 'no-store' });
   if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(typeof body.error === 'string' ? body.error : 'Opération impossible.'); }
   return response.json() as Promise<T>;
 }

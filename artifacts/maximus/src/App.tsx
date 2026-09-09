@@ -46,6 +46,7 @@ import {
 import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
@@ -372,6 +373,13 @@ function AppContent() {
   const [pathname, setLocation] = useLocation();
   const [search] = useSearch();
   const location = search ? `${pathname}?${search}` : pathname;
+  const dataRef = useRef(data);
+  const appStateSaveQueue = useRef(Promise.resolve());
+  const appStateVersionRef = useRef(appStateVersion);
+  const appStateRefreshRef = useRef<Promise<void> | null>(null);
+  const localMutationVersionRef = useRef(0);
+  dataRef.current = data;
+  appStateVersionRef.current = appStateVersion;
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
@@ -459,33 +467,47 @@ function AppContent() {
       cancelled = true;
     };
   }, [pathname, session]);
-  useEffect(() => {
-    if (!session || session.startsWith('company:sector-test-')) {
-      return undefined;
-    }
-    let cancelled = false;
-    void appStateApi.bootstrap()
-      .then(({ data: remoteData, version }) => {
-        if (cancelled) return;
-        setData(sanitizeStoreData(remoteData));
+  const refreshAppState = async (waitForPendingSave = true) => {
+    if (!session || session.startsWith('company:sector-test-')) return;
+    if (appStateRefreshRef.current) return appStateRefreshRef.current;
+
+    const pendingSave = waitForPendingSave
+      ? appStateSaveQueue.current.catch(() => undefined)
+      : Promise.resolve();
+    const request = pendingSave
+      .then(async () => {
+        const { data: remoteData, version } = await appStateApi.bootstrap();
+        const nextData = sanitizeStoreData(remoteData);
+        dataRef.current = nextData;
+        setData(nextData);
+        appStateVersionRef.current = version;
         setAppStateVersion(version);
       })
       .catch((error) => {
-        if (!cancelled) {
-          if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
-            setSession(null);
-            localStorage.removeItem('maximus-session');
-            localStorage.removeItem('maximus-sector-test-company');
-            notify('Votre session MAXIMUS n’est plus active.', 'warning');
-            return;
-          }
-          notify(error instanceof Error ? error.message : 'Les données métier sont indisponibles.', 'error');
+        if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
+          setSession(null);
+          localStorage.removeItem('maximus-session');
+          localStorage.removeItem('maximus-sector-test-company');
+          notify('Votre session MAXIMUS n’est plus active.', 'warning');
+          return;
         }
+        notify(error instanceof Error ? error.message : 'Les données métier sont indisponibles.', 'error');
+      })
+      .finally(() => {
+        appStateRefreshRef.current = null;
       });
-    return () => {
-      cancelled = true;
-    };
+
+    appStateRefreshRef.current = request;
+    return request;
+  };
+
+  useEffect(() => {
+    void refreshAppState();
   }, [session]);
+  useAutoRefresh(() => refreshAppState(), {
+    enabled: Boolean(session && !session.startsWith('company:sector-test-')),
+    intervalMs: 30_000,
+  });
   useEffect(() => {
     if (session !== 'admin') return;
     const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF');
@@ -498,32 +520,37 @@ function AppContent() {
     });
   }, [session]);
 
-  const appStateSaveQueue = useRef(Promise.resolve());
-  const appStateVersionRef = useRef(appStateVersion);
-  useEffect(() => {
-    appStateVersionRef.current = appStateVersion;
-  }, [appStateVersion]);
   const mutate = (fn: (draft: StoreData) => void, message?: string, persist = true) => {
-    const previous = data;
-    const next = structuredClone(data) as StoreData;
+    const previous = dataRef.current;
+    const next = structuredClone(previous) as StoreData;
     fn(next);
     const safeNext = sanitizeStoreData(next);
+    const mutationVersion = ++localMutationVersionRef.current;
+    dataRef.current = safeNext;
     setData(safeNext);
     if (session && persist) {
       appStateSaveQueue.current = appStateSaveQueue.current
         .catch(() => undefined)
         .then(async () => {
-          const { version } = await appStateApi.save(safeNext, appStateVersionRef.current);
+          const { version } = await appStateApi.save(dataRef.current, appStateVersionRef.current);
           appStateVersionRef.current = version;
           setAppStateVersion(version);
+          if (message) notify(message, 'success');
         })
         .catch((error) => {
-          setData((current) => current === safeNext ? previous : current);
+          if (mutationVersion === localMutationVersionRef.current) {
+            dataRef.current = previous;
+            setData(previous);
+          }
+          if (error instanceof AppStateRequestError && error.status === 409) {
+            void refreshAppState(false);
+          }
           notify(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.', 'error');
           throw error;
         });
+    } else if (message) {
+      notify(message, 'success');
     }
-    if (message) notify(message, 'success');
   };
   const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => {
     await setCompanyModuleAccess(companyId, moduleId, status);
@@ -2280,19 +2307,18 @@ function CompanyEditModal({
 
 function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
   const [pendingRequests, setPendingRequests] = useState<number | null>(null);
+  const refreshPendingRequests = async () => {
+    try {
+      const result = await companyRequestApi.list();
+      setPendingRequests(result.requests.length);
+    } catch {
+      setPendingRequests(null);
+    }
+  };
   useEffect(() => {
-    let active = true;
-    void companyRequestApi.list()
-      .then((result) => {
-        if (active) setPendingRequests(result.requests.length);
-      })
-      .catch(() => {
-        if (active) setPendingRequests(null);
-      });
-    return () => {
-      active = false;
-    };
+    void refreshPendingRequests();
   }, []);
+  useAutoRefresh(refreshPendingRequests, { intervalMs: 30_000 });
   const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
   return (
     <div className="space-y-6">
@@ -3003,21 +3029,21 @@ function RequestsPage({
   const [requests, setRequests] = useState<CompanyRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingCompanyId, setPendingCompanyId] = useState<string | null>(null);
+  const refreshRequests = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const result = await companyRequestApi.list();
+      setRequests(result.requests);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Les demandes sont indisponibles.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    void companyRequestApi.list()
-      .then((result) => {
-        if (active) setRequests(result.requests);
-      })
-      .catch((error) => notify(error instanceof Error ? error.message : 'Les demandes sont indisponibles.'))
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+    void refreshRequests();
   }, []);
+  useAutoRefresh(() => refreshRequests(true), { intervalMs: 30_000 });
   const approveRequest = async (company: Company) => {
     setPendingCompanyId(company.id);
     try {

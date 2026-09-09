@@ -20,6 +20,7 @@ type ModuleBootstrap = {
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(`/api${path}`, {
     credentials: 'include',
+    cache: 'no-store',
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -49,6 +50,7 @@ export async function loadCompanyModuleAccess(companyId: string, expectedModuleI
 export async function setCompanyModuleAccess(companyId: string, moduleId: string, status: ModuleAvailability): Promise<ServerModuleAccess> {
   const response = await fetch(`/api/modules/${encodeURIComponent(moduleId)}/access?companyId=${encodeURIComponent(companyId)}`, {
     method: 'PATCH',
+    cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   });

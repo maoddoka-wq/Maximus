@@ -68,7 +68,7 @@ function normalizeHealth(payload: unknown): SystemHealth {
 type NewTaskInput = Omit<ControlTask, 'status' | 'createdAt' | 'updatedAt'>;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, options);
+  const response = await fetch(`/api${path}`, { ...options, cache: 'no-store' });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(typeof body.error === 'string' ? body.error : 'La persistance du contrôle est indisponible.');

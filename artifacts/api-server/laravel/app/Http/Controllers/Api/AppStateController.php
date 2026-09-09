@@ -285,50 +285,55 @@ class AppStateController extends Controller
             'version' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        $current = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
-        $currentPayload = is_string($current?->payload)
-            ? json_decode($current->payload, true)
-            : ($current?->payload ?? []);
-        $currentPayload = is_array($currentPayload) ? $currentPayload : [];
+        return DB::transaction(function () use ($actor, $data): JsonResponse {
+            $current = DB::table('maximus_app_states')
+                ->where('scope', 'workspace')
+                ->lockForUpdate()
+                ->first();
+            $currentPayload = is_string($current?->payload)
+                ? json_decode($current->payload, true)
+                : ($current?->payload ?? []);
+            $currentPayload = is_array($currentPayload) ? $currentPayload : [];
 
-        $incomingState = $this->stripCredentials($data['data']);
-        if (($actor['role'] ?? null) !== 'maximus_admin') {
-            if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager'], true)) {
-                return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
+            $incomingState = $this->stripCredentials($data['data']);
+            if (($actor['role'] ?? null) !== 'maximus_admin') {
+                if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager'], true)) {
+                    return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
+                }
+
+                $companyId = (string) ($actor['companyId'] ?? '');
+                if ($companyId === '') {
+                    return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
+                }
+
+                $currentPayload = $this->mergeCompanyState($currentPayload, $incomingState, $companyId);
+            } else {
+                $currentPayload = $incomingState;
+            }
+            $currentPayload = $this->stripCredentials($currentPayload);
+
+            $expectedVersion = array_key_exists('version', $data) ? (int) $data['version'] : null;
+            if ($current && $expectedVersion !== null && (int) $current->version !== $expectedVersion) {
+                return response()->json([
+                    'error' => 'L’état métier a changé depuis son chargement. Rechargez la page avant de réessayer.',
+                    'version' => (int) $current->version,
+                ], 409);
             }
 
-            $companyId = (string) ($actor['companyId'] ?? '');
-            if ($companyId === '') {
-                return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
-            }
+            $nextVersion = ((int) ($current->version ?? 0)) + 1;
+            DB::table('maximus_app_states')->updateOrInsert(
+                ['scope' => 'workspace'],
+                [
+                    'company_id' => null,
+                    'payload' => json_encode($currentPayload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'version' => $nextVersion,
+                    'updated_at' => now(),
+                    'created_at' => $current?->created_at ?? now(),
+                ],
+            );
 
-            $currentPayload = $this->mergeCompanyState($currentPayload, $incomingState, $companyId);
-        } else {
-            $currentPayload = $incomingState;
-        }
-        $currentPayload = $this->stripCredentials($currentPayload);
-
-        $expectedVersion = array_key_exists('version', $data) ? (int) $data['version'] : null;
-        if ($current && $expectedVersion !== null && (int) $current->version !== $expectedVersion) {
-            return response()->json([
-                'error' => 'L’état métier a changé depuis son chargement. Rechargez la page avant de réessayer.',
-                'version' => (int) $current->version,
-            ], 409);
-        }
-
-        $nextVersion = ((int) ($current->version ?? 0)) + 1;
-        DB::table('maximus_app_states')->updateOrInsert(
-            ['scope' => 'workspace'],
-            [
-                'company_id' => null,
-                'payload' => json_encode($currentPayload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-                'version' => $nextVersion,
-                'updated_at' => now(),
-                'created_at' => $current?->created_at ?? now(),
-            ],
-        );
-
-        return response()->json(['ok' => true, 'version' => $nextVersion]);
+            return response()->json(['ok' => true, 'version' => $nextVersion]);
+        });
     }
 
     private function stripCredentials(array $state): array

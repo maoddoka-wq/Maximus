@@ -75,6 +75,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const { json, headers, ...init } = options;
   const response = await fetch(`/api/payroll${path}`, {
     ...init,
+    cache: 'no-store',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(headers ?? {}) },
     body: json === undefined ? init.body : JSON.stringify(json),
   });

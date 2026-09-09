@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Banknote, Check, ChevronRight, ClipboardCheck, CreditCard, History, Plus, RefreshCw, ShieldCheck, Trash2, UsersRound, WalletCards, X } from 'lucide-react';
 import { createPayrollApi, type PayrollBatch, type PayrollBootstrap } from '@/lib/payroll-api';
 import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
 const dateLabel = (value: string) => value ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(`${value.slice(0, 10)}T12:00:00`)) : '—';
@@ -35,12 +36,13 @@ export default function PayrollModulePage({ companyId: _companyId, employees = [
   const [batchPeriod, setBatchPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [beneficiaryForm, setBeneficiaryForm] = useState({ employeeId: '', fullName: '', mobile: '', accountNumber: '', monthlySalary: '', paymentDay: '28' });
-  const refresh = async () => {
+  const refresh = async (silent = false) => {
     if (preview) { setData({ wallet: { currency: 'XOF', availableBalance: 0, reservedBalance: 0, totalFunded: 0 }, beneficiaries: [], batches: [], items: [], topups: [] }); setLoading(false); return; }
-    setLoading(true);
+    if (!silent) setLoading(true);
     try { setData(await api.bootstrap()); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger la Paie.'); } finally { setLoading(false); }
   };
   useEffect(() => { void refresh(); }, [api, preview]);
+  useAutoRefresh(() => refresh(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
 
   const activeBatch = data?.batches[0];
   const selectedTotal = useMemo(() => data?.beneficiaries.filter(item => selected.includes(item.id)).reduce((sum, item) => sum + item.monthlySalary, 0) ?? 0, [data, selected]);

@@ -4,6 +4,7 @@ import { createStockApi, type StockApi, type StockBootstrap, type StockInventory
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
 const dateLabel = (value: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -68,6 +69,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     }
     void load();
   }, [companyId, preview]);
+  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
   const run = async (action: () => Promise<unknown>, success: string) => {
     if (pendingAction) return;
     setPendingAction(true);

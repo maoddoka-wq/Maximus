@@ -310,6 +310,7 @@ export interface EcommerceCustomerBootstrap {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
+    cache: 'no-store',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
@@ -342,6 +343,7 @@ export const createEcommerceApi = (companyId: string) => {
       formData.append('image', file);
       const response = await fetch(`/api${withCompany('/ecommerce/store/logo')}`, {
         method: 'POST',
+        cache: 'no-store',
         credentials: 'include',
         body: formData,
       });
@@ -362,6 +364,7 @@ export const createEcommerceApi = (companyId: string) => {
       formData.append('image', file);
       const response = await fetch(`/api${withCompany(`/ecommerce/products/${encodeURIComponent(id)}/image`)}`, {
         method: 'POST',
+        cache: 'no-store',
         credentials: 'include',
         body: formData,
       });
@@ -375,6 +378,7 @@ export const createEcommerceApi = (companyId: string) => {
         formData.append('image', file);
         const response = await fetch(`/api${withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/image`)}`, {
           method: 'POST',
+          cache: 'no-store',
           credentials: 'include',
           body: formData,
         });

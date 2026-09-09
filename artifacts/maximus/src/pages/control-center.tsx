@@ -16,6 +16,7 @@ import {
   type StoreData,
 } from '@/lib/store';
 import { controlApi, type ControlBootstrap, type SystemHealth, type SystemHealthCheck } from '@/lib/control-api';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 function formatDate(value: string) {
   if (!value) return '—';
@@ -100,6 +101,22 @@ export function ControlCenterPage({
       .catch(error => { if (active) setSyncError(error instanceof Error ? error.message : 'La synchronisation du journal est indisponible.'); });
     return () => { active = false; };
   }, [companyId, controlScope, employeeId, isAdmin]);
+  useAutoRefresh(() => {
+    let active = true;
+    return controlApi.bootstrap({ companyId: isAdmin ? undefined : companyId, scope: controlScope })
+      .then(snapshot => {
+        if (active) {
+          setServerSnapshot(snapshot);
+          setSyncError('');
+        }
+      })
+      .catch(error => {
+        if (active) setSyncError(error instanceof Error ? error.message : 'La synchronisation du journal est indisponible.');
+      })
+      .finally(() => {
+        active = false;
+      });
+  }, { enabled: true, intervalMs: 30_000 });
 
   useEffect(() => {
     if (!isAdmin) return undefined;

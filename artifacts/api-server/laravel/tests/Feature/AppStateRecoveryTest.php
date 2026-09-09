@@ -373,4 +373,84 @@ class AppStateRecoveryTest extends TestCase
 
         $this->assertSame(['active-company'], collect($response->json('data.companies'))->pluck('id')->all());
     }
+
+    public function test_authenticated_bootstrap_is_not_cached_by_the_browser(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'no-store-admin',
+            'email' => 'no-store.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'max-age=0, no-store, private')
+            ->assertHeader('Pragma', 'no-cache');
+    }
+
+    public function test_app_state_rejects_a_stale_write_without_overwriting_the_latest_data(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'version-admin',
+            'email' => 'version.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $request = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin));
+        $state = [
+            'companies' => [],
+            'employees' => [],
+            'roles' => [],
+            'notifications' => [[
+                'id' => 'fresh-notification',
+                'title' => 'État confirmé',
+                'text' => 'La première écriture est la référence.',
+                'read' => false,
+                'date' => 'À l’instant',
+            ]],
+        ];
+
+        $request->putJson('/api/app-state', ['version' => 0, 'data' => $state])
+            ->assertOk()
+            ->assertJsonPath('version', 1);
+
+        $request->putJson('/api/app-state', [
+            'version' => 0,
+            'data' => [
+                'companies' => [],
+                'employees' => [],
+                'roles' => [],
+                'notifications' => [[
+                    'id' => 'stale-notification',
+                    'title' => 'État obsolète',
+                    'text' => 'Cette écriture ne doit pas remplacer la précédente.',
+                    'read' => false,
+                    'date' => 'À l’instant',
+                ]],
+            ],
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('version', 1);
+
+        $this->assertStringContainsString(
+            'fresh-notification',
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+        );
+        $this->assertStringNotContainsString(
+            'stale-notification',
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+        );
+    }
 }

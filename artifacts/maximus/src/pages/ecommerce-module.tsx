@@ -47,6 +47,7 @@ import {
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
@@ -244,6 +245,7 @@ export default function EcommerceModulePage({
   useEffect(() => {
     void load();
   }, [companyId, preview]);
+  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
 
   const run = async <T,>(action: () => Promise<T>, success: string, actionKey = 'action'): Promise<T | undefined> => {
     if (pendingAction) return undefined;

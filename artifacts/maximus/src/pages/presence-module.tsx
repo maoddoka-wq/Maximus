@@ -7,6 +7,7 @@ import { useQueryTab } from '@/lib/query-tab';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
 type Tab = (typeof presenceFeatureDefinitions)[number]['tab'];
@@ -117,7 +118,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [error, setError] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState(currentEmployee?.id ?? employees[0]?.id ?? '');
   const [selected, setSelected] = useState<PresenceItem | null>(null);
-  const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
+  const refresh = async (silent = false) => { if (!silent) setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
   useEffect(() => {
     if (preview) {
       setItems([]);
@@ -127,6 +128,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     }
     void refresh();
   }, [api, preview]);
+  useAutoRefresh(() => refresh(true), { enabled: !preview, intervalMs: 30_000 });
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
   const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
