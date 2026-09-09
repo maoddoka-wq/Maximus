@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'maximus.auth' => \App\Http\Middleware\AuthenticateMaximus::class,
+            'maximus.diagnostic' => \App\Http\Middleware\AuthenticateDiagnosticToken::class,
             'maximus.company' => \App\Http\Middleware\ResolveCompanyContext::class,
             'maximus.module' => \App\Http\Middleware\EnsureModuleEnabled::class,
         ]);

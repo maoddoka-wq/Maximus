@@ -6,6 +6,28 @@ export type SellerWalletMaturityPolicy = {
   label: string;
 };
 
+export type DiagnosticTokenStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+
+export type DiagnosticTokenSummary = {
+  id: string;
+  tokenPrefix: string;
+  label: string;
+  scope: string;
+  status: DiagnosticTokenStatus;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+};
+
+export type IssuedDiagnosticToken = {
+  id: string;
+  token: string;
+  tokenPrefix: string;
+  label: string;
+  scope: string;
+  expiresAt: string;
+};
+
 export class PlatformSettingsRequestError extends Error {
   constructor(
     message: string,
@@ -44,5 +66,15 @@ export const platformSettingsApi = {
     request<SellerWalletMaturityPolicy>('/platform-settings/seller-wallet-maturity', {
       method: 'PUT',
       body: JSON.stringify(payload),
+    }),
+  diagnosticTokens: async () => request<{ tokens: DiagnosticTokenSummary[] }>('/platform-settings/diagnostic-tokens'),
+  createDiagnosticToken: (payload: { label: string; expiresInHours: number }) =>
+    request<IssuedDiagnosticToken>('/platform-settings/diagnostic-tokens', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  revokeDiagnosticToken: (id: string) =>
+    request<{ ok: true }>(`/platform-settings/diagnostic-tokens/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
     }),
 };

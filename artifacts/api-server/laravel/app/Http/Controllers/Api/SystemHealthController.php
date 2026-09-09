@@ -12,7 +12,7 @@ class SystemHealthController extends Controller
     public function show(Request $request, SystemHealthService $health): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
-        if (($actor['role'] ?? null) !== 'maximus_admin') {
+        if (($actor['role'] ?? null) !== 'maximus_admin' && ! $request->attributes->has('diagnosticToken')) {
             return response()->json(['error' => 'La surveillance système est réservée à l’administration MAXIMUS.'], 403);
         }
 

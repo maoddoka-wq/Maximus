@@ -3,8 +3,10 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
+use App\Http\Controllers\Api\SystemHealthController;
 use App\Services\SystemHealthService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +78,12 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
 Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (): void {
     Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);
     Route::put('/seller-wallet-maturity', [PlatformSettingsController::class, 'updateSellerWalletMaturity']);
+    Route::get('/diagnostic-tokens', [DiagnosticTokenController::class, 'index']);
+    Route::post('/diagnostic-tokens', [DiagnosticTokenController::class, 'store']);
+    Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);
 });
+
+Route::middleware('maximus.diagnostic')->get('/diagnostics/health', [SystemHealthController::class, 'show']);
 
 require __DIR__.'/control.php';
 require __DIR__.'/presence.php';
