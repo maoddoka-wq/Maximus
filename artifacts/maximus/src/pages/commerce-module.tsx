@@ -212,7 +212,7 @@ export default function CommerceModulePage({
      {tab === 'purchases' && <PurchasesPageComplete data={data} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} companyId={companyId} />}
      {tab === 'expenses' && <ExpensesPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
      {tab === 'cash' && <CashPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
-     {tab === 'credit' && <CreditPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
+      {tab === 'credit' && <CreditPageComplete data={data} state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} companyId={companyId} onUpdate={updateState} />}
      {tab === 'invoices' && <InvoicesPageComplete data={data} query={query} onToast={setToast} />}
     {tab === 'returns' && <ReturnsPageComplete data={data} state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} onUpdate={updateState} companyId={companyId} />}
     {tab === 'reports' && <ReportsPage data={data} state={state} />}
@@ -427,7 +427,7 @@ function CashPageComplete({ state, query, canCreate, canModify, onUpdate }: { st
   return <div className="space-y-5"><Panel title="Comptes de caisse" description="Visualisez les liquidités disponibles par compte et leur responsable." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouveau compte</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Solde total" value={money(state.cashAccounts.filter(item => item.active).reduce((sum, item) => sum + item.balance, 0))} detail="Tous comptes actifs" icon={WalletCards} accent /><Metric label="Comptes actifs" value={String(state.cashAccounts.filter(item => item.active).length)} detail="Trésorerie suivie" icon={Building2} /><Metric label="Dernière caisse" value={state.cashAccounts[0]?.name ?? '—'} detail="Compte par défaut" icon={CircleDollarSign} /></div></Panel><Panel title="Comptes"><DataTable headers={['Compte', 'Responsable', 'Solde', 'État', 'Actions']} rows={accounts.map(item => [<strong key={item.id}>{item.name}</strong>, item.responsible, money(item.balance), <StatusBadge status={item.active ? 'ACTIF' : 'ARCHIVÉ'} />, <div className="flex gap-1">{canModify && <button type="button" onClick={() => open(item)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => toggle(item)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">{item.active ? 'Archiver' : 'Réactiver'}</button>}</div>])} /></Panel>{modal && <Modal title={modal === 'new' ? 'Nouveau compte de caisse' : 'Modifier le compte'} onClose={() => setModal(null)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du compte" value={form.name} onChange={value => setForm(current => ({ ...current, name: value }))} placeholder="Ex. Caisse boutique" /><Field label="Responsable" value={form.responsible} onChange={value => setForm(current => ({ ...current, responsible: value }))} /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={save}>Enregistrer</Button></div></Modal>}</div>;
 }
 
-function CreditPageComplete({ state, query, canCreate, canModify, onUpdate }: { state: CommerceState; query: string; canCreate: boolean; canModify: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
+function CreditPageComplete({ data, state, query, canCreate, canModify, mutate, companyId, onUpdate }: { data: StoreData; state: CommerceState; query: string; canCreate: boolean; canModify: boolean; mutate: (fn: (draft: StoreData) => void, message?: string) => void; companyId: string; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
   const { confirm } = useAppDialog();
   const [modal, setModal] = useState<Credit | 'new' | null>(null);
   const [paymentCredit, setPaymentCredit] = useState<Credit | null>(null);
@@ -435,7 +435,31 @@ function CreditPageComplete({ state, query, canCreate, canModify, onUpdate }: { 
   const [paymentAmount, setPaymentAmount] = useState('');
   const open = (credit?: Credit) => { setModal(credit ?? 'new'); setForm(credit ? { client: credit.client, reference: credit.reference, amount: String(credit.amount), dueDate: credit.dueDate } : { client: '', reference: `CRD-${Date.now().toString().slice(-6)}`, amount: '', dueDate: '' }); };
   const save = () => { const nextAmount = Number(form.amount); if (!form.client.trim() || !form.reference.trim() || !form.amount || !Number.isFinite(nextAmount) || nextAmount <= 0) return; onUpdate(draft => { draft.credits.unshift({ id: uid('credit'), client: form.client.trim(), reference: form.reference.trim(), amount: nextAmount, paid: 0, dueDate: form.dueDate.trim() || 'À définir', status: 'EN COURS' }); const client = draft.clients.find(item => item.name.toLowerCase() === form.client.trim().toLowerCase()); if (client) client.balance += nextAmount; }, 'Crédit client créé.'); setModal(null); };
-  const pay = () => { const nextPayment = Number(paymentAmount); if (!paymentCredit || !paymentAmount || !Number.isFinite(nextPayment) || nextPayment <= 0) return; onUpdate(draft => { const target = draft.credits.find(item => item.id === paymentCredit.id); if (target) { const previousRemaining = target.amount - target.paid; const applied = Math.min(previousRemaining, nextPayment); target.paid += applied; target.status = target.paid >= target.amount ? 'RÉGLÉ' : 'EN COURS'; const client = draft.clients.find(item => item.name.toLowerCase() === target.client.toLowerCase()); if (client) client.balance = Math.max(0, client.balance - applied); } }, 'Règlement client enregistré.'); setPaymentCredit(null); setPaymentAmount(''); };
+   const pay = () => {
+     const nextPayment = Number(paymentAmount);
+     if (!paymentCredit || !paymentAmount || !Number.isFinite(nextPayment) || nextPayment <= 0) return;
+     mutate(draft => {
+       const nextState = readState(draft, companyId);
+       const target = nextState.credits.find(item => item.id === paymentCredit.id);
+       if (target) {
+         const previousRemaining = target.amount - target.paid;
+         const applied = Math.min(previousRemaining, nextPayment);
+         target.paid += applied;
+         target.status = target.paid >= target.amount ? 'RÉGLÉ' : 'EN COURS';
+         const client = nextState.clients.find(item => item.name.toLowerCase() === target.client.toLowerCase());
+         if (client) client.balance = Math.max(0, client.balance - applied);
+         const sale = draft.sales.find(item => item.reference === target.reference);
+         if (sale) {
+           sale.paidAmount = target.paid;
+           sale.paymentStatus = target.paid >= target.amount ? 'PAYÉ' : 'PARTIEL';
+           sale.paymentMethod = 'CRÉDIT';
+         }
+       }
+       draft.commerceStates[companyId] = nextState;
+     }, 'Règlement client enregistré.');
+     setPaymentCredit(null);
+     setPaymentAmount('');
+   };
   const credits = state.credits.filter(item => `${item.client} ${item.reference} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
   return <div className="space-y-5"><Panel title="Crédit clients" description="Créez les ventes à terme et enregistrez les règlements partiels ou complets." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouveau crédit</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Créances ouvertes" value={money(state.credits.filter(item => item.status === 'EN COURS').reduce((sum, item) => sum + item.amount - item.paid, 0))} detail="Reste à encaisser" icon={CreditCard} warning /><Metric label="Dossiers ouverts" value={String(state.credits.filter(item => item.status === 'EN COURS').length)} detail="Clients concernés" icon={Users} /><Metric label="Règlements complets" value={String(state.credits.filter(item => item.status === 'RÉGLÉ').length)} detail="Dossiers soldés" icon={Check} accent /></div></Panel><Panel title="Portefeuille crédit"><DataTable headers={['Référence', 'Client', 'Montant', 'Déjà payé', 'Reste', 'Échéance', 'Statut', 'Action']} rows={credits.map(item => [<strong key={item.id}>{item.reference}</strong>, item.client, money(item.amount), money(item.paid), money(Math.max(0, item.amount - item.paid)), item.dueDate, <StatusBadge key={`${item.id}-status`} status={item.status === 'RÉGLÉ' ? 'CONFIRMÉ' : 'EN ATTENTE'} />, item.status === 'EN COURS' && canModify ? <button type="button" onClick={() => { setPaymentCredit(item); setPaymentAmount(String(item.amount - item.paid)); }} className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Enregistrer règlement</button> : '—'])} /></Panel>{modal && <Modal title="Nouveau crédit client" onClose={() => setModal(null)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Client" value={form.client} onChange={value => setForm(current => ({ ...current, client: value }))} /><Field label="Référence" value={form.reference} onChange={value => setForm(current => ({ ...current, reference: value }))} /><Field label="Montant" value={form.amount} onChange={value => setForm(current => ({ ...current, amount: value }))} type="number" /><Field label="Échéance" value={form.dueDate} onChange={value => setForm(current => ({ ...current, dueDate: value }))} placeholder="Ex. 30 juin 2024" /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={save}>Créer le crédit</Button></div></Modal>}{paymentCredit && <Modal title={`Règlement ${paymentCredit.reference}`} onClose={() => setPaymentCredit(null)}><Field label="Montant reçu" value={paymentAmount} onChange={setPaymentAmount} type="number" help={`Reste à encaisser : ${money(paymentCredit.amount - paymentCredit.paid)}.`} /><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setPaymentCredit(null)}>Annuler</Button><Button primary onClick={pay}>Enregistrer le règlement</Button></div></Modal>}</div>;
 }
@@ -461,11 +485,15 @@ function ReturnsPageComplete({ data, state, query, canCreate, canModify, mutate,
 function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRate, companyId }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; taxRate: number; companyId: string }) {
   const { alert, confirm } = useAppDialog();
   const [modal, setModal] = useState<Sale | 'new' | null>(null);
+  const [paymentSale, setPaymentSale] = useState<Sale | null>(null);
   const [client, setClient] = useState('');
   const [manualAmount, setManualAmount] = useState('');
   const [discount, setDiscount] = useState('0');
   const [saleTaxRate, setSaleTaxRate] = useState(String(taxRate));
   const [lines, setLines] = useState<CommerceSaleLine[]>([]);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<Sale['paymentMethod']>('ESPÈCES');
+  const [paymentCashAccountId, setPaymentCashAccountId] = useState('');
   const open = (sale?: Sale) => {
     setModal(sale ?? 'new');
     setClient(sale?.client ?? '');
@@ -490,17 +518,40 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
     }, modal !== 'new' && modal ? 'Vente modifiée.' : 'Vente enregistrée en brouillon.');
     setModal(null);
   };
-  const validate = async (sale: Sale) => {
+  const startValidation = async (sale: Sale) => {
     if (!sale.items.length) { await alert({ title: 'Vente incomplète', description: 'Ajoutez au moins un article avant de valider la vente afin de mettre à jour le stock.', confirmLabel: 'Compris' }); return; }
     const requested = new Map<string, number>();
     sale.items.forEach(item => requested.set(item.productId, (requested.get(item.productId) ?? 0) + item.quantity));
     const unavailable = [...requested.entries()].find(([productId, quantity]) => (data.products.find(product => product.id === productId)?.stock ?? 0) < quantity);
     if (unavailable) { await alert({ title: 'Stock insuffisant', description: `Stock insuffisant pour ${data.products.find(product => product.id === unavailable[0])?.name ?? 'cet article'}.`, confirmLabel: 'Compris', tone: 'danger' }); return; }
-    if (!await confirm({ title: 'Valider cette vente ?', description: `La vente ${sale.reference} sera validée et le stock sera déduit.`, confirmLabel: 'Valider' })) return;
+    const activeCashAccount = readState(data, companyId).cashAccounts.find(account => account.active);
+    setPaymentSale(sale);
+    setPaymentAmount(String(sale.amount));
+    setPaymentMethod(activeCashAccount ? 'ESPÈCES' : 'CRÉDIT');
+    setPaymentCashAccountId(activeCashAccount?.id ?? '');
+  };
+  const completeValidation = async () => {
+    if (!paymentSale) return;
+    const paidAmount = Number(paymentAmount);
+    if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > paymentSale.amount) {
+      await alert({ title: 'Montant invalide', description: 'Le montant encaissé doit être compris entre zéro et le montant de la vente.', confirmLabel: 'Compris', tone: 'danger' });
+      return;
+    }
+    const commercialState = readState(data, companyId);
+    const cashAccount = commercialState.cashAccounts.find(account => account.id === paymentCashAccountId && account.active);
+    if (paymentMethod !== 'CRÉDIT' && paidAmount > 0 && !cashAccount) {
+      await alert({ title: 'Compte de caisse requis', description: 'Créez ou activez un compte de caisse avant d’enregistrer cet encaissement.', confirmLabel: 'Compris', tone: 'danger' });
+      return;
+    }
+    if (!await confirm({ title: 'Valider cette vente ?', description: `La vente ${paymentSale.reference} sera validée, le stock sera déduit et l’encaissement sera enregistré.`, confirmLabel: 'Valider' })) return;
+    const remainingAmount = Math.max(0, paymentSale.amount - paidAmount);
     mutate(draft => {
-      const target = draft.sales.find(item => item.id === sale.id);
+      const target = draft.sales.find(item => item.id === paymentSale.id);
       if (!target || target.status === 'VALIDÉ') return;
       target.status = 'VALIDÉ';
+      target.paidAmount = paidAmount;
+      target.paymentMethod = paymentMethod;
+      target.paymentStatus = paidAmount >= target.amount ? 'PAYÉ' : paidAmount > 0 ? 'PARTIEL' : 'NON_PAYÉ';
       target.items.forEach(item => {
         const product = draft.products.find(candidate => candidate.id === item.productId);
         if (product) {
@@ -509,11 +560,37 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
           if (product.stock <= product.threshold) addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/entreprise/stocks?tab=products' });
         }
       });
-      draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente', module: 'Gestion commerciale', object: target.reference, date: 'À l’instant', status: 'VALIDÉ', companyId });
+      const nextCommercialState = readState(draft, companyId);
+      if (cashAccount && paidAmount > 0) {
+        const targetCashAccount = nextCommercialState.cashAccounts.find(account => account.id === cashAccount.id);
+        if (targetCashAccount) targetCashAccount.balance += paidAmount;
+      }
+      if (remainingAmount > 0) {
+        const existingCredit = nextCommercialState.credits.find(credit => credit.reference === target.reference);
+        if (existingCredit) {
+          existingCredit.amount = target.amount;
+          existingCredit.paid = paidAmount;
+          existingCredit.status = paidAmount >= target.amount ? 'RÉGLÉ' : 'EN COURS';
+        } else {
+          nextCommercialState.credits.unshift({
+            id: uid('credit'),
+            client: target.client,
+            reference: target.reference,
+            amount: target.amount,
+            paid: paidAmount,
+            dueDate: 'À définir',
+            status: 'EN COURS',
+          });
+          const targetClient = nextCommercialState.clients.find(client => client.name.toLowerCase() === target.client.toLowerCase());
+          if (targetClient) targetClient.balance += remainingAmount;
+        }
+      }
+      draft.commerceStates[companyId] = nextCommercialState;
+      draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente et enregistré son encaissement', module: 'Gestion commerciale', object: target.reference, date: 'À l’instant', status: 'VALIDÉ', companyId });
       recordControlEvent(draft, {
         type: 'APPROVAL_GRANTED',
         label: 'Vente validée',
-        summary: `${target.reference} a été validée et le stock a été mis à jour.`,
+        summary: `${target.reference} a été validée, le stock a été mis à jour et l’encaissement a été enregistré.`,
         actorName: 'Utilisateur actuel',
         entityType: 'sale',
         entityId: target.id,
@@ -521,8 +598,9 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
         moduleId: 'commerce',
         severity: 'success',
       });
-          addNotification(draft, { title: 'Vente validée', text: `La vente ${target.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/entreprise/commerce?tab=sales' });
-    }, 'Vente validée et stock mis à jour.');
+      addNotification(draft, { title: 'Vente validée', text: remainingAmount > 0 ? `La vente ${target.reference} est validée. Le reste à encaisser est de ${money(remainingAmount)}.` : `La vente ${target.reference} est validée et encaissée.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/entreprise/commerce?tab=sales' });
+    }, remainingAmount > 0 ? 'Vente validée et créance client créée.' : 'Vente validée et encaissement enregistré.');
+    setPaymentSale(null);
   };
   const remove = async (sale: Sale) => { if (!await confirm({ title: 'Supprimer ce brouillon ?', description: `Le brouillon ${sale.reference} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' })) return; mutate(draft => { draft.sales = draft.sales.filter(item => item.id !== sale.id); }, 'Vente supprimée.'); };
   const sales = data.sales.filter(item => `${item.reference} ${item.client} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
@@ -530,7 +608,7 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
     <Panel title="Ventes & caisse" description="Composez la vente, appliquez la remise et les taxes, puis encaissez et validez." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouvelle vente</Button> : undefined}>
       <div className="grid gap-3 sm:grid-cols-3"><Metric label="Ventes" value={String(data.sales.length)} detail="Brouillons compris" icon={ShoppingCart} /><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Panier moyen" value={money(data.sales.length ? data.sales.reduce((sum, item) => sum + item.amount, 0) / data.sales.length : 0)} detail="Sur les ventes enregistrées" icon={Tags} /></div>
     </Panel>
-    <Panel title="Journal des ventes"><DataTable headers={['Référence', 'Client', 'Montant', 'Date', 'Statut', 'Actions']} rows={sales.map(sale => [<strong key={sale.id}>{sale.reference}</strong>, sale.client, money(sale.amount), sale.date, <StatusBadge key={`${sale.id}-status`} status={sale.status} />, sale.status === 'BROUILLON' ? <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => validate(sale)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Valider</button>}{canModify && <button type="button" onClick={() => remove(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Stock déduit</span>])} /></Panel>
+     <Panel title="Journal des ventes"><DataTable headers={['Référence', 'Client', 'Montant', 'Encaissement', 'Date', 'Statut', 'Actions']} rows={sales.map(sale => [<strong key={sale.id}>{sale.reference}</strong>, sale.client, money(sale.amount), sale.status === 'BROUILLON' ? '—' : sale.paymentStatus === 'PAYÉ' ? 'Payé' : sale.paymentStatus === 'PARTIEL' ? `Partiel · ${money(Math.max(0, sale.amount - (sale.paidAmount ?? 0)))} dû` : 'À encaisser', sale.date, <StatusBadge key={`${sale.id}-status`} status={sale.status} />, sale.status === 'BROUILLON' ? <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => startValidation(sale)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Valider</button>}{canModify && <button type="button" onClick={() => remove(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Stock déduit</span>])} /></Panel>
     {modal && <Modal title={modal === 'new' ? 'Nouvelle vente' : `Modifier ${modal.reference}`} onClose={() => setModal(null)}>
       <div className="space-y-4"><Field label="Client" value={client} onChange={setClient} placeholder="Nom du client" />
         <div className="rounded-xl border p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Articles</h3><p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Le stock est contrôlé puis déduit uniquement à la validation.</p></div><button type="button" onClick={() => setLines(current => [...current, { productId: data.products[0]?.id ?? '', quantity: '1' }])} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Plus size={13} />Ajouter un article</button></div>
@@ -541,6 +619,33 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
         <div className="rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-right"><p className="text-xs text-[hsl(var(--muted-foreground))]">Total TTC</p><p className="text-2xl font-bold">{money(total)}</p></div><div className="flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={save}><Check size={15} />Enregistrer le brouillon</Button></div>
       </div>
     </Modal>}
+     {paymentSale && <Modal title={`Encaisser ${paymentSale.reference}`} onClose={() => setPaymentSale(null)}>
+       <div className="space-y-4">
+         <div className="rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-sm">
+           <p className="text-[hsl(var(--muted-foreground))]">Client</p>
+           <p className="mt-1 font-bold">{paymentSale.client}</p>
+           <p className="mt-3 text-[hsl(var(--muted-foreground))]">Total à encaisser</p>
+           <p className="mt-1 text-xl font-bold">{money(paymentSale.amount)}</p>
+         </div>
+         <Field label="Montant encaissé" value={paymentAmount} onChange={setPaymentAmount} type="number" />
+         <label className="block text-sm font-semibold">Mode d’encaissement
+           <select value={paymentMethod} onChange={event => setPaymentMethod(event.target.value as Sale['paymentMethod'])} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">
+             <option value="ESPÈCES">Espèces</option>
+             <option value="MOBILE MONEY">Mobile money</option>
+             <option value="VIREMENT">Virement</option>
+             <option value="CRÉDIT">Crédit client</option>
+           </select>
+         </label>
+         {paymentMethod !== 'CRÉDIT' && <label className="block text-sm font-semibold">Compte de caisse
+           <select value={paymentCashAccountId} onChange={event => setPaymentCashAccountId(event.target.value)} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">
+             {readState(data, companyId).cashAccounts.filter(account => account.active).map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
+           </select>
+           {readState(data, companyId).cashAccounts.filter(account => account.active).length === 0 && <span className="mt-1 block text-xs font-normal text-[hsl(var(--destructive))]">Aucun compte de caisse actif. Créez-en un avant d’enregistrer un paiement immédiat.</span>}
+         </label>}
+         <p className="rounded-lg border p-3 text-xs text-[hsl(var(--muted-foreground))]">Si le montant est inférieur au total, MAXIMUS crée automatiquement une créance client avec le reste à encaisser.</p>
+         <div className="flex justify-end gap-2"><Button onClick={() => setPaymentSale(null)}>Annuler</Button><Button primary onClick={completeValidation}>Valider la vente</Button></div>
+       </div>
+     </Modal>}
   </div>;
 }
 
