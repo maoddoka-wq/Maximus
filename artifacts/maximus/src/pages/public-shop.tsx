@@ -501,14 +501,14 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     <header className="relative border-b bg-[var(--shop-accent)] text-white">
        <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-4 sm:flex-nowrap sm:px-6">
          <button type="button" onClick={() => go('')} className="flex min-w-0 max-w-full flex-1 shrink items-center gap-3 text-left sm:max-w-[calc(100%-3rem)]"><span className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={21} /></span>}</span><span className="min-w-0"><span className="block truncate text-lg font-bold">{store.name}</span><span className="block truncate text-xs text-white/65">{store.description}</span></span></button>
-         <div className="order-2 flex w-full min-w-0 items-center gap-2 sm:order-none sm:w-auto">
+         <div className="order-2 flex w-full min-w-0 items-center sm:order-none sm:ml-auto sm:w-auto">
            <nav aria-label="Navigation de la boutique" className="min-w-0 flex-1 overflow-x-auto sm:flex-none">
              <div className="flex min-w-max items-center gap-1">
                {scrollNavItems.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className="shrink-0 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
              </div>
            </nav>
-           {accountNavItem && <button type="button" onClick={() => go(accountNavItem.path)} className="shrink-0 rounded-lg border-l border-white/15 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/10 sm:border-0 sm:text-white/80">{accountNavItem.label}</button>}
          </div>
+          {accountNavItem && <button type="button" onClick={() => go(accountNavItem.path)} className="order-1 shrink-0 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/15 sm:order-none">{accountNavItem.label}</button>}
       </div>
     </header>
      <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
