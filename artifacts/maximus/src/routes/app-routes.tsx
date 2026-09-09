@@ -282,7 +282,7 @@ export function CompanyRouter({
     return renderScreen(screens.stocks, {
       companyId,
       companyUsers: data.employees.filter(item => item.companyId === companyId),
-      companyServices: data.orgNodes.filter(node => node.companyId === companyId && node.type === 'service'),
+      companyServices: data.orgNodes.filter(node => node.companyId === companyId),
       canCreate: hasPermission('stocks', 'créer'),
       canModify: hasPermission('stocks', 'modifier'),
       stockPermissions,

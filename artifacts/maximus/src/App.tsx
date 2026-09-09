@@ -697,7 +697,6 @@ function AppContent() {
       companyId: testCompanyId,
       code: 'TEST',
       name: preset.name,
-      type: 'sector',
       parentId: null,
       moduleIds: selectedModules,
       modulePackIds: Object.fromEntries(
@@ -4139,7 +4138,7 @@ function OrganisationPage({
         <GitBranch size={19} className="text-[hsl(var(--primary))]" />
         <h2 className="mt-5 font-bold">Une structure vivante</h2>
         <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Direction, département, service ou équipe : chaque nœud peut accueillir ses propres enfants.
+           Chaque unité peut accueillir ses propres sous-unités.
         </p>
         <div className="mt-6 border-t pt-4">
           <p className="mono text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Total nœuds</p>
@@ -4182,7 +4181,7 @@ function OrganisationPage({
                 onClick={() => {
                   if (!name) return;
                   mutate((d) => {
-                    if (modal === 'new') d.orgNodes.push({ id: uid('org'), name, type: 'service', parentId: parent });
+                    if (modal === 'new') d.orgNodes.push({ id: uid('org'), name, parentId: parent });
                     else {
                       const x = d.orgNodes.find((n) => n.id === (modal as OrgNode).id);
                       if (x) {
@@ -4235,10 +4234,7 @@ function OrgTree({
         <span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]">
           <Building2 size={14} />
         </span>
-        <span className="flex-1 text-sm font-bold">
-          {node.name}
-          <small className="ml-2 text-[10px] font-normal text-[hsl(var(--muted-foreground))]">{node.type}</small>
-        </span>
+        <span className="flex-1 text-sm font-bold">{node.name}</span>
         <button
           data-testid={`button-edit-org-${node.id}`}
           onClick={() => onEdit(node)}

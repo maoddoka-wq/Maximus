@@ -9,6 +9,12 @@ L’administration d’une entreprise reste regroupée dans la page Organisation
 
 **How to apply:** Ne pas créer de rubriques latérales séparées pour les autorisations ou les comptes. Les onglets de la page Organisation portent ces étapes ; dans Structure & unités, masquer les packs jusqu’à la sélection du module, puis laisser les rôles préciser les menus et actions autorisés, notamment aux dix rubriques de Gestion de stock.
 
+Les unités organisationnelles n’ont pas de type imposé : l’interface ne doit pas afficher ni générer automatiquement des catégories comme direction, secteur ou service. Une unité se définit par son nom, son code, son parent et ses accès.
+
+**Why:** Ces catégories simples ne correspondent pas à toutes les organisations et imposent une structure artificielle dès la création d’une entreprise.
+
+**How to apply:** Ne pas rendre le champ `type` obligatoire dans les formulaires d’organisation ; conserver uniquement les anciennes valeurs éventuelles pour compatibilité de données, sans les afficher ni en créer de nouvelles.
+
 L’activation MAXIMUS d’une entreprise doit provisionner son compte `company_admin` dans PostgreSQL avant de passer le statut local à ACTIF ; les entreprises déjà actives sont resynchronisées lors d’une session MAXIMUS.
 
 **Why:** Le formulaire d’inscription conserve la demande dans le navigateur, tandis que la connexion est vérifiée par Laravel. Changer uniquement le statut local rendait l’espace visuellement actif mais impossible à ouvrir.
