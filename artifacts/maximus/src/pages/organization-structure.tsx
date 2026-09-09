@@ -133,20 +133,17 @@ export function StructureTab({
 function StructureNodeItem({
   node,
   allNodes,
-  organizationTypes,
   onEdit,
   onDelete,
   depth,
 }: {
   node: OrgNode;
   allNodes: OrgNode[];
-  organizationTypes: OrganizationType[];
   onEdit: (node: OrgNode) => void;
   onDelete: (id: string) => void;
   depth: number;
 }) {
   const children = allNodes.filter(candidate => candidate.parentId === node.id);
-  const typeName = organizationTypes.find(type => type.id === node.type)?.name ?? 'Type non défini';
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -159,7 +156,6 @@ function StructureNodeItem({
           <span className="shrink-0 rounded bg-[hsl(var(--primary)/.1)] p-1.5 text-[hsl(var(--primary))]"><Building2 size={14} /></span>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-sm font-bold">{node.name}</span>
-            <span className="shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase text-[hsl(var(--muted-foreground))]">{typeName}</span>
             {node.code && <span className="mono max-w-[32%] shrink-0 truncate text-[10px] text-[hsl(var(--muted-foreground))]">{node.code}</span>}
           </div>
         </div>
@@ -171,7 +167,7 @@ function StructureNodeItem({
           <button type="button" data-testid={`button-delete-org-${node.id}`} aria-label={`Supprimer ${node.name}`} onClick={() => onDelete(node.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><Trash2 size={13} /><span>Supprimer</span></button>
           </div>
       </div>
-      {expanded && children.map(child => <StructureNodeItem key={child.id} node={child} allNodes={allNodes} organizationTypes={organizationTypes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />)}
+      {expanded && children.map(child => <StructureNodeItem key={child.id} node={child} allNodes={allNodes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />)}
     </div>
   );
 }
@@ -180,14 +176,12 @@ function StructureFormModal({
   initialData,
   allNodes,
   availableModules,
-  organizationTypes,
   onClose,
   onSave,
 }: {
   initialData: OrgNode | null;
   allNodes: OrgNode[];
   availableModules: Module[];
-  organizationTypes: OrganizationType[];
   onClose: () => void;
   onSave: (data: Omit<OrgNode, 'id' | 'companyId'>) => void;
 }) {
@@ -195,7 +189,6 @@ function StructureFormModal({
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     code: initialData?.code || '',
-    type: initialData?.type || '',
     parentId: initialData?.parentId || '',
     moduleIds: initialData?.moduleIds ? [...initialData.moduleIds] : [],
     modulePackIds: Object.fromEntries(Object.entries(initialData?.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]])) as Partial<Record<ModuleId, string[]>>,
@@ -213,7 +206,7 @@ function StructureFormModal({
   };
 
   const handleSave = () => {
-    if (!formData.name.trim() || !formData.code.trim() || !formData.type) {
+    if (!formData.name.trim() || !formData.code.trim()) {
       setError('Le nom et le code de l’unité sont obligatoires.');
       return;
     }
@@ -241,13 +234,6 @@ function StructureFormModal({
         <Field label="Code" value={formData.code} onChange={(value: string) => setFormData(current => ({ ...current, code: value }))} placeholder="Ex: UNITE-01" help="Identifiant court utilisé pour retrouver rapidement cette unité." />
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="block text-sm font-semibold">Type *
-          <select value={formData.type} onChange={event => setFormData(current => ({ ...current, type: event.target.value as OrgNode['type'] }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
-            <option value="">Sélectionnez un type</option>
-            {organizationTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
-          </select>
-          <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Le type est défini par l’entreprise ou par MAXIMUS.</span>
-        </label>
         <label className="block text-sm font-semibold">Unité Parente
           <select value={formData.parentId} onChange={event => setFormData(current => ({ ...current, parentId: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
             <option value="">Aucune (Racine)</option>

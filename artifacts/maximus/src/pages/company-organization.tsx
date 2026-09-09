@@ -16,7 +16,6 @@ export function CompanyOrganizationAdmin({
   mutate,
   initialTab = 'structure',
   standalone = false,
-  isMaximusAdmin = false,
   sectorManager = false,
   scopeNodeId,
 }: {
@@ -25,7 +24,6 @@ export function CompanyOrganizationAdmin({
   mutate: Mutate;
   initialTab?: OrganizationTab;
   standalone?: boolean;
-  isMaximusAdmin?: boolean;
   sectorManager?: boolean;
   scopeNodeId?: string;
 }) {
@@ -109,7 +107,7 @@ export function CompanyOrganizationAdmin({
           ))}
         </div>
       </div>
-      {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} isMaximusAdmin={isMaximusAdmin} />}
+      {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
       {tab === 'profile' && !sectorManager && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}

@@ -1954,7 +1954,7 @@ function OrganizationAdminPage({
           ))}
         </select>
       </label>
-       <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} isMaximusAdmin />
+      <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} />
     </div>
   );
 }
