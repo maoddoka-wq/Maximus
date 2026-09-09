@@ -34,3 +34,4 @@
 - [Surveillance de santé Render](render-health-monitoring.md) — utiliser la sonde `/api/healthz` existante pour détecter et persister les incidents sans worker séparé.
 - [Identité publique des boutiques](public-store-identity.md) — les noms peuvent être identiques entre entreprises, mais chaque slug public doit rester globalement unique.
 - [Catalogue d’inscription](registration-catalog-boundary.md) — l’inscription publique lit uniquement le catalogue publié, jamais l’état workspace ou son brouillon.
+- [Commission e-commerce](ecommerce-commission-policy.md) — chaque vente est répartie à 3 % DiamanoPay, 2 % MAXIMUS et 95 % vendeur, avec registre MAXIMUS idempotent.

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
+use App\Services\EcommerceCommissionPolicy;
+use App\Services\MaximusWalletService;
 use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use App\Support\ModuleAuthorization;
@@ -22,6 +24,8 @@ final class SellerWalletController extends Controller
 
     public function __construct(
         private readonly DiamanoPayService $diamanoPay,
+        private readonly EcommerceCommissionPolicy $commissionPolicy,
+        private readonly MaximusWalletService $maximusWallet,
         private readonly SellerWalletFeePolicy $feePolicy,
         private readonly SellerWalletMaturityPolicy $maturityPolicy,
     ) {}
@@ -42,6 +46,7 @@ final class SellerWalletController extends Controller
             'ledger' => $this->ledger($company),
             'maturityPolicy' => $this->maturityPolicy->payload(),
             'withdrawalFee' => $this->feePolicy->payload(),
+            'commissionPolicy' => $this->commissionPolicy->payload(),
         ]);
     }
 
@@ -259,6 +264,19 @@ final class SellerWalletController extends Controller
                 report($error);
 
                 return response()->json(['error' => 'Le webhook de retrait n’a pas pu être traité.'], 500);
+            }
+
+            return response()->json(['received' => true]);
+        }
+
+        $maximusWithdrawal = $this->maximusWallet->withdrawalByProviderId($providerId);
+        if ($maximusWithdrawal) {
+            try {
+                $this->maximusWallet->applyProviderStatus($maximusWithdrawal->id, $data);
+            } catch (Throwable $error) {
+                report($error);
+
+                return response()->json(['error' => 'Le webhook de retrait MAXIMUS n’a pas pu être traité.'], 500);
             }
 
             return response()->json(['received' => true]);
@@ -520,6 +538,7 @@ final class SellerWalletController extends Controller
         ]);
         DB::table('seller_wallet_ledger')->where('id', $credit->id)->update(['reversed_at' => now(), 'updated_at' => now()]);
         $this->ledgerInsert($wallet, 'SALE_REVERSAL', $bucket, 'DEBIT', (int) $credit->amount, $order->id, 'sale-reversal:'.$order->id);
+        $this->maximusWallet->reverseCommission((string) $order->company_id, (string) $order->id);
     }
 
     public function restoreOrderStock(object $order): void
@@ -544,12 +563,21 @@ final class SellerWalletController extends Controller
         }
         $wallet = $this->wallet($order->company_id);
         $available = $order->status === 'LIVRÉE';
+        $commission = $this->commissionPolicy->calculate((int) $order->total);
+        $sellerAmount = (int) $commission['sellerNet'];
         DB::table('seller_wallets')->where('id', $wallet->id)->update([
-            $available ? 'available_balance' : 'pending_balance' => DB::raw(($available ? 'available_balance' : 'pending_balance').' + '.(int) $order->total),
-            'total_credited' => DB::raw('total_credited + '.(int) $order->total),
+            $available ? 'available_balance' : 'pending_balance' => DB::raw(($available ? 'available_balance' : 'pending_balance').' + '.$sellerAmount),
+            'total_credited' => DB::raw('total_credited + '.$sellerAmount),
             'updated_at' => now(),
         ]);
-        $this->ledgerInsert($wallet, 'SALE_CREDIT', $available ? 'AVAILABLE' : 'PENDING', 'CREDIT', (int) $order->total, $order->id, $key, $availableAt, $data);
+        $this->ledgerInsert($wallet, 'SALE_CREDIT', $available ? 'AVAILABLE' : 'PENDING', 'CREDIT', $sellerAmount, $order->id, $key, $availableAt, [
+            ...$data,
+            'grossAmount' => (int) $commission['grossAmount'],
+            'providerFee' => (int) $commission['providerFee'],
+            'maximusCommission' => (int) $commission['maximusCommission'],
+            'sellerNet' => $sellerAmount,
+        ]);
+        $this->maximusWallet->creditCommission((string) $order->company_id, (string) $order->id, $commission, $data);
     }
 
     private function releaseMaturedFunds(string $company): void

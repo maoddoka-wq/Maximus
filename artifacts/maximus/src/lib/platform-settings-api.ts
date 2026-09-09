@@ -11,6 +11,59 @@ export type SellerWalletWithdrawalFeePolicy = {
   label: string;
 };
 
+export type EcommerceCommissionPolicy = {
+  providerPercent: number;
+  maximusPercent: number;
+  totalPercent: number;
+  sellerPercent: number;
+  label: string;
+};
+
+export type MaximusWallet = {
+  currency: 'XOF';
+  availableBalance: number;
+  reservedBalance: number;
+  totalCredited: number;
+  payoutProvider: 'WAVE';
+  payoutMobile: string;
+  payoutName: string;
+};
+
+export type MaximusWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
+
+export type MaximusWithdrawal = {
+  id: string;
+  amount: number;
+  fee: number;
+  netAmount: number;
+  totalDebit: number;
+  provider: 'WAVE';
+  mobile: string;
+  beneficiaryName: string;
+  status: MaximusWithdrawalStatus;
+  providerPayoutId: string | null;
+  failureReason: string;
+  requestedAt: string;
+  processedAt: string | null;
+};
+
+export type MaximusWalletLedgerEntry = {
+  id: string;
+  type: string;
+  direction: 'CREDIT' | 'DEBIT';
+  amount: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  createdAt: string;
+};
+
+export type MaximusWalletBootstrap = {
+  wallet: MaximusWallet;
+  withdrawals: MaximusWithdrawal[];
+  ledger: MaximusWalletLedgerEntry[];
+  commissionPolicy: EcommerceCommissionPolicy;
+};
+
 export type DiagnosticTokenStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
 
 export type DiagnosticTokenSummary = {
@@ -76,6 +129,30 @@ export const platformSettingsApi = {
   updateSellerWalletWithdrawalFee: (payload: { amount: number }) =>
     request<SellerWalletWithdrawalFeePolicy>('/platform-settings/seller-wallet-withdrawal-fee', {
       method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  ecommerceCommission: () => request<EcommerceCommissionPolicy>('/platform-settings/ecommerce-commission'),
+  updateEcommerceCommission: (payload: { providerPercent: number; maximusPercent: number }) =>
+    request<EcommerceCommissionPolicy>('/platform-settings/ecommerce-commission', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  maximusWallet: () => request<MaximusWalletBootstrap>('/platform-settings/maximus-wallet'),
+  updateMaximusPayoutAccount: (payload: { provider: 'WAVE'; mobile: string; beneficiaryName: string }) =>
+    request<MaximusWallet>('/platform-settings/maximus-wallet/payout-account', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  requestMaximusWithdrawal: (payload: {
+    amount: number;
+    provider: 'WAVE';
+    mobile: string;
+    beneficiaryName: string;
+    idempotencyKey: string;
+  }) =>
+    request<{ withdrawal: MaximusWithdrawal }>('/platform-settings/maximus-wallet/withdrawals', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': payload.idempotencyKey },
       body: JSON.stringify(payload),
     }),
   diagnosticTokens: async () => request<{ tokens: DiagnosticTokenSummary[] }>('/platform-settings/diagnostic-tokens'),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\EcommerceCommissionPolicy;
 use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,7 @@ final class PlatformSettingsController extends Controller
     public function __construct(
         private readonly SellerWalletMaturityPolicy $maturityPolicy,
         private readonly SellerWalletFeePolicy $feePolicy,
+        private readonly EcommerceCommissionPolicy $commissionPolicy,
     ) {}
 
     public function sellerWalletMaturity(Request $request): JsonResponse
@@ -65,6 +67,35 @@ final class PlatformSettingsController extends Controller
 
         return response()->json($this->feePolicy->payload(
             $this->feePolicy->update((int) $input['amount']),
+        ));
+    }
+
+    public function ecommerceCommission(Request $request): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Cette configuration est réservée à l’administration MAXIMUS.'], 403);
+        }
+
+        return response()->json($this->commissionPolicy->payload());
+    }
+
+    public function updateEcommerceCommission(Request $request): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Cette configuration est réservée à l’administration MAXIMUS.'], 403);
+        }
+
+        $input = $request->validate([
+            'providerPercent' => ['required', 'integer', 'min:0', 'max:100'],
+            'maximusPercent' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+        if ((int) $input['providerPercent'] + (int) $input['maximusPercent'] > 100) {
+            return response()->json(['error' => 'La commission totale ne peut pas dépasser 100 %.'], 422);
+        }
+
+        return response()->json($this->commissionPolicy->payloadForUpdate(
+            (int) $input['providerPercent'],
+            (int) $input['maximusPercent'],
         ));
     }
 

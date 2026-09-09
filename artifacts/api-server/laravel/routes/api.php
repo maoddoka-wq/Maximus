@@ -1,15 +1,15 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AppStateController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
+use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Services\SystemHealthService;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
 
 Route::get('/healthz', function () {
     try {
@@ -23,7 +23,7 @@ Route::get('/healthz', function () {
             'status' => $health['status'],
             'checkedAt' => $health['checkedAt'],
         ], $ok ? 200 : 503);
-    } catch (\Throwable $exception) {
+    } catch (Throwable $exception) {
         report($exception);
 
         return response()->json(['ok' => false, 'database' => false, 'status' => 'DOWN'], 503);
@@ -81,6 +81,11 @@ Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (
     Route::put('/seller-wallet-maturity', [PlatformSettingsController::class, 'updateSellerWalletMaturity']);
     Route::get('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'sellerWalletWithdrawalFee']);
     Route::put('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'updateSellerWalletWithdrawalFee']);
+    Route::get('/ecommerce-commission', [PlatformSettingsController::class, 'ecommerceCommission']);
+    Route::put('/ecommerce-commission', [PlatformSettingsController::class, 'updateEcommerceCommission']);
+    Route::get('/maximus-wallet', [MaximusWalletController::class, 'bootstrap']);
+    Route::patch('/maximus-wallet/payout-account', [MaximusWalletController::class, 'updatePayoutAccount']);
+    Route::post('/maximus-wallet/withdrawals', [MaximusWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
     Route::get('/diagnostic-tokens', [DiagnosticTokenController::class, 'index']);
     Route::post('/diagnostic-tokens', [DiagnosticTokenController::class, 'store']);
     Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);

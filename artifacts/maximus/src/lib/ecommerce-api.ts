@@ -201,6 +201,13 @@ export interface SellerWalletBootstrap {
     amount: number;
     label: string;
   };
+  commissionPolicy: {
+    providerPercent: number;
+    maximusPercent: number;
+    totalPercent: number;
+    sellerPercent: number;
+    label: string;
+  };
 }
 
 export interface PublicShopBootstrap {

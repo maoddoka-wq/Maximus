@@ -105,6 +105,7 @@ import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
+import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
   loadCompanyModuleAccess,
   setCompanyModuleAccess,
@@ -3841,11 +3842,14 @@ function SubscriptionsPage({
 
   if (subscriptions.length === 0) {
     return (
-      <EmptyState
-        title="Aucun abonnement enregistré"
-        text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
-        action={() => onNavigate('/maximus/demandes')}
-      />
+      <div className="space-y-6">
+        <MaximusWalletPanel formatAmount={formatAmount} />
+        <EmptyState
+          title="Aucun abonnement enregistré"
+          text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
+          action={() => onNavigate('/maximus/demandes')}
+        />
+      </div>
     );
   }
 
@@ -3870,6 +3874,8 @@ function SubscriptionsPage({
         </div>
         <div className="absolute -right-14 -top-16 h-48 w-48 rounded-full border border-white/10 bg-white/[.03]" />
       </section>
+
+      <MaximusWalletPanel formatAmount={formatAmount} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -4002,6 +4008,182 @@ function SubscriptionsPage({
     </div>
   );
 }
+
+function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) => string }) {
+  const [bootstrap, setBootstrap] = useState<MaximusWalletBootstrap | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [beneficiaryName, setBeneficiaryName] = useState('');
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  const load = async () => {
+    try {
+      const response = await platformSettingsApi.maximusWallet();
+      setBootstrap(response);
+      setMobile(response.wallet.payoutMobile);
+      setBeneficiaryName(response.wallet.payoutName);
+    } catch (error) {
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Le solde MAXIMUS est indisponible.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const savePayoutAccount = async () => {
+    if (mobile.trim().length < 8 || beneficiaryName.trim().length < 2) {
+      setMessage({ tone: 'error', text: 'Indiquez un numéro mobile et un nom de bénéficiaire valides.' });
+      return false;
+    }
+    await platformSettingsApi.updateMaximusPayoutAccount({
+      provider: 'WAVE',
+      mobile: mobile.trim(),
+      beneficiaryName: beneficiaryName.trim(),
+    });
+    return true;
+  };
+
+  const requestWithdrawal = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!bootstrap) return;
+    const requestedAmount = Number(amount);
+    if (!Number.isInteger(requestedAmount) || requestedAmount < 1000 || requestedAmount > bootstrap.wallet.availableBalance) {
+      setMessage({ tone: 'error', text: 'Le retrait doit être entier, d’au moins 1 000 FCFA et couvert par le solde disponible.' });
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      const accountSaved = await savePayoutAccount();
+      if (!accountSaved) return;
+      const response = await platformSettingsApi.requestMaximusWithdrawal({
+        amount: requestedAmount,
+        provider: 'WAVE',
+        mobile: mobile.trim(),
+        beneficiaryName: beneficiaryName.trim(),
+        idempotencyKey: uid('maximus-withdrawal'),
+      });
+      setAmount('');
+      setMessage({
+        tone: response.withdrawal.status === 'FAILED' ? 'error' : 'success',
+        text: response.withdrawal.status === 'SUCCEEDED'
+          ? 'Le retrait MAXIMUS a été confirmé.'
+          : response.withdrawal.status === 'FAILED'
+            ? response.withdrawal.failureReason || 'Le retrait MAXIMUS a échoué.'
+            : 'Le retrait MAXIMUS est en cours de traitement.',
+      });
+      await load();
+    } catch (error) {
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Le retrait MAXIMUS a échoué.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section data-testid="maximus-wallet-panel" className="card-surface overflow-hidden rounded-2xl">
+      <div className="border-b border-[hsl(var(--border))] p-5 sm:p-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Compte plateforme</p>
+            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions e-commerce</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Chaque vente est répartie automatiquement : {bootstrap?.commissionPolicy.label ?? '3 % DiamanoPay, 2 % MAXIMUS, 95 % vendeur.'}
+            </p>
+          </div>
+          <WalletCards size={22} className="text-[hsl(var(--primary))]" />
+        </div>
+      </div>
+
+      {loading && <p className="p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement du compte MAXIMUS…</p>}
+      {!loading && !bootstrap && <p className="p-6 text-sm text-[hsl(var(--destructive))]">Le compte MAXIMUS n’a pas pu être chargé.</p>}
+      {bootstrap && (
+        <div className="space-y-6 p-5 sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: 'Disponible', value: bootstrap.wallet.availableBalance, icon: CircleDollarSign },
+              { label: 'Réservé', value: bootstrap.wallet.reservedBalance, icon: ShieldCheck },
+              { label: 'Commissions cumulées', value: bootstrap.wallet.totalCredited, icon: TrendingUp },
+            ].map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">{metric.label}</p>
+                    <Icon size={16} className="text-[hsl(var(--primary))]" />
+                  </div>
+                  <p className="mt-3 text-xl font-bold">{formatAmount(metric.value)}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
+            <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.2)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold">Répartition appliquée</p>
+                <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{bootstrap.commissionPolicy.totalPercent} % de commission</span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {[
+                  ['DiamanoPay', bootstrap.commissionPolicy.providerPercent],
+                  ['MAXIMUS', bootstrap.commissionPolicy.maximusPercent],
+                  ['Vendeur', bootstrap.commissionPolicy.sellerPercent],
+                ].map(([label, percent]) => (
+                  <div key={label} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background)/.65)] p-3">
+                    <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{label}</p>
+                    <strong className="mt-1 block text-lg">{percent} %</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={requestWithdrawal} className="rounded-xl border border-[hsl(var(--border))] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold">Retirer le solde MAXIMUS</p>
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Minimum 1 000 FCFA</span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-semibold">Montant à recevoir<input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" min="1000" step="1" placeholder="1000" className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label>
+                <label className="text-xs font-semibold">Mobile WAVE<input value={mobile} onChange={(event) => setMobile(event.target.value)} type="tel" placeholder="77 000 00 00" className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label>
+              </div>
+              <label className="mt-3 block text-xs font-semibold">Bénéficiaire<input value={beneficiaryName} onChange={(event) => setBeneficiaryName(event.target.value)} placeholder="Nom du bénéficiaire" className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label>
+              <p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Le montant est débité du compte MAXIMUS et envoyé au compte configuré via DiamanoPay.</p>
+              {message && <p role="alert" className={`mt-3 rounded-lg p-3 text-xs font-semibold ${message.tone === 'error' ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]'}`}>{message.text}</p>}
+              <button type="submit" disabled={busy} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">
+                <ArrowUpFromLine size={15} />{busy ? 'Traitement…' : 'Demander le retrait'}
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold">Derniers retraits MAXIMUS</p>
+              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{bootstrap.withdrawals.length} demande(s)</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {bootstrap.withdrawals.slice(0, 5).map((withdrawal) => (
+                <div key={withdrawal.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5">
+                  <ArrowUpFromLine size={14} className="text-[hsl(var(--primary))]" />
+                  <div className="min-w-0 flex-1"><strong className="block text-xs">{formatAmount(withdrawal.amount)}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{withdrawal.mobile} · {withdrawal.beneficiaryName}</span></div>
+                  <StatusBadge status={withdrawal.status} />
+                </div>
+              ))}
+              {bootstrap.withdrawals.length === 0 && <p className="rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">Aucun retrait MAXIMUS enregistré.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function NotificationsPage({
   data,
   mutate,
