@@ -172,6 +172,77 @@ class AppStateRecoveryTest extends TestCase
         $this->assertNotNull(DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'));
     }
 
+    public function test_company_bootstrap_refreshes_stale_module_features_from_company_registry(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'stale-payroll-company',
+            'name' => 'Entreprise Paie',
+            'manager' => 'Administrateur',
+            'email' => 'stale-payroll@example.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['paie'],
+            'requested_module_pack_ids' => [
+                'paie' => ['paie-supervision'],
+            ],
+            'requested_module_features' => [
+                'paie' => [
+                    'tableau-de-bord',
+                    'bénéficiaires',
+                    'préparer-une-paie',
+                    'validation',
+                    'virements',
+                    'solde-de-paie',
+                    'historique',
+                ],
+            ],
+            'requested_module_permissions' => [
+                'paie' => [
+                    'tableau-de-bord' => ['voir'],
+                    'bénéficiaires' => ['voir', 'créer', 'modifier'],
+                    'préparer-une-paie' => ['voir', 'créer', 'modifier'],
+                    'validation' => ['voir', 'modifier'],
+                    'virements' => ['voir', 'modifier'],
+                    'solde-de-paie' => ['voir', 'modifier'],
+                    'historique' => ['voir'],
+                ],
+            ],
+        ]);
+        $user = AuthUser::query()->create([
+            'id' => 'stale-payroll-admin',
+            'email' => 'stale-payroll-admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administrateur Paie',
+            'role' => 'company_admin',
+            'company_id' => $company->id,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'companies' => [[
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'allowedModules' => [],
+                    'requestedModuleFeatures' => [],
+                ]],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 4,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.companies.0.allowedModules.0', 'paie')
+            ->assertJsonPath('data.companies.0.requestedModuleFeatures.paie.0', 'tableau-de-bord')
+            ->assertJsonPath('data.companies.0.requestedModulePermissions.paie.validation.1', 'modifier');
+    }
+
     public function test_bootstrap_recovery_keeps_persisted_catalog_packs_and_drafts(): void
     {
         Company::query()->create([

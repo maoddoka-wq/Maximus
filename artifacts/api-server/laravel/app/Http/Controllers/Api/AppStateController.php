@@ -92,6 +92,10 @@ class AppStateController extends Controller
         $state = $this->hydrateCompanyBranding($state);
 
         if (($actor['role'] ?? null) !== 'maximus_admin') {
+            $state = $this->mergeCurrentCompanyFromRegistry(
+                $state,
+                (string) ($actor['companyId'] ?? ''),
+            );
             $state = $this->restrictToCompany($state, (string) ($actor['companyId'] ?? ''));
         } else {
             $state = $this->mergeRegistryCompanies($state);
@@ -453,6 +457,65 @@ class AppStateController extends Controller
             },
             $state['companies'],
         );
+
+        return $state;
+    }
+
+    /**
+     * The companies registry is authoritative for access configuration.
+     * Older app-state snapshots can still contain the company with stale
+     * requested modules/features, which would hide authorized module entries
+     * from the company workspace after a deployment.
+     */
+    private function mergeCurrentCompanyFromRegistry(array $state, string $companyId): array
+    {
+        if ($companyId === '') {
+            return $state;
+        }
+
+        $company = Company::query()
+            ->whereNull('deleted_at')
+            ->whereKey($companyId)
+            ->first();
+        if (!$company) {
+            return $state;
+        }
+
+        $registryCompany = [
+            'id' => $company->id,
+            'name' => $company->name,
+            'manager' => $company->manager,
+            'email' => $company->email,
+            'phone' => (string) ($company->phone ?? ''),
+            'country' => (string) ($company->country ?? ''),
+            'sector' => (string) ($company->sector ?? ''),
+            'status' => $company->status,
+            'requestedModules' => $company->requested_modules ?? [],
+            'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],
+            'requestedModuleFeatures' => $company->requested_module_features ?? [],
+            'requestedModulePermissions' => $company->requested_module_permissions ?? [],
+            'allowedModules' => $company->status === 'ACTIF' ? ($company->requested_modules ?? []) : [],
+            'refusedModules' => [],
+            'createdAt' => optional($company->created_at)->toISOString(),
+            'profilePhoto' => $company->profile_photo,
+            'primaryColor' => $company->primary_color,
+            'accentColor' => $company->accent_color,
+            'sidebarColor' => $company->sidebar_color,
+        ];
+
+        $companies = collect($state['companies'] ?? []);
+        if ($companies->contains(fn (mixed $item): bool => is_array($item) && ($item['id'] ?? null) === $companyId)) {
+            $state['companies'] = $companies
+                ->map(fn (mixed $item): mixed =>
+                    is_array($item) && ($item['id'] ?? null) === $companyId
+                        ? array_replace($item, $registryCompany)
+                        : $item,
+                )
+                ->values()
+                ->all();
+        } else {
+            $state['companies'] = [...$companies->all(), $registryCompany];
+        }
 
         return $state;
     }
