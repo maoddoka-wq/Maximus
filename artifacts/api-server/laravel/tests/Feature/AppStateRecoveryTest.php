@@ -212,7 +212,9 @@ class AppStateRecoveryTest extends TestCase
             ->assertJsonPath('data.companies.0.profilePhoto', $company->profile_photo)
             ->assertJsonPath('data.companies.0.primaryColor', '#123456')
             ->assertJsonPath('data.companies.0.accentColor', '#ABCDEF')
-            ->assertJsonPath('data.companies.0.sidebarColor', '#101820');
+            ->assertJsonPath('data.companies.0.sidebarColor', '#101820')
+            ->assertJsonPath('data.companies.0.onboardingCompleted', false)
+            ->assertJsonPath('data.companies.0.onboardingStep', 1);
     }
 
     public function test_maximus_bootstrap_does_not_publish_pending_requests_as_companies(): void

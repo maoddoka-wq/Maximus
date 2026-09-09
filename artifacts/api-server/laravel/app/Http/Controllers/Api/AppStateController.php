@@ -98,6 +98,24 @@ class AppStateController extends Controller
         $activeCompanies->each(
             function (Company $company) use (&$state, $known): void {
                 if ($known->has($company->id)) {
+                    $existing = $known->get($company->id);
+                    $hasOrganisation = collect($state['orgNodes'] ?? [])
+                        ->contains(fn ($node): bool => is_array($node) && ($node['companyId'] ?? null) === $company->id);
+                    if (
+                        is_array($existing)
+                        && ! array_key_exists('onboardingCompleted', $existing)
+                        && ! $hasOrganisation
+                    ) {
+                        $state['companies'] = collect($state['companies'] ?? [])
+                            ->map(function ($item) use ($company): array {
+                                if (! is_array($item) || ($item['id'] ?? null) !== $company->id) {
+                                    return is_array($item) ? $item : [];
+                                }
+                                return [...$item, 'onboardingCompleted' => false, 'onboardingStep' => 1];
+                            })
+                            ->values()
+                            ->all();
+                    }
                     return;
                 }
                 $state['companies'][] = [
@@ -471,7 +489,25 @@ class AppStateController extends Controller
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
                     'onboardingCompleted' => false,
+                    'onboardingStep' => 1,
                 ];
+            }
+        } else {
+            $hasOrganisation = collect($state['orgNodes'] ?? [])
+                ->contains(fn ($node): bool => is_array($node) && ($node['companyId'] ?? null) === $companyId);
+            if (!$hasOrganisation) {
+                $state['companies'] = collect($state['companies'] ?? [])
+                    ->map(function ($item) use ($companyId): array {
+                        if (!is_array($item) || ($item['id'] ?? null) !== $companyId) {
+                            return is_array($item) ? $item : [];
+                        }
+                        if (array_key_exists('onboardingCompleted', $item)) {
+                            return $item;
+                        }
+                        return [...$item, 'onboardingCompleted' => false, 'onboardingStep' => 1];
+                    })
+                    ->values()
+                    ->all();
             }
         }
 
