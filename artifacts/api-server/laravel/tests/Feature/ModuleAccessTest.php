@@ -127,7 +127,12 @@ class ModuleAccessTest extends TestCase
         $response
             ->assertJsonPath('modules.0.description', 'Piloter les ventes, les clients, les achats et la performance commerciale.')
             ->assertJsonPath('modules.0.featurePacks.0.description', 'Consulter les clients et le suivi commercial.')
-            ->assertJsonPath('modules.1.featurePacks.0.description', 'Publier une boutique et présenter vos produits.');
+            ->assertJsonPath('modules.1.featurePacks.0.description', 'Publier une boutique et présenter vos produits.')
+            ->assertJsonPath('modules.4.id', 'paie')
+            ->assertJsonCount(7, 'modules.4.features')
+            ->assertJsonCount(3, 'modules.4.featurePacks')
+            ->assertJsonPath('modules.4.featurePacks.1.featurePermissions.préparer-une-paie.1', 'créer')
+            ->assertJsonPath('modules.4.featurePacks.2.featurePermissions.virements.1', 'modifier');
     }
 
     private function asCompanyAdmin(): self

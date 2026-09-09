@@ -146,6 +146,22 @@ test('nettoie les secteurs intégrés retirés des anciennes sauvegardes', () =>
   assert.deepEqual(normalized.catalogDraft?.sectorPresets.map(preset => preset.id), ['custom-sector-draft']);
 });
 
+test('restaure les secteurs actifs quand une sauvegarde ne contient que les anciens secteurs retirés', () => {
+  const normalized = normalizeStoreData({
+    sectorPresets: [
+      {
+        id: 'distribution',
+        name: 'Distribution historique',
+        moduleIds: ['commerce', 'stocks'],
+      },
+    ],
+  });
+
+  assert.ok(normalized.sectorPresets.length > 0);
+  assert.ok(normalized.sectorPresets.every(preset => preset.moduleIds.includes('paie')));
+  assert.equal(normalized.sectorPresets.some(preset => preset.id === 'distribution'), false);
+});
+
 test('isole les écrans de fonctionnalités des overrides de modules incomplets', () => {
   const configured = getConfiguredModules({
     removedModules: [],

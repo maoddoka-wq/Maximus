@@ -137,9 +137,44 @@ export const modules: Module[] = [
   ], status: 'ACTIF' },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'], featurePacks: [
-    { id: 'paie-consultation', name: 'Consultation paie', description: 'Consulter les bénéficiaires et l’historique.', featureIds: ['dashboard', 'beneficiaires', 'historique'] },
-    { id: 'paie-gestion', name: 'Gestionnaire de paie', description: 'Préparer les paies et gérer les bénéficiaires.', featureIds: ['dashboard', 'beneficiaires', 'preparation', 'historique'] },
-    { id: 'paie-supervision', name: 'Responsable paie', description: 'Valider, financer et lancer les virements.', featureIds: ['dashboard', 'beneficiaires', 'preparation', 'validation', 'virements', 'solde-de-paie', 'historique'] },
+    {
+      id: 'paie-consultation',
+      name: 'Consultation paie',
+      description: 'Consulter les bénéficiaires et l’historique.',
+      featureIds: ['tableau-de-bord', 'bénéficiaires', 'historique'],
+      featurePermissions: {
+        'tableau-de-bord': ['voir'],
+        bénéficiaires: ['voir'],
+        historique: ['voir'],
+      },
+    },
+    {
+      id: 'paie-gestion',
+      name: 'Gestionnaire de paie',
+      description: 'Préparer les paies et gérer les bénéficiaires.',
+      featureIds: ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'historique'],
+      featurePermissions: {
+        'tableau-de-bord': ['voir'],
+        bénéficiaires: ['voir', 'créer', 'modifier'],
+        'préparer-une-paie': ['voir', 'créer', 'modifier'],
+        historique: ['voir'],
+      },
+    },
+    {
+      id: 'paie-supervision',
+      name: 'Responsable paie',
+      description: 'Valider, financer et lancer les virements.',
+      featureIds: ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique'],
+      featurePermissions: {
+        'tableau-de-bord': ['voir'],
+        bénéficiaires: ['voir', 'créer', 'modifier'],
+        'préparer-une-paie': ['voir', 'créer', 'modifier'],
+        validation: ['voir', 'modifier'],
+        virements: ['voir', 'modifier'],
+        'solde-de-paie': ['voir', 'modifier'],
+        historique: ['voir'],
+      },
+    },
   ], status: 'ACTIF' },
 ];
 
@@ -165,6 +200,49 @@ export const sectorPresets: SectorPreset[] = [
   { id: 'agroalimentaire', name: 'Agroalimentaire', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
   { id: 'services', name: 'Services', moduleIds: ['commerce', 'stocks', 'presences'], modulePackIds: { stocks: ['stock-consultation'], commerce: ['commerce-consultation'], presences: ['presence-consultation'] } },
   { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'stocks', 'ecommerce'], modulePackIds: { commerce: ['commerce-gestion'], stocks: ['stock-gestion'], ecommerce: ['ecommerce-gestion'] } },
+  {
+    id: 'commerce-distribution',
+    name: 'Commerce et distribution',
+    moduleIds: ['commerce', 'ecommerce', 'stocks', 'paie'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      ecommerce: ['ecommerce-gestion'],
+      stocks: ['stock-gestion'],
+      paie: ['paie-gestion'],
+    },
+  },
+  {
+    id: 'services-professionnels',
+    name: 'Services professionnels',
+    moduleIds: ['commerce', 'presences', 'paie'],
+    modulePackIds: {
+      commerce: ['commerce-consultation'],
+      presences: ['presence-gestion'],
+      paie: ['paie-gestion'],
+    },
+  },
+  {
+    id: 'industrie-agroalimentaire',
+    name: 'Industrie et agroalimentaire',
+    moduleIds: ['commerce', 'stocks', 'presences', 'paie'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-gestion'],
+      presences: ['presence-supervision'],
+      paie: ['paie-supervision'],
+    },
+  },
+  {
+    id: 'batiment-travaux-publics',
+    name: 'Bâtiment et travaux publics',
+    moduleIds: ['commerce', 'stocks', 'presences', 'paie'],
+    modulePackIds: {
+      commerce: ['commerce-gestion'],
+      stocks: ['stock-gestion'],
+      presences: ['presence-gestion'],
+      paie: ['paie-gestion'],
+    },
+  },
 ];
 
 // These legacy presets are intentionally no longer offered for new companies.
@@ -338,8 +416,11 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
     normalized.removedModules = defaults.removedModules;
   }
   if (Array.isArray(source.sectorPresets)) {
-    normalized.sectorPresets = restoreBuiltInSectorPackSelections(normalized.sectorPresets)
+    const availableSectorPresets = restoreBuiltInSectorPackSelections(normalized.sectorPresets)
       .filter((preset) => !isRetiredSectorPreset(preset));
+    normalized.sectorPresets = availableSectorPresets.length
+      ? availableSectorPresets
+      : structuredClone(defaults.sectorPresets);
   }
   if (normalized.catalogDraft?.sectorPresets) {
     normalized.catalogDraft = {

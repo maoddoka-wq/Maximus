@@ -20,7 +20,7 @@ import { parseQueryTab } from './query-tab';
 import { featureSlug, resolveFeatureDependencies } from './permission-keys';
 import { getModuleFeatureOptions } from './module-features';
 import { presenceFeatureDefinitions, presenceFeaturePacks } from './presence-features';
-import { recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
+import { emptyStoreData, recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
 import type { Company, Employee, ModuleId, OrgNode, Role, StoreData } from './store';
 
@@ -283,6 +283,25 @@ test('conserve les packs métiers configurés dans un secteur', () => {
   assert.ok(distribution);
   assert.deepEqual(distribution.modulePackIds?.stocks, ['stock-gestion']);
   assert.deepEqual(distribution.modulePackIds?.commerce, ['commerce-gestion']);
+});
+
+test('expose tous les packs et fonctionnalités Paie dans le catalogue entreprise', () => {
+  const payroll = modules.find(module => module.id === 'paie');
+  assert.ok(payroll);
+  assert.deepEqual(
+    getModuleFeatureOptions(payroll).map(feature => feature.id),
+    ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique'],
+  );
+  assert.deepEqual(
+    payroll.featurePacks?.map(pack => pack.id),
+    ['paie-consultation', 'paie-gestion', 'paie-supervision'],
+  );
+  assert.ok(payroll.featurePacks?.every(pack => pack.featureIds.length > 0));
+
+  const availableSectors = emptyStoreData().sectorPresets;
+  assert.ok(availableSectors.length > 0);
+  assert.ok(availableSectors.every(sector => sector.moduleIds.includes('paie')));
+  assert.ok(availableSectors.every(sector => (sector.modulePackIds?.paie ?? []).length > 0));
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {

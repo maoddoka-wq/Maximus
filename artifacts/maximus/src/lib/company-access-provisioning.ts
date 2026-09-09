@@ -120,6 +120,33 @@ export function provisionCompanyAccess(
     }),
   ) as Partial<Record<ModuleId, string[]>>;
   company.requestedModuleFeatures = requestedFeatures;
+  const requestedPermissions = Object.fromEntries(
+    moduleIds.map(moduleId => {
+      const module = configuredModules.find(candidate => candidate.id === moduleId);
+      if (!module) return [moduleId, {}];
+
+      const packPermissions = (module.featurePacks ?? [])
+        .filter(pack => (selectedPackIds[moduleId] ?? []).includes(pack.id))
+        .reduce<Record<string, string[]>>((permissions, pack) => {
+          Object.entries(pack.featurePermissions ?? {}).forEach(([featureId, values]) => {
+            permissions[featureId] = [...new Set([...(permissions[featureId] ?? []), ...(values ?? [])])];
+          });
+          return permissions;
+        }, {});
+      const existingPermissions = company.requestedModulePermissions?.[moduleId] ?? {};
+      const featureIds = requestedFeatures[moduleId] ?? [];
+      return [
+        moduleId,
+        Object.fromEntries(
+          featureIds.map(featureId => [
+            featureId,
+            [...new Set(existingPermissions[featureId] ?? packPermissions[featureId] ?? ['voir'])],
+          ]),
+        ),
+      ];
+    }),
+  ) as Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
+  company.requestedModulePermissions = requestedPermissions;
   if (!data.subscriptions.some(subscription => subscription.companyId === company.id)) {
     data.subscriptions.push(buildSubscriptionForCompany({
       companyId: company.id,

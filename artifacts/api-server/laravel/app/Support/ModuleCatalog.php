@@ -71,9 +71,44 @@ final class ModuleCatalog
                 'description' => 'Enregistrer les bénéficiaires, préparer les salaires et lancer les virements groupés.',
                 'features' => ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'],
                 'feature_packs' => [
-                    ['id' => 'paie-consultation', 'name' => 'Consultation paie', 'description' => 'Consulter les bénéficiaires et l’historique des paies.', 'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'historique']],
-                    ['id' => 'paie-gestion', 'name' => 'Gestionnaire de paie', 'description' => 'Préparer les paies et gérer les bénéficiaires.', 'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'historique']],
-                    ['id' => 'paie-supervision', 'name' => 'Responsable paie', 'description' => 'Valider les paies, alimenter le solde et lancer les virements.', 'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique']],
+                    [
+                        'id' => 'paie-consultation',
+                        'name' => 'Consultation paie',
+                        'description' => 'Consulter les bénéficiaires et l’historique des paies.',
+                        'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'historique'],
+                        'feature_permissions' => [
+                            'tableau-de-bord' => ['voir'],
+                            'bénéficiaires' => ['voir'],
+                            'historique' => ['voir'],
+                        ],
+                    ],
+                    [
+                        'id' => 'paie-gestion',
+                        'name' => 'Gestionnaire de paie',
+                        'description' => 'Préparer les paies et gérer les bénéficiaires.',
+                        'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'historique'],
+                        'feature_permissions' => [
+                            'tableau-de-bord' => ['voir'],
+                            'bénéficiaires' => ['voir', 'créer', 'modifier'],
+                            'préparer-une-paie' => ['voir', 'créer', 'modifier'],
+                            'historique' => ['voir'],
+                        ],
+                    ],
+                    [
+                        'id' => 'paie-supervision',
+                        'name' => 'Responsable paie',
+                        'description' => 'Valider les paies, alimenter le solde et lancer les virements.',
+                        'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique'],
+                        'feature_permissions' => [
+                            'tableau-de-bord' => ['voir'],
+                            'bénéficiaires' => ['voir', 'créer', 'modifier'],
+                            'préparer-une-paie' => ['voir', 'créer', 'modifier'],
+                            'validation' => ['voir', 'modifier'],
+                            'virements' => ['voir', 'modifier'],
+                            'solde-de-paie' => ['voir', 'modifier'],
+                            'historique' => ['voir'],
+                        ],
+                    ],
                 ],
             ],
         ];
@@ -155,6 +190,7 @@ final class ModuleCatalog
                         'name' => $pack['name'],
                         'description' => $pack['description'],
                         'featureIds' => $pack['feature_ids'],
+                        'featurePermissions' => $pack['feature_permissions'] ?? [],
                     ])
                     ->values()
                     ->all(),
