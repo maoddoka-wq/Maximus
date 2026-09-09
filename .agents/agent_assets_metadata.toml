@@ -70,3 +70,17 @@ mtime_ms = 1788606180502
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/aaa2ddab-761e-4117-8200-43f08019af91/876dab92-8bc1-40b3-91a3-dccc18972e35"
 storage_version_token = "1788606201124198"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "5sb1J101HO_VLGJTkCQ1d"
+uri = "file://.agents/outputs/guide-domaine-boutique-maximus.pdf"
+type = "pdf"
+title = "Guide PDF — connecter le domaine à la boutique MAXIMUS"
+description = "Procédure pas à pas pour configurer le domaine chez le fournisseur DNS, dans Render et dans MAXIMUS, avec les valeurs CNAME et TXT à renseigner."
+logical_id = "b0778150-8ed5-47e8-8a5a-0ce5586fc8b7"
+content_hash = "sha256:cf79066c2bc16c46b4c62a37189581c83e74b6631f8d5af0131ec2aa1b849cbc"
+size = 54539
+mtime_ms = 1788945074100
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/b0778150-8ed5-47e8-8a5a-0ce5586fc8b7/9a47917d-0841-4aee-b427-920992ba00af"
+storage_version_token = "1788945091462794"
+content_type = "application/pdf"
