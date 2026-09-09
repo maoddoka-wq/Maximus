@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, MapPin, Menu, Minus, Package, Plus, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, MapPin, Minus, Package, Plus, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -93,7 +93,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [cartNotice, setCartNotice] = useState('');
-  const [mobileMenu, setMobileMenu] = useState(false);
   const [submitted, setSubmitted] = useState<PaymentSummary | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,7 +178,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     ? `/client-app${suffix}`
     : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
   const go = (suffix: string) => {
-    setMobileMenu(false);
     setLocation(shopPath(suffix));
   };
 
@@ -496,15 +494,21 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
   ];
   const isFavorite = (product: PublicProduct) => customerData?.favoriteProductSlugs.includes(product.slug) ?? false;
+  const accountNavItem = publicNav.find(item => item.path === '/connexion' || item.path === '/compte');
+  const scrollNavItems = publicNav.filter(item => item !== accountNavItem);
 
   return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--background))]" style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
     <header className="relative border-b bg-[var(--shop-accent)] text-white">
-      <div className="flex w-full items-center justify-between gap-4 px-4 py-4 sm:px-6">
-         <button type="button" onClick={() => go('')} className="flex min-w-0 max-w-[calc(100%-3rem)] shrink items-center gap-3 text-left"><span className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={21} /></span>}</span><span className="min-w-0"><span className="block truncate text-lg font-bold">{store.name}</span><span className="block truncate text-xs text-white/65">{store.description}</span></span></button>
-        <button type="button" className="rounded-lg p-2 sm:hidden" onClick={() => setMobileMenu(open => !open)} aria-label="Ouvrir le menu"><Menu size={21} /></button>
-        <nav className={`${mobileMenu ? 'flex' : 'hidden'} absolute left-4 right-4 top-full z-30 flex-col gap-1 rounded-2xl bg-[var(--shop-accent)] p-3 shadow-xl sm:static sm:flex sm:flex-row sm:items-center sm:bg-transparent sm:p-0 sm:shadow-none`}>
-          {publicNav.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
-        </nav>
+       <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-4 sm:flex-nowrap sm:px-6">
+         <button type="button" onClick={() => go('')} className="flex min-w-0 max-w-full flex-1 shrink items-center gap-3 text-left sm:max-w-[calc(100%-3rem)]"><span className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={21} /></span>}</span><span className="min-w-0"><span className="block truncate text-lg font-bold">{store.name}</span><span className="block truncate text-xs text-white/65">{store.description}</span></span></button>
+         <div className="order-2 flex w-full min-w-0 items-center gap-2 sm:order-none sm:w-auto">
+           <nav aria-label="Navigation de la boutique" className="min-w-0 flex-1 overflow-x-auto sm:flex-none">
+             <div className="flex min-w-max items-center gap-1">
+               {scrollNavItems.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className="shrink-0 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
+             </div>
+           </nav>
+           {accountNavItem && <button type="button" onClick={() => go(accountNavItem.path)} className="shrink-0 rounded-lg border-l border-white/15 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/10 sm:border-0 sm:text-white/80">{accountNavItem.label}</button>}
+         </div>
       </div>
     </header>
      <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
@@ -527,7 +531,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
         : isAuthRoute ? <AuthPanel mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
         : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} onChange={change} onSubmit={() => void submitOrder()} onBack={() => go('')} />
-         : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => { setMobileMenu(false); setLocation(shopPath(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')); }} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
+         : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => { setLocation(shopPath(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')); }} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
           : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} onAdd={addRental} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
