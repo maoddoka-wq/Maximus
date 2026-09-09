@@ -49,7 +49,7 @@ Dans l’espace entreprise, le menu global regroupe chaque module autorisé avec
 
 **Why:** Une entreprise doit pouvoir atteindre immédiatement ses fonctionnalités sans ouvrir chaque module au préalable, tout en gardant une lecture claire par sections de module.
 
-**How to apply:** Construire une section par module autorisé, afficher uniquement les fonctionnalités sélectionnées ou permises, conserver les paramètres administratifs nécessaires, et réutiliser les mêmes identifiants/routes que les onglets internes.
+**How to apply:** Construire une section par module autorisé, afficher uniquement les fonctionnalités sélectionnées ou permises, conserver les paramètres administratifs nécessaires, et réutiliser les mêmes identifiants/routes que les onglets internes. Si un module autorisé n’a aucune sélection détaillée héritée, conserver son entrée parent vers sa route de base sans inventer de sous-fonctionnalités.
 
 Le registre de module doit dériver l’identité métier du catalogue et porter les informations de route, d’icône et de type d’écran ; navigation et routeur ne doivent pas recopier une liste de modules.
 

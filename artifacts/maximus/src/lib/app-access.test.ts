@@ -139,7 +139,10 @@ test('n’affiche aucune fonctionnalité Paie sans sélection explicite de l’e
   });
 
   assert.deepEqual(access.selectedPayrollFeatureIds, []);
-  assert.deepEqual(access.sidebarFeatureGroups, []);
+  assert.deepEqual(
+    access.sidebarFeatureGroups.flatMap(group => group.items.map(item => item.href)),
+    ['/entreprise/paie'],
+  );
 });
 
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {

@@ -197,6 +197,17 @@ export function buildSidebarFeatureGroups({
                     : LayoutGrid,
             }));
 
-    return items.length ? [{ label: module.name, items }] : [];
+    if (items.length) return [{ label: module.name, items }];
+    if (moduleId === 'paie' && allowed.includes('paie')) {
+      return [{
+        label: module.name,
+        items: [{
+          href: '/entreprise/paie',
+          label: module.name,
+          icon: WalletCards,
+        }],
+      }];
+    }
+    return [];
   });
 }
