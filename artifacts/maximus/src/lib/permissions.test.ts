@@ -279,7 +279,7 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
 });
 
 test('conserve les packs métiers configurés dans un secteur', () => {
-  const distribution = sectorPresets.find(preset => preset.id === 'senegal-commerce-distribution');
+  const distribution = sectorPresets.find(preset => preset.id === 'distribution');
   assert.ok(distribution);
   assert.deepEqual(distribution.modulePackIds?.stocks, ['stock-gestion']);
   assert.deepEqual(distribution.modulePackIds?.commerce, ['commerce-gestion']);

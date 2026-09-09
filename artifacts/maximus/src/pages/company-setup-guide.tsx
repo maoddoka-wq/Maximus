@@ -75,7 +75,7 @@ const baseSteps: GuideStep[] = [
     objective:
       'Renseigner un profil fiable afin que les utilisateurs reconnaissent immédiatement le bon espace entreprise.',
     actions: [
-      'Compléter le nom, les coordonnées, le profil d’activité et les informations de contact de référence.',
+      'Compléter le nom, les coordonnées, le secteur et les informations de contact de référence.',
       'Vérifier l’orthographe, les formats de téléphone et l’adresse utilisée pour les échanges administratifs.',
       'Faire valider ces informations par la personne qui porte la responsabilité légale ou opérationnelle.',
     ],
@@ -126,7 +126,7 @@ const baseSteps: GuideStep[] = [
     objective:
       'Reproduire l’organisation réelle avec une hiérarchie assez précise pour affecter les responsabilités, sans créer de niveaux artificiels.',
     actions: [
-      'Créer les unités qui correspondent aux responsabilités réelles de l’entreprise, sans imposer de catégories prédéfinies.',
+      'Créer les unités dans l’ordre hiérarchique : direction, secteur, service puis département si nécessaire.',
       'Renseigner un code, un contact et un responsable pour chaque unité opérationnelle.',
       'Vérifier que chaque employé et chaque flux futur pourra être rattaché à une unité identifiable.',
     ],

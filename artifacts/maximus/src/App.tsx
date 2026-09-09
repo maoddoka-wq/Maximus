@@ -173,7 +173,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   '/maximus/entreprises/organisation': {
     kicker: 'Administration des entreprises',
     title: 'Organisation & accès',
-    description: 'Structurez les profils d’activité, leurs modules, les rôles et les comptes employés.',
+    description: 'Structurez les secteurs, leurs modules, les rôles et les comptes employés.',
   },
   '/maximus/demandes': {
     kicker: 'Administration',
@@ -187,8 +187,8 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   },
   '/maximus/secteurs': {
     kicker: 'Configuration',
-    title: 'Profils d’activité',
-    description: 'Préparez les modules proposés selon les activités des entreprises.',
+    title: 'Secteurs d’activité',
+    description: 'Préparez les modules proposés lors de l’inscription d’une entreprise.',
   },
   '/maximus/abonnements': {
     kicker: 'Compte',
@@ -744,7 +744,7 @@ function AppContent() {
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation('/entreprise/dashboard');
-    setToast(`Test réel lancé pour le profil « ${preset.name} ».`);
+    setToast(`Test réel lancé pour le secteur « ${preset.name} ».`);
   };
   const exitSectorTest = () => {
     if (!sectorTestCompanyId) return logout();
@@ -758,7 +758,7 @@ function AppContent() {
     setSession('admin');
     localStorage.setItem('maximus-session', 'admin');
     setLocation('/maximus/secteurs');
-    setToast('Test réel terminé. Retour à la configuration des profils d’activité.');
+    setToast('Test réel terminé. Retour à la configuration des secteurs.');
   };
   const logout = () => {
     void authApi.logout().finally(() => {
@@ -953,9 +953,9 @@ function AppContent() {
               className="mb-5 flex flex-col gap-3 rounded-xl border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.08)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <strong className="block text-xs text-[hsl(var(--primary))]">Test réel de profil en cours</strong>
+                <strong className="block text-xs text-[hsl(var(--primary))]">Test réel de secteur en cours</strong>
                 <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">
-                  Vous êtes dans l’espace entreprise réel avec les modules autorisés par ce profil.
+                  Vous êtes dans l’espace entreprise réel avec les modules autorisés par ce secteur.
                 </span>
               </div>
               <button
@@ -1580,14 +1580,14 @@ function Signup({
                 testId="input-company-country"
               />
               <label className="block text-sm font-semibold">
-                 Profil d’activité
+                Secteur
                 <select
                   data-testid="select-company-sector"
                   value={sector}
                   onChange={(e) => changeSector(e.target.value)}
                   className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
                 >
-                  <option value="">Aucun profil — configurer manuellement</option>
+                  <option value="">Aucun secteur — configurer manuellement</option>
                   {data.sectorPresets.map((preset) => (
                     <option key={preset.id} value={preset.name}>
                       {preset.name}
@@ -1674,11 +1674,11 @@ function Signup({
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-wide text-[hsl(var(--accent))]">
-                    {sector ? `Suggestion pour le profil ${sector}` : 'Configuration manuelle'}
+                    {sector ? `Suggestion pour le secteur ${sector}` : 'Configuration manuelle'}
                   </p>
                   <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">
                     {selectedPreset
-                      ? 'Les packs ci-dessous ont été préparés pour ce profil. Vous pouvez les retirer ou les compléter.'
+                      ? 'Les packs ci-dessous ont été préparés pour ce secteur. Vous pouvez les retirer ou les compléter.'
                       : 'Une sélection de départ est affichée. Choisissez les modules et les packs adaptés à votre activité.'}
                   </p>
                   {selectedPreset?.modulePackIds && (
@@ -2076,7 +2076,7 @@ function CompanyProfilePage({
           />
           <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" />
           <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" />
-          <Field label="Profil d’activité" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" />
+          <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" />
         </div>
         <div className="mt-7 border-t pt-6">
           <h3 className="font-bold">Modifier le mot de passe</h3>
@@ -2250,7 +2250,7 @@ function CompanyEditModal({
         />
         <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-edit-company-phone" />
         <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-edit-company-country" />
-        <Field label="Profil d’activité" value={form.sector} onChange={setField('sector')} testId="input-edit-company-sector" />
+        <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-edit-company-sector" />
         <Field
           label="Nouveau mot de passe"
           value={password}
@@ -3166,7 +3166,7 @@ function CatalogWorkflowBar({
     if (
       !(await confirm({
         title: 'Annuler le brouillon du catalogue ?',
-        description: 'Toutes les modifications non publiées sur les modules, packs et profils d’activité seront abandonnées.',
+        description: 'Toutes les modifications non publiées sur les modules, packs et secteurs seront abandonnées.',
         confirmLabel: 'Annuler le brouillon',
         tone: 'danger',
       }))
@@ -3223,7 +3223,7 @@ function CatalogWorkflowBar({
       {detailsOpen && (
         <div className="mt-4 grid gap-2 border-t border-[hsl(var(--primary)/.15)] pt-4 text-[11px] sm:grid-cols-4">
           <span><strong>{impact.changedModules}</strong> module(s) modifié(s)</span>
-          <span><strong>{impact.changedSectors}</strong> profil(s) d’activité modifié(s)</span>
+          <span><strong>{impact.changedSectors}</strong> secteur(s) modifié(s)</span>
           <span><strong>{impact.affectedCompanies}</strong> entreprise(s) concernée(s)</span>
           <span><strong>{impact.affectedUnits}</strong> unité(s) concernée(s)</span>
         </div>
@@ -3372,7 +3372,7 @@ function SectorPresetsPage({
   const buildSectorPreset = (): SectorPreset | null => {
     const normalizedName = sectorName.trim();
     if (!normalizedName) {
-       setSectorError('Saisissez le nom du profil d’activité.');
+      setSectorError('Saisissez le nom du secteur.');
       return null;
     }
     if (
@@ -3380,7 +3380,7 @@ function SectorPresetsPage({
         (preset) => preset.id !== editingSector?.id && preset.name.toLowerCase() === normalizedName.toLowerCase(),
       )
     ) {
-       setSectorError('Ce profil d’activité existe déjà.');
+      setSectorError('Ce secteur existe déjà.');
       return null;
     }
     if (sectorModules.length === 0) {
@@ -3424,7 +3424,7 @@ function SectorPresetsPage({
             : [...catalogDraft.sectorPresets, preset];
         });
       },
-       editingSector ? 'Profil d’activité modifié.' : 'Profil d’activité et modules par défaut enregistrés.',
+      editingSector ? 'Secteur modifié.' : 'Secteur et modules par défaut enregistrés.',
     );
     setSectorName('');
     setSectorModules([]);
@@ -3452,10 +3452,10 @@ function SectorPresetsPage({
     const affectedCompanies = data.companies.filter((company) => company.sector === preset.name);
     if (
       !(await confirm({
-         title: 'Supprimer ce profil d’activité ?',
+        title: 'Supprimer ce secteur ?',
         description: affectedCompanies.length > 0
-           ? `Le profil « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions. ${affectedCompanies.length} entreprise(s) existante(s) le conservent comme historique.`
-           : `Le profil « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions.`,
+          ? `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions. ${affectedCompanies.length} entreprise(s) existante(s) le conservent comme historique.`
+          : `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions.`,
         confirmLabel: 'Supprimer',
         tone: 'danger',
       }))
@@ -3465,7 +3465,7 @@ function SectorPresetsPage({
       updateCatalogDraft(draft, (catalogDraft) => {
         catalogDraft.sectorPresets = catalogDraft.sectorPresets.filter((item) => item.id !== preset.id);
       });
-    }, 'Profil d’activité retiré du brouillon. Publiez les changements pour confirmer.');
+    }, 'Secteur retiré du brouillon. Publiez les changements pour confirmer.');
   };
 
   return (
@@ -3481,9 +3481,9 @@ function SectorPresetsPage({
               <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
                 Configuration du catalogue
               </p>
-               <h2 className="mt-2 text-xl font-bold">Configurer un profil d’activité</h2>
+              <h2 className="mt-2 text-xl font-bold">Configurer un secteur d’activité</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                Un profil d’activité sélectionne directement les packs déjà définis dans les modules. Aucun nom de métier ou de pack
+                Un secteur sélectionne directement les packs déjà définis dans les modules. Aucun nom de métier ou de pack
                 n’est recréé ici.
               </p>
             </div>
@@ -3495,23 +3495,23 @@ function SectorPresetsPage({
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition hover:opacity-90"
           >
             <Plus size={15} />
-             Ajouter un profil d’activité
+            Ajouter un secteur d’activité
           </button>
         </div>
         {sectorModalOpen && (
           <Modal
-             title={editingSector ? 'Modifier le profil d’activité' : 'Ajouter un profil d’activité'}
+            title={editingSector ? 'Modifier le secteur d’activité' : 'Ajouter un secteur d’activité'}
             onClose={closeSectorModal}
             className="max-h-[88vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
           >
             <form onSubmit={createSector} className="space-y-5">
           <label className="block max-w-md text-sm font-semibold">
-             Nom du profil d’activité
+            Nom du secteur
             <input
               data-testid="input-sector-name"
               value={sectorName}
               onChange={(event) => setSectorName(event.target.value)}
-               placeholder="Ex. Commerce et distribution"
+              placeholder="Ex. Bâtiment et travaux publics"
               className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
             />
           </label>
@@ -3608,7 +3608,7 @@ function SectorPresetsPage({
               className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.45)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.06)]"
             >
               <Gauge size={15} />
-               Tester ce profil
+              Tester ce secteur
             </button>
             <button
               data-testid="button-create-sector"
@@ -3616,7 +3616,7 @@ function SectorPresetsPage({
               className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
             >
               {editingSector ? <Edit3 size={15} /> : <Plus size={15} />}
-               {editingSector ? 'Enregistrer les modifications' : 'Enregistrer le profil'}
+              {editingSector ? 'Enregistrer les modifications' : 'Enregistrer le secteur'}
             </button>
             {editingSector && (
               <button
@@ -3635,10 +3635,10 @@ function SectorPresetsPage({
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-1">
           <div>
-             <h2 className="font-bold">Profils d’activité configurés</h2>
+            <h2 className="font-bold">Secteurs configurés</h2>
             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-               {sectorPresets.length} profil{sectorPresets.length > 1 ? 's' : ''} disponible
-               {sectorPresets.length > 1 ? 's' : ''} à l’inscription
+              {sectorPresets.length} secteur{sectorPresets.length > 1 ? 's' : ''} disponible
+              {sectorPresets.length > 1 ? 's' : ''} à l’inscription
             </p>
           </div>
         </div>
@@ -3684,7 +3684,7 @@ function SectorPresetsPage({
                   type="button"
                   data-testid={`button-test-sector-${preset.id}`}
                   onClick={() => onTestSector(preset)}
-                   aria-label={`Tester le profil ${preset.name}`}
+                  aria-label={`Tester le secteur ${preset.name}`}
                   className="rounded-lg p-2 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
                 >
                   <Gauge size={16} />
@@ -3693,7 +3693,7 @@ function SectorPresetsPage({
                   type="button"
                   data-testid={`button-edit-sector-${preset.id}`}
                   onClick={() => openSector(preset)}
-                   aria-label={`Modifier le profil ${preset.name}`}
+                  aria-label={`Modifier le secteur ${preset.name}`}
                   className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
                 >
                   <Edit3 size={16} />
@@ -3702,7 +3702,7 @@ function SectorPresetsPage({
                   type="button"
                   data-testid={`button-delete-sector-${preset.id}`}
                   onClick={() => deleteSector(preset)}
-                   aria-label={`Supprimer le profil ${preset.name}`}
+                  aria-label={`Supprimer le secteur ${preset.name}`}
                   className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"
                 >
                   <Trash2 size={16} />
@@ -3714,9 +3714,9 @@ function SectorPresetsPage({
         {sectorPresets.length === 0 && (
           <div className="card-surface rounded-2xl border-dashed p-10 text-center">
             <Building2 className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} />
-             <h3 className="mt-4 font-bold">Aucun profil d’activité configuré</h3>
+            <h3 className="mt-4 font-bold">Aucun secteur configuré</h3>
             <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-               Ajoutez un premier profil pour guider les inscriptions.
+              Ajoutez un premier secteur pour guider les inscriptions.
             </p>
           </div>
         )}
@@ -6556,14 +6556,14 @@ function AdminCreateCompanyPage({
             testId="input-admin-company-country"
           />
            <label className="block text-sm font-semibold">
-                   Profil d’activité <span className="font-normal text-[hsl(var(--muted-foreground))]">(facultatif)</span>
+             Secteur <span className="font-normal text-[hsl(var(--muted-foreground))]">(facultatif)</span>
             <select
               data-testid="select-admin-company-sector"
               value={sector}
               onChange={(event) => changeSector(event.target.value)}
               className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
             >
-                <option value="">Aucun profil — configurer manuellement</option>
+               <option value="">Aucun secteur — configurer manuellement</option>
               {availableSectorPresets.map((preset) => (
                 <option key={preset.id} value={preset.name}>
                   {preset.name}

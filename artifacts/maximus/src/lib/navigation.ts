@@ -51,7 +51,7 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
   { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
-  { href: '/maximus/secteurs', label: 'Profils d’activité', icon: Building2 },
+  { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
   { href: '/maximus/parametres/portefeuille', label: 'Paramètres plateforme', icon: Settings },

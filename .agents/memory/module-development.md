@@ -15,11 +15,11 @@ For modules with several screens, keep one canonical feature definition shared b
 
 **How to apply:** Add every user-facing capability to the module feature manifest first, derive the module catalog and navigation from it, and add a regression test that compares the manifest with the selectable feature options.
 
-Each MAXIMUS module is a reusable business application built from named business packs. Packs are constitutive application offerings, not optional metadata added after the module is created; a module should be publishable only once its pack composition is valid. Activity profiles select those existing module packs directly. A selected pack is a starting role template, not a permanent lock: the company can add or remove features and create independent roles.
+Each MAXIMUS module is a reusable business application built from named business packs. Packs are constitutive application offerings, not optional metadata added after the module is created; a module should be publishable only once its pack composition is valid. Sector presets select those existing module packs directly. A selected pack is a starting role template, not a permanent lock: the company can add or remove features and create independent roles.
 
 **Why:** The product is understood as application → business packs → features and rights. Treating a pack as optional reverses that model and lets an application exist without a usable business offering. Pack names and permissions are defined once in the module catalog, while real companies need to adapt a template to their organization without duplicating the catalog or being forced into one role.
 
-**How to apply:** Keep creation and publication explicit as module application → one or more module packs → pack features and rights → activity-profile/company selection → editable company roles. Show packs only after their module is selected, persist the selected composition with the signup request or unit, and let administrators review the resulting permissions. A draft module may be incomplete, but a usable/published module needs a valid pack composition.
+**How to apply:** Keep creation and publication explicit as module application → one or more module packs → pack features and rights → sector/company selection → editable company roles. Show packs only after their module is selected, persist the selected composition with the signup request or unit, and let administrators review the resulting permissions. A draft module may be incomplete, but a usable/published module needs a valid pack composition.
 
 Legacy packs without an explicit feature permission map are interpreted as view-only when they are edited, tested, or copied into an onboarding request.
 
