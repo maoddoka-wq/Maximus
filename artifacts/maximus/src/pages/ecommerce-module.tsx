@@ -433,6 +433,13 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
   const available = data.wallet.availableBalance;
   const fee = data.withdrawalFee.amount;
   const maximumAmount = Math.max(0, available - fee);
+  const requestedAmount = Number(amount);
+  const amountExceedsBalance = Number.isInteger(requestedAmount) && requestedAmount + fee > available;
+  const canRequestWithdrawal = Number.isInteger(requestedAmount)
+    && requestedAmount >= 1000
+    && !amountExceedsBalance
+    && account.mobile.trim() !== ''
+    && account.beneficiaryName.trim() !== '';
 
   const saveAccount = async (event: FormEvent) => {
     event.preventDefault();
@@ -444,9 +451,8 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
 
   const withdraw = async (event: FormEvent) => {
     event.preventDefault();
-    const value = Number(amount);
-    if (!Number.isInteger(value) || value < 1000 || value + fee > available) return;
-    const result = await run(() => api.requestWithdrawal({ amount: value, provider: 'WAVE', mobile: account.mobile.trim(), beneficiaryName: account.beneficiaryName.trim() }), 'Demande de retrait envoyée.');
+    if (!canRequestWithdrawal) return;
+    const result = await run(() => api.requestWithdrawal({ amount: requestedAmount, provider: 'WAVE', mobile: account.mobile.trim(), beneficiaryName: account.beneficiaryName.trim() }), 'Demande de retrait envoyée.');
     if (result) setAmount('');
   };
 
@@ -478,8 +484,8 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
           <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.06)] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
              Disponible : <strong className="text-[hsl(var(--foreground))]">{money(available, currency)}</strong>. Frais : <strong className="text-[hsl(var(--foreground))]">{money(fee, currency)}</strong>. Le montant demandé et les frais doivent être couverts par le solde disponible. Retrait maximal actuel : <strong className="text-[hsl(var(--foreground))]">{money(maximumAmount, currency)}</strong>.
           </div>
-           {Number.isInteger(Number(amount)) && Number(amount) >= 1000 && Number(amount) + fee > available && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-xs font-semibold text-[hsl(var(--destructive))]">Ce retrait est impossible : le solde ne couvre pas le montant demandé et les frais.</p>}
-           <button type="submit" disabled={!canModify || !Number.isInteger(Number(amount)) || Number(amount) < 1000 || Number(amount) + fee > available || !account.mobile.trim() || !account.beneficiaryName.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowDownToLine size={15} />Demander le retrait</button>
+            {amountExceedsBalance && requestedAmount >= 1000 && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-xs font-semibold text-[hsl(var(--destructive))]">Ce retrait est impossible : le solde ne couvre pas le montant demandé et les frais.</p>}
+            <button type="submit" disabled={!canModify || !canRequestWithdrawal} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><ArrowDownToLine size={15} />Demander le retrait</button>
         </form>
       </Panel>
       <Panel title="Compte de retrait" description="Ces coordonnées sont utilisées uniquement pour les payouts de cette entreprise.">

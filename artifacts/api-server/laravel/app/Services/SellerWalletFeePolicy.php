@@ -36,18 +36,18 @@ final class SellerWalletFeePolicy
         return $setting;
     }
 
-    public function feeFor(int $withdrawalAmount): int
+    public function fixedAmount(): int
     {
         return $this->current()['amount'];
     }
 
-    public function payload(): array
+    public function payload(?array $setting = null): array
     {
-        $setting = $this->current();
+        $setting ??= $this->current();
 
         return [
             ...$setting,
-            'label' => sprintf('Frais de retrait : %d XOF par opération.', $setting['amount']),
+            'label' => $this->label((int) $setting['amount']),
         ];
     }
 
@@ -60,5 +60,10 @@ final class SellerWalletFeePolicy
         return [
             'amount' => max(0, min($amount, 1_000_000)),
         ];
+    }
+
+    private function label(int $amount): string
+    {
+        return sprintf('Frais de retrait : %d XOF par opération.', $amount);
     }
 }

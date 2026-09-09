@@ -121,7 +121,7 @@ final class SellerWalletController extends Controller
         $company = $this->company($request);
         $this->releaseMaturedFunds($company);
         $requestedAmount = (int) $input['amount'];
-        $withdrawalFee = $this->feePolicy->feeFor($requestedAmount);
+        $withdrawalFee = $this->feePolicy->fixedAmount();
         $idempotencyKey = trim((string) ($request->header('Idempotency-Key') ?: ($input['idempotencyKey'] ?? '')));
         $created = null;
         $createdFresh = false;
@@ -183,7 +183,7 @@ final class SellerWalletController extends Controller
             });
         } catch (Throwable $error) {
             $insufficient = $error->getMessage() === 'SOLDE_INSUFFISANT';
-            $fee = $this->feePolicy->feeFor($requestedAmount);
+            $fee = $this->feePolicy->fixedAmount();
             $available = (int) (DB::table('seller_wallets')->where('company_id', $company)->value('available_balance') ?? 0);
 
             return response()->json([

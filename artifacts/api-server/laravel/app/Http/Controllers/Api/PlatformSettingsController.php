@@ -63,10 +63,9 @@ final class PlatformSettingsController extends Controller
             'amount' => ['required', 'integer', 'min:0', 'max:1000000'],
         ]);
 
-        return response()->json([
-            ...$this->feePolicy->update((int) $input['amount']),
-            'label' => sprintf('Frais de retrait : %d XOF par opération.', (int) $input['amount']),
-        ]);
+        return response()->json($this->feePolicy->payload(
+            $this->feePolicy->update((int) $input['amount']),
+        ));
     }
 
     private function isMaximusAdmin(Request $request): bool
