@@ -26,6 +26,7 @@
 - [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
+- [Garde de création de paiement](payment-creation-guard.md) — verrouiller la commande pendant la création du checkout et réutiliser toute charge PENDING existante.
 - [Capacités vitrine e-commerce](public-commerce-capabilities.md) — Location et Livraisons ne sont visibles publiquement que si l’accès e-commerce actif les autorise.
 - [Frontière vente/location/livraison](rental-delivery-boundary.md) — les locations sont typées explicitement et les demandes de livraison restent un service séparé et isolé.
 - [Isolation des aperçus de modules](module-preview-isolation.md) — les tests administratifs restent autonomes, sans entreprise réelle ni appel d’écriture en production.

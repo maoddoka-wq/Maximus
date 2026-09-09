@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, Menu, Minus, Package, Phone, Plus, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, Menu, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -14,6 +14,7 @@ import {
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
 import { canInstallPwa, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
+import { showAppToast } from '@/hooks/use-toast';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
 type PublicRental = PublicShopBootstrap['rentals'][number];
@@ -91,12 +92,12 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [loading, setLoading] = useState(true);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [cartNotice, setCartNotice] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
   const [submitted, setSubmitted] = useState<PaymentSummary | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -365,7 +366,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
         ? await api.login({ email: authForm.email, password: authForm.password })
         : await api.register(authForm);
       await loadCustomer(result.customer);
-      setNotice('Vous êtes connecté.');
+      showAppToast('Vous êtes connecté.', 'success');
       go('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La connexion n’a pas abouti.');
@@ -373,7 +374,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   };
 
   const submitOrder = async () => {
-    if (!data || cart.length === 0) return;
+    if (!data || cart.length === 0 || submittingOrder) return;
+    setSubmittingOrder(true);
     setError('');
     const currentKey = checkoutKey ?? crypto.randomUUID();
     setCheckoutKey(currentKey);
@@ -396,13 +398,19 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       setCheckoutKey(null);
       setCart([]);
       if (customer) {
-        await api.clearCart();
-        const refreshed = await api.bootstrap();
-        setCustomerData(refreshed);
+         void api.clearCart().catch(() => undefined);
       }
+       showAppToast('Redirection vers le paiement DiamanoPay.', 'info');
+       // Nothing else is awaited after the checkout URL is available.
+       // The browser leaves immediately instead of waiting for a cart refresh.
       window.location.assign(payment.checkoutUrl);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'La commande n’a pas pu être envoyée.');
+      const message = cause instanceof Error ? cause.message : 'La commande n’a pas pu être envoyée.';
+      setError(message);
+      showAppToast(message, 'error');
+      setCheckoutKey(null);
+    } finally {
+      setSubmittingOrder(false);
     }
   };
 
@@ -439,7 +447,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       const updated = await api.updateProfile(profileForm);
       setCustomer(updated);
       setCustomerData(current => current ? { ...current, customer: updated } : current);
-      setNotice('Profil mis à jour.');
+      showAppToast('Profil mis à jour.', 'success');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Le profil n’a pas pu être enregistré.');
     }
@@ -449,7 +457,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     try {
       await api.changePassword(passwordForm);
       setPasswordForm({ currentPassword: '', newPassword: '' });
-      setNotice('Mot de passe modifié. Les autres sessions ont été fermées.');
+      showAppToast('Mot de passe modifié. Les autres sessions ont été fermées.', 'success');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Le mot de passe n’a pas pu être modifié.');
     }
@@ -464,7 +472,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       setCustomerData(refreshed);
       setEditingAddressId(null);
       setAddressForm({ label: 'Domicile', recipientName: customer?.name ?? '', phone: customer?.phone ?? '', line1: '', line2: '', city: '', region: '', postalCode: '', country: 'Sénégal', isDefault: false });
-      setNotice('Adresse enregistrée.');
+      showAppToast('Adresse enregistrée.', 'success');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'L’adresse n’a pas pu être enregistrée.');
     }
@@ -482,7 +490,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const installClientApp = async () => {
     if (isIosDevice()) return;
     const installed = await promptPwaInstall();
-    if (installed) setNotice('MAXIMUS est maintenant installé sur votre appareil.');
+    if (installed) showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
@@ -553,7 +561,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        </div>}
      <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-      {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><Check size={16} /><span>{notice}</span><button type="button" className="ml-auto" onClick={() => setNotice('')} aria-label="Fermer"><X size={16} /></button></div>}
       {!isStandalonePwa() && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><Download size={18} /></span>
@@ -570,7 +577,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       </div>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
         : isAuthRoute ? <AuthPanel mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
-        : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} onChange={change} onSubmit={() => void submitOrder()} onBack={() => go('')} />
+        : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
          : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => { setMobileMenu(false); setLocation(shopPath(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')); }} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
           : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} onAdd={addRental} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
@@ -775,8 +782,8 @@ function AuthPanel({ mode, setMode, form, setForm, onSubmit, onBack }: { mode: '
   return <section className="mx-auto w-full min-w-0 max-w-md rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:p-8"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour à la boutique</button><div className="mt-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--muted))]"><LockKeyhole size={22} /></div><h1 className="mt-5 break-words text-2xl font-bold">{mode === 'login' ? 'Bienvenue dans votre espace' : 'Créer votre compte client'}</h1><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{mode === 'login' ? 'Suivez vos commandes et retrouvez vos informations de livraison.' : 'Votre compte est propre à cette boutique et ne donne accès qu’à vos données.'}</p><div className="mt-6 min-w-0 space-y-3">{mode === 'register' && <><input className="box-border w-full min-w-0 rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /><input className="box-border w-full min-w-0 rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /></>}<input className="box-border w-full min-w-0 rounded-xl border px-3 py-3 text-sm" placeholder="Email" type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} /><input className="box-border w-full min-w-0 rounded-xl border px-3 py-3 text-sm" placeholder="Mot de passe (8 caractères minimum)" type="password" value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} /></div><button type="button" onClick={onSubmit} className="mt-5 w-full rounded-xl py-3.5 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>{mode === 'login' ? 'Se connecter' : 'Créer mon compte'}</button><button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="mt-4 w-full text-sm font-semibold underline underline-offset-4">{mode === 'login' ? 'Créer un compte' : 'J’ai déjà un compte'}</button></section>;
 }
 
-function CartPanel({ cart, total, store, customer, form, setForm, onChange, onSubmit, onBack }: { cart: CartLine[]; total: number; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }; setForm: (form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }) => void; onChange: (slug: string, delta: number) => void; onSubmit: () => void; onBack: () => void }) {
-  return <section className="mx-auto max-w-3xl"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Continuer mes achats</button><div className="mt-5 rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>Panier</p><h1 className="mt-1 text-2xl font-bold">Votre commande</h1></div><ShoppingBag size={24} /></div>{cart.length === 0 ? <p className="py-14 text-center text-sm text-[hsl(var(--muted-foreground))]">Votre panier est vide.</p> : <><div className="mt-6 divide-y border-y">{cart.map(line => <div key={line.product.slug} className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{line.product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{line.product.productType === 'RENTAL' ? `LOCATION · ${line.product.rentalPeriod === 'MOIS' ? 'mois' : line.product.rentalPeriod === 'SEMAINE' ? 'semaine' : 'jour'}` : 'VENTE'} · {money(line.product.price, store.currency)}</p></div><div className="flex items-center gap-2 rounded-lg border px-2 py-1"><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer une unité"><Minus size={14} /></button><span className="w-5 text-center text-sm font-bold">{line.quantity}</span><button type="button" onClick={() => onChange(line.product.slug, 1)} aria-label="Ajouter une unité"><Plus size={14} /></button></div><p className="w-24 text-right text-sm font-bold">{money(line.product.price * line.quantity, store.currency)}</p></div>)}</div><div className="mt-5 flex items-center justify-between text-lg font-bold"><span>Total</span><span>{money(total, store.currency)}</span></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" value={form.customerName} onChange={event => setForm({ ...form, customerName: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Email" type="email" value={form.customerEmail} onChange={event => setForm({ ...form, customerEmail: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" value={form.customerPhone} onChange={event => setForm({ ...form, customerPhone: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={3} placeholder="Adresse de livraison" value={form.shippingAddress} onChange={event => setForm({ ...form, shippingAddress: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Note pour la boutique (facultatif)" value={form.note} onChange={event => setForm({ ...form, note: event.target.value })} /></div>{customer && <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Cette commande sera rattachée à votre compte client.</p>}<button type="button" onClick={onSubmit} disabled={!form.customerName.trim() || !form.customerEmail.trim() || !form.shippingAddress.trim() || cart.length === 0} className="mt-6 w-full rounded-xl py-3.5 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>Envoyer la commande</button></>}</div></section>;
+function CartPanel({ cart, total, store, customer, form, setForm, onChange, onSubmit, submitting, onBack }: { cart: CartLine[]; total: number; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }; setForm: (form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }) => void; onChange: (slug: string, delta: number) => void; onSubmit: () => void; submitting: boolean; onBack: () => void }) {
+  return <section className="mx-auto max-w-3xl"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Continuer mes achats</button><div className="mt-5 rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>Panier</p><h1 className="mt-1 text-2xl font-bold">Votre commande</h1></div><ShoppingBag size={24} /></div>{cart.length === 0 ? <p className="py-14 text-center text-sm text-[hsl(var(--muted-foreground))]">Votre panier est vide.</p> : <><div className="mt-6 divide-y border-y">{cart.map(line => <div key={line.product.slug} className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{line.product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{line.product.productType === 'RENTAL' ? `LOCATION · ${line.product.rentalPeriod === 'MOIS' ? 'mois' : line.product.rentalPeriod === 'SEMAINE' ? 'semaine' : 'jour'}` : 'VENTE'} · {money(line.product.price, store.currency)}</p></div><div className="flex items-center gap-2 rounded-lg border px-2 py-1"><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer une unité"><Minus size={14} /></button><span className="w-5 text-center text-sm font-bold">{line.quantity}</span><button type="button" onClick={() => onChange(line.product.slug, 1)} aria-label="Ajouter une unité"><Plus size={14} /></button></div><p className="w-24 text-right text-sm font-bold">{money(line.product.price * line.quantity, store.currency)}</p></div>)}</div><div className="mt-5 flex items-center justify-between text-lg font-bold"><span>Total</span><span>{money(total, store.currency)}</span></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" value={form.customerName} onChange={event => setForm({ ...form, customerName: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Email" type="email" value={form.customerEmail} onChange={event => setForm({ ...form, customerEmail: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" value={form.customerPhone} onChange={event => setForm({ ...form, customerPhone: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={3} placeholder="Adresse de livraison" value={form.shippingAddress} onChange={event => setForm({ ...form, shippingAddress: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Note pour la boutique (facultatif)" value={form.note} onChange={event => setForm({ ...form, note: event.target.value })} /></div>{customer && <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Cette commande sera rattachée à votre compte client.</p>}<button type="button" onClick={onSubmit} disabled={submitting || !form.customerName.trim() || !form.customerEmail.trim() || !form.shippingAddress.trim() || cart.length === 0} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>{submitting && <RefreshCw size={15} className="animate-spin" />}{submitting ? 'Préparation du paiement…' : 'Payer avec DiamanoPay'}</button></>}</div></section>;
 }
 
 function AccountPanel(props: { store: PublicShopBootstrap['store']; section: AccountSection; customer: EcommerceCustomer; products: PublicProduct[]; customerData: EcommerceCustomerBootstrap | null; customerLoading: boolean; selectedOrder?: EcommerceCustomerBootstrap['orders'][number]; profileForm: { name: string; phone: string }; setProfileForm: (form: { name: string; phone: string }) => void; passwordForm: { currentPassword: string; newPassword: string }; setPasswordForm: (form: { currentPassword: string; newPassword: string }) => void; addressForm: Omit<EcommerceCustomerAddress, 'id'>; setAddressForm: (form: Omit<EcommerceCustomerAddress, 'id'>) => void; editingAddressId: string | null; setEditingAddressId: (id: string | null) => void; onProfile: () => void; onPassword: () => void; onAddress: () => void; onDeleteAddress: (id: string) => void; onFavorite: (product: PublicProduct) => void; onOrder: (id: string) => void; onLogout: () => void; onNavigate: (path: string) => void }) {

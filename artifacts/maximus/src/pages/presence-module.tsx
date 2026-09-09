@@ -6,6 +6,7 @@ import { featureSlug } from '@/lib/permission-keys';
 import { useQueryTab } from '@/lib/query-tab';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { showAppToast } from '@/hooks/use-toast';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
 type Tab = (typeof presenceFeatureDefinitions)[number]['tab'];
@@ -114,7 +115,6 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState(currentEmployee?.id ?? employees[0]?.id ?? '');
   const [selected, setSelected] = useState<PresenceItem | null>(null);
   const refresh = async () => { setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
@@ -151,11 +151,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     return { employee, attendance, payload, absence, leave, mission, holiday, status, work, night: nightMinutes(payload.arrival, payload.exit), late: Number(payload.lateMinutes ?? 0), early: payload.exit && settings.expectedEnd ? Math.max(0, minutes(String(settings.expectedEnd)) - minutes(String(payload.exit))) : 0 };
   };
   const rows = visibleEmployees.map(employee => dayRow(employee));
-  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800); };
-  const create = async (input: Parameters<typeof api.create>[0]) => { try { await api.create(input); await refresh(); notify('Enregistrement créé.'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Création impossible.'); } };
-  const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => { try { await api.update(item.id, { payload, status, actor }); await refresh(); setSelected(null); notify('Modification enregistrée.'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Modification impossible.'); } };
-  const remove = async (item: PresenceItem) => { if (!canDelete || !await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return; try { await api.remove(item.id, actor); await refresh(); notify('Enregistrement supprimé.'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Suppression impossible.'); } };
-  const clock = async (action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd') => { if (!canCreate) return; try { await api.clock({ employeeId: selectedEmployee, workDate: date, action, actor, expectedStart: String(settings.expectedStart ?? '08:00'), tolerance: Number(settings.tolerance ?? 10) }); await refresh(); notify(action === 'arrival' ? 'Arrivée enregistrée.' : action === 'exit' ? 'Sortie enregistrée.' : action === 'pauseStart' ? 'Pause commencée.' : 'Pause terminée.'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Pointage impossible.'); } };
+  const create = async (input: Parameters<typeof api.create>[0]) => { try { await api.create(input); await refresh(); showAppToast('Enregistrement créé.', 'success'); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Création impossible.', 'error'); } };
+  const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => { try { await api.update(item.id, { payload, status, actor }); await refresh(); setSelected(null); showAppToast('Modification enregistrée.', 'success'); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Modification impossible.', 'error'); } };
+  const remove = async (item: PresenceItem) => { if (!canDelete || !await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return; try { await api.remove(item.id, actor); await refresh(); showAppToast('Enregistrement supprimé.', 'success'); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); } };
+  const clock = async (action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd') => { if (!canCreate) return; try { await api.clock({ employeeId: selectedEmployee, workDate: date, action, actor, expectedStart: String(settings.expectedStart ?? '08:00'), tolerance: Number(settings.tolerance ?? 10) }); await refresh(); showAppToast(action === 'arrival' ? 'Arrivée enregistrée.' : action === 'exit' ? 'Sortie enregistrée.' : action === 'pauseStart' ? 'Pause commencée.' : 'Pause terminée.', 'success'); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Pointage impossible.', 'error'); } };
   const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExport) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
   const kpis = { active: employees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
   const render = () => {
@@ -177,7 +176,6 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">{error}<button onClick={() => setError('')}><X size={16} /></button></div>}
     {loading ? <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-48 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-48 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div> : render()}
     {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrect} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}
-    {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-semibold text-white shadow-2xl"><Check size={15} />{toast}</div>}
   </div>;
 }
 

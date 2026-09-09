@@ -46,6 +46,7 @@ import {
 } from '@/lib/ecommerce-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { showAppToast } from '@/hooks/use-toast';
 
 type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
@@ -194,7 +195,7 @@ export default function EcommerceModulePage({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+  const [pendingAction, setPendingAction] = useState('');
   const api = createEcommerceApi(companyId);
 
   const load = async (silent = false) => {
@@ -244,22 +245,20 @@ export default function EcommerceModulePage({
     void load();
   }, [companyId, preview]);
 
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timeout = window.setTimeout(() => setToast(''), 3000);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
-
-  const run = async <T,>(action: () => Promise<T>, success: string): Promise<T | undefined> => {
+  const run = async <T,>(action: () => Promise<T>, success: string, actionKey = 'action'): Promise<T | undefined> => {
+    if (pendingAction) return undefined;
+    setPendingAction(actionKey);
     try {
       const result = await action();
       await load(true);
-      setToast(success);
+      showAppToast(success, 'success');
       setError('');
       return result;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Opération impossible.');
+      showAppToast(cause instanceof Error ? cause.message : 'Opération impossible.', 'error');
       return undefined;
+    } finally {
+      setPendingAction('');
     }
   };
 
@@ -273,8 +272,6 @@ export default function EcommerceModulePage({
   return (
     <div className="space-y-5" data-testid="ecommerce-module">
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button type="button" aria-label="Fermer le message" onClick={() => setError('')}><X size={16} /></button></div>}
-      {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-bold text-[hsl(var(--sidebar-foreground))] shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
-
       <section className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))]">
         <div className="grid min-w-0 gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:px-4">
           <div className="order-2 flex min-w-0 items-center gap-2 sm:order-1 sm:col-start-1">
@@ -318,7 +315,7 @@ export default function EcommerceModulePage({
       {tab === 'promotions' && <Promotions />}
        {tab === 'location' && <RentalPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
-      {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} />}
+      {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} pendingAction={pendingAction} />}
       {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
       </>}
     </div>
@@ -425,7 +422,7 @@ function RentalModal({ editing, form, categories, setForm, onClose, onSave }: { 
   return <Modal large title={editing === 'new' ? 'Ajouter une location' : `Modifier ${editing.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la location" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Maison familiale" /><label className="block text-xs font-bold">Catégorie<select value={form.categoryId} onChange={event => patch({ categoryId: event.target.value, category: event.target.options[event.target.selectedIndex]?.text ?? form.category })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sans catégorie</option>{categories.filter(category => category.isActive).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><Field label="Catégorie libre" value={form.categoryId ? categories.find(category => category.id === form.categoryId)?.name ?? form.category : form.category} onChange={value => patch({ category: value, categoryId: '' })} placeholder="Ex. Habitat" /><Field label="Tarif" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><label className="block text-xs font-bold">Unité de facturation<select value={form.billingUnit} onChange={event => patch({ billingUnit: event.target.value as EcommerceRentalPeriod })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="JOUR">Par jour</option><option value="SEMAINE">Par semaine</option><option value="MOIS">Par mois</option></select></label><Field label="Disponibilité" required type="number" value={form.availability} onChange={value => patch({ availability: value })} placeholder="0" /><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as EcommerceRentalStatus })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="block text-xs font-bold">Photo de la location<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{editing !== 'new' && editing.imageUrl && !form.imageFile && <img src={editing.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} placeholder="Décrivez ce qui est loué et les conditions utiles." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
 }
 
-function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBootstrap; currency: EcommerceStore['currency']; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+function WalletPanel({ data, currency, canModify, run, pendingAction }: { data: SellerWalletBootstrap; currency: EcommerceStore['currency']; canModify: boolean; run: (action: () => Promise<unknown>, success: string, actionKey?: string) => Promise<unknown | undefined>; pendingAction: string }) {
   const [account, setAccount] = useState({ mobile: data.wallet.payoutMobile, beneficiaryName: data.wallet.payoutName });
   const [amount, setAmount] = useState('');
   const [savingAccount, setSavingAccount] = useState(false);
@@ -463,10 +460,10 @@ function WalletPanel({ data, currency, canModify, run }: { data: SellerWalletBoo
         <h2 className="mt-1 text-lg font-bold">Ne comptabiliser que l’argent confirmé</h2>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le solde est crédité uniquement après confirmation DiamanoPay. Cette vérification récupère aussi les paiements confirmés dont le webhook n’est pas arrivé.</p>
       </div>
-      <button type="button" disabled={!canModify} onClick={() => void run(async () => {
+      <button type="button" disabled={!canModify || Boolean(pendingAction)} onClick={() => void run(async () => {
         const result = await api.reconcilePayments();
         return result;
-      }, 'Paiements vérifiés auprès de DiamanoPay.')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border bg-[hsl(var(--background))] px-4 py-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw size={15} />Vérifier les paiements</button>
+      }, 'Paiements vérifiés auprès de DiamanoPay.', 'reconcile')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border bg-[hsl(var(--background))] px-4 py-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw size={15} className={pendingAction === 'reconcile' ? 'animate-spin' : ''} />{pendingAction === 'reconcile' ? 'Vérification…' : 'Vérifier les paiements'}</button>
     </section>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <WalletMetric label="Solde disponible" value={money(data.wallet.availableBalance, currency)} detail="Retirable maintenant" icon={Wallet} accent />

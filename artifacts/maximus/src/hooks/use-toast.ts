@@ -135,7 +135,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>;
 
-function toast({ ...props }: Toast) {
+export function toast({ ...props }: Toast) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -164,6 +164,23 @@ function toast({ ...props }: Toast) {
   };
 }
 
+export type AppToastKind = 'success' | 'error' | 'info' | 'warning';
+
+export function showAppToast(message: string, kind: AppToastKind = 'info') {
+  const titles: Record<AppToastKind, string> = {
+    success: 'Succès',
+    error: 'Erreur',
+    info: 'Information',
+    warning: 'Attention',
+  };
+  const variant = kind === 'error' ? 'destructive' : kind;
+  return toast({
+    title: titles[kind],
+    description: message,
+    variant,
+  });
+}
+
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
@@ -184,4 +201,4 @@ function useToast() {
   };
 }
 
-export { useToast, toast };
+export { useToast };

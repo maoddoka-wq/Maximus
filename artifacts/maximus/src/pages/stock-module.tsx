@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes,
 import { createStockApi, type StockApi, type StockBootstrap, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { showAppToast } from '@/hooks/use-toast';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';
 const dateLabel = (value: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -48,7 +49,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+  const [pendingAction, setPendingAction] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const api = createStockApi(companyId);
 
@@ -68,8 +69,11 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     void load();
   }, [companyId, preview]);
   const run = async (action: () => Promise<unknown>, success: string) => {
-    try { await action(); await load(true); setToast(success); window.setTimeout(() => setToast(''), 3200); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Opération impossible.'); }
+    if (pendingAction) return;
+    setPendingAction(true);
+    try { await action(); await load(true); showAppToast(success, 'success'); }
+    catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Opération impossible.', 'error'); }
+    finally { setPendingAction(false); }
   };
   useEffect(() => {
     if (!data || !stockPermissions) return;
@@ -105,7 +109,6 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
       {tab === 'settings' && <StockSettingsPanel />}
       </div>
     </div>
-    {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-semibold text-white shadow-2xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
   </div></StockAccessContext.Provider></StockApiContext.Provider>;
 }
 

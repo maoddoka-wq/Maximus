@@ -8,6 +8,7 @@ import {
   type SellerWalletMaturityPolicy,
   type SellerWalletWithdrawalFeePolicy,
 } from '@/lib/platform-settings-api';
+import { showAppToast } from '@/hooks/use-toast';
 
 const modeOptions: Array<{
   value: SellerWalletMaturityMode;
@@ -41,7 +42,6 @@ export default function PlatformSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [savingFee, setSavingFee] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [diagnosticTokens, setDiagnosticTokens] = useState<DiagnosticTokenSummary[]>([]);
   const [diagnosticLabel, setDiagnosticLabel] = useState('Accès diagnostic');
   const [diagnosticExpiry, setDiagnosticExpiry] = useState('24');
@@ -88,7 +88,7 @@ export default function PlatformSettingsPage() {
       setIssuedDiagnosticToken(issued);
       const tokenResponse = await platformSettingsApi.diagnosticTokens();
       setDiagnosticTokens(tokenResponse.tokens);
-      setNotice('Le token a été généré. Copiez-le maintenant : il ne sera plus affiché ensuite.');
+      showAppToast('Le token a été généré. Copiez-le maintenant : il ne sera plus affiché ensuite.', 'success');
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Le token n’a pas pu être généré.');
@@ -101,7 +101,7 @@ export default function PlatformSettingsPage() {
     if (!issuedDiagnosticToken) return;
     try {
       await navigator.clipboard.writeText(issuedDiagnosticToken.token);
-      setNotice('Token copié dans le presse-papiers.');
+      showAppToast('Token copié dans le presse-papiers.', 'success');
     } catch {
       setError('La copie automatique a échoué. Sélectionnez le token et copiez-le manuellement.');
     }
@@ -113,7 +113,7 @@ export default function PlatformSettingsPage() {
     try {
       await platformSettingsApi.revokeDiagnosticToken(token.id);
       setDiagnosticTokens(current => current.map(item => item.id === token.id ? { ...item, status: 'REVOKED' } : item));
-      setNotice('L’accès de diagnostic a été révoqué.');
+      showAppToast('L’accès de diagnostic a été révoqué.', 'success');
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'L’accès de diagnostic n’a pas pu être révoqué.');
@@ -142,7 +142,7 @@ export default function PlatformSettingsPage() {
       });
       setPolicy(nextPolicy);
       setValue(nextPolicy.value === null ? '' : String(nextPolicy.value));
-      setNotice('La règle de maturation a été enregistrée.');
+      showAppToast('La règle de maturation a été enregistrée.', 'success');
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La règle n’a pas pu être enregistrée.');
@@ -164,7 +164,7 @@ export default function PlatformSettingsPage() {
       const nextFeePolicy = await platformSettingsApi.updateSellerWalletWithdrawalFee({ amount: numericAmount });
       setFeePolicy(nextFeePolicy);
       setFeeAmount(String(nextFeePolicy.amount));
-      setNotice('Le frais de retrait a été enregistré.');
+      showAppToast('Le frais de retrait a été enregistré.', 'success');
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Le frais de retrait n’a pas pu être enregistré.');
@@ -186,12 +186,6 @@ export default function PlatformSettingsPage() {
       {error && (
         <div role="alert" className="rounded-xl border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">
           {error}
-        </div>
-      )}
-      {notice && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
-          <Check size={16} />
-          {notice}
         </div>
       )}
       <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--card))_58%)] p-5 sm:p-7">

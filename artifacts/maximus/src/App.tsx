@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
+import { showAppToast } from '@/hooks/use-toast';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
@@ -360,7 +361,6 @@ function AppContent() {
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
-  const [toast, setToast] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
   const [serverModuleAccessReady, setServerModuleAccessReady] = useState(false);
@@ -375,11 +375,8 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(''), 3000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
+    showAppToast(message, kind);
   useEffect(() => {
     const isPotentialCustomShopPath = pathname === '/'
       || pathname === '/connexion'
@@ -479,10 +476,10 @@ function AppContent() {
             setSession(null);
             localStorage.removeItem('maximus-session');
             localStorage.removeItem('maximus-sector-test-company');
-            setToast('Votre session MAXIMUS n’est plus active.');
+            notify('Votre session MAXIMUS n’est plus active.', 'warning');
             return;
           }
-          setToast(error instanceof Error ? error.message : 'Les données métier sont indisponibles.');
+          notify(error instanceof Error ? error.message : 'Les données métier sont indisponibles.', 'error');
         }
       });
     return () => {
@@ -497,7 +494,7 @@ function AppContent() {
         synchronizeCompanyModuleAccess(company.id, company.allowedModules),
       ]),
     ).catch((error) => {
-      setToast(error instanceof Error ? `Synchronisation incomplète : ${error.message}` : 'Synchronisation des entreprises incomplète.');
+      notify(error instanceof Error ? `Synchronisation incomplète : ${error.message}` : 'Synchronisation des entreprises incomplète.', 'warning');
     });
   }, [session]);
 
@@ -522,13 +519,12 @@ function AppContent() {
         })
         .catch((error) => {
           setData((current) => current === safeNext ? previous : current);
-          setToast(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.');
+          notify(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.', 'error');
           throw error;
         });
     }
-    if (message) setToast(message);
+    if (message) notify(message, 'success');
   };
-  const notify = (message: string) => setToast(message);
   const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => {
     await setCompanyModuleAccess(companyId, moduleId, status);
     mutate((draft) => {
@@ -746,7 +742,7 @@ function AppContent() {
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation('/entreprise/dashboard');
-    setToast(`Test réel lancé pour le secteur « ${preset.name} ».`);
+    notify(`Test réel lancé pour le secteur « ${preset.name} ».`);
   };
   const exitSectorTest = () => {
     if (!sectorTestCompanyId) return logout();
@@ -760,7 +756,7 @@ function AppContent() {
     setSession('admin');
     localStorage.setItem('maximus-session', 'admin');
     setLocation('/maximus/secteurs');
-    setToast('Test réel terminé. Retour à la configuration des secteurs.');
+    notify('Test réel terminé. Retour à la configuration des secteurs.', 'success');
   };
   const logout = () => {
     void authApi.logout().finally(() => {
@@ -803,7 +799,7 @@ function AppContent() {
         data={data}
         mutate={mutate}
         onComplete={() => {
-          setToast('Demande d’entreprise enregistrée. Validez-la pour activer le compte.');
+          notify('Demande d’entreprise enregistrée. Validez-la pour activer le compte.', 'success');
           setLocation('/maximus/demandes');
         }}
         onCancel={() => setLocation('/maximus/entreprises')}
@@ -813,7 +809,7 @@ function AppContent() {
         key={`signup-${registrationCatalogVersion}`}
         data={data}
         onComplete={() => {
-          setToast('Votre demande a bien été envoyée.');
+          notify('Votre demande a bien été envoyée.', 'success');
           setLocation('/');
         }}
       />
@@ -1069,15 +1065,6 @@ function AppContent() {
           </ErrorBoundary>
         </div>
       </main>
-      {toast && (
-        <div
-          data-testid="status-toast"
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-xl bg-[hsl(var(--sidebar))] px-4 py-3 text-sm font-semibold text-[hsl(var(--sidebar-foreground))] shadow-2xl fade-up"
-        >
-          <Check size={16} className="text-[hsl(var(--accent))]" />
-          {toast}
-        </div>
-      )}
       <Toaster />
     </div>
   );

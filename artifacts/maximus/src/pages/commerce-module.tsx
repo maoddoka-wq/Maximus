@@ -37,6 +37,7 @@ import type { Sale, Status, StoreData } from '@/lib/store';
 import { addNotification, getVisibleNotifications, money, recordControlEvent, shortMoney, uid } from '@/lib/store';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { showAppToast } from '@/hooks/use-toast';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 
 type Icon = ComponentType<{ size?: number; className?: string }>;
@@ -141,16 +142,9 @@ export default function CommerceModulePage({
   const defaultTab = availableTabIds.includes(initialTab) ? initialTab : (availableTabIds[0] ?? 'dashboard');
   const [tab, setTab] = useQueryTab({ tabs: availableTabIds, defaultTab, aliases: featureTabAliases });
   const [query, setQuery] = useState('');
-  const [toast, setToast] = useState('');
-
   useEffect(() => {
     setState(readState(data, companyId));
   }, [companyId, data.commerceStates]);
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timeout = window.setTimeout(() => setToast(''), 2800);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
 
   const navigateTab = (next: Tab) => {
     setTab(next);
@@ -165,7 +159,7 @@ export default function CommerceModulePage({
       });
       return next;
     });
-    if (message) setToast(message);
+    if (message) showAppToast(message, 'success');
   };
   const validatedSales = data.sales.filter(sale => sale.status === 'VALIDÉ');
   const revenue = validatedSales.reduce((sum, sale) => sum + sale.amount, 0);
@@ -181,7 +175,6 @@ export default function CommerceModulePage({
   }
 
   return <div className="space-y-5" data-testid="commerce-module">
-    {toast && <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-xl bg-[hsl(var(--foreground))] px-4 py-3 text-sm font-bold text-[hsl(var(--background))] shadow-xl"><Check size={16} className="text-[hsl(var(--accent))]" />{toast}</div>}
     <section className="mobile-hero card-surface rounded-2xl border border-[hsl(var(--primary)/.18)] p-5 sm:p-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
@@ -213,11 +206,11 @@ export default function CommerceModulePage({
      {tab === 'expenses' && <ExpensesPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
      {tab === 'cash' && <CashPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
      {tab === 'credit' && <CreditPageComplete state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} onUpdate={updateState} />}
-     {tab === 'invoices' && <InvoicesPageComplete data={data} query={query} onToast={setToast} />}
+     {tab === 'invoices' && <InvoicesPageComplete data={data} query={query} onToast={message => showAppToast(message, 'success')} />}
     {tab === 'returns' && <ReturnsPageComplete data={data} state={state} query={query} canCreate={currentCanCreate} canModify={currentCanModify} mutate={mutate} onUpdate={updateState} companyId={companyId} />}
     {tab === 'reports' && <ReportsPage data={data} state={state} />}
     {tab === 'activity' && <ActivityPage data={data} query={query} />}
-    {tab === 'team' && <TeamPage data={data} query={query} canModify={currentCanModify} onToast={setToast} onNavigate={onNavigate} />}
+     {tab === 'team' && <TeamPage data={data} query={query} canModify={currentCanModify} onToast={message => showAppToast(message, 'info')} onNavigate={onNavigate} />}
     {tab === 'settings' && <SettingsPage state={state} canModify={currentCanModify} onUpdate={updateState} />}
   </div>;
 }
