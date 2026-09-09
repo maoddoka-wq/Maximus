@@ -47,6 +47,71 @@ class AppStateRecoveryTest extends TestCase
             ->assertJsonMissingPath('catalog.companies');
     }
 
+    public function test_saved_and_published_sector_becomes_available_to_public_registration_catalog(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'catalog-publication-admin',
+            'email' => 'catalog.publication.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $request = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin));
+        $sector = [
+            'id' => 'construction',
+            'name' => 'Construction',
+            'moduleIds' => ['ecommerce'],
+            'modulePackIds' => ['ecommerce' => ['ecommerce-catalogue']],
+        ];
+
+        $request
+            ->putJson('/api/app-state', [
+                'version' => 0,
+                'data' => [
+                    'catalogVersion' => 1,
+                    'sectorPresets' => [],
+                    'catalogDraft' => [
+                        'catalogVersion' => 1,
+                        'sectorPresets' => [$sector],
+                        'moduleOverrides' => [],
+                        'moduleStatuses' => [],
+                        'removedModules' => [],
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('version', 1);
+
+        $request
+            ->getJson('/api/registration-catalog')
+            ->assertOk()
+            ->assertJsonCount(0, 'catalog.sectorPresets');
+
+        $request
+            ->putJson('/api/app-state', [
+                'version' => 1,
+                'data' => [
+                    'catalogVersion' => 2,
+                    'sectorPresets' => [$sector],
+                    'moduleOverrides' => [],
+                    'moduleStatuses' => [],
+                    'removedModules' => [],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('version', 2);
+
+        $this->getJson('/api/registration-catalog')
+            ->assertOk()
+            ->assertJsonPath('catalog.catalogVersion', 2)
+            ->assertJsonPath('catalog.sectorPresets.0.id', 'construction')
+            ->assertJsonPath('catalog.sectorPresets.0.name', 'Construction');
+    }
+
     public function test_bootstrap_recovers_company_and_employee_modules_when_state_is_missing(): void
     {
         ModuleCatalog::ensureCompanyAccess('recovery-company', ['stocks']);

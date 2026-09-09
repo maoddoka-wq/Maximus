@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildModulePack, emptyModulePackDraft, updatePackPermission } from './module-pack';
 import { getModuleFeatureOptions } from './module-features';
+import { modules } from './store';
 import type { Module } from './store';
 
 const moduleFixture: Module = {
@@ -37,4 +38,22 @@ test('refuse un pack sans description', () => {
   const pack = buildModulePack(moduleFixture, { ...draft, name: 'Pack sans explication' }, 'pack-no-description');
 
   assert.equal(pack, null);
+});
+
+test('expose et conserve la fonctionnalité Catégories dans les packs e-commerce', () => {
+  const ecommerce = modules.find((module) => module.id === 'ecommerce');
+  assert.ok(ecommerce);
+
+  const categories = getModuleFeatureOptions(ecommerce).find((feature) => feature.id === 'categories');
+  assert.deepEqual(categories, { id: 'categories', label: 'Catégories' });
+
+  const draft = updatePackPermission(emptyModulePackDraft(), 'categories', 'edit');
+  const pack = buildModulePack(
+    ecommerce,
+    { ...draft, name: 'Gestion des catégories', description: 'Organiser le catalogue par familles.' },
+    'pack-categories',
+  );
+
+  assert.deepEqual(pack?.featureIds, ['categories']);
+  assert.deepEqual(pack?.featurePermissions?.categories, ['voir', 'créer', 'modifier']);
 });

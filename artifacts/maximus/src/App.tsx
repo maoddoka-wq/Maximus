@@ -1267,7 +1267,7 @@ function Signup({
     name: 'Distribution',
     moduleIds: ['commerce', 'stocks', 'presences'],
   };
-  const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
+  const initialPreset = fallbackPreset;
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [name, setName] = useState('');
@@ -1277,7 +1277,7 @@ function Signup({
   const [country, setCountry] = useState('Sénégal');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [sector, setSector] = useState(initialPreset.name);
+  const [sector, setSector] = useState('');
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(
@@ -1567,6 +1567,7 @@ function Signup({
                   onChange={(e) => changeSector(e.target.value)}
                   className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
                 >
+                  <option value="">Aucun secteur — configurer manuellement</option>
                   {data.sectorPresets.map((preset) => (
                     <option key={preset.id} value={preset.name}>
                       {preset.name}
@@ -1782,7 +1783,7 @@ function Signup({
                  </p>
                )}
                <button
-                 disabled={selectedModules.length === 0 || !sector}
+                  disabled={selectedModules.length === 0}
                 data-testid="button-submit-signup"
                  onClick={() => {
                    if (submitting) return;
