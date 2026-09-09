@@ -208,7 +208,7 @@ final class PayrollController extends Controller
 
     public function topup(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'solde')) {
+        if (! $this->allowed($request, 'modify', 'solde-de-paie')) {
             return $this->forbidden();
         }
         $input = Validator::make($request->all(), [
@@ -309,7 +309,17 @@ final class PayrollController extends Controller
     private function allowed(Request $request, string $action, ?string $feature = null): bool
     {
         $actor = $request->attributes->get('authActor');
-        return is_array($actor) && ModuleAuthorization::allows($actor, 'paie', $action, $feature);
+        if (! is_array($actor)) {
+            return false;
+        }
+        if (ModuleAuthorization::allows($actor, 'paie', $action, $feature)) {
+            return true;
+        }
+
+        // Keep the previous balance feature readable for companies migrated
+        // before the canonical "solde-de-paie" identifier was published.
+        return $feature === 'solde-de-paie'
+            && ModuleAuthorization::allows($actor, 'paie', $action, 'solde');
     }
 
     private function company(Request $request): string

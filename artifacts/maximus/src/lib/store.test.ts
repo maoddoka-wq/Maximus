@@ -78,6 +78,74 @@ test('répare les tableaux de droits absents des anciennes fiches entreprise', (
   assert.deepEqual(normalized.companies[0]?.refusedModules, []);
 });
 
+test('normalise les anciens identifiants Paie dans les espaces existants', () => {
+  const normalized = normalizeStoreData({
+    companies: [{
+      id: 'legacy-payroll-company',
+      name: 'Entreprise Paie historique',
+      manager: 'Responsable',
+      email: 'paie@test.local',
+      phone: '',
+      country: 'Sénégal',
+      sector: 'Services',
+      status: 'ACTIF',
+      requestedModules: ['paie'],
+      requestedModuleFeatures: { paie: ['dashboard', 'beneficiaires', 'preparation', 'solde-paie'] },
+      requestedModulePermissions: {
+        paie: {
+          dashboard: ['voir'],
+          beneficiaires: ['voir', 'créer'],
+          'solde-paie': ['voir', 'modifier'],
+        },
+      },
+      allowedModules: ['paie'],
+      refusedModules: [],
+      createdAt: '2026-09-09',
+    } as never],
+    roles: [{
+      id: 'legacy-payroll-role',
+      name: 'Responsable Paie',
+      description: '',
+      modulePermissions: {
+        paie: ['voir'],
+        'paie:menu:dashboard': ['voir'],
+        'paie:menu:solde-paie': ['voir', 'modifier'],
+      },
+    } as never],
+    moduleOverrides: {
+      paie: {
+        featurePacks: [{
+          id: 'legacy-payroll-pack',
+          name: 'Pack historique',
+          featureIds: ['dashboard', 'preparation'],
+          featurePermissions: { dashboard: ['voir'] },
+        }],
+      },
+    } as never,
+  });
+
+  assert.deepEqual(normalized.companies[0]?.requestedModuleFeatures?.paie, [
+    'tableau-de-bord',
+    'bénéficiaires',
+    'préparer-une-paie',
+    'solde-de-paie',
+  ]);
+  assert.deepEqual(normalized.companies[0]?.requestedModulePermissions?.paie, {
+    'tableau-de-bord': ['voir'],
+    'bénéficiaires': ['voir', 'créer'],
+    'solde-de-paie': ['voir', 'modifier'],
+  });
+  assert.deepEqual(normalized.roles[0]?.modulePermissions, {
+    paie: ['voir'],
+    'paie:menu:tableau-de-bord': ['voir'],
+    'paie:menu:solde-de-paie': ['voir', 'modifier'],
+  });
+  assert.deepEqual(
+    getConfiguredModules(normalized).find(module => module.id === 'paie')?.featurePacks?.[0]?.featureIds,
+    ['tableau-de-bord', 'préparer-une-paie'],
+  );
+});
+
 test('conserve les données valides pendant le nettoyage des credentials', () => {
   const data = emptyStoreData();
   data.companies.push({

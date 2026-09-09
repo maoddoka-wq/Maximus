@@ -101,6 +101,27 @@ class PayrollTest extends TestCase
         $this->assertDatabaseCount('payroll_wallet_ledger', 1);
     }
 
+    public function test_employee_with_canonical_balance_permission_can_create_a_topup(): void
+    {
+        Config::set('services.diamanopay.access_token', 'test-token');
+        Config::set('services.diamanopay.webhook_secret', 'test-secret');
+        Http::fake([
+            'https://api.diamanopay.com/api/charges' => Http::response([
+                'data' => ['id' => 'charge-payroll-canonical', 'checkoutUrl' => 'https://checkout.example/payroll-canonical'],
+            ], 201),
+        ]);
+
+        $permissions = [
+            'paie' => ['voir'],
+            'paie:menu:solde-de-paie' => ['voir', 'modifier'],
+        ];
+        $this->asActor('employee', $permissions)->postJson('/api/payroll/wallet/topups?companyId=kora', [
+            'amount' => 100000,
+            'idempotencyKey' => 'payroll-canonical-balance',
+        ])->assertCreated()
+            ->assertJsonPath('topup.status', 'PENDING');
+    }
+
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([

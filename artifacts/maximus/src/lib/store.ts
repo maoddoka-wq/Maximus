@@ -418,7 +418,9 @@ function normalizeRolePermissions(value: unknown): Record<string, string[]> {
     Object.entries(normalized).filter(([key]) => key === 'paie' || key.startsWith('paie:')),
   );
   return {
-    ...normalized,
+    ...Object.fromEntries(
+      Object.entries(normalized).filter(([key]) => key !== 'paie' && !key.startsWith('paie:')),
+    ),
     ...normalizePayrollPermissionMap(payrollPermissions),
   };
 }

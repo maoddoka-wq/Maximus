@@ -117,6 +117,15 @@ test('propage le pack Paie et ses droits vers l’espace entreprise', () => {
   });
 
   assert.equal(access.allowed.includes('paie'), true);
+  assert.deepEqual(access.selectedPayrollFeatureIds, [
+    'tableau-de-bord',
+    'bénéficiaires',
+    'préparer-une-paie',
+    'validation',
+    'virements',
+    'solde-de-paie',
+    'historique',
+  ]);
   assert.equal(access.hasPermission('paie', 'créer'), true);
   assert.equal(access.hasPermission('paie', 'modifier'), true);
 });

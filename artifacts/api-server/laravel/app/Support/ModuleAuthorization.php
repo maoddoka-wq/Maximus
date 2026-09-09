@@ -4,6 +4,16 @@ namespace App\Support;
 
 final class ModuleAuthorization
 {
+    private const PAYROLL_FEATURE_ALIASES = [
+        'tableau-de-bord' => ['tableau-de-bord', 'dashboard'],
+        'bénéficiaires' => ['bénéficiaires', 'beneficiaires'],
+        'préparer-une-paie' => ['préparer-une-paie', 'preparation'],
+        'validation' => ['validation'],
+        'virements' => ['virements'],
+        'solde-de-paie' => ['solde-de-paie', 'solde-paie', 'solde'],
+        'historique' => ['historique'],
+    ];
+
     private const STOCK_FEATURE_KEYS = [
         'dashboard',
         'products',
@@ -133,7 +143,12 @@ final class ModuleAuthorization
         $prefix = $module.':menu:';
         $detailed = array_filter(array_keys($permissions), fn (string $key): bool => str_starts_with($key, $prefix));
         if ($feature && $detailed !== []) {
-            return self::contains($permissions[$prefix.$feature] ?? [], $required);
+            $featureKeys = $module === 'paie'
+                ? (self::PAYROLL_FEATURE_ALIASES[$feature] ?? [$feature])
+                : [$feature];
+
+            return collect($featureKeys)
+                ->contains(fn (string $featureKey): bool => self::contains($permissions[$prefix.$featureKey] ?? [], $required));
         }
         if ($detailed !== []) {
             return $action === 'view' && collect($detailed)->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], 'voir'));
