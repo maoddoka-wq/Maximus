@@ -94,6 +94,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [notice, setNotice] = useState('');
   const [cartNotice, setCartNotice] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
   const [submitted, setSubmitted] = useState<PaymentSummary | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,6 +175,15 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
     if (routePath.endsWith('/connexion')) setAuthMode('login');
   }, [routePath]);
+
+  useEffect(() => {
+    if (!logoPreviewOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLogoPreviewOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [logoPreviewOpen]);
 
   const shopPath = (suffix = '') => clientApp
     ? `/client-app${suffix}`
@@ -495,18 +505,34 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     { label: 'Panier', path: '/panier' },
     { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
   ];
-  const isFavorite = (product: PublicProduct) => customerData?.favoriteProductSlugs.includes(product.slug) ?? false;
-
   return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--background))]" style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
     <header className="relative border-b bg-[var(--shop-accent)] text-white">
       <div className="flex w-full items-center justify-between gap-4 px-4 py-4 sm:px-6">
-         <button type="button" onClick={() => go('')} className="flex min-w-0 max-w-[calc(100%-3rem)] shrink items-center gap-3 text-left"><span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={18} /></span>}</span><span className="min-w-0"><span className="block whitespace-normal break-words text-lg font-bold leading-tight">{store.name}</span><span className="block truncate text-xs text-white/65">{store.description}</span></span></button>
+          <div className="flex min-w-0 max-w-[calc(100%-3rem)] shrink items-center gap-3">
+            <button type="button" onClick={() => store.logoUrl && setLogoPreviewOpen(true)} disabled={!store.logoUrl} aria-label={store.logoUrl ? `Voir le logo de ${store.name}` : undefined} className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:cursor-default disabled:hover:bg-transparent">
+              {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={18} /></span>}
+            </button>
+            <button type="button" onClick={() => go('')} className="min-w-0 text-left">
+              <span className="block whitespace-normal break-words text-lg font-bold leading-tight">{store.name}</span>
+              <span className="block truncate text-xs text-white/65">{store.description}</span>
+            </button>
+          </div>
          <button type="button" className="rounded-lg p-2 sm:hidden" onClick={() => setMobileMenu(open => !open)} aria-label="Ouvrir le menu" aria-expanded={mobileMenu} aria-controls="mobile-shop-menu"><Menu size={21} /></button>
          <nav id="mobile-shop-menu" className={`${mobileMenu ? 'flex' : 'hidden'} absolute right-4 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-white/10 bg-[var(--shop-accent)] p-2 shadow-2xl ring-1 ring-black/10 sm:static sm:flex sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0`}>
            {publicNav.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className="rounded-xl px-3 py-3 text-left text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 hover:text-white sm:py-2">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
         </nav>
       </div>
     </header>
+      {logoPreviewOpen && store.logoUrl && <div role="dialog" aria-modal="true" aria-label={`Aperçu du logo de ${store.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setLogoPreviewOpen(false); }}>
+        <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-5 shadow-2xl sm:p-8">
+          <button type="button" onClick={() => setLogoPreviewOpen(false)} aria-label="Fermer l’aperçu du logo" className="absolute right-3 top-3 rounded-full p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><X size={20} /></button>
+          <p className="pr-10 text-center text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>Logo de la boutique</p>
+          <div className="mt-5 flex min-h-48 w-full items-center justify-center rounded-2xl bg-[hsl(var(--muted)/.45)] p-6 sm:min-h-72">
+            <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="max-h-[65vh] max-w-full object-contain" />
+          </div>
+          <p className="mt-4 text-center text-sm font-semibold text-[hsl(var(--muted-foreground))]">{store.name}</p>
+        </div>
+      </div>}
      <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
       {notice && <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><Check size={16} /><span>{notice}</span><button type="button" className="ml-auto" onClick={() => setNotice('')} aria-label="Fermer"><X size={16} /></button></div>}
@@ -531,7 +557,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
           : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} onAdd={addRental} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
-          : <><section className="mb-8 flex min-w-0 flex-col justify-between gap-5 sm:flex-row sm:items-end"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Sélection de la boutique</p><h1 className="mt-2 text-3xl font-bold tracking-[-.04em] sm:text-4xl">Trouvez ce qu’il vous faut.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Commandez en ligne et retrouvez vos commandes dans votre espace client.</p></div><button type="button" onClick={() => go('/compte/favoris')} className="inline-flex items-center gap-2 self-start rounded-xl border px-3 py-2.5 text-sm font-bold sm:self-auto"><Heart size={16} />Favoris</button></section><div className="mb-7 grid gap-3 sm:grid-cols-[1fr_auto_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher dans la boutique" className="w-full rounded-xl border bg-[hsl(var(--card))] py-3 pl-10 pr-3 text-sm" /></label><select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-xl border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select><button type="button" onClick={() => go('/compte/favoris')} className="inline-flex items-center justify-center gap-2 rounded-xl border bg-[hsl(var(--card))] px-4 py-3 text-sm font-bold"><Heart size={16} fill={customer ? 'currentColor' : 'none'} className={customer ? 'text-red-600' : ''} />{customerData?.favoriteProductSlugs.length ?? 0}</button></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onFavorite={product => void toggleFavorite(product)} isFavorite={isFavorite} />}</>}
+           : <><section className="mb-8 min-w-0"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Sélection de la boutique</p><h1 className="mt-2 text-3xl font-bold tracking-[-.04em] sm:text-4xl">Trouvez ce qu’il vous faut.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Commandez en ligne et retrouvez vos commandes dans votre espace client.</p></div></section><div className="mb-7 grid gap-3 sm:grid-cols-[1fr_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher dans la boutique" className="w-full rounded-xl border bg-[hsl(var(--card))] py-3 pl-10 pr-3 text-sm" /></label><select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-xl border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
     </main>
      {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-4 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
@@ -580,8 +606,6 @@ function PublicOfferCard({
   store,
   onOpen,
   onAdd,
-  onFavorite,
-  favorite = false,
 }: {
   imageUrl: string;
   icon: typeof Package;
@@ -594,8 +618,6 @@ function PublicOfferCard({
   store: PublicShopBootstrap['store'];
   onOpen?: () => void;
   onAdd?: () => void;
-  onFavorite?: () => void;
-  favorite?: boolean;
 }) {
   const isAvailable = availability !== 'Indisponible';
   const availabilityLabel = availability ? (isAvailable ? 'Disponible' : 'Indisponible') : undefined;
@@ -616,9 +638,8 @@ function PublicOfferCard({
         <span>{availability}</span>
         <span className="ml-auto truncate">{badge.split(' · ')[1] || badge}</span>
       </div>}
-      {(onAdd || onFavorite) && <div className="mt-3 flex items-center gap-1.5">
-        {onFavorite && <button type="button" onClick={onFavorite} className="rounded-lg border p-1.5" aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}><Heart size={14} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-red-600' : ''} /></button>}
-        {onAdd && isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2.5 py-2 text-[11px] font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
+      {onAdd && <div className="mt-3 flex items-center gap-1.5">
+        {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2.5 py-2 text-[11px] font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
       </div>}
     </div>
   </article>;
@@ -631,8 +652,6 @@ function CatalogSections({
   store,
   onProduct,
   onAdd,
-  onFavorite,
-  isFavorite,
 }: {
   products: PublicProduct[];
   rentals: PublicRental[];
@@ -640,8 +659,6 @@ function CatalogSections({
   store: PublicShopBootstrap['store'];
   onProduct: (product: PublicProduct) => void;
   onAdd: (product: PublicProduct) => void;
-  onFavorite: (product: PublicProduct) => void;
-  isFavorite: (product: PublicProduct) => boolean;
 }) {
   return <div className="space-y-10">
     {categories.map(category => {
@@ -651,7 +668,7 @@ function CatalogSections({
       return <section key={category}>
         <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? `${product.stock} disponible${product.stock > 1 ? 's' : ''}` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onFavorite={() => onFavorite(product)} favorite={isFavorite(product)} />)}
+             {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? `${product.stock} disponible${product.stock > 1 ? 's' : ''}` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} />)}
           {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
         </div>
       </section>;
