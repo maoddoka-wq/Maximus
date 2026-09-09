@@ -38,3 +38,4 @@
 - [Commission e-commerce](ecommerce-commission-policy.md) — chaque vente est répartie à 3 % DiamanoPay, 2 % MAXIMUS et 95 % vendeur, avec registre MAXIMUS idempotent.
 - [Frontière financière de la paie](payroll-financial-boundary.md) — créditer le solde uniquement après webhook signé, chiffrer les comptes et réserver les fonds avant virement.
 - [Catalogue Paie](payroll-catalog.md) — les packs doivent utiliser les slugs des libellés et matérialiser leurs permissions lors du provisionnement entreprise.
+- [Assistant local contrôlé](local-assistant.md) — l’assistant entreprise doit répondre depuis un contexte filtré par session, entreprise et modules autorisés, sans mutation implicite.

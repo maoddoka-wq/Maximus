@@ -125,6 +125,7 @@ import {
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
+import { answerAssistantQuestion, buildAssistantInsights, buildAssistantScope } from '@/lib/local-assistant';
 
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
@@ -142,6 +143,7 @@ const CompanyOrganizationAdmin = lazy(() =>
 const CompanySetupGuide = lazy(() => import('@/pages/company-setup-guide'));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const PayrollModulePage = lazy(() => import('@/pages/payroll-module'));
+const MaximusAssistantPage = lazy(() => import('@/pages/maximus-assistant'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
 );
@@ -218,6 +220,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Espace entreprise',
     title: 'Votre activité, en un regard.',
     description: 'Pilotez vos opérations depuis un espace unifié.',
+  },
+  '/entreprise/assistant': {
+    kicker: 'Copilote local MAXIMUS',
+    title: 'Comprendre votre activité, sans perdre le contrôle.',
+    description: 'Une lecture assistée des données autorisées de votre entreprise.',
   },
   '/entreprise/controle': {
     kicker: 'Espace entreprise',
@@ -870,6 +877,7 @@ function AppContent() {
   ];
   if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
   const isAdmin = session === 'admin';
+  const companyAdmin = session.startsWith('company:');
   const employeeId = sessionEmployeeId;
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
   const companyId = activeCompanyId ?? '';
@@ -901,6 +909,23 @@ function AppContent() {
     serverModuleAccessReady:
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
+  const assistantVisibleEmployees = companyAdmin
+    ? data.employees.filter(item => item.companyId === companyId)
+    : sectorManager
+      ? presenceEmployees
+      : employee
+        ? [employee]
+        : [];
+  const assistantScope = buildAssistantScope({
+    data,
+    companyId,
+    userLabel: employee ? `${employee.firstName} ${employee.lastName}` : currentCompany?.manager ?? 'Administrateur',
+    visibleEmployees: assistantVisibleEmployees,
+    allowedModules: allowed,
+    isCompanyAdmin: companyAdmin,
+    isSectorManager: sectorManager,
+  });
+  const assistantInsights = buildAssistantInsights(assistantScope);
   const baseMeta =
     pageMeta[normalizeRoutePath(location)] ??
     modulePageMeta[normalizeRoutePath(location)] ??
@@ -1056,7 +1081,7 @@ function AppContent() {
                   onBack={goBack}
                   allowed={allowed}
                   canManagePeople={canManagePeople}
-                  companyAdmin={session.startsWith('company:')}
+                  companyAdmin={companyAdmin}
                   sectorManager={sectorManager}
                   scopeNodeId={employeeNode?.id}
                   companyId={companyId}
@@ -1071,8 +1096,12 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                   singleModuleNavigation={verticalModuleNavigation}
+                  assistantScope={assistantScope}
+                  assistantInsights={assistantInsights}
+                  onAskAssistant={(question) => answerAssistantQuestion(assistantScope, question).answer}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
+                    assistant: MaximusAssistantPage,
                     control: ControlCenterPage,
                     notifications: NotificationsPage,
                     setupGuide: CompanySetupGuide,

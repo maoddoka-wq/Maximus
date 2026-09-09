@@ -4,6 +4,7 @@ import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
 import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
 import { normalizeRoutePath } from '@/lib/navigation';
+import type { AssistantInsight, AssistantScope } from '@/lib/local-assistant';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -122,6 +123,7 @@ export function AdminRouter({
 
 export type CompanyRouteScreens = {
   dashboard: Screen;
+  assistant: Screen;
   control: Screen;
   notifications: Screen;
   setupGuide: Screen;
@@ -161,6 +163,9 @@ export function CompanyRouter({
   commerceTabIds,
   moduleStatuses,
   singleModuleNavigation,
+  assistantScope,
+  assistantInsights,
+  onAskAssistant,
   screens,
 }: {
   location: string;
@@ -186,6 +191,9 @@ export function CompanyRouter({
   moduleStatuses: Record<string, ModuleAvailability>;
   singleModuleNavigation?: boolean;
   screens: CompanyRouteScreens;
+  assistantScope: AssistantScope;
+  assistantInsights: AssistantInsight[];
+  onAskAssistant: (question: string) => string;
 }) {
   const routePath = normalizeRoutePath(location);
   const query = new URLSearchParams(location.split('?')[1] ?? '');
@@ -208,6 +216,19 @@ export function CompanyRouter({
   }
   if (routePath === '/entreprise/dashboard') {
     return renderScreen(screens.dashboard, { data, onNavigate, allowed });
+  }
+  if (routePath === '/entreprise/assistant') {
+    return renderScreen(screens.assistant, {
+      companyContext: {
+        name: assistantScope.company?.name ?? 'votre entreprise',
+        sector: assistantScope.company?.sector,
+        reportingPeriod: 'Période courante',
+        activeUsers: assistantScope.visibleEmployees.length,
+        lastSyncLabel: 'État local de la session',
+      },
+      insightCards: assistantInsights,
+      onAsk: onAskAssistant,
+    });
   }
   if (routePath === '/entreprise/controle') {
     return renderScreen(screens.control, {

@@ -11,6 +11,7 @@ import {
   ListChecks,
   ShieldAlert,
   Settings,
+  Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from './store';
@@ -59,6 +60,7 @@ export const adminNav: NavigationItem[] = [
 
 const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
+  { href: '/entreprise/assistant', label: 'Assistant MAXIMUS', icon: Sparkles, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/entreprise/organisation', label: 'Organisation & accès', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/entreprise/guide-configuration', label: 'Guide de configuration', icon: BookOpen, module: null, peopleAdminOnly: true },
