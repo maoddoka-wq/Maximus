@@ -124,6 +124,7 @@ export type CompanyRouteScreens = {
   dashboard: Screen;
   control: Screen;
   notifications: Screen;
+  setupGuide: Screen;
   organization: Screen;
   empty: Screen;
   stocks: Screen;
@@ -218,6 +219,23 @@ export function CompanyRouter({
   }
   if (routePath === '/entreprise/notifications') {
     return renderScreen(screens.notifications, { data, mutate, context: { isAdmin: false, companyId } });
+  }
+  if (routePath === '/entreprise/guide-configuration') {
+    const company = data.companies.find(item => item.id === companyId);
+    return company && companyAdmin ? (
+      renderScreen(screens.setupGuide, {
+        companyId,
+        companyName: company.name,
+        allowedModules: allowed,
+        onNavigate,
+      })
+    ) : (
+      renderScreen(screens.empty, {
+        title: 'Accès réservé',
+        text: 'Le guide de configuration est accessible à l’administrateur de l’entreprise.',
+        action: () => onBack('/entreprise/dashboard'),
+      })
+    );
   }
   if (routePath === '/entreprise/profil') {
     const company = data.companies.find(item => item.id === companyId);

@@ -136,6 +136,7 @@ const OperationalModulePage = lazy(() =>
 const CompanyOrganizationAdmin = lazy(() =>
   import('@/pages/company-organization').then((module) => ({ default: module.CompanyOrganizationAdmin })),
 );
+const CompanySetupGuide = lazy(() => import('@/pages/company-setup-guide'));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
@@ -234,6 +235,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     title: 'Mon profil',
     description: 'Mettez à jour les informations et les accès de votre entreprise.',
   },
+  '/entreprise/guide-configuration': {
+    kicker: 'Espace entreprise',
+    title: 'Guide de configuration',
+    description: 'Configurez votre entreprise de A à Z avec une méthode vérifiable et sans angle mort.',
+  },
   '/entreprise/roles': {
     kicker: 'Espace entreprise',
     title: 'Rôles',
@@ -327,6 +333,7 @@ const routesWithModuleHeaders = new Set([
   '/entreprise/presences',
   '/entreprise/rapports',
   '/entreprise/organisation',
+  '/entreprise/guide-configuration',
   '/entreprise/acces',
   '/entreprise/autorisations',
   '/entreprise/employes',
@@ -1042,6 +1049,7 @@ function AppContent() {
                     dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,
                     notifications: NotificationsPage,
+                    setupGuide: CompanySetupGuide,
                     organization: CompanyOrganizationAdmin,
                     empty: EmptyState,
                     stocks: StockModulePage,
