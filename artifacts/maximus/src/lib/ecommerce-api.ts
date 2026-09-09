@@ -199,7 +199,15 @@ export interface SellerWalletBootstrap {
 }
 
 export interface PublicShopBootstrap {
-  store: Omit<EcommerceStore, 'id' | 'companyId'> & { enabledFeatures: PublicShopFeatures };
+  store: Omit<EcommerceStore, 'id' | 'companyId'> & {
+    seller: {
+      name: string;
+      email: string;
+      phone: string;
+      photoUrl: string;
+    };
+    enabledFeatures: PublicShopFeatures;
+  };
   products: Array<Omit<EcommerceProduct, 'id' | 'companyId' | 'sku' | 'status'>>;
   rentals: Array<{
     id: string;

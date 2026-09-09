@@ -962,15 +962,26 @@ class EcommerceController extends Controller
 
     private function publicStorePayload(object $row): array
     {
+        $company = DB::table('companies')
+            ->where('id', $row->company_id)
+            ->whereNull('deleted_at')
+            ->first(['name', 'email', 'phone', 'profile_photo']);
+
         return [
             'slug' => $row->slug,
             'name' => $row->name,
-            'description' => $row->description,
+            'description' => (string) ($row->description ?? ''),
             'status' => $row->status,
             'currency' => $row->currency,
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
+            'seller' => [
+                'name' => (string) ($company->name ?? $row->name ?? ''),
+                'email' => (string) ($company->email ?? ''),
+                'phone' => (string) ($company->phone ?? ''),
+                'photoUrl' => (string) ($company->profile_photo ?? ''),
+            ],
             'enabledFeatures' => $this->publicEnabledFeatures((string) $row->company_id),
         ];
     }
