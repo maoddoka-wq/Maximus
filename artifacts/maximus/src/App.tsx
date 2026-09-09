@@ -104,7 +104,6 @@ import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
-import { activeModuleIds, getCustomerNeeds, isNeedAvailable, moduleIdsForNeed, type CustomerNeed } from '@/lib/onboarding-catalog';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
 import {
   loadCompanyModuleAccess,
@@ -136,9 +135,6 @@ const OperationalModulePage = lazy(() =>
 );
 const CompanyOrganizationAdmin = lazy(() =>
   import('@/pages/company-organization').then((module) => ({ default: module.CompanyOrganizationAdmin })),
-);
-const CompanyOnboardingPage = lazy(() =>
-  import('@/pages/company-onboarding').then((module) => ({ default: module.CompanyOnboardingPage })),
 );
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const ControlCenterPage = lazy(() =>
@@ -895,31 +891,6 @@ function AppContent() {
         : { ...baseMeta, kicker: currentCompany.name }
       : baseMeta;
   const currentPath = companyRoutePath;
-  const shouldShowOnboarding =
-    !isAdmin
-    && session.startsWith('company:')
-    && Boolean(currentCompany)
-    && currentCompany?.onboardingCompleted === false
-    && (currentPath === '/entreprise/dashboard' || currentPath === '/entreprise/demarrage');
-  if (shouldShowOnboarding && currentCompany) {
-    return (
-      <Suspense
-        fallback={
-          <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">
-            Préparation de votre espace…
-          </div>
-        }
-      >
-        <CompanyOnboardingPage
-          data={data}
-          company={currentCompany}
-          mutate={mutate}
-          onComplete={() => navigate('/entreprise/dashboard')}
-          onExit={() => navigate('/entreprise/organisation')}
-        />
-      </Suspense>
-    );
-  }
   const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
   const companyInitials =
     currentCompany?.name
@@ -1052,7 +1023,6 @@ function AppContent() {
                   onNavigate={navigate}
                   onBack={goBack}
                   allowed={allowed}
-                  company={currentCompany ?? null}
                   canManagePeople={canManagePeople}
                   companyAdmin={session.startsWith('company:')}
                   sectorManager={sectorManager}
@@ -1297,9 +1267,7 @@ function Signup({
     name: 'Distribution',
     moduleIds: ['commerce', 'stocks', 'presences'],
   };
-  const enabledModuleIds = activeModuleIds(data);
   const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
-  const initialModuleIds = initialPreset.moduleIds.filter(moduleId => enabledModuleIds.has(moduleId));
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [name, setName] = useState('');
@@ -1310,12 +1278,12 @@ function Signup({
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState(initialPreset.name);
-  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialModuleIds]);
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(
     () =>
       Object.fromEntries(
-        initialModuleIds.map((moduleId) => {
+        initialPreset.moduleIds.map((moduleId) => {
           const module = modules.find((item) => item.id === moduleId);
           return [
             moduleId,
@@ -1329,7 +1297,7 @@ function Signup({
   >(
     () =>
       Object.fromEntries(
-        initialModuleIds.map((moduleId) => {
+        initialPreset.moduleIds.map((moduleId) => {
           const module = modules.find((item) => item.id === moduleId);
           const featureIds = module
             ? getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])
@@ -1341,14 +1309,12 @@ function Signup({
   const [moduleError, setModuleError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const customerNeeds = getCustomerNeeds(data);
   const configuredModule = (moduleId: ModuleId) => {
-    return getConfiguredModules(data).find((module) => module.id === moduleId && enabledModuleIds.has(module.id));
+    return getConfiguredModules(data).find((module) => module.id === moduleId);
   };
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find((item) => item.name === nextSector);
-    const nextModules = (preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds])
-      .filter(moduleId => enabledModuleIds.has(moduleId));
+    const nextModules = preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds];
     setSector(nextSector);
     if (preset?.modulePackIds && Object.keys(preset.modulePackIds).length > 0) {
       applySectorPacks(preset);
@@ -1385,12 +1351,11 @@ function Signup({
     const entries = packEntries.length
       ? packEntries
       : (Object.entries(preset.moduleFeatures ?? {}) as [ModuleId, string[]][]);
-    const selectedPackEntries = packEntries.filter(([moduleId]) => enabledModuleIds.has(moduleId));
-    setSelectedModules(selectedPackEntries.length ? selectedPackEntries.map(([moduleId]) => moduleId) : preset.moduleIds.filter(moduleId => enabledModuleIds.has(moduleId)));
-    setSelectedModulePackIds(Object.fromEntries(selectedPackEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])));
+    setSelectedModules(packEntries.length ? packEntries.map(([moduleId]) => moduleId) : [...preset.moduleIds]);
+    setSelectedModulePackIds(Object.fromEntries(packEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])));
     setSelectedModuleFeatures(
       Object.fromEntries(
-        entries.filter(([moduleId]) => enabledModuleIds.has(moduleId)).map(([moduleId, featureIds]) => {
+        entries.map(([moduleId, featureIds]) => {
           const module = configuredModule(moduleId);
           const packFeatures = packEntries.length
             ? (module?.featurePacks ?? [])
@@ -1403,7 +1368,7 @@ function Signup({
     );
     setSelectedModulePermissions(
       Object.fromEntries(
-        entries.filter(([moduleId]) => enabledModuleIds.has(moduleId)).map(([moduleId]) => {
+        entries.map(([moduleId]) => {
           const module = configuredModule(moduleId);
           const selectedPacks =
             module?.featurePacks?.filter((pack) => preset.modulePackIds?.[moduleId]?.includes(pack.id)) ?? [];
@@ -1452,54 +1417,6 @@ function Signup({
         return next;
       });
     setModuleError('');
-  };
-  const toggleNeed = (need: CustomerNeed) => {
-    if (!isNeedAvailable(need, enabledModuleIds)) return;
-    const moduleIds = moduleIdsForNeed(need, enabledModuleIds);
-    const enabled = moduleIds.every(moduleId => selectedModules.includes(moduleId));
-    setSelectedModules(current =>
-      enabled
-        ? current.filter(moduleId => !moduleIds.includes(moduleId))
-        : [...new Set([...current, ...moduleIds])],
-    );
-    if (enabled) {
-      setSelectedModulePackIds(current => {
-        const next = { ...current };
-        moduleIds.forEach(moduleId => delete next[moduleId]);
-        return next;
-      });
-      setSelectedModuleFeatures(current => {
-        const next = { ...current };
-        moduleIds.forEach(moduleId => delete next[moduleId]);
-        return next;
-      });
-      setSelectedModulePermissions(current => {
-        const next = { ...current };
-        moduleIds.forEach(moduleId => delete next[moduleId]);
-        return next;
-      });
-      return;
-    }
-    moduleIds
-      .filter(moduleId => !selectedModules.includes(moduleId))
-      .forEach(moduleId => {
-        const module = configuredModule(moduleId);
-        if (!module) return;
-        const defaultPackIds = selectedModulePackIds[moduleId] ?? [];
-        const featureIds = defaultPackIds.length
-          ? (module.featurePacks ?? [])
-              .filter(pack => defaultPackIds.includes(pack.id))
-              .flatMap(pack => pack.featureIds)
-          : getModuleFeatureOptions(module).map(feature => feature.id);
-        setSelectedModuleFeatures(current => ({
-          ...current,
-          [moduleId]: [...getEffectiveModuleFeatureIds(module, featureIds)],
-        }));
-        setSelectedModulePermissions(current => ({
-          ...current,
-          [moduleId]: defaultFeaturePermissions(featureIds),
-        }));
-      });
   };
   const togglePack = (moduleId: ModuleId, packId: string) => {
     const module = configuredModule(moduleId);
@@ -1586,15 +1503,16 @@ function Signup({
           <p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">
             Nouvel espace entreprise
           </p>
-           <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Créez votre espace simplement.</h1>
+          <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1>
           <p className="mt-3 text-[hsl(var(--muted-foreground))]">
-             Renseignez votre entreprise, dites-nous ce que vous voulez gérer et nous préparerons votre espace après validation.
+            Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
+            être construite après l’activation de votre espace.
           </p>
         </div>
         <div className="mb-10 flex items-center gap-3">
           <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />
           <div className="h-px flex-1 bg-[hsl(var(--border))]" />
-           <Step n={2} label="Vos besoins" active={step === 2} done={false} />
+          <Step n={2} label="Fonctionnalités" active={step === 2} done={false} />
         </div>
         {step === 1 ? (
           <form
@@ -1656,7 +1574,7 @@ function Signup({
                   ))}
                 </select>
                 <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-                   Ce choix nous aide à vous proposer une première base adaptée.
+                  Ce choix détermine les modules proposés au démarrage.
                 </span>
               </label>
               <Field
@@ -1696,13 +1614,16 @@ function Signup({
         ) : (
           <div className="card-surface rounded-2xl p-6 sm:p-8">
             <section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
-               <h2 className="font-bold">Que voulez-vous gérer ?</h2>
+              <h2 className="font-bold">Choisissez les fonctionnalités dont votre entreprise a besoin</h2>
               <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                 Choisissez vos priorités en langage simple. MAXIMUS traduira automatiquement ces choix dans votre espace.
+                {sector
+                  ? `La sélection proposée correspond au secteur ${sector}. `
+                  : 'Une sélection de départ vous est proposée. '}
+                Sélectionnez les fonctionnalités à activer au démarrage. Vous pourrez modifier vos choix plus tard.
               </p>
             </section>
             {data.sectorPresets.find((preset) => preset.name === sector)?.modulePackIds && (
-               <section className="mb-6 hidden rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
+              <section className="mb-6 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
                 <h2 className="font-bold">Packs proposés par ce secteur</h2>
                 <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
                   Les packs déjà configurés dans les modules sont proposés automatiquement. Vous pourrez encore ajuster
@@ -1733,35 +1654,7 @@ function Signup({
                 {moduleError}
               </p>
             )}
-             <div className="grid gap-3 sm:grid-cols-2">
-                {customerNeeds.map((need) => {
-                  const enabled = isNeedAvailable(need, enabledModuleIds);
-                  const needModuleIds = moduleIdsForNeed(need, enabledModuleIds);
-                  const available = enabled && needModuleIds.every(moduleId => selectedModules.includes(moduleId));
-                 return (
-                   <button
-                      key={need.id}
-                     type="button"
-                     disabled={!enabled}
-                      onClick={() => toggleNeed(need)}
-                      data-testid={`button-signup-business-need-${need.id}`}
-                     className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${!enabled ? 'cursor-not-allowed opacity-55' : available ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary)/.4)]'}`}
-                   >
-                     <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${available ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>
-                       {available && <Check size={13} />}
-                     </span>
-                     <span className="min-w-0">
-                       <span className="flex flex-wrap items-center gap-2">
-                         <strong className="block text-sm">{need.label}</strong>
-                         {!enabled && <span className="rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Bientôt disponible</span>}
-                       </span>
-                       <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">{need.description}</span>
-                     </span>
-                   </button>
-                 );
-               })}
-             </div>
-             <div className="hidden grid gap-3">
+            <div className="grid gap-3">
               {modules.map((baseModule) => {
                 const mod = configuredModule(baseModule.id) ?? baseModule;
                 const enabled = selectedModules.includes(mod.id);
@@ -2432,14 +2325,10 @@ function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
-  company,
-  companyAdmin,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
-  company: Company | null;
-  companyAdmin: boolean;
 }) {
   const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
   const canStocks = allowed.includes('stocks');
@@ -2516,60 +2405,6 @@ function RoleAwareCompanyDashboard({
           </section>
         )}
       </div>
-      {companyAdmin && company && (
-        <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[hsl(var(--primary)/.035)] p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Pour bien démarrer</p>
-              <h2 className="mt-2 text-xl font-bold">Votre espace est prêt. Ajoutez vos premières informations.</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                Suivez ces quelques étapes quand vous le souhaitez. Elles ne bloquent pas l’utilisation de MAXIMUS.
-              </p>
-            </div>
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
-              <ClipboardCheck size={19} />
-            </span>
-          </div>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                label: 'Compléter mon entreprise',
-                done: Boolean(company.name && company.manager && company.email && company.country),
-                path: '/entreprise/profil',
-              },
-              {
-                label: 'Ajouter mon équipe',
-                done: data.employees.some((item) => item.companyId === company.id),
-                path: '/entreprise/employes',
-              },
-              {
-                label: 'Ajouter mon premier produit',
-                done: data.products.some((item) => item.companyId === company.id),
-                path: '/entreprise/stocks',
-                hidden: !canStocks,
-              },
-              {
-                label: 'Configurer ma boutique',
-                done: Boolean(data.commerceStates?.[company.id]),
-                path: '/entreprise/ecommerce',
-                hidden: !canCommerce,
-              },
-            ].filter((item) => !item.hidden).map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => onNavigate(item.path)}
-                className="flex items-center gap-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.82)] px-3 py-3 text-left transition hover:border-[hsl(var(--primary)/.4)] hover:bg-[hsl(var(--card))]"
-              >
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
-                  {item.done ? <Check size={13} strokeWidth={3} /> : <span className="h-2 w-2 rounded-full bg-current" />}
-                </span>
-                <span className={`text-xs font-bold ${item.done ? 'text-[hsl(var(--muted-foreground))] line-through' : 'text-[hsl(var(--foreground))]'}`}>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -3126,10 +2961,8 @@ function RequestsPage({
         const target = d.companies.find((item) => item.id === company.id);
         if (target) {
           Object.assign(target, result.company);
-          target.onboardingCompleted = false;
-          target.onboardingStep = 1;
         } else {
-          d.companies.push({ ...result.company, onboardingCompleted: false, onboardingStep: 1 });
+          d.companies.push(result.company);
         }
       }, 'Entreprise activée et compte administrateur synchronisé.');
       setRequests((current) => current.filter((item) => item.id !== company.id));

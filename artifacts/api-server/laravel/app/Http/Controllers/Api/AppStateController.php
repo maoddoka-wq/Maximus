@@ -98,24 +98,6 @@ class AppStateController extends Controller
         $activeCompanies->each(
             function (Company $company) use (&$state, $known): void {
                 if ($known->has($company->id)) {
-                    $existing = $known->get($company->id);
-                    $hasOrganisation = collect($state['orgNodes'] ?? [])
-                        ->contains(fn ($node): bool => is_array($node) && ($node['companyId'] ?? null) === $company->id);
-                    if (
-                        is_array($existing)
-                        && ! array_key_exists('onboardingCompleted', $existing)
-                        && ! $hasOrganisation
-                    ) {
-                        $state['companies'] = collect($state['companies'] ?? [])
-                            ->map(function ($item) use ($company): array {
-                                if (! is_array($item) || ($item['id'] ?? null) !== $company->id) {
-                                    return is_array($item) ? $item : [];
-                                }
-                                return [...$item, 'onboardingCompleted' => false, 'onboardingStep' => 1];
-                            })
-                            ->values()
-                            ->all();
-                    }
                     return;
                 }
                 $state['companies'][] = [
@@ -138,7 +120,6 @@ class AppStateController extends Controller
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
-                    'onboardingCompleted' => false,
                 ];
             },
         );
@@ -456,59 +437,6 @@ class AppStateController extends Controller
     {
         if ($companyId === '') {
             return [];
-        }
-
-        $hasCompany = collect($state['companies'] ?? [])
-            ->contains(fn (mixed $item): bool => is_array($item) && (string) ($item['id'] ?? '') === $companyId);
-        if (!$hasCompany) {
-            $company = Company::query()
-                ->whereKey($companyId)
-                ->whereNull('deleted_at')
-                ->where('status', 'ACTIF')
-                ->first();
-            if ($company) {
-                $state['companies'] = is_array($state['companies'] ?? null) ? $state['companies'] : [];
-                $state['companies'][] = [
-                    'id' => $company->id,
-                    'name' => $company->name,
-                    'manager' => $company->manager,
-                    'email' => $company->email,
-                    'phone' => (string) ($company->phone ?? ''),
-                    'country' => (string) ($company->country ?? ''),
-                    'sector' => (string) ($company->sector ?? ''),
-                    'status' => $company->status,
-                    'requestedModules' => $company->requested_modules ?? [],
-                    'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],
-                    'requestedModuleFeatures' => $company->requested_module_features ?? [],
-                    'requestedModulePermissions' => $company->requested_module_permissions ?? [],
-                    'allowedModules' => $company->requested_modules ?? [],
-                    'refusedModules' => [],
-                    'createdAt' => optional($company->created_at)->toISOString(),
-                    'profilePhoto' => $company->profile_photo,
-                    'primaryColor' => $company->primary_color,
-                    'accentColor' => $company->accent_color,
-                    'sidebarColor' => $company->sidebar_color,
-                    'onboardingCompleted' => false,
-                    'onboardingStep' => 1,
-                ];
-            }
-        } else {
-            $hasOrganisation = collect($state['orgNodes'] ?? [])
-                ->contains(fn ($node): bool => is_array($node) && ($node['companyId'] ?? null) === $companyId);
-            if (!$hasOrganisation) {
-                $state['companies'] = collect($state['companies'] ?? [])
-                    ->map(function ($item) use ($companyId): array {
-                        if (!is_array($item) || ($item['id'] ?? null) !== $companyId) {
-                            return is_array($item) ? $item : [];
-                        }
-                        if (array_key_exists('onboardingCompleted', $item)) {
-                            return $item;
-                        }
-                        return [...$item, 'onboardingCompleted' => false, 'onboardingStep' => 1];
-                    })
-                    ->values()
-                    ->all();
-            }
         }
 
         foreach ([

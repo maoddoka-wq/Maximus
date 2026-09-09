@@ -36,35 +36,6 @@ class CompanyRequestTest extends TestCase
         ]);
     }
 
-    public function test_public_request_only_keeps_currently_available_modules_and_known_packs(): void
-    {
-        DB::table('maximus_app_states')->insert([
-            'scope' => 'workspace',
-            'payload' => json_encode([
-                'moduleStatuses' => ['stocks' => 'INACTIF'],
-                'removedModules' => [],
-            ], JSON_THROW_ON_ERROR),
-            'version' => 1,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $response = $this->postJson('/api/company-requests', [
-            ...$this->requestPayload(),
-            'requestedModules' => ['commerce', 'stocks'],
-            'requestedModulePackIds' => [
-                'commerce' => ['commerce-gestion', 'pack-inexistant'],
-                'stocks' => ['stock-gestion'],
-            ],
-        ]);
-
-        $response->assertCreated();
-        $company = Company::query()->where('email', 'owner@atelier.test')->firstOrFail();
-
-        $this->assertSame(['commerce'], $company->requested_modules);
-        $this->assertSame(['commerce' => ['commerce-gestion']], $company->requested_module_pack_ids);
-    }
-
     public function test_maximus_can_approve_a_request_and_provision_the_admin_and_modules(): void
     {
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
