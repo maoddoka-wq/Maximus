@@ -6372,7 +6372,7 @@ function AdminCreateCompanyPage({
   };
   const catalog = getCatalogSnapshot(data);
   const availableSectorPresets = catalog.sectorPresets.length > 0 ? catalog.sectorPresets : [fallbackPreset];
-  const initialPreset = availableSectorPresets[0];
+  const initialPreset = fallbackPreset;
   const [name, setName] = useState('');
   const [manager, setManager] = useState('');
   const [email, setEmail] = useState('');
@@ -6380,7 +6380,7 @@ function AdminCreateCompanyPage({
   const [country, setCountry] = useState('Sénégal');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [sector, setSector] = useState(initialPreset.name);
+  const [sector, setSector] = useState('');
   const [orgName, setOrgName] = useState('');
   const [orgCode, setOrgCode] = useState('');
   const [orgType, setOrgType] = useState<OrgNode['type']>('direction');
@@ -6390,7 +6390,7 @@ function AdminCreateCompanyPage({
   const changeSector = (nextSector: string) => {
     const preset = availableSectorPresets.find((item) => item.name === nextSector);
     setSector(nextSector);
-    setSelectedModules(preset ? [...preset.moduleIds] : []);
+    setSelectedModules(preset ? [...preset.moduleIds] : [...initialPreset.moduleIds]);
     setError('');
   };
 
@@ -6498,14 +6498,15 @@ function AdminCreateCompanyPage({
             placeholder="Sénégal"
             testId="input-admin-company-country"
           />
-          <label className="block text-sm font-semibold">
-            Secteur
+           <label className="block text-sm font-semibold">
+             Secteur <span className="font-normal text-[hsl(var(--muted-foreground))]">(facultatif)</span>
             <select
               data-testid="select-admin-company-sector"
               value={sector}
               onChange={(event) => changeSector(event.target.value)}
               className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
             >
+               <option value="">Aucun secteur — configurer manuellement</option>
               {availableSectorPresets.map((preset) => (
                 <option key={preset.id} value={preset.name}>
                   {preset.name}
