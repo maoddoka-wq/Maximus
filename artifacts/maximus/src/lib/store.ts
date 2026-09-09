@@ -162,6 +162,13 @@ export const sectorPresets: SectorPreset[] = [
   { id: 'commerce', name: 'Commerce', moduleIds: ['commerce', 'stocks', 'ecommerce'], modulePackIds: { commerce: ['commerce-gestion'], stocks: ['stock-gestion'], ecommerce: ['ecommerce-gestion'] } },
 ];
 
+// These legacy presets are intentionally no longer offered for new companies.
+// Keeping the ids here lets normalization clean old persisted payloads without
+// changing the compatibility data used to repair historical pack selections.
+export const retiredSectorPresetIds = ['distribution', 'agroalimentaire', 'services', 'commerce'] as const;
+const isRetiredSectorPreset = (preset: Pick<SectorPreset, 'id'>) =>
+  retiredSectorPresetIds.includes(preset.id as (typeof retiredSectorPresetIds)[number]);
+
 export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
   return modules
     .filter(module => !data.removedModules?.includes(module.id))
@@ -234,7 +241,7 @@ export function emptyStoreData(): StoreData {
     activities: [], controlTasks: [], domainEvents: [], auditEntries: [], orgNodes: [], notifications: [],
     purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
-    sectorPresets: structuredClone(sectorPresets),
+    sectorPresets: structuredClone(sectorPresets.filter((preset) => !isRetiredSectorPreset(preset))),
     moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
     moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
@@ -326,12 +333,14 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
     normalized.removedModules = defaults.removedModules;
   }
   if (Array.isArray(source.sectorPresets)) {
-    normalized.sectorPresets = restoreBuiltInSectorPackSelections(normalized.sectorPresets);
+    normalized.sectorPresets = restoreBuiltInSectorPackSelections(normalized.sectorPresets)
+      .filter((preset) => !isRetiredSectorPreset(preset));
   }
   if (normalized.catalogDraft?.sectorPresets) {
     normalized.catalogDraft = {
       ...normalized.catalogDraft,
-      sectorPresets: restoreBuiltInSectorPackSelections(normalized.catalogDraft.sectorPresets),
+      sectorPresets: restoreBuiltInSectorPackSelections(normalized.catalogDraft.sectorPresets)
+        .filter((preset) => !isRetiredSectorPreset(preset)),
     };
   }
 

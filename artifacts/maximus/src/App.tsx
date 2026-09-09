@@ -3383,14 +3383,13 @@ function SectorPresetsPage({
   };
 
   const deleteSector = async (preset: SectorPreset) => {
-    if (data.companies.some((company) => company.sector === preset.name)) {
-      setSectorError(`Le secteur « ${preset.name} » est déjà utilisé par une entreprise.`);
-      return;
-    }
+    const affectedCompanies = data.companies.filter((company) => company.sector === preset.name);
     if (
       !(await confirm({
         title: 'Supprimer ce secteur ?',
-        description: `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions.`,
+        description: affectedCompanies.length > 0
+          ? `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions. ${affectedCompanies.length} entreprise(s) existante(s) le conservent comme historique.`
+          : `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions.`,
         confirmLabel: 'Supprimer',
         tone: 'danger',
       }))
@@ -3400,7 +3399,7 @@ function SectorPresetsPage({
       updateCatalogDraft(draft, (catalogDraft) => {
         catalogDraft.sectorPresets = catalogDraft.sectorPresets.filter((item) => item.id !== preset.id);
       });
-    }, 'Secteur retiré du brouillon.');
+    }, 'Secteur retiré du brouillon. Publiez les changements pour confirmer.');
   };
 
   return (

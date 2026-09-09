@@ -20,11 +20,21 @@ class AppStateController extends Controller
             ? json_decode($row->payload, true)
             : ($row?->payload ?? []);
         $state = is_array($payload) ? $payload : [];
+        $sectorPresets = array_key_exists('sectorPresets', $state) ? $state['sectorPresets'] : null;
+        if (is_array($sectorPresets)) {
+            $retiredSectorIds = ['distribution', 'agroalimentaire', 'services', 'commerce'];
+            $sectorPresets = array_values(array_filter(
+                $sectorPresets,
+                static fn (mixed $sector): bool =>
+                    is_array($sector)
+                    && ! in_array((string) ($sector['id'] ?? ''), $retiredSectorIds, true),
+            ));
+        }
 
         return response()->json([
             'version' => (int) ($row?->version ?? 0),
             'catalog' => [
-                'sectorPresets' => array_key_exists('sectorPresets', $state) ? $state['sectorPresets'] : null,
+                'sectorPresets' => $sectorPresets,
                 'moduleOverrides' => $state['moduleOverrides'] ?? [],
                 'moduleStatuses' => $state['moduleStatuses'] ?? [],
                 'removedModules' => $state['removedModules'] ?? [],
