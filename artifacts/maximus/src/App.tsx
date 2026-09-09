@@ -6471,9 +6471,9 @@ function AdminCreateCompanyPage({
       !normalizedEmail ||
       !country.trim() ||
       password.length < 8 ||
-      password !== passwordConfirm ||
+       password !== passwordConfirm
     ) {
-       setError('Complétez les informations de l’entreprise et vérifiez le mot de passe.');
+      setError('Complétez les informations de l’entreprise et vérifiez le mot de passe.');
       return;
     }
     if (selectedModules.length === 0) {

@@ -8,7 +8,6 @@ import {
   type Module,
   type ModuleId,
   type OrgNode,
-  type OrganizationType,
   type StoreData,
 } from '@/lib/store';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
@@ -21,72 +20,16 @@ export function StructureTab({
   company,
   data,
   mutate,
-  isMaximusAdmin = false,
 }: {
   company: Company;
   data: StoreData;
   mutate: Mutate;
-  isMaximusAdmin?: boolean;
 }) {
   const { alert } = useAppDialog();
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const availableModules = getConfiguredModules(data).filter(module => company.allowedModules.includes(module.id));
-  const organizationTypes = data.organizationTypes.filter(type => !type.companyId || type.companyId === company.id);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<OrgNode | null>(null);
-  const [typeModalOpen, setTypeModalOpen] = useState(false);
-  const [editingType, setEditingType] = useState<OrganizationType | null>(null);
-  const [typeName, setTypeName] = useState('');
-  const [typeScope, setTypeScope] = useState<'MAXIMUS' | 'ENTREPRISE'>('ENTREPRISE');
-
-  const openTypeModal = (type?: OrganizationType) => {
-    setEditingType(type ?? null);
-    setTypeName(type?.name ?? '');
-    setTypeScope(type?.companyId ? 'ENTREPRISE' : 'MAXIMUS');
-    setTypeModalOpen(true);
-  };
-
-  const saveType = () => {
-    const name = typeName.trim();
-    if (!name) return;
-    const duplicate = organizationTypes.some(item =>
-      item.id !== editingType?.id && item.name.toLowerCase() === name.toLowerCase(),
-    );
-    if (duplicate) return;
-    mutate(draft => {
-      if (editingType) {
-        const current = draft.organizationTypes.find(item => item.id === editingType.id);
-        if (current) {
-          current.name = name;
-          current.companyId = typeScope === 'MAXIMUS' ? undefined : company.id;
-          current.createdBy = typeScope;
-        }
-      } else {
-        draft.organizationTypes.push({
-          id: uid('org-type'),
-          name,
-          companyId: typeScope === 'MAXIMUS' ? undefined : company.id,
-          createdBy: typeScope,
-        });
-      }
-    }, editingType ? 'Type d’unité mis à jour.' : 'Type d’unité créé.');
-    setTypeModalOpen(false);
-  };
-
-  const deleteType = async (type: OrganizationType) => {
-    if (companyNodes.some(node => node.type === type.id)) {
-      await alert({
-        title: 'Suppression impossible',
-        description: 'Ce type est encore utilisé par une unité. Modifiez d’abord les unités concernées.',
-        confirmLabel: 'Compris',
-        tone: 'danger',
-      });
-      return;
-    }
-    mutate(draft => {
-      draft.organizationTypes = draft.organizationTypes.filter(item => item.id !== type.id);
-    }, 'Type d’unité supprimé.');
-  };
 
   const deleteNode = async (id: string) => {
     const ids = new Set([id]);
@@ -137,27 +80,7 @@ export function StructureTab({
         </ActionButton>
       </div>
       <div className="mb-4 rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-        <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez vos types d’unités, puis construisez la hiérarchie. Les rôles, les sous-autorisations et les managers se configurent ensuite dans les étapes 2 et 3 ci-dessus.
-      </div>
-      <div className="mb-5 rounded-xl border p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-bold">Types d’unités</h3>
-            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les types sont créés et modifiés ici. Aucun type n’est imposé par le code.</p>
-          </div>
-          <ActionButton onClick={() => openTypeModal()} testId="btn-create-org-type">Créer un type</ActionButton>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {organizationTypes.map(type => (
-            <span key={type.id} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs">
-              <span>{type.name}</span>
-              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{type.companyId ? 'Entreprise' : 'MAXIMUS'}</span>
-              <button type="button" onClick={() => openTypeModal(type)} className="font-bold text-[hsl(var(--primary))]">Modifier</button>
-              <button type="button" onClick={() => void deleteType(type)} className="font-bold text-[hsl(var(--destructive))]">Supprimer</button>
-            </span>
-          ))}
-          {organizationTypes.length === 0 && <span className="text-xs text-[hsl(var(--muted-foreground))]">Créez le premier type avant de créer une unité.</span>}
-        </div>
+        <strong className="text-[hsl(var(--foreground))]">Étape 1 · Construire la hiérarchie.</strong> Créez les unités de l’entreprise, puis configurez les rôles, les sous-autorisations et les managers dans les étapes suivantes de cette même page.
       </div>
       <div className="mb-5 flex flex-col gap-1 rounded-xl border px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
         <span><strong>{companyNodes.length}</strong> unité(s) créée(s)</span>
@@ -171,7 +94,7 @@ export function StructureTab({
             <span className="text-right">Actions</span>
           </div>
           {companyNodes.filter(node => !node.parentId).map(root => (
-            <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} organizationTypes={organizationTypes} onEdit={node => { setEditingNode(node); setModalOpen(true); }} onDelete={deleteNode} depth={0} />
+            <StructureNodeItem key={root.id} node={root} allNodes={companyNodes} onEdit={node => { setEditingNode(node); setModalOpen(true); }} onDelete={deleteNode} depth={0} />
           ))}
           {companyNodes.filter(node => !node.parentId).length === 0 && <div className="py-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune unité définie.</div>}
         </div>
@@ -182,7 +105,6 @@ export function StructureTab({
             initialData={editingNode}
             allNodes={companyNodes}
             availableModules={availableModules}
-            organizationTypes={organizationTypes}
             onClose={() => setModalOpen(false)}
             onSave={nodeData => {
               mutate(draft => {
@@ -202,26 +124,6 @@ export function StructureTab({
               setModalOpen(false);
             }}
           />
-        </Modal>
-      )}
-      {typeModalOpen && (
-        <Modal title={editingType ? 'Modifier un type d’unité' : 'Créer un type d’unité'} onClose={() => setTypeModalOpen(false)}>
-          <div className="space-y-4">
-            <Field label="Nom du type *" value={typeName} onChange={setTypeName} placeholder="Ex. Direction générale" testId="input-org-type-name" />
-            {isMaximusAdmin && (
-              <label className="block text-sm font-semibold">
-                Portée
-                <select value={typeScope} onChange={event => setTypeScope(event.target.value as 'MAXIMUS' | 'ENTREPRISE')} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm">
-                  <option value="MAXIMUS">Disponible pour toutes les entreprises</option>
-                  <option value="ENTREPRISE">Disponible uniquement pour cette entreprise</option>
-                </select>
-              </label>
-            )}
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setTypeModalOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-bold">Annuler</button>
-              <ActionButton primary onClick={saveType} disabled={!typeName.trim()} testId="btn-save-org-type">Enregistrer</ActionButton>
-            </div>
-          </div>
         </Modal>
       )}
     </div>
