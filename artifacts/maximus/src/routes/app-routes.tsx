@@ -61,10 +61,10 @@ export function AdminRouter({
     return renderScreen(screens.dashboard, { data, onNavigate });
   }
   if (routePath === '/maximus/controle') {
-    return renderScreen(screens.control, { data, mutate, isAdmin: true, actorName: 'MAXIMUS' });
+    return renderScreen(screens.control, { data, isAdmin: true });
   }
   if (routePath === '/maximus/surveillance') {
-    return renderScreen(screens.control, { data, mutate, isAdmin: true, actorName: 'MAXIMUS', focusHealth: true });
+    return renderScreen(screens.control, { data, isAdmin: true, focusHealth: true });
   }
   if (routePath === '/maximus/entreprises/organisation') {
     return renderScreen(screens.organization, { data, mutate, onNavigate });
@@ -208,14 +208,9 @@ export function CompanyRouter({
   if (routePath === '/entreprise/controle') {
     return renderScreen(screens.control, {
       data,
-      mutate,
       companyId,
       employeeId: employee?.id,
       scopeNodeId,
-      actorName:
-        employee
-          ? `${employee.firstName} ${employee.lastName}`
-          : data.companies.find(company => company.id === companyId)?.manager ?? 'Administrateur',
       isAdmin: false,
       companyAdmin,
       sectorManager,
