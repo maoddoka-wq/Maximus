@@ -59,7 +59,19 @@ class AppStateController extends Controller
         }
         $stateVersion = (int) ($row?->version ?? 0);
         if (empty($state['companies']) && AuthUser::query()->whereNotNull('company_id')->exists()) {
-            $state = $this->recoverStateFromAccounts();
+            $recoveredState = $this->recoverStateFromAccounts();
+            // Recovery is only responsible for rebuilding account-scoped
+            // records. Keep the catalog already persisted in app-state:
+            // otherwise a restart with an empty companies collection would
+            // silently erase custom modules, packs, and pending drafts.
+            foreach (['companies', 'employees', 'roles', 'orgNodes'] as $key) {
+                $state[$key] = $recoveredState[$key] ?? [];
+            }
+            foreach ($recoveredState as $key => $value) {
+                if (! array_key_exists($key, $state)) {
+                    $state[$key] = $value;
+                }
+            }
             $nextVersion = ((int) ($row?->version ?? 0)) + 1;
             DB::table('maximus_app_states')->updateOrInsert(
                 ['scope' => 'workspace'],

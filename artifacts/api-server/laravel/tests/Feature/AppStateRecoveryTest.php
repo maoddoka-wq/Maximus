@@ -172,6 +172,66 @@ class AppStateRecoveryTest extends TestCase
         $this->assertNotNull(DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'));
     }
 
+    public function test_bootstrap_recovery_keeps_persisted_catalog_packs_and_drafts(): void
+    {
+        Company::query()->create([
+            'id' => 'catalog-recovery-company',
+            'name' => 'Entreprise catalogue',
+            'manager' => 'Administration',
+            'email' => 'catalog-recovery@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'catalog-recovery-admin',
+            'email' => 'catalog-recovery.admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'company_id' => 'catalog-recovery-company',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $pack = [
+            'id' => 'pack-persisted-after-restart',
+            'name' => 'Pack persistant',
+            'description' => 'Pack conservé après récupération de l’état.',
+            'featureIds' => ['dashboard'],
+            'featurePermissions' => ['dashboard' => ['voir']],
+        ];
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'companies' => [],
+                'catalogVersion' => 3,
+                'moduleOverrides' => ['commerce' => ['featurePacks' => [$pack]]],
+                'catalogDraft' => [
+                    'moduleOverrides' => ['commerce' => ['featurePacks' => [$pack]]],
+                    'moduleStatuses' => [],
+                    'removedModules' => [],
+                    'sectorPresets' => [],
+                    'updatedAt' => now()->toISOString(),
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 7,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.catalogVersion', 3)
+            ->assertJsonPath('data.moduleOverrides.commerce.featurePacks.0.id', $pack['id'])
+            ->assertJsonPath('data.catalogDraft.moduleOverrides.commerce.featurePacks.0.id', $pack['id']);
+
+        $payload = json_decode((string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'), true);
+        $this->assertSame($pack['id'], $payload['catalogDraft']['moduleOverrides']['commerce']['featurePacks'][0]['id']);
+        $this->assertSame($pack['id'], $response->json('data.catalogDraft.moduleOverrides.commerce.featurePacks.0.id'));
+    }
+
     public function test_maximus_bootstrap_discards_records_for_companies_absent_from_the_registry(): void
     {
         Company::query()->create([
