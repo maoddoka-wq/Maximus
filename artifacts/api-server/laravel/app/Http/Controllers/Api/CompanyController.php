@@ -41,14 +41,42 @@ class CompanyController extends Controller
             return response()->json(['error' => 'Une demande ou une entreprise utilise déjà cette adresse email.'], 409);
         }
 
-        $knownModules = collect(ModuleCatalog::definitions())->pluck('id')->all();
-        $requestedModules = array_values(array_unique(array_intersect($input['requestedModules'], $knownModules)));
+        $definitions = collect(ModuleCatalog::definitions())->keyBy('id');
+        $workspaceRow = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $workspacePayload = is_string($workspaceRow?->payload)
+            ? json_decode($workspaceRow->payload, true)
+            : ($workspaceRow?->payload ?? []);
+        $workspacePayload = is_array($workspacePayload) ? $workspacePayload : [];
+        $moduleStatuses = is_array($workspacePayload['moduleStatuses'] ?? null)
+            ? $workspacePayload['moduleStatuses']
+            : [];
+        $removedModules = is_array($workspacePayload['removedModules'] ?? null)
+            ? $workspacePayload['removedModules']
+            : [];
+        $activeModules = $definitions
+            ->filter(fn (array $definition, string $moduleId): bool =>
+                !in_array($moduleId, $removedModules, true)
+                && in_array((string) ($moduleStatuses[$moduleId] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)
+            )
+            ->keys()
+            ->all();
+        $requestedModules = array_values(array_unique(array_intersect($input['requestedModules'], $activeModules)));
         if ($requestedModules === []) {
-            return response()->json(['error' => 'Sélectionnez au moins un module valide.'], 422);
+            return response()->json(['error' => 'Sélectionnez au moins une capacité actuellement disponible.'], 422);
         }
+        $requestedModulePackIds = collect($input['requestedModulePackIds'] ?? [])
+            ->filter(fn (mixed $packIds, string $moduleId): bool => in_array($moduleId, $requestedModules, true) && is_array($packIds))
+            ->map(function (array $packIds, string $moduleId) use ($definitions): array {
+                $knownPackIds = collect($definitions->get($moduleId)['feature_packs'] ?? [])
+                    ->pluck('id')
+                    ->all();
+                return array_values(array_unique(array_intersect($packIds, $knownPackIds)));
+            })
+            ->filter(fn (array $packIds): bool => $packIds !== [])
+            ->all();
 
         $companyId = (string) Str::uuid();
-        $company = DB::transaction(function () use ($input, $email, $requestedModules, $companyId): Company {
+        $company = DB::transaction(function () use ($input, $email, $requestedModules, $requestedModulePackIds, $companyId): Company {
             $company = Company::query()->create([
                 'id' => $companyId,
                 'name' => trim($input['name']),
@@ -59,7 +87,7 @@ class CompanyController extends Controller
                 'sector' => trim((string) ($input['sector'] ?? '')),
                 'status' => 'EN ATTENTE',
                 'requested_modules' => $requestedModules,
-                'requested_module_pack_ids' => $input['requestedModulePackIds'] ?? [],
+                'requested_module_pack_ids' => $requestedModulePackIds,
                 'requested_module_features' => $input['requestedModuleFeatures'] ?? [],
                 'requested_module_permissions' => $input['requestedModulePermissions'] ?? [],
             ]);

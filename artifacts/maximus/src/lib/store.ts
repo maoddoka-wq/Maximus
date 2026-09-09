@@ -62,6 +62,13 @@ export interface ModuleFeaturePack {
   featurePermissions?: Partial<Record<string, string[]>>;
 }
 
+export interface CustomerNeedDefinition {
+  id: string;
+  label: string;
+  description: string;
+  order?: number;
+}
+
 export interface Module {
   id: ModuleId;
   name: string;
@@ -69,10 +76,13 @@ export interface Module {
   features: string[];
   featureDependencies?: Partial<Record<string, string[]>>;
   featurePacks?: ModuleFeaturePack[];
+  customerNeed?: CustomerNeedDefinition;
   status: 'ACTIF' | 'BETA';
 }
 
-export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
+export type ModuleOverrides = Partial<
+  Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks' | 'customerNeed'>>>
+>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
@@ -132,17 +142,17 @@ export interface StoreData {
 }
 
 export const modules: Module[] = [
-  { id: 'commerce', name: 'Gestion commerciale', description: 'Piloter les ventes, les clients, les achats et la performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
+  { id: 'commerce', name: 'Gestion commerciale', description: 'Piloter les ventes, les clients, les achats et la performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], customerNeed: { id: 'sell', label: 'Vendre mes produits ou services', description: 'Suivez vos clients, vos ventes, vos commandes et vos résultats.', order: 10 }, featurePacks: [
     { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
     { id: 'commerce-gestion', name: 'Gestion commerciale', description: 'Gérer les ventes, clients et indicateurs.', featureIds: ['clients', 'sales', 'products', 'reports'] },
   ], status: 'ACTIF' },
-  { id: 'ecommerce', name: 'E-commerce', description: 'Boutique en ligne, catalogue public et commandes clients.', features: ecommerceFeatureDefinitions.map(feature => feature.label), featureDependencies: ecommerceFeatureDependencies, featurePacks: ecommerceFeaturePacks.map(pack => ({ ...pack, featureIds: [...pack.featureIds], featurePermissions: Object.fromEntries(Object.entries(pack.featurePermissions).map(([featureId, permissions]) => [featureId, [...permissions]])) })), status: 'ACTIF' },
-  { id: 'stocks', name: 'Gestion de stock', description: 'Suivre les articles, les entrées, les sorties et les niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
+  { id: 'ecommerce', name: 'E-commerce', description: 'Boutique en ligne, catalogue public et commandes clients.', features: ecommerceFeatureDefinitions.map(feature => feature.label), featureDependencies: ecommerceFeatureDependencies, customerNeed: { id: 'online-store', label: 'Créer ma boutique en ligne', description: 'Présentez vos produits et recevez des commandes en ligne.', order: 60 }, featurePacks: ecommerceFeaturePacks.map(pack => ({ ...pack, featureIds: [...pack.featureIds], featurePermissions: Object.fromEntries(Object.entries(pack.featurePermissions).map(([featureId, permissions]) => [featureId, [...permissions]])) })), status: 'ACTIF' },
+  { id: 'stocks', name: 'Gestion de stock', description: 'Suivre les articles, les entrées, les sorties et les niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, customerNeed: { id: 'stock', label: 'Gérer mon stock', description: 'Suivez vos produits, les entrées, les sorties et les alertes.', order: 20 }, featurePacks: [
     { id: 'stock-consultation', name: 'Consultation du stock', description: 'Consulter les articles et les niveaux de stock.', featureIds: ['dashboard', 'products', 'reports'] },
     { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
   ], status: 'ACTIF' },
-  { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
+  { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, customerNeed: { id: 'attendance', label: 'Suivre les présences de mon équipe', description: 'Suivez les horaires, les absences et le quotidien de votre équipe.', order: 50 }, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
 ];
 
 export const stockSubmodules = [

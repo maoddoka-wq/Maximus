@@ -99,10 +99,14 @@ export function provisionCompanyAccess(
   company: Company,
   options: CompanyAccessProvisioningOptions = {},
 ) {
-  const configuredModules = getConfiguredModules(data);
-  const moduleIds = [
+  const configuredModules = getConfiguredModules(data).filter(module => {
+    const status = data.moduleStatuses?.[module.id] ?? module.status;
+    return status === 'ACTIF' || status === 'BETA';
+  });
+  const requestedModuleIds = [
     ...new Set(options.moduleIds ?? (company.allowedModules.length ? company.allowedModules : company.requestedModules)),
   ];
+  const moduleIds = requestedModuleIds.filter(moduleId => configuredModules.some(module => module.id === moduleId));
   const sourcePackIds = options.modulePackIds ?? company.requestedModulePackIds ?? {};
   const selectedPackIds = copyPackIds(
     configuredModules.filter(module => moduleIds.includes(module.id)),

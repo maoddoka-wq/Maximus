@@ -104,6 +104,7 @@ import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
+import { activeModuleIds, getCustomerNeeds, isNeedAvailable, moduleIdsForNeed, type CustomerNeed } from '@/lib/onboarding-catalog';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
 import {
   loadCompanyModuleAccess,
@@ -1296,7 +1297,9 @@ function Signup({
     name: 'Distribution',
     moduleIds: ['commerce', 'stocks', 'presences'],
   };
+  const enabledModuleIds = activeModuleIds(data);
   const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
+  const initialModuleIds = initialPreset.moduleIds.filter(moduleId => enabledModuleIds.has(moduleId));
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [name, setName] = useState('');
@@ -1307,12 +1310,12 @@ function Signup({
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState(initialPreset.name);
-  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialModuleIds]);
   const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(
     () =>
       Object.fromEntries(
-        initialPreset.moduleIds.map((moduleId) => {
+        initialModuleIds.map((moduleId) => {
           const module = modules.find((item) => item.id === moduleId);
           return [
             moduleId,
@@ -1326,7 +1329,7 @@ function Signup({
   >(
     () =>
       Object.fromEntries(
-        initialPreset.moduleIds.map((moduleId) => {
+        initialModuleIds.map((moduleId) => {
           const module = modules.find((item) => item.id === moduleId);
           const featureIds = module
             ? getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])
@@ -1338,20 +1341,14 @@ function Signup({
   const [moduleError, setModuleError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const customerNeeds = getCustomerNeeds(data);
   const configuredModule = (moduleId: ModuleId) => {
-    return getConfiguredModules(data).find((module) => module.id === moduleId);
+    return getConfiguredModules(data).find((module) => module.id === moduleId && enabledModuleIds.has(module.id));
   };
-  const signupNeeds: { moduleId: ModuleId; label: string; description: string }[] = [
-    { moduleId: 'commerce', label: 'Vendre mes produits', description: 'Suivre mes ventes, mes clients et mes commandes.' },
-    { moduleId: 'stocks', label: 'Gérer mon stock', description: 'Connaître mes produits, les entrées et les sorties.' },
-    { moduleId: 'rh', label: 'Suivre mes employés', description: 'Centraliser les informations de mon équipe.' },
-    { moduleId: 'finance', label: 'Gérer mes finances', description: 'Garder une vue claire sur mes encaissements et mes résultats.' },
-    { moduleId: 'presences', label: 'Suivre les présences', description: 'Suivre les horaires, absences et présences.' },
-    { moduleId: 'ecommerce', label: 'Créer ma boutique en ligne', description: 'Présenter mes produits et recevoir des commandes en ligne.' },
-  ];
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find((item) => item.name === nextSector);
-    const nextModules = preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds];
+    const nextModules = (preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds])
+      .filter(moduleId => enabledModuleIds.has(moduleId));
     setSector(nextSector);
     if (preset?.modulePackIds && Object.keys(preset.modulePackIds).length > 0) {
       applySectorPacks(preset);
@@ -1388,11 +1385,12 @@ function Signup({
     const entries = packEntries.length
       ? packEntries
       : (Object.entries(preset.moduleFeatures ?? {}) as [ModuleId, string[]][]);
-    setSelectedModules(packEntries.length ? packEntries.map(([moduleId]) => moduleId) : [...preset.moduleIds]);
-    setSelectedModulePackIds(Object.fromEntries(packEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])));
+    const selectedPackEntries = packEntries.filter(([moduleId]) => enabledModuleIds.has(moduleId));
+    setSelectedModules(selectedPackEntries.length ? selectedPackEntries.map(([moduleId]) => moduleId) : preset.moduleIds.filter(moduleId => enabledModuleIds.has(moduleId)));
+    setSelectedModulePackIds(Object.fromEntries(selectedPackEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])));
     setSelectedModuleFeatures(
       Object.fromEntries(
-        entries.map(([moduleId, featureIds]) => {
+        entries.filter(([moduleId]) => enabledModuleIds.has(moduleId)).map(([moduleId, featureIds]) => {
           const module = configuredModule(moduleId);
           const packFeatures = packEntries.length
             ? (module?.featurePacks ?? [])
@@ -1405,7 +1403,7 @@ function Signup({
     );
     setSelectedModulePermissions(
       Object.fromEntries(
-        entries.map(([moduleId]) => {
+        entries.filter(([moduleId]) => enabledModuleIds.has(moduleId)).map(([moduleId]) => {
           const module = configuredModule(moduleId);
           const selectedPacks =
             module?.featurePacks?.filter((pack) => preset.modulePackIds?.[moduleId]?.includes(pack.id)) ?? [];
@@ -1454,6 +1452,54 @@ function Signup({
         return next;
       });
     setModuleError('');
+  };
+  const toggleNeed = (need: CustomerNeed) => {
+    if (!isNeedAvailable(need, enabledModuleIds)) return;
+    const moduleIds = moduleIdsForNeed(need, enabledModuleIds);
+    const enabled = moduleIds.every(moduleId => selectedModules.includes(moduleId));
+    setSelectedModules(current =>
+      enabled
+        ? current.filter(moduleId => !moduleIds.includes(moduleId))
+        : [...new Set([...current, ...moduleIds])],
+    );
+    if (enabled) {
+      setSelectedModulePackIds(current => {
+        const next = { ...current };
+        moduleIds.forEach(moduleId => delete next[moduleId]);
+        return next;
+      });
+      setSelectedModuleFeatures(current => {
+        const next = { ...current };
+        moduleIds.forEach(moduleId => delete next[moduleId]);
+        return next;
+      });
+      setSelectedModulePermissions(current => {
+        const next = { ...current };
+        moduleIds.forEach(moduleId => delete next[moduleId]);
+        return next;
+      });
+      return;
+    }
+    moduleIds
+      .filter(moduleId => !selectedModules.includes(moduleId))
+      .forEach(moduleId => {
+        const module = configuredModule(moduleId);
+        if (!module) return;
+        const defaultPackIds = selectedModulePackIds[moduleId] ?? [];
+        const featureIds = defaultPackIds.length
+          ? (module.featurePacks ?? [])
+              .filter(pack => defaultPackIds.includes(pack.id))
+              .flatMap(pack => pack.featureIds)
+          : getModuleFeatureOptions(module).map(feature => feature.id);
+        setSelectedModuleFeatures(current => ({
+          ...current,
+          [moduleId]: [...getEffectiveModuleFeatureIds(module, featureIds)],
+        }));
+        setSelectedModulePermissions(current => ({
+          ...current,
+          [moduleId]: defaultFeaturePermissions(featureIds),
+        }));
+      });
   };
   const togglePack = (moduleId: ModuleId, packId: string) => {
     const module = configuredModule(moduleId);
@@ -1688,16 +1734,17 @@ function Signup({
               </p>
             )}
              <div className="grid gap-3 sm:grid-cols-2">
-               {signupNeeds.map((need) => {
-                 const available = Boolean(configuredModule(need.moduleId)) && selectedModules.includes(need.moduleId);
-                 const enabled = Boolean(configuredModule(need.moduleId));
+                {customerNeeds.map((need) => {
+                  const enabled = isNeedAvailable(need, enabledModuleIds);
+                  const needModuleIds = moduleIdsForNeed(need, enabledModuleIds);
+                  const available = enabled && needModuleIds.every(moduleId => selectedModules.includes(moduleId));
                  return (
                    <button
-                     key={need.moduleId}
+                      key={need.id}
                      type="button"
                      disabled={!enabled}
-                     onClick={() => toggle(need.moduleId)}
-                     data-testid={`button-signup-business-need-${need.moduleId}`}
+                      onClick={() => toggleNeed(need)}
+                      data-testid={`button-signup-business-need-${need.id}`}
                      className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${!enabled ? 'cursor-not-allowed opacity-55' : available ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary)/.4)]'}`}
                    >
                      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${available ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>

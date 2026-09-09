@@ -5,7 +5,6 @@ import {
   Building2,
   Check,
   CheckCircle2,
-  ChevronDown,
   CircleHelp,
   Layers3,
   LogOut,
@@ -16,11 +15,11 @@ import {
 import { Brand } from '@/components/app-ui';
 import { getPublishedCatalogSnapshot, type CatalogSnapshot } from '@/lib/catalog-workflow';
 import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
+import { activeModuleIds, getCustomerNeeds, isNeedAvailable, moduleIdsForNeed, type CustomerNeed } from '@/lib/onboarding-catalog';
 import {
   getConfiguredModules,
   type Company,
   type ModuleId,
-  type OrgNode,
   type StoreData,
 } from '@/lib/store';
 
@@ -29,7 +28,6 @@ type OnboardingCompany = Company & {
   onboardingCompleted?: boolean;
   onboardingStep?: number;
 };
-type UnitType = OrgNode['type'];
 
 const steps = [
   { number: 1, label: 'Votre activité', shortLabel: 'Activité' },
@@ -37,26 +35,6 @@ const steps = [
   { number: 3, label: 'Votre base', shortLabel: 'Base' },
   { number: 4, label: 'C’est prêt', shortLabel: 'Résumé' },
 ] as const;
-
-const unitTypes: { value: UnitType; label: string; description: string }[] = [
-  { value: 'direction', label: 'Direction', description: 'Le niveau racine de votre organisation' },
-  { value: 'sector', label: 'Secteur', description: 'Une activité ou une grande équipe' },
-  { value: 'service', label: 'Service', description: 'Un service rattaché à l’organisation' },
-  { value: 'department', label: 'Département', description: 'Une équipe ou un département' },
-];
-
-const businessNeeds: { moduleId: ModuleId; label: string; description: string }[] = [
-  { moduleId: 'commerce', label: 'Vendre mes produits', description: 'Suivez vos ventes, vos clients et vos commandes.' },
-  { moduleId: 'stocks', label: 'Gérer mon stock', description: 'Suivez vos produits, les entrées, les sorties et les alertes.' },
-  { moduleId: 'rh', label: 'Suivre mes employés', description: 'Centralisez les informations de votre équipe.' },
-  { moduleId: 'finance', label: 'Gérer mes finances', description: 'Gardez une vue claire sur vos encaissements et vos résultats.' },
-  { moduleId: 'presences', label: 'Suivre les présences', description: 'Suivez les horaires, les absences et le quotidien de votre équipe.' },
-  { moduleId: 'ecommerce', label: 'Créer ma boutique en ligne', description: 'Présentez vos produits et recevez des commandes en ligne.' },
-];
-
-function getRootNode(data: StoreData, companyId: string) {
-  return data.orgNodes.find((node) => node.companyId === companyId && !node.parentId);
-}
 
 function selectedPackIdsFor(
   moduleId: ModuleId,
@@ -93,16 +71,23 @@ export function CompanyOnboardingPage({
       }),
     [catalog],
   );
+  const customerNeeds = useMemo(() => getCustomerNeeds({
+    moduleOverrides: catalog.moduleOverrides,
+    removedModules: catalog.removedModules,
+  }), [catalog.moduleOverrides, catalog.removedModules]);
   const sectors = catalog.sectorPresets ?? [];
   const companyModuleIds = useMemo(
     () => new Set(company.allowedModules.length ? company.allowedModules : company.requestedModules),
     [company.allowedModules, company.requestedModules],
   );
-  const availableModuleIds = useMemo(
-    () => new Set(configuredModules.map((module) => module.id)),
-    [configuredModules],
+  const enabledModuleIds = useMemo(
+    () => new Set([...activeModuleIds({
+      moduleOverrides: catalog.moduleOverrides,
+      moduleStatuses: catalog.moduleStatuses,
+      removedModules: catalog.removedModules,
+    })].filter(moduleId => companyModuleIds.has(moduleId))),
+    [catalog.moduleOverrides, catalog.moduleStatuses, catalog.removedModules, companyModuleIds],
   );
-  const rootNode = useMemo(() => getRootNode(data, company.id), [data, company.id]);
   const initialSector = useMemo(
     () =>
       sectors.find(
@@ -115,17 +100,17 @@ export function CompanyOnboardingPage({
   );
   const initialModuleIds = useMemo(() => {
     const onboardingSelection = company.onboardingSelectedModuleIds?.filter(
-      (moduleId) => availableModuleIds.has(moduleId) && companyModuleIds.has(moduleId),
+      (moduleId) => enabledModuleIds.has(moduleId),
     );
     if (onboardingSelection?.length) return onboardingSelection;
     const requested = company.requestedModules.filter(
-      (moduleId) => availableModuleIds.has(moduleId) && companyModuleIds.has(moduleId),
+      (moduleId) => enabledModuleIds.has(moduleId),
     );
     if (requested.length) return requested;
     return (initialSector?.moduleIds ?? []).filter(
-      (moduleId) => availableModuleIds.has(moduleId) && companyModuleIds.has(moduleId),
+      (moduleId) => enabledModuleIds.has(moduleId),
     );
-  }, [availableModuleIds, company.onboardingSelectedModuleIds, company.requestedModules, companyModuleIds, initialSector]);
+  }, [company.onboardingSelectedModuleIds, company.requestedModules, enabledModuleIds, initialSector]);
   const initialPackIds = useMemo(() => {
     if (company.onboardingModulePackIds) {
       return Object.fromEntries(
@@ -147,28 +132,22 @@ export function CompanyOnboardingPage({
   const [selectedModuleIds, setSelectedModuleIds] = useState<ModuleId[]>(initialModuleIds);
   const [modulePackIds, setModulePackIds] =
     useState<Partial<Record<ModuleId, string[]>>>(initialPackIds);
-  const [rootName, setRootName] = useState(company.onboardingRootName ?? rootNode?.name ?? 'Direction');
-  const [rootCode, setRootCode] = useState(company.onboardingRootCode ?? rootNode?.code ?? 'DIRECTION');
-  const [rootType, setRootType] = useState<UnitType>(company.onboardingRootType ?? rootNode?.type ?? 'direction');
   const [attempted, setAttempted] = useState(false);
 
   const selectedSector = sectors.find((sector) => sector.id === sectorId);
   const selectedModules = configuredModules.filter((module) => selectedModuleIds.includes(module.id));
   const completion = Math.round(((step - 1) / (steps.length - 1)) * 100);
-  const canContinue =
-    step === 1
-      ? Boolean(selectedSector)
-      : step === 2
-        ? selectedModuleIds.length > 0
-        : step === 3
-          ? Boolean(rootName.trim() && rootCode.trim())
-          : true;
+  const canContinue = step === 1
+    ? Boolean(selectedSector)
+    : step === 2
+      ? selectedModuleIds.length > 0
+      : true;
 
   const chooseSector = (nextSectorId: string) => {
     setSectorId(nextSectorId);
     const nextSector = sectors.find((sector) => sector.id === nextSectorId);
     const nextIds = (nextSector?.moduleIds ?? []).filter(
-      (moduleId) => availableModuleIds.has(moduleId) && companyModuleIds.has(moduleId),
+      (moduleId) => enabledModuleIds.has(moduleId),
     );
     setSelectedModuleIds(nextIds);
     const nextPacks: Partial<Record<ModuleId, string[]>> = {};
@@ -180,34 +159,32 @@ export function CompanyOnboardingPage({
     setAttempted(false);
   };
 
-  const toggleModule = (moduleId: ModuleId) => {
-    setSelectedModuleIds((current) => {
-      if (current.includes(moduleId)) {
-        setModulePackIds((packs) => {
-          const next = { ...packs };
-          delete next[moduleId];
-          return next;
-        });
-        return current.filter((id) => id !== moduleId);
-      }
-      if (!companyModuleIds.has(moduleId)) return current;
-      const module = configuredModules.find((candidate) => candidate.id === moduleId);
-      const defaultPack = selectedSector?.modulePackIds?.[moduleId] ?? [];
-      if (defaultPack.length || (module?.featurePacks?.length ?? 0) === 1) {
-        setModulePackIds((packs) => ({
-          ...packs,
-          [moduleId]: [...(defaultPack.length ? defaultPack : [module?.featurePacks?.[0]?.id ?? '']).filter(Boolean)],
-        }));
-      }
-      return [...current, moduleId];
+  const toggleNeed = (need: CustomerNeed) => {
+    const moduleIds = moduleIdsForNeed(need, enabledModuleIds);
+    if (moduleIds.length !== need.moduleIds.length) return;
+    const wasSelected = moduleIds.every(moduleId => selectedModuleIds.includes(moduleId));
+    setSelectedModuleIds(current => {
+      if (wasSelected) return current.filter(moduleId => !moduleIds.includes(moduleId));
+      return [...new Set([...current, ...moduleIds])];
     });
-  };
-
-  const updatePack = (moduleId: ModuleId, packId: string) => {
-    setModulePackIds((current) => ({
-      ...current,
-      [moduleId]: packId ? [packId] : [],
-    }));
+    setModulePackIds(current => {
+      const next = { ...current };
+      if (wasSelected) {
+        moduleIds.forEach(moduleId => delete next[moduleId]);
+        return next;
+      }
+      moduleIds.forEach(moduleId => {
+        const module = configuredModules.find(candidate => candidate.id === moduleId);
+        const defaultPack = selectedSector?.modulePackIds?.[moduleId] ?? [];
+        const packIds = defaultPack.length
+          ? defaultPack
+          : (module?.featurePacks?.length ?? 0) === 1
+            ? [module?.featurePacks?.[0]?.id ?? '']
+            : [];
+        if (packIds.length) next[moduleId] = packIds.filter(Boolean);
+      });
+      return next;
+    });
   };
 
   const persistProgress = (nextStep: number) => {
@@ -219,11 +196,11 @@ export function CompanyOnboardingPage({
       targetCompany.onboardingModulePackIds = Object.fromEntries(
         Object.entries(modulePackIds).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
       ) as Partial<Record<ModuleId, string[]>>;
-      targetCompany.onboardingRootName = rootName.trim();
-      targetCompany.onboardingRootCode = rootCode.trim();
-      targetCompany.onboardingRootType = rootType;
       targetCompany.requestedBusinessProfileId = selectedSector?.id;
       targetCompany.sector = selectedSector?.name ?? targetCompany.sector;
+      delete targetCompany.onboardingRootName;
+      delete targetCompany.onboardingRootCode;
+      delete targetCompany.onboardingRootType;
     }, 'Progression enregistrée.');
   };
 
@@ -246,7 +223,7 @@ export function CompanyOnboardingPage({
 
   const completeOnboarding = () => {
     setAttempted(true);
-    if (!selectedSector || !selectedModuleIds.length || !rootName.trim() || !rootCode.trim()) return;
+    if (!selectedSector || !selectedModuleIds.length) return;
     mutate(
       (draft) => {
         const targetCompany =
@@ -255,11 +232,6 @@ export function CompanyOnboardingPage({
         provisionCompanyAccess(draft, targetCompany, {
           moduleIds: selectedModuleIds,
           modulePackIds,
-          root: {
-            name: rootName.trim(),
-            code: rootCode.trim(),
-            type: rootType,
-          },
         });
         targetCompany.sector = selectedSector.name;
         targetCompany.requestedBusinessProfileId = selectedSector.id;
@@ -323,7 +295,7 @@ export function CompanyOnboardingPage({
         <div className="grid gap-3 sm:grid-cols-2">
           {sectors.map((sector) => {
             const active = sector.id === sectorId;
-            const count = sector.moduleIds.filter((moduleId) => availableModuleIds.has(moduleId)).length;
+            const count = sector.moduleIds.filter((moduleId) => enabledModuleIds.has(moduleId)).length;
             return (
               <button
                 key={sector.id}
@@ -380,19 +352,19 @@ export function CompanyOnboardingPage({
           Choisissez simplement vos priorités. MAXIMUS prépare automatiquement les bons outils pour vous.
         </p>
       </div>
-      {configuredModules.length ? (
+      {customerNeeds.length ? (
         <div className="space-y-3">
-          {businessNeeds.map((need) => {
-            const module = configuredModules.find((candidate) => candidate.id === need.moduleId);
-            const active = selectedModuleIds.includes(need.moduleId);
-            const moduleEnabled = Boolean(module && companyModuleIds.has(need.moduleId));
+          {customerNeeds.map((need) => {
+            const moduleEnabled = isNeedAvailable(need, enabledModuleIds);
+            const needModuleIds = moduleIdsForNeed(need, enabledModuleIds);
+            const active = moduleEnabled && needModuleIds.every(moduleId => selectedModuleIds.includes(moduleId));
             return (
               <button
-                key={need.moduleId}
+                key={need.id}
                 type="button"
-                onClick={() => toggleModule(need.moduleId)}
+                onClick={() => toggleNeed(need)}
                 disabled={!moduleEnabled}
-                data-testid={`checkbox-business-need-${need.moduleId}`}
+                data-testid={`checkbox-business-need-${need.id}`}
                 className={`flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition sm:p-5 ${!moduleEnabled ? 'cursor-not-allowed opacity-55' : active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)] shadow-[0_6px_18px_hsl(var(--primary)/.055)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/.7)] hover:border-[hsl(var(--primary)/.4)]'}`}
               >
                 <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
@@ -460,50 +432,6 @@ export function CompanyOnboardingPage({
             <span className="rounded-full bg-[hsl(var(--card))] px-3 py-2">Modifiable plus tard</span>
           </div>
         </div>
-        <div className="hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-6">
-          <div className="space-y-5">
-            <label className="block text-sm font-bold">
-              Nom de l’unité
-              <input
-                value={rootName}
-                onChange={(event) => setRootName(event.target.value)}
-                placeholder="Ex. Direction générale"
-                className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]"
-                data-testid="input-onboarding-unit-name"
-              />
-              <span className="mt-1.5 block text-[11px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Le nom visible par les personnes de votre entreprise.</span>
-            </label>
-            <label className="block text-sm font-bold">
-              Code court
-              <input
-                value={rootCode}
-                onChange={(event) => setRootCode(event.target.value.toUpperCase())}
-                placeholder="Ex. DIRECTION"
-                maxLength={18}
-                className="mono mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal uppercase focus:border-[hsl(var(--primary))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]"
-                data-testid="input-onboarding-unit-code"
-              />
-              <span className="mt-1.5 block text-[11px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Un repère simple utilisé dans vos listes et exports.</span>
-            </label>
-            <label className="block text-sm font-bold">
-              Type d’unité
-              <div className="relative mt-2">
-                <select
-                  value={rootType}
-                  onChange={(event) => setRootType(event.target.value as UnitType)}
-                  className="w-full appearance-none rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 pr-10 text-sm font-normal focus:border-[hsl(var(--primary))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]"
-                  data-testid="select-onboarding-unit-type"
-                >
-                  {unitTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-                </select>
-                <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-              </div>
-              <span className="mt-1.5 block text-[11px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-                {unitTypes.find((type) => type.value === rootType)?.description}
-              </span>
-            </label>
-          </div>
-        </div>
         <div className="rounded-2xl bg-[hsl(var(--sidebar))] p-5 text-[hsl(var(--sidebar-foreground))] sm:p-6">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--sidebar-primary)/.18)] text-[hsl(var(--sidebar-primary))]">
             <ShieldCheck size={18} />
@@ -518,9 +446,6 @@ export function CompanyOnboardingPage({
           </div>
         </div>
       </div>
-      {attempted && (!rootName.trim() || !rootCode.trim()) && (
-        <p className="mt-4 text-sm font-semibold text-[hsl(var(--destructive))]" role="alert">Renseignez le nom et le code de votre première unité.</p>
-      )}
     </section>
   );
 
@@ -651,7 +576,7 @@ export function CompanyOnboardingPage({
                 <button
                   type="button"
                   onClick={completeOnboarding}
-                  disabled={!selectedSector || !selectedModuleIds.length || !rootName.trim() || !rootCode.trim()}
+                  disabled={!selectedSector || !selectedModuleIds.length}
                   className="btn inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] shadow-[0_5px_14px_hsl(var(--primary)/.18)] disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid="button-complete-onboarding"
                 >

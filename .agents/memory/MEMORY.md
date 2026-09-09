@@ -35,3 +35,4 @@
 - [Identité publique des boutiques](public-store-identity.md) — les noms peuvent être identiques entre entreprises, mais chaque slug public doit rester globalement unique.
 - [Catalogue d’inscription](registration-catalog-boundary.md) — l’inscription publique lit uniquement le catalogue publié, jamais l’état workspace ou son brouillon.
 - [Onboarding entreprise](company-onboarding.md) — guider les nouvelles entreprises depuis l’accueil, avec progression reprenable et modules pilotés par le catalogue publié.
+- [Besoins métier d’inscription](onboarding-needs-catalog.md) — séparer les choix compréhensibles du client des modules techniques et filtrer leur disponibilité côté serveur.
