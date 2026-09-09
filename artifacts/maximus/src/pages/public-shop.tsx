@@ -489,8 +489,14 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   if (!data) return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6"><section className="card-surface max-w-md rounded-2xl p-8 text-center"><Store className="mx-auto text-[hsl(var(--primary))]" size={30} /><h1 className="mt-4 text-xl font-bold">Boutique indisponible</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p></section></div>;
 
   const { store, products: allProducts, rentals } = data;
-  const sellerPhotoUrl = store.seller.photoUrl || store.logoUrl;
-  const canOpenSellerCard = Boolean(sellerPhotoUrl || store.seller.name || store.seller.email || store.seller.phone);
+  const seller = {
+    name: store.seller?.name ?? '',
+    email: store.seller?.email ?? '',
+    phone: store.seller?.phone ?? '',
+    photoUrl: store.seller?.photoUrl ?? '',
+  };
+  const sellerPhotoUrl = seller.photoUrl || store.logoUrl;
+  const canOpenSellerCard = Boolean(sellerPhotoUrl || seller.name || seller.email || seller.phone);
   const products = allProducts.filter(product => product.productType === 'SALE');
   const enabledFeatures = store.enabledFeatures ?? { location: false, livraisons: false };
   const selectedOrder = customerData?.orders.find(order => order.id === orderDetailId);
@@ -511,7 +517,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     <header className="relative border-b bg-[var(--shop-accent)] text-white">
       <div className="flex w-full items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 max-w-[calc(100%-3rem)] shrink items-center gap-3">
-             <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${store.seller.name || store.name}` : undefined} className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:cursor-default disabled:hover:bg-transparent">
+             <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:cursor-default disabled:hover:bg-transparent">
               {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={18} /></span>}
             </button>
             <button type="button" onClick={() => go('')} className="min-w-0 text-left">
@@ -525,23 +531,23 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
         </nav>
       </div>
     </header>
-      {logoPreviewOpen && canOpenSellerCard && <div role="dialog" aria-modal="true" aria-label={`Fiche de ${store.seller.name || store.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setLogoPreviewOpen(false); }}>
+      {logoPreviewOpen && canOpenSellerCard && <div role="dialog" aria-modal="true" aria-label={`Fiche de ${seller.name || store.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setLogoPreviewOpen(false); }}>
          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-8">
            <button type="button" onClick={() => setLogoPreviewOpen(false)} aria-label="Fermer la fiche vendeur" className="absolute right-3 top-3 rounded-full p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><X size={20} /></button>
            <p className="pr-10 text-center text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>À propos de la boutique</p>
            <div className="mt-5 flex justify-center">
              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[var(--shop-primary)]/20 bg-[hsl(var(--muted)/.45)] p-2">
-               {sellerPhotoUrl ? <img src={sellerPhotoUrl} alt={`Photo de ${store.seller.name || store.name}`} className="h-full w-full rounded-full object-cover" /> : <UserRound size={48} className="text-[hsl(var(--muted-foreground))]" />}
+               {sellerPhotoUrl ? <img src={sellerPhotoUrl} alt={`Photo de ${seller.name || store.name}`} className="h-full w-full rounded-full object-cover" /> : <UserRound size={48} className="text-[hsl(var(--muted-foreground))]" />}
              </div>
            </div>
            <div className="mt-5 text-center">
-             <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">{store.seller.name || store.name}</h2>
+             <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">{seller.name || store.name}</h2>
              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{store.name}</p>
            </div>
            <div className="mt-6 grid gap-3">
-             {store.seller.email && <a href={`mailto:${store.seller.email}`} className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition hover:bg-[hsl(var(--muted)/.55)]"><Mail size={17} style={{ color: 'var(--shop-primary)' }} /><span className="min-w-0 break-all">{store.seller.email}</span></a>}
-             {store.seller.phone && <a href={`tel:${store.seller.phone}`} className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition hover:bg-[hsl(var(--muted)/.55)]"><Phone size={17} style={{ color: 'var(--shop-primary)' }} /><span>{store.seller.phone}</span></a>}
-             {!store.seller.email && !store.seller.phone && <p className="rounded-xl bg-[hsl(var(--muted)/.55)] px-4 py-3 text-center text-sm text-[hsl(var(--muted-foreground))]">Les coordonnées du vendeur ne sont pas renseignées.</p>}
+             {seller.email && <a href={`mailto:${seller.email}`} className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition hover:bg-[hsl(var(--muted)/.55)]"><Mail size={17} style={{ color: 'var(--shop-primary)' }} /><span className="min-w-0 break-all">{seller.email}</span></a>}
+             {seller.phone && <a href={`tel:${seller.phone}`} className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition hover:bg-[hsl(var(--muted)/.55)]"><Phone size={17} style={{ color: 'var(--shop-primary)' }} /><span>{seller.phone}</span></a>}
+             {!seller.email && !seller.phone && <p className="rounded-xl bg-[hsl(var(--muted)/.55)] px-4 py-3 text-center text-sm text-[hsl(var(--muted-foreground))]">Les coordonnées du vendeur ne sont pas renseignées.</p>}
            </div>
          </div>
        </div>}
