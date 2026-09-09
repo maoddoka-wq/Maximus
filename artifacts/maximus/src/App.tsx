@@ -6362,7 +6362,9 @@ function AdminCreateCompanyPage({
     name: 'Distribution',
     moduleIds: ['commerce', 'stocks', 'presences'],
   };
-  const initialPreset = data.sectorPresets[0] ?? fallbackPreset;
+  const catalog = getCatalogSnapshot(data);
+  const availableSectorPresets = catalog.sectorPresets.length > 0 ? catalog.sectorPresets : [fallbackPreset];
+  const initialPreset = availableSectorPresets[0];
   const [name, setName] = useState('');
   const [manager, setManager] = useState('');
   const [email, setEmail] = useState('');
@@ -6378,7 +6380,7 @@ function AdminCreateCompanyPage({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const changeSector = (nextSector: string) => {
-    const preset = data.sectorPresets.find((item) => item.name === nextSector);
+    const preset = availableSectorPresets.find((item) => item.name === nextSector);
     setSector(nextSector);
     setSelectedModules(preset ? [...preset.moduleIds] : []);
     setError('');
@@ -6415,7 +6417,7 @@ function AdminCreateCompanyPage({
     }
     setSaving(true);
     try {
-      const preset = data.sectorPresets.find((item) => item.name === sector);
+      const preset = availableSectorPresets.find((item) => item.name === sector);
       await companyRequestApi.create({
         name: name.trim(),
         manager: manager.trim(),
@@ -6496,7 +6498,7 @@ function AdminCreateCompanyPage({
               onChange={(event) => changeSector(event.target.value)}
               className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
             >
-              {data.sectorPresets.map((preset) => (
+              {availableSectorPresets.map((preset) => (
                 <option key={preset.id} value={preset.name}>
                   {preset.name}
                 </option>

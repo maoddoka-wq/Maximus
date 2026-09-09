@@ -82,6 +82,23 @@ test('enregistre les modifications du catalogue en brouillon sans toucher au pub
   assert.equal(getCatalogSnapshot(data).moduleStatuses.commerce, 'MAINTENANCE');
 });
 
+test('rend un secteur ajouté disponible aux écrans administratifs avant publication', () => {
+  const data = fixture();
+  const addedSector = {
+    id: 'construction',
+    name: 'Construction',
+    moduleIds: ['commerce'] as const,
+    modulePackIds: { commerce: ['commerce-gestion'] },
+  };
+
+  updateCatalogDraft(data, draft => {
+    draft.sectorPresets.push(addedSector);
+  });
+
+  assert.equal(data.sectorPresets.some(sector => sector.id === 'construction'), false);
+  assert.equal(getCatalogSnapshot(data).sectorPresets.some(sector => sector.id === 'construction'), true);
+});
+
 test('bloque la publication d’un catalogue incohérent', () => {
   const data = fixture();
   updateCatalogDraft(data, draft => {
