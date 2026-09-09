@@ -19,7 +19,6 @@ import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import {
   getConfiguredModules,
   type Company,
-  type Module,
   type ModuleId,
   type OrgNode,
   type StoreData,
@@ -34,9 +33,9 @@ type UnitType = OrgNode['type'];
 
 const steps = [
   { number: 1, label: 'Votre activité', shortLabel: 'Activité' },
-  { number: 2, label: 'Vos modules', shortLabel: 'Modules' },
-  { number: 3, label: 'Votre unité', shortLabel: 'Unité' },
-  { number: 4, label: 'Vérification', shortLabel: 'Résumé' },
+  { number: 2, label: 'Vos priorités', shortLabel: 'Priorités' },
+  { number: 3, label: 'Votre base', shortLabel: 'Base' },
+  { number: 4, label: 'C’est prêt', shortLabel: 'Résumé' },
 ] as const;
 
 const unitTypes: { value: UnitType; label: string; description: string }[] = [
@@ -46,18 +45,17 @@ const unitTypes: { value: UnitType; label: string; description: string }[] = [
   { value: 'department', label: 'Département', description: 'Une équipe ou un département' },
 ];
 
+const businessNeeds: { moduleId: ModuleId; label: string; description: string }[] = [
+  { moduleId: 'commerce', label: 'Vendre mes produits', description: 'Suivez vos ventes, vos clients et vos commandes.' },
+  { moduleId: 'stocks', label: 'Gérer mon stock', description: 'Suivez vos produits, les entrées, les sorties et les alertes.' },
+  { moduleId: 'rh', label: 'Suivre mes employés', description: 'Centralisez les informations de votre équipe.' },
+  { moduleId: 'finance', label: 'Gérer mes finances', description: 'Gardez une vue claire sur vos encaissements et vos résultats.' },
+  { moduleId: 'presences', label: 'Suivre les présences', description: 'Suivez les horaires, les absences et le quotidien de votre équipe.' },
+  { moduleId: 'ecommerce', label: 'Créer ma boutique en ligne', description: 'Présentez vos produits et recevez des commandes en ligne.' },
+];
+
 function getRootNode(data: StoreData, companyId: string) {
   return data.orgNodes.find((node) => node.companyId === companyId && !node.parentId);
-}
-
-function initialCode(companyName: string) {
-  const code = companyName
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 5)
-    .toUpperCase();
-  return code || 'RACINE';
 }
 
 function selectedPackIdsFor(
@@ -149,8 +147,8 @@ export function CompanyOnboardingPage({
   const [selectedModuleIds, setSelectedModuleIds] = useState<ModuleId[]>(initialModuleIds);
   const [modulePackIds, setModulePackIds] =
     useState<Partial<Record<ModuleId, string[]>>>(initialPackIds);
-  const [rootName, setRootName] = useState(company.onboardingRootName ?? rootNode?.name ?? company.name);
-  const [rootCode, setRootCode] = useState(company.onboardingRootCode ?? rootNode?.code ?? initialCode(company.name));
+  const [rootName, setRootName] = useState(company.onboardingRootName ?? rootNode?.name ?? 'Direction');
+  const [rootCode, setRootCode] = useState(company.onboardingRootCode ?? rootNode?.code ?? 'DIRECTION');
   const [rootType, setRootType] = useState<UnitType>(company.onboardingRootType ?? rootNode?.type ?? 'direction');
   const [attempted, setAttempted] = useState(false);
 
@@ -315,10 +313,10 @@ export function CompanyOnboardingPage({
       <div className="mb-7 max-w-2xl">
         <span className="mono text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">01 · Le point de départ</span>
         <h1 id="onboarding-step-title" className="mt-3 text-3xl font-bold tracking-[-.055em] text-[hsl(var(--foreground))] sm:text-4xl">
-          Parlons de votre activité.
+          Commençons par votre activité.
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Ce choix nous aide à vous proposer une première configuration cohérente. Vous pourrez toujours l’affiner ensuite.
+          Nous allons préparer un espace adapté à votre entreprise. Vous pourrez toujours modifier vos choix plus tard.
         </p>
       </div>
       {sectors.length ? (
@@ -344,11 +342,11 @@ export function CompanyOnboardingPage({
                 </span>
                 <span className="block text-base font-bold">{sector.name}</span>
                 <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                  Une base prête à l’emploi avec {count} module{count > 1 ? 's' : ''} recommandé{count > 1 ? 's' : ''} pour cette activité.
+                  Une base prête à l’emploi avec {count} besoin{count > 1 ? 's' : ''} recommandé{count > 1 ? 's' : ''}.
                 </span>
                 <span className={`mt-5 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.08em] ${active ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'}`}>
                   {active ? <CheckCircle2 size={13} /> : <Layers3 size={13} />}
-                  {count} module{count > 1 ? 's' : ''} disponible{count > 1 ? 's' : ''}
+                  Activité sélectionnée
                 </span>
               </button>
             );
@@ -374,100 +372,64 @@ export function CompanyOnboardingPage({
   const renderModulesStep = () => (
     <section aria-labelledby="onboarding-step-title">
       <div className="mb-7 max-w-2xl">
-        <span className="mono text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">02 · Les bons outils</span>
+        <span className="mono text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">02 · Vos priorités</span>
         <h1 id="onboarding-step-title" className="mt-3 text-3xl font-bold tracking-[-.055em] sm:text-4xl">
-          Composez votre espace de travail.
+          Que voulez-vous faire en premier ?
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Nous avons préparé une sélection pour <strong className="text-[hsl(var(--foreground))]">{selectedSector?.name ?? 'votre activité'}</strong>. Gardez uniquement ce qui est utile aujourd’hui.
+          Choisissez simplement vos priorités. MAXIMUS prépare automatiquement les bons outils pour vous.
         </p>
       </div>
       {configuredModules.length ? (
         <div className="space-y-3">
-          {configuredModules.map((module) => {
-            const active = selectedModuleIds.includes(module.id);
-            const moduleEnabled = companyModuleIds.has(module.id);
-            const packs = module.featurePacks ?? [];
-            const selectedPack = modulePackIds[module.id]?.[0] ?? '';
+          {businessNeeds.map((need) => {
+            const module = configuredModules.find((candidate) => candidate.id === need.moduleId);
+            const active = selectedModuleIds.includes(need.moduleId);
+            const moduleEnabled = Boolean(module && companyModuleIds.has(need.moduleId));
             return (
-              <div
-                key={module.id}
-                className={`rounded-2xl border p-4 transition sm:p-5 ${!moduleEnabled ? 'opacity-60' : active ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--card))] shadow-[0_6px_18px_hsl(var(--primary)/.055)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/.7)]'}`}
+              <button
+                key={need.moduleId}
+                type="button"
+                onClick={() => toggleModule(need.moduleId)}
+                disabled={!moduleEnabled}
+                data-testid={`checkbox-business-need-${need.moduleId}`}
+                className={`flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition sm:p-5 ${!moduleEnabled ? 'cursor-not-allowed opacity-55' : active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)] shadow-[0_6px_18px_hsl(var(--primary)/.055)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/.7)] hover:border-[hsl(var(--primary)/.4)]'}`}
               >
-                <div className="flex items-start gap-3">
-                  <input
-                    id={`module-${module.id}`}
-                    type="checkbox"
-                    checked={active}
-                    onChange={() => toggleModule(module.id)}
-                    disabled={!moduleEnabled}
-                    className="mt-1 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
-                    data-testid={`checkbox-module-${module.id}`}
-                  />
-                  <label htmlFor={`module-${module.id}`} className="min-w-0 flex-1 cursor-pointer">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-bold">{module.name}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[.08em] ${!moduleEnabled ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' : module.status === 'BETA' ? 'bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]'}`}>
-                        {!moduleEnabled ? 'À activer' : module.status === 'BETA' ? 'Bêta' : 'Disponible'}
-                      </span>
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                  {active ? <Check size={17} strokeWidth={3} /> : <Layers3 size={17} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold">{need.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[.08em] ${!moduleEnabled ? 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' : active ? 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                      {!moduleEnabled ? 'Bientôt disponible' : active ? 'Ajouté' : 'Ajouter'}
                     </span>
-                    <span className="mt-1 block max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</span>
-                    {!moduleEnabled && (
-                      <span className="mt-2 block text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
-                        Ce module est publié mais n’est pas encore activé pour votre entreprise.
-                      </span>
-                    )}
-                  </label>
-                  <span className={`mt-0.5 hidden h-6 w-6 shrink-0 items-center justify-center rounded-full sm:flex ${active ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
-                    {active ? <Check size={14} /> : <Layers3 size={14} />}
                   </span>
-                </div>
-                {active && packs.length > 0 && (
-                  <div className="ml-7 mt-4 max-w-md">
-                    <label htmlFor={`pack-${module.id}`} className="mb-1.5 block text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">
-                      Niveau de configuration
-                    </label>
-                    <div className="relative">
-                      <select
-                        id={`pack-${module.id}`}
-                        value={selectedPack}
-                        onChange={(event) => updatePack(module.id, event.target.value)}
-                        className="w-full appearance-none rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3 py-2.5 pr-9 text-xs font-semibold focus:border-[hsl(var(--primary))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]"
-                        data-testid={`select-pack-${module.id}`}
-                      >
-                        <option value="">Configuration standard</option>
-                        {packs.map((pack) => (
-                          <option key={pack.id} value={pack.id}>{pack.name}</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-                    </div>
-                    {selectedPack && (
-                      <p className="mt-1.5 text-[11px] leading-4 text-[hsl(var(--muted-foreground))]">
-                        {packs.find((pack) => pack.id === selectedPack)?.description ?? 'Une configuration adaptée à votre équipe.'}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+                  <span className="mt-1 block max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">{need.description}</span>
+                  {!moduleEnabled && <span className="mt-2 block text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">Cette option sera disponible après activation par MAXIMUS.</span>}
+                </span>
+                <span className={`mt-1 hidden h-7 w-7 shrink-0 items-center justify-center rounded-full sm:flex ${active ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                  {active ? <Check size={14} /> : <ArrowRight size={14} />}
+                </span>
+              </button>
             );
           })}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/.35)] p-8 text-center">
           <Layers3 className="mx-auto text-[hsl(var(--muted-foreground))]" size={24} />
-          <h2 className="mt-3 text-base font-bold">Le catalogue ne contient aucun module actif</h2>
+          <h2 className="mt-3 text-base font-bold">Aucune option de gestion n’est disponible</h2>
           <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-            Revenez vers votre administrateur pour publier au moins un module disponible.
+            Votre espace ne peut pas encore être préparé. Revenez un peu plus tard ou contactez MAXIMUS.
           </p>
         </div>
       )}
       <div className="mt-4 flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
-        <span>{selectedModules.length} module{selectedModules.length > 1 ? 's' : ''} sélectionné{selectedModules.length > 1 ? 's' : ''}</span>
+        <span>{selectedModules.length} priorité{selectedModules.length > 1 ? 's' : ''} sélectionnée{selectedModules.length > 1 ? 's' : ''}</span>
         <span>Vous pourrez en ajouter plus tard</span>
       </div>
       {attempted && selectedModuleIds.length === 0 && (
-        <p className="mt-3 text-sm font-semibold text-[hsl(var(--destructive))]" role="alert">Choisissez au moins un module.</p>
+        <p className="mt-3 text-sm font-semibold text-[hsl(var(--destructive))]" role="alert">Choisissez au moins une priorité.</p>
       )}
     </section>
   );
@@ -475,16 +437,30 @@ export function CompanyOnboardingPage({
   const renderUnitStep = () => (
     <section aria-labelledby="onboarding-step-title">
       <div className="mb-7 max-w-2xl">
-        <span className="mono text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">03 · Le premier repère</span>
+        <span className="mono text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">03 · Une base prête</span>
         <h1 id="onboarding-step-title" className="mt-3 text-3xl font-bold tracking-[-.055em] sm:text-4xl">
-          Où commence votre organisation ?
+          Nous préparons votre espace automatiquement.
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Cette première unité sera votre point d’entrée dans MAXIMUS. Vous pourrez ensuite créer vos équipes et vos sites.
+          Vous n’avez rien de technique à configurer. MAXIMUS crée une base simple que vous pourrez enrichir quand vous le souhaitez.
         </p>
       </div>
       <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
-        <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-6">
+        <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.045)] p-6 sm:p-8">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+            <Building2 size={22} />
+          </div>
+          <h2 className="mt-6 text-xl font-bold">Votre base de départ</h2>
+          <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            Une base <strong className="text-[hsl(var(--foreground))]">Direction</strong> sera créée pour votre entreprise, avec votre accès administrateur prêt à l’emploi.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-full bg-[hsl(var(--card))] px-3 py-2">Direction</span>
+            <span className="rounded-full bg-[hsl(var(--card))] px-3 py-2">Accès administrateur</span>
+            <span className="rounded-full bg-[hsl(var(--card))] px-3 py-2">Modifiable plus tard</span>
+          </div>
+        </div>
+        <div className="hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-6">
           <div className="space-y-5">
             <label className="block text-sm font-bold">
               Nom de l’unité
@@ -532,13 +508,13 @@ export function CompanyOnboardingPage({
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--sidebar-primary)/.18)] text-[hsl(var(--sidebar-primary))]">
             <ShieldCheck size={18} />
           </div>
-          <h2 className="mt-5 text-base font-bold">Une base claire, dès le premier jour</h2>
+          <h2 className="mt-5 text-base font-bold">Rien n’est bloquant</h2>
           <p className="mt-2 text-sm leading-6 text-[hsl(var(--sidebar-foreground)/.68)]">
-            MAXIMUS utilisera cette unité pour organiser vos accès, vos rôles et vos futures équipes. Rien n’est figé.
+            Vous pourrez ajouter vos employés, créer d’autres équipes et ajuster votre organisation depuis l’accueil.
           </p>
           <div className="mt-6 space-y-3 border-t border-[hsl(var(--sidebar-border))] pt-5 text-xs">
             <div className="flex items-center justify-between gap-3"><span className="text-[hsl(var(--sidebar-foreground)/.62)]">Activité</span><strong>{selectedSector?.name ?? 'À définir'}</strong></div>
-            <div className="flex items-center justify-between gap-3"><span className="text-[hsl(var(--sidebar-foreground)/.62)]">Modules</span><strong>{selectedModules.length}</strong></div>
+            <div className="flex items-center justify-between gap-3"><span className="text-[hsl(var(--sidebar-foreground)/.62)]">Priorités</span><strong>{selectedModules.length}</strong></div>
           </div>
         </div>
       </div>
@@ -553,10 +529,10 @@ export function CompanyOnboardingPage({
       <div className="mb-7 max-w-2xl">
         <span className="mono text-[10px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">04 · Prêt à commencer</span>
         <h1 id="onboarding-step-title" className="mt-3 text-3xl font-bold tracking-[-.055em] sm:text-4xl">
-          Vérifiez votre configuration.
+          Votre espace est presque prêt.
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Tout est prêt. Relisez ces quelques éléments avant d’ouvrir votre espace MAXIMUS.
+          Voici ce que MAXIMUS va préparer pour vous. Vous pourrez commencer immédiatement après l’ouverture.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -566,15 +542,14 @@ export function CompanyOnboardingPage({
           <button type="button" onClick={() => setStep(1)} className="mt-4 text-xs font-bold text-[hsl(var(--primary))] hover:underline">Modifier</button>
         </div>
         <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
-          <span className="text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">Modules</span>
-          <p className="mt-3 text-lg font-bold">{selectedModules.length} sélectionné{selectedModules.length > 1 ? 's' : ''}</p>
+          <span className="text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">Priorités</span>
+          <p className="mt-3 text-lg font-bold">{selectedModules.length} choisie{selectedModules.length > 1 ? 's' : ''}</p>
           <button type="button" onClick={() => setStep(2)} className="mt-4 text-xs font-bold text-[hsl(var(--primary))] hover:underline">Modifier</button>
         </div>
         <div className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
-          <span className="text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">Unité racine</span>
-          <p className="mt-3 truncate text-lg font-bold">{rootName || 'À renseigner'}</p>
-          <p className="mono mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{rootCode || '—'} · {unitTypes.find((type) => type.value === rootType)?.label}</p>
-          <button type="button" onClick={() => setStep(3)} className="mt-3 text-xs font-bold text-[hsl(var(--primary))] hover:underline">Modifier</button>
+          <span className="text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">Base de départ</span>
+          <p className="mt-3 truncate text-lg font-bold">Direction</p>
+          <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Accès administrateur prêt à l’emploi</p>
         </div>
       </div>
       <div className="mt-5 rounded-2xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.06)] p-5 sm:p-6">
@@ -583,7 +558,7 @@ export function CompanyOnboardingPage({
           <div>
             <h2 className="text-sm font-bold">Ce qui va se passer ensuite</h2>
             <p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Votre espace sera créé avec les modules choisis et une première unité organisationnelle. Vous pourrez immédiatement inviter votre équipe et compléter votre structure.
+              Votre espace sera créé avec vos priorités, une base Direction et un accès administrateur. Depuis l’accueil, vous pourrez ensuite ajouter votre équipe, vos produits et vos ventes quand vous le souhaitez.
             </p>
           </div>
         </div>

@@ -143,6 +143,7 @@ export function CompanyRouter({
   onNavigate,
   onBack,
   allowed,
+  company,
   canManagePeople,
   companyAdmin,
   sectorManager,
@@ -166,6 +167,7 @@ export function CompanyRouter({
   onNavigate: Navigate;
   onBack: (fallback: string) => void;
   allowed: ModuleId[];
+  company: StoreData['companies'][number] | null;
   canManagePeople: boolean;
   companyAdmin: boolean;
   sectorManager: boolean;
@@ -203,7 +205,7 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/dashboard') {
-    return renderScreen(screens.dashboard, { data, onNavigate, allowed });
+    return renderScreen(screens.dashboard, { data, onNavigate, allowed, company, companyAdmin });
   }
   if (routePath === '/entreprise/controle') {
     return renderScreen(screens.control, {

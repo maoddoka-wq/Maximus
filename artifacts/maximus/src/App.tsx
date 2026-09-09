@@ -1051,6 +1051,7 @@ function AppContent() {
                   onNavigate={navigate}
                   onBack={goBack}
                   allowed={allowed}
+                  company={currentCompany ?? null}
                   canManagePeople={canManagePeople}
                   companyAdmin={session.startsWith('company:')}
                   sectorManager={sectorManager}
@@ -1340,6 +1341,14 @@ function Signup({
   const configuredModule = (moduleId: ModuleId) => {
     return getConfiguredModules(data).find((module) => module.id === moduleId);
   };
+  const signupNeeds: { moduleId: ModuleId; label: string; description: string }[] = [
+    { moduleId: 'commerce', label: 'Vendre mes produits', description: 'Suivre mes ventes, mes clients et mes commandes.' },
+    { moduleId: 'stocks', label: 'Gérer mon stock', description: 'Connaître mes produits, les entrées et les sorties.' },
+    { moduleId: 'rh', label: 'Suivre mes employés', description: 'Centraliser les informations de mon équipe.' },
+    { moduleId: 'finance', label: 'Gérer mes finances', description: 'Garder une vue claire sur mes encaissements et mes résultats.' },
+    { moduleId: 'presences', label: 'Suivre les présences', description: 'Suivre les horaires, absences et présences.' },
+    { moduleId: 'ecommerce', label: 'Créer ma boutique en ligne', description: 'Présenter mes produits et recevoir des commandes en ligne.' },
+  ];
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find((item) => item.name === nextSector);
     const nextModules = preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds];
@@ -1531,16 +1540,15 @@ function Signup({
           <p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">
             Nouvel espace entreprise
           </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1>
+           <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Créez votre espace simplement.</h1>
           <p className="mt-3 text-[hsl(var(--muted-foreground))]">
-            Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
-            être construite après l’activation de votre espace.
+             Renseignez votre entreprise, dites-nous ce que vous voulez gérer et nous préparerons votre espace après validation.
           </p>
         </div>
         <div className="mb-10 flex items-center gap-3">
           <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />
           <div className="h-px flex-1 bg-[hsl(var(--border))]" />
-          <Step n={2} label="Fonctionnalités" active={step === 2} done={false} />
+           <Step n={2} label="Vos besoins" active={step === 2} done={false} />
         </div>
         {step === 1 ? (
           <form
@@ -1602,7 +1610,7 @@ function Signup({
                   ))}
                 </select>
                 <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-                  Ce choix détermine les modules proposés au démarrage.
+                   Ce choix nous aide à vous proposer une première base adaptée.
                 </span>
               </label>
               <Field
@@ -1642,16 +1650,13 @@ function Signup({
         ) : (
           <div className="card-surface rounded-2xl p-6 sm:p-8">
             <section className="mb-8 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.04)] p-4">
-              <h2 className="font-bold">Choisissez les fonctionnalités dont votre entreprise a besoin</h2>
+               <h2 className="font-bold">Que voulez-vous gérer ?</h2>
               <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                {sector
-                  ? `La sélection proposée correspond au secteur ${sector}. `
-                  : 'Une sélection de départ vous est proposée. '}
-                Sélectionnez les fonctionnalités à activer au démarrage. Vous pourrez modifier vos choix plus tard.
+                 Choisissez vos priorités en langage simple. MAXIMUS traduira automatiquement ces choix dans votre espace.
               </p>
             </section>
             {data.sectorPresets.find((preset) => preset.name === sector)?.modulePackIds && (
-              <section className="mb-6 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
+               <section className="mb-6 hidden rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.06)] p-4">
                 <h2 className="font-bold">Packs proposés par ce secteur</h2>
                 <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
                   Les packs déjà configurés dans les modules sont proposés automatiquement. Vous pourrez encore ajuster
@@ -1682,7 +1687,34 @@ function Signup({
                 {moduleError}
               </p>
             )}
-            <div className="grid gap-3">
+             <div className="grid gap-3 sm:grid-cols-2">
+               {signupNeeds.map((need) => {
+                 const available = Boolean(configuredModule(need.moduleId)) && selectedModules.includes(need.moduleId);
+                 const enabled = Boolean(configuredModule(need.moduleId));
+                 return (
+                   <button
+                     key={need.moduleId}
+                     type="button"
+                     disabled={!enabled}
+                     onClick={() => toggle(need.moduleId)}
+                     data-testid={`button-signup-business-need-${need.moduleId}`}
+                     className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${!enabled ? 'cursor-not-allowed opacity-55' : available ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary)/.4)]'}`}
+                   >
+                     <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${available ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}>
+                       {available && <Check size={13} />}
+                     </span>
+                     <span className="min-w-0">
+                       <span className="flex flex-wrap items-center gap-2">
+                         <strong className="block text-sm">{need.label}</strong>
+                         {!enabled && <span className="rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Bientôt disponible</span>}
+                       </span>
+                       <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">{need.description}</span>
+                     </span>
+                   </button>
+                 );
+               })}
+             </div>
+             <div className="hidden grid gap-3">
               {modules.map((baseModule) => {
                 const mod = configuredModule(baseModule.id) ?? baseModule;
                 const enabled = selectedModules.includes(mod.id);
@@ -2353,10 +2385,14 @@ function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
+  company,
+  companyAdmin,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
+  company: Company | null;
+  companyAdmin: boolean;
 }) {
   const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
   const canStocks = allowed.includes('stocks');
@@ -2433,6 +2469,60 @@ function RoleAwareCompanyDashboard({
           </section>
         )}
       </div>
+      {companyAdmin && company && (
+        <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[hsl(var(--primary)/.035)] p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Pour bien démarrer</p>
+              <h2 className="mt-2 text-xl font-bold">Votre espace est prêt. Ajoutez vos premières informations.</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Suivez ces quelques étapes quand vous le souhaitez. Elles ne bloquent pas l’utilisation de MAXIMUS.
+              </p>
+            </div>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
+              <ClipboardCheck size={19} />
+            </span>
+          </div>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                label: 'Compléter mon entreprise',
+                done: Boolean(company.name && company.manager && company.email && company.country),
+                path: '/entreprise/profil',
+              },
+              {
+                label: 'Ajouter mon équipe',
+                done: data.employees.some((item) => item.companyId === company.id),
+                path: '/entreprise/employes',
+              },
+              {
+                label: 'Ajouter mon premier produit',
+                done: data.products.some((item) => item.companyId === company.id),
+                path: '/entreprise/stocks',
+                hidden: !canStocks,
+              },
+              {
+                label: 'Configurer ma boutique',
+                done: Boolean(data.commerceStates?.[company.id]),
+                path: '/entreprise/ecommerce',
+                hidden: !canCommerce,
+              },
+            ].filter((item) => !item.hidden).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onNavigate(item.path)}
+                className="flex items-center gap-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.82)] px-3 py-3 text-left transition hover:border-[hsl(var(--primary)/.4)] hover:bg-[hsl(var(--card))]"
+              >
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                  {item.done ? <Check size={13} strokeWidth={3} /> : <span className="h-2 w-2 rounded-full bg-current" />}
+                </span>
+                <span className={`text-xs font-bold ${item.done ? 'text-[hsl(var(--muted-foreground))] line-through' : 'text-[hsl(var(--foreground))]'}`}>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
