@@ -65,6 +65,17 @@ final class ModuleCatalog
                     'rapports' => ['pointage', 'présences'],
                 ],
             ],
+            [
+                'id' => 'paie',
+                'name' => 'Paie',
+                'description' => 'Enregistrer les bénéficiaires, préparer les salaires et lancer les virements groupés.',
+                'features' => ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'],
+                'feature_packs' => [
+                    ['id' => 'paie-consultation', 'name' => 'Consultation paie', 'description' => 'Consulter les bénéficiaires et l’historique des paies.', 'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'historique']],
+                    ['id' => 'paie-gestion', 'name' => 'Gestionnaire de paie', 'description' => 'Préparer les paies et gérer les bénéficiaires.', 'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'historique']],
+                    ['id' => 'paie-supervision', 'name' => 'Responsable paie', 'description' => 'Valider les paies, alimenter le solde et lancer les virements.', 'feature_ids' => ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique']],
+                ],
+            ],
         ];
     }
 

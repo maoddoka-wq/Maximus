@@ -136,6 +136,11 @@ export const modules: Module[] = [
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
   ], status: 'ACTIF' },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
+  { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'], featurePacks: [
+    { id: 'paie-consultation', name: 'Consultation paie', description: 'Consulter les bénéficiaires et l’historique.', featureIds: ['dashboard', 'beneficiaires', 'historique'] },
+    { id: 'paie-gestion', name: 'Gestionnaire de paie', description: 'Préparer les paies et gérer les bénéficiaires.', featureIds: ['dashboard', 'beneficiaires', 'preparation', 'historique'] },
+    { id: 'paie-supervision', name: 'Responsable paie', description: 'Valider, financer et lancer les virements.', featureIds: ['dashboard', 'beneficiaires', 'preparation', 'validation', 'virements', 'solde-de-paie', 'historique'] },
+  ], status: 'ACTIF' },
 ];
 
 export const stockSubmodules = [

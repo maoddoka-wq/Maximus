@@ -97,3 +97,4 @@ require __DIR__.'/control.php';
 require __DIR__.'/presence.php';
 require __DIR__.'/stock.php';
 require __DIR__.'/ecommerce.php';
+require __DIR__.'/payroll.php';

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
 use App\Services\EcommerceCommissionPolicy;
 use App\Services\MaximusWalletService;
+use App\Services\PayrollService;
 use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use App\Support\ModuleAuthorization;
@@ -26,6 +27,7 @@ final class SellerWalletController extends Controller
         private readonly DiamanoPayService $diamanoPay,
         private readonly EcommerceCommissionPolicy $commissionPolicy,
         private readonly MaximusWalletService $maximusWallet,
+        private readonly PayrollService $payroll,
         private readonly SellerWalletFeePolicy $feePolicy,
         private readonly SellerWalletMaturityPolicy $maturityPolicy,
     ) {}
@@ -277,6 +279,23 @@ final class SellerWalletController extends Controller
                 report($error);
 
                 return response()->json(['error' => 'Le webhook de retrait MAXIMUS n’a pas pu être traité.'], 500);
+            }
+
+            return response()->json(['received' => true]);
+        }
+
+        if ($this->payroll->applyTopupStatus($providerId, $data)) {
+            return response()->json(['received' => true]);
+        }
+
+        $payrollItem = $this->payroll->itemByProviderId($providerId);
+        if ($payrollItem) {
+            try {
+                $this->payroll->applyPayoutStatus($payrollItem->id, $data);
+            } catch (Throwable $error) {
+                report($error);
+
+                return response()->json(['error' => 'Le webhook de virement Paie n’a pas pu être traité.'], 500);
             }
 
             return response()->json(['received' => true]);

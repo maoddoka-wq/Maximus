@@ -139,6 +139,7 @@ const CompanyOrganizationAdmin = lazy(() =>
 );
 const CompanySetupGuide = lazy(() => import('@/pages/company-setup-guide'));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
+const PayrollModulePage = lazy(() => import('@/pages/payroll-module'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
 );
@@ -1057,6 +1058,7 @@ function AppContent() {
                     finance: FinancePage,
                     commerce: CommerceModulePage,
                     operational: OperationalModulePage,
+                    payroll: PayrollModulePage,
                     humanResources: HumanResourcesWorkspace,
                     presence: PresenceModulePage,
                     reports: OperationalReportsPage,
@@ -6399,6 +6401,7 @@ function ModulePackTestWorkbench({
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
             {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
+            {module.id === 'paie' && <PayrollModulePage companyId={previewCompanyId || 'module-preview'} employees={[]} canCreate={false} canModify={false} preview />}
            {module.id === 'ecommerce' && (
              <EcommerceModulePage
                companyId={previewCompanyId || 'module-preview'}
@@ -6408,7 +6411,7 @@ function ModulePackTestWorkbench({
                preview
              />
            )}
-          {operationalModules.includes(module.id) && (
+          {operationalModules.includes(module.id) && module.id !== 'paie' && (
             <OperationalModulePage
               moduleId={module.id}
               data={data}
@@ -6417,7 +6420,7 @@ function ModulePackTestWorkbench({
             />
           )}
           {module.id === 'rapports' && <OperationalReportsPage data={data} />}
-           {!['stocks', 'commerce', 'ventes', 'ecommerce', 'finance', 'rh', 'presences', 'rapports', ...operationalModules].includes(
+           {!['stocks', 'commerce', 'ventes', 'ecommerce', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
             module.id,
           ) && (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">

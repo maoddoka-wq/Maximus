@@ -24,6 +24,7 @@ export type ModuleRouteKind =
   | 'finance'
   | 'humanResources'
   | 'presence'
+  | 'payroll'
   | 'reports'
   | 'operational';
 
@@ -49,7 +50,7 @@ const moduleRouteConfig: Record<
   comptabilite: { icon: FileBarChart, routeKind: 'operational' },
   rh: { icon: UserRoundCog, routeKind: 'humanResources' },
   presences: { icon: FileClock, routeKind: 'presence' },
-  paie: { icon: CreditCard, routeKind: 'operational' },
+  paie: { icon: CreditCard, routeKind: 'payroll' },
   crm: { icon: Users, routeKind: 'operational' },
   fournisseurs: { icon: Store, routeKind: 'operational' },
   logistique: { icon: Warehouse, routeKind: 'operational' },

@@ -44,7 +44,7 @@ final class ModuleAuthorization
             return self::allowsEcommerce($permissions, $action, $feature);
         }
 
-        return false;
+        return self::allowsGeneric($permissions, $module, $action, $feature);
     }
 
     public static function allowsPresenceClock(array $actor, string $employeeId): bool
@@ -125,6 +125,21 @@ final class ModuleAuthorization
         }
 
         return self::contains($permissions['ecommerce'] ?? [], $required);
+    }
+
+    private static function allowsGeneric(array $permissions, string $module, string $action, ?string $feature): bool
+    {
+        $required = self::stockAction($action);
+        $prefix = $module.':menu:';
+        $detailed = array_filter(array_keys($permissions), fn (string $key): bool => str_starts_with($key, $prefix));
+        if ($feature && $detailed !== []) {
+            return self::contains($permissions[$prefix.$feature] ?? [], $required);
+        }
+        if ($detailed !== []) {
+            return $action === 'view' && collect($detailed)->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], 'voir'));
+        }
+
+        return self::contains($permissions[$module] ?? [], $required);
     }
 
     private static function stockAction(string $action): string

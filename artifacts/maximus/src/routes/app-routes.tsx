@@ -132,6 +132,7 @@ export type CompanyRouteScreens = {
   finance: Screen;
   commerce: Screen;
   operational: Screen;
+  payroll: Screen;
   humanResources: Screen;
   presence: Screen;
   reports: Screen;
@@ -312,6 +313,15 @@ export function CompanyRouter({
       singleModuleNavigation,
       initialTab: routePath === '/entreprise/ventes' ? 'sales' : 'dashboard',
       onNavigate,
+    });
+  }
+  if (routePath === '/entreprise/paie') {
+    return renderScreen(screens.payroll, {
+      companyId,
+      employees: data.employees.filter(item => item.companyId === companyId),
+      canCreate: hasPermission('paie', 'créer'),
+      canModify: hasPermission('paie', 'modifier'),
+      singleModuleNavigation,
     });
   }
   const operationalModule =
