@@ -5,6 +5,7 @@ import type { PresencePermission } from '@/lib/employee-permissions';
 import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
 import { normalizeRoutePath } from '@/lib/navigation';
 import type { AssistantInsight, AssistantScope } from '@/lib/local-assistant';
+import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -345,6 +346,7 @@ export function CompanyRouter({
       canCreate: hasPermission('paie', 'créer'),
       canModify: hasPermission('paie', 'modifier'),
       visibleFeatureIds: payrollFeatureIds,
+      activeFeatureId: normalizePayrollFeatureId(query.get('feature') ?? '') ?? 'tableau-de-bord',
       singleModuleNavigation,
     });
   }
