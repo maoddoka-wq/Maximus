@@ -33,6 +33,12 @@ Feature visibility must use the explicit feature selection, while dependencies r
 
 **How to apply:** Preserve dependencies when calculating effective permissions, but pass the pack or unit’s explicit feature ids to tests, navigation, and tab guards; never infer visible pack scope from dependency-expanded role permissions.
 
+Pour Paie, une entreprise sans sélection explicite ne doit pas recevoir toutes les fonctionnalités du module par défaut : l’absence de sélection signifie qu’aucune fonctionnalité Paie n’est visible.
+
+**Why:** Le fallback global vers `module.features` transforme une absence de configuration en activation des sept écrans Paie, ce qui donne à l’administrateur une capacité qu’il n’a pas choisie.
+
+**How to apply:** Conserver un tableau vide comme sélection explicite pour Paie, afficher un état vide dans la page et ne jamais reconstruire la navigation à partir de la définition complète du module.
+
 Feature manifests must expose stable ids separately from display labels; navigation and access checks should consume the manifest ids rather than slugging translated labels.
 
 **Why:** Slugging labels such as “Tableau de bord” or “Paramètres” produces ids that no longer match pack selections like `dashboard` or `parametres`, silently hiding authorized features or showing the wrong scope.

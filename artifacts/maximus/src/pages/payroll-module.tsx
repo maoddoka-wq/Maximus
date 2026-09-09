@@ -113,6 +113,9 @@ export default function PayrollModulePage({ companyId: _companyId, employees = [
   const statusLabel: Record<string, string> = { DRAFT: 'Brouillon', PENDING_APPROVAL: 'À valider', APPROVED: 'Validée', PROCESSING: 'Virements en cours', COMPLETED: 'Terminée', PARTIAL: 'Partielle', FAILED: 'Échouée' };
   if (loading) return <div className="card-surface rounded-2xl p-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement du module Paie…</div>;
   if (!data) return <div className="card-surface rounded-2xl p-10 text-center text-sm text-red-700">{error || 'Module Paie indisponible.'}</div>;
+  if (visibleFeatureIds && visibleFeatures.size === 0) {
+    return <div className="card-surface rounded-2xl p-10 text-center"><p className="font-bold">Aucune fonctionnalité Paie activée</p><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">L’administrateur de l’entreprise doit sélectionner au moins une fonctionnalité Paie avant d’ouvrir cet espace.</p></div>;
+  }
 
   return <div className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4">

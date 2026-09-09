@@ -121,6 +121,27 @@ test('affiche les fonctionnalités de tous les modules autorisés dans le menu e
   assert.equal(access.verticalModuleNavigation, true);
 });
 
+test('n’affiche aucune fonctionnalité Paie sans sélection explicite de l’entreprise', () => {
+  const { data, company } = createAccessFixture();
+  company.requestedModules = ['paie'];
+  company.allowedModules = ['paie'];
+  delete company.requestedModuleFeatures;
+  delete company.requestedModulePackIds;
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.selectedPayrollFeatureIds, []);
+  assert.deepEqual(access.sidebarFeatureGroups, []);
+});
+
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {
   const { data, company, employee } = createAccessFixture();
   const foreignCompany = { ...company, id: 'foreign-company' };
