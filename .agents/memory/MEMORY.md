@@ -32,3 +32,4 @@
 - [Normalisation des réponses E-commerce](ecommerce-response-boundary.md) — protéger les vues contre les commandes et collections historiques incomplètes avant rendu.
 - [Overrides de catalogue tolérants](catalogue-override-normalization.md) — nettoyer les modules, packs et permissions persistés avant tout rendu administratif.
 - [Surveillance de santé Render](render-health-monitoring.md) — utiliser la sonde `/api/healthz` existante pour détecter et persister les incidents sans worker séparé.
+- [Identité publique des boutiques](public-store-identity.md) — les noms peuvent être identiques entre entreprises, mais chaque slug public doit rester globalement unique.

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Support\CompanyRegistry;
+use App\Support\ModuleCatalog;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -140,6 +141,77 @@ class EcommerceTest extends TestCase
             'price' => 12000,
             'stock' => 3,
         ])->assertCreated()->assertJsonPath('slug', 'sac-atlas-2');
+    }
+
+    public function test_same_store_name_keeps_each_company_isolated_with_a_unique_public_slug(): void
+    {
+        $first = $this->asActor()
+            ->patchJson('/api/ecommerce/store?companyId=kora', [
+                'name' => 'Boutique commune',
+                'slug' => 'boutique-commune',
+                'description' => 'Catalogue de la première entreprise',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primaryColor' => '#D69E2E',
+                'accentColor' => '#172033',
+            ])
+            ->assertOk()
+            ->json();
+
+        CompanyRegistry::ensureActive('other-company', 'Autre entreprise');
+        ModuleCatalog::ensureCompanyAccess('other-company');
+        $otherUser = AuthUser::query()->create([
+            'id' => 'ecommerce-other-company',
+            'email' => 'ecommerce-other-company@demo.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Autre boutiquier',
+            'role' => 'company_admin',
+            'company_id' => 'other-company',
+            'employee_id' => null,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $otherRequest = $this
+            ->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($otherUser));
+
+        $second = $otherRequest
+            ->patchJson('/api/ecommerce/store?companyId=other-company', [
+                'name' => 'Boutique commune',
+                'slug' => 'boutique-commune',
+                'description' => 'Catalogue de la deuxième entreprise',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primaryColor' => '#123456',
+                'accentColor' => '#654321',
+            ])
+            ->assertOk()
+            ->assertJsonPath('slug', 'boutique-commune-2')
+            ->json();
+
+        $this->assertNotSame($first['id'], $second['id']);
+        $this->assertDatabaseHas('ecommerce_stores', [
+            'id' => $first['id'],
+            'company_id' => 'kora',
+            'name' => 'Boutique commune',
+            'description' => 'Catalogue de la première entreprise',
+            'slug' => 'boutique-commune',
+        ]);
+        $this->assertDatabaseHas('ecommerce_stores', [
+            'id' => $second['id'],
+            'company_id' => 'other-company',
+            'name' => 'Boutique commune',
+            'description' => 'Catalogue de la deuxième entreprise',
+            'slug' => 'boutique-commune-2',
+        ]);
+
+        $this->getJson('/api/shop/boutique-commune')
+            ->assertOk()
+            ->assertJsonPath('store.description', 'Catalogue de la première entreprise');
+        $this->getJson('/api/shop/boutique-commune-2')
+            ->assertOk()
+            ->assertJsonPath('store.description', 'Catalogue de la deuxième entreprise');
     }
 
     public function test_published_shop_recalculates_total_and_decrements_stock_transactionally(): void

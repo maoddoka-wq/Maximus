@@ -75,14 +75,10 @@ class EcommerceController extends Controller
             'logoUrl' => ['nullable', 'string', 'max:500'],
         ])->validate();
         $company = $this->company($request);
-        $existing = DB::table('ecommerce_stores')->where('id', '!=', 'ecommerce-store-'.$company)->where('slug', $input['slug'])->exists();
-        if ($existing) {
-            return response()->json(['error' => 'Ce slug de boutique est déjà utilisé.'], 422);
-        }
-
         $row = $this->ensureStore($company);
+        $slug = $this->uniqueStoreSlug($input['slug'], (string) $row->id);
         $storeValues = [
-            'slug' => $input['slug'],
+            'slug' => $slug,
             'name' => $input['name'],
             'description' => $input['description'] ?? '',
             'status' => $input['status'],
@@ -92,8 +88,8 @@ class EcommerceController extends Controller
             'logo_url' => array_key_exists('logoUrl', $input) ? ($input['logoUrl'] ?? '') : ($row->logo_url ?? ''),
             'updated_at' => now(),
         ];
-        if (DB::table('ecommerce_stores')->where('id', $row->id)->exists()) {
-            DB::table('ecommerce_stores')->where('id', $row->id)->update($storeValues);
+        if (DB::table('ecommerce_stores')->where('id', $row->id)->where('company_id', $company)->exists()) {
+            DB::table('ecommerce_stores')->where('id', $row->id)->where('company_id', $company)->update($storeValues);
         } else {
             DB::table('ecommerce_stores')->insert(array_merge([
                 'id' => $row->id,
@@ -102,7 +98,12 @@ class EcommerceController extends Controller
             ], $storeValues));
         }
 
-        return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $row->id)->first()));
+        return response()->json($this->store(
+            DB::table('ecommerce_stores')
+                ->where('id', $row->id)
+                ->where('company_id', $company)
+                ->first(),
+        ));
     }
 
     public function uploadStoreLogo(Request $request): JsonResponse
@@ -1731,12 +1732,19 @@ class EcommerceController extends Controller
 
     private function ensureStore(string $company): object
     {
-        $id = 'ecommerce-store-'.$company;
-        $existing = DB::table('ecommerce_stores')->where('id', $id)->first();
+        $existing = DB::table('ecommerce_stores')
+            ->where('company_id', $company)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
         if ($existing) {
             return $existing;
         }
 
+        $id = 'ecommerce-store-'.$company;
+        if (DB::table('ecommerce_stores')->where('id', $id)->exists()) {
+            $id = $this->id('store');
+        }
         $baseSlug = Str::slug($company).'-boutique';
         $slug = $baseSlug;
         $suffix = 2;
@@ -1756,6 +1764,26 @@ class EcommerceController extends Controller
             'accent_color' => '#172033',
             'logo_url' => '',
         ];
+    }
+
+    private function uniqueStoreSlug(string $requested, string $ignoreId): string
+    {
+        $base = Str::slug(trim($requested));
+        if ($base === '') {
+            $base = 'boutique';
+        }
+
+        $slug = $base;
+        $suffix = 2;
+        while (DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('id', '!=', $ignoreId)
+            ->exists()) {
+            $slug = $base.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $slug;
     }
 
     private function allowed(Request $request, string $action, ?string $feature = null): bool
