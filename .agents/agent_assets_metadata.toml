@@ -84,3 +84,31 @@ mtime_ms = 1788945074100
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/b0778150-8ed5-47e8-8a5a-0ce5586fc8b7/9a47917d-0841-4aee-b427-920992ba00af"
 storage_version_token = "1788945091462794"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "xx83-ry4PK9DOKGHAoU1K"
+uri = "file://.agents/outputs/maximus-affiche-a4.pdf"
+type = "pdf"
+title = "Affiche MAXIMUS — format A4"
+description = "Affiche publicitaire MAXIMUS prête à imprimer au format A4. Ajoutez vos coordonnées dans les emplacements prévus avant impression."
+logical_id = "8c89679f-20d3-4b09-8d8a-c09b373e1183"
+content_hash = "sha256:1bc5844f76946e76fd7757aa575da4087b309aaff7c3570d20b8c88de6cd2feb"
+size = 1201056
+mtime_ms = 1788967859487
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/8c89679f-20d3-4b09-8d8a-c09b373e1183/33c4abfd-806f-469f-8a5a-d6268c43a5e5"
+storage_version_token = "1788967868347160"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "Mkq0KiNJW4OIcn946cM60"
+uri = "file://.agents/outputs/maximus-affiche-a4.png"
+type = "image"
+title = "Aperçu de l’affiche MAXIMUS"
+description = "Aperçu image de l’affiche publicitaire MAXIMUS."
+logical_id = "22ca4932-39bf-4bf8-81ab-31712e81f55d"
+content_hash = "sha256:8a9498771cdcc7a6a73d37dccc807d24bd62dde543fc35131901881d81a96e8b"
+size = 162045
+mtime_ms = 1788967859823
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/22ca4932-39bf-4bf8-81ab-31712e81f55d/ff0763bc-4398-4ccb-93b4-3dbb6a32ccbb"
+storage_version_token = "1788967868986313"
+content_type = "image/png"
