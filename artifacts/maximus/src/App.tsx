@@ -742,12 +742,13 @@ function AppContent() {
     const state = window.history.state as { maximusIndex?: number } | null;
     const currentIndex = typeof state?.maximusIndex === 'number' ? state.maximusIndex : 0;
     const nextPath = canonicalAppPath(path);
-    setLocation(nextPath);
-    window.history.replaceState(
-      { ...(window.history.state ?? {}), maximus: true, maximusIndex: currentIndex + 1 },
-      '',
-      window.location.href,
-    );
+    setLocation(nextPath, {
+      state: {
+        ...(window.history.state ?? {}),
+        maximus: true,
+        maximusIndex: currentIndex + 1,
+      },
+    });
     setMobileOpen(false);
   };
   const goBack = (fallback: string) => {
