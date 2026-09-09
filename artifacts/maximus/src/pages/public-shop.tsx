@@ -507,8 +507,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
                {scrollNavItems.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className="shrink-0 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
              </div>
            </nav>
+           {accountNavItem && <button type="button" onClick={() => go(accountNavItem.path)} className="shrink-0 rounded-lg border-l border-white/20 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/10">{accountNavItem.label}</button>}
          </div>
-          {accountNavItem && <button type="button" onClick={() => go(accountNavItem.path)} className="order-1 shrink-0 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/15 sm:order-none">{accountNavItem.label}</button>}
       </div>
     </header>
      <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
