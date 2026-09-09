@@ -885,6 +885,7 @@ function AppContent() {
     presenceEmployees,
     selectedPresenceFeatureIds,
     selectedEcommerceFeatureIds,
+    selectedPayrollFeatureIds,
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
@@ -1065,6 +1066,7 @@ function AppContent() {
                   hasPresencePermission={hasPresencePermission}
                   presenceFeatureIds={selectedPresenceFeatureIds}
                   ecommerceFeatureIds={selectedEcommerceFeatureIds}
+                  payrollFeatureIds={selectedPayrollFeatureIds}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
@@ -6414,7 +6416,7 @@ function ModulePackTestWorkbench({
             <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
             {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
-            {module.id === 'paie' && <PayrollModulePage companyId={previewCompanyId || 'module-preview'} employees={[]} canCreate={false} canModify={false} preview />}
+            {module.id === 'paie' && <PayrollModulePage companyId={previewCompanyId || 'module-preview'} employees={[]} canCreate={false} canModify={false} visibleFeatureIds={authorizedFeatures} preview />}
            {module.id === 'ecommerce' && (
              <EcommerceModulePage
                companyId={previewCompanyId || 'module-preview'}

@@ -1,5 +1,10 @@
 import { presenceFeatureDefinitions, presenceFeatureDependencies, presenceFeaturePacks } from './presence-features';
 import { ecommerceFeatureDefinitions, ecommerceFeatureDependencies, ecommerceFeaturePacks } from './ecommerce-features';
+import {
+  normalizePayrollFeatureIds,
+  normalizePayrollPermissionMap,
+  payrollFeatureDefinitions,
+} from './payroll-features';
 import type { ModuleId } from './module-ids';
 import { buildSubscriptionForCompany, type CompanySubscription } from './subscription-model';
 import type { CatalogDraft } from './catalog-workflow';
@@ -136,7 +141,7 @@ export const modules: Module[] = [
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
   ], status: 'ACTIF' },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
-  { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'], featurePacks: [
+  { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: payrollFeatureDefinitions.map(feature => feature.label), featurePacks: [
     {
       id: 'paie-consultation',
       name: 'Consultation paie',
@@ -259,7 +264,7 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
       const override = data.moduleOverrides?.[module.id];
       if (!override || typeof override !== 'object') return module;
 
-      const featurePacks = Array.isArray(override.featurePacks)
+      let featurePacks = Array.isArray(override.featurePacks)
         ? override.featurePacks
             .filter((pack): pack is ModuleFeaturePack => Boolean(pack && typeof pack === 'object'))
             .map(pack => ({
@@ -284,6 +289,14 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
             }))
             .filter(pack => pack.id.length > 0)
         : module.featurePacks;
+
+      if (module.id === 'paie') {
+        featurePacks = (featurePacks ?? []).map(pack => ({
+          ...pack,
+          featureIds: normalizePayrollFeatureIds(pack.featureIds),
+          featurePermissions: normalizePayrollPermissionMap(pack.featurePermissions),
+        }));
+      }
 
       return {
         ...module,
@@ -367,6 +380,49 @@ function normalizeStringArrayMap(value: unknown): Partial<Record<string, string[
   );
 }
 
+function normalizeModuleFeatureMap(value: unknown): Partial<Record<ModuleId, string[]>> {
+  const normalized = normalizeStringArrayMap(value);
+  if (Array.isArray(normalized.paie)) {
+    normalized.paie = normalizePayrollFeatureIds(normalized.paie);
+  }
+  return normalized as Partial<Record<ModuleId, string[]>>;
+}
+
+function normalizeModulePermissionMap(value: unknown): Partial<Record<ModuleId, Partial<Record<string, string[]>>>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).map(([moduleId, permissions]) => {
+      if (!permissions || typeof permissions !== 'object' || Array.isArray(permissions)) {
+        return [moduleId, {}];
+      }
+      const normalizedPermissions = Object.fromEntries(
+        Object.entries(permissions).map(([featureId, values]) => [featureId, normalizeStringArray(values)]),
+      );
+      return [
+        moduleId,
+        moduleId === 'paie'
+          ? normalizePayrollPermissionMap(normalizedPermissions)
+          : normalizedPermissions,
+      ];
+    }),
+  ) as Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
+}
+
+function normalizeRolePermissions(value: unknown): Record<string, string[]> {
+  const normalized = Object.fromEntries(
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.entries(value).map(([key, values]) => [key, normalizeStringArray(values)])
+      : [],
+  );
+  const payrollPermissions = Object.fromEntries(
+    Object.entries(normalized).filter(([key]) => key === 'paie' || key.startsWith('paie:')),
+  );
+  return {
+    ...normalized,
+    ...normalizePayrollPermissionMap(payrollPermissions),
+  };
+}
+
 export function normalizeStoreData(input: Partial<StoreData> | null | undefined): StoreData {
   const defaults = emptyStoreData();
   const source = input && typeof input === 'object' ? input : {};
@@ -399,10 +455,21 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
         normalizedCompany.requestedModulePackIds = normalizeStringArrayMap(raw.requestedModulePackIds) as Partial<Record<ModuleId, string[]>>;
       }
       if (raw.requestedModuleFeatures !== undefined) {
-        normalizedCompany.requestedModuleFeatures = normalizeStringArrayMap(raw.requestedModuleFeatures) as Partial<Record<ModuleId, string[]>>;
+        normalizedCompany.requestedModuleFeatures = normalizeModuleFeatureMap(raw.requestedModuleFeatures);
+      }
+      if (raw.requestedModulePermissions !== undefined) {
+        normalizedCompany.requestedModulePermissions = normalizeModulePermissionMap(raw.requestedModulePermissions);
       }
       return normalizedCompany;
     });
+  normalized.orgNodes = normalized.orgNodes.map(node => ({
+    ...node,
+    ...(node.moduleFeatures ? { moduleFeatures: normalizeModuleFeatureMap(node.moduleFeatures) } : {}),
+  }));
+  normalized.roles = normalized.roles.map(role => ({
+    ...role,
+    modulePermissions: normalizeRolePermissions(role.modulePermissions),
+  }));
   if (!source.commerceStates || Array.isArray(source.commerceStates) || typeof source.commerceStates !== 'object') {
     normalized.commerceStates = defaults.commerceStates;
   }

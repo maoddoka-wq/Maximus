@@ -154,6 +154,7 @@ export function CompanyRouter({
   presenceEmployees,
   presenceFeatureIds,
   ecommerceFeatureIds,
+  payrollFeatureIds,
   hasPermission,
   hasPresencePermission,
   stockPermissions,
@@ -177,6 +178,7 @@ export function CompanyRouter({
   presenceEmployees: Employee[];
   presenceFeatureIds?: string[];
   ecommerceFeatureIds?: string[];
+  payrollFeatureIds?: string[];
   hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean;
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
@@ -321,6 +323,7 @@ export function CompanyRouter({
       employees: data.employees.filter(item => item.companyId === companyId),
       canCreate: hasPermission('paie', 'créer'),
       canModify: hasPermission('paie', 'modifier'),
+      visibleFeatureIds: payrollFeatureIds,
       singleModuleNavigation,
     });
   }

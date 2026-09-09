@@ -38,6 +38,7 @@ export type AppAccessContext = {
   presenceEmployees: Employee[];
   selectedPresenceFeatureIds?: string[];
   selectedEcommerceFeatureIds?: string[];
+  selectedPayrollFeatureIds?: string[];
   stockPermissions?: Record<string, string[]>;
   commerceTabIds?: string[];
   sidebarFeatureGroups: SidebarFeatureGroup[];
@@ -152,6 +153,13 @@ export function buildAppAccessContext({
       : accessRole && ecommerceModule
         ? [...getSelectedFeatureIds(accessRole, ecommerceModule, employeeNode?.moduleFeatures?.[ecommerceModule.id])]
         : undefined;
+  const payrollModule = configuredModules.find(module => module.id === 'paie');
+  const selectedPayrollFeatureIds =
+    payrollModule && companyAdmin
+      ? companySelectedFeatureIds(payrollModule)
+      : accessRole && payrollModule
+        ? [...getSelectedFeatureIds(accessRole, payrollModule, employeeNode?.moduleFeatures?.[payrollModule.id])]
+        : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
@@ -227,6 +235,7 @@ export function buildAppAccessContext({
     presenceEmployees,
     selectedPresenceFeatureIds,
     selectedEcommerceFeatureIds,
+    selectedPayrollFeatureIds,
     stockPermissions,
     commerceTabIds,
     sidebarFeatureGroups,
