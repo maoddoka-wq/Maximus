@@ -31,3 +31,4 @@
 - [Isolation des aperçus de modules](module-preview-isolation.md) — les tests administratifs restent autonomes, sans entreprise réelle ni appel d’écriture en production.
 - [Normalisation des réponses E-commerce](ecommerce-response-boundary.md) — protéger les vues contre les commandes et collections historiques incomplètes avant rendu.
 - [Overrides de catalogue tolérants](catalogue-override-normalization.md) — nettoyer les modules, packs et permissions persistés avant tout rendu administratif.
+- [Surveillance de santé Render](render-health-monitoring.md) — utiliser la sonde `/api/healthz` existante pour détecter et persister les incidents sans worker séparé.

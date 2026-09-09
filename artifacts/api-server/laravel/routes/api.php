@@ -5,18 +5,26 @@ use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
+use App\Services\SystemHealthService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
 Route::get('/healthz', function () {
     try {
-        DB::connection()->getPdo();
+        $health = app(SystemHealthService::class)->run();
+        $database = collect($health['checks'])->firstWhere('key', 'database');
+        $ok = $health['status'] === 'OPERATIONAL';
 
-        return response()->json(['ok' => true, 'database' => true]);
+        return response()->json([
+            'ok' => $ok,
+            'database' => ($database['status'] ?? null) === 'UP',
+            'status' => $health['status'],
+            'checkedAt' => $health['checkedAt'],
+        ], $ok ? 200 : 503);
     } catch (\Throwable $exception) {
         report($exception);
 
-        return response()->json(['ok' => false, 'database' => false], 503);
+        return response()->json(['ok' => false, 'database' => false, 'status' => 'DOWN'], 503);
     }
 });
 
