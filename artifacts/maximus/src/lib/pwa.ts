@@ -17,11 +17,12 @@ export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userA
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
-export function mountClientManifest(manifestUrl: string, storeName: string, storeLogoUrl?: string) {
-  const version = encodeURIComponent(`${storeName}|${storeLogoUrl ?? ''}`);
+export function mountClientManifest(manifestUrl: string) {
   const link = document.createElement('link');
   link.rel = 'manifest';
-  link.href = `${manifestUrl}${manifestUrl.includes('?') ? '&' : '?'}v=${version}`;
+  // Keep one stable manifest URL so installed PWAs can update their name and icon.
+  // The API response is explicitly no-store and always reflects the latest store data.
+  link.href = manifestUrl;
   link.dataset.maximusClientManifest = 'true';
   document.head.appendChild(link);
 

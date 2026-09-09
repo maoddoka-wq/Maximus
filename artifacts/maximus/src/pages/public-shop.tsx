@@ -167,7 +167,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     const manifestUrl = domain
       ? '/api/shop-domain/manifest.webmanifest'
       : `/api/shop/${encodeURIComponent(slug ?? data.store.slug)}/manifest.webmanifest`;
-    return mountClientManifest(manifestUrl, data.store.name, data.store.logoUrl);
+    return mountClientManifest(manifestUrl);
   }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, slug]);
 
   useEffect(() => {
