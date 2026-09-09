@@ -14,6 +14,39 @@ class AppStateRecoveryTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_public_registration_catalog_exposes_only_the_published_catalog(): void
+    {
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'catalogVersion' => 4,
+                'sectorPresets' => [[
+                    'id' => 'batiment',
+                    'name' => 'Bâtiment',
+                    'moduleIds' => ['commerce'],
+                    'modulePackIds' => ['commerce' => ['commerce-gestion']],
+                ]],
+                'moduleOverrides' => ['commerce' => ['name' => 'Ventes']],
+                'catalogDraft' => [
+                    'sectorPresets' => [['id' => 'draft', 'name' => 'Brouillon']],
+                ],
+                'companies' => [['id' => 'private-company', 'name' => 'Ne pas exposer']],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 8,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/registration-catalog')
+            ->assertOk()
+            ->assertJsonPath('version', 8)
+            ->assertJsonPath('catalog.catalogVersion', 4)
+            ->assertJsonPath('catalog.sectorPresets.0.name', 'Bâtiment')
+            ->assertJsonPath('catalog.moduleOverrides.commerce.name', 'Ventes')
+            ->assertJsonMissingPath('catalog.catalogDraft')
+            ->assertJsonMissingPath('catalog.companies');
+    }
+
     public function test_bootstrap_recovers_company_and_employee_modules_when_state_is_missing(): void
     {
         ModuleCatalog::ensureCompanyAccess('recovery-company', ['stocks']);

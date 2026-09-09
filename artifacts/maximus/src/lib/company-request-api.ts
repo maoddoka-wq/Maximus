@@ -29,6 +29,7 @@ export const companyRequestApi = {
     manager: string;
     email: string;
     password: string;
+    phone?: string;
     country?: string;
     sector?: string;
     requestedModules: ModuleId[];

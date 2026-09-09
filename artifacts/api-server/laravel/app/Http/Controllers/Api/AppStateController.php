@@ -13,6 +13,26 @@ use Illuminate\Support\Str;
 
 class AppStateController extends Controller
 {
+    public function registrationCatalog(): JsonResponse
+    {
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = is_string($row?->payload)
+            ? json_decode($row->payload, true)
+            : ($row?->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+
+        return response()->json([
+            'version' => (int) ($row?->version ?? 0),
+            'catalog' => [
+                'sectorPresets' => array_key_exists('sectorPresets', $state) ? $state['sectorPresets'] : null,
+                'moduleOverrides' => $state['moduleOverrides'] ?? [],
+                'moduleStatuses' => $state['moduleStatuses'] ?? [],
+                'removedModules' => $state['removedModules'] ?? [],
+                'catalogVersion' => $state['catalogVersion'] ?? null,
+            ],
+        ]);
+    }
+
     public function bootstrap(Request $request): JsonResponse
     {
         $actor = $request->attributes->get('authActor');

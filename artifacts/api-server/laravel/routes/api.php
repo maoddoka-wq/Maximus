@@ -30,6 +30,7 @@ Route::get('/healthz', function () {
     }
 });
 
+Route::get('/registration-catalog', [AppStateController::class, 'registrationCatalog']);
 Route::post('/company-requests', [CompanyController::class, 'createRequest'])->middleware('throttle:login');
 
 Route::prefix('auth')->group(function () {

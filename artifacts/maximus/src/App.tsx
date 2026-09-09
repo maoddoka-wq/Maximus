@@ -103,6 +103,7 @@ import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-regist
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
+import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { publicEcommerceApi } from '@/lib/ecommerce-api';
 import {
   loadCompanyModuleAccess,
@@ -336,6 +337,7 @@ const routesWithModuleHeaders = new Set([
 function AppContent() {
   const { alert, confirm } = useAppDialog();
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
+  const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>(
     () => (window.location.pathname === '/'
@@ -424,6 +426,33 @@ function AppContent() {
         localStorage.removeItem('maximus-session');
       });
   }, []);
+  useEffect(() => {
+    if (session || pathname !== '/inscription') return undefined;
+    let cancelled = false;
+    void registrationCatalogApi.bootstrap()
+      .then(({ catalog, version }) => {
+        if (cancelled) return;
+        setData((previous) =>
+          sanitizeStoreData({
+            ...previous,
+            ...(catalog.sectorPresets !== null && catalog.sectorPresets !== undefined
+              ? { sectorPresets: catalog.sectorPresets }
+              : {}),
+            moduleOverrides: catalog.moduleOverrides ?? previous.moduleOverrides,
+            moduleStatuses: catalog.moduleStatuses ?? previous.moduleStatuses,
+            removedModules: catalog.removedModules ?? previous.removedModules,
+            catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
+          }),
+        );
+        setRegistrationCatalogVersion(version);
+      })
+      .catch(() => {
+        // Les secteurs intégrés restent disponibles si le catalogue distant est indisponible.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, session]);
   useEffect(() => {
     if (!session || session.startsWith('company:sector-test-')) {
       return undefined;
@@ -773,6 +802,7 @@ function AppContent() {
       />
     ) : (
       <Signup
+        key={`signup-${registrationCatalogVersion}`}
         data={data}
         onComplete={() => {
           setToast('Votre demande a bien été envoyée.');
@@ -1243,9 +1273,11 @@ function Signup({
   const [name, setName] = useState('');
   const [manager, setManager] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('Sénégal');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [sector, setSector] = useState('');
+  const [sector, setSector] = useState(initialPreset.name);
   const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
   const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
   const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(
@@ -1513,15 +1545,28 @@ function Signup({
                 type="email"
                 testId="input-company-email"
               />
+              <Field
+                label="Téléphone"
+                placeholder="+221 77 000 00 00"
+                value={phone}
+                onChange={setPhone}
+                testId="input-company-phone"
+              />
+              <Field
+                label="Pays"
+                placeholder="Sénégal"
+                value={country}
+                onChange={setCountry}
+                testId="input-company-country"
+              />
               <label className="block text-sm font-semibold">
-                Secteur <span className="font-normal text-[hsl(var(--muted-foreground))]">(optionnel)</span>
+                Secteur
                 <select
                   data-testid="select-company-sector"
                   value={sector}
                   onChange={(e) => changeSector(e.target.value)}
                   className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
                 >
-                  <option value="">Je préciserai plus tard</option>
                   {data.sectorPresets.map((preset) => (
                     <option key={preset.id} value={preset.name}>
                       {preset.name}
@@ -1529,7 +1574,7 @@ function Signup({
                   ))}
                 </select>
                 <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-                  Vous pourrez le définir depuis votre espace.
+                  Ce choix détermine les modules proposés au démarrage.
                 </span>
               </label>
               <Field
@@ -1737,7 +1782,7 @@ function Signup({
                  </p>
                )}
                <button
-                disabled={selectedModules.length === 0}
+                 disabled={selectedModules.length === 0 || !sector}
                 data-testid="button-submit-signup"
                  onClick={() => {
                    if (submitting) return;
@@ -1766,7 +1811,8 @@ function Signup({
                      manager: manager.trim(),
                      email: email.trim(),
                      password,
-                     country: 'Sénégal',
+                      phone: phone.trim(),
+                      country: country.trim(),
                      sector: sector.trim(),
                      requestedModules: selectedModules,
                      requestedModulePackIds: Object.fromEntries(
@@ -6319,6 +6365,8 @@ function AdminCreateCompanyPage({
   const [name, setName] = useState('');
   const [manager, setManager] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('Sénégal');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [sector, setSector] = useState(initialPreset.name);
@@ -6347,6 +6395,7 @@ function AdminCreateCompanyPage({
       !name.trim() ||
       !manager.trim() ||
       !normalizedEmail ||
+      !country.trim() ||
       password.length < 8 ||
       password !== passwordConfirm ||
       !orgName.trim() ||
@@ -6371,7 +6420,8 @@ function AdminCreateCompanyPage({
         manager: manager.trim(),
         email: normalizedEmail,
         password,
-        country: 'Sénégal',
+        phone: phone.trim(),
+        country: country.trim(),
         sector,
         requestedModules: [...selectedModules],
         requestedModulePackIds: Object.fromEntries(
@@ -6422,6 +6472,20 @@ function AdminCreateCompanyPage({
             type="email"
             placeholder="admin@entreprise.com"
             testId="input-admin-company-email"
+          />
+          <Field
+            label="Téléphone"
+            value={phone}
+            onChange={setPhone}
+            placeholder="+221 77 000 00 00"
+            testId="input-admin-company-phone"
+          />
+          <Field
+            label="Pays"
+            value={country}
+            onChange={setCountry}
+            placeholder="Sénégal"
+            testId="input-admin-company-country"
           />
           <label className="block text-sm font-semibold">
             Secteur
