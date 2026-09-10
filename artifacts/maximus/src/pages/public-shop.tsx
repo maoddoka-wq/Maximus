@@ -537,7 +537,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              </button>
              <button type="button" onClick={() => go('')} className="min-w-0 text-left">
                 <span className="line-clamp-2 break-words text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{store.name}</span>
-                <span className="line-clamp-1 text-xs text-[hsl(var(--muted-foreground))]">{store.description || 'Votre boutique en ligne'}</span>
              </button>
            </div>
           <nav id="mobile-shop-menu" className={`${mobileMenu ? 'flex' : 'hidden'} absolute right-4 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-black/5 bg-white p-2 shadow-2xl ring-1 ring-black/5 sm:static sm:flex sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0`}>
