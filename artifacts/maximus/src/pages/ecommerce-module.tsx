@@ -33,6 +33,7 @@ import {
   type EcommerceCategory,
   type EcommerceDeliveryRequest,
   type EcommerceDeliveryRequestStatus,
+  type EcommerceDeliveryZone,
   type EcommerceDomain,
   type EcommerceOrder,
   type EcommerceOrderStatus,
@@ -115,6 +116,7 @@ function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: strin
     products: Array.isArray(payload.products) ? payload.products : [],
     rentals: Array.isArray(payload.rentals) ? payload.rentals : [],
     orders,
+    deliveryZones: Array.isArray(payload.deliveryZones) ? payload.deliveryZones : [],
     deliveryRequests: Array.isArray(payload.deliveryRequests) ? payload.deliveryRequests : [],
   };
 }
@@ -257,6 +259,7 @@ export default function EcommerceModulePage({
         products: [],
         rentals: [],
         orders: [],
+        deliveryZones: [],
         deliveryRequests: [],
       });
       setWalletData(null);
@@ -352,7 +355,7 @@ export default function EcommerceModulePage({
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
        {tab === 'location' && <RentalPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />}
-      {tab === 'livraisons' && <Deliveries data={data} canModify={canModify} run={run} />}
+      {tab === 'livraisons' && <Deliveries data={data} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} pendingAction={pendingAction} />}
       {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
       </>}
@@ -920,18 +923,59 @@ function Promotions() {
   return <div className="fade-up"><Panel title="Promotions" description="Préparez vos temps forts commerciaux sans perdre de vue la cohérence de votre catalogue."><div className="mx-auto max-w-2xl py-8 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Megaphone size={24} /></span><h2 className="mt-5 text-xl font-bold">Les promotions arrivent dans votre cockpit</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Cette vue est prête pour vos futures campagnes. En attendant, gérez vos prix et vos prix barrés directement depuis le catalogue.</p></div></Panel></div>;
 }
 
-function Deliveries({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+function Deliveries({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const shipments = data.orders.filter(order => !['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'].includes(order.status));
   const change = (order: EcommerceOrder, status: EcommerceOrderStatus) => run(() => createEcommerceApi(data.store.companyId).updateOrderStatus(order.id, status), 'Flux de livraison mis à jour.');
   const changeRequest = (request: EcommerceDeliveryRequest, status: EcommerceDeliveryRequestStatus) => run(() => createEcommerceApi(data.store.companyId).updateDeliveryRequestStatus(request.id, status), 'Demande de livraison mise à jour.');
   return <div className="space-y-5 fade-up">
+     <DeliveryZoneManager data={data} canCreate={canCreate} canModify={canModify} run={run} />
     <Panel title="Demandes de services" description="Les clients peuvent demander une livraison même sans panier.">
-      {data.deliveryRequests.length === 0 ? <Empty icon={Truck} title="Aucune demande de livraison" text="Les demandes déposées depuis la vitrine apparaîtront ici." /> : <div className="grid gap-3 md:grid-cols-2">{data.deliveryRequests.map(request => <div key={request.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{request.reference}</p><h3 className="mt-1 font-bold">{request.requesterName}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{request.requesterEmail} · {request.requesterPhone || 'Téléphone non renseigné'}</p></div><StatusPill value={request.status} /></div><p className="mt-3 text-sm">{request.address}</p><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{request.serviceType === 'URGENT' ? 'Demande urgente' : 'Livraison standard'}{request.desiredDate ? ` · souhaitée le ${dateLabel(request.desiredDate)}` : ''}</p>{request.note && <p className="mt-2 rounded-lg bg-[hsl(var(--muted)/.45)] p-2 text-xs">{request.note}</p>}<div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(request.createdAt)}</span>{canModify && <select aria-label={`Changer le statut de ${request.reference}`} value={request.status} onChange={event => void changeRequest(request, event.target.value as EcommerceDeliveryRequestStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{(['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'] as EcommerceDeliveryRequestStatus[]).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
+       {data.deliveryRequests.length === 0 ? <Empty icon={Truck} title="Aucune demande de livraison" text="Les demandes déposées depuis la vitrine apparaîtront ici." /> : <div className="grid gap-3 md:grid-cols-2">{data.deliveryRequests.map(request => <div key={request.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{request.reference}</p><h3 className="mt-1 font-bold">{request.requesterName}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{request.requesterEmail} · {request.requesterPhone || 'Téléphone non renseigné'}</p></div><StatusPill value={request.status} /></div><p className="mt-3 text-sm">{request.address}</p>{request.deliveryZoneName && <p className="mt-2 text-xs font-bold text-[hsl(var(--primary))]">Zone : {request.deliveryZoneName}{request.deliveryZoneFee ? ` · ${money(request.deliveryZoneFee, data.store.currency)}` : ''}</p>}<p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{request.serviceType === 'URGENT' ? 'Demande urgente' : 'Livraison standard'}{request.desiredDate ? ` · souhaitée le ${dateLabel(request.desiredDate)}` : ''}</p>{request.note && <p className="mt-2 rounded-lg bg-[hsl(var(--muted)/.45)] p-2 text-xs">{request.note}</p>}<div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(request.createdAt)}</span>{canModify && <select aria-label={`Changer le statut de ${request.reference}`} value={request.status} onChange={event => void changeRequest(request, event.target.value as EcommerceDeliveryRequestStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{(['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'] as EcommerceDeliveryRequestStatus[]).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
     </Panel>
     <Panel title="Livraisons de commandes" description="Le flux des commandes qui ont quitté le bureau pour rejoindre vos clients.">
       {shipments.length === 0 ? <Empty icon={Truck} title="Aucune livraison de commande en cours" text="Les commandes en préparation et expédiées seront suivies ici." /> : <div className="grid gap-3 md:grid-cols-2">{shipments.map(order => <div key={order.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><h3 className="mt-1 font-bold">{order.customerName}</h3></div><StatusPill value={order.status} /></div><p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{order.shippingAddress || 'Adresse de livraison non renseignée'}</p><div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs font-bold">{money(order.total, data.store.currency)}</span>{canModify && <select aria-label={`Avancer la livraison ${order.reference}`} value={order.status} onChange={event => void change(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.filter(item => !['NOUVELLE', 'ANNULÉE'].includes(item)).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
     </Panel>
   </div>;
+}
+
+type DeliveryZoneForm = {
+  name: string;
+  description: string;
+  fee: number;
+  estimatedMinutes: number;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+function DeliveryZoneManager({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const { confirm } = useAppDialog();
+  const [editing, setEditing] = useState<EcommerceDeliveryZone | 'new' | null>(null);
+  const [form, setForm] = useState<DeliveryZoneForm>({ name: '', description: '', fee: 0, estimatedMinutes: 0, isActive: true, sortOrder: data.deliveryZones.length });
+  const open = (zone?: EcommerceDeliveryZone) => {
+    setEditing(zone ?? 'new');
+    setForm(zone
+      ? { name: zone.name, description: zone.description, fee: zone.fee, estimatedMinutes: zone.estimatedMinutes, isActive: zone.isActive, sortOrder: zone.sortOrder }
+      : { name: '', description: '', fee: 0, estimatedMinutes: 0, isActive: true, sortOrder: data.deliveryZones.length });
+  };
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!form.name.trim()) return;
+    const body = { ...form, name: form.name.trim(), description: form.description.trim() };
+    const result = editing === 'new'
+      ? await run(() => createEcommerceApi(data.store.companyId).createDeliveryZone(body), 'Zone de livraison créée.')
+      : editing ? await run(() => createEcommerceApi(data.store.companyId).updateDeliveryZone(editing.id, body), 'Zone de livraison mise à jour.') : undefined;
+    if (result) setEditing(null);
+  };
+  const remove = async (zone: EcommerceDeliveryZone) => {
+    if (!await confirm({ title: 'Supprimer cette zone ?', description: `Les anciennes demandes conserveront leur historique : « ${zone.name} ».`, confirmLabel: 'Supprimer', tone: 'danger' })) return;
+    await run(() => createEcommerceApi(data.store.companyId).deleteDeliveryZone(zone.id), 'Zone de livraison supprimée.');
+  };
+  const duration = (minutes: number) => minutes <= 0 ? 'À confirmer' : minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
+
+  return <Panel title="Zones de livraison" description="Définissez les secteurs desservis et les frais affichés aux clients." action={canCreate ? <button type="button" onClick={() => open()} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter une zone</button> : undefined}>
+    {data.deliveryZones.length === 0 ? <Empty icon={Truck} title="Aucune zone configurée" text="Créez une zone pour permettre aux clients de choisir leur secteur de livraison." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Créer la première zone</button> : undefined} /> : <div className="grid gap-3 md:grid-cols-2">{data.deliveryZones.map(zone => <article key={zone.id} className={`rounded-xl border p-4 ${zone.isActive ? '' : 'opacity-60'}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{zone.name}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{zone.description || 'Aucune précision'}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${zone.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{zone.isActive ? 'Active' : 'Inactive'}</span></div><div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-lg bg-[hsl(var(--muted)/.55)] px-2.5 py-1.5">{zone.fee > 0 ? money(zone.fee, data.store.currency) : 'Gratuit'}</span><span className="rounded-lg bg-[hsl(var(--muted)/.55)] px-2.5 py-1.5">{duration(zone.estimatedMinutes)}</span></div>{canModify && <div className="mt-4 flex gap-2 border-t pt-3"><button type="button" onClick={() => open(zone)} className="rounded-lg border px-2.5 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button><button type="button" onClick={() => void remove(zone)} className="rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><Archive size={13} className="mr-1 inline" />Supprimer</button></div>}</article>)}</div>}
+    {editing && <Modal title={editing === 'new' ? 'Nouvelle zone de livraison' : `Modifier ${editing.name}`} onClose={() => setEditing(null)}><form onSubmit={save} className="space-y-4"><Field label="Nom de la zone" required value={form.name} onChange={value => setForm({ ...form, name: value })} placeholder="Ex. Dakar centre" /><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} rows={2} placeholder="Quartiers, communes ou repères desservis" className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><Field label={`Frais (${data.store.currency})`} type="number" value={String(form.fee)} onChange={value => setForm({ ...form, fee: Math.max(0, Number(value) || 0) })} /><Field label="Délai indicatif (minutes)" type="number" value={String(form.estimatedMinutes)} onChange={value => setForm({ ...form, estimatedMinutes: Math.max(0, Number(value) || 0) })} /><Field label="Ordre d’affichage" type="number" value={String(form.sortOrder)} onChange={value => setForm({ ...form, sortOrder: Math.max(0, Number(value) || 0) })} /><label className="flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><input type="checkbox" checked={form.isActive} onChange={event => setForm({ ...form, isActive: event.target.checked })} />Zone active</label></div><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Enregistrer</button></div></form></Modal>}
+  </Panel>;
 }
 
 function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {

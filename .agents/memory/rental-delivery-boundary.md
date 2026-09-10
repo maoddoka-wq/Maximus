@@ -11,6 +11,12 @@ Les livraisons demandées par un client sont une entité séparée des commandes
 
 **Comment appliquer:** conserver les types explicites dans les contrats API, les migrations, les formulaires internes et les vues publiques; filtrer les capacités publiques côté serveur avant toute création ou affichage.
 
+Les zones de livraison sont des entités configurées par l’entreprise, exposées publiquement seulement lorsqu’elles sont actives. Une demande valide la zone côté serveur dans le périmètre de la boutique puis conserve son nom et son tarif au moment de la création.
+
+**Pourquoi:** une zone peut être renommée, tarifée différemment ou désactivée après une demande; l’historique client et boutiquier ne doit pas changer rétroactivement.
+
+**Comment appliquer:** ne jamais faire confiance à un `companyId` ou à un tarif envoyé par le navigateur; sélectionner la zone active dans le périmètre de la boutique et utiliser cette lecture serveur pour remplir la demande.
+
 Les locations autonomes restent séparées des produits dans le catalogue, mais peuvent désormais devenir des lignes de commande avec leur propre `rental_id`. Leur disponibilité est réservée lors de la création de commande et leur montant utilise le même checkout et le même suivi de paiement que les ventes.
 
 **Pourquoi:** séparer le modèle métier ne doit pas empêcher une location publiée d’être payée dans le parcours e-commerce commun.

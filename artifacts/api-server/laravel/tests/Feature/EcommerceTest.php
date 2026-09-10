@@ -823,6 +823,80 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseHas('ecommerce_delivery_requests', ['id' => $requestId, 'status' => 'CONFIRMEE']);
     }
 
+    public function test_company_can_manage_delivery_zones_and_public_requests_use_an_active_zone(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique zones',
+            'slug' => 'boutique-zones',
+            'description' => 'Livraison par secteur',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $zone = $request->postJson('/api/ecommerce/delivery-zones?companyId=kora', [
+            'name' => 'Dakar centre',
+            'description' => 'Plateau, Médina et alentours',
+            'fee' => 1500,
+            'estimatedMinutes' => 90,
+            'isActive' => true,
+            'sortOrder' => 1,
+        ])->assertCreated()
+            ->assertJsonPath('name', 'Dakar centre')
+            ->assertJsonPath('fee', 1500)
+            ->json();
+
+        $zoneId = $zone['id'];
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('deliveryZones.0.id', $zoneId);
+        $this->getJson('/api/shop/boutique-zones')
+            ->assertOk()
+            ->assertJsonPath('deliveryZones.0.name', 'Dakar centre')
+            ->assertJsonPath('deliveryZones.0.fee', 1500);
+
+        $this->postJson('/api/shop/boutique-zones/delivery-requests', [
+            'requesterName' => 'Client Zone',
+            'requesterEmail' => 'zone@example.test',
+            'address' => 'Plateau, Dakar',
+            'serviceType' => 'STANDARD',
+        ])->assertStatus(422);
+
+        $created = $this->postJson('/api/shop/boutique-zones/delivery-requests', [
+            'requesterName' => 'Client Zone',
+            'requesterEmail' => 'zone@example.test',
+            'address' => 'Plateau, Dakar',
+            'deliveryZoneId' => $zoneId,
+            'serviceType' => 'STANDARD',
+        ])->assertCreated()
+            ->assertJsonPath('deliveryZoneId', $zoneId)
+            ->assertJsonPath('deliveryZoneName', 'Dakar centre')
+            ->assertJsonPath('deliveryZoneFee', 1500);
+
+        $this->assertDatabaseHas('ecommerce_delivery_requests', [
+            'id' => $created->json('id'),
+            'delivery_zone_id' => $zoneId,
+            'delivery_zone_name' => 'Dakar centre',
+            'delivery_zone_fee' => 1500,
+        ]);
+
+        $request->patchJson('/api/ecommerce/delivery-zones/'.$zoneId.'?companyId=kora', [
+            'isActive' => false,
+        ])->assertOk()->assertJsonPath('isActive', false);
+        $this->getJson('/api/shop/boutique-zones')
+            ->assertOk()
+            ->assertJsonCount(0, 'deliveryZones');
+        $this->postJson('/api/shop/boutique-zones/delivery-requests', [
+            'requesterName' => 'Client Zone',
+            'requesterEmail' => 'zone-2@example.test',
+            'address' => 'Plateau, Dakar',
+            'deliveryZoneId' => $zoneId,
+            'serviceType' => 'STANDARD',
+        ])->assertStatus(422);
+    }
+
     public function test_public_delivery_service_is_hidden_and_blocked_without_the_company_feature(): void
     {
         DB::table('maximus_company_modules')

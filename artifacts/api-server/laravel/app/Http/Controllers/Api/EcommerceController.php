@@ -54,6 +54,7 @@ class EcommerceController extends Controller
                 ->values(),
             'rentals' => $this->listRentals($company, true),
             'orders' => $this->orders($company),
+            'deliveryZones' => $this->listDeliveryZones($company),
             'deliveryRequests' => $this->listDeliveryRequests($company),
         ]);
     }
@@ -839,6 +840,90 @@ class EcommerceController extends Controller
         return response()->json($this->deliveryRequest(DB::table('ecommerce_delivery_requests')->where('id', $id)->first()));
     }
 
+    public function createDeliveryZone(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'livraisons')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->deliveryZoneInput($request);
+        $company = $this->company($request);
+        if (DB::table('ecommerce_delivery_zones')->where('company_id', $company)->where('name', $input['name'])->exists()) {
+            return response()->json(['error' => 'Une zone portant ce nom existe déjà.'], 422);
+        }
+
+        $row = [
+            'id' => $this->id('delivery-zone'),
+            'company_id' => $company,
+            'name' => trim($input['name']),
+            'description' => trim((string) ($input['description'] ?? '')),
+            'fee' => (int) ($input['fee'] ?? 0),
+            'estimated_minutes' => (int) ($input['estimatedMinutes'] ?? 0),
+            'is_active' => (bool) ($input['isActive'] ?? true),
+            'sort_order' => (int) ($input['sortOrder'] ?? 0),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('ecommerce_delivery_zones')->insert($row);
+
+        return response()->json($this->deliveryZone((object) $row), 201);
+    }
+
+    public function updateDeliveryZone(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'livraisons')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $zone = DB::table('ecommerce_delivery_zones')
+            ->where('id', $id)
+            ->where('company_id', $company)
+            ->first();
+        if (! $zone) {
+            return response()->json(['error' => 'Zone de livraison introuvable.'], 404);
+        }
+
+        $input = $this->deliveryZoneInput($request, true);
+        $name = array_key_exists('name', $input) ? trim($input['name']) : $zone->name;
+        if (DB::table('ecommerce_delivery_zones')
+            ->where('company_id', $company)
+            ->where('name', $name)
+            ->where('id', '!=', $id)
+            ->exists()) {
+            return response()->json(['error' => 'Une zone portant ce nom existe déjà.'], 422);
+        }
+
+        $values = [];
+        if (array_key_exists('name', $input)) $values['name'] = $name;
+        if (array_key_exists('description', $input)) $values['description'] = trim((string) ($input['description'] ?? ''));
+        if (array_key_exists('fee', $input)) $values['fee'] = (int) $input['fee'];
+        if (array_key_exists('estimatedMinutes', $input)) $values['estimated_minutes'] = (int) $input['estimatedMinutes'];
+        if (array_key_exists('isActive', $input)) $values['is_active'] = (bool) $input['isActive'];
+        if (array_key_exists('sortOrder', $input)) $values['sort_order'] = (int) $input['sortOrder'];
+        $values['updated_at'] = now();
+        DB::table('ecommerce_delivery_zones')->where('id', $id)->update($values);
+
+        return response()->json($this->deliveryZone(DB::table('ecommerce_delivery_zones')->where('id', $id)->first()));
+    }
+
+    public function deleteDeliveryZone(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'livraisons')) {
+            return $this->forbidden();
+        }
+
+        $deleted = DB::table('ecommerce_delivery_zones')
+            ->where('id', $id)
+            ->where('company_id', $this->company($request))
+            ->delete();
+        if (! $deleted) {
+            return response()->json(['error' => 'Zone de livraison introuvable.'], 404);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function publicBootstrap(string $slug): JsonResponse
     {
         $store = DB::table('ecommerce_stores')
@@ -932,9 +1017,25 @@ class EcommerceController extends Controller
             'requesterPhone' => ['nullable', 'string', 'max:40'],
             'address' => ['required', 'string', 'min:5', 'max:500'],
             'serviceType' => ['required', 'in:STANDARD,URGENT'],
+            'deliveryZoneId' => ['nullable', 'string', 'max:160'],
             'desiredDate' => ['nullable', 'date', 'after_or_equal:today'],
             'note' => ['nullable', 'string', 'max:500'],
         ])->validate();
+        $activeZones = DB::table('ecommerce_delivery_zones')
+            ->where('company_id', $store->company_id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+        $zone = null;
+        if (! empty($input['deliveryZoneId'])) {
+            $zone = $activeZones->firstWhere('id', $input['deliveryZoneId']);
+            if (! $zone) {
+                return response()->json(['error' => 'La zone de livraison sélectionnée est indisponible.'], 422);
+            }
+        } elseif ($activeZones->isNotEmpty()) {
+            return response()->json(['error' => 'Veuillez sélectionner une zone de livraison.'], 422);
+        }
         $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
         if ($customer) {
             $input['requesterName'] = $customer->name;
@@ -955,6 +1056,9 @@ class EcommerceController extends Controller
             'requester_phone' => trim((string) ($input['requesterPhone'] ?? '')),
             'address' => trim($input['address']),
             'service_type' => $input['serviceType'],
+            'delivery_zone_id' => $zone?->id,
+            'delivery_zone_name' => $zone?->name,
+            'delivery_zone_fee' => (int) ($zone->fee ?? 0),
             'desired_date' => $input['desiredDate'] ?? null,
             'note' => trim((string) ($input['note'] ?? '')),
             'status' => 'DEMANDEE',
@@ -988,6 +1092,7 @@ class EcommerceController extends Controller
                         ->map(fn ($row) => $this->publicRentalProduct($row))
                 )
                 ->values(),
+            'deliveryZones' => $this->publicDeliveryZones((string) $store->company_id),
         ])->getData(true);
     }
 
@@ -1710,6 +1815,50 @@ class EcommerceController extends Controller
             ->all();
     }
 
+    private function listDeliveryZones(string $company): array
+    {
+        return DB::table('ecommerce_delivery_zones')
+            ->where('company_id', $company)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row) => $this->deliveryZone($row))
+            ->values()
+            ->all();
+    }
+
+    private function publicDeliveryZones(string $company): array
+    {
+        $features = $this->publicEnabledFeatures($company);
+        if (! $features['livraisons']) {
+            return [];
+        }
+
+        return DB::table('ecommerce_delivery_zones')
+            ->where('company_id', $company)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row) => $this->deliveryZone($row))
+            ->values()
+            ->all();
+    }
+
+    private function deliveryZone(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'companyId' => $row->company_id,
+            'name' => $row->name,
+            'description' => (string) ($row->description ?? ''),
+            'fee' => (int) ($row->fee ?? 0),
+            'estimatedMinutes' => (int) ($row->estimated_minutes ?? 0),
+            'isActive' => (bool) ($row->is_active ?? false),
+            'sortOrder' => (int) ($row->sort_order ?? 0),
+        ];
+    }
+
     private function deliveryRequest(object $row): array
     {
         return [
@@ -1722,6 +1871,9 @@ class EcommerceController extends Controller
             'requesterEmail' => $row->requester_email,
             'requesterPhone' => $row->requester_phone,
             'address' => $row->address,
+            'deliveryZoneId' => $row->delivery_zone_id ?? null,
+            'deliveryZoneName' => $row->delivery_zone_name ?? null,
+            'deliveryZoneFee' => (int) ($row->delivery_zone_fee ?? 0),
             'serviceType' => $row->service_type,
             'desiredDate' => $row->desired_date,
             'note' => $row->note,
@@ -1729,6 +1881,20 @@ class EcommerceController extends Controller
             'createdAt' => $row->created_at,
             'updatedAt' => $row->updated_at,
         ];
+    }
+
+    private function deliveryZoneInput(Request $request, bool $partial = false): array
+    {
+        $required = $partial ? ['sometimes'] : ['required'];
+
+        return Validator::make($request->all(), [
+            'name' => array_merge($required, ['string', 'min:2', 'max:120']),
+            'description' => ['sometimes', 'nullable', 'string', 'max:300'],
+            'fee' => ['sometimes', 'integer', 'min:0', 'max:100000000'],
+            'estimatedMinutes' => ['sometimes', 'integer', 'min:0', 'max:43200'],
+            'isActive' => ['sometimes', 'boolean'],
+            'sortOrder' => ['sometimes', 'integer', 'min:0', 'max:10000'],
+        ])->validate();
     }
 
     private function categories(string $company): array

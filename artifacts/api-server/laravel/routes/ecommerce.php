@@ -42,6 +42,9 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
         Route::get('/delivery-requests', [EcommerceController::class, 'deliveryRequests']);
         Route::patch('/delivery-requests/{id}/status', [EcommerceController::class, 'updateDeliveryRequestStatus']);
+         Route::post('/delivery-zones', [EcommerceController::class, 'createDeliveryZone']);
+         Route::patch('/delivery-zones/{id}', [EcommerceController::class, 'updateDeliveryZone']);
+         Route::delete('/delivery-zones/{id}', [EcommerceController::class, 'deleteDeliveryZone']);
     });
 
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
