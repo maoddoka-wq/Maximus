@@ -15,7 +15,7 @@ run = "cd laravel && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php"
 [services.production]
 
 [services.production.build]
-args = ["bash", "-lc", "cd laravel && composer install --no-interaction --prefer-dist --no-dev"]
+args = ["bash", "-lc", "composer install --working-dir=artifacts/api-server/laravel --no-interaction --prefer-dist --no-dev"]
 
 [services.production.build.env]
 APP_ENV = "production"
@@ -24,7 +24,7 @@ NODE_ENV = "production"
 
 [services.production.run]
 # we don't run through pnpm to make startup faster in production
-args = ["bash", "-lc", "set -euo pipefail; test -n \"${APP_KEY:-}\" || { echo 'APP_KEY is required in production' >&2; exit 1; }; cd laravel && DB_CONNECTION=pgsql php artisan migrate --force --no-interaction && DB_CONNECTION=pgsql php artisan maximus:provision-admin --no-interaction && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php"]
+args = ["bash", "-lc", "set -euo pipefail; test -n \"${APP_KEY:-}\" || { echo 'APP_KEY is required in production' >&2; exit 1; }; DB_CONNECTION=pgsql php artifacts/api-server/laravel/artisan migrate --force --no-interaction && DB_CONNECTION=pgsql php artifacts/api-server/laravel/artisan maximus:provision-admin --no-interaction && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} artifacts/api-server/laravel/server.php"]
 
 [services.production.run.env]
 APP_ENV = "production"

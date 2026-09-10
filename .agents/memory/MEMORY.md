@@ -47,3 +47,4 @@
 - [Isolation des PWA boutiques](pwa-shop-isolation.md) — deux boutiques sur une même origine exigent un start_url/id distinct et un état client indexé par boutique.
 - [Routage OpenStreetMap des locations](openrouteservice-rental-routing.md) — le devis utilise le géocodage puis la matrice OpenRouteService, sans fallback vers une distance inventée.
 - [En-têtes de sécurité](security-headers.md) — les protections HTTP du frontend se configurent dans `.replit`, avec un middleware équivalent pour l’API Laravel.
+- [Chemins des artefacts Replit](replit-artifact-paths.md) — les commandes de production partent de la racine du dépôt, pas du dossier de l’artefact.
