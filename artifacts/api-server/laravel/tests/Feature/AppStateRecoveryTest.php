@@ -243,6 +243,56 @@ class AppStateRecoveryTest extends TestCase
             ->assertJsonPath('data.companies.0.requestedModulePermissions.paie.validation.1', 'modifier');
     }
 
+    public function test_company_bootstrap_uses_modules_activated_after_registration(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'post-registration-payroll-company',
+            'name' => 'Entreprise Paie activée',
+            'manager' => 'Administrateur',
+            'email' => 'post-registration-payroll@example.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['ecommerce'],
+            'requested_module_features' => [
+                'ecommerce' => ['dashboard', 'catalogue'],
+            ],
+        ]);
+        ModuleCatalog::ensureCompanyAccess($company->id, ['ecommerce', 'paie']);
+        $user = AuthUser::query()->create([
+            'id' => 'post-registration-payroll-admin',
+            'email' => 'post-registration-payroll-admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administrateur Paie',
+            'role' => 'company_admin',
+            'company_id' => $company->id,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'companies' => [[
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'requestedModules' => ['ecommerce'],
+                    'allowedModules' => ['ecommerce'],
+                ]],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.companies.0.allowedModules.0', 'ecommerce')
+            ->assertJsonPath('data.companies.0.allowedModules.1', 'paie')
+            ->assertJsonPath('data.companies.0.requestedModules.0', 'ecommerce');
+    }
+
     public function test_bootstrap_recovery_keeps_persisted_catalog_packs_and_drafts(): void
     {
         Company::query()->create([

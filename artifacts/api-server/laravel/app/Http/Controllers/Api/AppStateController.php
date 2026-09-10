@@ -139,7 +139,7 @@ class AppStateController extends Controller
                     'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],
                     'requestedModuleFeatures' => $company->requested_module_features ?? [],
                     'requestedModulePermissions' => $company->requested_module_permissions ?? [],
-                    'allowedModules' => $company->status === 'ACTIF' ? ($company->requested_modules ?? []) : [],
+                    'allowedModules' => $this->allowedModulesFromRegistry($company),
                     'refusedModules' => [],
                     'createdAt' => optional($company->created_at)->toISOString(),
                     'profilePhoto' => $company->profile_photo,
@@ -494,7 +494,7 @@ class AppStateController extends Controller
             'requestedModulePackIds' => $company->requested_module_pack_ids ?? [],
             'requestedModuleFeatures' => $company->requested_module_features ?? [],
             'requestedModulePermissions' => $company->requested_module_permissions ?? [],
-            'allowedModules' => $company->status === 'ACTIF' ? ($company->requested_modules ?? []) : [],
+            'allowedModules' => $this->allowedModulesFromRegistry($company),
             'refusedModules' => [],
             'createdAt' => optional($company->created_at)->toISOString(),
             'profilePhoto' => $company->profile_photo,
@@ -518,6 +518,31 @@ class AppStateController extends Controller
         }
 
         return $state;
+    }
+
+    /**
+     * The persisted module access rows represent the effective authorization.
+     * requested_modules only describes the original registration request and
+     * does not include modules activated later by MAXIMUS.
+     */
+    private function allowedModulesFromRegistry(Company $company): array
+    {
+        if ($company->status !== 'ACTIF') {
+            return [];
+        }
+
+        $hasPersistedAccess = DB::table('maximus_company_modules')
+            ->where('company_id', $company->id)
+            ->exists();
+        if (!$hasPersistedAccess) {
+            return $company->requested_modules ?? [];
+        }
+
+        return collect(ModuleCatalog::bootstrap($company->id))
+            ->filter(fn (array $module): bool => in_array($module['status'] ?? null, ['ACTIF', 'BETA'], true))
+            ->pluck('id')
+            ->values()
+            ->all();
     }
 
     /**

@@ -145,6 +145,30 @@ test('n’affiche aucune fonctionnalité Paie sans sélection explicite de l’e
   );
 });
 
+test('conserve Paie quand MAXIMUS l’active après l’inscription', () => {
+  const { data, company } = createAccessFixture();
+  company.requestedModules = ['ecommerce'];
+  company.allowedModules = ['ecommerce', 'paie'];
+  delete company.requestedModuleFeatures;
+  delete company.requestedModulePackIds;
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: { ecommerce: 'ACTIF', paie: 'ACTIF' },
+  });
+
+  assert.ok(access.allowed.includes('paie'));
+  assert.deepEqual(
+    access.sidebarFeatureGroups.find(group => group.label === 'Paie')?.items.map(item => item.href),
+    ['/entreprise/paie'],
+  );
+});
+
 test('refuse un rôle de secteur qui sort du périmètre de son entreprise', () => {
   const { data, company, employee } = createAccessFixture();
   const foreignCompany = { ...company, id: 'foreign-company' };
