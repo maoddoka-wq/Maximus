@@ -140,6 +140,10 @@ test('affiche les fonctionnalités Paie quand le module est autorisé sans séle
 
   assert.equal(access.selectedPayrollFeatureIds, undefined);
   assert.deepEqual(
+    access.sidebarFeatureGroups.find(group => group.label === 'Paie')?.items.map(item => item.label),
+    ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'],
+  );
+  assert.deepEqual(
     access.sidebarFeatureGroups.flatMap(group => group.items.map(item => item.href)),
     [
       '/entreprise/paie?feature=tableau-de-bord',
@@ -171,6 +175,10 @@ test('conserve Paie quand MAXIMUS l’active après l’inscription', () => {
   });
 
   assert.ok(access.allowed.includes('paie'));
+  assert.deepEqual(
+    access.sidebarFeatureGroups.find(group => group.label === 'Paie')?.items.map(item => item.label),
+    ['Tableau de bord', 'Bénéficiaires', 'Préparer une paie', 'Validation', 'Virements', 'Solde de paie', 'Historique'],
+  );
   assert.deepEqual(
     access.sidebarFeatureGroups.find(group => group.label === 'Paie')?.items.map(item => item.href),
     [
