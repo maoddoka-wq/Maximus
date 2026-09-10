@@ -400,6 +400,32 @@ final class SellerWalletController extends Controller
                     'payment_failure_reason' => '',
                     'updated_at' => now(),
                 ]);
+                // Location reservations share the regular ecommerce payment lifecycle.
+                // Keep this idempotent so repeated webhook deliveries cannot duplicate
+                // confirmation or invoice generation.
+                $reservation = DB::table('ecommerce_car_reservations')->where('order_id', $locked->id)->lockForUpdate()->first();
+                if ($reservation) {
+                    $detail = json_decode((string) $reservation->total_detail, true) ?: [];
+                    $car = DB::table('ecommerce_rentals')->where('id', $reservation->rental_id)->first();
+                    $store = DB::table('ecommerce_stores')->where('company_id', $reservation->company_id)->first();
+                    $esc = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+                    $html = '<!doctype html><html><head><meta charset="utf-8"><title>Facture '.$esc($reservation->id).
+                        '</title><style>body{font:14px sans-serif;max-width:800px;margin:2rem auto}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;border-bottom:1px solid #ddd;text-align:left}</style></head><body>'.
+                        '<h1>Facture de réservation</h1><p><strong>'. $esc($store->name ?? 'Boutique') .'</strong></p>'.
+                        '<p>Référence : '.$esc($reservation->id).' · Statut : PAYÉE</p><h2>Client</h2><p>'.$esc($locked->customer_name).' · '.$esc($locked->customer_email).' · '.$esc($locked->customer_phone).'</p>'.
+                        '<h2>Véhicule</h2><p>'.$esc($car->name ?? '').' '.$esc($car->brand ?? '').' '.$esc($car->model ?? '').'</p>'.
+                        '<h2>Période et trajet</h2><p>Du '.$esc($reservation->starts_at).' au '.$esc($reservation->ends_at).'<br>'.
+                        $esc($reservation->departure).' → '.$esc($reservation->destination).' · '.$esc($reservation->distance_km).' km</p>'.
+                        '<table><tr><th>Détail</th><th>Montant (XOF)</th></tr><tr><td>Jours</td><td>'.$esc($detail['daily'] ?? 0).
+                        '</td></tr><tr><td>Distance</td><td>'.$esc($detail['distance'] ?? 0).'</td></tr><tr><td>Frais</td><td>'.$esc($detail['fees'] ?? 0).
+                        '</td></tr><tr><td>Caution</td><td>'.$esc($detail['deposit'] ?? 0).'</td></tr><tr><th>Total payé</th><th>'.$esc($detail['total'] ?? $locked->total).
+                        '</th></tr></table></body></html>';
+                    DB::table('ecommerce_car_reservations')->where('id', $reservation->id)->update([
+                        'status' => 'CONFIRMED',
+                        'invoice_html' => $reservation->invoice_html ?: $html,
+                        'updated_at' => now(),
+                    ]);
+                }
 
                 return;
             }
@@ -411,6 +437,9 @@ final class SellerWalletController extends Controller
                     'payment_failure_reason' => $reason,
                     'updated_at' => now(),
                 ]);
+                DB::table('ecommerce_car_reservations')->where('order_id', $locked->id)
+                    ->whereNotIn('status', ['COMPLETED', 'CANCELLED'])
+                    ->update(['status' => 'PAYMENT_FAILED', 'updated_at' => now()]);
                 $this->restoreOrderStock($locked);
             }
         });

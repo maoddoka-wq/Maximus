@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\EcommerceController;
 use App\Http\Controllers\Api\EcommerceCustomerController;
 use App\Http\Controllers\Api\EcommercePaymentController;
 use App\Http\Controllers\Api\SellerWalletController;
+use App\Http\Controllers\Api\CarRentalController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/payments/diamanopay/webhook', [SellerWalletController::class, 'webhook']);
@@ -33,12 +34,19 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
          Route::patch('/rentals/{id}', [EcommerceController::class, 'updateRental']);
          Route::patch('/rentals/{id}/availability', [EcommerceController::class, 'setRentalAvailability']);
          Route::delete('/rentals/{id}', [EcommerceController::class, 'archiveRental']);
+         Route::get('/location/settings', [CarRentalController::class, 'settings']);
+         Route::put('/location/settings', [CarRentalController::class, 'saveSettings']);
+         Route::get('/location/reservations', [CarRentalController::class, 'reservations']);
+          Route::patch('/location/reservations/{id}/status', [CarRentalController::class, 'transition']);
+         Route::get('/location/reservations/{id}/invoice', [CarRentalController::class, 'invoice']);
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
         Route::get('/delivery-requests', [EcommerceController::class, 'deliveryRequests']);
         Route::patch('/delivery-requests/{id}/status', [EcommerceController::class, 'updateDeliveryRequestStatus']);
     });
 
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
+Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
+Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
 Route::get('/shop-domain/manifest.webmanifest', [EcommerceController::class, 'publicManifestByDomain']);
 Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
@@ -53,6 +61,9 @@ Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, '
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/manifest.webmanifest', [EcommerceController::class, 'publicManifest']);
     Route::get('/', [EcommerceController::class, 'publicBootstrap']);
+    Route::get('/location/{id}/quote', [CarRentalController::class, 'quote']);
+    Route::post('/location/reservations', [CarRentalController::class, 'reserve'])->middleware('throttle:orders');
+    Route::get('/location/reservations/{id}/invoice', [CarRentalController::class, 'publicInvoice']);
     Route::post('/orders', [EcommerceController::class, 'createPublicOrder'])->middleware('throttle:orders');
     Route::post('/delivery-requests', [EcommerceController::class, 'createPublicDeliveryRequest'])->middleware('throttle:orders');
     Route::post('/orders/{orderId}/payment', [EcommercePaymentController::class, 'create'])->middleware('throttle:orders');

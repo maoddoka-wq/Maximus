@@ -41,6 +41,10 @@ import {
   type EcommerceRental,
   type EcommerceRentalPeriod,
   type EcommerceRentalStatus,
+  type EcommerceRentalTransmission,
+  type EcommerceRentalFuel,
+  type EcommerceLocationSettings,
+  type EcommerceCarReservation,
   type EcommerceStore,
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
@@ -140,6 +144,21 @@ type RentalForm = {
   price: string;
   billingUnit: EcommerceRentalPeriod;
   availability: string;
+  brand: string;
+  model: string;
+  year: string;
+  seats: string;
+  transmission: EcommerceRentalTransmission | '';
+  fuel: EcommerceRentalFuel | '';
+  equipment: string;
+  galleryFiles: File[];
+  dailyRate: string;
+  kmRate: string;
+  deposit: string;
+  fees: string;
+  conditions: string;
+  instructions: string;
+  unavailablePeriods: string;
   status: EcommerceRentalStatus;
 };
 
@@ -151,7 +170,22 @@ const blankRental: RentalForm = {
   imageFile: null,
   price: '',
   billingUnit: 'JOUR',
-  availability: '0',
+  availability: '1',
+  brand: '',
+  model: '',
+  year: '',
+  seats: '',
+  transmission: '',
+  fuel: '',
+  equipment: '',
+  galleryFiles: [],
+  dailyRate: '',
+  kmRate: '',
+  deposit: '',
+  fees: '',
+  conditions: '',
+  instructions: '',
+  unavailablePeriods: '[]',
   status: 'PUBLISHED',
 };
 
@@ -368,6 +402,28 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
 }
 
 function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [subTab, setSubTab] = useState<'vehicules' | 'reservations' | 'parametres'>('vehicules');
+  
+  return <div className="space-y-5 fade-up">
+    <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--card))_55%)] p-5 sm:p-7">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div><span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Location & réservation</span><h2 className="mt-2 text-2xl font-bold tracking-[-.04em]">Espace de gestion automobile</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Gérez votre flotte, suivez vos réservations et configurez vos paramètres de location.</p></div>
+      </div>
+    </section>
+    
+    <div className="flex gap-2 border-b">
+      <button type="button" onClick={() => setSubTab('vehicules')} className={`px-4 py-2 text-sm font-bold border-b-2 ${subTab === 'vehicules' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Véhicules</button>
+      <button type="button" onClick={() => setSubTab('reservations')} className={`px-4 py-2 text-sm font-bold border-b-2 ${subTab === 'reservations' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Réservations</button>
+      <button type="button" onClick={() => setSubTab('parametres')} className={`px-4 py-2 text-sm font-bold border-b-2 ${subTab === 'parametres' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Paramètres</button>
+    </div>
+
+    {subTab === 'vehicules' && <RentalVehiclesTab data={data} canCreate={canCreate} canModify={canModify} run={run} />}
+    {subTab === 'reservations' && <RentalReservationsTab data={data} canModify={canModify} run={run} />}
+    {subTab === 'parametres' && <RentalSettingsTab data={data} canModify={canModify} run={run} />}
+  </div>;
+}
+
+function RentalVehiclesTab({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const { confirm, alert } = useAppDialog();
   const [editing, setEditing] = useState<EcommerceRental | 'new' | null>(null);
   const [form, setForm] = useState<RentalForm>(blankRental);
@@ -375,7 +431,15 @@ function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBoots
   const activeRentals = rentals.filter(rental => rental.status !== 'ARCHIVED');
   const open = (rental?: EcommerceRental) => {
     setEditing(rental ?? 'new');
-    setForm(rental ? { name: rental.name, description: rental.description, category: rental.category, categoryId: rental.categoryId ?? '', imageFile: null, price: String(rental.price), billingUnit: rental.billingUnit, availability: String(rental.availability), status: rental.status } : blankRental);
+    setForm(rental ? {
+      name: rental.name, description: rental.description, category: rental.category, categoryId: rental.categoryId ?? '',
+      imageFile: null, price: String(rental.price), billingUnit: rental.billingUnit, availability: String(rental.availability),
+      brand: rental.brand ?? '', model: rental.model ?? '', year: rental.year ? String(rental.year) : '', seats: rental.seats ? String(rental.seats) : '',
+      transmission: rental.transmission ?? '', fuel: rental.fuel ?? '', equipment: rental.equipment ? (JSON.parse(rental.equipment) as string[]).join(', ') : '',
+      galleryFiles: [], dailyRate: rental.dailyRate ? String(rental.dailyRate) : String(rental.price), kmRate: rental.kmRate ? String(rental.kmRate) : '',
+      deposit: rental.deposit ? String(rental.deposit) : '', fees: rental.fees ? String(rental.fees) : '', conditions: rental.conditions ?? '',
+      instructions: rental.instructions ?? '', unavailablePeriods: rental.unavailablePeriods ?? '[]', status: rental.status
+    } : blankRental);
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -386,7 +450,15 @@ function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBoots
       return;
     }
     const category = data.categories.find(item => item.id === form.categoryId);
-    const body = { name: form.name.trim(), description: form.description.trim(), category: category?.name ?? form.category.trim(), categoryId: form.categoryId || null, price, billingUnit: form.billingUnit, availability, status: form.status };
+    const body = {
+      name: form.name.trim(), description: form.description.trim(), category: category?.name ?? form.category.trim(), categoryId: form.categoryId || null,
+      price, billingUnit: form.billingUnit, availability,
+      brand: form.brand.trim() || null, model: form.model.trim() || null, year: form.year ? Number(form.year) : null, seats: form.seats ? Number(form.seats) : null,
+      transmission: form.transmission || null, fuel: form.fuel || null, equipment: form.equipment ? form.equipment.split(',').map(s => s.trim()).filter(Boolean) : null,
+      dailyRate: form.dailyRate ? Number(form.dailyRate) : price, kmRate: form.kmRate ? Number(form.kmRate) : 0, deposit: form.deposit ? Number(form.deposit) : 0, fees: form.fees ? Number(form.fees) : 0,
+      conditions: form.conditions.trim() || null, instructions: form.instructions.trim() || null, unavailablePeriods: (() => { try { return JSON.parse(form.unavailablePeriods); } catch { return []; } })(),
+      status: form.status
+    };
     const result = editing === 'new'
       ? await run(() => createEcommerceApi(data.store.companyId).createRental(body), 'Location ajoutée.')
       : editing ? await run(() => createEcommerceApi(data.store.companyId).updateRental(editing.id, body), 'Location mise à jour.') : undefined;
@@ -405,21 +477,221 @@ function RentalPanel({ data, canCreate, canModify, run }: { data: EcommerceBoots
   };
 
   return <div className="space-y-5 fade-up">
-    <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--card))_55%)] p-5 sm:p-7">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div><span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Location & réservation</span><h2 className="mt-2 text-2xl font-bold tracking-[-.04em]">Gérez vos offres indépendamment du catalogue.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Chaque location possède ses propres tarifs, disponibilités et statuts. Elle ne crée ni ne modifie aucun produit vendu.</p></div>
-        {canCreate && <button type="button" onClick={() => open()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter une location</button>}
-      </div>
-    </section>
-    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Offres actives" value={String(activeRentals.length)} detail="Brouillons et publiées" icon={House} accent /><Metric label="Disponibles" value={String(activeRentals.filter(rental => rental.isAvailable).length)} detail="Avec une capacité positive" icon={CheckCircle2} /><Metric label="Visibles en ligne" value={String(activeRentals.filter(rental => rental.status === 'PUBLISHED').length)} detail="Statut publié" icon={Megaphone} /></div>
-    <Panel title="Offres de location" description="Les fiches restent indépendantes du catalogue produit et se conservent après actualisation.">
-        {activeRentals.length === 0 ? <Empty icon={House} title="Aucune location" text="Créez votre première offre autonome pour l’afficher dans la rubrique Location." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter une location</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Location</th><th className="px-4">Tarif</th><th className="px-4">Disponibilité</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{activeRentals.map(rental => <tr key={rental.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{rental.imageUrl ? <img src={rental.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><House size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{rental.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{rental.category} · par {rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}</small></span></div></td><td className="px-4 py-3 font-bold">{money(rental.price, data.store.currency)}</td><td className="px-4 py-3"><input aria-label={`Disponibilité de ${rental.name}`} type="number" min="0" value={rental.availability} disabled={!canModify} onChange={event => void setAvailability(rental, event.target.value)} className="w-24 rounded-lg border bg-transparent px-2.5 py-2 text-sm font-bold disabled:opacity-50" /></td><td className="px-4 py-3"><StatusPill value={rental.status === 'PUBLISHED' && rental.isAvailable ? 'Disponible' : rental.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && <button type="button" onClick={() => open(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModify && <button type="button" onClick={() => void archive(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
+    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Véhicules" value={String(activeRentals.length)} detail="Dans la flotte" icon={House} accent /><Metric label="Disponibles" value={String(activeRentals.filter(rental => rental.isAvailable).length)} detail="Avec une capacité positive" icon={CheckCircle2} /><Metric label="En ligne" value={String(activeRentals.filter(rental => rental.status === 'PUBLISHED').length)} detail="Statut publié" icon={Megaphone} /></div>
+    <Panel title="Flotte de véhicules" description="Gérez votre catalogue de voitures de location." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]"><Plus className="inline mr-1" size={14}/>Ajouter un véhicule</button> : undefined}>
+        {activeRentals.length === 0 ? <Empty icon={House} title="Aucun véhicule" text="Créez votre première offre autonome pour l’afficher dans la rubrique Location." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un véhicule</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Véhicule</th><th className="px-4">Tarif jour</th><th className="px-4">Disponibilité</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{activeRentals.map(rental => <tr key={rental.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{rental.imageUrl ? <img src={rental.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><House size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{rental.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{rental.category}</small></span></div></td><td className="px-4 py-3 font-bold">{money(rental.dailyRate ?? rental.price, data.store.currency)}</td><td className="px-4 py-3"><input aria-label={`Disponibilité de ${rental.name}`} type="number" min="0" value={rental.availability} disabled={!canModify} onChange={event => void setAvailability(rental, event.target.value)} className="w-24 rounded-lg border bg-transparent px-2.5 py-2 text-sm font-bold disabled:opacity-50" /></td><td className="px-4 py-3"><StatusPill value={rental.status === 'PUBLISHED' && rental.isAvailable ? 'Disponible' : rental.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && <button type="button" onClick={() => open(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModify && <button type="button" onClick={() => void archive(rental)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
      {editing && <RentalModal editing={editing} form={form} categories={data.categories} setForm={setForm} onClose={() => setEditing(null)} onSave={save} />}
   </div>;
 }
 
+function RentalReservationsTab({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [reservations, setReservations] = useState<EcommerceCarReservation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const api = createEcommerceApi(data.store.companyId);
+  const { alert } = useAppDialog();
+
+  useEffect(() => {
+    api.getLocationReservations().then(res => {
+      setReservations(res);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const updateStatus = async (id: string, status: EcommerceCarReservationStatus) => {
+    if (!canModify) return;
+    const res = await run(() => api.updateLocationReservationStatus(id, status), 'Statut mis à jour.');
+    if (res) {
+      setReservations(reservations.map(r => r.id === id ? res as EcommerceCarReservation : r));
+    }
+  };
+
+  const activeReservations = reservations.filter(r => !['COMPLETED', 'CANCELLED', 'PAYMENT_FAILED'].includes(r.status));
+  const pendingCount = reservations.filter(r => r.status === 'PENDING_PAYMENT').length;
+  const confirmedCount = reservations.filter(r => r.status === 'CONFIRMED').length;
+  const inProgressCount = reservations.filter(r => r.status === 'IN_PROGRESS').length;
+
+  if (loading) return <div className="p-8 text-center"><RefreshCw className="animate-spin mx-auto text-[hsl(var(--muted-foreground))]" size={24} /></div>;
+
+  return <div className="space-y-5 fade-up">
+    <div className="grid gap-4 sm:grid-cols-3">
+      <Metric label="En attente paiement" value={String(pendingCount)} detail="Réservations bloquées" icon={Clock3} />
+      <Metric label="Confirmées" value={String(confirmedCount)} detail="A venir" icon={CheckCircle2} accent />
+      <Metric label="En cours" value={String(inProgressCount)} detail="Véhicules sur la route" icon={Truck} />
+    </div>
+    <Panel title="Toutes les réservations" description="Suivez et gérez l'état de vos locations de véhicules.">
+      {reservations.length === 0 ? <Empty icon={ClipboardList} title="Aucune réservation" text="Vos réservations de véhicules apparaîtront ici." /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Dates</th><th className="px-4">Véhicule</th><th className="px-4">Trajet</th><th className="px-4">Total</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{reservations.map(r => {
+        const car = data.rentals.find(c => c.id === r.rentalId);
+        return <tr key={r.id}>
+          <td className="px-4 py-3"><div className="font-bold text-xs">{dateLabel(r.startsAt)}</div><div className="text-xs text-[hsl(var(--muted-foreground))]">au {dateLabel(r.endsAt)}</div></td>
+          <td className="px-4 py-3"><div className="font-bold">{car?.name ?? 'Véhicule inconnu'}</div><div className="text-xs text-[hsl(var(--muted-foreground))]">{r.tripType === 'BUSINESS' ? 'Affaires' : 'Famille'}</div></td>
+          <td className="px-4 py-3"><div className="text-xs max-w-[12rem] truncate" title={r.departure}>{r.departure}</div><div className="text-xs text-[hsl(var(--muted-foreground))]">vers {r.destination}</div></td>
+          <td className="px-4 py-3 font-bold">{money(r.totalDetail.total, data.store.currency)}</td>
+          <td className="px-4 py-3">
+            <select disabled={!canModify} value={r.status} onChange={e => void updateStatus(r.id, e.target.value as EcommerceCarReservationStatus)} className="rounded-lg border bg-transparent px-2 py-1.5 text-xs font-bold disabled:opacity-50">
+              <option value="PENDING_PAYMENT">En attente paiement</option>
+              <option value="CONFIRMED">Confirmée</option>
+              <option value="IN_PROGRESS">En cours</option>
+              <option value="COMPLETED">Terminée</option>
+              <option value="CANCELLED">Annulée</option>
+              <option value="PAYMENT_FAILED">Paiement échoué</option>
+              <option value="UNAVAILABLE">Indisponible</option>
+            </select>
+          </td>
+          <td className="px-4 py-3 text-right">
+            {r.invoiceAvailable && <a href={`/api/ecommerce/location/reservations/${r.id}/invoice?companyId=${data.store.companyId}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary))]"><ArrowDownToLine size={13} />Facture</a>}
+          </td>
+        </tr>;
+      })}</tbody></table></div>}
+    </Panel>
+  </div>;
+}
+
+function RentalSettingsTab({ data, canModify, run }: { data: EcommerceBootstrap; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [settings, setSettings] = useState<EcommerceLocationSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const api = createEcommerceApi(data.store.companyId);
+
+  useEffect(() => {
+    api.getLocationSettings().then(res => {
+      setSettings(res);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!settings || !canModify) return;
+    await run(() => api.updateLocationSettings(settings), 'Paramètres enregistrés.');
+  };
+
+  if (loading) return <div className="p-8 text-center"><RefreshCw className="animate-spin mx-auto text-[hsl(var(--muted-foreground))]" size={24} /></div>;
+
+  return <form onSubmit={save} className="space-y-5 fade-up">
+    <Panel title="Configuration générale" description="Paramètres par défaut appliqués aux nouvelles offres de location.">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Tarif journalier par défaut" type="number" value={String(settings?.defaultDailyRate ?? 0)} onChange={v => setSettings(s => s ? { ...s, defaultDailyRate: Number(v) } : null)} />
+        <Field label="Tarif au km par défaut" type="number" value={String(settings?.defaultKmRate ?? 0)} onChange={v => setSettings(s => s ? { ...s, defaultKmRate: Number(v) } : null)} />
+        <Field label="Caution par défaut" type="number" value={String(settings?.defaultDeposit ?? 0)} onChange={v => setSettings(s => s ? { ...s, defaultDeposit: Number(v) } : null)} />
+      </div>
+      <div className="mt-4">
+        <label className="block text-xs font-bold mb-1.5">Politique de location</label>
+        <textarea rows={4} value={settings?.policy ?? ''} onChange={e => setSettings(s => s ? { ...s, policy: e.target.value } : null)} className="w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Conditions générales, âge minimum, etc." />
+      </div>
+    </Panel>
+    <Panel title="Service client WhatsApp" description="Permet aux clients de vous contacter directement après une réservation confirmée.">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Numéro WhatsApp" placeholder="Ex: +221770000000" value={settings?.whatsapp ?? ''} onChange={v => setSettings(s => s ? { ...s, whatsapp: v } : null)} />
+        <Field label="Message par défaut" placeholder="Laisser vide pour utiliser le message automatique" value={settings?.message ?? ''} onChange={v => setSettings(s => s ? { ...s, message: v } : null)} />
+      </div>
+    </Panel>
+    {canModify && <div className="flex justify-end"><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-5 py-2.5 text-sm font-bold text-[hsl(var(--primary-foreground))]">Enregistrer les paramètres</button></div>}
+  </form>;
+}
+
 function RentalModal({ editing, form, categories, setForm, onClose, onSave }: { editing: EcommerceRental | 'new'; form: RentalForm; categories: EcommerceCategory[]; setForm: (value: RentalForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
+  const patch = (updates: Partial<RentalForm>) => setForm({ ...form, ...updates });
+  const [tab, setTab] = useState<'general' | 'specs' | 'pricing' | 'conditions'>('general');
+
+  return <Modal large title={editing === 'new' ? 'Ajouter un véhicule' : `Modifier ${editing.name}`} onClose={onClose}>
+    <div className="flex gap-2 border-b mb-4 px-4 pt-2 overflow-x-auto">
+      <button type="button" onClick={() => setTab('general')} className={`px-3 py-2 text-xs font-bold border-b-2 whitespace-nowrap ${tab === 'general' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Général</button>
+      <button type="button" onClick={() => setTab('specs')} className={`px-3 py-2 text-xs font-bold border-b-2 whitespace-nowrap ${tab === 'specs' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Spécifications</button>
+      <button type="button" onClick={() => setTab('pricing')} className={`px-3 py-2 text-xs font-bold border-b-2 whitespace-nowrap ${tab === 'pricing' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Tarification</button>
+      <button type="button" onClick={() => setTab('conditions')} className={`px-3 py-2 text-xs font-bold border-b-2 whitespace-nowrap ${tab === 'conditions' ? 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))]'}`}>Conditions</button>
+    </div>
+
+    <form onSubmit={onSave} className="space-y-4 px-4 pb-4">
+      {tab === 'general' && <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nom du véhicule" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Toyota Corolla" />
+          <label className="block text-xs font-bold">Catégorie
+            <select value={form.categoryId} onChange={event => patch({ categoryId: event.target.value, category: event.target.options[event.target.selectedIndex]?.text ?? form.category })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+              <option value="">Sans catégorie</option>
+              {categories.filter(category => category.isActive).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          <Field label="Catégorie libre" value={form.categoryId ? categories.find(category => category.id === form.categoryId)?.name ?? form.category : form.category} onChange={value => patch({ category: value, categoryId: '' })} placeholder="Ex. Citadine" />
+          <label className="block text-xs font-bold">Photo principale
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" />
+            <span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum</span>
+            {form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}
+            {editing !== 'new' && editing.imageUrl && !form.imageFile && <img src={editing.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}
+          </label>
+          <Field label="Disponibilité (unités)" required type="number" value={form.availability} onChange={value => patch({ availability: value })} placeholder="1" />
+          <label className="block text-xs font-bold">Statut
+            <select value={form.status} onChange={event => patch({ status: event.target.value as EcommerceRentalStatus })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+              <option value="DRAFT">Brouillon</option>
+              <option value="PUBLISHED">Publié</option>
+              <option value="ARCHIVED">Archivé</option>
+            </select>
+          </label>
+        </div>
+        <label className="block text-xs font-bold">Description
+          <textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} placeholder="Décrivez le véhicule et ses points forts." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" />
+        </label>
+      </div>}
+
+      {tab === 'specs' && <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Marque" value={form.brand} onChange={value => patch({ brand: value })} placeholder="Ex. Toyota" />
+        <Field label="Modèle" value={form.model} onChange={value => patch({ model: value })} placeholder="Ex. Corolla" />
+        <Field label="Année" type="number" value={form.year} onChange={value => patch({ year: value })} placeholder="2023" />
+        <Field label="Places" type="number" value={form.seats} onChange={value => patch({ seats: value })} placeholder="5" />
+        <label className="block text-xs font-bold">Transmission
+          <select value={form.transmission} onChange={event => patch({ transmission: event.target.value as EcommerceRentalTransmission | '' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+            <option value="">Sélectionner</option>
+            <option value="MANUAL">Manuelle</option>
+            <option value="AUTOMATIC">Automatique</option>
+          </select>
+        </label>
+        <label className="block text-xs font-bold">Carburant
+          <select value={form.fuel} onChange={event => patch({ fuel: event.target.value as EcommerceRentalFuel | '' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+            <option value="">Sélectionner</option>
+            <option value="GASOLINE">Essence</option>
+            <option value="DIESEL">Diesel</option>
+            <option value="HYBRID">Hybride</option>
+            <option value="ELECTRIC">Électrique</option>
+          </select>
+        </label>
+        <div className="col-span-2">
+          <Field label="Équipements (séparés par des virgules)" value={form.equipment} onChange={value => patch({ equipment: value })} placeholder="Climatisation, Bluetooth, GPS..." />
+        </div>
+      </div>}
+
+      {tab === 'pricing' && <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Tarif de base (fallback)" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
+        <label className="block text-xs font-bold">Unité de facturation
+          <select value={form.billingUnit} onChange={event => patch({ billingUnit: event.target.value as EcommerceRentalPeriod })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+            <option value="JOUR">Par jour</option>
+            <option value="SEMAINE">Par semaine</option>
+            <option value="MOIS">Par mois</option>
+          </select>
+        </label>
+        <Field label="Tarif journalier" type="number" value={form.dailyRate} onChange={value => patch({ dailyRate: value })} placeholder="0" />
+        <Field label="Tarif au kilomètre" type="number" value={form.kmRate} onChange={value => patch({ kmRate: value })} placeholder="0" />
+        <Field label="Frais fixes" type="number" value={form.fees} onChange={value => patch({ fees: value })} placeholder="0" />
+        <Field label="Caution" type="number" value={form.deposit} onChange={value => patch({ deposit: value })} placeholder="0" />
+      </div>}
+
+      {tab === 'conditions' && <div className="space-y-4">
+        <label className="block text-xs font-bold">Conditions spécifiques
+          <textarea value={form.conditions} onChange={event => patch({ conditions: event.target.value })} rows={3} placeholder="Âge minimum, permis requis..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" />
+        </label>
+        <label className="block text-xs font-bold">Instructions de retrait
+          <textarea value={form.instructions} onChange={event => patch({ instructions: event.target.value })} rows={3} placeholder="Lieu de rendez-vous, contact sur place..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" />
+        </label>
+        <label className="block text-xs font-bold">Périodes d'indisponibilité (JSON optionnel)
+          <textarea value={form.unavailablePeriods} onChange={event => patch({ unavailablePeriods: event.target.value })} rows={2} placeholder='[{"startsAt": "2024-01-01", "endsAt": "2024-01-10"}]' className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm font-mono text-xs" />
+        </label>
+      </div>}
+
+      <div className="modal-footer flex justify-end gap-2 pt-4 border-t">
+        <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button>
+        <button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button>
+      </div>
+    </form>
+  </Modal>;
+} editing, form, categories, setForm, onClose, onSave }: { editing: EcommerceRental | 'new'; form: RentalForm; categories: EcommerceCategory[]; setForm: (value: RentalForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
   const patch = (updates: Partial<RentalForm>) => setForm({ ...form, ...updates });
   return <Modal large title={editing === 'new' ? 'Ajouter une location' : `Modifier ${editing.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la location" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Maison familiale" /><label className="block text-xs font-bold">Catégorie<select value={form.categoryId} onChange={event => patch({ categoryId: event.target.value, category: event.target.options[event.target.selectedIndex]?.text ?? form.category })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sans catégorie</option>{categories.filter(category => category.isActive).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><Field label="Catégorie libre" value={form.categoryId ? categories.find(category => category.id === form.categoryId)?.name ?? form.category : form.category} onChange={value => patch({ category: value, categoryId: '' })} placeholder="Ex. Habitat" /><Field label="Tarif" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><label className="block text-xs font-bold">Unité de facturation<select value={form.billingUnit} onChange={event => patch({ billingUnit: event.target.value as EcommerceRentalPeriod })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="JOUR">Par jour</option><option value="SEMAINE">Par semaine</option><option value="MOIS">Par mois</option></select></label><Field label="Disponibilité" required type="number" value={form.availability} onChange={value => patch({ availability: value })} placeholder="0" /><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as EcommerceRentalStatus })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="block text-xs font-bold">Photo de la location<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{editing !== 'new' && editing.imageUrl && !form.imageFile && <img src={editing.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} placeholder="Décrivez ce qui est loué et les conditions utiles." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
 }

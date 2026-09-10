@@ -577,6 +577,21 @@ class EcommerceController extends Controller
             'price' => (int) $input['price'],
             'billing_unit' => $input['billingUnit'],
             'availability' => (int) $input['availability'],
+            'brand' => $input['brand'] ?? null,
+            'model' => $input['model'] ?? null,
+            'year' => $input['year'] ?? null,
+            'seats' => $input['seats'] ?? null,
+            'transmission' => $input['transmission'] ?? null,
+            'fuel' => $input['fuel'] ?? null,
+            'equipment' => isset($input['equipment']) ? json_encode($input['equipment']) : null,
+            'gallery' => isset($input['gallery']) ? json_encode($input['gallery']) : null,
+            'daily_rate' => (int) ($input['dailyRate'] ?? $input['price']),
+            'km_rate' => (int) ($input['kmRate'] ?? 0),
+            'deposit' => (int) ($input['deposit'] ?? 0),
+            'fees' => (int) ($input['fees'] ?? 0),
+            'conditions' => $input['conditions'] ?? null,
+            'instructions' => $input['instructions'] ?? null,
+            'unavailable_periods' => isset($input['unavailablePeriods']) ? json_encode($input['unavailablePeriods']) : null,
             'status' => $input['status'] ?? 'DRAFT',
             'created_at' => now(),
             'updated_at' => now(),
@@ -620,6 +635,15 @@ class EcommerceController extends Controller
         if (array_key_exists('billingUnit', $input)) $changes['billing_unit'] = $input['billingUnit'];
         if (array_key_exists('availability', $input)) $changes['availability'] = (int) $input['availability'];
         if (array_key_exists('status', $input)) $changes['status'] = $input['status'];
+        foreach (['brand','model','year','seats','transmission','fuel','conditions','instructions'] as $field) {
+            if (array_key_exists($field, $input)) $changes[$field] = $input[$field];
+        }
+        foreach (['equipment','gallery','unavailablePeriods'] as $field) {
+            if (array_key_exists($field, $input)) $changes[Str::snake($field)] = json_encode($input[$field]);
+        }
+        foreach (['dailyRate' => 'daily_rate', 'kmRate' => 'km_rate', 'deposit' => 'deposit', 'fees' => 'fees', 'year' => 'year', 'seats' => 'seats'] as $from => $to) {
+            if (array_key_exists($from, $input)) $changes[$to] = (int) $input[$from];
+        }
         $changes['updated_at'] = now();
         DB::table('ecommerce_rentals')->where('id', $id)->update($changes);
 
@@ -1075,6 +1099,21 @@ class EcommerceController extends Controller
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
             'isAvailable' => (int) $row->availability > 0,
+            'brand' => $row->brand ?? null,
+            'model' => $row->model ?? null,
+            'year' => $row->year ?? null,
+            'seats' => $row->seats ?? null,
+            'transmission' => $row->transmission ?? null,
+            'fuel' => $row->fuel ?? null,
+            'equipment' => json_decode($row->equipment ?? '[]', true) ?: [],
+            'gallery' => json_decode($row->gallery ?? '[]', true) ?: [],
+            'dailyRate' => (int) ($row->daily_rate ?? $row->price),
+            'kmRate' => (int) ($row->km_rate ?? 0),
+            'deposit' => (int) ($row->deposit ?? 0),
+            'fees' => (int) ($row->fees ?? 0),
+            'conditions' => $row->conditions ?? null,
+            'instructions' => $row->instructions ?? null,
+            'unavailablePeriods' => json_decode($row->unavailable_periods ?? '[]', true) ?: [],
             'createdAt' => $row->created_at,
             'updatedAt' => $row->updated_at,
         ];
@@ -1114,6 +1153,21 @@ class EcommerceController extends Controller
             'availability' => (int) $row->availability,
             'isAvailable' => (int) $row->availability > 0,
             'status' => $row->status,
+            'brand' => $row->brand ?? null,
+            'model' => $row->model ?? null,
+            'year' => $row->year ?? null,
+            'seats' => $row->seats ?? null,
+            'transmission' => $row->transmission ?? null,
+            'fuel' => $row->fuel ?? null,
+            'equipment' => json_decode($row->equipment ?? '[]', true) ?: [],
+            'gallery' => json_decode($row->gallery ?? '[]', true) ?: [],
+            'dailyRate' => (int) ($row->daily_rate ?? $row->price),
+            'kmRate' => (int) ($row->km_rate ?? 0),
+            'deposit' => (int) ($row->deposit ?? 0),
+            'fees' => (int) ($row->fees ?? 0),
+            'conditions' => $row->conditions ?? null,
+            'instructions' => $row->instructions ?? null,
+            'unavailablePeriods' => json_decode($row->unavailable_periods ?? '[]', true) ?: [],
             'createdAt' => $row->created_at,
             'updatedAt' => $row->updated_at,
         ];
@@ -1133,6 +1187,23 @@ class EcommerceController extends Controller
             'billingUnit' => array_merge($required, ['in:'.implode(',', self::RENTAL_PERIODS)]),
             'availability' => array_merge($required, ['integer', 'min:0', 'max:1000000']),
             'status' => ['sometimes', 'in:'.implode(',', self::RENTAL_STATUSES)],
+            'brand' => ['nullable', 'string', 'max:80'],
+            'model' => ['nullable', 'string', 'max:120'],
+            'year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 2)],
+            'seats' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'transmission' => ['nullable', 'in:MANUAL,AUTOMATIC'],
+            'fuel' => ['nullable', 'in:PETROL,DIESEL,HYBRID,ELECTRIC,OTHER'],
+            'equipment' => ['nullable', 'array'],
+            'equipment.*' => ['string', 'max:120'],
+            'gallery' => ['nullable', 'array', 'max:30'],
+            'gallery.*' => ['string', 'max:500'],
+            'dailyRate' => ['nullable', 'integer', 'min:0'],
+            'kmRate' => ['nullable', 'integer', 'min:0'],
+            'deposit' => ['nullable', 'integer', 'min:0'],
+            'fees' => ['nullable', 'integer', 'min:0'],
+            'conditions' => ['nullable', 'string', 'max:5000'],
+            'instructions' => ['nullable', 'string', 'max:5000'],
+            'unavailablePeriods' => ['nullable', 'array'],
         ])->validate();
     }
 

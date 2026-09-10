@@ -9,6 +9,54 @@ export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY';
 
+export type EcommerceRentalTransmission = 'MANUAL' | 'AUTOMATIC';
+export type EcommerceRentalFuel = 'GASOLINE' | 'DIESEL' | 'HYBRID' | 'ELECTRIC';
+export type EcommerceCarReservationStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'PAYMENT_FAILED' | 'UNAVAILABLE';
+export type EcommerceCarTripType = 'FAMILY' | 'BUSINESS';
+
+export interface EcommerceLocationSettings {
+  companyId: string;
+  whatsapp: string;
+  message: string;
+  defaultDailyRate: number;
+  defaultKmRate: number;
+  defaultDeposit: number;
+  policy: string;
+}
+
+export interface EcommerceCarReservation {
+  id: string;
+  rentalId: string;
+  orderId: string;
+  customerId: string | null;
+  startsAt: string;
+  endsAt: string;
+  tripType: EcommerceCarTripType;
+  departure: string;
+  destination: string;
+  distanceKm: number;
+  durationMinutes: number;
+  rateSnapshot: {
+    dailyRate: number;
+    kmRate: number;
+    deposit: number;
+    fees: number;
+  };
+  totalDetail: {
+    days: number;
+    distanceKm: number;
+    durationMinutes: number;
+    daily: number;
+    distance: number;
+    fees: number;
+    deposit: number;
+    total: number;
+  };
+  status: EcommerceCarReservationStatus;
+  holdExpiresAt: string | null;
+  invoiceAvailable: boolean;
+}
+
 export interface EcommerceStore {
   id: string;
   companyId: string;
@@ -82,6 +130,21 @@ export interface EcommerceRental {
   billingUnit: EcommerceRentalPeriod;
   availability: number;
   isAvailable: boolean;
+  brand?: string | null;
+  model?: string | null;
+  year?: number | null;
+  seats?: number | null;
+  transmission?: EcommerceRentalTransmission | null;
+  fuel?: EcommerceRentalFuel | null;
+  equipment?: string | null; // json array
+  gallery?: string | null; // json array
+  dailyRate?: number;
+  kmRate?: number;
+  deposit?: number;
+  fees?: number;
+  conditions?: string | null;
+  instructions?: string | null;
+  unavailablePeriods?: string | null; // json array
   status: EcommerceRentalStatus;
   createdAt: string;
   updatedAt: string;
@@ -234,6 +297,21 @@ export interface PublicShopBootstrap {
     billingUnit: EcommerceRentalPeriod;
     availability: number;
     isAvailable: boolean;
+    brand?: string | null;
+    model?: string | null;
+    year?: number | null;
+    seats?: number | null;
+    transmission?: EcommerceRentalTransmission | null;
+    fuel?: EcommerceRentalFuel | null;
+    equipment?: string | null;
+    gallery?: string | null;
+    dailyRate?: number;
+    kmRate?: number;
+    deposit?: number;
+    fees?: number;
+    conditions?: string | null;
+    instructions?: string | null;
+    unavailablePeriods?: string | null;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -387,13 +465,17 @@ export const createEcommerceApi = (companyId: string) => {
         if (!response.ok) throw new Error(body.error ?? 'La photo n’a pas pu être envoyée.');
         return body as EcommerceRental;
       },
-      createRental: (body: { name: string; description?: string; category?: string; categoryId?: string | null; price: number; billingUnit: EcommerceRentalPeriod; availability: number; status?: EcommerceRentalStatus }) =>
+      createRental: (body: any) =>
        request<EcommerceRental>(withCompany('/ecommerce/rentals'), json(body)),
-      updateRental: (id: string, body: Partial<Omit<EcommerceRental, 'id' | 'companyId' | 'createdAt' | 'updatedAt' | 'isAvailable' | 'imageUrl'>>) =>
+      updateRental: (id: string, body: any) =>
        request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
      updateRentalAvailability: (id: string, availability: number) =>
        request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/availability`), { method: 'PATCH', body: JSON.stringify({ availability }) }),
      archiveRental: (id: string) => request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}`), { method: 'DELETE' }),
+     getLocationSettings: () => request<EcommerceLocationSettings>(withCompany('/ecommerce/location/settings')),
+     updateLocationSettings: (body: Partial<EcommerceLocationSettings>) => request<EcommerceLocationSettings>(withCompany('/ecommerce/location/settings'), { method: 'PUT', body: JSON.stringify(body) }),
+     getLocationReservations: () => request<EcommerceCarReservation[]>(withCompany('/ecommerce/location/reservations')),
+     updateLocationReservationStatus: (id: string, status: EcommerceCarReservationStatus) => request<EcommerceCarReservation>(withCompany(`/ecommerce/location/reservations/${encodeURIComponent(id)}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
     updateOrderStatus: (id: string, status: EcommerceOrderStatus) => request<EcommerceOrder>(withCompany(`/ecommerce/orders/${id}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
     deliveryRequests: () => request<{ deliveryRequests: EcommerceDeliveryRequest[] }>(withCompany('/ecommerce/delivery-requests')),
     updateDeliveryRequestStatus: (id: string, status: EcommerceDeliveryRequestStatus) => request<EcommerceDeliveryRequest>(withCompany(`/ecommerce/delivery-requests/${encodeURIComponent(id)}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
@@ -403,6 +485,10 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
+  quoteLocation: (slug: string, id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<any>(`/shop/${encodeURIComponent(slug)}/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
+  quoteDomainLocation: (id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<any>(`/shop-domain/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
+  reserveLocation: (slug: string, body: any, idempotencyKey?: string) => request<EcommerceCarReservation>(`/shop/${encodeURIComponent(slug)}/location/reservations`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
+  reserveDomainLocation: (body: any, idempotencyKey?: string) => request<EcommerceCarReservation>('/shop-domain/location/reservations', { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
   createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
