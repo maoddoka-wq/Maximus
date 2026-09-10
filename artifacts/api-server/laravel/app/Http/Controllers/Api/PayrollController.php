@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
+use Illuminate\Validation\ValidationException;
 
 final class PayrollController extends Controller
 {
@@ -34,6 +35,7 @@ final class PayrollController extends Controller
         }
         $input = $this->validateBeneficiary($request);
         $company = $this->company($request);
+        $this->assertEmployeeBelongsToCompany($input['employeeId'] ?? null, $company);
         $row = [
             'id' => 'payroll-beneficiary-'.Str::uuid(),
             'company_id' => $company,
@@ -59,6 +61,7 @@ final class PayrollController extends Controller
             return $this->forbidden();
         }
         $input = $this->validateBeneficiary($request, true);
+        $this->assertEmployeeBelongsToCompany($input['employeeId'] ?? null, $this->company($request));
         $query = DB::table('payroll_beneficiaries')->where('id', $id)->where('company_id', $this->company($request));
         if (! $query->exists()) {
             return response()->json(['error' => 'Bénéficiaire introuvable.'], 404);
@@ -335,6 +338,24 @@ final class PayrollController extends Controller
     private function forbidden(): JsonResponse
     {
         return response()->json(['error' => 'Cette action n’est pas autorisée pour votre rôle.'], 403);
+    }
+
+    private function assertEmployeeBelongsToCompany(?string $employeeId, string $companyId): void
+    {
+        if (! $employeeId) {
+            return;
+        }
+
+        $belongsToCompany = DB::table('auth_users')
+            ->where('employee_id', $employeeId)
+            ->where('company_id', $companyId)
+            ->exists();
+
+        if (! $belongsToCompany) {
+            throw ValidationException::withMessages([
+                'employeeId' => 'Cet employé n’appartient pas à cette entreprise.',
+            ]);
+        }
     }
 
     private function decryptAccount(string $value): string

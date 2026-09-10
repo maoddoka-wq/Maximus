@@ -344,6 +344,7 @@ export function CompanyRouter({
       canModify: hasPermission('paie', 'modifier'),
       visibleFeatureIds: payrollFeatureIds,
       activeFeatureId: normalizePayrollFeatureId(query.get('feature') ?? '') ?? 'tableau-de-bord',
+      onNavigate,
       singleModuleNavigation,
     });
   }

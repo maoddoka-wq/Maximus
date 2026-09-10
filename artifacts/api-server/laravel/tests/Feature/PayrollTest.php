@@ -38,6 +38,33 @@ class PayrollTest extends TestCase
         $request->getJson('/api/payroll/bootstrap?companyId=kora')->assertJsonCount(0, 'beneficiaries');
     }
 
+    public function test_beneficiary_cannot_reference_an_employee_from_another_company(): void
+    {
+        AuthUser::query()->create([
+            'id' => 'payroll-foreign-employee-'.uniqid(),
+            'email' => 'foreign-employee-'.uniqid().'@other.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Employé autre entreprise',
+            'role' => 'employee',
+            'company_id' => 'other-company',
+            'employee_id' => 'employee-other-company',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        $this->asActor()->postJson('/api/payroll/beneficiaries?companyId=kora', [
+            'employeeId' => 'employee-other-company',
+            'fullName' => 'Employé autre entreprise',
+            'mobile' => '+221770000099',
+            'accountNumber' => 'WAVE-FOREIGN-001',
+            'provider' => 'WAVE',
+            'monthlySalary' => 250000,
+            'paymentDay' => 28,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('employeeId');
+    }
+
     public function test_batch_lifecycle_is_persisted_and_insufficient_balance_blocks_payout(): void
     {
         $request = $this->asActor();
