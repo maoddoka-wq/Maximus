@@ -218,6 +218,16 @@ const blankProduct: ProductForm = {
   status: 'PUBLISHED',
 };
 
+const digitalFileAccept = [
+  'video/*',
+  'audio/*',
+  'application/pdf',
+  '.doc',
+  '.docx',
+  '.ppt',
+  '.pptx',
+].join(',');
+
 export default function EcommerceModulePage({
   companyId,
   canCreate = true,
@@ -890,7 +900,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
         <Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
         <Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" />
          {form.fulfillmentType === 'PHYSICAL' ? <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /> : <div className="rounded-lg border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.06)] px-3 py-2.5 text-xs"><strong className="block">Vente numérique</strong><span className="mt-1 block text-[hsl(var(--muted-foreground))]">Le stock physique n’est pas décrémenté. Une unité est réservée par commande.</span></div>}
-         {form.fulfillmentType === 'DIGITAL' ? <label className="block text-xs font-bold">Fichier numérique {!form.digitalFileName && <span className="text-[hsl(var(--destructive))]">*</span>}<input type="file" onChange={event => { const file = event.target.files?.[0] ?? null; patch({ digitalFile: file, digitalFileName: file?.name ?? form.digitalFileName }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">Fichier privé · 50 Mo maximum · accessible après paiement confirmé.</span>{form.digitalFileName && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFileName}</span>}</label> : null}
+         {form.fulfillmentType === 'DIGITAL' ? <label className="block text-xs font-bold">Fichier numérique {!form.digitalFileName && <span className="text-[hsl(var(--destructive))]">*</span>}<input type="file" accept={digitalFileAccept} onChange={event => { const file = event.target.files?.[0] ?? null; patch({ digitalFile: file, digitalFileName: file?.name ?? form.digitalFileName }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Vidéo, musique, PDF, Word ou PowerPoint · 1 Go maximum · fichier privé accessible après paiement confirmé.</span>{form.digitalFileName && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFileName}</span>}</label> : null}
         <label className="block text-xs font-bold">Photo du produit<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum · envoyée à l’enregistrement</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label>
       </div>
       <label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur ou le locataire..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>

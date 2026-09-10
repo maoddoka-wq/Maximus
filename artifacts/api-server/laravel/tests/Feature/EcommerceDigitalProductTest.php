@@ -62,6 +62,42 @@ class EcommerceDigitalProductTest extends TestCase
         ]);
     }
 
+    public function test_digital_files_accept_video_audio_pdf_word_and_powerpoint_formats(): void
+    {
+        Storage::fake('digital');
+        $request = $this->asActor();
+        $this->enableDigitalSales('kora');
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Médiathèque numérique',
+            'sku' => 'DIGITAL-MEDIA',
+            'price' => 2500,
+            'stock' => 1,
+            'fulfillmentType' => 'DIGITAL',
+            'status' => 'DRAFT',
+        ])->assertCreated()->json();
+
+        foreach ([
+            ['video.mp4', 'video/mp4'],
+            ['video.mov', 'video/quicktime'],
+            ['audio.mp3', 'audio/mpeg'],
+            ['audio.wav', 'audio/wav'],
+            ['document.pdf', 'application/pdf'],
+            ['document.doc', 'application/msword'],
+            ['document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+            ['presentation.ppt', 'application/vnd.ms-powerpoint'],
+            ['presentation.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+        ] as [$name, $mime]) {
+            $request->post('/api/ecommerce/products/'.$product['id'].'/digital-file?companyId=kora', [
+                'file' => UploadedFile::fake()->create($name, 10, $mime),
+            ])->assertOk()->assertJsonPath('digitalFile.name', $name);
+        }
+
+        $request->postJson('/api/ecommerce/products/'.$product['id'].'/digital-file?companyId=kora', [
+            'file' => UploadedFile::fake()->create('programme.exe', 10, 'application/octet-stream'),
+        ])->assertUnprocessable();
+    }
+
     public function test_digital_orders_do_not_consume_physical_stock_and_download_is_paid_customer_bound(): void
     {
         Storage::fake('digital');

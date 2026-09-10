@@ -524,7 +524,12 @@ class EcommerceController extends Controller
         }
 
         $input = Validator::make($request->all(), [
-            'file' => ['required', 'file', 'max:51200'],
+            'file' => [
+                'required',
+                'file',
+                'mimes:mp4,mov,webm,avi,mkv,m4v,mp3,wav,ogg,m4a,aac,flac,pdf,doc,docx,ppt,pptx',
+                'max:1048576',
+            ],
         ])->validate();
         $file = $input['file'];
         $path = $file->store('company-'.$company.'/product-'.$id, 'digital');

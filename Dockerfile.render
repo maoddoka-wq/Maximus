@@ -35,6 +35,7 @@ WORKDIR /app
 
 COPY artifacts/api-server/laravel ./laravel
 COPY render-entrypoint.sh /usr/local/bin/render-entrypoint.sh
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 
 RUN cd laravel \
     && attempt=1; \
