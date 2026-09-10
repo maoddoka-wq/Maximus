@@ -79,4 +79,40 @@ class MaximusAssistantTest extends TestCase
                 && str_contains($request['system'], 'administration principale');
         });
     }
+
+    public function test_it_explains_when_anthropic_has_no_available_credit(): void
+    {
+        config()->set('services.anthropic.key', 'test-anthropic-key');
+        Http::fake([
+            'https://api.anthropic.com/v1/messages' => Http::response([
+                'type' => 'error',
+                'error' => [
+                    'type' => 'invalid_request_error',
+                    'message' => 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
+                ],
+            ], 400),
+        ]);
+
+        $admin = AuthUser::query()->create([
+            'id' => 'assistant-credit-admin',
+            'email' => 'credit-admin@maximus.test',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/ask', [
+                'question' => 'Vérifier la disponibilité de Claude',
+            ])
+            ->assertStatus(503)
+            ->assertJsonPath(
+                'error',
+                'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
+            );
+    }
 }

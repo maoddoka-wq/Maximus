@@ -50,7 +50,29 @@ final class AnthropicAssistantService
         ]);
 
         if ($response->failed()) {
-            report(new RuntimeException('Anthropic request failed with HTTP '.$response->status().'.'));
+            $errorMessage = strtolower((string) $response->json('error.message', ''));
+            $errorType = (string) $response->json('error.type', 'unknown_error');
+            report(new RuntimeException(
+                'Anthropic request failed with HTTP '.$response->status().' ('.$errorType.').'
+            ));
+
+            if (
+                str_contains($errorMessage, 'credit balance')
+                || str_contains($errorMessage, 'purchase credits')
+            ) {
+                throw new RuntimeException(
+                    'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
+                );
+            }
+
+            if ($response->status() === 401) {
+                throw new RuntimeException('La clé Anthropic configurée sur le serveur est invalide.');
+            }
+
+            if ($response->status() === 429) {
+                throw new RuntimeException('Claude a atteint une limite temporaire. Réessayez dans quelques instants.');
+            }
+
             throw new RuntimeException('Claude n’a pas pu répondre pour le moment.');
         }
 
