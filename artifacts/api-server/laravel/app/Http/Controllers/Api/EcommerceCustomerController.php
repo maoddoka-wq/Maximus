@@ -118,7 +118,7 @@ class EcommerceCustomerController extends Controller
             'addresses' => $this->addresses($customer),
             'favoriteProductSlugs' => $this->favoriteProductSlugs($customer),
             'cart' => $this->cartLines($customer),
-            'orders' => $this->customerOrders($customer),
+            'orders' => $this->customerOrders($customer, (string) $store->slug),
             'deliveryRequests' => $this->customerDeliveryRequests($customer),
         ]);
     }
@@ -348,7 +348,7 @@ class EcommerceCustomerController extends Controller
                 return response()->json(['error' => 'Commande introuvable.'], 404);
             }
 
-            return response()->json($this->orderPayload($order));
+            return response()->json($this->orderPayload($order, (string) $store->slug));
         });
     }
 
@@ -561,7 +561,7 @@ class EcommerceCustomerController extends Controller
             ->all();
     }
 
-    private function customerOrders(object $customer): array
+    private function customerOrders(object $customer, string $storeSlug = ''): array
     {
         $rows = DB::table('ecommerce_orders')
             ->where('company_id', $customer->company_id)
@@ -570,7 +570,7 @@ class EcommerceCustomerController extends Controller
             ->limit(100)
             ->get();
 
-        return $rows->map(fn (object $row): array => $this->orderPayload($row))->values()->all();
+        return $rows->map(fn (object $row): array => $this->orderPayload($row, $storeSlug))->values()->all();
     }
 
     private function customerDeliveryRequests(object $customer): array
@@ -586,7 +586,7 @@ class EcommerceCustomerController extends Controller
             ->all();
     }
 
-    private function orderPayload(object $row): array
+    private function orderPayload(object $row, string $storeSlug = ''): array
     {
         $items = DB::table('ecommerce_order_items')
             ->leftJoin('ecommerce_products as product', function ($join) use ($row): void {
@@ -598,6 +598,7 @@ class EcommerceCustomerController extends Controller
             ->get([
                 'ecommerce_order_items.*',
                 'product.image_url',
+                'product.digital_file_name',
             ]);
 
         return [
@@ -622,7 +623,11 @@ class EcommerceCustomerController extends Controller
                 'lineTotal' => (int) $item->line_total,
                 'productType' => $item->product_type ?? 'SALE',
                 'rentalPeriod' => $item->rental_period,
-                'imageUrl' => $item->image_url ?? '',
+                 'imageUrl' => $item->image_url ?? '',
+                 'digitalFileName' => $item->product_type === 'DIGITAL' ? ($item->digital_file_name ?? '') : '',
+                 'digitalDownloadUrl' => ($row->payment_status ?? 'UNPAID') === 'PAID' && $item->product_type === 'DIGITAL' && $storeSlug !== ''
+                     ? '/api/shop/'.rawurlencode($storeSlug).'/orders/'.rawurlencode($row->id).'/digital-downloads/'.rawurlencode($item->id)
+                     : null,
             ])->values()->all(),
         ];
     }

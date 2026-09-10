@@ -42,3 +42,4 @@
 - [Assistant local contrôlé](local-assistant.md) — l’assistant entreprise doit répondre depuis un contexte filtré par session, entreprise et modules autorisés, sans mutation implicite.
 - [Frontière serveur Anthropic](anthropic-server-boundary.md) — une clé Claude reste côté serveur, nommée pour son fournisseur, avec accès MAXIMUS-admin et validation humaine.
 - [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.
+- [Téléchargements numériques](digital-download-security.md) — un fichier numérique reste privé et n’est accessible qu’après paiement, par client authentifié ou jeton de commande vérifié.

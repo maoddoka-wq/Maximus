@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
 use App\Support\CompanyRegistry;
+use App\Support\EcommerceCustomerAuth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +50,7 @@ final class EcommercePaymentController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
-        return $this->statusForOrder($store, $orderId);
+        return $this->statusForOrder($request, $store, $orderId, '/api/shop/'.rawurlencode($slug));
     }
 
     public function statusByDomain(Request $request, string $orderId): JsonResponse
@@ -61,7 +62,29 @@ final class EcommercePaymentController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
-        return $this->statusForOrder($store, $orderId);
+        return $this->statusForOrder($request, $store, $orderId, '/api/shop-domain');
+    }
+
+    public function downloadDigitalProduct(Request $request, string $slug, string $orderId, string $itemId)
+    {
+        $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->downloadForOrder($request, $store, $orderId, $itemId);
+    }
+
+    public function downloadDigitalProductByDomain(Request $request, string $orderId, string $itemId)
+    {
+        $host = strtolower(trim($request->getHost()));
+        $domain = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE')->first();
+        $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)->where('status', 'PUBLISHED')->first() : null;
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->downloadForOrder($request, $store, $orderId, $itemId);
     }
 
     private function createForOrder(Request $request, object $store, string $orderId): JsonResponse
@@ -163,7 +186,7 @@ final class EcommercePaymentController extends Controller
         }
     }
 
-    private function statusForOrder(object $store, string $orderId): JsonResponse
+    private function statusForOrder(Request $request, object $store, string $orderId, string $downloadBasePath): JsonResponse
     {
         $order = DB::table('ecommerce_orders')
             ->where('id', $orderId)
@@ -179,12 +202,97 @@ final class EcommercePaymentController extends Controller
             ->where('company_id', $store->company_id)
             ->first() ?? $order;
 
-        return response()->json([
+        $payload = [
             'reference' => $order->reference,
             'total' => (int) $order->total,
             'paymentStatus' => $order->payment_status ?? 'UNPAID',
             'orderStatus' => $order->status,
             'failureReason' => $order->payment_failure_reason ?? '',
-        ])->header('Cache-Control', 'private, no-store');
+        ];
+        if (($order->payment_status ?? 'UNPAID') === 'PAID' && $this->canDownload($request, $store, $order)) {
+            $payload['digitalDownloads'] = $this->digitalDownloads($order, $downloadBasePath, (string) $request->query('token', ''));
+        } else {
+            $payload['digitalDownloads'] = [];
+        }
+
+        return response()->json($payload)->header('Cache-Control', 'private, no-store');
+    }
+
+    private function downloadForOrder(Request $request, object $store, string $orderId, string $itemId)
+    {
+        $order = DB::table('ecommerce_orders')
+            ->where('id', $orderId)
+            ->where('company_id', $store->company_id)
+            ->first();
+        if (! $order || ($order->payment_status ?? 'UNPAID') !== 'PAID' || ! $this->canDownload($request, $store, $order)) {
+            return response()->json(['error' => 'Téléchargement indisponible.'], 403);
+        }
+
+        $item = DB::table('ecommerce_order_items as item')
+            ->join('ecommerce_products as product', function ($join) use ($store): void {
+                $join->on('product.id', '=', 'item.product_id')
+                    ->where('product.company_id', '=', $store->company_id);
+            })
+            ->where('item.id', $itemId)
+            ->where('item.order_id', $order->id)
+            ->where('item.product_type', 'DIGITAL')
+            ->first([
+                'product.digital_file_data',
+                'product.digital_file_name',
+                'product.digital_file_mime',
+            ]);
+        if (! $item || empty($item->digital_file_data)) {
+            return response()->json(['error' => 'Fichier numérique introuvable.'], 404);
+        }
+
+        $contents = base64_decode($item->digital_file_data, true);
+        if ($contents === false) {
+            return response()->json(['error' => 'Le fichier numérique est illisible.'], 500);
+        }
+
+        return response($contents, 200, [
+            'Content-Type' => $item->digital_file_mime ?: 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="'.addcslashes($item->digital_file_name ?: 'telechargement', "\"\\").'"',
+            'Content-Length' => (string) strlen($contents),
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    private function canDownload(Request $request, object $store, object $order): bool
+    {
+        $token = trim((string) $request->query('token', ''));
+        $expected = hash_hmac('sha256', $store->company_id.':'.$order->id, (string) config('app.key'));
+        if ($token !== '' && hash_equals($expected, $token)) {
+            return true;
+        }
+
+        $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
+        return $customer !== null && (string) ($order->customer_id ?? '') === (string) $customer->id;
+    }
+
+    private function digitalDownloads(object $order, string $basePath, string $token): array
+    {
+        $query = DB::table('ecommerce_order_items as item')
+            ->join('ecommerce_products as product', 'product.id', '=', 'item.product_id')
+            ->where('item.order_id', $order->id)
+            ->where('item.product_type', 'DIGITAL')
+            ->where('product.company_id', $order->company_id)
+            ->whereNotNull('product.digital_file_data')
+            ->get(['item.id', 'product.digital_file_name', 'product.digital_file_size', 'product.digital_file_mime']);
+
+        return $query->map(function (object $item) use ($basePath, $order, $token): array {
+            $url = $basePath.'/orders/'.rawurlencode($order->id).'/digital-downloads/'.rawurlencode($item->id);
+            if ($token !== '') {
+                $url .= '?token='.rawurlencode($token);
+            }
+
+            return [
+                'itemId' => $item->id,
+                'fileName' => $item->digital_file_name,
+                'fileSize' => (int) ($item->digital_file_size ?? 0),
+                'mimeType' => $item->digital_file_mime ?? 'application/octet-stream',
+                'url' => $url,
+            ];
+        })->values()->all();
     }
 }
