@@ -97,9 +97,9 @@ export function buildAppAccessContext({
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;
     if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
-      // Paie ne doit jamais exposer toutes ses fonctionnalités par défaut :
-      // l’administrateur doit avoir activé explicitement chaque entrée affichée.
-      if (module.id === 'paie') return [];
+      // Comme les autres modules, un module autorisé sans sélection détaillée
+      // expose ses fonctionnalités configurées. Une sélection explicite reste
+      // respectée lorsqu’elle existe.
       return undefined;
     }
 

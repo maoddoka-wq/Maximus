@@ -121,7 +121,7 @@ test('affiche les fonctionnalités de tous les modules autorisés dans le menu e
   assert.equal(access.verticalModuleNavigation, true);
 });
 
-test('n’affiche aucune fonctionnalité Paie sans sélection explicite de l’entreprise', () => {
+test('affiche les fonctionnalités Paie quand le module est autorisé sans sélection détaillée', () => {
   const { data, company } = createAccessFixture();
   company.requestedModules = ['paie'];
   company.allowedModules = ['paie'];
@@ -138,10 +138,18 @@ test('n’affiche aucune fonctionnalité Paie sans sélection explicite de l’e
     serverModuleStatuses: null,
   });
 
-  assert.deepEqual(access.selectedPayrollFeatureIds, []);
+  assert.equal(access.selectedPayrollFeatureIds, undefined);
   assert.deepEqual(
     access.sidebarFeatureGroups.flatMap(group => group.items.map(item => item.href)),
-    ['/entreprise/paie'],
+    [
+      '/entreprise/paie?feature=tableau-de-bord',
+      '/entreprise/paie?feature=bénéficiaires',
+      '/entreprise/paie?feature=préparer-une-paie',
+      '/entreprise/paie?feature=validation',
+      '/entreprise/paie?feature=virements',
+      '/entreprise/paie?feature=solde-de-paie',
+      '/entreprise/paie?feature=historique',
+    ],
   );
 });
 
@@ -165,7 +173,15 @@ test('conserve Paie quand MAXIMUS l’active après l’inscription', () => {
   assert.ok(access.allowed.includes('paie'));
   assert.deepEqual(
     access.sidebarFeatureGroups.find(group => group.label === 'Paie')?.items.map(item => item.href),
-    ['/entreprise/paie'],
+    [
+      '/entreprise/paie?feature=tableau-de-bord',
+      '/entreprise/paie?feature=bénéficiaires',
+      '/entreprise/paie?feature=préparer-une-paie',
+      '/entreprise/paie?feature=validation',
+      '/entreprise/paie?feature=virements',
+      '/entreprise/paie?feature=solde-de-paie',
+      '/entreprise/paie?feature=historique',
+    ],
   );
 });
 
