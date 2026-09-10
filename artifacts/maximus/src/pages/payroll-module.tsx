@@ -238,16 +238,19 @@ function BeneficiaryForm({
           </select>
         </label>
         <Field label="Nom complet" value={form.fullName} onChange={(value) => onChange({ ...form, fullName: value })} />
-        <Field label="Numéro Wave" value={form.mobile} onChange={(value) => onChange({ ...form, mobile: value })} placeholder="+221…" />
+         <Field label="Numéro de réception Wave" value={form.mobile} onChange={(value) => onChange({ ...form, mobile: value })} placeholder="+221…" />
         <Field
-          label={editing ? 'Nouveau compte (facultatif)' : 'Numéro de compte'}
+           label={editing ? 'Identifiant de compte (facultatif)' : 'Identifiant de compte Wave'}
           value={form.accountNumber}
           onChange={(value) => onChange({ ...form, accountNumber: value })}
           placeholder={editing ? 'Laisser vide pour conserver' : undefined}
         />
-        <Field label="Salaire mensuel (FCFA)" value={form.monthlySalary} onChange={(value) => onChange({ ...form, monthlySalary: value })} type="number" />
-        <Field label="Jour de paiement" value={form.paymentDay} onChange={(value) => onChange({ ...form, paymentDay: value })} type="number" />
+         <Field label="Montant mensuel proposé (FCFA)" value={form.monthlySalary} onChange={(value) => onChange({ ...form, monthlySalary: value })} type="number" />
+         <Field label="Jour habituel de paiement" value={form.paymentDay} onChange={(value) => onChange({ ...form, paymentDay: value })} type="number" />
       </div>
+       <p className="mt-3 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
+         Le montant exact et la date de chaque paie seront confirmés dans « Préparer une paie » avant validation et virement.
+       </p>
       <div className="mt-4 flex justify-end gap-2">
         <Button onClick={onCancel}>Annuler</Button>
         <Button primary onClick={onSave} loading={loading}>{editing ? 'Enregistrer les changements' : 'Enregistrer'}</Button>
@@ -285,6 +288,7 @@ export default function PayrollModulePage({
   const [batchPeriod, setBatchPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [selected, setSelected] = useState<string[]>([]);
+  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({});
   const [showBeneficiary, setShowBeneficiary] = useState(false);
   const [editingBeneficiary, setEditingBeneficiary] = useState<PayrollBeneficiary | null>(null);
   const [beneficiaryForm, setBeneficiaryForm] = useState({
@@ -404,12 +408,20 @@ export default function PayrollModulePage({
       showAppToast('Sélectionnez au moins un bénéficiaire.', 'warning');
       return;
     }
+    const amounts = Object.fromEntries(selected.map((id) => [id, Number(paymentAmounts[id])]));
+    if (Object.values(amounts).some((amount) => !Number.isInteger(amount) || amount <= 0)) {
+      showAppToast('Chaque bénéficiaire sélectionné doit avoir un montant de paie valide.', 'warning');
+      return;
+    }
     const success = await mutate(
-      () => api.createBatch({ period: batchPeriod, paymentDate, beneficiaryIds: selected }),
+      () => api.createBatch({ period: batchPeriod, paymentDate, beneficiaryIds: selected, amounts }),
       'Paie préparée. Elle est maintenant disponible pour validation.',
       'batch',
     );
-    if (success) setSelected([]);
+    if (success) {
+      setSelected([]);
+      setPaymentAmounts({});
+    }
   };
 
   const topup = async () => {
@@ -444,7 +456,12 @@ export default function PayrollModulePage({
 
   const pendingBatches = data.batches.filter((batch) => batch.status === 'PENDING_APPROVAL');
   const payableBatches = data.batches.filter((batch) => ['APPROVED', 'PROCESSING', 'PARTIAL', 'COMPLETED', 'FAILED'].includes(batch.status));
-  const selectedTotal = data.beneficiaries.filter((item) => selected.includes(item.id)).reduce((sum, item) => sum + item.monthlySalary, 0);
+  const selectedTotal = data.beneficiaries
+    .filter((item) => selected.includes(item.id))
+    .reduce((sum, item) => {
+      const amount = Number(paymentAmounts[item.id] ?? item.monthlySalary);
+      return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
   const activeBatch = data.batches[0];
 
   return (
@@ -493,10 +510,21 @@ export default function PayrollModulePage({
           batchPeriod={batchPeriod}
           paymentDate={paymentDate}
           selected={selected}
+           paymentAmounts={paymentAmounts}
           selectedTotal={selectedTotal}
           onPeriodChange={setBatchPeriod}
           onPaymentDateChange={setPaymentDate}
-          onToggle={(id, checked) => setSelected((current) => checked ? [...current, id] : current.filter((item) => item !== id))}
+           onToggle={(id, checked) => {
+             const beneficiary = data.beneficiaries.find((item) => item.id === id);
+             setSelected((current) => checked ? [...current, id] : current.filter((item) => item !== id));
+             setPaymentAmounts((current) => {
+               if (checked) return { ...current, [id]: current[id] ?? String(beneficiary?.monthlySalary ?? '') };
+               const next = { ...current };
+               delete next[id];
+               return next;
+             });
+           }}
+           onAmountChange={(id, value) => setPaymentAmounts((current) => ({ ...current, [id]: value }))}
           onCreate={() => void createBatch()}
           canCreate={canPrepare && !preview}
           loading={pendingAction === 'batch'}
@@ -622,7 +650,7 @@ function BeneficiariesView({
   return (
     <Panel title={`Bénéficiaires actifs (${data.beneficiaries.length})`} action={canCreate ? <Button primary onClick={onOpenCreate}><Plus size={15} />Ajouter</Button> : null}>
       {showForm && <BeneficiaryForm employees={employees} form={form} editing={editing} onChange={onChange} onSave={onSave} onCancel={onCancel} loading={loading} />}
-      {data.beneficiaries.length === 0 ? <EmptyList>Aucun bénéficiaire enregistré.</EmptyList> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-[hsl(var(--muted-foreground))]"><th className="pb-3 pr-3">Bénéficiaire</th><th className="pb-3 pr-3">Compte</th><th className="pb-3 pr-3">Salaire</th><th className="pb-3 pr-3">Paiement</th><th className="pb-3 text-right">Actions</th></tr></thead><tbody>{data.beneficiaries.map((item) => <tr key={item.id} className="border-b last:border-0"><td className="py-3 pr-3"><div className="font-bold">{item.fullName}</div><div className="text-xs text-[hsl(var(--muted-foreground))]">{item.mobile}</div></td><td className="py-3 pr-3 font-mono text-xs">{item.accountNumberMasked}</td><td className="py-3 pr-3 font-semibold">{money(item.monthlySalary)}</td><td className="py-3 pr-3">Le {item.paymentDay}</td><td className="py-3 text-right"><div className="flex justify-end gap-2">{canModify && <><Button onClick={() => onEdit(item)}><Pencil size={14} /></Button><Button danger onClick={() => onArchive(item.id)}><Trash2 size={14} /></Button></>}</div></td></tr>)}</tbody></table></div>}
+       {data.beneficiaries.length === 0 ? <EmptyList>Aucun bénéficiaire enregistré.</EmptyList> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-[hsl(var(--muted-foreground))]"><th className="pb-3 pr-3">Employé</th><th className="pb-3 pr-3">Réception</th><th className="pb-3 pr-3">Montant proposé</th><th className="pb-3 pr-3">Jour habituel</th><th className="pb-3 text-right">Actions</th></tr></thead><tbody>{data.beneficiaries.map((item) => <tr key={item.id} className="border-b last:border-0"><td className="py-3 pr-3"><div className="font-bold">{item.fullName}</div><div className="text-xs text-[hsl(var(--muted-foreground))]">{item.employeeId ? 'Employé lié' : 'Employé à compléter'}</div></td><td className="py-3 pr-3"><div className="font-medium">{item.mobile}</div><div className="font-mono text-[11px] text-[hsl(var(--muted-foreground))]">{item.accountNumberMasked}</div></td><td className="py-3 pr-3 font-semibold">{money(item.monthlySalary)}</td><td className="py-3 pr-3">Le {item.paymentDay}</td><td className="py-3 text-right"><div className="flex justify-end gap-2">{canModify && <><Button onClick={() => onEdit(item)}><Pencil size={14} /></Button><Button danger onClick={() => onArchive(item.id)}><Trash2 size={14} /></Button></>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
   );
 }
@@ -632,10 +660,12 @@ function PrepareView({
   batchPeriod,
   paymentDate,
   selected,
+  paymentAmounts,
   selectedTotal,
   onPeriodChange,
   onPaymentDateChange,
   onToggle,
+  onAmountChange,
   onCreate,
   canCreate,
   loading,
@@ -644,18 +674,21 @@ function PrepareView({
   batchPeriod: string;
   paymentDate: string;
   selected: string[];
+  paymentAmounts: Record<string, string>;
   selectedTotal: number;
   onPeriodChange: (value: string) => void;
   onPaymentDateChange: (value: string) => void;
   onToggle: (id: string, checked: boolean) => void;
+  onAmountChange: (id: string, value: string) => void;
   onCreate: () => void;
   canCreate: boolean;
   loading: boolean;
 }) {
   return (
     <Panel title="Nouveau brouillon de paie" action={<ShieldCheck size={18} className="text-[hsl(var(--primary))]" />}>
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]"><Field label="Période" value={batchPeriod} onChange={onPeriodChange} type="month" /><Field label="Date de paiement" value={paymentDate} onChange={onPaymentDateChange} type="date" /><div className="flex items-end pb-1 text-sm font-bold">{selected.length} bénéficiaire(s) · {money(selectedTotal)}</div><div className="flex items-end"><Button primary disabled={!canCreate || !selected.length} loading={loading} onClick={onCreate}><Plus size={15} />Créer le brouillon</Button></div></div>
-      {data.beneficiaries.length === 0 ? <div className="mt-5"><EmptyList>Ajoutez d’abord un bénéficiaire avant de préparer une paie.</EmptyList></div> : <div className="mt-5 grid gap-2 md:grid-cols-2">{data.beneficiaries.map((item) => <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm hover:bg-[hsl(var(--muted)/.35)]"><input type="checkbox" checked={selected.includes(item.id)} onChange={(event) => onToggle(item.id, event.target.checked)} /><span className="flex-1"><strong>{item.fullName}</strong><span className="ml-2 text-xs text-[hsl(var(--muted-foreground))]">{money(item.monthlySalary)}</span></span></label>)}</div>}
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]"><Field label="Période" value={batchPeriod} onChange={onPeriodChange} type="month" /><Field label="Date exacte de paiement" value={paymentDate} onChange={onPaymentDateChange} type="date" /><div className="flex items-end pb-1 text-sm font-bold">{selected.length} bénéficiaire(s) · {money(selectedTotal)}</div><div className="flex items-end"><Button primary disabled={!canCreate || !selected.length} loading={loading} onClick={onCreate}><Plus size={15} />Créer le brouillon</Button></div></div>
+      <p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Sélectionnez les employés à payer. Le montant proposé vient de leur fiche, mais vous pouvez l’ajuster pour cette paie avant la validation.</p>
+      {data.beneficiaries.length === 0 ? <div className="mt-5"><EmptyList>Ajoutez d’abord un bénéficiaire avant de préparer une paie.</EmptyList></div> : <div className="mt-5 space-y-2">{data.beneficiaries.map((item) => { const isSelected = selected.includes(item.id); return <div key={item.id} className={`rounded-xl border p-3 transition ${isSelected ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--primary)/.04)]' : ''}`}><label className="flex cursor-pointer items-center gap-3 text-sm"><input type="checkbox" checked={isSelected} onChange={(event) => onToggle(item.id, event.target.checked)} /><span className="min-w-0 flex-1"><strong className="block">{item.fullName}</strong><span className="text-xs text-[hsl(var(--muted-foreground))]">{item.mobile} · {item.accountNumberMasked}</span></span><span className="hidden text-xs text-[hsl(var(--muted-foreground))] sm:inline">Proposé : {money(item.monthlySalary)}</span></label>{isSelected && <div className="mt-3 max-w-xs pl-7"><Field label="Montant de cette paie (FCFA)" value={paymentAmounts[item.id] ?? ''} onChange={(value) => onAmountChange(item.id, value)} type="number" /></div>}</div>; })}</div>}
     </Panel>
   );
 }

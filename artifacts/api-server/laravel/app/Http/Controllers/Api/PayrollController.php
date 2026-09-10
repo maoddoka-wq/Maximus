@@ -118,6 +118,8 @@ final class PayrollController extends Controller
             'paymentDate' => ['required', 'date'],
             'beneficiaryIds' => ['required', 'array', 'min:1', 'max:1000'],
             'beneficiaryIds.*' => ['required', 'string'],
+            'amounts' => ['sometimes', 'array'],
+            'amounts.*' => ['required', 'integer', 'min:1', 'max:100000000'],
         ])->validate();
         $company = $this->company($request);
         $beneficiaries = DB::table('payroll_beneficiaries')
@@ -128,14 +130,23 @@ final class PayrollController extends Controller
         if ($beneficiaries->count() !== count(array_unique($input['beneficiaryIds']))) {
             return response()->json(['error' => 'Un ou plusieurs bénéficiaires sont introuvables ou inactifs.'], 422);
         }
+        $amounts = collect($input['amounts'] ?? [])
+            ->mapWithKeys(fn ($amount, $beneficiaryId): array => [(string) $beneficiaryId => (int) $amount])
+            ->all();
+        if (array_diff(array_keys($amounts), array_map('strval', array_unique($input['beneficiaryIds'])))) {
+            return response()->json(['error' => 'Un montant de paie référence un bénéficiaire qui n’est pas sélectionné.'], 422);
+        }
         $batchId = 'payroll-batch-'.Str::uuid();
-        DB::transaction(function () use ($batchId, $company, $input, $beneficiaries, $request): void {
+        DB::transaction(function () use ($batchId, $company, $input, $beneficiaries, $amounts, $request): void {
+            $totalAmount = $beneficiaries->sum(
+                fn (object $beneficiary): int => $amounts[$beneficiary->id] ?? (int) $beneficiary->monthly_salary,
+            );
             DB::table('payroll_batches')->insert([
                 'id' => $batchId,
                 'company_id' => $company,
                 'period' => trim($input['period']),
                 'payment_date' => $input['paymentDate'],
-                'total_amount' => $beneficiaries->sum('monthly_salary'),
+                'total_amount' => $totalAmount,
                 'status' => 'DRAFT',
                 'created_by' => $this->actorName($request),
                 'approved_by' => null,
@@ -154,7 +165,7 @@ final class PayrollController extends Controller
                     'mobile' => $beneficiary->mobile,
                     'account_number' => Crypt::encryptString($this->decryptAccount($beneficiary->account_number)),
                     'provider' => $beneficiary->provider,
-                    'amount' => (int) $beneficiary->monthly_salary,
+                    'amount' => $amounts[$beneficiary->id] ?? (int) $beneficiary->monthly_salary,
                     'status' => 'PENDING',
                     'provider_payout_id' => null,
                     'idempotency_key' => 'payroll-payout:'.$batchId.':'.$beneficiary->id,

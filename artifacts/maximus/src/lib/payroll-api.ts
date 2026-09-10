@@ -93,7 +93,7 @@ export function createPayrollApi() {
       request<PayrollBeneficiary>(`/beneficiaries/${encodeURIComponent(id)}`, { method: 'PATCH', json: input }),
     archiveBeneficiary: (id: string) =>
       request<{ ok: true }>(`/beneficiaries/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-    createBatch: (input: { period: string; paymentDate: string; beneficiaryIds: string[] }) =>
+    createBatch: (input: { period: string; paymentDate: string; beneficiaryIds: string[]; amounts?: Record<string, number> }) =>
       request<{ batch: PayrollBatch }>('/batches', { method: 'POST', json: input }),
     submitBatch: (id: string) => request<{ batch: PayrollBatch }>(`/batches/${id}/submit`, { method: 'POST' }),
     approveBatch: (id: string) => request<{ batch: PayrollBatch }>(`/batches/${id}/approve`, { method: 'POST' }),

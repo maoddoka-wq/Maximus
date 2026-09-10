@@ -91,6 +91,32 @@ class PayrollTest extends TestCase
             ->assertJsonPath('error', 'Le solde du portefeuille de paie ne couvre pas cette paie.');
     }
 
+    public function test_batch_uses_the_amount_entered_for_each_payment(): void
+    {
+        $request = $this->asActor();
+        $beneficiary = $request->postJson('/api/payroll/beneficiaries?companyId=kora', [
+            'fullName' => 'Fatou Diop',
+            'mobile' => '+221770000002',
+            'accountNumber' => 'WAVE-ACCOUNT-003',
+            'provider' => 'WAVE',
+            'monthlySalary' => 180000,
+            'paymentDay' => 28,
+        ])->assertCreated()->json('id');
+
+        $batch = $request->postJson('/api/payroll/batches?companyId=kora', [
+            'period' => '2026-09',
+            'paymentDate' => '2026-09-30',
+            'beneficiaryIds' => [$beneficiary],
+            'amounts' => [$beneficiary => 245000],
+        ])->assertCreated()
+            ->assertJsonPath('batch.totalAmount', 245000)
+            ->json('batch.id');
+
+        $request->getJson('/api/payroll/bootstrap?companyId=kora')
+            ->assertJsonPath('items.0.batchId', $batch)
+            ->assertJsonPath('items.0.amount', 245000);
+    }
+
     public function test_topup_is_idempotent_and_webhook_credits_the_wallet_once(): void
     {
         Config::set('services.diamanopay.access_token', 'test-token');
