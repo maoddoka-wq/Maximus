@@ -629,8 +629,9 @@ function PublicOfferCard({
   icon: Icon,
   badge,
   name,
-  description,
   price,
+  priceValue,
+  compareAtPrice,
   priceSuffix,
   availability,
   store,
@@ -641,8 +642,9 @@ function PublicOfferCard({
   icon: typeof Package;
   badge: string;
   name: string;
-  description: string;
   price: string;
+  priceValue: number;
+  compareAtPrice?: number | null;
   priceSuffix?: string;
   availability?: string;
   store: PublicShopBootstrap['store'];
@@ -650,26 +652,20 @@ function PublicOfferCard({
   onAdd?: () => void;
 }) {
   const isAvailable = availability !== 'Indisponible';
-  const availabilityLabel = availability ? (isAvailable ? 'Disponible' : 'Indisponible') : undefined;
-  return <article className="group min-w-0 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_8px_25px_rgba(15,23,42,.05)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_16px_35px_rgba(15,23,42,.1)]">
-     <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.45)] disabled:cursor-default">
-       {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <Icon size={38} className="text-[hsl(var(--muted-foreground))]" />}
-       {availabilityLabel && <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{availabilityLabel}</span>}
+  const discount = compareAtPrice && compareAtPrice > priceValue ? Math.round((1 - priceValue / compareAtPrice) * 100) : null;
+  return <article className="group min-w-0 overflow-hidden rounded-xl border border-black/5 bg-white shadow-[0_3px_12px_rgba(15,23,42,.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,.1)]">
+     <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.35)] p-1.5 disabled:cursor-default sm:p-2">
+       {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]" /> : <Icon size={28} className="text-[hsl(var(--muted-foreground))]" />}
+       {discount !== null && <span className="absolute left-1.5 top-1.5 rounded-md bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white sm:left-2 sm:top-2 sm:text-[10px]">-{discount}%</span>}
+       {availability && <span className={`absolute bottom-1.5 left-1.5 max-w-[calc(100%-.75rem)] truncate rounded-md px-1.5 py-0.5 text-[9px] font-bold sm:bottom-2 sm:left-2 ${isAvailable ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800'}`}>{availability}</span>}
     </button>
-      <div className="border-t border-black/5 bg-white p-4 sm:p-5">
-       <p className="truncate text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: 'var(--shop-primary)' }}>{badge}</p>
-       <div className="mt-2 flex min-w-0 items-start justify-between gap-3">
-         {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-base font-bold leading-tight text-[hsl(var(--foreground))] sm:text-lg">{name}</button> : <h3 className="min-w-0 break-words text-base font-bold leading-tight text-[hsl(var(--foreground))] sm:text-lg">{name}</h3>}
-         <p className="shrink-0 text-right text-sm font-bold text-[hsl(var(--foreground))] sm:text-base">{price}{priceSuffix && <span className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))]">{priceSuffix}</span>}</p>
-      </div>
-       {description && <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{description || `Une offre proposée par ${store.name}.`}</p>}
-       {availability && <div className="mt-4 flex items-center gap-2 border-t border-black/5 pt-3 text-xs font-semibold text-[hsl(var(--muted-foreground))]">
-         <Package size={15} className="shrink-0" style={{ color: 'var(--shop-primary)' }} />
-        <span>{availability}</span>
-         <span className="ml-auto truncate">{badge.split(' · ')[1] || badge}</span>
-      </div>}
-       {onAdd && <div className="mt-4 flex items-center gap-1.5">
-         {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter au panier</button>}
+      <div className="border-t border-black/5 bg-white p-2.5 sm:p-3">
+       <p className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">{badge.split(' · ')[1] || badge}</p>
+       {onOpen ? <button type="button" onClick={onOpen} className="mt-1 line-clamp-2 min-h-8 w-full break-words text-left text-xs font-semibold leading-4 text-[hsl(var(--foreground))] sm:text-sm">{name}</button> : <h3 className="mt-1 line-clamp-2 min-h-8 break-words text-xs font-semibold leading-4 text-[hsl(var(--foreground))] sm:text-sm">{name}</h3>}
+       <p className="mt-1.5 text-sm font-bold leading-4 text-[hsl(var(--foreground))] sm:text-base">{price}{priceSuffix && <span className="ml-0.5 text-[9px] font-medium text-[hsl(var(--muted-foreground))]">{priceSuffix}</span>}</p>
+       {compareAtPrice && compareAtPrice > priceValue && <div className="mt-1 flex items-center gap-1.5"><span className="truncate text-[10px] text-[hsl(var(--muted-foreground))] line-through">{money(compareAtPrice, store.currency)}</span><span className="rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700">-{discount}%</span></div>}
+       {onAdd && <div className="mt-2.5 flex items-center gap-1.5">
+          {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-white shadow-sm transition hover:brightness-95 sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}><ShoppingBag size={12} className="mr-1 inline-block" />Ajouter</button>}
       </div>}
     </div>
   </article>;
@@ -690,16 +686,16 @@ function CatalogSections({
   onProduct: (product: PublicProduct) => void;
   onAdd: (product: PublicProduct) => void;
 }) {
-  return <div className="space-y-12">
+  return <div className="space-y-8">
     {categories.map(category => {
       const categoryProducts = products.filter(product => product.category === category);
       const categoryRentals = rentals.filter(rental => rental.category === category);
       if (categoryProducts.length === 0 && categoryRentals.length === 0) return null;
        return <section key={category}>
-         <div className="mb-5 flex items-end justify-between gap-3 border-b border-black/5 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold tracking-[-.03em]">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-             {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? `${product.stock} disponible${product.stock > 1 ? 's' : ''}` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} />)}
-          {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
+         <div className="mb-3 flex items-end justify-between gap-3 border-b border-black/5 pb-2"><div><p className="text-[9px] font-bold uppercase tracking-[.15em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-lg font-bold tracking-[-.02em] sm:text-xl">{category}</h2></div><span className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
+           <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6">
+              {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} price={money(product.price, store.currency)} priceValue={product.price} compareAtPrice={product.compareAtPrice} availability={product.stock > 0 ? `${product.stock} en stock` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} />)}
+           {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} price={money(rental.price, store.currency)} priceValue={rental.price} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} en stock` : 'Indisponible'} store={store} />)}
         </div>
       </section>;
     })}
