@@ -15,6 +15,8 @@ use Illuminate\Support\Str;
 
 class EcommerceCustomerController extends Controller
 {
+    private const DIGITAL_CART_LIMIT = 100;
+
     public function session(Request $request, ?string $slug = null): JsonResponse
     {
         $store = $this->publishedStore($request, $slug);
@@ -289,7 +291,7 @@ class EcommerceCustomerController extends Controller
             if (! $product) {
                 return response()->json(['error' => 'Produit introuvable.'], 404);
             }
-            if ((int) $input['quantity'] > (int) $product->stock) {
+            if (($product->product_type ?? 'SALE') !== 'DIGITAL' && (int) $input['quantity'] > (int) $product->stock) {
                 return response()->json(['error' => 'La quantité demandée dépasse le stock disponible.'], 409);
             }
 
@@ -551,7 +553,9 @@ class EcommerceCustomerController extends Controller
                 'category' => $row->category,
                 'price' => (int) $row->price,
                 'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
-                'stock' => (int) $row->stock,
+                'stock' => ($row->product_type ?? 'SALE') === 'DIGITAL'
+                    ? self::DIGITAL_CART_LIMIT
+                    : (int) $row->stock,
                 'imageUrl' => $row->image_url,
                 'productType' => $row->product_type ?? 'SALE',
                 'rentalPeriod' => $row->rental_period,

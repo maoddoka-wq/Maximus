@@ -1081,7 +1081,7 @@ class EcommerceController extends Controller
             'category' => $row->category,
             'price' => (int) $row->price,
             'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
-            'stock' => ($row->product_type ?? 'SALE') === 'DIGITAL' ? 1 : (int) $row->stock,
+            'stock' => ($row->product_type ?? 'SALE') === 'DIGITAL' ? 100 : (int) $row->stock,
             'imageUrl' => $row->image_url,
             'featured' => (bool) $row->featured,
             'productType' => $row->product_type ?? 'SALE',
