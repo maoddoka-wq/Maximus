@@ -42,3 +42,4 @@
 - [Assistant local contrôlé](local-assistant.md) — l’assistant entreprise doit répondre depuis un contexte filtré par session, entreprise et modules autorisés, sans mutation implicite.
 - [Frontière serveur Anthropic](anthropic-server-boundary.md) — une clé Claude reste côté serveur, nommée pour son fournisseur, avec accès MAXIMUS-admin et validation humaine.
 - [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.
+- [Réservations automobiles](car-rental-payment-boundary.md) — un créneau n’est confirmé qu’après paiement valide avant expiration, sans chevauchement actif.
