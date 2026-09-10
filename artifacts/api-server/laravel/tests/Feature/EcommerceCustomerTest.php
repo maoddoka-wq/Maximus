@@ -133,53 +133,6 @@ class EcommerceCustomerTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_customer_cart_items', ['customer_id' => $customer->id]);
     }
 
-    public function test_customer_can_keep_a_digital_product_in_the_cart_without_physical_stock(): void
-    {
-        $this->createStore('kora', 'kora-digital-cart');
-        $productId = 'digital-cart-product';
-        DB::table('ecommerce_products')->insert([
-            'id' => $productId,
-            'company_id' => 'kora',
-            'name' => 'Guide numérique',
-            'slug' => 'guide-digital-cart',
-            'sku' => 'GUIDE-DIGITAL-CART',
-            'description' => '',
-            'category' => 'Guides',
-            'price' => 4500,
-            'compare_at_price' => null,
-            'stock' => 0,
-            'image_url' => '',
-            'featured' => false,
-            'status' => 'PUBLISHED',
-            'product_type' => 'DIGITAL',
-            'digital_file_name' => 'guide.pdf',
-            'digital_file_size' => 12,
-            'digital_file_mime' => 'application/pdf',
-            'digital_file_data' => base64_encode('%PDF-1.7 guide'),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $customer = $this->createCustomer('customer-digital-cart', 'kora', 'digital-cart@example.test');
-        $token = EcommerceCustomerAuth::issueSession($customer);
-
-        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
-            ->putJson('/api/shop/kora-digital-cart/customer/cart', [
-                'productSlug' => 'guide-digital-cart',
-                'quantity' => 2,
-            ])
-            ->assertOk()
-            ->assertJsonPath('cart.0.productType', 'DIGITAL')
-            ->assertJsonPath('cart.0.quantity', 2)
-            ->assertJsonPath('cart.0.stock', 100);
-
-        $this->assertDatabaseHas('ecommerce_customer_cart_items', [
-            'customer_id' => $customer->id,
-            'product_id' => $productId,
-            'quantity' => 2,
-        ]);
-        $this->assertDatabaseHas('ecommerce_products', ['id' => $productId, 'stock' => 0]);
-    }
-
     public function test_customer_can_retrieve_only_its_delivery_requests(): void
     {
         $this->createStore('kora', 'kora-delivery');

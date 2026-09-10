@@ -722,76 +722,6 @@ class EcommerceTest extends TestCase
             ->assertJsonFragment(['slug' => $sale['slug'], 'productType' => 'SALE', 'rentalPeriod' => null]);
     }
 
-    public function test_digital_product_is_uploaded_privately_and_downloaded_only_after_payment_without_stock_decrement(): void
-    {
-        $request = $this->asActor();
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'name' => 'Boutique numérique',
-            'slug' => 'boutique-numerique',
-            'description' => '',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primaryColor' => '#D69E2E',
-            'accentColor' => '#172033',
-        ])->assertOk();
-
-        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
-            'name' => 'Guide numérique',
-            'sku' => 'DIGITAL-01',
-            'price' => 4500,
-            'stock' => 0,
-            'status' => 'PUBLISHED',
-            'productType' => 'DIGITAL',
-        ])->assertCreated()
-            ->assertJsonPath('productType', 'DIGITAL')
-            ->json();
-
-        $request->post('/api/ecommerce/products/'.$product['id'].'/digital-file?companyId=kora', [
-            'file' => UploadedFile::fake()->createWithContent('guide.pdf', '%PDF-1.7 digital guide'),
-        ])
-            ->assertOk()
-            ->assertJsonPath('digitalFileName', 'guide.pdf')
-            ->assertJsonPath('digitalFileMime', 'application/pdf');
-        $this->assertDatabaseHas('ecommerce_products', ['id' => $product['id'], 'product_type' => 'DIGITAL']);
-        $this->assertNotEmpty(DB::table('ecommerce_products')->where('id', $product['id'])->value('digital_file_data'));
-
-        $this->getJson('/api/shop/boutique-numerique')
-            ->assertOk()
-            ->assertJsonFragment(['slug' => $product['slug'], 'productType' => 'DIGITAL'])
-            ->assertJsonMissingPath('products.0.digitalFileData');
-
-        $order = $this->postJson('/api/shop/boutique-numerique/orders', [
-            'customerName' => 'Client numérique',
-            'customerEmail' => 'digital@example.test',
-            'items' => [['productSlug' => $product['slug'], 'quantity' => 1]],
-        ])->assertCreated()
-            ->assertJsonPath('total', 4500)
-            ->assertJsonPath('paymentStatus', 'UNPAID')
-            ->json();
-
-        $this->assertNotEmpty($order['downloadToken']);
-        $this->assertDatabaseHas('ecommerce_products', ['id' => $product['id'], 'stock' => 0]);
-
-        $this->getJson('/api/shop/boutique-numerique/orders/'.$order['id'].'/payment-status?token='.$order['downloadToken'])
-            ->assertOk()
-            ->assertJsonPath('digitalDownloads', []);
-        $this->get('/api/shop/boutique-numerique/orders/'.$order['id'].'/digital-downloads/'.$this->firstOrderItemId($order['id']).'?token='.$order['downloadToken'])
-            ->assertForbidden();
-
-        DB::table('ecommerce_orders')->where('id', $order['id'])->update(['payment_status' => 'PAID']);
-
-        $status = $this->getJson('/api/shop/boutique-numerique/orders/'.$order['id'].'/payment-status?token='.$order['downloadToken'])
-            ->assertOk()
-            ->assertJsonCount(1, 'digitalDownloads')
-            ->json();
-        $this->get($status['digitalDownloads'][0]['url'])
-            ->assertOk()
-            ->assertHeader('Content-Type', 'application/pdf')
-            ->assertHeader('Content-Disposition', 'attachment; filename="guide.pdf"');
-        $this->get('/api/shop/boutique-numerique/orders/'.$order['id'].'/digital-downloads/'.$this->firstOrderItemId($order['id']).'?token=invalid')
-            ->assertForbidden();
-    }
-
     public function test_delivery_requests_are_scoped_and_status_can_be_managed_by_the_company(): void
     {
         $request = $this->asActor();
@@ -1003,10 +933,5 @@ class EcommerceTest extends TestCase
         return $this
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
-    }
-
-    private function firstOrderItemId(string $orderId): string
-    {
-        return (string) DB::table('ecommerce_order_items')->where('order_id', $orderId)->value('id');
     }
 }

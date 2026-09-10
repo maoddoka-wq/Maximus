@@ -15,8 +15,6 @@ use Illuminate\Support\Str;
 
 class EcommerceCustomerController extends Controller
 {
-    private const DIGITAL_CART_LIMIT = 100;
-
     public function session(Request $request, ?string $slug = null): JsonResponse
     {
         $store = $this->publishedStore($request, $slug);
@@ -120,7 +118,7 @@ class EcommerceCustomerController extends Controller
             'addresses' => $this->addresses($customer),
             'favoriteProductSlugs' => $this->favoriteProductSlugs($customer),
             'cart' => $this->cartLines($customer),
-            'orders' => $this->customerOrders($customer, (string) $store->slug),
+            'orders' => $this->customerOrders($customer),
             'deliveryRequests' => $this->customerDeliveryRequests($customer),
         ]);
     }
@@ -291,7 +289,7 @@ class EcommerceCustomerController extends Controller
             if (! $product) {
                 return response()->json(['error' => 'Produit introuvable.'], 404);
             }
-            if (($product->product_type ?? 'SALE') !== 'DIGITAL' && (int) $input['quantity'] > (int) $product->stock) {
+            if ((int) $input['quantity'] > (int) $product->stock) {
                 return response()->json(['error' => 'La quantité demandée dépasse le stock disponible.'], 409);
             }
 
@@ -350,7 +348,7 @@ class EcommerceCustomerController extends Controller
                 return response()->json(['error' => 'Commande introuvable.'], 404);
             }
 
-            return response()->json($this->orderPayload($order, (string) $store->slug));
+            return response()->json($this->orderPayload($order));
         });
     }
 
@@ -553,9 +551,7 @@ class EcommerceCustomerController extends Controller
                 'category' => $row->category,
                 'price' => (int) $row->price,
                 'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
-                'stock' => ($row->product_type ?? 'SALE') === 'DIGITAL'
-                    ? self::DIGITAL_CART_LIMIT
-                    : (int) $row->stock,
+                'stock' => (int) $row->stock,
                 'imageUrl' => $row->image_url,
                 'productType' => $row->product_type ?? 'SALE',
                 'rentalPeriod' => $row->rental_period,
@@ -565,7 +561,7 @@ class EcommerceCustomerController extends Controller
             ->all();
     }
 
-    private function customerOrders(object $customer, string $storeSlug = ''): array
+    private function customerOrders(object $customer): array
     {
         $rows = DB::table('ecommerce_orders')
             ->where('company_id', $customer->company_id)
@@ -574,7 +570,7 @@ class EcommerceCustomerController extends Controller
             ->limit(100)
             ->get();
 
-        return $rows->map(fn (object $row): array => $this->orderPayload($row, $storeSlug))->values()->all();
+        return $rows->map(fn (object $row): array => $this->orderPayload($row))->values()->all();
     }
 
     private function customerDeliveryRequests(object $customer): array
@@ -590,7 +586,7 @@ class EcommerceCustomerController extends Controller
             ->all();
     }
 
-    private function orderPayload(object $row, string $storeSlug = ''): array
+    private function orderPayload(object $row): array
     {
         $items = DB::table('ecommerce_order_items')
             ->leftJoin('ecommerce_products as product', function ($join) use ($row): void {
@@ -602,7 +598,6 @@ class EcommerceCustomerController extends Controller
             ->get([
                 'ecommerce_order_items.*',
                 'product.image_url',
-                'product.digital_file_name',
             ]);
 
         return [
@@ -627,11 +622,7 @@ class EcommerceCustomerController extends Controller
                 'lineTotal' => (int) $item->line_total,
                 'productType' => $item->product_type ?? 'SALE',
                 'rentalPeriod' => $item->rental_period,
-                 'imageUrl' => $item->image_url ?? '',
-                 'digitalFileName' => $item->product_type === 'DIGITAL' ? ($item->digital_file_name ?? '') : '',
-                 'digitalDownloadUrl' => ($row->payment_status ?? 'UNPAID') === 'PAID' && $item->product_type === 'DIGITAL' && $storeSlug !== ''
-                     ? '/api/shop/'.rawurlencode($storeSlug).'/orders/'.rawurlencode($row->id).'/digital-downloads/'.rawurlencode($item->id)
-                     : null,
+                'imageUrl' => $item->image_url ?? '',
             ])->values()->all(),
         ];
     }

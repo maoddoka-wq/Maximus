@@ -26,7 +26,6 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);
         Route::post('/products', [EcommerceController::class, 'createProduct']);
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
-        Route::post('/products/{id}/digital-file', [EcommerceController::class, 'uploadDigitalProductFile']);
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
           Route::post('/rentals', [EcommerceController::class, 'createRental']);
@@ -58,7 +57,6 @@ Route::prefix('shop/{slug}')->group(function (): void {
     Route::post('/delivery-requests', [EcommerceController::class, 'createPublicDeliveryRequest'])->middleware('throttle:orders');
     Route::post('/orders/{orderId}/payment', [EcommercePaymentController::class, 'create'])->middleware('throttle:orders');
     Route::get('/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'status']);
-    Route::get('/orders/{orderId}/digital-downloads/{itemId}', [EcommercePaymentController::class, 'downloadDigitalProduct']);
     Route::get('/customer/session', [EcommerceCustomerController::class, 'session']);
     Route::post('/customer/register', [EcommerceCustomerController::class, 'register'])->middleware('throttle:login');
     Route::post('/customer/login', [EcommerceCustomerController::class, 'login'])->middleware('throttle:login');
@@ -98,6 +96,5 @@ Route::get('/shop-domain/customer/orders', [EcommerceCustomerController::class, 
 Route::get('/shop-domain/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
 Route::get('/shop-domain/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
-Route::get('/shop-domain/orders/{orderId}/digital-downloads/{itemId}', [EcommercePaymentController::class, 'downloadDigitalProductByDomain']);
 Route::post('/shop-domain/customer/logout', [EcommerceCustomerController::class, 'logout']);
 Route::post('/shop/{slug}/customer/logout', [EcommerceCustomerController::class, 'logout']);

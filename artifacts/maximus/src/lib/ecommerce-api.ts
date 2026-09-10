@@ -1,6 +1,6 @@
 export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-export type EcommerceProductType = 'SALE' | 'DIGITAL' | 'RENTAL';
+export type EcommerceProductType = 'SALE' | 'RENTAL';
 export type EcommerceRentalPeriod = 'JOUR' | 'SEMAINE' | 'MOIS';
 export type EcommerceRentalStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
@@ -58,9 +58,6 @@ export interface EcommerceProduct {
   status: EcommerceProductStatus;
   productType: EcommerceProductType;
   rentalPeriod: EcommerceRentalPeriod | null;
-  digitalFileName?: string;
-  digitalFileSize?: number;
-  digitalFileMime?: string;
 }
 
 export interface EcommerceCategory {
@@ -81,8 +78,6 @@ export interface EcommerceRental {
   category: string;
   categoryId: string | null;
   imageUrl: string;
-  digitalFileName?: string;
-  digitalDownloadUrl?: string | null;
   price: number;
   billingUnit: EcommerceRentalPeriod;
   availability: number;
@@ -251,15 +246,6 @@ export interface PublicPaymentStatus {
   paymentStatus: EcommerceOrder['paymentStatus'];
   orderStatus: EcommerceOrderStatus;
   failureReason: string;
-  digitalDownloads: EcommerceDigitalDownload[];
-}
-
-export interface EcommerceDigitalDownload {
-  itemId: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  url: string;
 }
 
 export interface EcommerceCustomer {
@@ -387,19 +373,6 @@ export const createEcommerceApi = (companyId: string) => {
       if (!response.ok) throw new Error(body.error ?? 'La photo n’a pas pu être envoyée.');
       return body as EcommerceProduct;
     },
-    uploadDigitalProductFile: async (id: string, file: File) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch(`/api${withCompany(`/ecommerce/products/${encodeURIComponent(id)}/digital-file`)}`, {
-        method: 'POST',
-        cache: 'no-store',
-        credentials: 'include',
-        body: formData,
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? 'Le fichier numérique n’a pas pu être envoyé.');
-      return body as EcommerceProduct;
-    },
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
       uploadRentalImage: async (id: string, file: File) => {
         const formData = new FormData();
@@ -430,18 +403,18 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string; downloadToken?: string | null }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string; downloadToken?: string | null }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
   createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   createDomainPayment: (orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
-  paymentStatus: (slug: string, orderId: string, token?: string) =>
-    request<PublicPaymentStatus>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment-status${token ? `?token=${encodeURIComponent(token)}` : ''}`),
-  domainPaymentStatus: (orderId: string, token?: string) =>
-    request<PublicPaymentStatus>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment-status${token ? `?token=${encodeURIComponent(token)}` : ''}`),
+  paymentStatus: (slug: string, orderId: string) =>
+    request<PublicPaymentStatus>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment-status`),
+  domainPaymentStatus: (orderId: string) =>
+    request<PublicPaymentStatus>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment-status`),
 };
 
 export const createCustomerApi = (slug?: string) => {
