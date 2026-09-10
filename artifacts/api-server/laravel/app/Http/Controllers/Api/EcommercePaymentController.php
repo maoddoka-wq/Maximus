@@ -83,6 +83,18 @@ final class EcommercePaymentController extends Controller
                 if (! $order) {
                     return response()->json(['error' => 'Commande introuvable.'], 404);
                 }
+                $reservation = DB::table('ecommerce_car_reservations')
+                    ->where('order_id', $order->id)->lockForUpdate()->first();
+                if ($reservation) {
+                    if ($reservation->status !== 'PENDING_PAYMENT'
+                        || ($reservation->hold_expires_at && now()->greaterThan($reservation->hold_expires_at))) {
+                        if ($reservation->status === 'PENDING_PAYMENT') {
+                            DB::table('ecommerce_car_reservations')->where('id', $reservation->id)
+                                ->update(['status' => 'PAYMENT_FAILED', 'updated_at' => now()]);
+                        }
+                        return response()->json(['error' => 'Le délai de réservation est expiré ou la réservation n’est plus payable.'], 422);
+                    }
+                }
                 if ($order->payment_status === 'PAID') {
                     return response()->json(['error' => 'Cette commande est déjà payée.'], 422);
                 }

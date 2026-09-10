@@ -47,6 +47,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
 Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
 Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
+Route::get('/shop-domain/location/reservations/{id}/invoice', [CarRentalController::class, 'publicInvoiceDomain']);
 Route::get('/shop-domain/manifest.webmanifest', [EcommerceController::class, 'publicManifestByDomain']);
 Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');

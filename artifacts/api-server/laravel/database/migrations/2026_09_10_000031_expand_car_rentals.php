@@ -24,7 +24,7 @@ return new class extends Migration {
             $t->unsignedBigInteger('default_deposit')->default(0); $t->text('policy')->default(''); $t->timestampsTz();
         });
         if (!Schema::hasTable('ecommerce_car_reservations')) Schema::create('ecommerce_car_reservations', function(Blueprint $t) {
-            $t->string('id')->primary(); $t->string('company_id')->index(); $t->string('rental_id')->index(); $t->string('order_id')->nullable()->index(); $t->string('customer_id')->nullable()->index();
+            $t->string('id')->primary(); $t->string('company_id')->index(); $t->string('rental_id')->index(); $t->string('order_id')->nullable()->index(); $t->string('customer_id')->nullable()->index(); $t->string('public_token_hash')->nullable()->index();
             $t->timestampTz('starts_at'); $t->timestampTz('ends_at'); $t->string('trip_type',20)->default('FAMILY'); $t->text('departure'); $t->text('destination');
             $t->unsignedBigInteger('distance_km')->nullable(); $t->unsignedInteger('duration_minutes')->nullable(); $t->json('rate_snapshot'); $t->json('total_detail');
             $t->string('status',20)->index(); $t->timestampTz('hold_expires_at')->nullable(); $t->string('idempotency_key')->nullable(); $t->text('invoice_html')->nullable(); $t->timestampsTz();

@@ -557,6 +557,9 @@ class EcommerceController extends Controller
         }
 
         $input = $this->rentalInput($request);
+        if (($input['brand'] ?? null) !== null || ($input['model'] ?? null) !== null) {
+            $input['billingUnit'] = 'JOUR';
+        }
         $company = $this->company($request);
         $input = $this->normalizeRentalCategory($input, $company);
         $input = $this->requireRentalCategory($input);
@@ -614,6 +617,9 @@ class EcommerceController extends Controller
         }
 
         $input = $this->rentalInput($request, true);
+        if (($input['brand'] ?? $existing->brand ?? null) !== null || ($input['model'] ?? $existing->model ?? null) !== null) {
+            $input['billingUnit'] = 'JOUR';
+        }
         $input = $this->normalizeRentalCategory($input, $company);
         $input = $this->requireRentalCategory($input, (string) ($existing->category ?? ''));
         if (array_key_exists('name', $input) && DB::table('ecommerce_rentals')
@@ -1008,6 +1014,17 @@ class EcommerceController extends Controller
                 'photoUrl' => (string) ($company->profile_photo ?? ''),
             ],
             'enabledFeatures' => $this->publicEnabledFeatures((string) $row->company_id),
+            'locationSettings' => $this->publicLocationSettings((string) $row->company_id),
+        ];
+    }
+
+    private function publicLocationSettings(string $company): array
+    {
+        $row = DB::table('ecommerce_location_settings')->where('company_id', $company)->first();
+        return [
+            'whatsapp' => (string) ($row->whatsapp ?? ''),
+            'message' => (string) ($row->message ?? ''),
+            'policy' => (string) ($row->policy ?? ''),
         ];
     }
 
@@ -1177,7 +1194,7 @@ class EcommerceController extends Controller
     {
         $required = $partial ? ['sometimes'] : ['required'];
 
-        return Validator::make($request->all(), [
+        $input = Validator::make($request->all(), [
             'name' => array_merge($required, ['string', 'min:2', 'max:160']),
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['nullable', 'string', 'max:80'],
@@ -1192,7 +1209,7 @@ class EcommerceController extends Controller
             'year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 2)],
             'seats' => ['nullable', 'integer', 'min:1', 'max:100'],
             'transmission' => ['nullable', 'in:MANUAL,AUTOMATIC'],
-            'fuel' => ['nullable', 'in:PETROL,DIESEL,HYBRID,ELECTRIC,OTHER'],
+            'fuel' => ['nullable', 'in:GASOLINE,PETROL,DIESEL,HYBRID,ELECTRIC,OTHER'],
             'equipment' => ['nullable', 'array'],
             'equipment.*' => ['string', 'max:120'],
             'gallery' => ['nullable', 'array', 'max:30'],
@@ -1204,7 +1221,23 @@ class EcommerceController extends Controller
             'conditions' => ['nullable', 'string', 'max:5000'],
             'instructions' => ['nullable', 'string', 'max:5000'],
             'unavailablePeriods' => ['nullable', 'array'],
+            'unavailablePeriods.*.startsAt' => ['required_with:unavailablePeriods.*.endsAt', 'date'],
+            'unavailablePeriods.*.endsAt' => ['required_with:unavailablePeriods.*.startsAt', 'date'],
         ])->validate();
+        $periods = $input['unavailablePeriods'] ?? [];
+        foreach ($periods as $index => $period) {
+            if (strtotime($period['endsAt'] ?? '') <= strtotime($period['startsAt'] ?? '')) {
+                abort(response()->json(['error' => 'Chaque période d’indisponibilité doit avoir une fin après son début.'], 422));
+            }
+            foreach ($periods as $otherIndex => $other) {
+                if ($index !== $otherIndex && ($period['startsAt'] ?? '') < ($other['endsAt'] ?? '')
+                    && ($period['endsAt'] ?? '') > ($other['startsAt'] ?? '')) {
+                    abort(response()->json(['error' => 'Les périodes d’indisponibilité ne doivent pas se chevaucher.'], 422));
+                }
+            }
+        }
+
+        return $input;
     }
 
     private function normalizeRentalCategory(array $input, string $company): array

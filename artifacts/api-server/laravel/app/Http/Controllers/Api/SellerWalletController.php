@@ -390,6 +390,30 @@ final class SellerWalletController extends Controller
             }
 
             if (in_array($status, self::PAYMENT_SUCCESS_STATUSES, true) && ! in_array($locked->payment_status, ['PAID', 'REFUNDED'], true)) {
+                $locationReservation = DB::table('ecommerce_car_reservations')
+                    ->where('order_id', $locked->id)->lockForUpdate()->first();
+                if ($locationReservation) {
+                    $expired = $locationReservation->status !== 'PENDING_PAYMENT'
+                        || ($locationReservation->hold_expires_at
+                            && now()->greaterThan($locationReservation->hold_expires_at));
+                    $conflict = DB::table('ecommerce_car_reservations')
+                        ->where('rental_id', $locationReservation->rental_id)
+                        ->where('id', '!=', $locationReservation->id)
+                        ->whereIn('status', ['CONFIRMED', 'IN_PROGRESS'])
+                        ->where('starts_at', '<', $locationReservation->ends_at)
+                        ->where('ends_at', '>', $locationReservation->starts_at)
+                        ->exists();
+                    if ($expired || $conflict) {
+                        DB::table('ecommerce_car_reservations')->where('id', $locationReservation->id)
+                            ->update(['status' => $conflict ? 'UNAVAILABLE' : 'PAYMENT_FAILED', 'updated_at' => now()]);
+                        DB::table('ecommerce_orders')->where('id', $locked->id)->update([
+                            'payment_status' => 'FAILED',
+                            'payment_failure_reason' => 'La réservation n’est plus disponible.',
+                            'updated_at' => now(),
+                        ]);
+                        return;
+                    }
+                }
                 $paidAt = $locked->paid_at ?? now();
                 $availableAt = $this->maturityPolicy->availableAt($locked->status, $paidAt);
                 $this->creditPaidOrder($locked, $data, $availableAt);
@@ -403,7 +427,7 @@ final class SellerWalletController extends Controller
                 // Location reservations share the regular ecommerce payment lifecycle.
                 // Keep this idempotent so repeated webhook deliveries cannot duplicate
                 // confirmation or invoice generation.
-                $reservation = DB::table('ecommerce_car_reservations')->where('order_id', $locked->id)->lockForUpdate()->first();
+                $reservation = $locationReservation;
                 if ($reservation) {
                     $detail = json_decode((string) $reservation->total_detail, true) ?: [];
                     $car = DB::table('ecommerce_rentals')->where('id', $reservation->rental_id)->first();

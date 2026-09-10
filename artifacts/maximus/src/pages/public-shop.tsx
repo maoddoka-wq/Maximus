@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -11,6 +11,8 @@ import {
   type EcommerceDeliveryRequest,
   type EcommerceDeliveryServiceType,
   type EcommerceCarReservation,
+  type EcommerceCarQuote,
+  type EcommerceCarReservationStatus,
   type EcommerceCarTripType,
   type PaymentProvider,
   type PublicPaymentStatus,
@@ -582,12 +584,12 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
           <Download size={15} />Installer l’application
         </button>}
       </div>}
-       {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
+       {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} store={store} orderId={paymentReturn?.orderId ?? ''} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
         : isCartRoute ? <CartPanel cart={cart} total={total} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
            : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void saveProfile()} onPassword={() => void savePassword()} onAddress={() => void saveAddress()} onDeleteAddress={id => void deleteAddress(id)} onFavorite={product => void toggleFavorite(product)} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void api.logout().then(() => { setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
           : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
-          : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} onAdd={addRental} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
+          : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : <><div id="shop-catalog-search" className="mb-8 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]"><label className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={17} /><input aria-label="Rechercher un produit" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher un produit" className="w-full rounded-2xl border border-black/5 bg-white py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10" /></label><select aria-label="Filtrer par catégorie" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-2xl border border-black/5 bg-white px-4 py-3.5 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
     </main>
@@ -596,7 +598,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   </div>;
 }
 
-function PaymentResultPanel({ summary, currency, onContinue, onOrders }: { summary: PaymentSummary; currency: PublicShopBootstrap['store']['currency']; onContinue: () => void; onOrders?: () => void }) {
+function PaymentResultPanel({ summary, currency, store, orderId, slug, domain, onContinue, onOrders }: { summary: PaymentSummary; currency: PublicShopBootstrap['store']['currency']; store: PublicShopBootstrap['store']; orderId: string; slug?: string; domain?: boolean; onContinue: () => void; onOrders?: () => void }) {
   const paid = summary.paymentStatus === 'PAID';
   const failed = ['FAILED', 'REFUNDED'].includes(summary.paymentStatus);
   const title = paid ? 'Paiement confirmé' : failed ? 'Paiement non confirmé' : 'Paiement en cours de confirmation';
@@ -606,17 +608,63 @@ function PaymentResultPanel({ summary, currency, onContinue, onOrders }: { summa
       ? (summary.failureReason || 'Le paiement n’a pas été confirmé. Vous pouvez retourner à la boutique et réessayer.')
       : 'Le paiement a été transmis. Cette page se met à jour dès que DiamanoPay confirme la transaction.';
 
+  let rentalData: { reservation: EcommerceCarReservation, carName: string } | null = null;
+  try {
+    const savedStr = localStorage.getItem('maximus-last-rental');
+    if (savedStr) {
+      const saved = JSON.parse(savedStr);
+      if (saved && saved.orderId === orderId) {
+        rentalData = saved;
+      } else {
+        localStorage.removeItem('maximus-last-rental');
+      }
+    }
+  } catch {}
+
+  const handleContinue = () => {
+    try { localStorage.removeItem('maximus-last-rental'); } catch {}
+    onContinue();
+  };
+
+  const handleOrders = () => {
+    try { localStorage.removeItem('maximus-last-rental'); } catch {}
+    if (onOrders) onOrders();
+  };
+
+  const getWhatsappUrl = () => {
+    if (!store.locationSettings?.whatsapp) return '';
+    const num = store.locationSettings.whatsapp.replace(/[^0-9+]/g, '');
+    let msg = store.locationSettings.message;
+    if (!msg) {
+      msg = `Bonjour, je viens de réserver le véhicule ${rentalData?.carName} du ${rentalData ? readableDate(rentalData.reservation.startsAt) : ''} au ${rentalData ? readableDate(rentalData.reservation.endsAt) : ''}. Ma référence est ${summary.reference}.`;
+    }
+    return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const getInvoiceUrl = () => {
+    if (!rentalData) return '';
+    const tokenParam = rentalData.reservation.invoiceToken ? `?token=${encodeURIComponent(rentalData.reservation.invoiceToken)}` : '';
+    if (domain) {
+      return `/api/shop-domain/location/reservations/${rentalData.reservation.id}/invoice${tokenParam}`;
+    }
+    return `/api/shop/${encodeURIComponent(slug ?? store.slug)}/location/reservations/${rentalData.reservation.id}/invoice${tokenParam}`;
+  };
+
   return <section className="mx-auto max-w-xl rounded-3xl border bg-[hsl(var(--card))] p-8 text-center shadow-sm sm:p-10">
     <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${paid ? 'bg-emerald-100 text-emerald-700' : failed ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
       {paid ? <Check size={26} /> : failed ? <X size={26} /> : <span className="text-xl font-bold">…</span>}
     </span>
     <h1 className="mt-5 text-2xl font-bold">{title}</h1>
-    <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{message}</p>
+    <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{rentalData ? (paid ? 'Votre réservation est confirmée. Vous pouvez télécharger votre facture ou contacter le loueur.' : message) : message}</p>
     <p className="mt-4 text-sm font-semibold">Référence : <strong className="text-[hsl(var(--foreground))]">{summary.reference}</strong></p>
     <p className="mt-2 text-lg font-bold" style={{ color: 'var(--shop-primary)' }}>{money(summary.total, currency)}</p>
+
     <div className="mt-7 flex flex-wrap justify-center gap-3">
-      <button type="button" onClick={onContinue} className="rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Retour à la boutique</button>
-      {onOrders && <button type="button" onClick={onOrders} className="rounded-xl border px-5 py-3 text-sm font-bold">Voir mes commandes</button>}
+      <button type="button" onClick={handleContinue} className="rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Retour à la boutique</button>
+      {onOrders && <button type="button" onClick={handleOrders} className="rounded-xl border px-5 py-3 text-sm font-bold">Voir mes commandes</button>}
+
+      {paid && rentalData && <a href={getInvoiceUrl()} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]"><ArrowDownToLine size={16} />Facture</a>}
+      {paid && rentalData && store.locationSettings?.whatsapp && <a href={getWhatsappUrl()} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: '#25D366' }}>WhatsApp</a>}
     </div>
   </section>;
 }
@@ -779,7 +827,7 @@ function RentalPage({ rentals, store, customer, slug, domain, onBack }: { rental
 function RentalBookingForm({ rental, store, customer, slug, domain, onBack }: { rental: PublicRental; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; slug?: string; domain?: boolean; onBack: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [form, setForm] = useState({ startsAt: '', endsAt: '', tripType: 'FAMILY' as EcommerceCarTripType, departure: '', destination: '', customerName: customer?.name || '', customerEmail: customer?.email || '', customerPhone: customer?.phone || '' });
-  const [quote, setQuote] = useState<any>(null);
+  const [quote, setQuote] = useState<EcommerceCarQuote | null>(null);
   const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('WAVE');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -817,8 +865,7 @@ function RentalBookingForm({ rental, store, customer, slug, domain, onBack }: { 
         : await publicEcommerceApi.reserveLocation(slug ?? '', payload);
 
       const returnUrl = () => {
-        const url = new URL(window.location.origin);
-        url.pathname = slug ? `/shop/${encodeURIComponent(slug)}/location` : '/location';
+        const url = new URL(window.location.href);
         url.searchParams.set('payment', 'return');
         url.searchParams.set('order', reservation.orderId);
         return url.toString();
@@ -827,6 +874,14 @@ function RentalBookingForm({ rental, store, customer, slug, domain, onBack }: { 
       const payment = domain
         ? await publicEcommerceApi.createDomainPayment(reservation.orderId, { redirectUrl: returnUrl(), provider: paymentProvider })
         : await publicEcommerceApi.createPayment(slug ?? '', reservation.orderId, { redirectUrl: returnUrl(), provider: paymentProvider });
+
+      try {
+        localStorage.setItem('maximus-last-rental', JSON.stringify({
+          reservation,
+          carName: rental.name,
+          orderId: reservation.orderId
+        }));
+      } catch {}
 
       showAppToast('Redirection vers le paiement DiamanoPay.', 'info');
       window.location.assign(payment.checkoutUrl);

@@ -55,6 +55,19 @@ export interface EcommerceCarReservation {
   status: EcommerceCarReservationStatus;
   holdExpiresAt: string | null;
   invoiceAvailable: boolean;
+  invoiceToken?: string;
+  invoiceUrl?: string;
+}
+
+export interface EcommerceCarQuote {
+  days: number;
+  distanceKm: number;
+  durationMinutes: number;
+  daily: number;
+  distance: number;
+  fees: number;
+  deposit: number;
+  total: number;
 }
 
 export interface EcommerceStore {
@@ -136,15 +149,15 @@ export interface EcommerceRental {
   seats?: number | null;
   transmission?: EcommerceRentalTransmission | null;
   fuel?: EcommerceRentalFuel | null;
-  equipment?: string | null; // json array
-  gallery?: string | null; // json array
+  equipment?: string[] | null;
+  gallery?: string[] | null;
   dailyRate?: number;
   kmRate?: number;
   deposit?: number;
   fees?: number;
   conditions?: string | null;
   instructions?: string | null;
-  unavailablePeriods?: string | null; // json array
+  unavailablePeriods?: any[] | null;
   status: EcommerceRentalStatus;
   createdAt: string;
   updatedAt: string;
@@ -283,6 +296,11 @@ export interface PublicShopBootstrap {
       photoUrl: string;
     };
     enabledFeatures: PublicShopFeatures;
+    locationSettings?: {
+      whatsapp: string;
+      message: string;
+      policy: string;
+    } | null;
   };
   products: Array<Omit<EcommerceProduct, 'id' | 'companyId' | 'sku' | 'status'>>;
   rentals: Array<{
@@ -485,10 +503,10 @@ export const createEcommerceApi = (companyId: string) => {
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain'),
-  quoteLocation: (slug: string, id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<any>(`/shop/${encodeURIComponent(slug)}/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
-  quoteDomainLocation: (id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<any>(`/shop-domain/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
-  reserveLocation: (slug: string, body: any, idempotencyKey?: string) => request<EcommerceCarReservation>(`/shop/${encodeURIComponent(slug)}/location/reservations`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
-  reserveDomainLocation: (body: any, idempotencyKey?: string) => request<EcommerceCarReservation>('/shop-domain/location/reservations', { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
+  quoteLocation: (slug: string, id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<EcommerceCarQuote>(`/shop/${encodeURIComponent(slug)}/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
+  quoteDomainLocation: (id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<EcommerceCarQuote>(`/shop-domain/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
+  reserveLocation: (slug: string, body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>(`/shop/${encodeURIComponent(slug)}/location/reservations`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
+  reserveDomainLocation: (body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>('/shop-domain/location/reservations', { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
   createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),

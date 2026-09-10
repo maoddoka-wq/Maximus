@@ -45,6 +45,8 @@ import {
   type EcommerceRentalFuel,
   type EcommerceLocationSettings,
   type EcommerceCarReservation,
+  type EcommerceCarReservationStatus,
+  type EcommerceCarTripType,
   type EcommerceStore,
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
@@ -435,10 +437,10 @@ function RentalVehiclesTab({ data, canCreate, canModify, run }: { data: Ecommerc
       name: rental.name, description: rental.description, category: rental.category, categoryId: rental.categoryId ?? '',
       imageFile: null, price: String(rental.price), billingUnit: rental.billingUnit, availability: String(rental.availability),
       brand: rental.brand ?? '', model: rental.model ?? '', year: rental.year ? String(rental.year) : '', seats: rental.seats ? String(rental.seats) : '',
-      transmission: rental.transmission ?? '', fuel: rental.fuel ?? '', equipment: rental.equipment ? (JSON.parse(rental.equipment) as string[]).join(', ') : '',
+      transmission: rental.transmission ?? '', fuel: rental.fuel ?? '', equipment: Array.isArray(rental.equipment) ? rental.equipment.join(', ') : '',
       galleryFiles: [], dailyRate: rental.dailyRate ? String(rental.dailyRate) : String(rental.price), kmRate: rental.kmRate ? String(rental.kmRate) : '',
       deposit: rental.deposit ? String(rental.deposit) : '', fees: rental.fees ? String(rental.fees) : '', conditions: rental.conditions ?? '',
-      instructions: rental.instructions ?? '', unavailablePeriods: rental.unavailablePeriods ?? '[]', status: rental.status
+      instructions: rental.instructions ?? '', unavailablePeriods: typeof rental.unavailablePeriods === 'string' ? rental.unavailablePeriods : JSON.stringify(rental.unavailablePeriods ?? []), status: rental.status
     } : blankRental);
   };
   const save = async (event: FormEvent) => {
@@ -528,14 +530,19 @@ function RentalReservationsTab({ data, canModify, run }: { data: EcommerceBootst
           <td className="px-4 py-3"><div className="text-xs max-w-[12rem] truncate" title={r.departure}>{r.departure}</div><div className="text-xs text-[hsl(var(--muted-foreground))]">vers {r.destination}</div></td>
           <td className="px-4 py-3 font-bold">{money(r.totalDetail.total, data.store.currency)}</td>
           <td className="px-4 py-3">
-            <select disabled={!canModify} value={r.status} onChange={e => void updateStatus(r.id, e.target.value as EcommerceCarReservationStatus)} className="rounded-lg border bg-transparent px-2 py-1.5 text-xs font-bold disabled:opacity-50">
-              <option value="PENDING_PAYMENT">En attente paiement</option>
-              <option value="CONFIRMED">Confirmée</option>
-              <option value="IN_PROGRESS">En cours</option>
-              <option value="COMPLETED">Terminée</option>
-              <option value="CANCELLED">Annulée</option>
-              <option value="PAYMENT_FAILED">Paiement échoué</option>
-              <option value="UNAVAILABLE">Indisponible</option>
+            <select disabled={!canModify || ['COMPLETED', 'CANCELLED'].includes(r.status)} value={r.status} onChange={e => void updateStatus(r.id, e.target.value as EcommerceCarReservationStatus)} className="rounded-lg border bg-transparent px-2 py-1.5 text-xs font-bold disabled:opacity-50">
+              <option value={r.status}>{
+                r.status === 'PENDING_PAYMENT' ? 'En attente paiement' :
+                r.status === 'CONFIRMED' ? 'Confirmée' :
+                r.status === 'IN_PROGRESS' ? 'En cours' :
+                r.status === 'COMPLETED' ? 'Terminée' :
+                r.status === 'CANCELLED' ? 'Annulée' :
+                r.status === 'PAYMENT_FAILED' ? 'Paiement échoué' :
+                r.status === 'UNAVAILABLE' ? 'Indisponible' : r.status
+              }</option>
+              {r.status === 'CONFIRMED' && <option value="IN_PROGRESS">En cours</option>}
+              {r.status === 'IN_PROGRESS' && <option value="COMPLETED">Terminée</option>}
+              {!['COMPLETED', 'CANCELLED'].includes(r.status) && <option value="CANCELLED">Annuler la réservation</option>}
             </select>
           </td>
           <td className="px-4 py-3 text-right">
@@ -618,7 +625,10 @@ function RentalModal({ editing, form, categories, setForm, onClose, onSave }: { 
             {form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}
             {editing !== 'new' && editing.imageUrl && !form.imageFile && <img src={editing.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}
           </label>
-          <Field label="Disponibilité (unités)" required type="number" value={form.availability} onChange={value => patch({ availability: value })} placeholder="1" />
+        <div className="flex items-center gap-3 mt-4 mb-2">
+          <input id="car-availability" type="checkbox" checked={Number(form.availability) > 0} onChange={event => patch({ availability: event.target.checked ? '1' : '0' })} className="h-4 w-4 rounded border-gray-300 text-[hsl(var(--primary))] focus:ring-[hsl(var(--primary))]" />
+          <label htmlFor="car-availability" className="text-xs font-bold">Véhicule disponible à la location</label>
+        </div>
           <label className="block text-xs font-bold">Statut
             <select value={form.status} onChange={event => patch({ status: event.target.value as EcommerceRentalStatus })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
               <option value="DRAFT">Brouillon</option>
@@ -633,19 +643,19 @@ function RentalModal({ editing, form, categories, setForm, onClose, onSave }: { 
       </div>}
 
       {tab === 'specs' && <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Marque" value={form.brand} onChange={value => patch({ brand: value })} placeholder="Ex. Toyota" />
-        <Field label="Modèle" value={form.model} onChange={value => patch({ model: value })} placeholder="Ex. Corolla" />
-        <Field label="Année" type="number" value={form.year} onChange={value => patch({ year: value })} placeholder="2023" />
-        <Field label="Places" type="number" value={form.seats} onChange={value => patch({ seats: value })} placeholder="5" />
-        <label className="block text-xs font-bold">Transmission
-          <select value={form.transmission} onChange={event => patch({ transmission: event.target.value as EcommerceRentalTransmission | '' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+        <Field label="Marque" required={editing === 'new'} value={form.brand} onChange={value => patch({ brand: value })} placeholder="Ex. Toyota" />
+        <Field label="Modèle" required={editing === 'new'} value={form.model} onChange={value => patch({ model: value })} placeholder="Ex. Corolla" />
+        <Field label="Année" required={editing === 'new'} type="number" value={form.year} onChange={value => patch({ year: value })} placeholder="2023" />
+        <Field label="Places" required={editing === 'new'} type="number" value={form.seats} onChange={value => patch({ seats: value })} placeholder="5" />
+        <label className="block text-xs font-bold">Transmission{editing === 'new' && <span className="ml-1 text-red-500">*</span>}
+          <select required={editing === 'new'} value={form.transmission} onChange={event => patch({ transmission: event.target.value as EcommerceRentalTransmission | '' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
             <option value="">Sélectionner</option>
             <option value="MANUAL">Manuelle</option>
             <option value="AUTOMATIC">Automatique</option>
           </select>
         </label>
-        <label className="block text-xs font-bold">Carburant
-          <select value={form.fuel} onChange={event => patch({ fuel: event.target.value as EcommerceRentalFuel | '' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+        <label className="block text-xs font-bold">Carburant{editing === 'new' && <span className="ml-1 text-red-500">*</span>}
+          <select required={editing === 'new'} value={form.fuel} onChange={event => patch({ fuel: event.target.value as EcommerceRentalFuel | '' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
             <option value="">Sélectionner</option>
             <option value="GASOLINE">Essence</option>
             <option value="DIESEL">Diesel</option>
@@ -667,7 +677,7 @@ function RentalModal({ editing, form, categories, setForm, onClose, onSave }: { 
             <option value="MOIS">Par mois</option>
           </select>
         </label>
-        <Field label="Tarif journalier" type="number" value={form.dailyRate} onChange={value => patch({ dailyRate: value })} placeholder="0" />
+        <Field label="Tarif journalier" required={editing === 'new'} type="number" value={form.dailyRate} onChange={value => patch({ dailyRate: value })} placeholder="0" />
         <Field label="Tarif au kilomètre" type="number" value={form.kmRate} onChange={value => patch({ kmRate: value })} placeholder="0" />
         <Field label="Frais fixes" type="number" value={form.fees} onChange={value => patch({ fees: value })} placeholder="0" />
         <Field label="Caution" type="number" value={form.deposit} onChange={value => patch({ deposit: value })} placeholder="0" />
@@ -691,11 +701,7 @@ function RentalModal({ editing, form, categories, setForm, onClose, onSave }: { 
       </div>
     </form>
   </Modal>;
-} editing, form, categories, setForm, onClose, onSave }: { editing: EcommerceRental | 'new'; form: RentalForm; categories: EcommerceCategory[]; setForm: (value: RentalForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
-  const patch = (updates: Partial<RentalForm>) => setForm({ ...form, ...updates });
-  return <Modal large title={editing === 'new' ? 'Ajouter une location' : `Modifier ${editing.name}`} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la location" required value={form.name} onChange={value => patch({ name: value })} placeholder="Ex. Maison familiale" /><label className="block text-xs font-bold">Catégorie<select value={form.categoryId} onChange={event => patch({ categoryId: event.target.value, category: event.target.options[event.target.selectedIndex]?.text ?? form.category })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sans catégorie</option>{categories.filter(category => category.isActive).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><Field label="Catégorie libre" value={form.categoryId ? categories.find(category => category.id === form.categoryId)?.name ?? form.category : form.category} onChange={value => patch({ category: value, categoryId: '' })} placeholder="Ex. Habitat" /><Field label="Tarif" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" /><label className="block text-xs font-bold">Unité de facturation<select value={form.billingUnit} onChange={event => patch({ billingUnit: event.target.value as EcommerceRentalPeriod })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="JOUR">Par jour</option><option value="SEMAINE">Par semaine</option><option value="MOIS">Par mois</option></select></label><Field label="Disponibilité" required type="number" value={form.availability} onChange={value => patch({ availability: value })} placeholder="0" /><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as EcommerceRentalStatus })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="block text-xs font-bold">Photo de la location<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{editing !== 'new' && editing.imageUrl && !form.imageFile && <img src={editing.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label></div><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} placeholder="Décrivez ce qui est loué et les conditions utiles." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div></form></Modal>;
 }
-
 function WalletPanel({ data, currency, canModify, run, pendingAction }: { data: SellerWalletBootstrap; currency: EcommerceStore['currency']; canModify: boolean; run: (action: () => Promise<unknown>, success: string, actionKey?: string) => Promise<unknown | undefined>; pendingAction: string }) {
   const [account, setAccount] = useState({ mobile: data.wallet.payoutMobile, beneficiaryName: data.wallet.payoutName });
   const [amount, setAmount] = useState('');

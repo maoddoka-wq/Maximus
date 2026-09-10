@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\EcommerceCustomerAuth;
+use App\Support\ModuleAuthorization;
+use App\Support\CompanyRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,9 @@ final class CarRentalController extends Controller
 
     public function settings(Request $request): JsonResponse
     {
+        if (! $this->ownerAllowed($request, 'view', 'location')) {
+            return $this->forbidden();
+        }
         $company = $this->company($request);
         $settings = DB::table('ecommerce_location_settings')->where('company_id', $company)->first();
 
@@ -32,6 +37,9 @@ final class CarRentalController extends Controller
 
     public function saveSettings(Request $request): JsonResponse
     {
+        if (! $this->ownerAllowed($request, 'modify', 'location')) {
+            return $this->forbidden();
+        }
         $input = Validator::make($request->all(), [
             'whatsapp' => ['nullable', 'string', 'max:40'],
             'message' => ['nullable', 'string', 'max:2000'],
@@ -64,6 +72,9 @@ final class CarRentalController extends Controller
 
     public function reservations(Request $request): JsonResponse
     {
+        if (! $this->ownerAllowed($request, 'view', 'location')) {
+            return $this->forbidden();
+        }
         return response()->json(DB::table('ecommerce_car_reservations')
             ->where('company_id', $this->company($request))
             ->orderBy('starts_at')->get()
@@ -72,6 +83,9 @@ final class CarRentalController extends Controller
 
     public function transition(Request $request, string $id): JsonResponse
     {
+        if (! $this->ownerAllowed($request, 'modify', 'location')) {
+            return $this->forbidden();
+        }
         $input = Validator::make($request->all(), [
             'status' => ['required', 'in:'.implode(',', self::STATUSES)],
         ])->validate();
@@ -136,6 +150,9 @@ final class CarRentalController extends Controller
 
     public function invoice(Request $request, string $id)
     {
+        if (! $this->ownerAllowed($request, 'view', 'location')) {
+            return $this->forbidden();
+        }
         $row = $this->ownedReservation($request, $id);
         if (! $row) {
             return response()->json(['error' => 'Réservation introuvable.'], 404);
@@ -156,11 +173,22 @@ final class CarRentalController extends Controller
         $row = $store ? DB::table('ecommerce_car_reservations')->where('id', $id)
             ->where('company_id', $store->company_id)->first() : null;
         $customer = $store ? EcommerceCustomerAuth::customerFromRequest($request, $store->company_id) : null;
-        if (! $row || ! $customer || $row->customer_id !== $customer->id || ! $row->invoice_html) {
+        $token = trim((string) $request->query('token', ''));
+        $tokenValid = $token !== '' && $row && hash_equals((string) $row->public_token_hash, hash('sha256', $token));
+        if (! $row || ((! $customer || $row->customer_id !== $customer->id) && ! $tokenValid) || ! $row->invoice_html) {
             return response()->json(['error' => 'Facture introuvable.'], 404);
         }
 
         return response($row->invoice_html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    public function publicInvoiceDomain(Request $request, string $id)
+    {
+        $store = $this->store(null, $request);
+        if (! $store) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+        return $this->publicInvoiceForStore($request, $store, $id);
     }
 
     private function quoteForStore(Request $request, object $store, string $id): JsonResponse
@@ -183,10 +211,12 @@ final class CarRentalController extends Controller
     private function reserveForStore(Request $request, object $store): JsonResponse
     {
         $customer = EcommerceCustomerAuth::customerFromRequest($request, $store->company_id);
+        $publicToken = Str::random(64);
+        $created = false;
         $input = $this->reservationInput($request, ! $customer);
         $key = trim((string) ($request->header('Idempotency-Key') ?: ($input['idempotencyKey'] ?? '')));
         try {
-            $reservation = DB::transaction(function () use ($input, $key, $store, $customer): object {
+            $reservation = DB::transaction(function () use ($input, $key, $store, $customer, $publicToken, &$created): object {
                 if ($key !== '') {
                     $existing = DB::table('ecommerce_car_reservations')
                         ->where('company_id', $store->company_id)->where('idempotency_key', $key)->first();
@@ -224,7 +254,7 @@ final class CarRentalController extends Controller
                 ]);
                 DB::table('ecommerce_car_reservations')->insert([
                     'id' => $reservationId, 'company_id' => $store->company_id, 'rental_id' => $car->id,
-                    'order_id' => $orderId, 'customer_id' => $customer?->id, 'starts_at' => $input['startsAt'],
+                    'order_id' => $orderId, 'customer_id' => $customer?->id, 'public_token_hash' => hash('sha256', $publicToken), 'starts_at' => $input['startsAt'],
                     'ends_at' => $input['endsAt'], 'trip_type' => $input['tripType'], 'departure' => $input['departure'],
                     'destination' => $input['destination'], 'distance_km' => $quote['distanceKm'],
                     'duration_minutes' => $quote['durationMinutes'], 'rate_snapshot' => json_encode($this->rateSnapshot($car)),
@@ -232,11 +262,17 @@ final class CarRentalController extends Controller
                     'hold_expires_at' => now()->addMinutes(30), 'idempotency_key' => $key ?: null,
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
+                $created = true;
 
                 return DB::table('ecommerce_car_reservations')->where('id', $reservationId)->first();
             });
 
-            return response()->json($this->reservationPayload($reservation), 201);
+            $payload = $this->reservationPayload($reservation);
+            if ($created) {
+                $payload['invoiceToken'] = $publicToken;
+                $payload['invoiceUrl'] = '/api/shop/'.$store->slug.'/location/reservations/'.$reservation->id.'/invoice';
+            }
+            return response()->json($payload, $created ? 201 : 200);
         } catch (Throwable $error) {
             return response()->json(['error' => $error->getMessage()],
                 str_contains($error->getMessage(), 'déjà réservée') ? 409 : 422);
@@ -294,7 +330,7 @@ final class CarRentalController extends Controller
         }
 
         return [
-            (int) round($response->json('rows.0.elements.0.distance.value') / 1000),
+            (int) ceil($response->json('rows.0.elements.0.distance.value') / 1000),
             (int) round($response->json('rows.0.elements.0.duration.value') / 60),
         ];
     }
@@ -339,19 +375,34 @@ final class CarRentalController extends Controller
     private function store(?string $slug, Request $request): ?object
     {
         if ($slug) {
-            return DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
+            $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
+            return $store && $this->publicLocationEnabled((string) $store->company_id) ? $store : null;
         }
         $domain = DB::table('ecommerce_domains')->where('domain', strtolower($request->getHost()))
             ->where('status', 'ACTIVE')->first();
 
-        return $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)
+        $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)
             ->where('status', 'PUBLISHED')->first() : null;
+        return $store && $this->publicLocationEnabled((string) $store->company_id) ? $store : null;
     }
 
     private function ownedReservation(Request $request, string $id): ?object
     {
         return DB::table('ecommerce_car_reservations')->where('id', $id)
             ->where('company_id', $this->company($request))->first();
+    }
+
+    private function publicInvoiceForStore(Request $request, object $store, string $id)
+    {
+        $row = DB::table('ecommerce_car_reservations')->where('id', $id)
+            ->where('company_id', $store->company_id)->first();
+        $customer = EcommerceCustomerAuth::customerFromRequest($request, $store->company_id);
+        $token = trim((string) $request->query('token', ''));
+        $tokenValid = $token !== '' && $row && hash_equals((string) $row->public_token_hash, hash('sha256', $token));
+        if (! $row || ((! $customer || $row->customer_id !== $customer->id) && ! $tokenValid) || ! $row->invoice_html) {
+            return response()->json(['error' => 'Facture introuvable.'], 404);
+        }
+        return response($row->invoice_html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
 
     private function rateSnapshot(object $car): array
@@ -380,5 +431,29 @@ final class CarRentalController extends Controller
     private function company(Request $request): string
     {
         return (string) $request->attributes->get('companyId', $request->query('companyId', ''));
+    }
+
+    private function ownerAllowed(Request $request, string $action, string $feature): bool
+    {
+        $actor = $request->attributes->get('authActor');
+        return is_array($actor) && ModuleAuthorization::allows($actor, 'ecommerce', $action, $feature);
+    }
+
+    private function publicLocationEnabled(string $company): bool
+    {
+        if (! CompanyRegistry::isActive($company)) {
+            return false;
+        }
+        $access = DB::table('maximus_company_modules')->where('company_id', $company)
+            ->where('module_id', 'ecommerce')->first();
+        $features = $access ? json_decode($access->feature_ids ?? '[]', true) : [];
+        $features = is_array($features) ? $features : [];
+        return in_array($access->status ?? '', ['ACTIF', 'BETA'], true)
+            && ($features === [] || in_array('location', $features, true));
+    }
+
+    private function forbidden(): JsonResponse
+    {
+        return response()->json(['error' => 'Cette action n’est pas autorisée pour votre rôle.'], 403);
     }
 }
