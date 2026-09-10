@@ -57,3 +57,16 @@ test('expose et conserve la fonctionnalité Catégories dans les packs e-commerc
   assert.deepEqual(pack?.featureIds, ['categories']);
   assert.deepEqual(pack?.featurePermissions?.categories, ['voir', 'créer', 'modifier']);
 });
+
+test('expose les autorisations de vente physique et numérique dans e-commerce', () => {
+  const ecommerce = modules.find((module) => module.id === 'ecommerce');
+  assert.ok(ecommerce);
+
+  assert.deepEqual(
+    getModuleFeatureOptions(ecommerce).filter((feature) => feature.id.startsWith('vente-')),
+    [
+      { id: 'vente-physique', label: 'Vente de produits physiques' },
+      { id: 'vente-numerique', label: 'Vente de produits numériques' },
+    ],
+  );
+});
