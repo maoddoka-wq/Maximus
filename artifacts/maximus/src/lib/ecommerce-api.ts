@@ -7,6 +7,7 @@ export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION'
 export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COURS' | 'LIVREE' | 'ANNULEE';
 export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
+export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY' | 'MASTERCARD';
 
 export interface EcommerceStore {
   id: string;
@@ -406,9 +407,9 @@ export const publicEcommerceApi = {
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
-  createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string }) =>
+  createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
-  createDomainPayment: (orderId: string, body?: { redirectUrl?: string }) =>
+  createDomainPayment: (orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop-domain/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   paymentStatus: (slug: string, orderId: string) =>
     request<PublicPaymentStatus>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment-status`),

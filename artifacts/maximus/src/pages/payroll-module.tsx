@@ -218,9 +218,13 @@ function BeneficiaryForm({
         <strong>{editing ? 'Modifier le bénéficiaire' : 'Nouveau bénéficiaire'}</strong>
         <button type="button" onClick={onCancel} aria-label="Fermer"><X size={17} /></button>
       </div>
+      <div className="mb-4 rounded-lg border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.05)] px-3 py-2.5 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+        <strong className="text-[hsl(var(--foreground))]">Référentiel permanent</strong>
+        <span className="ml-1">: cette fiche indique qui doit recevoir la paie et sur quel compte. Le montant et la date exacts se choisissent ensuite dans « Préparer une paie ».</span>
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block text-xs font-bold">
-          Employé existant
+          Employé lié (facultatif)
           <select
             value={form.employeeId}
             onChange={(event) => {
@@ -236,21 +240,31 @@ function BeneficiaryForm({
             <option value="">Saisie libre</option>
             {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}
           </select>
+          <span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">Liez la fiche RH si cette personne existe déjà dans l’entreprise.</span>
         </label>
-        <Field label="Nom complet" value={form.fullName} onChange={(value) => onChange({ ...form, fullName: value })} />
-         <Field label="Numéro de réception Wave" value={form.mobile} onChange={(value) => onChange({ ...form, mobile: value })} placeholder="+221…" />
+        <div>
+          <Field label="Nom complet du bénéficiaire" value={form.fullName} onChange={(value) => onChange({ ...form, fullName: value })} />
+          <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Le nom de la personne qui recevra les virements.</p>
+        </div>
+        <div>
+          <Field label="Numéro de réception" value={form.mobile} onChange={(value) => onChange({ ...form, mobile: value })} placeholder="+221…" />
+          <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Numéro utilisé pour le versement via le fournisseur configuré.</p>
+        </div>
         <Field
-           label={editing ? 'Identifiant de compte (facultatif)' : 'Identifiant de compte Wave'}
+           label={editing ? 'Identifiant du compte (facultatif)' : 'Identifiant du compte de réception'}
           value={form.accountNumber}
           onChange={(value) => onChange({ ...form, accountNumber: value })}
-          placeholder={editing ? 'Laisser vide pour conserver' : undefined}
+           placeholder={editing ? 'Laisser vide pour conserver' : 'Identifiant fourni par le moyen de paiement'}
         />
-         <Field label="Montant mensuel proposé (FCFA)" value={form.monthlySalary} onChange={(value) => onChange({ ...form, monthlySalary: value })} type="number" />
-         <Field label="Jour habituel de paiement" value={form.paymentDay} onChange={(value) => onChange({ ...form, paymentDay: value })} type="number" />
+         <div>
+           <Field label="Montant mensuel de référence (FCFA)" value={form.monthlySalary} onChange={(value) => onChange({ ...form, monthlySalary: value })} type="number" />
+           <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Suggestion modifiable pour chaque paie.</p>
+         </div>
+         <div>
+           <Field label="Jour habituel de versement" value={form.paymentDay} onChange={(value) => onChange({ ...form, paymentDay: value })} type="number" />
+           <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Repère indicatif, pas la date d’une paie.</p>
+         </div>
       </div>
-       <p className="mt-3 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
-         Le montant exact et la date de chaque paie seront confirmés dans « Préparer une paie » avant validation et virement.
-       </p>
       <div className="mt-4 flex justify-end gap-2">
         <Button onClick={onCancel}>Annuler</Button>
         <Button primary onClick={onSave} loading={loading}>{editing ? 'Enregistrer les changements' : 'Enregistrer'}</Button>

@@ -68,6 +68,7 @@ final class EcommercePaymentController extends Controller
     {
         Validator::make($request->all(), [
             'redirectUrl' => ['nullable', 'url', 'max:500'],
+            'provider' => ['sometimes', 'string', 'in:WAVE,ORANGE_MONEY,MASTERCARD'],
         ])->validate();
 
         try {
@@ -94,7 +95,12 @@ final class EcommercePaymentController extends Controller
                     ]);
                 }
 
-                $provider = trim((string) config('services.diamanopay.provider', ''));
+                $requestedProvider = trim((string) $request->input('provider', ''));
+                $configuredProvider = trim((string) config('services.diamanopay.provider', ''));
+                $provider = strtoupper($requestedProvider !== '' ? $requestedProvider : ($configuredProvider !== '' ? $configuredProvider : 'WAVE'));
+                if (! in_array($provider, ['WAVE', 'ORANGE_MONEY', 'MASTERCARD'], true)) {
+                    return response()->json(['error' => 'Moyen de paiement DiamanoPay non disponible.'], 422);
+                }
                 $webhookUrl = trim((string) config('services.diamanopay.webhook_url', ''));
                 if ($webhookUrl === '') {
                     $webhookUrl = rtrim((string) config('app.url', ''), '/');
@@ -110,9 +116,7 @@ final class EcommercePaymentController extends Controller
                 $charge = $this->diamanoPay->createCharge([
                     'amount' => (int) $order->total,
                     'currency' => (string) $store->currency,
-                    // Only the configured provider is sent. Orange Money and
-                    // Mastercard are not advertised until DiamanoPay exposes them.
-                    'provider' => strtoupper($provider !== '' ? $provider : 'WAVE'),
+                    'provider' => $provider,
                     'description' => 'Commande '.$order->reference,
                     'clientReference' => $order->reference,
                     'redirectUrl' => $request->input('redirectUrl'),
