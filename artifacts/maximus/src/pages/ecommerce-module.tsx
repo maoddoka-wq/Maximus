@@ -289,6 +289,7 @@ export default function EcommerceModulePage({
   const run = async <T,>(action: () => Promise<T>, success: string, actionKey = 'action'): Promise<T | undefined> => {
     if (pendingAction) return undefined;
     setPendingAction(actionKey);
+    showAppToast('Action en cours…', 'info');
     try {
       const result = await action();
       await load(true);
@@ -311,7 +312,13 @@ export default function EcommerceModulePage({
   const navigate = (next: EcommerceTab) => setTab(next);
 
   return (
-    <div className="space-y-5" data-testid="ecommerce-module">
+    <div className="space-y-5" data-testid="ecommerce-module" aria-busy={Boolean(pendingAction)}>
+      {pendingAction && (
+        <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.07)] px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))]" role="status">
+          <RefreshCw size={15} className="animate-spin" aria-hidden="true" />
+          Enregistrement en cours…
+        </div>
+      )}
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button type="button" aria-label="Fermer le message" onClick={() => setError('')}><X size={16} /></button></div>}
       <section className="rounded-2xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))]">
         <div className="grid min-w-0 gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:px-4">

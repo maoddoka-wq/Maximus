@@ -73,6 +73,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   const run = async (action: () => Promise<unknown>, success: string) => {
     if (pendingAction) return;
     setPendingAction(true);
+    showAppToast('Action en cours…', 'info');
     try { await action(); await load(true); showAppToast(success, 'success'); }
     catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Opération impossible.', 'error'); }
     finally { setPendingAction(false); }
@@ -91,7 +92,8 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   const currentCanCreate = canCreate && (!stockPermissions || currentTabPermissions?.includes('créer'));
   const currentCanModify = canModify && (!stockPermissions || currentTabPermissions?.includes('modifier'));
 
-  return <StockApiContext.Provider value={api}><StockAccessContext.Provider value={{ canCreate: Boolean(currentCanCreate), canModify: Boolean(currentCanModify) }}><div className="space-y-5">
+  return <StockApiContext.Provider value={api}><StockAccessContext.Provider value={{ canCreate: Boolean(currentCanCreate), canModify: Boolean(currentCanModify) }}><div className="space-y-5" aria-busy={pendingAction}>
+    {pendingAction && <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.07)] px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))]" role="status"><RefreshCw size={15} className="animate-spin" aria-hidden="true" />Enregistrement en cours…</div>}
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
     <div className="space-y-5">
        <div className={`flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 ${singleModuleNavigation ? 'justify-end' : ''}`}>

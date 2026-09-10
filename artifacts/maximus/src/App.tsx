@@ -130,6 +130,7 @@ import {
   buildAdminAssistantScope,
 } from '@/lib/local-assistant';
 import { maximusAssistantApi, type MaximusAssistantAction, type MaximusAssistantMessage } from '@/lib/maximus-assistant-api';
+import { mutationSuccessMessage } from '@/lib/mutation-feedback';
 
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
@@ -541,6 +542,7 @@ function AppContent() {
     fn(next);
     const safeNext = sanitizeStoreData(next);
     const mutationVersion = ++localMutationVersionRef.current;
+    const successMessage = mutationSuccessMessage(message, Boolean(session), persist);
     dataRef.current = safeNext;
     setData(safeNext);
     if (session && persist) {
@@ -550,7 +552,7 @@ function AppContent() {
           const { version } = await appStateApi.save(dataRef.current, appStateVersionRef.current);
           appStateVersionRef.current = version;
           setAppStateVersion(version);
-          if (message) notify(message, 'success');
+          if (successMessage) notify(successMessage, 'success');
         })
         .catch((error) => {
           if (mutationVersion === localMutationVersionRef.current) {
@@ -563,8 +565,8 @@ function AppContent() {
           notify(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.', 'error');
           throw error;
         });
-    } else if (message) {
-      notify(message, 'success');
+    } else if (successMessage) {
+      notify(successMessage, 'success');
     }
   };
   const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => {
@@ -586,6 +588,7 @@ function AppContent() {
           : status === 'BETA'
             ? 'Module passé en mode bêta pour cette entreprise.'
             : 'Module activé pour cette entreprise.',
+      'success',
     );
   };
   const sessionEmployeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
