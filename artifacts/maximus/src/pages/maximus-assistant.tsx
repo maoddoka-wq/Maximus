@@ -21,8 +21,10 @@ import {
   X,
 } from 'lucide-react';
 
-export type MaximusCompanyContext = {
+export type MaximusWorkspaceContext = {
   name: string;
+  scopeLabel?: string;
+  description?: string;
   sector?: string;
   reportingPeriod?: string;
   activeUsers?: number;
@@ -53,7 +55,7 @@ type ConversationEntry = {
 };
 
 type MaximusAssistantProps = {
-  companyContext: MaximusCompanyContext;
+  workspaceContext: MaximusWorkspaceContext;
   insightCards: MaximusInsightCard[];
   onAsk: (question: string) => void | string | Promise<void | string>;
   loading?: boolean;
@@ -190,7 +192,7 @@ function InsightCard({
 }
 
 export function MaximusAssistantPage({
-  companyContext,
+  workspaceContext,
   insightCards,
   onAsk,
   loading = false,
@@ -207,7 +209,7 @@ export function MaximusAssistantPage({
     setQuestion(initialQuestion);
   }, [initialQuestion]);
 
-  const activeUserLabel = formatUserCount(companyContext.activeUsers);
+  const activeUserLabel = formatUserCount(workspaceContext.activeUsers);
   const actionCount = useMemo(
     () => insightCards.filter(insight => Boolean(insight.proposedAction)).length,
     [insightCards],
@@ -256,35 +258,35 @@ export function MaximusAssistantPage({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-[hsl(var(--primary)/.12)] px-3 py-1.5 text-[11px] font-bold text-[hsl(var(--primary))]">
                 <Sparkles size={13} />
-                Copilote opérationnel
+                Assistant administratif
               </span>
               <span className="mono text-[10px] uppercase tracking-[.13em] text-[hsl(var(--muted-foreground))]">
-                Données autorisées uniquement
+                Contexte MAXIMUS contrôlé
               </span>
             </div>
             <h1 className="mt-5 max-w-3xl text-3xl font-black leading-[1.02] tracking-[-.055em] sm:text-5xl">
-              Décider avec les bons signaux.
+              Comprendre et configurer MAXIMUS.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))] sm:text-base">
-              Posez une question sur {companyContext.name}. MAXIMUS vous aide à lire la situation, à retrouver les faits et à distinguer clairement ce qui demande une validation humaine.
+              {workspaceContext.description ?? `Posez une question sur ${workspaceContext.name}. MAXIMUS vous aide à comprendre les mécanismes de la plateforme et à distinguer clairement ce qui demande une validation humaine.`}
             </p>
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[hsl(var(--muted-foreground))]">
-              {companyContext.sector && (
+              {workspaceContext.scopeLabel && (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
-                  {companyContext.sector}
+                  {workspaceContext.scopeLabel}
                 </span>
               )}
-              {companyContext.reportingPeriod && (
+              {workspaceContext.sector && (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
-                  Période : {companyContext.reportingPeriod}
+                  {workspaceContext.sector}
                 </span>
               )}
               {activeUserLabel && (
                 <span className="inline-flex items-center gap-2">
                   <UsersRound size={13} />
-                  {activeUserLabel} utilisateur{companyContext.activeUsers === 1 ? '' : 's'} actif{companyContext.activeUsers === 1 ? '' : 's'}
+                  {activeUserLabel} utilisateur{workspaceContext.activeUsers === 1 ? '' : 's'} actif{workspaceContext.activeUsers === 1 ? '' : 's'}
                 </span>
               )}
             </div>
@@ -301,9 +303,9 @@ export function MaximusAssistantPage({
                 </p>
               </div>
             </div>
-            {companyContext.lastSyncLabel && (
+            {workspaceContext.lastSyncLabel && (
               <p className="mt-4 border-t border-[hsl(var(--border))] pt-3 text-[11px] text-[hsl(var(--muted-foreground))]">
-                Dernière synchronisation : <span className="font-bold text-[hsl(var(--foreground))]">{companyContext.lastSyncLabel}</span>
+                Dernière synchronisation : <span className="font-bold text-[hsl(var(--foreground))]">{workspaceContext.lastSyncLabel}</span>
               </p>
             )}
           </div>

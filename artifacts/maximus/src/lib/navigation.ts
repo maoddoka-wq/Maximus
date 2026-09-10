@@ -46,6 +46,7 @@ export function canonicalAppPath(path: string): string {
 
 export const adminNav: NavigationItem[] = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
+  { href: '/maximus/assistant', label: 'Assistant administratif', icon: Sparkles },
   { href: '/maximus/controle', label: 'Contrôle & coordination', icon: ListChecks },
   { href: '/maximus/surveillance', label: 'Détecteur de problèmes', icon: ShieldAlert },
   { href: '/maximus/entreprises', label: 'Entreprises', icon: Building2 },
@@ -60,7 +61,6 @@ export const adminNav: NavigationItem[] = [
 
 const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/entreprise/assistant', label: 'Assistant MAXIMUS', icon: Sparkles, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/entreprise/organisation', label: 'Organisation & accès', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/entreprise/guide-configuration', label: 'Guide de configuration', icon: BookOpen, module: null, peopleAdminOnly: true },

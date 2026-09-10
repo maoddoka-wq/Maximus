@@ -9,6 +9,9 @@ import type {
   Sale,
   StoreData,
 } from './store';
+import { getConfiguredModules } from './store';
+import type { Module, ModuleFeaturePack, Role, SectorPreset, OrgNode, CompanySubscription } from './store';
+import { getCatalogImpact, getCatalogSnapshot, validateCatalogDraft } from './catalog-workflow';
 import type { ModuleId } from './module-ids';
 
 export type AssistantTone = 'watch' | 'positive' | 'neutral';
@@ -53,6 +56,22 @@ export type AssistantAnswer = {
   insights: AssistantInsight[];
   suggestedQuestions: string[];
   proposedActions: AssistantInsight['proposedAction'][];
+};
+
+export type AdminAssistantScope = {
+  userLabel: string;
+  companies: Company[];
+  employees: Employee[];
+  roles: Role[];
+  orgNodes: OrgNode[];
+  subscriptions: CompanySubscription[];
+  modules: Module[];
+  sectorPresets: SectorPreset[];
+  moduleStatuses: StoreData['moduleStatuses'];
+  removedModules: ModuleId[];
+  catalogDraftPresent: boolean;
+  catalogImpact: ReturnType<typeof getCatalogImpact>;
+  catalogValidation: ReturnType<typeof validateCatalogDraft>;
 };
 
 const completedTaskStatuses = new Set(['VALIDÉ', 'TERMINÉ', 'REFUSÉ']);
@@ -291,6 +310,199 @@ export function answerAssistantQuestion(scope: AssistantScope, rawQuestion: stri
     citations: ['Périmètre de session'],
     insights,
     suggestedQuestions: ['Quels articles sont sous le seuil ?', 'Quelles tâches demandent une décision ?', 'Résumer mon périmètre de données'],
+    proposedActions: [],
+  };
+}
+
+function adminModuleLabel(module: Module): string {
+  return `${module.name} (${module.id})`;
+}
+
+function adminPackSummary(module: Module): string {
+  const packs = module.featurePacks ?? [];
+  if (!packs.length) return 'aucun pack défini';
+  return packs.map(pack => `${pack.name} [${pack.id}]`).join(', ');
+}
+
+function adminCatalogKnowledge(scope: AdminAssistantScope): string {
+  const moduleSummary = scope.modules
+    .map(module => `${adminModuleLabel(module)} : ${adminPackSummary(module)}`)
+    .join('; ');
+  return [
+    'Le catalogue MAXIMUS suit une chaîne contrôlée : module → fonctionnalités → pack → permissions → accès entreprise.',
+    `Modules configurés : ${moduleSummary || 'aucun'}.`,
+    'Un pack regroupe des fonctionnalités et leurs droits (voir, créer, modifier).',
+    'Un secteur compose ensuite des modules, des packs et des fonctionnalités avant publication.',
+    'Une entreprise reçoit uniquement les modules et sélections explicitement autorisés.',
+  ].join(' ');
+}
+
+function adminOrganizationKnowledge(scope: AdminAssistantScope): string {
+  const activeCompanies = scope.companies.filter(company => company.status === 'ACTIF').length;
+  const rootNodes = scope.orgNodes.filter(node => !node.parentId).length;
+  return [
+    `Le parcours organisationnel est : entreprise → unités et secteurs → rôles et permissions → employés → managers.`,
+    `${activeCompanies} entreprise(s) active(s), ${scope.orgNodes.length} unité(s) enregistrée(s), dont ${rootNodes} racine(s), ${scope.roles.length} rôle(s) et ${scope.employees.length} employé(s).`,
+    'Les droits doivent rester bornés par l’entreprise, l’unité, le rôle et les modules autorisés.',
+    'La session serveur reste la source du périmètre : un identifiant d’entreprise fourni par le navigateur ne peut pas élargir l’accès.',
+  ].join(' ');
+}
+
+export function buildAdminAssistantScope(data: StoreData, userLabel: string): AdminAssistantScope {
+  const catalog = getCatalogSnapshot(data);
+  const draftValidation = data.catalogDraft
+    ? validateCatalogDraft(data)
+    : { errors: [], warnings: [] };
+
+  return {
+    userLabel,
+    companies: [...data.companies],
+    employees: [...data.employees],
+    roles: [...data.roles],
+    orgNodes: [...data.orgNodes],
+    subscriptions: [...data.subscriptions],
+    modules: getConfiguredModules(data),
+    sectorPresets: [...catalog.sectorPresets],
+    moduleStatuses: catalog.moduleStatuses,
+    removedModules: [...catalog.removedModules],
+    catalogDraftPresent: Boolean(data.catalogDraft),
+    catalogImpact: getCatalogImpact(data),
+    catalogValidation: draftValidation,
+  };
+}
+
+export function buildAdminAssistantInsights(scope: AdminAssistantScope): AssistantInsight[] {
+  const activeCompanies = scope.companies.filter(company => company.status === 'ACTIF');
+  const pendingCompanies = scope.companies.filter(company => company.status === 'EN ATTENTE' || company.status === 'BROUILLON');
+  const packCount = scope.modules.reduce((total, module) => total + (module.featurePacks?.length ?? 0), 0);
+  const inactiveModules = scope.modules.filter(module => scope.moduleStatuses?.[module.id] === 'INACTIF' || scope.removedModules.includes(module.id));
+  const insights: AssistantInsight[] = [
+    {
+      id: 'admin-catalog',
+      eyebrow: 'Catalogue',
+      title: `${scope.modules.length} module${scope.modules.length > 1 ? 's' : ''} et ${packCount} pack${packCount > 1 ? 's' : ''}`,
+      summary: 'La chaîne module, fonctionnalités, packs et permissions est disponible pour préparer les accès.',
+      value: `${scope.modules.length}/${packCount}`,
+      trend: 'Configuration globale',
+      trendDirection: 'steady',
+      source: 'Catalogue MAXIMUS',
+      tone: 'positive',
+    },
+    {
+      id: 'admin-companies',
+      eyebrow: 'Entreprises',
+      title: `${activeCompanies.length} entreprise${activeCompanies.length > 1 ? 's' : ''} active${activeCompanies.length > 1 ? 's' : ''}`,
+      summary: pendingCompanies.length
+        ? `${pendingCompanies.length} demande${pendingCompanies.length > 1 ? 's' : ''} reste${pendingCompanies.length > 1 ? 'nt' : ''} à traiter.`
+        : 'Aucune demande en attente dans le périmètre administratif.',
+      value: String(activeCompanies.length),
+      trend: pendingCompanies.length ? 'À traiter' : 'Stable',
+      trendDirection: pendingCompanies.length ? 'down' : 'steady',
+      source: 'Registre des entreprises',
+      tone: pendingCompanies.length ? 'watch' : 'neutral',
+    },
+    {
+      id: 'admin-organization',
+      eyebrow: 'Organisation',
+      title: `${scope.orgNodes.length} unité${scope.orgNodes.length > 1 ? 's' : ''} et ${scope.roles.length} rôle${scope.roles.length > 1 ? 's' : ''}`,
+      summary: 'La structure est lue avant les employés afin de préserver le périmètre des droits.',
+      value: String(scope.employees.length),
+      trend: 'Employés suivis',
+      trendDirection: 'steady',
+      source: 'Organisation et accès',
+      tone: 'neutral',
+    },
+  ];
+
+  if (scope.catalogDraftPresent) {
+    insights.push({
+      id: 'admin-draft',
+      eyebrow: 'Publication',
+      title: scope.catalogValidation.errors.length
+        ? `${scope.catalogValidation.errors.length} erreur${scope.catalogValidation.errors.length > 1 ? 's' : ''} dans le brouillon`
+        : 'Brouillon de catalogue à vérifier',
+      summary: scope.catalogValidation.errors[0]
+        ?? `${scope.catalogImpact.changedModules} module(s) et ${scope.catalogImpact.changedSectors} secteur(s) ont changé.`,
+      trend: scope.catalogValidation.errors.length ? 'Bloqué' : 'Validation requise',
+      trendDirection: 'down',
+      source: 'Validation du catalogue',
+      tone: 'watch',
+      proposedAction: {
+        label: 'Revoir avant publication',
+        detail: 'Contrôler les modules, packs, dépendances et secteurs avant toute publication.',
+        impact: 'Aucune modification ne sera publiée automatiquement.',
+      },
+    });
+  }
+
+  if (inactiveModules.length) {
+    insights.push({
+      id: 'admin-inactive-modules',
+      eyebrow: 'Disponibilité',
+      title: `${inactiveModules.length} module${inactiveModules.length > 1 ? 's' : ''} non disponible${inactiveModules.length > 1 ? 's' : ''}`,
+      summary: inactiveModules.map(module => module.name).join(', '),
+      trend: 'À contrôler',
+      trendDirection: 'down',
+      source: 'Statut du catalogue',
+      tone: 'watch',
+    });
+  }
+
+  return insights;
+}
+
+export function answerAdminAssistantQuestion(scope: AdminAssistantScope, rawQuestion: string): AssistantAnswer {
+  const question = rawQuestion.trim().toLocaleLowerCase('fr-FR');
+  const insights = buildAdminAssistantInsights(scope);
+  const catalogSummary = adminCatalogKnowledge(scope);
+  const organizationSummary = adminOrganizationKnowledge(scope);
+
+  if (/(module|catalogue|fonctionnalité|fonctionnalites|pack|permission|droit)/.test(question)) {
+    const mentionedModule = scope.modules.find(module =>
+      question.includes(module.id) || question.includes(module.name.toLocaleLowerCase('fr-FR')),
+    );
+    const answer = mentionedModule
+      ? `${adminModuleLabel(mentionedModule)} propose ${mentionedModule.features.length} fonctionnalité(s). Packs disponibles : ${adminPackSummary(mentionedModule)}. ${mentionedModule.featureDependencies && Object.keys(mentionedModule.featureDependencies).length ? 'Ses dépendances doivent être respectées avant publication.' : ''}`
+      : catalogSummary;
+    return {
+      answer,
+      citations: ['Catalogue des modules', 'Packs métiers et permissions', 'Règles de publication'],
+      insights,
+      suggestedQuestions: ['Comment créer un pack sécurisé ?', 'Comment affecter un module à une entreprise ?', 'Comment vérifier les permissions d’un rôle ?'],
+      proposedActions: [],
+    };
+  }
+
+  if (/(organis|secteur|unité|unite|entreprise|employé|employe|manager|rôle|role)/.test(question)) {
+    return {
+      answer: organizationSummary,
+      citations: ['Registre des entreprises', 'Organisation et accès', 'Gouvernance par unité'],
+      insights,
+      suggestedQuestions: ['Quel est le parcours complet de création d’une entreprise ?', 'Comment limiter un rôle à son unité ?', 'Comment préparer un secteur ?'],
+      proposedActions: [],
+    };
+  }
+
+  if (/(publier|publication|brouillon|validation|catalogue|retirer|maintenance)/.test(question)) {
+    const validation = scope.catalogValidation.errors.length
+      ? `Le brouillon est bloqué par : ${scope.catalogValidation.errors.join(' ')}`
+      : scope.catalogDraftPresent
+        ? `Le brouillon est valide à ce stade. Impact estimé : ${scope.catalogImpact.changedModules} module(s), ${scope.catalogImpact.changedSectors} secteur(s), ${scope.catalogImpact.affectedCompanies} entreprise(s) et ${scope.catalogImpact.affectedUnits} unité(s).`
+        : 'Aucun brouillon de catalogue n’est ouvert.';
+    return {
+      answer: `${validation} La publication reste une décision administrative explicite ; l’assistant ne la déclenche jamais.`,
+      citations: ['Workflow du catalogue', 'Validation avant publication'],
+      insights,
+      suggestedQuestions: ['Quels packs sont disponibles ?', 'Quels secteurs utilisent ce module ?', 'Quelles entreprises seraient affectées ?'],
+      proposedActions: [],
+    };
+  }
+
+  return {
+    answer: `Je suis l’assistant de l’administration principale MAXIMUS. Je peux vous aider à comprendre et configurer le catalogue, les modules, les fonctionnalités, les packs, les permissions, les secteurs, les entreprises et l’organisation. ${catalogSummary} ${organizationSummary}`,
+    citations: ['Contexte administratif MAXIMUS', 'Catalogue et organisation'],
+    insights,
+    suggestedQuestions: ['Explique-moi le mécanisme complet de MAXIMUS.', 'Comment créer un pack avec des permissions sûres ?', 'Comment créer et organiser une entreprise ?'],
     proposedActions: [],
   };
 }

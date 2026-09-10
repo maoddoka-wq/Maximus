@@ -125,7 +125,10 @@ import {
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
-import { answerAssistantQuestion, buildAssistantInsights, buildAssistantScope } from '@/lib/local-assistant';
+import {
+  answerAdminAssistantQuestion,
+  buildAdminAssistantScope,
+} from '@/lib/local-assistant';
 
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
@@ -160,6 +163,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Cockpit MAXIMUS',
     title: 'Bonjour, équipe MAXIMUS.',
     description: 'Voici ce qui mérite votre attention aujourd’hui.',
+  },
+  '/maximus/assistant': {
+    kicker: 'Administration principale',
+    title: 'Assistant administratif MAXIMUS',
+    description: 'Comprenez les modules, les packs, les organisations et les règles d’accès avant de décider.',
   },
   '/maximus/controle': {
     kicker: 'Pilotage MAXIMUS',
@@ -220,11 +228,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Espace entreprise',
     title: 'Votre activité, en un regard.',
     description: 'Pilotez vos opérations depuis un espace unifié.',
-  },
-  '/entreprise/assistant': {
-    kicker: 'Copilote local MAXIMUS',
-    title: 'Comprendre votre activité, sans perdre le contrôle.',
-    description: 'Une lecture assistée des données autorisées de votre entreprise.',
   },
   '/entreprise/controle': {
     kicker: 'Espace entreprise',
@@ -909,23 +912,7 @@ function AppContent() {
     serverModuleAccessReady:
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
-  const assistantVisibleEmployees = companyAdmin
-    ? data.employees.filter(item => item.companyId === companyId)
-    : sectorManager
-      ? presenceEmployees
-      : employee
-        ? [employee]
-        : [];
-  const assistantScope = buildAssistantScope({
-    data,
-    companyId,
-    userLabel: employee ? `${employee.firstName} ${employee.lastName}` : currentCompany?.manager ?? 'Administrateur',
-    visibleEmployees: assistantVisibleEmployees,
-    allowedModules: allowed,
-    isCompanyAdmin: companyAdmin,
-    isSectorManager: sectorManager,
-  });
-  const assistantInsights = buildAssistantInsights(assistantScope);
+  const adminAssistantScope = buildAdminAssistantScope(data, 'Administration principale');
   const baseMeta =
     pageMeta[normalizeRoutePath(location)] ??
     modulePageMeta[normalizeRoutePath(location)] ??
@@ -1055,9 +1042,12 @@ function AppContent() {
                   onNavigate={navigate}
                   onBack={goBack}
                   onModuleAccess={updateCompanyModuleAccess}
+                   assistantScope={adminAssistantScope}
+                   onAskAssistant={(question) => answerAdminAssistantQuestion(adminAssistantScope, question).answer}
                    onTestSector={startSectorTest}
                   screens={{
                     dashboard: AdminDashboard,
+                     assistant: MaximusAssistantPage,
                     control: ControlCenterPage,
                     organization: OrganizationAdminPage,
                     companyDetail: CompanyModulesDetail,
@@ -1096,12 +1086,8 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                   singleModuleNavigation={verticalModuleNavigation}
-                  assistantScope={assistantScope}
-                  assistantInsights={assistantInsights}
-                  onAskAssistant={(question) => answerAssistantQuestion(assistantScope, question).answer}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
-                    assistant: MaximusAssistantPage,
                     control: ControlCenterPage,
                     notifications: NotificationsPage,
                     setupGuide: CompanySetupGuide,

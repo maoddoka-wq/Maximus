@@ -3,8 +3,8 @@ name: Assistant local contrôlé
 description: Principes de sécurité et d’évolution pour le copilote IA intégré à MAXIMUS.
 ---
 
-Le premier assistant MAXIMUS est un copilote local déterministe : il lit uniquement un contexte déjà filtré par entreprise, session, unité et modules autorisés, explique ses sources et ne déclenche aucune action métier.
+L’assistant MAXIMUS est réservé à l’administration principale : il lit le catalogue global, les modules, fonctionnalités, packs, permissions, secteurs, entreprises et organisations, explique ses sources et ne déclenche aucune action métier dans les espaces entreprise.
 
-**Why:** La fiabilité et l’isolation des données doivent être établies avant d’ajouter un modèle local capable d’interpréter des demandes plus libres.
+**Why:** L’assistance de configuration et de gouvernance appartient à MAXIMUS ; les entreprises ne doivent pas recevoir de visibilité sur le fonctionnement global de la plateforme.
 
-**How to apply:** Toute nouvelle capacité doit recevoir un contexte borné, produire une réponse observable avec ses sources, et transformer les actions sensibles en propositions soumises à confirmation explicite.
+**How to apply:** Toute nouvelle capacité doit être branchée sur le contexte administratif global, produire une réponse observable avec ses sources, rester sans mutation implicite et ne jamais réintroduire de route ou d’entrée IA dans l’espace entreprise.
