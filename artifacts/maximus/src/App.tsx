@@ -126,9 +126,9 @@ import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
 import { buildAppAccessContext } from '@/lib/app-access';
 import {
-  answerAdminAssistantQuestion,
   buildAdminAssistantScope,
 } from '@/lib/local-assistant';
+import { maximusAssistantApi } from '@/lib/maximus-assistant-api';
 
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
@@ -1043,7 +1043,14 @@ function AppContent() {
                   onBack={goBack}
                   onModuleAccess={updateCompanyModuleAccess}
                    assistantScope={adminAssistantScope}
-                   onAskAssistant={(question) => answerAdminAssistantQuestion(adminAssistantScope, question).answer}
+                    onAskAssistant={(question) =>
+                      maximusAssistantApi.ask(question).then(response => [
+                        response.answer,
+                        '',
+                        'Sources consultées :',
+                        ...response.citations.map(citation => `- ${citation}`),
+                      ].join('\n'))
+                    }
                    onTestSector={startSectorTest}
                   screens={{
                     dashboard: AdminDashboard,

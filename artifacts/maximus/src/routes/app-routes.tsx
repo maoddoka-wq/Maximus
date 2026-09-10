@@ -61,7 +61,7 @@ export function AdminRouter({
   onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>;
   onTestSector: (preset: SectorPreset) => void;
   assistantScope: AdminAssistantScope;
-  onAskAssistant: (question: string) => string;
+  onAskAssistant: (question: string) => string | Promise<string>;
   screens: AdminRouteScreens;
 }) {
   const routePath = normalizeRoutePath(location);

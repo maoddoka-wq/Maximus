@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\MaximusWalletController;
+use App\Http\Controllers\Api\MaximusAssistantController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
@@ -90,6 +91,8 @@ Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (
     Route::post('/diagnostic-tokens', [DiagnosticTokenController::class, 'store']);
     Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);
 });
+
+Route::middleware('maximus.auth')->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
 
 Route::middleware('maximus.diagnostic')->get('/diagnostics/health', [SystemHealthController::class, 'show']);
 

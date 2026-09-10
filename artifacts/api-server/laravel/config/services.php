@@ -45,4 +45,10 @@ return [
         'webhook_secret' => env('DIAMANOPAY_WEBHOOK_SECRET'),
     ],
 
+    'anthropic' => [
+        'url' => env('ANTHROPIC_API_URL', 'https://api.anthropic.com/v1/messages'),
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
+    ],
+
 ];
