@@ -317,22 +317,49 @@ final class CarRentalController extends Controller
 
     private function distance(string $origin, string $destination): array
     {
-        $key = config('services.google_maps.api_key');
+        $key = trim((string) config('services.openrouteservice.api_key'));
         if (! $key) {
-            throw new \RuntimeException('GOOGLE_MAPS_API_KEY est requis pour calculer la distance.');
+            throw new \RuntimeException('OPENROUTESERVICE_API_KEY est requis pour calculer la distance.');
         }
-        $response = Http::timeout(10)->get('https://maps.googleapis.com/maps/api/distancematrix/json', [
-            'origins' => $origin, 'destinations' => $destination, 'key' => $key,
+
+        $baseUrl = rtrim((string) config('services.openrouteservice.base_url', 'https://api.openrouteservice.org'), '/');
+        $headers = ['Authorization' => $key, 'Accept' => 'application/json'];
+        $originCoordinates = $this->geocode($baseUrl, $headers, $origin);
+        $destinationCoordinates = $this->geocode($baseUrl, $headers, $destination);
+        $response = Http::timeout(10)->withHeaders($headers)->post($baseUrl.'/v2/matrix/driving-car', [
+            'locations' => [$originCoordinates, $destinationCoordinates],
+            'metrics' => ['distance', 'duration'],
+            'units' => 'm',
         ]);
-        if (! $response->successful() || $response->json('status') !== 'OK'
-            || $response->json('rows.0.elements.0.status') !== 'OK') {
-            throw new \RuntimeException('Google Maps Distance Matrix n’a pas pu calculer la distance.');
+        $distance = $response->json('distances.0.1');
+        $duration = $response->json('durations.0.1');
+        if (! $response->successful() || ! is_numeric($distance) || ! is_numeric($duration)) {
+            throw new \RuntimeException('OpenRouteService n’a pas pu calculer la distance routière.');
         }
 
         return [
-            (int) ceil($response->json('rows.0.elements.0.distance.value') / 1000),
-            (int) round($response->json('rows.0.elements.0.duration.value') / 60),
+            (int) ceil(((float) $distance) / 1000),
+            (int) round(((float) $duration) / 60),
         ];
+    }
+
+    /**
+     * @return array{0: float, 1: float}
+     */
+    private function geocode(string $baseUrl, array $headers, string $address): array
+    {
+        $response = Http::timeout(10)->withHeaders($headers)->get($baseUrl.'/geocode/search', [
+            'text' => $address,
+            'size' => 1,
+        ]);
+        $coordinates = $response->json('features.0.geometry.coordinates');
+        if (! $response->successful() || ! is_array($coordinates)
+            || ! isset($coordinates[0], $coordinates[1])
+            || ! is_numeric($coordinates[0]) || ! is_numeric($coordinates[1])) {
+            throw new \RuntimeException('OpenRouteService n’a pas pu localiser une des adresses fournies.');
+        }
+
+        return [(float) $coordinates[0], (float) $coordinates[1]];
     }
 
     private function overlaps(string $rentalId, string $startsAt, string $endsAt): bool

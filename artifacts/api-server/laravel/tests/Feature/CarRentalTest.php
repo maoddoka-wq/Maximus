@@ -23,15 +23,11 @@ class CarRentalTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_quote_uses_google_distance_and_automobile_rates(): void
+    public function test_quote_uses_openrouteservice_distance_and_automobile_rates(): void
     {
         $this->createStore('kora', 'cars-quote');
         $car = $this->createCar(['daily_rate' => 10000, 'km_rate' => 100, 'fees' => 500]);
-        Http::fake(['https://maps.googleapis.com/maps/api/distancematrix/json*' => Http::response([
-            'status' => 'OK',
-            'rows' => [['elements' => [['status' => 'OK', 'distance' => ['value' => 12501], 'duration' => ['value' => 3600]]]]],
-        ])]);
-        config(['services.google_maps.api_key' => 'test-google-key']);
+        $this->fakeOpenRouteService(12501, 3600);
 
         $this->getJson('/api/shop/cars-quote/location/'.$car.'/quote?'.http_build_query($this->periodPayload()))
             ->assertOk()
@@ -148,11 +144,7 @@ class CarRentalTest extends TestCase
 
     private function reserve(string $car, string $slug)
     {
-        config(['services.google_maps.api_key' => 'test-google-key']);
-        Http::fake(['https://maps.googleapis.com/maps/api/distancematrix/json*' => Http::response([
-            'status' => 'OK', 'rows' => [['elements' => [['status' => 'OK',
-                'distance' => ['value' => 1000], 'duration' => ['value' => 600]]]]],
-        ])]);
+        $this->fakeOpenRouteService(1000, 600);
 
         return $this->postJson('/api/shop/'.$slug.'/location/reservations', [
             ...$this->periodPayload(),
@@ -161,6 +153,20 @@ class CarRentalTest extends TestCase
             'customerName' => 'Client Location',
             'customerEmail' => 'location@example.test',
             'customerPhone' => '+221770000000',
+        ]);
+    }
+
+    private function fakeOpenRouteService(int $distanceMeters, int $durationSeconds): void
+    {
+        config(['services.openrouteservice.api_key' => 'test-openrouteservice-key']);
+        Http::fake([
+            'https://api.openrouteservice.org/geocode/search*' => Http::response([
+                'features' => [['geometry' => ['coordinates' => [-17.4677, 14.7167]]]],
+            ]),
+            'https://api.openrouteservice.org/v2/matrix/driving-car' => Http::response([
+                'distances' => [[0, $distanceMeters], [$distanceMeters, 0]],
+                'durations' => [[0, $durationSeconds], [$durationSeconds, 0]],
+            ]),
         ]);
     }
 

@@ -45,8 +45,9 @@ return [
         'webhook_secret' => env('DIAMANOPAY_WEBHOOK_SECRET'),
     ],
 
-    'google_maps' => [
-        'api_key' => env('GOOGLE_MAPS_API_KEY'),
+    'openrouteservice' => [
+        'api_key' => env('OPENROUTESERVICE_API_KEY'),
+        'base_url' => env('OPENROUTESERVICE_BASE_URL', 'https://api.openrouteservice.org'),
     ],
 
     'anthropic' => [
