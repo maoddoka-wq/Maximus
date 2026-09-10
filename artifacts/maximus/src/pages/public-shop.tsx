@@ -10,6 +10,8 @@ import {
   type EcommerceCustomerCartLine,
   type EcommerceDeliveryRequest,
   type EcommerceDeliveryServiceType,
+  type EcommerceCarReservation,
+  type EcommerceCarTripType,
   type PaymentProvider,
   type PublicPaymentStatus,
   type PublicShopBootstrap,
@@ -725,7 +727,7 @@ function DeliveryPage({ store, customer, requests, form, setForm, submitted, onS
   </section>;
 }
 
-function RentalProductCard({ rental, store, onAdd }: { rental: PublicRental; store: PublicShopBootstrap['store']; onAdd: () => void }) {
+function RentalProductCard({ rental, store, onSelect }: { rental: PublicRental; store: PublicShopBootstrap['store']; onSelect: () => void }) {
   const unit = rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour';
   return <article className="overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
     <div className="relative flex aspect-[2/1] items-center justify-center overflow-hidden bg-[#fbfaf7]">
@@ -736,36 +738,189 @@ function RentalProductCard({ rental, store, onAdd }: { rental: PublicRental; sto
       <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{rental.category || 'Général'} · Location</p>
       <div className="mt-1.5 flex items-start justify-between gap-3">
         <h2 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{rental.name}</h2>
-        <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{money(rental.price, store.currency)}<span className="block text-[10px] font-medium text-[#655e55]">/ {unit}</span></p>
+        <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{money(rental.dailyRate ?? rental.price, store.currency)}<span className="block text-[10px] font-medium text-[#655e55]">/ jour</span></p>
       </div>
-      <div className="mt-3 flex items-center gap-2 border-t border-[#eee7dc] pt-2 text-[11px] font-semibold text-[#655e55]">
-        <Home size={14} className="shrink-0 text-[#8c6c37]" />
-        <span>{rental.availability} disponible{rental.availability > 1 ? 's' : ''}</span>
-        <span className="ml-auto truncate">{rental.category || 'Général'}</span>
+      <div className="mt-3 flex items-center justify-between border-t border-[#eee7dc] pt-2 text-[11px] font-semibold text-[#655e55]">
+        <div className="flex items-center gap-1.5"><Home size={14} className="shrink-0 text-[#8c6c37]" /><span>{rental.seats ? `${rental.seats} places` : 'Places N/A'}</span></div>
+        <div className="flex items-center gap-1.5 truncate"><span>{rental.transmission === 'AUTOMATIC' ? 'Auto' : rental.transmission === 'MANUAL' ? 'Manuelle' : 'Transmission N/A'}</span></div>
       </div>
-      <button type="button" onClick={onAdd} disabled={!rental.isAvailable} className="mt-3 w-full rounded-lg px-2.5 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter au panier</button>
+      <button type="button" onClick={onSelect} disabled={!rental.isAvailable} className="mt-3 w-full rounded-lg px-2.5 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>Réserver</button>
     </div>
   </article>;
 }
 
-function RentalPage({ rentals, store, onBack, onAdd }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; onBack: () => void; onAdd: (rental: PublicRental) => void }) {
+function RentalPage({ rentals, store, customer, slug, domain, onBack }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; slug?: string; domain?: boolean; onBack: () => void }) {
+  const [selectedRental, setSelectedRental] = useState<PublicRental | null>(null);
+
+  if (selectedRental) {
+    return <RentalBookingForm rental={selectedRental} store={store} customer={customer} slug={slug} domain={domain} onBack={() => setSelectedRental(null)} />;
+  }
+
   const categories = [...new Set(rentals.map(rental => rental.category || 'Général'))].sort((a, b) => a.localeCompare(b, 'fr'));
 
   return <section className="mx-auto max-w-6xl">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour à la boutique</button>
     <header className="mt-6 flex flex-col justify-between gap-3 border-b pb-5 sm:flex-row sm:items-end">
-      <div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: store.primaryColor }}>Offres disponibles</p><h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Trouvez votre prochaine location</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Des offres séparées des produits de la boutique, avec leur tarif et leur disponibilité.</p></div>
-      <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{rentals.length} offre{rentals.length > 1 ? 's' : ''}</span>
+      <div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: store.primaryColor }}>Flotte automobile</p><h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Trouvez votre prochaine location</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Sélectionnez un véhicule pour obtenir un devis immédiat.</p></div>
+      <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{rentals.length} véhicule{rentals.length > 1 ? 's' : ''}</span>
     </header>
     {rentals.length === 0
       ? <div className="mt-6 rounded-2xl border border-dashed p-10 text-center"><p className="text-sm font-semibold">Les offres de location arrivent bientôt.</p><p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Aucune location publiée n’est disponible dans cette boutique.</p></div>
       : <div className="mt-6 space-y-8">{categories.map(category => {
         const categoryRentals = rentals.filter(rental => (rental.category || 'Général') === category);
         return <section key={category}>
-          <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h2 className="mt-1 text-xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} offre{categoryRentals.length > 1 ? 's' : ''}</span></div>
-           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} onAdd={() => onAdd(rental)} />)}</div>
+          <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Catégorie</p><h2 className="mt-1 text-xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryRentals.length} véhicule{categoryRentals.length > 1 ? 's' : ''}</span></div>
+           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{categoryRentals.map(rental => <RentalProductCard key={`${category}-${rental.name}-${rental.billingUnit}`} rental={rental} store={store} onSelect={() => setSelectedRental(rental)} />)}</div>
         </section>;
       })}</div>}
+  </section>;
+}
+
+function RentalBookingForm({ rental, store, customer, slug, domain, onBack }: { rental: PublicRental; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; slug?: string; domain?: boolean; onBack: () => void }) {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [form, setForm] = useState({ startsAt: '', endsAt: '', tripType: 'FAMILY' as EcommerceCarTripType, departure: '', destination: '', customerName: customer?.name || '', customerEmail: customer?.email || '', customerPhone: customer?.phone || '' });
+  const [quote, setQuote] = useState<any>(null);
+  const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('WAVE');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const getQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.startsAt || !form.endsAt || !form.departure || !form.destination) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = domain
+        ? await publicEcommerceApi.quoteDomainLocation(rental.id, { startsAt: form.startsAt, endsAt: form.endsAt, departure: form.departure, destination: form.destination })
+        : await publicEcommerceApi.quoteLocation(slug ?? '', rental.id, { startsAt: form.startsAt, endsAt: form.endsAt, departure: form.departure, destination: form.destination });
+      setQuote(res);
+      setStep(2);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de calculer le devis.');
+      showAppToast('Impossible de calculer le devis. Vérifiez que les adresses sont précises.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const book = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.customerName || !form.customerEmail) return;
+    setLoading(true);
+    setError('');
+    try {
+      const payload = { rentalId: rental.id, ...form };
+      const reservation = domain
+        ? await publicEcommerceApi.reserveDomainLocation(payload)
+        : await publicEcommerceApi.reserveLocation(slug ?? '', payload);
+
+      const returnUrl = () => {
+        const url = new URL(window.location.origin);
+        url.pathname = slug ? `/shop/${encodeURIComponent(slug)}/location` : '/location';
+        url.searchParams.set('payment', 'return');
+        url.searchParams.set('order', reservation.orderId);
+        return url.toString();
+      };
+
+      const payment = domain
+        ? await publicEcommerceApi.createDomainPayment(reservation.orderId, { redirectUrl: returnUrl(), provider: paymentProvider })
+        : await publicEcommerceApi.createPayment(slug ?? '', reservation.orderId, { redirectUrl: returnUrl(), provider: paymentProvider });
+
+      showAppToast('Redirection vers le paiement DiamanoPay.', 'info');
+      window.location.assign(payment.checkoutUrl);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'La réservation n’a pas abouti.');
+      showAppToast('Erreur lors de la réservation.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return <section className="mx-auto max-w-4xl">
+    <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour aux véhicules</button>
+    <div className="mt-6 flex flex-col md:flex-row gap-8">
+      <div className="w-full md:w-1/3 shrink-0 space-y-4">
+        <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="aspect-[3/2] bg-[hsl(var(--muted))]">{rental.imageUrl ? <img src={rental.imageUrl} alt={rental.name} className="h-full w-full object-cover" /> : <Home className="mx-auto h-full text-[hsl(var(--muted-foreground))]" size={40} />}</div>
+          <div className="p-4">
+            <h2 className="text-lg font-bold">{rental.name}</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{rental.category}</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              {rental.seats && <span className="rounded bg-[hsl(var(--muted))] px-2 py-1 font-semibold">{rental.seats} places</span>}
+              {rental.transmission && <span className="rounded bg-[hsl(var(--muted))] px-2 py-1 font-semibold">{rental.transmission === 'AUTOMATIC' ? 'Automatique' : 'Manuelle'}</span>}
+              {rental.fuel && <span className="rounded bg-[hsl(var(--muted))] px-2 py-1 font-semibold">{rental.fuel}</span>}
+            </div>
+            <p className="mt-4 text-xl font-bold text-[hsl(var(--foreground))]">{money(rental.dailyRate ?? rental.price, store.currency)}<span className="text-xs font-normal text-[hsl(var(--muted-foreground))]"> / jour</span></p>
+            {rental.kmRate ? <p className="text-xs text-[hsl(var(--muted-foreground))]">+ {money(rental.kmRate, store.currency)} / km</p> : null}
+          </div>
+        </div>
+      </div>
+      
+      <div className="w-full md:w-2/3">
+        {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
+        
+        {step === 1 && <form onSubmit={getQuote} className="rounded-3xl border bg-[hsl(var(--card))] p-6 shadow-sm sm:p-8 space-y-6 fade-up">
+          <h2 className="text-xl font-bold">1. Votre trajet</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-bold">Date de départ<input type="date" required min={today} value={form.startsAt} onChange={e => setForm({...form, startsAt: e.target.value})} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+            <label className="block text-sm font-bold">Date de retour<input type="date" required min={form.startsAt || today} value={form.endsAt} onChange={e => setForm({...form, endsAt: e.target.value})} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+          </div>
+          <div className="space-y-3">
+            <label className="block text-sm font-bold">Type de voyage</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2"><input type="radio" checked={form.tripType === 'FAMILY'} onChange={() => setForm({...form, tripType: 'FAMILY'})} /> Famille / Personnel</label>
+              <label className="flex items-center gap-2"><input type="radio" checked={form.tripType === 'BUSINESS'} onChange={() => setForm({...form, tripType: 'BUSINESS'})} /> Professionnel</label>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <label className="block text-sm font-bold">Adresse de départ<input required placeholder="Ex: Aéroport de Dakar" value={form.departure} onChange={e => setForm({...form, departure: e.target.value})} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+            <label className="block text-sm font-bold">Adresse de destination<input required placeholder="Ex: Saly Portudal" value={form.destination} onChange={e => setForm({...form, destination: e.target.value})} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm" /></label>
+          </div>
+          <button type="submit" disabled={loading} className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>
+            {loading ? 'Calcul en cours...' : 'Obtenir un devis'}
+          </button>
+        </form>}
+
+        {step === 2 && quote && <form onSubmit={book} className="rounded-3xl border bg-[hsl(var(--card))] p-6 shadow-sm sm:p-8 space-y-6 fade-up">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">2. Récapitulatif</h2>
+            <button type="button" onClick={() => setStep(1)} className="text-sm text-[hsl(var(--primary))] font-bold underline">Modifier</button>
+          </div>
+          
+          <div className="rounded-2xl border bg-[hsl(var(--muted)/.3)] p-4 space-y-3 text-sm">
+            <div className="flex justify-between"><span className="text-[hsl(var(--muted-foreground))]">Durée</span><strong>{quote.days} jour(s)</strong></div>
+            <div className="flex justify-between"><span className="text-[hsl(var(--muted-foreground))]">Distance estimée</span><strong>{quote.distanceKm} km</strong></div>
+            <div className="border-t pt-3 flex justify-between"><span className="text-[hsl(var(--muted-foreground))]">Location de base</span><strong>{money(quote.daily, store.currency)}</strong></div>
+            {quote.distance > 0 && <div className="flex justify-between"><span className="text-[hsl(var(--muted-foreground))]">Frais kilométriques</span><strong>{money(quote.distance, store.currency)}</strong></div>}
+            {quote.fees > 0 && <div className="flex justify-between"><span className="text-[hsl(var(--muted-foreground))]">Frais de service</span><strong>{money(quote.fees, store.currency)}</strong></div>}
+            {quote.deposit > 0 && <div className="flex justify-between"><span className="text-[hsl(var(--muted-foreground))]">Caution</span><strong>{money(quote.deposit, store.currency)}</strong></div>}
+            <div className="border-t pt-3 flex justify-between text-lg font-black"><span>Total à payer</span><span style={{ color: 'var(--shop-primary)' }}>{money(quote.total, store.currency)}</span></div>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-bold">Vos informations</h3>
+            <input required placeholder="Nom complet" value={form.customerName} onChange={e => setForm({...form, customerName: e.target.value})} className="w-full rounded-xl border px-3 py-3 text-sm" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <input required type="email" placeholder="Email" value={form.customerEmail} onChange={e => setForm({...form, customerEmail: e.target.value})} className="w-full rounded-xl border px-3 py-3 text-sm" />
+              <input placeholder="Téléphone" value={form.customerPhone} onChange={e => setForm({...form, customerPhone: e.target.value})} className="w-full rounded-xl border px-3 py-3 text-sm" />
+            </div>
+          </div>
+
+          <fieldset className="rounded-2xl border p-4">
+            <legend className="px-1 text-sm font-bold">Moyen de paiement</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {([['WAVE', 'Wave'], ['ORANGE_MONEY', 'Orange Money']] as const).map(([value, label]) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${paymentProvider === value ? 'border-[var(--shop-primary)] bg-[var(--shop-primary)]/10' : 'hover:bg-[hsl(var(--muted))]'}`}><input type="radio" checked={paymentProvider === value} onChange={() => setPaymentProvider(value)} />{label}</label>)}
+            </div>
+          </fieldset>
+
+          <button type="submit" disabled={loading || !form.customerName || !form.customerEmail} className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>
+            {loading ? 'Préparation...' : 'Réserver et Payer'}
+          </button>
+        </form>}
+      </div>
+    </div>
   </section>;
 }
 
