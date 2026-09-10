@@ -56,3 +56,9 @@ Le registre de module doit dériver l’identité métier du catalogue et porter
 **Why:** Un module ajouté dans une seule liste peut apparaître dans le catalogue sans route, ou être routable sans apparaître dans le menu, ce qui crée des écrans inaccessibles et des régressions silencieuses.
 
 **How to apply:** Lorsqu’un module est ajouté, enregistrer son identifiant dans le catalogue et sa configuration d’exécution dans le registre, puis laisser les tests de parité vérifier la route et la navigation.
+
+Les capacités de fulfillment d’un module e-commerce, comme la vente physique ou numérique, ne sont pas des onglets de navigation.
+
+**Why:** Une permission de type produit sert à contrôler les opérations autorisées dans le catalogue ; l’exposer comme page crée des liens dupliqués et des routes sans écran correspondant.
+
+**How to apply:** Garder ces identifiants dans le manifeste et les contrôles d’accès, mais les exclure des menus et des onglets ; utiliser uniquement les capacités autorisées pour afficher les choix de création correspondants.

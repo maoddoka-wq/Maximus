@@ -812,7 +812,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
   const [chooserOpen, setChooserOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(blankProduct);
   const filtered = data.products.filter(product => status === 'ALL' || product.status === status).filter(product => `${product.name} ${product.sku} ${product.category}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
-  const canSellPhysical = !allowedFeatureIds || allowedFeatureIds.includes('vente-physique') || allowedFeatureIds.includes('catalogue');
+  const canSellPhysical = !allowedFeatureIds || allowedFeatureIds.includes('vente-physique');
   const canSellDigital = !allowedFeatureIds || allowedFeatureIds.includes('vente-numerique');
   const open = (product?: EcommerceProduct, fulfillmentType: EcommerceProductFulfillmentType = 'PHYSICAL') => {
     setChooserOpen(false);

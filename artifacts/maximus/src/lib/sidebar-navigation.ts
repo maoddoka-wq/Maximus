@@ -78,6 +78,8 @@ const ecommerceFeatureIcons: Record<string, Icon> = {
   parametres: Settings,
 };
 
+const ecommerceCapabilityFeatureIds = new Set(['vente-physique', 'vente-numerique']);
+
 const payrollFeatureIcons: Record<string, Icon> = {
   'tableau-de-bord': Gauge,
   bénéficiaires: Users,
@@ -93,6 +95,7 @@ function buildEcommerceNavigationItems(
   selectedFeatureIds: Set<string>,
 ) {
   const featureItems = getModuleFeatureOptions(module)
+    .filter(feature => !ecommerceCapabilityFeatureIds.has(feature.id))
     .filter(feature => selectedFeatureIds.has(feature.id))
     .map(feature => ({
       href: `/entreprise/ecommerce?tab=${feature.id}`,

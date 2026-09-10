@@ -99,3 +99,22 @@ test('le menu e-commerce expose les catégories avec le catalogue', () => {
     '/entreprise/ecommerce?tab=categories',
   ]);
 });
+
+test('le menu e-commerce ne transforme pas les droits de vente en onglets', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['ecommerce'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+    selectedFeatureIdsByModule: {
+      ecommerce: ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique'],
+    },
+  });
+
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
+    '/entreprise/ecommerce?tab=dashboard',
+    '/entreprise/ecommerce?tab=catalogue',
+    '/entreprise/ecommerce?tab=categories',
+  ]);
+});
