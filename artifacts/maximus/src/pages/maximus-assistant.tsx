@@ -4,17 +4,21 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Clock3,
   CircleAlert,
   CircleCheck,
   Database,
   Info,
   LockKeyhole,
   MessageSquareText,
+  MoreHorizontal,
   Minus,
+  PanelTop,
   Plus,
   RefreshCw,
   Send,
   ShieldCheck,
+  Trash2,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -63,6 +67,13 @@ type ConversationEntry = {
   action?: MaximusAssistantAction;
 };
 
+type ConversationThread = {
+  id: string;
+  title: string;
+  updatedAt: number;
+  entries: ConversationEntry[];
+};
+
 type MaximusAssistantProps = {
   workspaceContext: MaximusWorkspaceContext;
   insightCards: MaximusInsightCard[];
@@ -78,6 +89,44 @@ const suggestedPrompts = [
   'Quels contrôles dois-je vérifier avant de publier le catalogue ?',
   'Comment organiser une entreprise sans élargir ses accès ?',
 ];
+
+const conversationStorageKey = 'maximus-maxi-conversations';
+
+function createConversationThread(): ConversationThread {
+  return {
+    id: `conversation-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: 'Nouvelle conversation',
+    updatedAt: Date.now(),
+    entries: [],
+  };
+}
+
+function loadConversationThreads(): ConversationThread[] {
+  try {
+    const stored = localStorage.getItem(conversationStorageKey);
+    if (!stored) return [createConversationThread()];
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) return [createConversationThread()];
+    const threads = parsed.filter((item): item is ConversationThread => (
+      Boolean(item)
+      && typeof item === 'object'
+      && typeof (item as ConversationThread).id === 'string'
+      && typeof (item as ConversationThread).title === 'string'
+      && typeof (item as ConversationThread).updatedAt === 'number'
+      && Array.isArray((item as ConversationThread).entries)
+    ));
+    return threads.length > 0 ? threads : [createConversationThread()];
+  } catch {
+    return [createConversationThread()];
+  }
+}
+
+function conversationDate(value: number) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+}
 
 function TrendMark({ direction }: { direction?: MaximusInsightCard['trendDirection'] }) {
   if (direction === 'up') return <TrendingUp size={14} aria-hidden="true" />;
@@ -212,11 +261,26 @@ export function MaximusAssistantPage({
   initialQuestion = '',
 }: MaximusAssistantProps) {
   const [question, setQuestion] = useState(initialQuestion);
-  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const [conversationThreads, setConversationThreads] = useState<ConversationThread[]>(loadConversationThreads);
+  const [activeConversationId, setActiveConversationId] = useState('');
   const [error, setError] = useState('');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [showBoundary, setShowBoundary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const activeThread = conversationThreads.find(thread => thread.id === activeConversationId)
+    ?? conversationThreads[0];
+  const conversation = activeThread?.entries ?? [];
+
+  useEffect(() => {
+    if (!activeConversationId && conversationThreads[0]) {
+      setActiveConversationId(conversationThreads[0].id);
+    }
+  }, [activeConversationId, conversationThreads]);
+
+  useEffect(() => {
+    localStorage.setItem(conversationStorageKey, JSON.stringify(conversationThreads.slice(0, 20)));
+  }, [conversationThreads]);
 
   useEffect(() => {
     setQuestion(initialQuestion);
@@ -229,14 +293,52 @@ export function MaximusAssistantPage({
   );
   const selectedAction = insightCards.find(insight => insight.id === selectedActionId)?.proposedAction;
 
+  const updateConversation = (
+    threadId: string,
+    update: (entries: ConversationEntry[]) => ConversationEntry[],
+  ) => {
+    setConversationThreads(current => current.map(thread => thread.id === threadId
+      ? { ...thread, entries: update(thread.entries), updatedAt: Date.now() }
+      : thread));
+  };
+
+  const startNewConversation = () => {
+    const thread = createConversationThread();
+    setConversationThreads(current => [thread, ...current]);
+    setActiveConversationId(thread.id);
+    setQuestion('');
+    setError('');
+    setSelectedActionId(null);
+  };
+
+  const selectConversation = (threadId: string) => {
+    setActiveConversationId(threadId);
+    setQuestion('');
+    setError('');
+    setSelectedActionId(null);
+  };
+
   const ask = async (value = question) => {
     const trimmed = value.trim();
     if (!trimmed || submitting || loading) return;
+    const threadId = activeThread?.id ?? createConversationThread().id;
+    if (!activeThread) {
+      const thread = createConversationThread();
+      setConversationThreads([thread]);
+      setActiveConversationId(thread.id);
+    }
     setQuestion('');
     setError('');
     setSubmitting(true);
     const entryId = `${Date.now()}`;
-    setConversation(current => [...current, { id: `question-${entryId}`, kind: 'user', text: trimmed }]);
+    updateConversation(threadId, current => [...current, { id: `question-${entryId}`, kind: 'user', text: trimmed }]);
+    setConversationThreads(current => current.map(thread => thread.id === threadId
+      ? {
+        ...thread,
+        title: thread.entries.length === 0 ? trimmed.slice(0, 64) : thread.title,
+        updatedAt: Date.now(),
+      }
+      : thread));
     try {
       const history = conversation.map<MaximusAssistantMessage>(entry => ({
         role: entry.kind,
@@ -246,7 +348,7 @@ export function MaximusAssistantPage({
       const response = requestedAction
         ? await onPreviewAction(requestedAction)
         : await Promise.resolve(onAsk(trimmed, history));
-      setConversation(current => [
+      updateConversation(threadId, current => [
         ...current,
         {
           id: `answer-${entryId}`,
@@ -269,7 +371,7 @@ export function MaximusAssistantPage({
     setSubmitting(true);
     try {
       const response = await onExecuteAction(action);
-      setConversation(current => current.map(entry => entry.id === entryId
+      updateConversation(activeThread?.id ?? '', current => current.map(entry => entry.id === entryId
         ? { ...entry, text: response.answer, citations: response.citations, action: response.action }
         : entry));
     } catch (cause) {
