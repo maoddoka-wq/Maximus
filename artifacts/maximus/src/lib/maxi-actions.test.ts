@@ -49,3 +49,50 @@ test('parse une demande MAXI de création d’unité', () => {
 test('ne transforme pas une demande incomplète en mutation', () => {
   assert.equal(parseMaxiActionRequest('Créer un module rapidement'), null);
 });
+
+test('parse une demande de création de fonctionnalité dans un module', () => {
+  assert.deepEqual(
+    parseMaxiActionRequest(
+      'Créer la fonctionnalité « Export comptable » dans le module « Gestion commerciale » description : Exporter les écritures vers la comptabilité.',
+    ),
+    {
+      type: 'create_feature',
+      name: 'Export comptable',
+      moduleId: 'Gestion commerciale',
+      description: 'Exporter les écritures vers la comptabilité',
+    },
+  );
+});
+
+test('parse une demande de création de secteur', () => {
+  assert.deepEqual(
+    parseMaxiActionRequest(
+      'Créer le secteur « Cabinet conseil » modules : Gestion commerciale, Présences fonctionnalités : clients, planning.',
+    ),
+    {
+      type: 'create_sector',
+      name: 'Cabinet conseil',
+      moduleIds: ['Gestion commerciale', 'Présences'],
+      moduleFeatures: {
+        'Gestion commerciale': ['clients', 'planning'],
+        Présences: ['clients', 'planning'],
+      },
+    },
+  );
+});
+
+test('parse une proposition de configuration d’entreprise', () => {
+  assert.deepEqual(
+    parseMaxiActionRequest(
+      'Configurer une entreprise « Atelier Kora » secteur : Artisanat modules : stocks, ecommerce besoins : suivi des commandes, catalogue public contact : atelier@example.com',
+    ),
+    {
+      type: 'create_company_plan',
+      name: 'Atelier Kora',
+      sector: 'Artisanat',
+      moduleIds: ['stocks', 'ecommerce'],
+      requirements: ['suivi des commandes', 'catalogue public'],
+      companyEmail: 'atelier@example.com',
+    },
+  );
+});

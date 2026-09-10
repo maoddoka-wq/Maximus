@@ -11,7 +11,13 @@ export type MaximusAssistantMessage = {
   content: string;
 };
 
-export type MaximusAssistantActionType = 'create_module' | 'create_pack' | 'create_organization_unit';
+export type MaximusAssistantActionType =
+  | 'create_module'
+  | 'create_pack'
+  | 'create_feature'
+  | 'create_sector'
+  | 'create_company_plan'
+  | 'create_organization_unit';
 export type MaximusAssistantActionStatus = 'PENDING_CONFIRMATION' | 'EXECUTED';
 
 export type MaximusAssistantAction = {
@@ -21,6 +27,11 @@ export type MaximusAssistantAction = {
   id?: string;
   name: string;
   description?: string;
+  sector?: string;
+  companyEmail?: string;
+  managerName?: string;
+  requirements?: string[];
+  nextSteps?: string[];
   moduleId?: string;
   companyId?: string;
   companyName?: string;

@@ -85,8 +85,31 @@ type MaximusAssistantProps = {
 
 const suggestedPrompts = [
   'Quels modules et packs sont publiés actuellement ?',
-  'Quels contrôles dois-je vérifier avant de publier le catalogue ?',
-  'Comment organiser une entreprise sans élargir ses accès ?',
+  'Construis une proposition précise pour une nouvelle entreprise selon ses besoins.',
+  'Quelles fonctionnalités manquent pour compléter une offre métier ?',
+];
+
+const guidedPrompts = [
+  {
+    label: 'Monter une entreprise',
+    prompt: 'Configurer une entreprise « Nom à préciser » secteur : Secteur à préciser modules : module-1, module-2 besoins : besoin métier principal contact : client@example.com',
+  },
+  {
+    label: 'Créer un module',
+    prompt: 'Créer le module « Nom du module » avec description : Décrire le besoin métier. fonctionnalités : Fonctionnalité 1, Fonctionnalité 2.',
+  },
+  {
+    label: 'Ajouter une fonctionnalité',
+    prompt: 'Créer la fonctionnalité « Nom de la fonctionnalité » dans le module « Nom du module » description : Décrire précisément ce que la fonctionnalité doit couvrir.',
+  },
+  {
+    label: 'Créer un pack',
+    prompt: 'Créer le pack « Nom du pack » pour le module « Nom du module » description : Décrire le niveau d’accès. fonctionnalités : Fonctionnalité 1, Fonctionnalité 2.',
+  },
+  {
+    label: 'Monter un secteur',
+    prompt: 'Créer le secteur « Nom du secteur » modules : module-1, module-2 fonctionnalités : fonctionnalité-1, fonctionnalité-2.',
+  },
 ];
 
 const conversationStorageKey = 'maximus-maxi-conversations';
@@ -178,6 +201,25 @@ function toneClasses(tone: MaximusInsightCard['tone']) {
 function formatUserCount(value?: number) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return new Intl.NumberFormat('fr-FR').format(value);
+}
+
+function actionDescription(action: MaximusAssistantAction) {
+  switch (action.type) {
+    case 'create_module':
+      return `Créer le module « ${action.name} » dans le brouillon du catalogue.`;
+    case 'create_pack':
+      return `Créer le pack « ${action.name} » dans « ${action.moduleId} ».`;
+    case 'create_feature':
+      return `Ajouter la fonctionnalité « ${action.name} » au module « ${action.moduleId} ».`;
+    case 'create_sector':
+      return `Créer le secteur « ${action.name} » avec ses modules et ses packs.`;
+    case 'create_company_plan':
+      return `Enregistrer le plan de configuration de « ${action.name} » pour le secteur « ${action.sector} », sans activer l’entreprise.`;
+    case 'create_organization_unit':
+      return `Créer l’unité « ${action.name} » dans « ${action.companyName} ».`;
+    default:
+      return 'Préparer une action contrôlée dans le périmètre MAXIMUS.';
+  }
 }
 
 function InsightCard({
@@ -511,6 +553,32 @@ export function MaximusAssistantPage({
               </button>
             </div>
           </div>
+
+          <div className="border-t border-[hsl(var(--border))] bg-[hsl(var(--background)/.32)] px-4 py-3 sm:px-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Concevoir avec MAXI</p>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez un parcours ou décrivez directement le besoin du client.</p>
+              </div>
+              <Sparkles size={15} className="shrink-0 text-[hsl(var(--primary))]" aria-hidden="true" />
+            </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {guidedPrompts.map(item => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setQuestion(item.prompt);
+                    setError('');
+                  }}
+                  disabled={loading || submitting}
+                  className="shrink-0 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-xs font-bold text-[hsl(var(--foreground))] transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:opacity-50"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </header>
 
         <div className="flex min-h-[30rem] flex-col">
@@ -549,7 +617,7 @@ export function MaximusAssistantPage({
                   </div>
                   <h2 className="mt-4 text-xl font-black tracking-[-.03em]">Comment puis-je vous aider ?</h2>
                   <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                    Posez une question sur le catalogue, les organisations ou la gouvernance. MAXI explique ses sources et demande une confirmation avant toute écriture.
+                     {workspaceContext.description ?? 'Posez une question sur le catalogue, les organisations ou la gouvernance.'} MAXI explique son raisonnement, affiche ses sources et demande une confirmation avant toute écriture.
                   </p>
                 </div>
                 <div className="mx-auto mt-7 grid w-full max-w-3xl gap-2 md:grid-cols-3">
@@ -598,9 +666,7 @@ export function MaximusAssistantPage({
                               <div className="min-w-0 flex-1">
                                 <p className="text-[11px] font-black uppercase tracking-[.12em] text-[hsl(var(--primary))]">Action vérifiée</p>
                                 <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                                  {entry.action.type === 'create_module' && `Créer le module « ${entry.action.name} » dans le brouillon du catalogue.`}
-                                  {entry.action.type === 'create_pack' && `Créer le pack « ${entry.action.name} » dans « ${entry.action.moduleId} ».`}
-                                  {entry.action.type === 'create_organization_unit' && `Créer l’unité « ${entry.action.name} » dans « ${entry.action.companyName} ».`}
+                                   {actionDescription(entry.action)}
                                 </p>
                                 <button
                                   type="button"

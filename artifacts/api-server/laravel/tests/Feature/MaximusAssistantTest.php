@@ -202,4 +202,68 @@ class MaximusAssistantTest extends TestCase
         $this->assertSame('company-action', $payload['orgNodes'][0]['companyId']);
         $this->assertCount(3, $payload['auditEntries']);
     }
+
+    public function test_maxi_can_prepare_features_sectors_and_a_company_plan_without_activating_company_access(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'assistant-planning-admin',
+            'email' => 'planning-admin@maximus.test',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+
+        $featureAction = [
+            'type' => 'create_feature',
+            'moduleId' => 'commerce',
+            'name' => 'Export comptable',
+            'description' => 'Exporter les écritures vers la comptabilité.',
+        ];
+        $sectorAction = [
+            'type' => 'create_sector',
+            'name' => 'Cabinet conseil',
+            'moduleIds' => ['commerce', 'presences'],
+            'modulePackIds' => [
+                'commerce' => ['commerce-consultation'],
+            ],
+        ];
+
+        foreach ([$featureAction, $sectorAction] as $action) {
+            $this->withCredentials()
+                ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+                ->postJson('/api/maximus-assistant/actions/execute', [
+                    'action' => $action,
+                    'confirmed' => true,
+                ])
+                ->assertOk()
+                ->assertJsonPath('action.status', 'EXECUTED');
+        }
+
+        $companyPlan = [
+            'type' => 'create_company_plan',
+            'name' => 'Atelier Kora',
+            'sector' => 'Cabinet conseil',
+            'companyEmail' => 'atelier@example.com',
+            'moduleIds' => ['commerce', 'presences'],
+            'requirements' => ['suivi des commandes', 'planning des équipes'],
+        ];
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/execute', [
+                'action' => $companyPlan,
+                'confirmed' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'EXECUTED');
+
+        $payload = json_decode((string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'), true);
+        $this->assertSame('Cabinet conseil', $payload['catalogDraft']['sectorPresets'][0]['name']);
+        $this->assertContains('Export comptable', $payload['catalogDraft']['moduleOverrides']['commerce']['features']);
+        $this->assertSame('DRAFT', $payload['companySetupPlans'][0]['status']);
+        $this->assertSame([], $payload['companies'] ?? []);
+    }
 }

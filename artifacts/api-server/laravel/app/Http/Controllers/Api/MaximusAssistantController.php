@@ -175,6 +175,15 @@ class MaximusAssistantController extends Controller
                 'status' => (string) ($subscription['status'] ?? ''),
                 'moduleIds' => $subscription['moduleIds'] ?? [],
             ])->values()->all(),
+            'companySetupPlans' => collect($state['companySetupPlans'] ?? [])->map(fn (mixed $plan): array => [
+                'id' => (string) ($plan['id'] ?? ''),
+                'name' => (string) ($plan['name'] ?? ''),
+                'sector' => (string) ($plan['sector'] ?? ''),
+                'status' => (string) ($plan['status'] ?? 'DRAFT'),
+                'moduleIds' => $plan['moduleIds'] ?? [],
+                'requirements' => $plan['requirements'] ?? [],
+                'nextSteps' => $plan['nextSteps'] ?? [],
+            ])->values()->all(),
         ];
     }
 

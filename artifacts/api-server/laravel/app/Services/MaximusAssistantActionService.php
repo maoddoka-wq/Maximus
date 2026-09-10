@@ -96,6 +96,9 @@ final class MaximusAssistantActionService
         return match ($type) {
             'create_module' => $this->normalizeModuleAction($action, $state),
             'create_pack' => $this->normalizePackAction($action, $state),
+            'create_feature' => $this->normalizeFeatureAction($action, $state),
+            'create_sector' => $this->normalizeSectorAction($action, $state),
+            'create_company_plan' => $this->normalizeCompanyPlanAction($action, $state),
             'create_organization_unit' => $this->normalizeOrganizationAction($action, $state),
             default => throw new RuntimeException('MAXI ne peut pas exécuter cette action de sécurité.'),
         };
@@ -263,6 +266,156 @@ final class MaximusAssistantActionService
     }
 
     /**
+     * Add a feature to a module draft. A feature is deliberately scoped to a
+     * module because the catalogue does not expose standalone feature records.
+     *
+     * @param array<string, mixed> $action
+     * @param array<string, mixed> $state
+     * @return array<string, mixed>
+     */
+    private function normalizeFeatureAction(array $action, array $state): array
+    {
+        $moduleId = $this->resolveModuleId($state, (string) ($action['moduleId'] ?? ''));
+        $module = $moduleId ? $this->findModule($state, $moduleId) : null;
+        $name = trim((string) ($action['name'] ?? ''));
+        $id = Str::slug((string) ($action['id'] ?? $name));
+
+        if (! $module || $moduleId === '') {
+            throw new RuntimeException('Le module cible de la fonctionnalité est introuvable.');
+        }
+        if ($id === '' || $name === '') {
+            throw new RuntimeException('Une fonctionnalité doit avoir un identifiant et un nom.');
+        }
+
+        $existing = $this->uniqueStrings($module['features'] ?? []);
+        if (in_array($id, array_map(fn (string $value): string => Str::slug($value), $existing), true)) {
+            throw new RuntimeException('Cette fonctionnalité existe déjà dans le module.');
+        }
+
+        $dependencies = $this->uniqueSlugs($action['dependencies'] ?? []);
+        $knownFeatures = array_values(array_unique([
+            ...array_map(fn (string $value): string => Str::slug($value), $existing),
+            ...collect($module['featurePacks'] ?? [])->flatMap(
+                fn (mixed $pack): array => is_array($pack) ? $this->uniqueSlugs($pack['featureIds'] ?? []) : [],
+            )->all(),
+        ]));
+        if (array_diff($dependencies, $knownFeatures) !== []) {
+            throw new RuntimeException('Une dépendance de la fonctionnalité est absente du module.');
+        }
+
+        return [
+            'type' => 'create_feature',
+            'id' => $id,
+            'name' => $name,
+            'description' => trim((string) ($action['description'] ?? '')),
+            'moduleId' => $moduleId,
+            'dependencies' => $dependencies,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $action
+     * @param array<string, mixed> $state
+     * @return array<string, mixed>
+     */
+    private function normalizeSectorAction(array $action, array $state): array
+    {
+        $name = trim((string) ($action['name'] ?? ''));
+        $id = Str::slug((string) ($action['id'] ?? $name));
+        $moduleIds = [];
+        foreach (is_array($action['moduleIds'] ?? null) ? $action['moduleIds'] : [] as $reference) {
+            $moduleId = $this->resolveModuleId($state, (string) $reference);
+            if (! $moduleId) {
+                throw new RuntimeException("Le module « {$reference} » est absent du catalogue.");
+            }
+            $moduleIds[] = $moduleId;
+        }
+        $moduleIds = array_values(array_unique($moduleIds));
+
+        if ($name === '' || $id === '' || $moduleIds === []) {
+            throw new RuntimeException('Un secteur doit avoir un nom et au moins un module.');
+        }
+
+        $existingSectors = $state['catalogDraft']['sectorPresets'] ?? $state['sectorPresets'] ?? [];
+        foreach (is_array($existingSectors) ? $existingSectors : [] as $sector) {
+            if (! is_array($sector)) {
+                continue;
+            }
+            if (($sector['id'] ?? null) === $id || strtolower((string) ($sector['name'] ?? '')) === strtolower($name)) {
+                throw new RuntimeException('Un secteur portant ce nom ou cet identifiant existe déjà.');
+            }
+        }
+
+        $modulePackIds = $this->normalizePackSelections($state, $moduleIds, $action['modulePackIds'] ?? []);
+        $moduleFeatures = [];
+        foreach (is_array($action['moduleFeatures'] ?? null) ? $action['moduleFeatures'] : [] as $reference => $features) {
+            $moduleId = $this->resolveModuleId($state, (string) $reference);
+            if (! $moduleId || ! in_array($moduleId, $moduleIds, true)) {
+                throw new RuntimeException('Une fonctionnalité du secteur référence un module absent.');
+            }
+            $moduleFeatures[$moduleId] = $this->uniqueSlugs($features);
+        }
+
+        return [
+            'type' => 'create_sector',
+            'id' => $id,
+            'name' => $name,
+            'moduleIds' => $moduleIds,
+            'modulePackIds' => $modulePackIds,
+            'moduleFeatures' => $moduleFeatures,
+            'businessProfiles' => is_array($action['businessProfiles'] ?? null) ? $action['businessProfiles'] : [],
+        ];
+    }
+
+    /**
+     * Store a complete configuration proposal without activating a company.
+     *
+     * @param array<string, mixed> $action
+     * @param array<string, mixed> $state
+     * @return array<string, mixed>
+     */
+    private function normalizeCompanyPlanAction(array $action, array $state): array
+    {
+        $name = trim((string) ($action['name'] ?? ''));
+        $sector = trim((string) ($action['sector'] ?? ''));
+        $moduleIds = [];
+        foreach (is_array($action['moduleIds'] ?? null) ? $action['moduleIds'] : [] as $reference) {
+            $moduleId = $this->resolveModuleId($state, (string) $reference);
+            if (! $moduleId) {
+                throw new RuntimeException("Le module « {$reference} » est absent du catalogue.");
+            }
+            $moduleIds[] = $moduleId;
+        }
+        $moduleIds = array_values(array_unique($moduleIds));
+
+        if ($name === '' || $sector === '' || $moduleIds === []) {
+            throw new RuntimeException('Le plan d’entreprise doit avoir un nom, un secteur et au moins un module.');
+        }
+        $email = trim((string) ($action['companyEmail'] ?? ''));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            throw new RuntimeException('Le contact de l’entreprise doit être une adresse e-mail valide.');
+        }
+
+        return [
+            'type' => 'create_company_plan',
+            'id' => 'company-plan-'.Str::lower(Str::random(12)),
+            'name' => $name,
+            'sector' => $sector,
+            'managerName' => trim((string) ($action['managerName'] ?? '')),
+            'companyEmail' => $email,
+            'moduleIds' => $moduleIds,
+            'modulePackIds' => $this->normalizePackSelections($state, $moduleIds, $action['modulePackIds'] ?? []),
+            'moduleFeatures' => is_array($action['moduleFeatures'] ?? null) ? $action['moduleFeatures'] : [],
+            'requirements' => $this->uniqueStrings($action['requirements'] ?? []),
+            'nextSteps' => [
+                'Valider les modules, packs et fonctionnalités proposés.',
+                'Compléter les informations de contact et le mot de passe de l’administrateur.',
+                'Soumettre la demande d’entreprise pour approbation MAXIMUS.',
+            ],
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $pack
      * @param array<int, string> $moduleFeatures
      * @param array<int, array<string, mixed>> $existingPacks
@@ -376,6 +529,57 @@ final class MaximusAssistantActionService
                 'moduleFeatures' => $action['moduleFeatures'],
             ];
             $state['organizationVersion'] = ((int) ($state['organizationVersion'] ?? 0)) + 1;
+        } elseif ($action['type'] === 'create_feature') {
+            $moduleId = (string) $action['moduleId'];
+            $customIndex = collect($state['catalogDraft']['customModules'])->search(
+                static fn (mixed $module): bool => is_array($module) && ($module['id'] ?? null) === $moduleId,
+            );
+            if ($customIndex !== false) {
+                $module = $state['catalogDraft']['customModules'][$customIndex];
+                $module['features'] = $this->uniqueStrings([
+                    ...($module['features'] ?? []),
+                    (string) $action['name'],
+                ]);
+                if (($action['dependencies'] ?? []) !== []) {
+                    $module['featureDependencies'] = [
+                        ...($module['featureDependencies'] ?? []),
+                        (string) $action['id'] => $action['dependencies'],
+                    ];
+                }
+                $state['catalogDraft']['customModules'][$customIndex] = $module;
+            } else {
+                $override = $state['catalogDraft']['moduleOverrides'][$moduleId]
+                    ?? $state['moduleOverrides'][$moduleId]
+                    ?? [];
+                $override['features'] = $this->uniqueStrings([
+                    ...($override['features'] ?? ($this->findModule($state, $moduleId)['features'] ?? [])),
+                    (string) $action['name'],
+                ]);
+                if (($action['dependencies'] ?? []) !== []) {
+                    $override['featureDependencies'] = [
+                        ...($override['featureDependencies'] ?? []),
+                        (string) $action['id'] => $action['dependencies'],
+                    ];
+                }
+                $state['catalogDraft']['moduleOverrides'][$moduleId] = $override;
+            }
+        } elseif ($action['type'] === 'create_sector') {
+            $state['catalogDraft']['sectorPresets'] ??= $state['sectorPresets'] ?? [];
+            $state['catalogDraft']['sectorPresets'][] = [
+                'id' => $action['id'],
+                'name' => $action['name'],
+                'moduleIds' => $action['moduleIds'],
+                'modulePackIds' => $action['modulePackIds'],
+                'moduleFeatures' => $action['moduleFeatures'],
+                'businessProfiles' => $action['businessProfiles'],
+            ];
+        } elseif ($action['type'] === 'create_company_plan') {
+            $state['companySetupPlans'] ??= [];
+            $state['companySetupPlans'][] = [
+                ...$action,
+                'status' => 'DRAFT',
+                'createdAt' => now()->toISOString(),
+            ];
         }
 
         $state['catalogDraft']['updatedAt'] = now()->toISOString();
@@ -440,6 +644,64 @@ final class MaximusAssistantActionService
         ];
     }
 
+    private function resolveModuleId(array $state, string $reference): ?string
+    {
+        $needle = Str::slug($reference);
+        if ($needle === '') {
+            return null;
+        }
+
+        foreach ($this->availableModules($state) as $moduleId => $module) {
+            if (Str::slug((string) $moduleId) === $needle || Str::slug((string) ($module['name'] ?? '')) === $needle) {
+                return (string) $moduleId;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     * @param array<int, string> $moduleIds
+     * @param mixed $selections
+     * @return array<string, array<int, string>>
+     */
+    private function normalizePackSelections(array $state, array $moduleIds, mixed $selections): array
+    {
+        if (! is_array($selections)) {
+            return [];
+        }
+
+        $modules = $this->availableModules($state);
+        $normalized = [];
+        foreach ($selections as $moduleReference => $packReferences) {
+            $moduleId = $this->resolveModuleId($state, (string) $moduleReference);
+            if (! $moduleId || ! in_array($moduleId, $moduleIds, true)) {
+                throw new RuntimeException('Une sélection de pack référence un module absent.');
+            }
+            $module = $modules[$moduleId] ?? null;
+            $packs = is_array($module['featurePacks'] ?? null) ? $module['featurePacks'] : [];
+            $normalized[$moduleId] = [];
+            foreach (is_array($packReferences) ? $packReferences : [$packReferences] as $packReference) {
+                $packNeedle = Str::slug((string) $packReference);
+                $pack = collect($packs)->first(
+                    static fn (mixed $candidate): bool => is_array($candidate)
+                        && (
+                            Str::slug((string) ($candidate['id'] ?? '')) === $packNeedle
+                            || Str::slug((string) ($candidate['name'] ?? '')) === $packNeedle
+                        ),
+                );
+                if (! is_array($pack)) {
+                    throw new RuntimeException("Le pack « {$packReference} » est absent du module « {$moduleId} ».");
+                }
+                $normalized[$moduleId][] = (string) $pack['id'];
+            }
+            $normalized[$moduleId] = array_values(array_unique($normalized[$moduleId]));
+        }
+
+        return $normalized;
+    }
+
     /** @return array<string, array<string, mixed>> */
     private function availableModules(array $state): array
     {
@@ -502,6 +764,9 @@ final class MaximusAssistantActionService
         return match ($action['type']) {
             'create_module' => "MAXI a préparé la création du module « {$action['name']} » dans le brouillon du catalogue. Confirmez pour l’enregistrer.",
             'create_pack' => "MAXI a préparé la création du pack « {$action['name']} » dans le module « {$action['moduleId']} ». Confirmez pour l’enregistrer.",
+            'create_feature' => "MAXI a préparé l’ajout de la fonctionnalité « {$action['name']} » au module « {$action['moduleId']} ». Confirmez pour l’enregistrer dans le brouillon.",
+            'create_sector' => "MAXI a préparé le secteur « {$action['name']} » avec {$this->count($action['moduleIds'] ?? [])} module(s). Confirmez pour l’enregistrer dans le brouillon.",
+            'create_company_plan' => "MAXI a préparé le plan de configuration de l’entreprise « {$action['name']} ». Confirmez pour enregistrer ce plan sans activer l’entreprise.",
             'create_organization_unit' => "MAXI a préparé la création de l’unité « {$action['name']} » dans « {$action['companyName']} ». Confirmez pour l’enregistrer.",
             default => 'MAXI a préparé une action contrôlée. Confirmez pour continuer.',
         };
@@ -513,9 +778,17 @@ final class MaximusAssistantActionService
         return match ($action['type']) {
             'create_module' => "Le module « {$action['name']} » a été ajouté au brouillon du catalogue. Validez puis publiez le catalogue depuis son espace pour l’activer.",
             'create_pack' => "Le pack « {$action['name']} » a été ajouté au brouillon du catalogue. Validez puis publiez le catalogue depuis son espace.",
+            'create_feature' => "La fonctionnalité « {$action['name']} » a été ajoutée au brouillon du module « {$action['moduleId']} ». Validez puis publiez le catalogue.",
+            'create_sector' => "Le secteur « {$action['name']} » a été ajouté au brouillon du catalogue. Vérifiez ses packs et publiez le catalogue avant de le proposer à une entreprise.",
+            'create_company_plan' => "Le plan de configuration de « {$action['name']} » est enregistré en brouillon. Complétez le contact, puis soumettez la demande d’entreprise pour approbation.",
             'create_organization_unit' => "L’unité « {$action['name']} » a été créée dans « {$action['companyName']} » avec les modules et packs validés.",
             default => 'L’action MAXI a été exécutée.',
         };
+    }
+
+    private function count(mixed $value): int
+    {
+        return is_countable($value) ? count($value) : 0;
     }
 
     /** @param array<string, mixed> $state @param array<string, mixed> $action @param array<string, mixed> $actor */

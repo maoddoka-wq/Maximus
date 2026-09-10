@@ -9,7 +9,7 @@ Les modifications des modules, packs et secteurs doivent être préparées dans 
 
 **How to apply:** Conserver une validation des références modules/packs avant publication, afficher les entreprises et unités concernées, et préférer le retrait contrôlé à la suppression silencieuse.
 
-MAXI peut préparer un module, un pack ou une unité organisationnelle, mais l’écriture reste soumise à une confirmation explicite et les créations de catalogue restent dans le brouillon. Les identifiants de packs sont canoniques et dérivés du module.
+MAXI peut préparer un module, un pack, une fonctionnalité, un secteur ou une unité organisationnelle, mais l’écriture reste soumise à une confirmation explicite et les créations de catalogue restent dans le brouillon. Un plan d’entreprise MAXI reste une proposition de configuration et n’active jamais une entreprise directement. Les identifiants de packs sont canoniques et dérivés du module.
 
 **Why:** L’assistant doit accélérer les opérations d’administration sans transformer une interprétation de langage en publication ou en changement d’accès implicite.
 
