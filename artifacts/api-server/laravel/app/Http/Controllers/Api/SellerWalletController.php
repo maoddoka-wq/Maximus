@@ -109,6 +109,7 @@ final class SellerWalletController extends Controller
                     return false;
                 }
 
+                $digitalStatusChanged = $this->deliverPaidDigitalOrder($locked);
                 $commission = $this->commissionPolicy->calculate((int) $locked->total);
                 $sellerLedgerExists = DB::table('seller_wallet_ledger')
                     ->where('company_id', $locked->company_id)
@@ -119,7 +120,7 @@ final class SellerWalletController extends Controller
                         ->where('idempotency_key', 'sale-commission:'.$locked->id)
                         ->exists();
                 if ($sellerLedgerExists && $maximusLedgerExists) {
-                    return false;
+                    return $digitalStatusChanged;
                 }
 
                 $availableAt = $locked->funds_available_at
@@ -142,6 +143,19 @@ final class SellerWalletController extends Controller
 
     public function refreshOrderPaymentStatus(object $order): void
     {
+        if ($order->payment_status === 'PAID') {
+            DB::transaction(function () use ($order): void {
+                $locked = DB::table('ecommerce_orders')
+                    ->where('id', $order->id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($locked) {
+                    $this->deliverPaidDigitalOrder($locked);
+                }
+            });
+
+            return;
+        }
         if ($order->payment_status !== 'PENDING' || trim((string) ($order->payment_charge_id ?? '')) === '') {
             return;
         }
@@ -464,9 +478,14 @@ final class SellerWalletController extends Controller
                     }
                 }
                 $paidAt = $locked->paid_at ?? now();
-                $availableAt = $this->maturityPolicy->availableAt($locked->status, $paidAt);
-                $this->creditPaidOrder($locked, $data, $availableAt);
+                $paidOrder = clone $locked;
+                if ($this->isDigitalOrder($locked) && $locked->status !== 'ANNULÉE') {
+                    $paidOrder->status = 'LIVRÉE';
+                }
+                $availableAt = $this->maturityPolicy->availableAt($paidOrder->status, $paidAt);
+                $this->creditPaidOrder($paidOrder, $data, $availableAt);
                 DB::table('ecommerce_orders')->where('id', $locked->id)->update([
+                    'status' => $paidOrder->status,
                     'payment_status' => 'PAID',
                     'paid_at' => $paidAt,
                     'funds_available_at' => $locked->funds_available_at ?? $availableAt,
@@ -674,6 +693,36 @@ final class SellerWalletController extends Controller
             }
         }
         DB::table('ecommerce_orders')->where('id', $order->id)->update(['stock_restored_at' => now(), 'updated_at' => now()]);
+    }
+
+    private function isDigitalOrder(object $order): bool
+    {
+        $items = DB::table('ecommerce_order_items')
+            ->where('order_id', $order->id)
+            ->pluck('fulfillment_type');
+
+        return $items->isNotEmpty()
+            && $items->every(fn (mixed $fulfillmentType): bool => ($fulfillmentType ?? 'PHYSICAL') === 'DIGITAL');
+    }
+
+    private function deliverPaidDigitalOrder(object $order): bool
+    {
+        if ($order->payment_status !== 'PAID'
+            || $order->status === 'ANNULÉE'
+            || ! $this->isDigitalOrder($order)) {
+            return false;
+        }
+
+        if ($order->status !== 'LIVRÉE') {
+            DB::table('ecommerce_orders')->where('id', $order->id)->update([
+                'status' => 'LIVRÉE',
+                'updated_at' => now(),
+            ]);
+            $order->status = 'LIVRÉE';
+        }
+        $this->releaseOrderFunds($order);
+
+        return true;
     }
 
     private function creditPaidOrder(object $order, array $data, mixed $availableAt = null): void

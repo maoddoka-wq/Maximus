@@ -25,7 +25,7 @@ type PublicRental = PublicShopBootstrap['rentals'][number];
 type CartProduct = PublicProduct & { rentalId?: string };
 type CartLine = { product: CartProduct; quantity: number };
 type AccountSection = 'dashboard' | 'orders' | 'profile' | 'addresses' | 'favorites';
-type PaymentSummary = Pick<PublicPaymentStatus, 'reference' | 'total' | 'paymentStatus' | 'failureReason'>;
+type PaymentSummary = Pick<PublicPaymentStatus, 'reference' | 'total' | 'paymentStatus' | 'orderStatus' | 'failureReason'>;
 
 const cartQuantity = (product: CartProduct | PublicProduct, quantity: number) =>
   product.fulfillmentType === 'DIGITAL' ? 1 : Math.min(quantity, product.stock);
@@ -345,6 +345,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
               reference: status.reference,
               total: status.total,
               paymentStatus: status.paymentStatus,
+               orderStatus: status.orderStatus,
               failureReason: status.failureReason,
             });
           }
@@ -693,9 +694,12 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 function PaymentResultPanel({ summary, currency, store, orderId, slug, domain, onContinue, onOrders }: { summary: PaymentSummary; currency: PublicShopBootstrap['store']['currency']; store: PublicShopBootstrap['store']; orderId: string; slug?: string; domain?: boolean; onContinue: () => void; onOrders?: () => void }) {
   const paid = summary.paymentStatus === 'PAID';
   const failed = ['FAILED', 'REFUNDED'].includes(summary.paymentStatus);
+  const deliveredAutomatically = paid && summary.orderStatus === 'LIVRÉE';
   const title = paid ? 'Paiement confirmé' : failed ? 'Paiement non confirmé' : 'Paiement en cours de confirmation';
   const message = paid
-    ? 'Votre commande est enregistrée. Le vendeur va maintenant la préparer.'
+    ? deliveredAutomatically
+      ? 'Votre produit numérique est livré automatiquement. Le téléchargement a été lancé et reste disponible dans votre espace client.'
+      : 'Votre commande est enregistrée. Le vendeur va maintenant la préparer.'
     : failed
       ? (summary.failureReason || 'Le paiement n’a pas été confirmé. Vous pouvez retourner à la boutique et réessayer.')
       : 'Le paiement a été transmis. Cette page se met à jour dès que DiamanoPay confirme la transaction.';
@@ -1083,11 +1087,12 @@ function FavoriteSection({ products, favoriteSlugs, onToggle, onNavigate }: { pr
 }
 
 function OrderSection({ orders, selectedOrder, onOrder, onDownload }: { orders: EcommerceCustomerBootstrap['orders']; selectedOrder?: EcommerceCustomerBootstrap['orders'][number]; onOrder: (id: string) => void; onDownload: (orderId: string, itemId: string) => void }) {
+  const selectedOrderIsDigital = Boolean(selectedOrder?.items.length) && selectedOrder?.items.every(item => item.fulfillmentType === 'DIGITAL');
   return <div className="min-w-0">
     <div className="flex min-w-0 items-end justify-between gap-3">
       <div className="min-w-0">
         <h1 className="break-words text-2xl font-bold">Vos commandes</h1>
-        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Le statut du paiement, de la préparation et de la livraison communiqué par la boutique.</p>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{selectedOrderIsDigital ? 'Votre produit numérique est livré automatiquement après confirmation du paiement.' : 'Le statut du paiement, de la préparation et de la livraison communiqué par la boutique.'}</p>
       </div>
     </div>
     {selectedOrder ? <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-4 shadow-sm sm:p-5">

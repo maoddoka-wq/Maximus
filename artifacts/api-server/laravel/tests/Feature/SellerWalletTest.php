@@ -261,6 +261,37 @@ class SellerWalletTest extends TestCase
         $this->assertDatabaseCount('seller_wallet_ledger', 1);
     }
 
+    public function test_paid_digital_order_is_delivered_immediately_and_funds_are_available(): void
+    {
+        $this->configureDiamano();
+        $this->createOrder('order-paid-digital', 'kora', 5000, 'charge-digital');
+        DB::table('ecommerce_order_items')->insert([
+            'id' => 'order-line-paid-digital',
+            'order_id' => 'order-paid-digital',
+            'product_id' => 'digital-product-paid',
+            'product_name' => 'Produit numérique payé',
+            'unit_price' => 5000,
+            'quantity' => 1,
+            'line_total' => 5000,
+            'fulfillment_type' => 'DIGITAL',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postSignedWebhook(['data' => ['id' => 'charge-digital', 'status' => 'SUCCEEDED']])->assertOk();
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => 'order-paid-digital',
+            'status' => 'LIVRÉE',
+            'payment_status' => 'PAID',
+        ]);
+        $this->assertDatabaseHas('seller_wallets', [
+            'company_id' => 'kora',
+            'pending_balance' => 0,
+            'available_balance' => 4750,
+        ]);
+    }
+
     public function test_pending_funds_become_available_after_configured_days(): void
     {
         $this->configureDiamano();
