@@ -4,6 +4,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 
 ## Run & Operate
 
+- Production is already deployed on Render. Preserve the existing Render deployment and its current configuration when making changes; do not suggest the generic Replit deploy/publish action for this project.
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, legacy Express entrypoint)
 - `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php`; development provisions the demo idempotently, while production migrates the schema and provisions only the MAXIMUS admin from environment secrets.
 - `pnpm run typecheck` — full typecheck across all packages
