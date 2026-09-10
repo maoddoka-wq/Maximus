@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowUpRight,
   Check,
@@ -22,7 +22,6 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
-  UsersRound,
   X,
 } from 'lucide-react';
 import {
@@ -103,18 +102,38 @@ function createConversationThread(): ConversationThread {
 
 function loadConversationThreads(): ConversationThread[] {
   try {
+    if (typeof window === 'undefined') return [createConversationThread()];
     const stored = localStorage.getItem(conversationStorageKey);
     if (!stored) return [createConversationThread()];
     const parsed = JSON.parse(stored) as unknown;
     if (!Array.isArray(parsed)) return [createConversationThread()];
-    const threads = parsed.filter((item): item is ConversationThread => (
-      Boolean(item)
-      && typeof item === 'object'
-      && typeof (item as ConversationThread).id === 'string'
-      && typeof (item as ConversationThread).title === 'string'
-      && typeof (item as ConversationThread).updatedAt === 'number'
-      && Array.isArray((item as ConversationThread).entries)
-    ));
+    const seenIds = new Set<string>();
+    const threads = parsed
+      .filter((item): item is ConversationThread => (
+        Boolean(item)
+        && typeof item === 'object'
+        && typeof (item as ConversationThread).id === 'string'
+        && typeof (item as ConversationThread).title === 'string'
+        && typeof (item as ConversationThread).updatedAt === 'number'
+        && Array.isArray((item as ConversationThread).entries)
+      ))
+      .map(thread => ({
+        ...thread,
+        entries: thread.entries.filter(entry => (
+          Boolean(entry)
+          && typeof entry === 'object'
+          && typeof entry.id === 'string'
+          && (entry.kind === 'user' || entry.kind === 'assistant')
+          && typeof entry.text === 'string'
+        )),
+      }))
+      .filter(thread => {
+        if (seenIds.has(thread.id)) return false;
+        seenIds.add(thread.id);
+        return true;
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 20);
     return threads.length > 0 ? threads : [createConversationThread()];
   } catch {
     return [createConversationThread()];
@@ -267,6 +286,10 @@ export function MaximusAssistantPage({
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [showBoundary, setShowBoundary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [copiedEntryId, setCopiedEntryId] = useState<string | null>(null);
+  const [reactionByEntry, setReactionByEntry] = useState<Record<string, 'up' | 'down' | undefined>>({});
+  const [openEntryMenuId, setOpenEntryMenuId] = useState<string | null>(null);
+  const confirmingActionIds = useRef(new Set<string>());
 
   const activeThread = conversationThreads.find(thread => thread.id === activeConversationId)
     ?? conversationThreads[0];
@@ -279,14 +302,15 @@ export function MaximusAssistantPage({
   }, [activeConversationId, conversationThreads]);
 
   useEffect(() => {
-    localStorage.setItem(conversationStorageKey, JSON.stringify(conversationThreads.slice(0, 20)));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(conversationStorageKey, JSON.stringify(conversationThreads.slice(0, 20)));
+    }
   }, [conversationThreads]);
 
   useEffect(() => {
     setQuestion(initialQuestion);
   }, [initialQuestion]);
 
-  const activeUserLabel = formatUserCount(workspaceContext.activeUsers);
   const actionCount = useMemo(
     () => insightCards.filter(insight => Boolean(insight.proposedAction)).length,
     [insightCards],
@@ -304,11 +328,12 @@ export function MaximusAssistantPage({
 
   const startNewConversation = () => {
     const thread = createConversationThread();
-    setConversationThreads(current => [thread, ...current]);
+    setConversationThreads(current => [thread, ...current].slice(0, 20));
     setActiveConversationId(thread.id);
     setQuestion('');
     setError('');
     setSelectedActionId(null);
+    setOpenEntryMenuId(null);
   };
 
   const selectConversation = (threadId: string) => {
@@ -316,16 +341,17 @@ export function MaximusAssistantPage({
     setQuestion('');
     setError('');
     setSelectedActionId(null);
+    setOpenEntryMenuId(null);
   };
 
   const ask = async (value = question) => {
     const trimmed = value.trim();
     if (!trimmed || submitting || loading) return;
-    const threadId = activeThread?.id ?? createConversationThread().id;
+    const fallbackThread = activeThread ?? createConversationThread();
+    const threadId = fallbackThread.id;
     if (!activeThread) {
-      const thread = createConversationThread();
-      setConversationThreads([thread]);
-      setActiveConversationId(thread.id);
+      setConversationThreads([fallbackThread]);
+      setActiveConversationId(fallbackThread.id);
     }
     setQuestion('');
     setError('');
@@ -365,8 +391,38 @@ export function MaximusAssistantPage({
     }
   };
 
+  const copyEntry = async (entry: ConversationEntry) => {
+    try {
+      await navigator.clipboard.writeText(entry.text);
+      setCopiedEntryId(entry.id);
+      window.setTimeout(() => setCopiedEntryId(current => current === entry.id ? null : current), 1600);
+    } catch {
+      setError('Le texte n’a pas pu être copié.');
+    }
+  };
+
+  const shareEntry = async (entry: ConversationEntry) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'MAXI', text: entry.text });
+        return;
+      } catch {
+        return;
+      }
+    }
+    await copyEntry(entry);
+  };
+
+  const toggleReaction = (entryId: string, reaction: 'up' | 'down') => {
+    setReactionByEntry(current => ({
+      ...current,
+      [entryId]: current[entryId] === reaction ? undefined as never : reaction,
+    }));
+  };
+
   const confirmAction = async (entryId: string, action: MaximusAssistantAction) => {
-    if (action.status === 'EXECUTED' || submitting || loading) return;
+    if (action.status === 'EXECUTED' || confirmingActionIds.current.has(entryId) || submitting || loading) return;
+    confirmingActionIds.current.add(entryId);
     setError('');
     setSubmitting(true);
     try {
@@ -377,6 +433,7 @@ export function MaximusAssistantPage({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'MAXI n’a pas pu confirmer cette action.');
     } finally {
+      confirmingActionIds.current.delete(entryId);
       setSubmitting(false);
     }
   };
@@ -388,158 +445,119 @@ export function MaximusAssistantPage({
 
   return (
     <div className="space-y-6 pb-12" data-testid="maximus-assistant">
-      <section className="relative overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[hsl(var(--card))] shadow-[var(--shadow-soft)]">
-        <div className="absolute right-0 top-0 h-48 w-48 translate-x-1/4 -translate-y-1/3 rounded-full border-[22px] border-[hsl(var(--primary)/.08)]" aria-hidden="true" />
-        <div className="absolute bottom-0 right-24 h-24 w-24 translate-y-1/2 rounded-full border border-[hsl(var(--primary)/.18)]" aria-hidden="true" />
-        <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(19rem,.8fr)] lg:items-end">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-[hsl(var(--primary)/.12)] px-3 py-1.5 text-[11px] font-bold text-[hsl(var(--primary))]">
-                <Sparkles size={13} />
-                 MAXI
+      <section className="overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[var(--shadow-soft)]" aria-labelledby="assistant-conversation-title">
+        <header className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.55)]">
+          <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary))] text-sm font-black text-[hsl(var(--primary-foreground))]">
+                <Sparkles size={17} />
               </span>
-              <span className="mono text-[10px] uppercase tracking-[.13em] text-[hsl(var(--muted-foreground))]">
-                 Assistant sécurisé MAXIMUS
-              </span>
-            </div>
-            <h1 className="mt-5 max-w-3xl text-3xl font-black leading-[1.02] tracking-[-.055em] sm:text-5xl">
-              MAXI, votre assistant de gouvernance.
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))] sm:text-base">
-              {workspaceContext.description ?? `Posez une question sur ${workspaceContext.name}. MAXI vous aide à comprendre, préparer et confirmer les actions autorisées sans contourner les règles de sécurité.`}
-            </p>
-            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[hsl(var(--muted-foreground))]">
-              {workspaceContext.scopeLabel && (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
-                  {workspaceContext.scopeLabel}
-                </span>
-              )}
-              {workspaceContext.sector && (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
-                  {workspaceContext.sector}
-                </span>
-              )}
-              {activeUserLabel && (
-                <span className="inline-flex items-center gap-2">
-                  <UsersRound size={13} />
-                  {activeUserLabel} utilisateur{workspaceContext.activeUsers === 1 ? '' : 's'} actif{workspaceContext.activeUsers === 1 ? '' : 's'}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background)/.64)] p-4">
-            <div className="flex items-start gap-3">
-              <span className="rounded-lg bg-[hsl(var(--primary)/.14)] p-2 text-[hsl(var(--primary))]">
-                <LockKeyhole size={16} />
-              </span>
-              <div>
-                <p className="text-sm font-bold">Une action contrôlée</p>
-                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                   MAXI prépare les actions, vérifie leurs règles et demande votre confirmation avant toute écriture.
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 id="assistant-conversation-title" className="text-base font-black">MAXI</h1>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">En ligne</span>
+                </div>
+                <p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
+                  Assistant de gouvernance · {workspaceContext.name}
                 </p>
               </div>
             </div>
-            {workspaceContext.lastSyncLabel && (
-              <p className="mt-4 border-t border-[hsl(var(--border))] pt-3 text-[11px] text-[hsl(var(--muted-foreground))]">
-                Dernière synchronisation : <span className="font-bold text-[hsl(var(--foreground))]">{workspaceContext.lastSyncLabel}</span>
-              </p>
-            )}
+            <div className="flex items-center gap-2 text-[11px] text-[hsl(var(--muted-foreground))]">
+              <LockKeyhole size={13} />
+              <span className="hidden sm:inline">Périmètre administrateur contrôlé</span>
+              <button
+                type="button"
+                onClick={startNewConversation}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 font-black text-[hsl(var(--primary-foreground))] transition hover:opacity-90"
+              >
+                <Plus size={14} />
+                Nouvelle
+              </button>
+            </div>
           </div>
-        </div>
-        <form onSubmit={handleSubmit} className="relative border-t border-[hsl(var(--border))] bg-[hsl(var(--background)/.48)] p-4 sm:p-5">
-          <label htmlFor="assistant-question" className="sr-only">Votre question</label>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex min-h-14 flex-1 items-center gap-3 rounded-xl border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-4 shadow-sm focus-within:border-[hsl(var(--primary))] focus-within:ring-2 focus-within:ring-[hsl(var(--primary)/.16)]">
-              <MessageSquareText size={18} className="shrink-0 text-[hsl(var(--muted-foreground))]" aria-hidden="true" />
-              <textarea
-                id="assistant-question"
-                value={question}
-                onChange={event => setQuestion(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    void ask();
-                  }
-                }}
-                rows={1}
-                 placeholder="Message à MAXI…"
-                className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[hsl(var(--muted-foreground)/.7)]"
-                disabled={loading || submitting}
-              />
+
+          <div className="border-t border-[hsl(var(--border))] px-4 py-3 sm:px-6">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Historique</p>
+              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{conversationThreads.length} conversation{conversationThreads.length === 1 ? '' : 's'}</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {conversationThreads.map(thread => (
+                <button
+                  key={thread.id}
+                  type="button"
+                  onClick={() => selectConversation(thread.id)}
+                  aria-current={activeThread?.id === thread.id ? 'true' : undefined}
+                  className={`min-w-[11.5rem] max-w-[15rem] shrink-0 rounded-xl border px-3 py-2 text-left transition ${
+                    activeThread?.id === thread.id
+                      ? 'border-[hsl(var(--primary)/.55)] bg-[hsl(var(--primary)/.1)]'
+                      : 'border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-[hsl(var(--primary)/.35)]'
+                  }`}
+                >
+                  <span className="block truncate text-xs font-bold">{thread.title}</span>
+                  <span className="mt-1 flex items-center gap-1.5 text-[10px] text-[hsl(var(--muted-foreground))]">
+                    <Clock3 size={11} />
+                    {thread.entries.length ? `${thread.entries.length} message${thread.entries.length === 1 ? '' : 's'}` : 'Vide'} · {conversationDate(thread.updatedAt)}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={startNewConversation}
+                className="flex min-w-[9rem] shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-[hsl(var(--border))] px-3 py-2 text-xs font-bold text-[hsl(var(--muted-foreground))] transition hover:border-[hsl(var(--primary)/.45)] hover:text-[hsl(var(--primary))]"
+              >
+                <Plus size={14} />
+                Démarrer
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex min-h-[30rem] flex-col">
+          <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black">{activeThread?.title ?? 'Nouvelle conversation'}</p>
+              <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">
+                {workspaceContext.scopeLabel ?? 'Lecture des données autorisées'}
+                {workspaceContext.lastSyncLabel ? ` · Synchronisé ${workspaceContext.lastSyncLabel}` : ''}
+              </p>
             </div>
             <button
-              type="submit"
-              disabled={!question.trim() || loading || submitting}
-              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 text-sm font-black text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+              type="button"
+              disabled={!conversation.length}
+              onClick={() => {
+                if (!activeThread) return;
+                setConversationThreads(current => current.map(thread => thread.id === activeThread.id
+                  ? { ...thread, title: 'Nouvelle conversation', entries: [], updatedAt: Date.now() }
+                  : thread));
+                setError('');
+                setReactionByEntry({});
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] px-2.5 py-2 text-[11px] font-bold text-[hsl(var(--muted-foreground))] transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {loading || submitting ? <RefreshCw size={17} className="animate-spin" /> : <Send size={17} />}
-              {submitting ? 'Analyse…' : 'Demander'}
+              <Trash2 size={13} />
+              <span className="hidden sm:inline">Effacer</span>
             </button>
           </div>
-          <p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">
-            Entrée pour envoyer · Maj + Entrée pour aller à la ligne
-          </p>
-        </form>
-      </section>
 
-      {error && (
-        <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-          <CircleAlert size={17} className="mt-0.5 shrink-0" />
-          <div className="flex-1">
-             <p className="font-bold">MAXI ne peut pas répondre</p>
-            <p className="mt-0.5 text-xs">{error}</p>
-          </div>
-          <button type="button" aria-label="Fermer l’erreur" onClick={() => setError('')} className="rounded p-1 hover:bg-rose-100">
-            <X size={15} />
-          </button>
-        </div>
-      )}
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(20rem,.82fr)]">
-        <section className="card-surface overflow-hidden rounded-2xl" aria-labelledby="assistant-conversation-title">
-          <div className="flex items-start justify-between gap-4 border-b border-[hsl(var(--border))] p-5">
-             <div className="flex items-center gap-3">
-               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--primary))] text-xs font-black text-[hsl(var(--primary-foreground))]">M</span>
-               <div>
-                 <p className="text-sm font-black">MAXI</p>
-                 <p className="text-[11px] text-[hsl(var(--muted-foreground))]">Assistant de gouvernance MAXIMUS</p>
-               </div>
-             </div>
-             <button
-               type="button"
-               onClick={() => {
-                 setConversation([]);
-                 setError('');
-               }}
-               className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] px-2.5 py-2 text-[11px] font-bold text-[hsl(var(--muted-foreground))] transition hover:border-[hsl(var(--primary)/.45)] hover:text-[hsl(var(--primary))]"
-             >
-               <Plus size={13} />
-               Nouvelle conversation
-             </button>
-          </div>
-          <div className="min-h-[270px] p-5">
+          <div className="flex-1 px-4 py-6 sm:px-8">
             {conversation.length === 0 ? (
-              <div className="flex min-h-[220px] flex-col justify-center">
-                <div className="mx-auto max-w-md text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
-                    <MessageSquareText size={22} />
+              <div className="flex min-h-[20rem] flex-col justify-center">
+                <div className="mx-auto max-w-lg text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
+                    <MessageSquareText size={24} />
                   </div>
-                  <h3 className="mt-4 text-base font-bold">Commencez par une question utile</h3>
+                  <h2 className="mt-4 text-xl font-black tracking-[-.03em]">Comment puis-je vous aider ?</h2>
                   <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                    Les réponses s’appuient sur le périmètre visible depuis cet espace. Aucun signal ne sera inventé pour combler une donnée manquante.
+                    Posez une question sur le catalogue, les organisations ou la gouvernance. MAXI explique ses sources et demande une confirmation avant toute écriture.
                   </p>
                 </div>
-                <div className="mt-6 grid gap-2 sm:grid-cols-3">
+                <div className="mx-auto mt-7 grid w-full max-w-3xl gap-2 md:grid-cols-3">
                   {suggestedPrompts.map(prompt => (
                     <button
                       key={prompt}
                       type="button"
-                      onClick={() => {
-                        setQuestion(prompt);
-                        void ask(prompt);
-                      }}
+                      onClick={() => void ask(prompt)}
                       disabled={loading || submitting}
                       className="group rounded-xl border border-[hsl(var(--border))] p-3 text-left text-xs leading-5 text-[hsl(var(--muted-foreground))] transition hover:border-[hsl(var(--primary)/.5)] hover:bg-[hsl(var(--primary)/.045)] hover:text-[hsl(var(--foreground))] disabled:opacity-50"
                     >
@@ -550,48 +568,81 @@ export function MaximusAssistantPage({
                 </div>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="mx-auto max-w-3xl space-y-6">
                 {conversation.map(entry => (
-                  <div key={entry.id} className={`flex gap-3 ${entry.kind === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div key={entry.id} className={`group flex gap-3 ${entry.kind === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {entry.kind === 'assistant' && (
                       <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.13)] text-[hsl(var(--primary))]">
                         <Sparkles size={15} />
                       </span>
                     )}
-                     <div className={`max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 ${entry.kind === 'user' ? 'rounded-br-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'rounded-bl-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/.6)]'}`}>
-                       <p className="whitespace-pre-wrap">{entry.text}</p>
-                       {entry.kind === 'assistant' && entry.citations && entry.citations.length > 0 && (
-                         <details className="mt-3 border-t border-[hsl(var(--border))] pt-2 text-xs">
-                           <summary className="cursor-pointer font-bold text-[hsl(var(--primary))]">Sources consultées</summary>
-                           <ul className="mt-2 space-y-1 text-[hsl(var(--muted-foreground))]">
-                             {entry.citations.map(citation => <li key={citation}>• {citation}</li>)}
-                           </ul>
-                         </details>
-                       )}
-                       {entry.action && (
-                         <div className="mt-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-3">
-                           <div className="flex items-start gap-2">
-                             <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
-                             <div className="min-w-0 flex-1">
-                               <p className="text-[11px] font-black uppercase tracking-[.12em] text-[hsl(var(--primary))]">Action vérifiée</p>
-                               <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                                 {entry.action.type === 'create_module' && `Créer le module « ${entry.action.name} » dans le brouillon du catalogue.`}
-                                 {entry.action.type === 'create_pack' && `Créer le pack « ${entry.action.name} » dans « ${entry.action.moduleId} ».`}
-                                 {entry.action.type === 'create_organization_unit' && `Créer l’unité « ${entry.action.name} » dans « ${entry.action.companyName} ».`}
-                               </p>
-                               <button
-                                 type="button"
-                                 disabled={entry.action.status === 'EXECUTED' || submitting || loading}
-                                 onClick={() => void confirmAction(entry.id, entry.action!)}
-                                 className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-black text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                               >
-                                 {entry.action.status === 'EXECUTED' ? <CircleCheck size={14} /> : <Check size={14} />}
-                                 {entry.action.status === 'EXECUTED' ? 'Action confirmée' : 'Confirmer et enregistrer'}
-                               </button>
-                             </div>
-                           </div>
-                         </div>
-                       )}
+                    <div className={`relative max-w-[min(92%,42rem)] ${entry.kind === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
+                        entry.kind === 'user'
+                          ? 'rounded-br-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
+                          : 'rounded-bl-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/.6)]'
+                      }`}>
+                        <p className="whitespace-pre-wrap">{entry.text}</p>
+                        {entry.kind === 'assistant' && entry.citations && entry.citations.length > 0 && (
+                          <details className="mt-3 border-t border-[hsl(var(--border))] pt-2 text-xs">
+                            <summary className="cursor-pointer font-bold text-[hsl(var(--primary))]">Sources consultées</summary>
+                            <ul className="mt-2 space-y-1 text-[hsl(var(--muted-foreground))]">
+                              {entry.citations.map(citation => <li key={citation}>• {citation}</li>)}
+                            </ul>
+                          </details>
+                        )}
+                        {entry.action && (
+                          <div className="mt-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-3">
+                            <div className="flex items-start gap-2">
+                              <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[11px] font-black uppercase tracking-[.12em] text-[hsl(var(--primary))]">Action vérifiée</p>
+                                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                                  {entry.action.type === 'create_module' && `Créer le module « ${entry.action.name} » dans le brouillon du catalogue.`}
+                                  {entry.action.type === 'create_pack' && `Créer le pack « ${entry.action.name} » dans « ${entry.action.moduleId} ».`}
+                                  {entry.action.type === 'create_organization_unit' && `Créer l’unité « ${entry.action.name} » dans « ${entry.action.companyName} ».`}
+                                </p>
+                                <button
+                                  type="button"
+                                  disabled={entry.action.status === 'EXECUTED' || submitting || loading}
+                                  onClick={() => void confirmAction(entry.id, entry.action!)}
+                                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-black text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {entry.action.status === 'EXECUTED' ? <CircleCheck size={14} /> : <Check size={14} />}
+                                  {entry.action.status === 'EXECUTED' ? 'Action confirmée' : 'Confirmer et enregistrer'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {entry.kind === 'assistant' && (
+                        <div className="mt-1 flex items-center gap-0.5 text-[hsl(var(--muted-foreground))]">
+                          <button type="button" onClick={() => void copyEntry(entry)} aria-label="Copier la réponse" className="rounded-md p-1.5 transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]">
+                            {copiedEntryId === entry.id ? <CircleCheck size={13} className="text-emerald-600" /> : <PanelTop size={13} />}
+                          </button>
+                          <button type="button" onClick={() => toggleReaction(entry.id, 'up')} aria-label="Réponse utile" className={`rounded-md p-1.5 transition hover:bg-[hsl(var(--muted))] ${reactionByEntry[entry.id] === 'up' ? 'text-emerald-600' : ''}`}>
+                            <TrendingUp size={13} />
+                          </button>
+                          <button type="button" onClick={() => toggleReaction(entry.id, 'down')} aria-label="Réponse à améliorer" className={`rounded-md p-1.5 transition hover:bg-[hsl(var(--muted))] ${reactionByEntry[entry.id] === 'down' ? 'text-rose-600' : ''}`}>
+                            <TrendingDown size={13} />
+                          </button>
+                          <button type="button" onClick={() => void shareEntry(entry)} aria-label="Partager la réponse" className="rounded-md p-1.5 transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]">
+                            <ArrowUpRight size={13} />
+                          </button>
+                          <span className="relative">
+                            <button type="button" onClick={() => setOpenEntryMenuId(current => current === entry.id ? null : entry.id)} aria-label="Plus d’actions" aria-expanded={openEntryMenuId === entry.id} className="rounded-md p-1.5 transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]">
+                              <MoreHorizontal size={13} />
+                            </button>
+                            {openEntryMenuId === entry.id && (
+                              <span className="absolute left-0 top-8 z-10 w-32 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-1 text-xs shadow-lg">
+                                <button type="button" onClick={() => { setOpenEntryMenuId(null); void copyEntry(entry); }} className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[hsl(var(--muted))]">Copier</button>
+                                <button type="button" onClick={() => { setOpenEntryMenuId(null); void shareEntry(entry); }} className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[hsl(var(--muted))]">Partager</button>
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -606,56 +657,84 @@ export function MaximusAssistantPage({
               </div>
             )}
           </div>
-        </section>
 
-        <aside className="card-surface overflow-hidden rounded-2xl" aria-labelledby="assistant-boundary-title">
-          <div className="border-b border-[hsl(var(--border))] p-5">
-            <div className="flex items-start gap-3">
-              <span className="rounded-lg bg-[hsl(var(--primary)/.12)] p-2 text-[hsl(var(--primary))]">
-                <ShieldCheck size={17} />
-              </span>
-              <div>
-                <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Garde-fou</p>
-               <h2 id="assistant-boundary-title" className="mt-1 text-base font-bold">Ce que MAXI ne décide pas</h2>
+          {error && (
+            <div role="alert" className="mx-4 mb-3 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 sm:mx-6">
+              <CircleAlert size={17} className="mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-bold">MAXI ne peut pas répondre</p>
+                <p className="mt-0.5 text-xs">{error}</p>
               </div>
+              <button type="button" aria-label="Fermer l’erreur" onClick={() => setError('')} className="rounded p-1 hover:bg-rose-100">
+                <X size={15} />
+              </button>
             </div>
-            <p className="mt-4 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Une recommandation peut accélérer votre travail. Elle ne remplace jamais une approbation, une vérification ou une responsabilité attribuée.
+          )}
+
+          <form onSubmit={handleSubmit} className="sticky bottom-3 border-t border-[hsl(var(--border))] bg-[hsl(var(--card)/.96)] p-4 backdrop-blur sm:px-6">
+            <label htmlFor="assistant-question" className="sr-only">Votre message à MAXI</label>
+            <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-[hsl(var(--input))] bg-[hsl(var(--background))] p-2 shadow-sm focus-within:border-[hsl(var(--primary))] focus-within:ring-2 focus-within:ring-[hsl(var(--primary)/.16)]">
+              <MessageSquareText size={18} className="mb-2 ml-2 shrink-0 text-[hsl(var(--muted-foreground))]" aria-hidden="true" />
+              <textarea
+                id="assistant-question"
+                value={question}
+                onChange={event => setQuestion(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    void ask();
+                  }
+                }}
+                rows={1}
+                placeholder="Message à MAXI…"
+                className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-[hsl(var(--muted-foreground)/.7)]"
+                disabled={loading || submitting}
+              />
+              <button
+                type="submit"
+                disabled={!question.trim() || loading || submitting}
+                aria-label="Envoyer le message"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {loading || submitting ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+              </button>
+            </div>
+            <p className="mx-auto mt-2 max-w-3xl text-[10px] text-[hsl(var(--muted-foreground))]">
+              Entrée pour envoyer · Maj + Entrée pour aller à la ligne
             </p>
-          </div>
-          <div className="p-5">
+          </form>
+        </div>
+
+        <footer className="border-t border-[hsl(var(--border))] bg-[hsl(var(--background)/.42)] px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => setShowBoundary(current => !current)}
               aria-expanded={showBoundary}
-              className="flex w-full items-center justify-between gap-4 text-left text-xs font-bold text-[hsl(var(--foreground))]"
+              className="inline-flex items-center gap-2 text-left text-xs font-bold text-[hsl(var(--foreground))]"
             >
-              <span className="flex items-center gap-2"><Info size={14} className="text-[hsl(var(--primary))]" /> Règles de confirmation</span>
-              {showBoundary ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <ShieldCheck size={14} className="text-[hsl(var(--primary))]" />
+              Règles de confirmation
+              {showBoundary ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
             </button>
-            {showBoundary && (
-              <ul className="mt-4 space-y-3 border-t border-[hsl(var(--border))] pt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                <li className="flex gap-2"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />Une action est toujours revue dans son module d’origine.</li>
-                <li className="flex gap-2"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />Les droits de l’utilisateur restent applicables.</li>
-                <li className="flex gap-2"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />La décision finale reste attribuée à une personne.</li>
-              </ul>
-            )}
-            <div className="mt-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background)/.55)] p-4">
-              <p className="text-xs font-bold">Propositions à revoir</p>
-              <p className="mt-2 text-2xl font-black tracking-[-.04em]">{actionCount}</p>
-              <p className="mt-1 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
-                 MAXI peut les préparer, mais une confirmation humaine est toujours requise.
-              </p>
-              {selectedAction && (
-                <div className="mt-4 border-t border-[hsl(var(--border))] pt-3 text-xs text-emerald-800">
-                  <p className="font-bold">Proposition marquée pour validation</p>
-                  <p className="mt-1 text-emerald-700">{selectedAction.label}</p>
-                </div>
-              )}
-            </div>
+            <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+              {actionCount} proposition{actionCount === 1 ? '' : 's'} à revoir
+            </span>
           </div>
-        </aside>
-      </div>
+          {showBoundary && (
+            <div className="mt-3 grid gap-2 border-t border-[hsl(var(--border))] pt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))] sm:grid-cols-3">
+              <p className="flex gap-2"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />Chaque action est revue dans son module d’origine.</p>
+              <p className="flex gap-2"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />Les droits de l’utilisateur restent applicables.</p>
+              <p className="flex gap-2"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />La décision finale reste attribuée à une personne.</p>
+            </div>
+          )}
+          {selectedAction && (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <span className="font-bold">Proposition marquée pour validation :</span> {selectedAction.label}
+            </div>
+          )}
+        </footer>
+      </section>
 
       <section aria-labelledby="assistant-insights-title">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
