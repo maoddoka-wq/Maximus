@@ -21,6 +21,7 @@ class EcommerceController extends Controller
     private const ORDER_STATUSES = ['NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'EXPÉDIÉE', 'LIVRÉE', 'ANNULÉE'];
     private const PRODUCT_TYPES = ['SALE', 'RENTAL'];
     private const RENTAL_PERIODS = ['JOUR', 'SEMAINE', 'MOIS'];
+    private const FULFILLMENT_TYPES = ['PHYSICAL', 'DIGITAL'];
     private const RENTAL_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
     private const DELIVERY_REQUEST_STATUSES = ['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'];
     private const ORDER_TRANSITIONS = [
@@ -358,6 +359,13 @@ class EcommerceController extends Controller
 
         $input = $this->productInput($request);
         $input = $this->normalizeProductType($input);
+        if (! $this->allowsProductFulfillment($this->company($request), (string) ($input['fulfillmentType'] ?? 'PHYSICAL'))) {
+            return $this->forbidden('Ce type de vente n’est pas autorisé pour cette entreprise.');
+        }
+        $input = $this->normalizeFulfillment($input);
+        if (($input['fulfillmentType'] ?? 'PHYSICAL') === 'DIGITAL' && ($input['status'] ?? 'DRAFT') === 'PUBLISHED') {
+            return response()->json(['error' => 'Joignez le fichier numérique avant de publier ce produit.'], 422);
+        }
         if (array_key_exists('imageUrl', $input)) {
             $input['imageUrl'] = $input['imageUrl'] ?? '';
         }
@@ -383,6 +391,11 @@ class EcommerceController extends Controller
             'featured' => false,
             'product_type' => 'SALE',
             'rental_period' => null,
+            'fulfillment_type' => 'PHYSICAL',
+            'digital_file_path' => null,
+            'digital_file_name' => null,
+            'digital_file_mime' => null,
+            'digital_file_size' => null,
             'status' => 'DRAFT',
             'id' => $this->id('product'),
             'company_id' => $company,
@@ -406,8 +419,22 @@ class EcommerceController extends Controller
         if (! $existing) {
             return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
+        $existingFulfillment = (string) ($existing->fulfillment_type ?? 'PHYSICAL');
+        if (! $this->allowsProductFulfillment($company, $existingFulfillment)) {
+            return $this->forbidden('Ce type de vente n’est pas autorisé pour cette entreprise.');
+        }
         $input = $this->productInput($request, true);
         $input = $this->normalizeProductType($input, true);
+        $input = $this->normalizeFulfillment($input, true, $existingFulfillment);
+        if (array_key_exists('fulfillmentType', $input)
+            && ! $this->allowsProductFulfillment($company, (string) $input['fulfillmentType'])) {
+            return $this->forbidden('Ce type de vente n’est pas autorisé pour cette entreprise.');
+        }
+        $nextFulfillment = (string) ($input['fulfillmentType'] ?? $existingFulfillment);
+        $nextStatus = (string) ($input['status'] ?? $existing->status);
+        if ($nextFulfillment === 'DIGITAL' && $nextStatus === 'PUBLISHED' && empty($existing->digital_file_path)) {
+            return response()->json(['error' => 'Joignez le fichier numérique avant de publier ce produit.'], 422);
+        }
         if (array_key_exists('imageUrl', $input)) {
             $input['imageUrl'] = $input['imageUrl'] ?? '';
         }
@@ -471,6 +498,51 @@ class EcommerceController extends Controller
             'updated_at' => now(),
         ]);
         $this->deleteStoredImage($product->image_url, $imageUrl);
+
+        return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
+    }
+
+    public function uploadDigitalFile(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $product = DB::table('ecommerce_products')
+            ->where('id', $id)
+            ->where('company_id', $company)
+            ->first();
+        if (! $product) {
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
+        }
+        if (($product->fulfillment_type ?? 'PHYSICAL') !== 'DIGITAL') {
+            return response()->json(['error' => 'Seuls les produits numériques peuvent recevoir un fichier.'], 422);
+        }
+        if (! $this->allowsProductFulfillment($company, 'DIGITAL')) {
+            return $this->forbidden('La vente numérique n’est pas autorisée pour cette entreprise.');
+        }
+
+        $input = Validator::make($request->all(), [
+            'file' => ['required', 'file', 'max:51200'],
+        ])->validate();
+        $file = $input['file'];
+        $path = $file->store('company-'.$company.'/product-'.$id, 'digital');
+        if (! is_string($path) || $path === '') {
+            return response()->json(['error' => 'Le fichier numérique n’a pas pu être enregistré.'], 500);
+        }
+        $disk = Storage::disk('digital');
+        if (! empty($product->digital_file_path) && $disk->exists($product->digital_file_path)) {
+            $disk->delete($product->digital_file_path);
+        }
+        DB::table('ecommerce_products')->where('id', $id)->update([
+            'digital_file_path' => $path,
+            'digital_file_name' => $file->getClientOriginalName(),
+            'digital_file_mime' => $file->getMimeType() ?: 'application/octet-stream',
+            'digital_file_size' => (int) ($file->getSize() ?: 0),
+            'status' => $product->status === 'DRAFT' ? 'PUBLISHED' : $product->status,
+            'updated_at' => now(),
+        ]);
 
         return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
     }
@@ -1084,6 +1156,8 @@ class EcommerceController extends Controller
             'store' => $this->publicStorePayload($store),
             'products' => $publishedProducts
                 ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'SALE')
+                ->filter(fn (object $row): bool => $this->allowsProductFulfillment((string) $store->company_id, (string) ($row->fulfillment_type ?? 'PHYSICAL')))
+            ->filter(fn (object $row): bool => ($row->fulfillment_type ?? 'PHYSICAL') !== 'DIGITAL' || ! empty($row->digital_file_path))
                 ->map(fn ($row) => $this->publicProduct($row))
                 ->values(),
             'rentals' => $this->publicEnabledFeatures((string) $store->company_id)['location']
@@ -1170,6 +1244,8 @@ class EcommerceController extends Controller
         return [
             'location' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'location'),
             'livraisons' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'livraisons'),
+            'ventePhysique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-physique'),
+            'venteNumerique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-numerique'),
         ];
     }
 
@@ -1187,6 +1263,7 @@ class EcommerceController extends Controller
             'featured' => (bool) $row->featured,
             'productType' => $row->product_type ?? 'SALE',
             'rentalPeriod' => $row->rental_period,
+            'fulfillmentType' => $row->fulfillment_type ?? 'PHYSICAL',
         ];
     }
 
@@ -1412,7 +1489,7 @@ class EcommerceController extends Controller
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
             'customerEmail' => ['required', 'email', 'max:160'],
             'customerPhone' => ['nullable', 'string', 'max:40'],
-            'shippingAddress' => ['required', 'string', 'min:5', 'max:500'],
+            'shippingAddress' => ['nullable', 'string', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.productSlug' => ['nullable', 'string', 'min:2', 'max:160'],
@@ -1510,8 +1587,18 @@ class EcommerceController extends Controller
                     if (! $product) {
                         throw new \RuntimeException('PRODUCT_NOT_FOUND');
                     }
-                    if ($product->stock < $item['quantity']) {
+                    $fulfillmentType = (string) ($product->fulfillment_type ?? 'PHYSICAL');
+                    if (! $this->allowsProductFulfillment((string) $store->company_id, $fulfillmentType)) {
+                        throw new \RuntimeException('PRODUCT_TYPE_NOT_AUTHORIZED');
+                    }
+                    if ($fulfillmentType === 'PHYSICAL' && trim((string) ($input['shippingAddress'] ?? '')) === '') {
+                        throw new \RuntimeException('SHIPPING_ADDRESS_REQUIRED');
+                    }
+                    if ($fulfillmentType === 'PHYSICAL' && $product->stock < $item['quantity']) {
                         throw new \RuntimeException('STOCK_INSUFFICIENT');
+                    }
+                    if ($fulfillmentType === 'DIGITAL' && $item['quantity'] > 1) {
+                        throw new \RuntimeException('DIGITAL_QUANTITY_LIMIT');
                     }
                     $lineTotal = $product->price * $item['quantity'];
                     $total += $lineTotal;
@@ -1525,13 +1612,17 @@ class EcommerceController extends Controller
                         'line_total' => $lineTotal,
                         'product_type' => $product->product_type ?? 'SALE',
                         'rental_period' => $product->rental_period,
+                        'fulfillment_type' => $fulfillmentType,
+                        'digital_file_name' => $product->digital_file_name ?? null,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
-                    DB::table('ecommerce_products')->where('id', $product->id)->update([
-                        'stock' => $product->stock - $item['quantity'],
-                        'updated_at' => now(),
-                    ]);
+                    if ($fulfillmentType === 'PHYSICAL') {
+                        DB::table('ecommerce_products')->where('id', $product->id)->update([
+                            'stock' => $product->stock - $item['quantity'],
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
 
                 $id = $this->id('order');
@@ -1545,7 +1636,7 @@ class EcommerceController extends Controller
                     'customer_name' => $input['customerName'],
                     'customer_email' => $input['customerEmail'],
                     'customer_phone' => $input['customerPhone'] ?? '',
-                    'shipping_address' => $input['shippingAddress'],
+                    'shipping_address' => trim((string) ($input['shippingAddress'] ?? '')),
                     'note' => $input['note'] ?? '',
                     'total' => $total,
                     'status' => 'NOUVELLE',
@@ -1572,7 +1663,13 @@ class EcommerceController extends Controller
                     ? 'Un article n’est plus disponible dans la quantité demandée.'
                     : ($error->getMessage() === 'RENTAL_UNAVAILABLE'
                         ? 'Cette location n’est plus disponible dans la quantité demandée.'
-                        : 'La commande n’a pas pu être enregistrée.'),
+                        : ($error->getMessage() === 'PRODUCT_TYPE_NOT_AUTHORIZED'
+                            ? 'Ce type de produit n’est pas activé pour cette boutique.'
+                            : ($error->getMessage() === 'SHIPPING_ADDRESS_REQUIRED'
+                                ? 'Une adresse est nécessaire pour une commande physique.'
+                                : ($error->getMessage() === 'DIGITAL_QUANTITY_LIMIT'
+                                    ? 'Un produit numérique ne peut être acheté qu’une seule fois par ligne.'
+                                    : 'La commande n’a pas pu être enregistrée.'))))
             ], in_array($error->getMessage(), ['STOCK_INSUFFICIENT', 'RENTAL_UNAVAILABLE'], true) ? 409 : 400);
         }
     }
@@ -1727,6 +1824,14 @@ class EcommerceController extends Controller
             'status' => $row->status,
             'productType' => $row->product_type ?? 'SALE',
             'rentalPeriod' => $row->rental_period,
+            'fulfillmentType' => $row->fulfillment_type ?? 'PHYSICAL',
+            'digitalFile' => ($row->fulfillment_type ?? 'PHYSICAL') === 'DIGITAL' && ! empty($row->digital_file_path)
+                ? [
+                    'name' => $row->digital_file_name ?? '',
+                    'mime' => $row->digital_file_mime ?? 'application/octet-stream',
+                    'size' => (int) ($row->digital_file_size ?? 0),
+                ]
+                : null,
         ];
     }
 
@@ -1755,6 +1860,7 @@ class EcommerceController extends Controller
                 'lineTotal' => (int) $item->line_total,
                 'productType' => $item->product_type ?? 'SALE',
                 'rentalPeriod' => $item->rental_period,
+                'fulfillmentType' => $item->fulfillment_type ?? 'PHYSICAL',
             ], $items),
         ];
     }
@@ -1778,6 +1884,7 @@ class EcommerceController extends Controller
             'status' => ['sometimes', 'in:'.implode(',', self::STATUSES)],
             'productType' => array_merge($partial ? ['sometimes'] : ['nullable'], ['in:'.implode(',', self::PRODUCT_TYPES)]),
             'rentalPeriod' => ['nullable', 'in:'.implode(',', self::RENTAL_PERIODS)],
+            'fulfillmentType' => array_merge($partial ? ['sometimes'] : ['nullable'], ['in:'.implode(',', self::FULFILLMENT_TYPES)]),
         ])->validate();
     }
 
@@ -1794,6 +1901,32 @@ class EcommerceController extends Controller
         }
 
         return $input;
+    }
+
+    private function normalizeFulfillment(array $input, bool $partial = false, string $existing = 'PHYSICAL'): array
+    {
+        if (! $partial && ! array_key_exists('fulfillmentType', $input)) {
+            $input['fulfillmentType'] = 'PHYSICAL';
+        }
+        if ($partial && ! array_key_exists('fulfillmentType', $input)) {
+            $input['fulfillmentType'] = $existing;
+        }
+        if (($input['fulfillmentType'] ?? $existing) === 'DIGITAL') {
+            $input['productType'] = 'SALE';
+            $input['rentalPeriod'] = null;
+            $input['stock'] = 1;
+        }
+
+        return $input;
+    }
+
+    private function allowsProductFulfillment(string $company, string $fulfillmentType): bool
+    {
+        return ModuleCatalog::allowsFeature(
+            $company,
+            'ecommerce',
+            $fulfillmentType === 'DIGITAL' ? 'vente-numerique' : 'vente-physique',
+        );
     }
 
     private function listDeliveryRequests(string $company): array
@@ -2075,8 +2208,8 @@ class EcommerceController extends Controller
         return collect($input)->mapWithKeys(fn ($value, $key) => [Str::snake($key) => $value])->all();
     }
 
-    private function forbidden(): JsonResponse
+    private function forbidden(string $message = 'Cette action n’est pas autorisée pour votre rôle.'): JsonResponse
     {
-        return response()->json(['error' => 'Cette action n’est pas autorisée pour votre rôle.'], 403);
+        return response()->json(['error' => $message], 403);
     }
 }

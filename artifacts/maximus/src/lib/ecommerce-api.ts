@@ -1,6 +1,7 @@
 export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceProductType = 'SALE' | 'RENTAL';
+export type EcommerceProductFulfillmentType = 'PHYSICAL' | 'DIGITAL';
 export type EcommerceRentalPeriod = 'JOUR' | 'SEMAINE' | 'MOIS';
 export type EcommerceRentalStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
@@ -86,6 +87,8 @@ export interface EcommerceStore {
 export interface PublicShopFeatures {
   location: boolean;
   livraisons: boolean;
+  ventePhysique: boolean;
+  venteNumerique: boolean;
 }
 
 export type EcommerceDomainStatus = 'PENDING' | 'ACTIVE';
@@ -119,6 +122,12 @@ export interface EcommerceProduct {
   status: EcommerceProductStatus;
   productType: EcommerceProductType;
   rentalPeriod: EcommerceRentalPeriod | null;
+  fulfillmentType: EcommerceProductFulfillmentType;
+  digitalFile?: {
+    name: string;
+    mime: string;
+    size: number;
+  } | null;
 }
 
 export interface EcommerceCategory {
@@ -174,6 +183,8 @@ export interface EcommerceOrderItem {
   productType: EcommerceProductType;
   rentalPeriod: EcommerceRentalPeriod | null;
   imageUrl: string;
+  fulfillmentType: EcommerceProductFulfillmentType;
+  downloadUrl?: string | null;
 }
 
 export interface EcommerceDeliveryRequest {
@@ -388,6 +399,7 @@ export interface EcommerceCustomerCartLine {
   description: string;
   category: string;
   productType: EcommerceProductType;
+  fulfillmentType: EcommerceProductFulfillmentType;
   rentalPeriod: EcommerceRentalPeriod | null;
   price: number;
   compareAtPrice: number | null;
@@ -472,6 +484,19 @@ export const createEcommerceApi = (companyId: string) => {
     deleteDomain: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createProduct: (body: Omit<EcommerceProduct, 'id' | 'companyId' | 'slug'> & { slug?: string }) => request<EcommerceProduct>(withCompany('/ecommerce/products'), json(body)),
     updateProduct: (id: string, body: Partial<Omit<EcommerceProduct, 'id' | 'companyId'>>) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'PATCH', body: JSON.stringify(body) }),
+    uploadDigitalFile: async (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`/api${withCompany(`/ecommerce/products/${encodeURIComponent(id)}/digital-file`)}`, {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'include',
+        body: formData,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? 'Le fichier numérique n’a pas pu être envoyé.');
+      return body as EcommerceProduct;
+    },
     uploadProductImage: async (id: string, file: File) => {
       const formData = new FormData();
       formData.append('image', file);
@@ -555,6 +580,26 @@ export const createCustomerApi = (slug?: string) => {
       request<{ customer: EcommerceCustomer }>(endpoint('/login'), { method: 'POST', body: JSON.stringify(body) }),
     logout: () => request<void>(endpoint('/logout'), { method: 'POST' }),
     bootstrap: () => request<EcommerceCustomerBootstrap>(endpoint('/bootstrap')),
+    downloadDigitalProduct: (orderId: string, itemId: string) =>
+      fetch(`/api${endpoint(`/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/download`)}`, {
+        credentials: 'include',
+      }).then(async response => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? 'Le téléchargement n’est pas disponible.');
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') ?? '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = match?.[1] ?? 'produit-numerique';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }),
     updateProfile: (body: { name: string; phone?: string }) =>
       request<EcommerceCustomer>(endpoint('/profile'), { method: 'PATCH', body: JSON.stringify(body) }),
     changePassword: (body: { currentPassword: string; newPassword: string }) =>

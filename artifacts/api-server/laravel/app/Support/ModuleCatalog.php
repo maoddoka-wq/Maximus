@@ -24,18 +24,22 @@ final class ModuleCatalog
                 'id' => 'ecommerce',
                 'name' => 'E-commerce',
                 'description' => 'Boutique en ligne, catalogue public et commandes clients.',
-                    'features' => ['Tableau de bord', 'Catalogue', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
+                    'features' => ['Tableau de bord', 'Catalogue', 'Vente physique', 'Vente numérique', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
                 'feature_packs' => [
-                    ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'categories', 'finances', 'parametres']],
-                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les commandes et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
-                    ['id' => 'ecommerce-location', 'name' => 'Location & réservation', 'description' => 'Présenter et gérer les offres de location de maisons, bâches, véhicules et équipements.', 'feature_ids' => ['dashboard', 'catalogue', 'categories', 'location', 'commandes', 'clients', 'parametres']],
-                    ['id' => 'ecommerce-supervision', 'name' => 'Supervision boutique', 'description' => 'Superviser la boutique, les promotions, la location, les livraisons et les retraits.', 'feature_ids' => ['dashboard', 'catalogue', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-vente-numerique', 'name' => 'Vente de produits numériques', 'description' => 'Publier des fichiers numériques et les délivrer après paiement.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-numerique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-vente-complete', 'name' => 'Ventes physiques et numériques', 'description' => 'Vendre des produits physiques et des produits numériques dans la même boutique.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-location', 'name' => 'Location & réservation', 'description' => 'Présenter et gérer les offres de location de maisons, bâches, véhicules et équipements.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'location', 'commandes', 'clients', 'parametres']],
+                    ['id' => 'ecommerce-supervision', 'name' => 'Supervision boutique', 'description' => 'Superviser les ventes physiques et numériques, les promotions, la location, les livraisons et les retraits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres']],
                 ],
                 'feature_dependencies' => [
                     'commandes' => ['catalogue'],
                     'categories' => ['catalogue'],
                     'promotions' => ['catalogue'],
                     'location' => ['catalogue'],
+                    'vente-physique' => ['catalogue'],
+                    'vente-numerique' => ['catalogue'],
                     'livraisons' => ['commandes'],
                 ],
             ],
@@ -192,9 +196,19 @@ final class ModuleCatalog
             $configuration = [];
         }
 
-        // Legacy rows with no explicit scope mean the complete module is enabled.
+        // Legacy rows with no explicit scope preserve physical sales for existing
+        // catalogues, but digital sales require an explicit grant.
         // New writes set featureScope=explicit, including an intentionally empty list.
-        if (($configuration['featureScope'] ?? null) === 'explicit' || $featureIds !== []) {
+        if (($configuration['featureScope'] ?? null) === 'explicit') {
+            return in_array($featureId, $featureIds, true);
+        }
+        if ($featureId === 'vente-numerique') {
+            return false;
+        }
+        if ($featureId === 'vente-physique') {
+            return $featureIds === [] || in_array('catalogue', $featureIds, true);
+        }
+        if ($featureIds !== []) {
             return in_array($featureId, $featureIds, true);
         }
 

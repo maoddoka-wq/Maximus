@@ -620,7 +620,7 @@ final class SellerWalletController extends Controller
         }
         $items = DB::table('ecommerce_order_items')->where('order_id', $order->id)->get();
         foreach ($items as $item) {
-            if ($item->product_id) {
+            if ($item->product_id && ($item->fulfillment_type ?? 'PHYSICAL') === 'PHYSICAL') {
                 DB::table('ecommerce_products')->where('id', $item->product_id)->increment('stock', (int) $item->quantity, ['updated_at' => now()]);
             }
         }

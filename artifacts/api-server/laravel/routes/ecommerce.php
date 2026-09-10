@@ -27,6 +27,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);
         Route::post('/products', [EcommerceController::class, 'createProduct']);
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
+        Route::post('/products/{id}/digital-file', [EcommerceController::class, 'uploadDigitalFile']);
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
           Route::post('/rentals', [EcommerceController::class, 'createRental']);
@@ -89,6 +90,7 @@ Route::prefix('shop/{slug}')->group(function (): void {
     Route::delete('/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
     Route::get('/customer/orders', [EcommerceCustomerController::class, 'orders']);
     Route::get('/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+     Route::get('/customer/orders/{id}/items/{itemId}/download', [EcommerceCustomerController::class, 'downloadDigitalProduct']);
     Route::get('/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 });
 
@@ -109,6 +111,7 @@ Route::put('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'p
 Route::delete('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
 Route::get('/shop-domain/customer/orders', [EcommerceCustomerController::class, 'orders']);
 Route::get('/shop-domain/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+ Route::get('/shop-domain/customer/orders/{id}/items/{itemId}/download', [EcommerceCustomerController::class, 'downloadDigitalProduct']);
 Route::get('/shop-domain/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
 Route::post('/shop-domain/customer/logout', [EcommerceCustomerController::class, 'logout']);

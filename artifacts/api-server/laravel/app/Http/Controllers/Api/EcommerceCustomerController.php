@@ -10,8 +10,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class EcommerceCustomerController extends Controller
 {
@@ -358,6 +360,56 @@ class EcommerceCustomerController extends Controller
         });
     }
 
+    public function downloadDigitalProduct(Request $request)
+    {
+        $id = (string) $request->route('id');
+        $itemId = (string) $request->route('itemId');
+        $slug = $request->route('slug');
+
+        return $this->withCustomer($request, is_string($slug) ? $slug : null, function (object $store, object $customer) use ($id, $itemId) {
+            $order = DB::table('ecommerce_orders')
+                ->where('id', $id)
+                ->where('company_id', $store->company_id)
+                ->where('customer_id', $customer->id)
+                ->first();
+            if (! $order) {
+                return response()->json(['error' => 'Commande introuvable.'], 404);
+            }
+            if (($order->payment_status ?? 'UNPAID') !== 'PAID') {
+                return response()->json(['error' => 'Le téléchargement est disponible après confirmation du paiement.'], 403);
+            }
+
+            $item = DB::table('ecommerce_order_items')
+                ->join('ecommerce_products as product', function ($join) use ($store): void {
+                    $join->on('product.id', '=', 'ecommerce_order_items.product_id')
+                        ->where('product.company_id', '=', $store->company_id);
+                })
+                ->where('ecommerce_order_items.id', $itemId)
+                ->where('ecommerce_order_items.order_id', $order->id)
+                ->where('ecommerce_order_items.fulfillment_type', 'DIGITAL')
+                ->first([
+                    'ecommerce_order_items.product_name',
+                    'product.digital_file_path',
+                    'product.digital_file_name',
+                    'product.digital_file_mime',
+                ]);
+            if (! $item || ! $item->digital_file_path) {
+                return response()->json(['error' => 'Fichier numérique introuvable.'], 404);
+            }
+
+            $disk = Storage::disk('digital');
+            if (! $disk->exists($item->digital_file_path)) {
+                return response()->json(['error' => 'Le fichier numérique n’est plus disponible.'], 404);
+            }
+
+            return response()->download(
+                $disk->path($item->digital_file_path),
+                $item->digital_file_name ?: ($item->product_name.'.bin'),
+                ['Content-Type' => $item->digital_file_mime ?: 'application/octet-stream'],
+            );
+        });
+    }
+
     public function deliveryRequests(Request $request, ?string $slug = null): JsonResponse
     {
         return $this->withCustomer($request, $slug, fn (object $store, object $customer): JsonResponse => response()->json([
@@ -365,7 +417,7 @@ class EcommerceCustomerController extends Controller
         ]));
     }
 
-    private function withCustomer(Request $request, ?string $slug, callable $callback): JsonResponse
+    private function withCustomer(Request $request, ?string $slug, callable $callback): SymfonyResponse
     {
         $store = $this->publishedStore($request, $slug);
         if (! $store) {
@@ -561,6 +613,7 @@ class EcommerceCustomerController extends Controller
                 'imageUrl' => $row->image_url,
                 'productType' => $row->product_type ?? 'SALE',
                 'rentalPeriod' => $row->rental_period,
+                'fulfillmentType' => $row->fulfillment_type ?? 'PHYSICAL',
                 'quantity' => (int) $row->quantity,
             ])
             ->values()
@@ -629,8 +682,18 @@ class EcommerceCustomerController extends Controller
                 'productType' => $item->product_type ?? 'SALE',
                 'rentalPeriod' => $item->rental_period,
                 'imageUrl' => $item->image_url ?? '',
+                 'fulfillmentType' => $item->fulfillment_type ?? 'PHYSICAL',
+                 'downloadUrl' => ($row->payment_status ?? 'UNPAID') === 'PAID'
+                     && ($item->fulfillment_type ?? 'PHYSICAL') === 'DIGITAL'
+                     ? $this->downloadPath($row->id, $item->id)
+                     : null,
             ])->values()->all(),
         ];
+    }
+
+    private function downloadPath(string $orderId, string $itemId): string
+    {
+        return '/customer/orders/'.rawurlencode($orderId).'/items/'.rawurlencode($itemId).'/download';
     }
 
     private function deliveryRequest(object $row): array

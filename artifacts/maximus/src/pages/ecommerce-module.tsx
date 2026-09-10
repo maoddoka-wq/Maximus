@@ -38,6 +38,7 @@ import {
   type EcommerceOrder,
   type EcommerceOrderStatus,
   type EcommerceProduct,
+  type EcommerceProductFulfillmentType,
   type EcommerceProductType,
   type EcommerceRental,
   type EcommerceRentalPeriod,
@@ -132,9 +133,12 @@ type ProductForm = {
   compareAtPrice: string;
   stock: string;
   productType: EcommerceProductType;
+  fulfillmentType: EcommerceProductFulfillmentType;
   rentalPeriod: EcommerceRentalPeriod;
   imageUrl: string;
   imageFile: File | null;
+  digitalFile: File | null;
+  digitalFileName: string;
   featured: boolean;
   status: EcommerceProduct['status'];
 };
@@ -204,9 +208,12 @@ const blankProduct: ProductForm = {
   compareAtPrice: '',
   stock: '0',
   productType: 'SALE',
+  fulfillmentType: 'PHYSICAL',
   rentalPeriod: 'JOUR',
   imageUrl: '',
   imageFile: null,
+  digitalFile: null,
+  digitalFileName: '',
   featured: false,
   status: 'PUBLISHED',
 };
@@ -356,7 +363,7 @@ export default function EcommerceModulePage({
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
-      {tab === 'catalogue' && <Catalogue data={data} canCreate={canCreate} canModify={canModify} run={run} />}
+      {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'categories' && <CategoryManager data={data} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'commandes' && <Orders data={data} canModify={canModify} run={run} />}
       {tab === 'clients' && <Clients data={data} />}
@@ -797,29 +804,34 @@ function WalletMetric({ label, value, detail, icon: Icon, accent = false }: { la
   return <div className={`card-surface rounded-2xl border p-4 ${accent ? 'border-[hsl(var(--primary)/.3)]' : ''}`}><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${accent ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}><Icon size={17} /></span><p className="mt-4 text-xs font-bold text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-xl font-bold tracking-tight">{value}</p><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{detail}</p></div>;
 }
 
-function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { data: EcommerceBootstrap; allowedFeatureIds?: string[]; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const { confirm, alert } = useAppDialog();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'ALL' | EcommerceProduct['status']>('ALL');
   const [modal, setModal] = useState<EcommerceProduct | 'new' | null>(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(blankProduct);
   const filtered = data.products.filter(product => status === 'ALL' || product.status === status).filter(product => `${product.name} ${product.sku} ${product.category}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
-  const open = (product?: EcommerceProduct) => {
+  const canSellPhysical = !allowedFeatureIds || allowedFeatureIds.includes('vente-physique') || allowedFeatureIds.includes('catalogue');
+  const canSellDigital = !allowedFeatureIds || allowedFeatureIds.includes('vente-numerique');
+  const open = (product?: EcommerceProduct, fulfillmentType: EcommerceProductFulfillmentType = 'PHYSICAL') => {
+    setChooserOpen(false);
     setModal(product ?? 'new');
-    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, categoryId: product.categoryId ?? '', price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), productType: product.productType, rentalPeriod: product.rentalPeriod ?? 'JOUR', imageUrl: product.imageUrl, imageFile: null, featured: product.featured, status: product.status } : blankProduct);
+    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, categoryId: product.categoryId ?? '', price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), productType: product.productType, fulfillmentType: product.fulfillmentType ?? 'PHYSICAL', rentalPeriod: product.rentalPeriod ?? 'JOUR', imageUrl: product.imageUrl, imageFile: null, digitalFile: null, digitalFileName: product.digitalFile?.name ?? '', featured: product.featured, status: product.status } : { ...blankProduct, fulfillmentType, stock: fulfillmentType === 'DIGITAL' ? '1' : '0' });
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
     const price = Number(form.price);
-    const stock = Number(form.stock);
+    const stock = form.fulfillmentType === 'DIGITAL' ? 1 : Number(form.stock);
     const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
-    if (!form.name.trim() || !form.sku.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0 || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0))) {
-      await alert({ title: 'Informations incomplètes', description: 'Renseignez un nom, une référence, un prix et un stock valides.', confirmLabel: 'Compris' });
+    if (!form.name.trim() || !form.sku.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0 || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) || (form.fulfillmentType === 'DIGITAL' && modal === 'new' && !form.digitalFile)) {
+      await alert({ title: 'Informations incomplètes', description: form.fulfillmentType === 'DIGITAL' ? 'Renseignez un nom, une référence, un prix et joignez le fichier numérique.' : 'Renseignez un nom, une référence, un prix et un stock valides.', confirmLabel: 'Compris' });
       return;
     }
-    const productType = modal !== 'new' && modal ? modal.productType : 'SALE';
-    const rentalPeriod = modal !== 'new' && modal ? modal.rentalPeriod : null;
-    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
+    const productType = form.fulfillmentType === 'DIGITAL' ? 'SALE' : (modal !== 'new' && modal ? modal.productType : 'SALE');
+    const rentalPeriod = form.fulfillmentType === 'DIGITAL' ? null : (modal !== 'new' && modal ? modal.rentalPeriod : null);
+    const requestedStatus = form.status;
+    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, fulfillmentType: form.fulfillmentType, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.fulfillmentType === 'DIGITAL' && !form.digitalFile && modal === 'new' ? 'DRAFT' : requestedStatus };
     const api = createEcommerceApi(data.store.companyId);
     const saved = modal === 'new'
       ? await run(() => api.createProduct(body), 'Produit ajouté au catalogue.')
@@ -831,6 +843,12 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
     if (form.imageFile) {
       await run(() => api.uploadProductImage(savedProduct.id, form.imageFile as File), 'Produit et photo enregistrés.');
     }
+    if (form.digitalFile) {
+      await run(() => api.uploadDigitalFile(savedProduct.id, form.digitalFile as File), 'Produit numérique et fichier enregistrés.');
+      if (requestedStatus === 'PUBLISHED' && savedProduct.status !== 'PUBLISHED') {
+        await run(() => api.updateProduct(savedProduct.id, { status: 'PUBLISHED' }), 'Produit numérique publié.');
+      }
+    }
     setModal(null);
   };
   const archive = async (product: EcommerceProduct) => {
@@ -838,19 +856,20 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
     await run(() => createEcommerceApi(data.store.companyId).archiveProduct(product.id), 'Produit archivé.');
   };
   return <div className="space-y-5 fade-up">
-    <Panel title="Catalogue en ligne" description="Organisez les références qui alimentent directement votre vitrine." action={canCreate ? <button type="button" onClick={() => open()} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un produit</button> : undefined}>
+    <Panel title="Catalogue en ligne" description="Organisez les références qui alimentent directement votre vitrine." action={canCreate ? <button type="button" onClick={() => setChooserOpen(true)} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un produit</button> : undefined}>
       <div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par nom, référence ou catégorie" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option><option value="PUBLISHED">Publié</option><option value="DRAFT">Brouillon</option><option value="ARCHIVED">Archivé</option></select></div>
         {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreate && !query ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Produit</th><th className="px-4">Référence</th><th className="px-4">Prix</th><th className="px-4">Stock</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{filtered.map(product => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.category}{product.featured ? ' · Vedette' : ''}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}</td><td className="px-4 py-3 font-bold">{money(product.price, data.store.currency)}</td><td className={`px-4 py-3 font-bold ${product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}`}>{product.stock}</td><td className="px-4 py-3"><StatusPill value={product.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={13} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
-    {modal && <ProductModal modal={modal} form={form} categories={data.categories} setForm={setForm} onClose={() => setModal(null)} onSave={save} />}
+     {chooserOpen && <Modal title="Choisir le type de produit" onClose={() => setChooserOpen(false)}><div className="grid gap-3 sm:grid-cols-2"><button type="button" disabled={!canSellPhysical} onClick={() => open(undefined, 'PHYSICAL')} className="rounded-2xl border p-5 text-left transition hover:border-[hsl(var(--primary))] disabled:cursor-not-allowed disabled:opacity-45"><Package size={25} className="text-[hsl(var(--primary))]" /><strong className="mt-3 block">Produit physique</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">Gérez le stock, la livraison et la vente d’un article matériel.</span>{!canSellPhysical && <small className="mt-3 block font-semibold text-[hsl(var(--destructive))]">Autorisation non activée</small>}</button><button type="button" disabled={!canSellDigital} onClick={() => open(undefined, 'DIGITAL')} className="rounded-2xl border p-5 text-left transition hover:border-[hsl(var(--primary))] disabled:cursor-not-allowed disabled:opacity-45"><ArrowDownToLine size={25} className="text-[hsl(var(--primary))]" /><strong className="mt-3 block">Produit numérique</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">Joignez un fichier privé, délivré uniquement après paiement confirmé.</span>{!canSellDigital && <small className="mt-3 block font-semibold text-[hsl(var(--destructive))]">Autorisation non activée</small>}</button></div></Modal>}
+     {modal && <ProductModal modal={modal} form={form} categories={data.categories} setForm={setForm} onClose={() => setModal(null)} onSave={save} />}
   </div>;
 }
 
-function ProductModal({ modal, form, categories, setForm, onClose, onSave }: { modal: EcommerceProduct | 'new'; form: ProductForm; categories: EcommerceCategory[]; setForm: (value: ProductForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
+ function ProductModal({ modal, form, categories, setForm, onClose, onSave }: { modal: EcommerceProduct | 'new'; form: ProductForm; categories: EcommerceCategory[]; setForm: (value: ProductForm) => void; onClose: () => void; onSave: (event: FormEvent) => void }) {
   const patch = (updates: Partial<ProductForm>) => setForm({ ...form, ...updates });
   const [, setSlugManuallyEdited] = useState(modal !== 'new');
   const changeName = (value: string) => patch({ name: value, ...(modal === 'new' ? { slug: slugify(value) } : {}) });
-  return <Modal large title={modal === 'new' ? 'Nouveau produit' : `Modifier ${modal.name}`} onClose={onClose}>
+  return <Modal large title={modal === 'new' ? (form.fulfillmentType === 'DIGITAL' ? 'Nouveau produit numérique' : 'Nouveau produit physique') : `Modifier ${modal.name}`} onClose={onClose}>
     <form onSubmit={onSave} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nom du produit" required value={form.name} onChange={changeName} placeholder="Ex. Sacoche Atlas" />
@@ -861,7 +880,8 @@ function ProductModal({ modal, form, categories, setForm, onClose, onSave }: { m
         <Field label="Slug public (optionnel)" value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} placeholder="généré automatiquement si vide" />
         <Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
         <Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" />
-        <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" />
+         {form.fulfillmentType === 'PHYSICAL' ? <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /> : <div className="rounded-lg border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.06)] px-3 py-2.5 text-xs"><strong className="block">Vente numérique</strong><span className="mt-1 block text-[hsl(var(--muted-foreground))]">Le stock physique n’est pas décrémenté. Une unité est réservée par commande.</span></div>}
+         {form.fulfillmentType === 'DIGITAL' ? <label className="block text-xs font-bold">Fichier numérique {!form.digitalFileName && <span className="text-[hsl(var(--destructive))]">*</span>}<input type="file" onChange={event => { const file = event.target.files?.[0] ?? null; patch({ digitalFile: file, digitalFileName: file?.name ?? form.digitalFileName }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">Fichier privé · 50 Mo maximum · accessible après paiement confirmé.</span>{form.digitalFileName && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFileName}</span>}</label> : null}
         <label className="block text-xs font-bold">Photo du produit<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum · envoyée à l’enregistrement</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label>
       </div>
       <label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur ou le locataire..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
