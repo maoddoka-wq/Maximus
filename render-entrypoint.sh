@@ -19,6 +19,8 @@ for variable in DIAMANOPAY_CLIENT_ID DIAMANOPAY_CLIENT_SECRET DIAMANOPAY_WEBHOOK
     fi
 done
 
+mkdir -p "${DIGITAL_STORAGE_PATH:-/var/data/digital-products}"
+
 attempt=1
 max_attempts=30
 

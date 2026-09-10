@@ -4,9 +4,13 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile.render
     dockerContext: .
-    plan: free
+    plan: starter
     healthCheckPath: /api/healthz
     autoDeploy: true
+    disk:
+      name: maximus-files
+      mountPath: /var/data
+      sizeGB: 10
     envVars:
       - key: APP_ENV
         value: production
@@ -30,6 +34,8 @@ services:
         value: maximus-erp.onrender.com
       - key: CACHE_STORE
         value: database
+      - key: DIGITAL_STORAGE_PATH
+        value: /var/data/digital-products
       - key: SESSION_DRIVER
         value: database
       - key: SESSION_SECURE_COOKIE
