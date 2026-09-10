@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maximus-client-shell-v2';
+const CACHE_NAME = 'maximus-client-shell-v3';
 
 const scopeUrl = () => new URL(self.registration.scope);
 const shellPath = () => new URL('index.html', scopeUrl()).pathname;

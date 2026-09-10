@@ -127,6 +127,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
+  const [manifestReady, setManifestReady] = useState(false);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
     const result = query.get('payment');
@@ -164,11 +165,32 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
 
   useEffect(() => {
-    if (!data?.store.name.trim()) return undefined;
+    if (!data?.store.name.trim()) {
+      setManifestReady(false);
+      return undefined;
+    }
     const manifestUrl = domain
       ? '/api/shop-domain/manifest.webmanifest'
       : `/api/shop/${encodeURIComponent(slug ?? data.store.slug)}/manifest.webmanifest`;
-    return mountClientManifest(manifestUrl);
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    setManifestReady(false);
+    void mountClientManifest(manifestUrl)
+      .then(unmount => {
+        if (cancelled) {
+          unmount();
+          return;
+        }
+        cleanup = unmount;
+        setManifestReady(true);
+      })
+      .catch(error => {
+        if (!cancelled) console.warn('Le manifest PWA de la boutique n’a pas pu être validé.', error);
+      });
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
   }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, slug]);
 
   useEffect(() => {
@@ -493,7 +515,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
-  if (!data) return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6"><section className="card-surface max-w-md rounded-2xl p-8 text-center"><Store className="mx-auto text-[hsl(var(--primary))]" size={30} /><h1 className="mt-4 text-xl font-bold">Boutique indisponible</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p></section></div>;
+  if (!data) return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6"><section className="card-surface max-w-md rounded-2xl p-8 text-center"><Store className="mx-auto text-[hsl(var(--primary))]" size={30} /><h1 className="mt-4 text-xl font-bold">{clientApp ? 'Installation PWA à renouveler' : 'Boutique indisponible'}</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{clientApp ? 'Cette installation ne possède pas une adresse propre à cette boutique. Désinstallez-la, ouvrez la boutique depuis son lien public, puis installez-la à nouveau.' : error}</p></section></div>;
 
   const { store, products: allProducts, rentals } = data;
   const seller = {
@@ -563,7 +585,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        </div>}
       <main className="shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pb-24 pt-6 sm:px-6 sm:py-9 lg:px-8">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-      {!isStandalonePwa() && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+       {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><Download size={18} /></span>
           <div>
