@@ -44,3 +44,4 @@
 - [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.
 - [Réservations automobiles](car-rental-payment-boundary.md) — un créneau n’est confirmé qu’après paiement valide avant expiration, sans chevauchement actif.
 - [Isolation des PWA boutiques](pwa-shop-isolation.md) — deux boutiques sur une même origine exigent un start_url/id distinct et un état client indexé par boutique.
+- [Routage OpenStreetMap des locations](openrouteservice-rental-routing.md) — le devis utilise le géocodage puis la matrice OpenRouteService, sans fallback vers une distance inventée.
