@@ -43,3 +43,4 @@
 - [Frontière serveur Anthropic](anthropic-server-boundary.md) — une clé Claude reste côté serveur, nommée pour son fournisseur, avec accès MAXIMUS-admin et validation humaine.
 - [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.
 - [Réservations automobiles](car-rental-payment-boundary.md) — un créneau n’est confirmé qu’après paiement valide avant expiration, sans chevauchement actif.
+- [Isolation des PWA boutiques](pwa-shop-isolation.md) — deux boutiques sur une même origine exigent un start_url/id distinct et un état client indexé par boutique.

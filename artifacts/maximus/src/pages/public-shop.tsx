@@ -18,7 +18,7 @@ import {
   type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
-import { canInstallPwa, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
+import { canInstallPwa, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
@@ -137,6 +137,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   }, [search]);
 
   const api = useMemo(() => createCustomerApi(slug), [slug]);
+  const shopStorageKey = useMemo(() => clientPwaStorageKey(slug, domain), [domain, slug]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
   const accountSection = useMemo<AccountSection>(() => {
@@ -161,14 +162,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   }, [routePath]);
 
   useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('maximus-client-pwa-entry', JSON.stringify({ slug: slug ?? null, domain }));
-    } catch {
-      // L’installation reste possible même si le navigateur bloque le stockage local.
-    }
-  }, [domain, slug]);
 
   useEffect(() => {
     if (!data?.store.name.trim()) return undefined;
@@ -250,7 +243,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
           setCustomerData(null);
           setError('La boutique est disponible, mais la session client n’a pas pu être restaurée.');
           try {
-             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
+             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${shopStorageKey}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
              setCart(restoreGuestCart(saved, result));
           } catch {
             setCart([]);
@@ -267,7 +260,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
           setProfileForm({ name: bootstrap.customer.name, phone: bootstrap.customer.phone });
         } else {
           try {
-             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${slug ?? 'domain'}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
+             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${shopStorageKey}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
              setCart(restoreGuestCart(saved, result));
           } catch {
             setCart([]);
@@ -277,14 +270,14 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Boutique indisponible.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [api, domain, slug]);
+  }, [api, domain, shopStorageKey, slug]);
 
   useEffect(() => {
     if (customer || !data) return;
-    localStorage.setItem(`ecommerce-cart:${slug ?? 'domain'}`, JSON.stringify(cart.map(line => line.product.rentalId
+    localStorage.setItem(`ecommerce-cart:${shopStorageKey}`, JSON.stringify(cart.map(line => line.product.rentalId
       ? { rentalId: line.product.rentalId, quantity: line.quantity }
       : { productSlug: line.product.slug, quantity: line.quantity })));
-  }, [cart, customer, data, slug]);
+  }, [cart, customer, data, shopStorageKey]);
 
   useEffect(() => {
     if (loading || !data || !paymentReturn) return;
@@ -610,24 +603,24 @@ function PaymentResultPanel({ summary, currency, store, orderId, slug, domain, o
 
   let rentalData: { reservation: EcommerceCarReservation, carName: string } | null = null;
   try {
-    const savedStr = localStorage.getItem('maximus-last-rental');
+    const savedStr = localStorage.getItem(`maximus-last-rental:${clientPwaStorageKey(slug, Boolean(domain))}`);
     if (savedStr) {
       const saved = JSON.parse(savedStr);
       if (saved && saved.orderId === orderId) {
         rentalData = saved;
       } else {
-        localStorage.removeItem('maximus-last-rental');
+        localStorage.removeItem(`maximus-last-rental:${clientPwaStorageKey(slug, Boolean(domain))}`);
       }
     }
   } catch {}
 
   const handleContinue = () => {
-    try { localStorage.removeItem('maximus-last-rental'); } catch {}
+    try { localStorage.removeItem(`maximus-last-rental:${clientPwaStorageKey(slug, Boolean(domain))}`); } catch {}
     onContinue();
   };
 
   const handleOrders = () => {
-    try { localStorage.removeItem('maximus-last-rental'); } catch {}
+    try { localStorage.removeItem(`maximus-last-rental:${clientPwaStorageKey(slug, Boolean(domain))}`); } catch {}
     if (onOrders) onOrders();
   };
 
@@ -876,7 +869,7 @@ function RentalBookingForm({ rental, store, customer, slug, domain, onBack }: { 
         : await publicEcommerceApi.createPayment(slug ?? '', reservation.orderId, { redirectUrl: returnUrl(), provider: paymentProvider });
 
       try {
-        localStorage.setItem('maximus-last-rental', JSON.stringify({
+        localStorage.setItem(`maximus-last-rental:${clientPwaStorageKey(slug, Boolean(domain))}`, JSON.stringify({
           reservation,
           carName: rental.name,
           orderId: reservation.orderId

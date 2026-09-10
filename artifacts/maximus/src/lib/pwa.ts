@@ -9,6 +9,30 @@ const subscribers = new Set<() => void>();
 
 const notify = () => subscribers.forEach((listener) => listener());
 
+export type ClientPwaEntry = { slug?: string; domain?: boolean };
+
+export const clientPwaStorageKey = (slug?: string, domain = false) =>
+  domain ? 'domain' : encodeURIComponent(slug ?? '');
+
+export const clientPwaStartPath = (slug: string) =>
+  `/client-app/shop/${encodeURIComponent(slug)}/`;
+
+export function parseClientPwaPath(pathname: string): ClientPwaEntry | null {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  const shopPrefix = '/client-app/shop/';
+  if (normalized.startsWith(shopPrefix)) {
+    const encodedSlug = normalized.slice(shopPrefix.length);
+    if (!encodedSlug || encodedSlug.includes('/')) return null;
+    try {
+      const slug = decodeURIComponent(encodedSlug);
+      return slug ? { slug } : null;
+    } catch {
+      return null;
+    }
+  }
+  return normalized === '/client-app' ? { domain: true } : null;
+}
+
 export const isStandalonePwa = () =>
   window.matchMedia('(display-mode: standalone)').matches
   || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);

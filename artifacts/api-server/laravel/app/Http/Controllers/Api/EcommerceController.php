@@ -886,7 +886,7 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
         }
 
-        return $this->manifestResponse($store);
+        return $this->manifestResponse($store, true);
     }
 
     public function createPublicDomainOrder(Request $request): JsonResponse
@@ -1028,17 +1028,21 @@ class EcommerceController extends Controller
         ];
     }
 
-    private function manifestResponse(object $store): JsonResponse
+    private function manifestResponse(object $store, bool $customDomain = false): JsonResponse
     {
         $storeName = trim((string) $store->name);
         $logoUrl = trim((string) ($store->logo_url ?? ''));
+        $startPath = $customDomain
+            ? '/client-app/'
+            : '/client-app/shop/'.rawurlencode((string) $store->slug).'/';
 
         return response()->json([
             'name' => $storeName,
             'short_name' => Str::substr($storeName ?: 'Boutique', 0, 12),
             'description' => 'La vitrine et l’espace client de '.($storeName ?: 'cette boutique').'.',
-            'start_url' => '/client-app/',
-            'scope' => '/client-app/',
+            'id' => $startPath,
+            'start_url' => $startPath,
+            'scope' => $startPath,
             'display' => 'standalone',
             'orientation' => 'portrait-primary',
             'background_color' => '#f8f5ed',

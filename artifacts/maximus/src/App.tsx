@@ -49,6 +49,7 @@ import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { parseClientPwaPath, type ClientPwaEntry } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import {
@@ -856,12 +857,19 @@ function AppContent() {
       />
     );
   if (pathname === '/client-app' || pathname.startsWith('/client-app/')) {
-    try {
-      const savedEntry = JSON.parse(localStorage.getItem('maximus-client-pwa-entry') ?? 'null') as { slug?: string | null; domain?: boolean } | null;
-      if (savedEntry?.slug) return <PublicShopPage slug={savedEntry.slug} clientApp />;
-      if (savedEntry?.domain) return <PublicShopPage domain clientApp />;
-    } catch {
-      // Le lancement PWA retombe sur le routage normal si l’entrée enregistrée est invalide.
+    const pwaEntry = parseClientPwaPath(pathname);
+    if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
+    if (pwaEntry?.domain) return <PublicShopPage domain clientApp />;
+    // Compatibilité avec les anciennes installations dont le start_url était partagé.
+    // Les nouvelles installations utilisent toujours une URL propre à la boutique.
+    if (pathname === '/client-app/') {
+      try {
+        const savedEntry = JSON.parse(localStorage.getItem('maximus-client-pwa-entry') ?? 'null') as ClientPwaEntry | null;
+        if (savedEntry?.slug) return <PublicShopPage slug={savedEntry.slug} clientApp />;
+        if (savedEntry?.domain) return <PublicShopPage domain clientApp />;
+      } catch {
+        // Lancement sans boutique connue : le routage normal affiche l’état d’erreur.
+      }
     }
   }
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);

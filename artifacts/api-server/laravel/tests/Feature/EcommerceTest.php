@@ -680,6 +680,49 @@ class EcommerceTest extends TestCase
             ->assertJson(['available' => false]);
     }
 
+    public function test_public_manifests_have_an_isolated_pwa_start_path_per_store(): void
+    {
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'ecommerce-store-kora-manifest',
+            'company_id' => 'kora',
+            'slug' => 'kora-boutique',
+            'name' => 'Boutique Kora',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#123456',
+            'accent_color' => '#654321',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'ecommerce-store-other',
+            'company_id' => 'other-company',
+            'slug' => 'autre-boutique',
+            'name' => 'Autre boutique',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#123456',
+            'accent_color' => '#654321',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $first = $this->getJson('/api/shop/kora-boutique/manifest.webmanifest')
+            ->assertOk()
+            ->json();
+        $second = $this->getJson('/api/shop/autre-boutique/manifest.webmanifest')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('/client-app/shop/kora-boutique/', $first['id']);
+        $this->assertSame($first['id'], $first['start_url']);
+        $this->assertSame($first['id'], $first['scope']);
+        $this->assertSame('/client-app/shop/autre-boutique/', $second['id']);
+        $this->assertNotSame($first['id'], $second['id']);
+    }
+
     public function test_sale_and_rental_products_keep_an_explicit_public_distinction(): void
     {
         $request = $this->asActor();

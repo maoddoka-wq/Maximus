@@ -68,7 +68,7 @@ class EcommerceCustomerController extends Controller
             'updated_at' => now(),
         ]);
 
-        return $this->withSessionCookie($customer, 201);
+        return $this->withSessionCookie($customer, 201, $this->customerCookiePath($request, $slug));
     }
 
     public function login(Request $request, ?string $slug = null): JsonResponse
@@ -92,14 +92,16 @@ class EcommerceCustomerController extends Controller
             return response()->json(['error' => 'Email ou mot de passe incorrect.'], 422);
         }
 
-        return $this->withSessionCookie($customer);
+        return $this->withSessionCookie($customer, 200, $this->customerCookiePath($request, $slug));
     }
 
-    public function logout(Request $request): Response
+    public function logout(Request $request, ?string $slug = null): Response
     {
         EcommerceCustomerAuth::forget($request);
 
-        return response()->noContent()->withCookie(cookie()->forget(EcommerceCustomerAuth::COOKIE));
+        return response()->noContent()
+            ->withCookie(cookie()->forget(EcommerceCustomerAuth::COOKIE, $this->customerCookiePath($request, $slug)))
+            ->withCookie(cookie()->forget(EcommerceCustomerAuth::COOKIE, '/'));
     }
 
     public function bootstrap(Request $request, ?string $slug = null): JsonResponse
@@ -157,7 +159,11 @@ class EcommerceCustomerController extends Controller
             DB::table('ecommerce_customer_sessions')->where('customer_id', $customer->id)->delete();
 
             return response()->json(['ok' => true])
-                ->withCookie($this->sessionCookie(EcommerceCustomerAuth::issueSession($customer)));
+                ->withCookie($this->sessionCookie(
+                    EcommerceCustomerAuth::issueSession($customer),
+                    $this->customerCookiePath($request, $slug),
+                ))
+                ->withCookie(cookie()->forget(EcommerceCustomerAuth::COOKIE, '/'));
         });
     }
 
@@ -652,27 +658,36 @@ class EcommerceCustomerController extends Controller
         ];
     }
 
-    private function withSessionCookie(object $customer, int $status = 200): JsonResponse
+    private function withSessionCookie(object $customer, int $status = 200, string $path = '/'): JsonResponse
     {
         $token = EcommerceCustomerAuth::issueSession($customer);
 
         return response()->json(['customer' => $this->customer($customer)], $status)
-            ->withCookie($this->sessionCookie($token));
+            ->withCookie($this->sessionCookie($token, $path))
+            ->withCookie(cookie()->forget(EcommerceCustomerAuth::COOKIE, '/'));
     }
 
-    private function sessionCookie(string $token)
+    private function sessionCookie(string $token, string $path = '/')
     {
         return cookie()->make(
             EcommerceCustomerAuth::COOKIE,
             $token,
             60 * 24 * 30,
-            '/',
+            $path,
             null,
             app()->environment('production'),
             true,
             false,
             'lax',
         );
+    }
+
+    private function customerCookiePath(Request $request, ?string $slug = null): string
+    {
+        $routeSlug = $slug ?? $request->route('slug');
+        return is_string($routeSlug) && $routeSlug !== ''
+            ? '/api/shop/'.rawurlencode($routeSlug)
+            : '/api/shop-domain';
     }
 
     private function storeNotFound(): JsonResponse
