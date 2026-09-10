@@ -843,17 +843,28 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
     const price = Number(form.price);
     const stock = form.fulfillmentType === 'DIGITAL' ? 1 : Number(form.stock);
     const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
-    if (!form.name.trim() || !form.sku.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0 || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) || (form.fulfillmentType === 'DIGITAL' && modal === 'new' && !form.digitalFile)) {
-      await alert({ title: 'Informations incomplètes', description: form.fulfillmentType === 'DIGITAL' ? 'Renseignez un nom, une référence, un prix et joignez le fichier numérique.' : 'Renseignez un nom, une référence, un prix et un stock valides.', confirmLabel: 'Compris' });
+    const missingFields: string[] = [];
+    if (!form.name.trim()) missingFields.push('le nom');
+    if (!form.sku.trim()) missingFields.push('la référence');
+    if (!form.price.trim() || !Number.isFinite(price) || price < 0) missingFields.push('un prix valide');
+    if (form.fulfillmentType === 'PHYSICAL' && (!form.stock.trim() || !Number.isFinite(stock) || stock < 0)) {
+      missingFields.push('un stock valide');
+    }
+    if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) {
+      missingFields.push('un prix barré valide');
+    }
+    if (missingFields.length > 0) {
+      await alert({ title: 'Informations incomplètes', description: `Complétez ${missingFields.join(', ')}.`, confirmLabel: 'Compris' });
       return;
     }
     const productType = form.fulfillmentType === 'DIGITAL' ? 'SALE' : (modal !== 'new' && modal ? modal.productType : 'SALE');
     const rentalPeriod = form.fulfillmentType === 'DIGITAL' ? null : (modal !== 'new' && modal ? modal.rentalPeriod : null);
     const requestedStatus = form.status;
+    const savingDigitalDraft = form.fulfillmentType === 'DIGITAL' && modal === 'new' && !form.digitalFile;
     const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, fulfillmentType: form.fulfillmentType, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.fulfillmentType === 'DIGITAL' && !form.digitalFile && modal === 'new' ? 'DRAFT' : requestedStatus };
     const api = createEcommerceApi(data.store.companyId);
     const saved = modal === 'new'
-      ? await run(() => api.createProduct(body), 'Produit ajouté au catalogue.')
+      ? await run(() => api.createProduct(body), savingDigitalDraft ? 'Produit numérique enregistré en brouillon. Ajoutez le fichier pour le publier.' : 'Produit ajouté au catalogue.')
       : modal
         ? await run(() => api.updateProduct(modal.id, body), 'Produit mis à jour.')
         : undefined;
@@ -900,7 +911,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
         <Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
         <Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" />
          {form.fulfillmentType === 'PHYSICAL' ? <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /> : <div className="rounded-lg border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.06)] px-3 py-2.5 text-xs"><strong className="block">Vente numérique</strong><span className="mt-1 block text-[hsl(var(--muted-foreground))]">Le stock physique n’est pas décrémenté. Une unité est réservée par commande.</span></div>}
-         {form.fulfillmentType === 'DIGITAL' ? <label className="block text-xs font-bold">Fichier numérique {!form.digitalFileName && <span className="text-[hsl(var(--destructive))]">*</span>}<input type="file" accept={digitalFileAccept} onChange={event => { const file = event.target.files?.[0] ?? null; patch({ digitalFile: file, digitalFileName: file?.name ?? form.digitalFileName }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Vidéo, musique, PDF, Word ou PowerPoint · 1 Go maximum · fichier privé accessible après paiement confirmé.</span>{form.digitalFileName && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFileName}</span>}</label> : null}
+         {form.fulfillmentType === 'DIGITAL' ? <label className="block text-xs font-bold">Fichier numérique<input type="file" accept={digitalFileAccept} onChange={event => { const file = event.target.files?.[0] ?? null; patch({ digitalFile: file, digitalFileName: file?.name ?? form.digitalFileName }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Vidéo, musique, PDF, Word ou PowerPoint · 1 Go maximum · requis pour publier. Un brouillon peut être enregistré avant l’ajout du fichier.</span>{form.digitalFileName && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFileName}</span>}</label> : null}
         <label className="block text-xs font-bold">Photo du produit<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum · envoyée à l’enregistrement</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label>
       </div>
       <label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur ou le locataire..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
