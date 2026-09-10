@@ -8,6 +8,7 @@ import { buildAdminAssistantInsights } from '@/lib/local-assistant';
 import type { AdminAssistantScope } from '@/lib/local-assistant';
 import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
+import { getAdminControlRoute } from '@/lib/control-routing';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -27,6 +28,7 @@ export type AdminRouteScreens = {
   dashboard: Screen;
   assistant: Screen;
   control: Screen;
+  surveillance: Screen;
   organization: Screen;
   companyDetail: Screen;
   companies: Screen;
@@ -86,11 +88,11 @@ export function AdminRouter({
       onExecuteAction: onExecuteAssistantAction,
     });
   }
-  if (routePath === '/maximus/controle') {
-    return renderScreen(screens.control, { data, isAdmin: true });
+  if (getAdminControlRoute(location) === 'coordination') {
+    return renderScreen(screens.control, { data, isAdmin: true, mutate, notify, actorName: 'Équipe MAXIMUS' });
   }
-  if (routePath === '/maximus/surveillance') {
-    return renderScreen(screens.control, { data, isAdmin: true, focusHealth: true });
+  if (getAdminControlRoute(location) === 'surveillance') {
+    return renderScreen(screens.surveillance, {});
   }
   if (routePath === '/maximus/entreprises/organisation') {
     return renderScreen(screens.organization, { data, mutate, onNavigate });
@@ -168,6 +170,7 @@ export function CompanyRouter({
   location,
   data,
   mutate,
+  notify,
   onNavigate,
   onBack,
   allowed,
@@ -192,6 +195,7 @@ export function CompanyRouter({
   location: string;
   data: StoreData;
   mutate: Mutate;
+  notify: (message: string) => void;
   onNavigate: Navigate;
   onBack: (fallback: string) => void;
   allowed: ModuleId[];
@@ -244,6 +248,9 @@ export function CompanyRouter({
       isAdmin: false,
       companyAdmin,
       sectorManager,
+      mutate,
+      notify,
+      actorName: employee ? `${employee.firstName} ${employee.lastName}` : data.companies.find(item => item.id === companyId)?.manager,
     });
   }
   if (routePath === '/entreprise/notifications') {

@@ -65,7 +65,7 @@ function normalizeHealth(payload: unknown): SystemHealth {
   };
 }
 
-type NewTaskInput = Omit<ControlTask, 'status' | 'createdAt' | 'updatedAt'>;
+type NewTaskInput = Omit<ControlTask, 'id' | 'status' | 'createdAt' | 'updatedAt'>;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, { ...options, cache: 'no-store' });
@@ -91,5 +91,5 @@ export const controlApi = {
   health: async () => normalizeHealth(await request<unknown>('/control/health')),
   createTask: (input: NewTaskInput) => request<ControlTask>('/control/tasks', json(input)),
   updateTaskStatus: (task: ControlTask, status: ControlTask['status']) =>
-    request<ControlTask>(`/control/tasks/${encodeURIComponent(task.id)}/status`, json({ status }, 'PATCH')),
+    request<ControlTask>(`/control/tasks/${encodeURIComponent(task.id)}/status`, json({ status, companyId: task.companyId }, 'PATCH')),
 };

@@ -150,6 +150,9 @@ const MaximusAssistantPage = lazy(() => import('@/pages/maximus-assistant'));
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
 );
+const SystemHealthPage = lazy(() =>
+  import('@/pages/system-health').then((module) => ({ default: module.SystemHealthPage })),
+);
 const PlatformSettingsPage = lazy(() => import('@/pages/platform-settings'));
 function sessionFromAuthUser(user: AuthUser): Session {
   return user.role === 'maximus_admin'
@@ -1057,6 +1060,7 @@ function AppContent() {
                     dashboard: AdminDashboard,
                      assistant: MaximusAssistantPage,
                     control: ControlCenterPage,
+                     surveillance: SystemHealthPage,
                     organization: OrganizationAdminPage,
                     companyDetail: CompanyModulesDetail,
                     companies: CompaniesPage,
@@ -1074,6 +1078,7 @@ function AppContent() {
                 <CompanyRouter
                   location={location}
                   mutate={mutate}
+                  notify={notify}
                   data={data}
                   onNavigate={navigate}
                   onBack={goBack}
