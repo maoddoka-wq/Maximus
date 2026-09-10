@@ -536,7 +536,7 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
       return;
     }
     const productType = form.productType;
-    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
+    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod: null, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
     const api = createEcommerceApi(data.store.companyId);
     const saved = modal === 'new'
       ? await run(() => api.createProduct(body), 'Produit ajouté au catalogue.')
