@@ -521,24 +521,24 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     { label: 'Panier', path: '/panier' },
     { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
   ];
-  return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--background))]" style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
-    <header className="relative border-b bg-[var(--shop-accent)] text-white">
-      <div className="flex w-full items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex min-w-0 max-w-[calc(100%-3rem)] shrink items-center gap-3">
-             <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:cursor-default disabled:hover:bg-transparent">
-              {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><ShoppingBag size={18} /></span>}
-            </button>
-            <button type="button" onClick={() => go('')} className="min-w-0 text-left">
-              <span className="block whitespace-normal break-words text-lg font-bold leading-tight">{store.name}</span>
-              <span className="block truncate text-xs text-white/65">{store.description}</span>
-            </button>
-          </div>
-         <button type="button" className="rounded-lg p-2 sm:hidden" onClick={() => setMobileMenu(open => !open)} aria-label="Ouvrir le menu" aria-expanded={mobileMenu} aria-controls="mobile-shop-menu"><Menu size={21} /></button>
-         <nav id="mobile-shop-menu" className={`${mobileMenu ? 'flex' : 'hidden'} absolute right-4 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-white/10 bg-[var(--shop-accent)] p-2 shadow-2xl ring-1 ring-black/10 sm:static sm:flex sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0`}>
-           {publicNav.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className="rounded-xl px-3 py-3 text-left text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 hover:text-white sm:py-2">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
-        </nav>
-      </div>
-    </header>
+  return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
+     <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
+       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
+           <div className="flex min-w-0 max-w-[calc(100%-3rem)] shrink items-center gap-3">
+              <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
+               {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-white" />}
+             </button>
+             <button type="button" onClick={() => go('')} className="min-w-0 text-left">
+               <span className="block truncate text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{store.name}</span>
+               <span className="block max-w-[14rem] truncate text-xs text-[hsl(var(--muted-foreground))]">{store.description || 'Votre boutique en ligne'}</span>
+             </button>
+           </div>
+          <button type="button" className="rounded-xl p-2.5 text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))] sm:hidden" onClick={() => setMobileMenu(open => !open)} aria-label="Ouvrir le menu" aria-expanded={mobileMenu} aria-controls="mobile-shop-menu"><Menu size={21} /></button>
+          <nav id="mobile-shop-menu" className={`${mobileMenu ? 'flex' : 'hidden'} absolute right-4 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-black/5 bg-white p-2 shadow-2xl ring-1 ring-black/5 sm:static sm:flex sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0`}>
+            {publicNav.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${routePath === shopPath(item.path) ? 'bg-[var(--shop-accent)] text-white shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
+         </nav>
+       </div>
+     </header>
       {logoPreviewOpen && canOpenSellerCard && <div role="dialog" aria-modal="true" aria-label={`Fiche de ${seller.name || store.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setLogoPreviewOpen(false); }}>
          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-8">
            <button type="button" onClick={() => setLogoPreviewOpen(false)} aria-label="Fermer la fiche vendeur" className="absolute right-3 top-3 rounded-full p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><X size={20} /></button>
@@ -559,7 +559,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
            </div>
          </div>
        </div>}
-     <main className="shop-main mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
+      <main className="shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 py-6 sm:px-6 sm:py-9 lg:px-8">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
       {!isStandalonePwa() && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -582,7 +582,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
           : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals} store={store} onBack={() => go('')} onAdd={addRental} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
-        : <><section className="mb-8 min-w-0"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Sélection de la boutique</p><h1 className="mt-2 text-3xl font-bold tracking-[-.04em] sm:text-4xl">Trouvez ce qu’il vous faut.</h1><p className="mt-2 max-w-2xl whitespace-pre-line text-sm leading-6 text-[hsl(var(--muted-foreground))]">{store.description || 'Découvrez les produits sélectionnés par cette boutique.'}</p></div></section><div className="mb-7 grid gap-3 sm:grid-cols-[1fr_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher dans la boutique" className="w-full rounded-xl border bg-[hsl(var(--card))] py-3 pl-10 pr-3 text-sm" /></label><select value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-xl border bg-[hsl(var(--card))] px-3 py-3 text-sm"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
+        : <><section className="mb-7 overflow-hidden rounded-[2rem] p-6 text-white shadow-[0_18px_55px_rgba(15,23,42,.12)] sm:p-8 lg:p-10" style={{ background: `linear-gradient(120deg, ${store.accentColor}, ${store.primaryColor})` }}><div className="pointer-events-none absolute" /><p className="relative text-[10px] font-bold uppercase tracking-[.2em] text-white/70">Catalogue</p><div className="relative mt-3 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><h1 className="max-w-2xl text-3xl font-bold tracking-[-.05em] sm:text-4xl lg:text-5xl">Les essentiels de {store.name}.</h1><p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-6 text-white/75">{store.description || 'Découvrez les produits sélectionnés par cette boutique.'}</p></div><span className="shrink-0 rounded-full bg-white/15 px-3.5 py-2 text-xs font-semibold text-white/90">{products.length} produit{products.length > 1 ? 's' : ''}</span></div></section><div className="mb-8 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]"><label className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={17} /><input aria-label="Rechercher un produit" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher un produit" className="w-full rounded-2xl border border-black/5 bg-white py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10" /></label><select aria-label="Filtrer par catégorie" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-2xl border border-black/5 bg-white px-4 py-3.5 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
     </main>
      {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-4 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
@@ -646,25 +646,25 @@ function PublicOfferCard({
 }) {
   const isAvailable = availability !== 'Indisponible';
   const availabilityLabel = availability ? (isAvailable ? 'Disponible' : 'Indisponible') : undefined;
-  return <article className="min-w-0 overflow-hidden rounded-xl border border-[#e8e0d4] bg-white shadow-sm">
-    <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[2/1] w-full items-center justify-center overflow-hidden bg-[#fbfaf7] disabled:cursor-default">
-      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover" /> : <Icon size={32} className="text-[hsl(var(--muted-foreground))]" />}
-      {availabilityLabel && <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{availabilityLabel}</span>}
+  return <article className="group min-w-0 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_8px_25px_rgba(15,23,42,.05)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_16px_35px_rgba(15,23,42,.1)]">
+     <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.45)] disabled:cursor-default">
+       {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <Icon size={38} className="text-[hsl(var(--muted-foreground))]" />}
+       {availabilityLabel && <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{availabilityLabel}</span>}
     </button>
-     <div className="border-t border-[#e8e0d4] bg-white p-3.5 sm:p-4">
-      <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{badge}</p>
-      <div className="mt-1.5 flex min-w-0 items-start justify-between gap-3">
-        {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-sm font-bold leading-tight text-[#20252f] sm:text-base">{name}</button> : <h3 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{name}</h3>}
-        <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{price}{priceSuffix && <span className="block text-[10px] font-medium text-[#655e55]">{priceSuffix}</span>}</p>
+      <div className="border-t border-black/5 bg-white p-4 sm:p-5">
+       <p className="truncate text-[10px] font-bold uppercase tracking-[.14em]" style={{ color: 'var(--shop-primary)' }}>{badge}</p>
+       <div className="mt-2 flex min-w-0 items-start justify-between gap-3">
+         {onOpen ? <button type="button" onClick={onOpen} className="min-w-0 break-words text-left text-base font-bold leading-tight text-[hsl(var(--foreground))] sm:text-lg">{name}</button> : <h3 className="min-w-0 break-words text-base font-bold leading-tight text-[hsl(var(--foreground))] sm:text-lg">{name}</h3>}
+         <p className="shrink-0 text-right text-sm font-bold text-[hsl(var(--foreground))] sm:text-base">{price}{priceSuffix && <span className="block text-[11px] font-medium text-[hsl(var(--muted-foreground))]">{priceSuffix}</span>}</p>
       </div>
-      {description && <p className="mt-2 line-clamp-2 min-h-8 text-[11px] leading-4 text-[#655e55]">{description || `Une offre proposée par ${store.name}.`}</p>}
-      {availability && <div className="mt-3 flex items-center gap-2 border-t border-[#eee7dc] pt-2 text-[11px] font-semibold text-[#655e55]">
-        <Package size={14} className="shrink-0 text-[#8c6c37]" />
+       {description && <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{description || `Une offre proposée par ${store.name}.`}</p>}
+       {availability && <div className="mt-4 flex items-center gap-2 border-t border-black/5 pt-3 text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+         <Package size={15} className="shrink-0" style={{ color: 'var(--shop-primary)' }} />
         <span>{availability}</span>
-        <span className="ml-auto truncate">{badge.split(' · ')[1] || badge}</span>
+         <span className="ml-auto truncate">{badge.split(' · ')[1] || badge}</span>
       </div>}
-      {onAdd && <div className="mt-3 flex items-center gap-1.5">
-        {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2.5 py-2 text-[11px] font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter</button>}
+       {onAdd && <div className="mt-4 flex items-center gap-1.5">
+         {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95" style={{ backgroundColor: 'var(--shop-accent)' }}>Ajouter au panier</button>}
       </div>}
     </div>
   </article>;
@@ -685,14 +685,14 @@ function CatalogSections({
   onProduct: (product: PublicProduct) => void;
   onAdd: (product: PublicProduct) => void;
 }) {
-  return <div className="space-y-10">
+  return <div className="space-y-12">
     {categories.map(category => {
       const categoryProducts = products.filter(product => product.category === category);
       const categoryRentals = rentals.filter(rental => rental.category === category);
       if (categoryProducts.length === 0 && categoryRentals.length === 0) return null;
-      return <section key={category}>
-        <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
-         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+       return <section key={category}>
+         <div className="mb-5 flex items-end justify-between gap-3 border-b border-black/5 pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-2xl font-bold tracking-[-.03em]">{category}</h2></div><span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
              {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} description={product.description} price={money(product.price, store.currency)} availability={product.stock > 0 ? `${product.stock} disponible${product.stock > 1 ? 's' : ''}` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} />)}
           {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} description={rental.description} price={money(rental.price, store.currency)} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} disponible${rental.availability > 1 ? 's' : ''}` : 'Indisponible'} store={store} />)}
         </div>
