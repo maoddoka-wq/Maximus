@@ -297,7 +297,10 @@ class EcommerceCustomerController extends Controller
             if (! $product) {
                 return response()->json(['error' => 'Produit introuvable.'], 404);
             }
-            if ((int) $input['quantity'] > (int) $product->stock) {
+            $quantity = ($product->fulfillment_type ?? 'PHYSICAL') === 'DIGITAL'
+                ? ((int) $input['quantity'] > 0 ? 1 : 0)
+                : (int) $input['quantity'];
+            if (($product->fulfillment_type ?? 'PHYSICAL') !== 'DIGITAL' && $quantity > (int) $product->stock) {
                 return response()->json(['error' => 'La quantité demandée dépasse le stock disponible.'], 409);
             }
 
@@ -305,17 +308,17 @@ class EcommerceCustomerController extends Controller
                 ->where('customer_id', $customer->id)
                 ->where('company_id', $store->company_id)
                 ->where('product_id', $product->id);
-            if ((int) $input['quantity'] === 0) {
+            if ($quantity === 0) {
                 $query->delete();
             } elseif ($query->exists()) {
-                $query->update(['quantity' => $input['quantity'], 'updated_at' => now()]);
+                $query->update(['quantity' => $quantity, 'updated_at' => now()]);
             } else {
                 DB::table('ecommerce_customer_cart_items')->insert([
                     'id' => $this->id('cart'),
                     'customer_id' => $customer->id,
                     'company_id' => $store->company_id,
                     'product_id' => $product->id,
-                    'quantity' => $input['quantity'],
+                    'quantity' => $quantity,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -600,6 +603,7 @@ class EcommerceCustomerController extends Controller
                 'product.image_url',
                 'product.product_type',
                 'product.rental_period',
+                'product.fulfillment_type',
             ])
             ->map(fn (object $row): array => [
                 'productId' => $row->product_id,
@@ -614,7 +618,7 @@ class EcommerceCustomerController extends Controller
                 'productType' => $row->product_type ?? 'SALE',
                 'rentalPeriod' => $row->rental_period,
                 'fulfillmentType' => $row->fulfillment_type ?? 'PHYSICAL',
-                'quantity' => (int) $row->quantity,
+                'quantity' => ($row->fulfillment_type ?? 'PHYSICAL') === 'DIGITAL' ? 1 : (int) $row->quantity,
             ])
             ->values()
             ->all();

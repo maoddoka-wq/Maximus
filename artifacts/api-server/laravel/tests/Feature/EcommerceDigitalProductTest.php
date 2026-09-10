@@ -118,7 +118,7 @@ class EcommerceDigitalProductTest extends TestCase
                 'shippingAddress' => 'Dakar',
                 'items' => [
                     ['productSlug' => 'physical-book', 'quantity' => 1],
-                    ['productSlug' => 'digital-book', 'quantity' => 1],
+                    ['productSlug' => 'digital-book', 'quantity' => 4],
                 ],
             ])->assertCreated()->json();
 
@@ -137,6 +137,7 @@ class EcommerceDigitalProductTest extends TestCase
             'id' => $itemId,
             'order_id' => $order['id'],
             'fulfillment_type' => 'DIGITAL',
+            'quantity' => 1,
         ]);
 
         $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)

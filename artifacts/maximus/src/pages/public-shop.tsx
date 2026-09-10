@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
@@ -27,6 +27,9 @@ type CartLine = { product: CartProduct; quantity: number };
 type AccountSection = 'dashboard' | 'orders' | 'profile' | 'addresses' | 'favorites';
 type PaymentSummary = Pick<PublicPaymentStatus, 'reference' | 'total' | 'paymentStatus' | 'failureReason'>;
 
+const cartQuantity = (product: CartProduct | PublicProduct, quantity: number) =>
+  product.fulfillmentType === 'DIGITAL' ? 1 : Math.min(quantity, product.stock);
+
 const money = (value: number, currency: PublicShopBootstrap['store']['currency']) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: currency === 'XOF' ? 0 : 2 }).format(value) + ` ${currency}`;
 
@@ -51,7 +54,7 @@ async function retryRequest<T>(request: () => Promise<T>, attempts = 3): Promise
 const customerCartToLines = (items: EcommerceCustomerCartLine[], products: PublicProduct[]): CartLine[] =>
   items.flatMap(item => {
     const product = products.find(candidate => candidate.slug === item.productSlug);
-    return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
+    return product ? [{ product, quantity: cartQuantity(product, item.quantity) }] : [];
   });
 
 const rentalToCartProduct = (rental: PublicRental): CartProduct => ({
@@ -80,7 +83,7 @@ const restoreGuestCart = (
     return rental ? [{ product: rentalToCartProduct(rental), quantity: Math.min(item.quantity, rental.availability) }] : [];
   }
   const product = item.productSlug ? shop.products.find(candidate => candidate.slug === item.productSlug) : undefined;
-  return product ? [{ product, quantity: Math.min(item.quantity, product.stock) }] : [];
+  return product ? [{ product, quantity: cartQuantity(product, item.quantity) }] : [];
 });
 
 const addressText = (address: EcommerceCustomerAddress) =>
@@ -109,6 +112,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [mobileMenu, setMobileMenu] = useState(false);
   const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
   const [submitted, setSubmitted] = useState<PaymentSummary | null>(null);
+  const autoDownloadedOrderId = useRef<string | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [submittingDelivery, setSubmittingDelivery] = useState(false);
@@ -327,6 +331,15 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             const refreshedCustomerData = await api.bootstrap();
             if (cancelled) return;
             setCustomerData(refreshedCustomerData);
+            if (status.paymentStatus === 'PAID' && autoDownloadedOrderId.current !== paymentReturn.orderId) {
+              const paidOrder = refreshedCustomerData.orders.find(order => order.id === paymentReturn.orderId);
+              const digitalItems = paidOrder?.items.filter(item => item.fulfillmentType === 'DIGITAL') ?? [];
+              if (digitalItems.length > 0) {
+                autoDownloadedOrderId.current = paymentReturn.orderId;
+                await Promise.allSettled(digitalItems.map(item => api.downloadDigitalProduct(paymentReturn.orderId, item.id)));
+                showAppToast('Le téléchargement de votre produit numérique a démarré.', 'success');
+              }
+            }
           } else {
             setSubmitted({
               reference: status.reference,
@@ -361,7 +374,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       for (const line of previous) {
         if (!nextSlugs.has(line.productSlug)) await api.putCartItem(line.productSlug, 0);
       }
-      for (const line of productLines) await api.putCartItem(line.product.slug, line.quantity);
+      for (const line of productLines) await api.putCartItem(line.product.slug, cartQuantity(line.product, line.quantity));
       const refreshed = await api.bootstrap();
       setCustomerData(refreshed);
     } catch (cause) {
@@ -378,7 +391,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     }
     const existing = cart.find(line => line.product.slug === product.slug);
     const next = existing
-      ? cart.map(line => line.product.slug === product.slug ? { ...line, quantity: Math.min(product.stock, line.quantity + 1) } : line)
+      ? cart.map(line => line.product.slug === product.slug ? { ...line, quantity: cartQuantity(product, line.quantity + 1) } : line)
       : [...cart, { product, quantity: 1 }];
     setCartNotice(`${product.name} a été ajouté au panier.`);
     showAppToast(`${product.name} a été ajouté au panier.`, 'success');
@@ -390,8 +403,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const change = (productSlug: string, delta: number) => {
     const next = cart.flatMap(line => {
       if (line.product.slug !== productSlug) return [line];
+      if (line.product.fulfillmentType === 'DIGITAL' && delta > 0) return [line];
       const quantity = line.quantity + delta;
-      return quantity <= 0 ? [] : [{ ...line, quantity: Math.min(line.product.stock, quantity) }];
+      return quantity <= 0 ? [] : [{ ...line, quantity: cartQuantity(line.product, quantity) }];
     });
     void syncCart(next);
   };
@@ -426,8 +440,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     setCheckoutKey(currentKey);
     try {
        const order = domain
-         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => line.product.rentalId ? { rentalId: line.product.rentalId, quantity: line.quantity } : { productSlug: line.product.slug, quantity: line.quantity }) })
-         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => line.product.rentalId ? { rentalId: line.product.rentalId, quantity: line.quantity } : { productSlug: line.product.slug, quantity: line.quantity }) });
+         ? await publicEcommerceApi.createDomainOrder({ ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => line.product.rentalId ? { rentalId: line.product.rentalId, quantity: line.quantity } : { productSlug: line.product.slug, quantity: cartQuantity(line.product, line.quantity) }) })
+         : await publicEcommerceApi.createOrder(slug ?? '', { ...checkoutForm, idempotencyKey: currentKey, items: cart.map(line => line.product.rentalId ? { rentalId: line.product.rentalId, quantity: line.quantity } : { productSlug: line.product.slug, quantity: cartQuantity(line.product, line.quantity) }) });
       const returnUrl = () => {
         const returnPath = customer
           ? shopPath(`/compte/commandes/${encodeURIComponent(order.id)}`)
@@ -1007,7 +1021,7 @@ function CartPanelV2({ cart, total, requiresShipping, store, customer, form, set
       <p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>Panier</p>
       <h1 className="mt-1 text-2xl font-bold">Votre commande</h1>
       {cart.length === 0 ? <p className="py-14 text-center text-sm text-[hsl(var(--muted-foreground))]">Votre panier est vide.</p> : <>
-        <div className="mt-6 divide-y border-y">{cart.map(line => <div key={line.product.slug} className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{line.product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{line.product.fulfillmentType === 'DIGITAL' ? 'Produit numérique' : line.product.productType === 'RENTAL' ? 'Location' : 'Produit physique'} · {money(line.product.price, store.currency)}</p></div><div className="flex items-center gap-2 rounded-lg border px-2 py-1"><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer une unité"><Minus size={14} /></button><span className="w-5 text-center text-sm font-bold">{line.quantity}</span><button type="button" onClick={() => onChange(line.product.slug, 1)} aria-label="Ajouter une unité"><Plus size={14} /></button></div><p className="w-24 text-right text-sm font-bold">{money(line.product.price * line.quantity, store.currency)}</p></div>)}</div>
+         <div className="mt-6 divide-y border-y">{cart.map(line => <div key={line.product.slug} className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{line.product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{line.product.fulfillmentType === 'DIGITAL' ? 'Produit numérique' : line.product.productType === 'RENTAL' ? 'Location' : 'Produit physique'} · {money(line.product.price, store.currency)}</p></div>{line.product.fulfillmentType === 'DIGITAL' ? <div className="flex items-center gap-2"><span className="text-sm font-bold">× 1</span><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer le produit numérique du panier" className="rounded-lg border p-1.5"><X size={13} /></button></div> : <div className="flex items-center gap-2 rounded-lg border px-2 py-1"><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer une unité"><Minus size={14} /></button><span className="w-5 text-center text-sm font-bold">{line.quantity}</span><button type="button" onClick={() => onChange(line.product.slug, 1)} aria-label="Ajouter une unité"><Plus size={14} /></button></div>}<p className="w-24 text-right text-sm font-bold">{money(line.product.price * line.quantity, store.currency)}</p></div>)}</div>
         <div className="mt-5 flex items-center justify-between text-lg font-bold"><span>Total</span><span>{money(total, store.currency)}</span></div>
         <div className="mt-6 grid gap-3 sm:grid-cols-2"><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" value={form.customerName} onChange={event => setForm({ ...form, customerName: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Email" type="email" value={form.customerEmail} onChange={event => setForm({ ...form, customerEmail: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" value={form.customerPhone} onChange={event => setForm({ ...form, customerPhone: event.target.value })} />{requiresShipping ? <textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={3} placeholder="Adresse de livraison" value={form.shippingAddress} onChange={event => setForm({ ...form, shippingAddress: event.target.value })} /> : <p className="rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] px-3 py-3 text-xs text-[hsl(var(--primary))] sm:col-span-2">Cette commande contient uniquement des produits numériques. Aucun envoi physique n’est nécessaire.</p>}<textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Note pour la boutique (facultatif)" value={form.note} onChange={event => setForm({ ...form, note: event.target.value })} /></div>
         <fieldset className="mt-5 rounded-2xl border p-4"><legend className="px-1 text-sm font-bold">Moyen de paiement</legend><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez votre moyen préféré. Le paiement sera sécurisé par DiamanoPay.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{([['WAVE', 'Wave'], ['ORANGE_MONEY', 'Orange Money']] as const).map(([value, label]) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${paymentProvider === value ? 'border-[var(--shop-primary)] bg-[var(--shop-primary)]/10' : 'hover:bg-[hsl(var(--muted))]'}`}><input type="radio" name="payment-provider" value={value} checked={paymentProvider === value} onChange={() => setPaymentProvider(value)} />{label}</label>)}</div></fieldset>
@@ -1016,10 +1030,6 @@ function CartPanelV2({ cart, total, requiresShipping, store, customer, form, set
       </>}
     </div>
   </section>;
-}
-
-function CartPanel({ cart, total, requiresShipping, store, customer, form, setForm, paymentProvider, setPaymentProvider, onChange, onSubmit, submitting, onBack }: { cart: CartLine[]; total: number; requiresShipping: boolean; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }; setForm: (form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }) => void; paymentProvider: PaymentProvider; setPaymentProvider: (provider: PaymentProvider) => void; onChange: (slug: string, delta: number) => void; onSubmit: () => void; submitting: boolean; onBack: () => void }) {
-  return <section className="mx-auto max-w-3xl"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Continuer mes achats</button><div className="mt-5 rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:p-8"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>Panier</p><h1 className="mt-1 text-2xl font-bold">Votre commande</h1></div><ShoppingBag size={24} /></div>{cart.length === 0 ? <p className="py-14 text-center text-sm text-[hsl(var(--muted-foreground))]">Votre panier est vide.</p> : <><div className="mt-6 divide-y border-y">{cart.map(line => <div key={line.product.slug} className="flex items-center gap-3 py-4"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{line.product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{line.product.productType === 'RENTAL' ? `LOCATION · ${line.product.rentalPeriod === 'MOIS' ? 'mois' : line.product.rentalPeriod === 'SEMAINE' ? 'semaine' : 'jour'}` : 'VENTE'} · {money(line.product.price, store.currency)}</p></div><div className="flex items-center gap-2 rounded-lg border px-2 py-1"><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer une unité"><Minus size={14} /></button><span className="w-5 text-center text-sm font-bold">{line.quantity}</span><button type="button" onClick={() => onChange(line.product.slug, 1)} aria-label="Ajouter une unité"><Plus size={14} /></button></div><p className="w-24 text-right text-sm font-bold">{money(line.product.price * line.quantity, store.currency)}</p></div>)}</div><div className="mt-5 flex items-center justify-between text-lg font-bold"><span>Total</span><span>{money(total, store.currency)}</span></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" value={form.customerName} onChange={event => setForm({ ...form, customerName: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Email" type="email" value={form.customerEmail} onChange={event => setForm({ ...form, customerEmail: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" value={form.customerPhone} onChange={event => setForm({ ...form, customerPhone: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={3} placeholder="Adresse de livraison" value={form.shippingAddress} onChange={event => setForm({ ...form, shippingAddress: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Note pour la boutique (facultatif)" value={form.note} onChange={event => setForm({ ...form, note: event.target.value })} /></div><fieldset className="mt-5 rounded-2xl border p-4"><legend className="px-1 text-sm font-bold">Moyen de paiement</legend><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez votre moyen préféré. Le paiement sera sécurisé par DiamanoPay.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{([['WAVE', 'Wave'], ['ORANGE_MONEY', 'Orange Money']] as const).map(([value, label]) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${paymentProvider === value ? 'border-[var(--shop-primary)] bg-[var(--shop-primary)]/10' : 'hover:bg-[hsl(var(--muted))]'}`}><input type="radio" name="payment-provider" value={value} checked={paymentProvider === value} onChange={() => setPaymentProvider(value)} />{label}</label>)}</div></fieldset>{customer && <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Cette commande sera rattachée à votre compte client.</p>}<button type="button" onClick={onSubmit} disabled={submitting || !form.customerName.trim() || !form.customerEmail.trim() || !form.shippingAddress.trim() || cart.length === 0} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>{submitting && <RefreshCw size={15} className="animate-spin" />}{submitting ? 'Préparation du paiement…' : `Payer avec ${paymentProvider === 'WAVE' ? 'Wave' : 'Orange Money'}`}</button></>}</div></section>;
 }
 
 function AccountPanel(props: { store: PublicShopBootstrap['store']; section: AccountSection; customer: EcommerceCustomer; products: PublicProduct[]; customerData: EcommerceCustomerBootstrap | null; customerLoading: boolean; customerActionPending: boolean; selectedOrder?: EcommerceCustomerBootstrap['orders'][number]; profileForm: { name: string; phone: string }; setProfileForm: (form: { name: string; phone: string }) => void; passwordForm: { currentPassword: string; newPassword: string }; setPasswordForm: (form: { currentPassword: string; newPassword: string }) => void; addressForm: Omit<EcommerceCustomerAddress, 'id'>; setAddressForm: (form: Omit<EcommerceCustomerAddress, 'id'>) => void; editingAddressId: string | null; setEditingAddressId: (id: string | null) => void; onProfile: () => void; onPassword: () => void; onAddress: () => void; onDeleteAddress: (id: string) => void; onFavorite: (product: PublicProduct) => void; onDownload: (orderId: string, itemId: string) => void; onOrder: (id: string) => void; onLogout: () => void; onNavigate: (path: string) => void }) {

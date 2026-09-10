@@ -1599,13 +1599,11 @@ class EcommerceController extends Controller
                     if ($fulfillmentType === 'PHYSICAL' && trim((string) ($input['shippingAddress'] ?? '')) === '') {
                         throw new \RuntimeException('SHIPPING_ADDRESS_REQUIRED');
                     }
-                    if ($fulfillmentType === 'PHYSICAL' && $product->stock < $item['quantity']) {
+                    $quantity = $fulfillmentType === 'DIGITAL' ? 1 : (int) $item['quantity'];
+                    if ($fulfillmentType === 'PHYSICAL' && $product->stock < $quantity) {
                         throw new \RuntimeException('STOCK_INSUFFICIENT');
                     }
-                    if ($fulfillmentType === 'DIGITAL' && $item['quantity'] > 1) {
-                        throw new \RuntimeException('DIGITAL_QUANTITY_LIMIT');
-                    }
-                    $lineTotal = $product->price * $item['quantity'];
+                    $lineTotal = $product->price * $quantity;
                     $total += $lineTotal;
                     $lines[] = [
                         'id' => $this->id('order-line'),
@@ -1613,7 +1611,7 @@ class EcommerceController extends Controller
                         'rental_id' => null,
                         'product_name' => $product->name,
                         'unit_price' => $product->price,
-                        'quantity' => $item['quantity'],
+                        'quantity' => $quantity,
                         'line_total' => $lineTotal,
                         'product_type' => $product->product_type ?? 'SALE',
                         'rental_period' => $product->rental_period,
@@ -1624,7 +1622,7 @@ class EcommerceController extends Controller
                     ];
                     if ($fulfillmentType === 'PHYSICAL') {
                         DB::table('ecommerce_products')->where('id', $product->id)->update([
-                            'stock' => $product->stock - $item['quantity'],
+                            'stock' => $product->stock - $quantity,
                             'updated_at' => now(),
                         ]);
                     }
@@ -1663,18 +1661,16 @@ class EcommerceController extends Controller
 
             return response()->json($order, 201);
         } catch (Throwable $error) {
+            $message = match ($error->getMessage()) {
+                'STOCK_INSUFFICIENT' => 'Un article n’est plus disponible dans la quantité demandée.',
+                'RENTAL_UNAVAILABLE' => 'Cette location n’est plus disponible dans la quantité demandée.',
+                'PRODUCT_TYPE_NOT_AUTHORIZED' => 'Ce type de produit n’est pas activé pour cette boutique.',
+                'SHIPPING_ADDRESS_REQUIRED' => 'Une adresse est nécessaire pour une commande physique.',
+                default => 'La commande n’a pas pu être enregistrée.',
+            };
+
             return response()->json([
-                'error' => $error->getMessage() === 'STOCK_INSUFFICIENT'
-                    ? 'Un article n’est plus disponible dans la quantité demandée.'
-                    : ($error->getMessage() === 'RENTAL_UNAVAILABLE'
-                        ? 'Cette location n’est plus disponible dans la quantité demandée.'
-                        : ($error->getMessage() === 'PRODUCT_TYPE_NOT_AUTHORIZED'
-                            ? 'Ce type de produit n’est pas activé pour cette boutique.'
-                            : ($error->getMessage() === 'SHIPPING_ADDRESS_REQUIRED'
-                                ? 'Une adresse est nécessaire pour une commande physique.'
-                                : ($error->getMessage() === 'DIGITAL_QUANTITY_LIMIT'
-                                    ? 'Un produit numérique ne peut être acheté qu’une seule fois par ligne.'
-                                    : 'La commande n’a pas pu être enregistrée.'))))
+                'error' => $message,
             ], in_array($error->getMessage(), ['STOCK_INSUFFICIENT', 'RENTAL_UNAVAILABLE'], true) ? 409 : 400);
         }
     }
