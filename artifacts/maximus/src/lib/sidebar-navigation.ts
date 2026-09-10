@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   CreditCard,
   FileBarChart,
+  FileText,
   Gauge,
   History,
   LayoutGrid,
@@ -75,6 +76,16 @@ const ecommerceFeatureIcons: Record<string, Icon> = {
   promotions: CreditCard,
   livraisons: Warehouse,
   parametres: Settings,
+};
+
+const payrollFeatureIcons: Record<string, Icon> = {
+  'tableau-de-bord': Gauge,
+  bénéficiaires: Users,
+  'préparer-une-paie': FileText,
+  validation: ClipboardCheck,
+  virements: ArrowUpFromLine,
+  'solde-de-paie': WalletCards,
+  historique: History,
 };
 
 function buildEcommerceNavigationItems(
@@ -188,13 +199,15 @@ export function buildSidebarFeatureGroups({
             .map(featureId => ({
             href: `/entreprise/${moduleId}?feature=${featureId}`,
               label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
-              icon: moduleId === 'ventes'
-                ? ShoppingCart
-                : moduleId === 'finance'
-                  ? WalletCards
-                  : moduleId === 'rh'
-                    ? Users
-                    : LayoutGrid,
+              icon: moduleId === 'paie'
+                ? payrollFeatureIcons[featureId] ?? WalletCards
+                : moduleId === 'ventes'
+                  ? ShoppingCart
+                  : moduleId === 'finance'
+                    ? WalletCards
+                    : moduleId === 'rh'
+                      ? Users
+                      : LayoutGrid,
             }));
 
     if (items.length) return [{ label: module.name, items }];

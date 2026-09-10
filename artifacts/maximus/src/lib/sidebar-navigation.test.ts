@@ -59,6 +59,28 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
 });
 
+test('le menu Paie utilise une icône distincte pour chaque fonctionnalité', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['paie'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+  });
+  const items = groups[0]?.items ?? [];
+
+  assert.deepEqual(items.map(item => item.href), [
+    '/entreprise/paie?feature=tableau-de-bord',
+    '/entreprise/paie?feature=bénéficiaires',
+    '/entreprise/paie?feature=préparer-une-paie',
+    '/entreprise/paie?feature=validation',
+    '/entreprise/paie?feature=virements',
+    '/entreprise/paie?feature=solde-de-paie',
+    '/entreprise/paie?feature=historique',
+  ]);
+  assert.equal(new Set(items.map(item => item.icon)).size, items.length);
+});
+
 test('le menu e-commerce expose les catégories avec le catalogue', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['ecommerce'],
