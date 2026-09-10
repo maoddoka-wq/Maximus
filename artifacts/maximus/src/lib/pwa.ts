@@ -17,20 +17,35 @@ export const clientPwaStorageKey = (slug?: string, domain = false) =>
 export const clientPwaStartPath = (slug: string) =>
   `/client-app/shop/${encodeURIComponent(slug)}/`;
 
+export const clientPwaPath = (slug?: string, suffix = '', domain = false) => {
+  const normalizedSuffix = suffix === ''
+    ? ''
+    : suffix.startsWith('/') ? suffix : `/${suffix}`;
+
+  if (domain || !slug) {
+    return `/client-app${normalizedSuffix || '/'}`;
+  }
+
+  return `/client-app/shop/${encodeURIComponent(slug)}${normalizedSuffix || '/'}`;
+};
+
 export function parseClientPwaPath(pathname: string): ClientPwaEntry | null {
   const normalized = pathname.replace(/\/+$/, '') || '/';
   const shopPrefix = '/client-app/shop/';
   if (normalized.startsWith(shopPrefix)) {
-    const encodedSlug = normalized.slice(shopPrefix.length);
-    if (!encodedSlug || encodedSlug.includes('/')) return null;
+    const encodedSlug = normalized.slice(shopPrefix.length).split('/')[0];
+    if (!encodedSlug) return null;
     try {
       const slug = decodeURIComponent(encodedSlug);
-      return slug ? { slug } : null;
+      return slug && !slug.includes('/') ? { slug } : null;
     } catch {
       return null;
     }
   }
-  return normalized === '/client-app' ? { domain: true } : null;
+  if (normalized === '/client-app/shop') return null;
+  return normalized === '/client-app' || normalized.startsWith('/client-app/')
+    ? { domain: true }
+    : null;
 }
 
 export const isStandalonePwa = () =>
@@ -87,7 +102,7 @@ export function initializePwa() {
           .filter((registration) => registration.scope === rootScope && registration.active?.scriptURL.endsWith('/sw.js'))
           .map((registration) => registration.unregister()),
       ))
-      .then(() => navigator.serviceWorker.register(clientServiceWorker, { scope: clientScope }))
+      .then(() => navigator.serviceWorker.register(clientServiceWorker, { scope: clientScope, updateViaCache: 'none' }))
       .catch((error: unknown) => {
         console.warn('Le service worker client MAXIMUS n’a pas pu être enregistré.', error);
       });

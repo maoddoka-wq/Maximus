@@ -18,7 +18,7 @@ import {
   type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
-import { canInstallPwa, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
+import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
@@ -208,7 +208,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   }, [logoPreviewOpen]);
 
   const shopPath = (suffix = '') => clientApp
-    ? `/client-app${suffix}`
+    ? clientPwaPath(slug, suffix, domain)
     : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
   const go = (suffix: string) => {
     setMobileMenu(false);

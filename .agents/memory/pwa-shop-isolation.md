@@ -9,4 +9,10 @@ Deux boutiques installées depuis la même origine ne doivent jamais dépendre d
 
 **How to apply:** Pour une boutique par slug, utiliser un start_url/id/scope sous `/client-app/shop/<slug>/`. Pour un domaine personnalisé, conserver `/client-app/`, car l’origine est déjà distincte. Ne jamais utiliser une seule clé localStorage pour choisir la boutique courante.
 
+Chaque navigation interne d’une PWA boutique doit conserver `/client-app/shop/<slug>/` avant son sous-chemin (`panier`, `produit`, `compte`, etc.) ; le parseur doit reconnaître ces sous-chemins, pas seulement l’accueil.
+
+**Why:** Perdre le slug lors d’un clic fait sortir la route du périmètre boutique. Le routeur général peut alors afficher l’administration si une session MAXIMUS existe.
+
+**How to apply:** Construire les liens PWA avec un helper partagé et tester au minimum l’accueil, un produit, le panier et une commande client.
+
 Les installations créées avec l’ancien `/client-app/` ne portent aucune information permettant de retrouver leur boutique d’origine. Elles doivent être désinstallées puis recréées depuis le lien public de la boutique après publication de la nouvelle version.
