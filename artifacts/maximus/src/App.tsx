@@ -7174,7 +7174,8 @@ function CompanyModulesDetail({
                        </div>
                      )}
                      <div>
-                       <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Fonctionnalités autorisées</p>
+                        <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Fonctionnalités autorisées</p>
+                        {module.id === 'ecommerce' && <p className="mb-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour autoriser les produits, cochez <strong>Vente de produits physiques</strong>, <strong>Vente de produits numériques</strong>, ou les deux.</p>}
                        <div className="grid gap-2 sm:grid-cols-2">
                          {getModuleFeatureOptions(module).map((feature) => (
                            <label key={feature.id} className="flex items-center gap-2 text-xs">
