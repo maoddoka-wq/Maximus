@@ -860,8 +860,11 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
     const productType = form.fulfillmentType === 'DIGITAL' ? 'SALE' : (modal !== 'new' && modal ? modal.productType : 'SALE');
     const rentalPeriod = form.fulfillmentType === 'DIGITAL' ? null : (modal !== 'new' && modal ? modal.rentalPeriod : null);
     const requestedStatus = form.status;
-    const savingDigitalDraft = form.fulfillmentType === 'DIGITAL' && modal === 'new' && !form.digitalFile;
-    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, fulfillmentType: form.fulfillmentType, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.fulfillmentType === 'DIGITAL' && !form.digitalFile && modal === 'new' ? 'DRAFT' : requestedStatus };
+    const existingDigitalFile = modal !== null && modal !== 'new' && form.fulfillmentType === 'DIGITAL' && Boolean(modal.digitalFile?.name);
+    const mustUploadBeforePublishing = form.fulfillmentType === 'DIGITAL' && requestedStatus === 'PUBLISHED' && !existingDigitalFile;
+    const savingDigitalDraft = form.fulfillmentType === 'DIGITAL' && requestedStatus === 'PUBLISHED' && !form.digitalFile && !existingDigitalFile;
+    const bodyStatus = mustUploadBeforePublishing ? 'DRAFT' : requestedStatus;
+    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, fulfillmentType: form.fulfillmentType, imageUrl: form.imageUrl.trim(), featured: form.featured, status: bodyStatus };
     const api = createEcommerceApi(data.store.companyId);
     const saved = modal === 'new'
       ? await run(() => api.createProduct(body), savingDigitalDraft ? 'Produit numérique enregistré en brouillon. Ajoutez le fichier pour le publier.' : 'Produit ajouté au catalogue.')
@@ -874,9 +877,11 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
       await run(() => api.uploadProductImage(savedProduct.id, form.imageFile as File), 'Produit et photo enregistrés.');
     }
     if (form.digitalFile) {
-      await run(() => api.uploadDigitalFile(savedProduct.id, form.digitalFile as File), 'Produit numérique et fichier enregistrés.');
-      if (requestedStatus === 'PUBLISHED' && savedProduct.status !== 'PUBLISHED') {
-        await run(() => api.updateProduct(savedProduct.id, { status: 'PUBLISHED' }), 'Produit numérique publié.');
+      const uploaded = await run(() => api.uploadDigitalFile(savedProduct.id, form.digitalFile as File), 'Produit numérique et fichier enregistrés.');
+      if (!uploaded) return;
+      if (requestedStatus === 'PUBLISHED' && bodyStatus !== 'PUBLISHED') {
+        const published = await run(() => api.updateProduct(savedProduct.id, { status: 'PUBLISHED' }), 'Produit numérique publié.');
+        if (!published) return;
       }
     }
     setModal(null);
