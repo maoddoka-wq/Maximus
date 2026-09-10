@@ -11,6 +11,7 @@ import {
   LockKeyhole,
   MessageSquareText,
   Minus,
+  Plus,
   RefreshCw,
   Send,
   ShieldCheck,
@@ -20,6 +21,12 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
+import {
+  type MaximusAssistantAction,
+  type MaximusAssistantMessage,
+  type MaximusAssistantResponse,
+} from '@/lib/maximus-assistant-api';
+import { parseMaxiActionRequest } from '@/lib/maxi-actions';
 
 export type MaximusWorkspaceContext = {
   name: string;
@@ -52,20 +59,24 @@ type ConversationEntry = {
   id: string;
   kind: 'user' | 'assistant';
   text: string;
+  citations?: string[];
+  action?: MaximusAssistantAction;
 };
 
 type MaximusAssistantProps = {
   workspaceContext: MaximusWorkspaceContext;
   insightCards: MaximusInsightCard[];
-  onAsk: (question: string) => void | string | Promise<void | string>;
+  onAsk: (question: string, history?: MaximusAssistantMessage[]) => MaximusAssistantResponse | Promise<MaximusAssistantResponse>;
+  onPreviewAction: (action: MaximusAssistantAction) => Promise<MaximusAssistantResponse>;
+  onExecuteAction: (action: MaximusAssistantAction) => Promise<MaximusAssistantResponse>;
   loading?: boolean;
   initialQuestion?: string;
 };
 
 const suggestedPrompts = [
-  'Qu’est-ce qui mérite mon attention cette semaine ?',
-  'Quels indicateurs ont le plus changé sur la période ?',
-  'Où dois-je vérifier les données avant de décider ?',
+  'Quels modules et packs sont publiés actuellement ?',
+  'Quels contrôles dois-je vérifier avant de publier le catalogue ?',
+  'Comment organiser une entreprise sans élargir ses accès ?',
 ];
 
 function TrendMark({ direction }: { direction?: MaximusInsightCard['trendDirection'] }) {
@@ -195,6 +206,8 @@ export function MaximusAssistantPage({
   workspaceContext,
   insightCards,
   onAsk,
+  onPreviewAction,
+  onExecuteAction,
   loading = false,
   initialQuestion = '',
 }: MaximusAssistantProps) {
@@ -225,19 +238,42 @@ export function MaximusAssistantPage({
     const entryId = `${Date.now()}`;
     setConversation(current => [...current, { id: `question-${entryId}`, kind: 'user', text: trimmed }]);
     try {
-      const response = await Promise.resolve(onAsk(trimmed));
+      const history = conversation.map<MaximusAssistantMessage>(entry => ({
+        role: entry.kind,
+        content: entry.text,
+      }));
+      const requestedAction = parseMaxiActionRequest(trimmed);
+      const response = requestedAction
+        ? await onPreviewAction(requestedAction)
+        : await Promise.resolve(onAsk(trimmed, history));
       setConversation(current => [
         ...current,
         {
           id: `answer-${entryId}`,
           kind: 'assistant',
-          text: typeof response === 'string'
-            ? response
-            : 'Question prise en compte. La réponse reste bornée aux données accessibles et aux règles de votre espace. MAXIMUS ne valide ni ne déclenche une action à votre place.',
+          text: response.answer,
+          citations: response.citations,
+          action: response.action,
         },
       ]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La question n’a pas pu être transmise. Réessayez.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmAction = async (entryId: string, action: MaximusAssistantAction) => {
+    if (action.status === 'EXECUTED' || submitting || loading) return;
+    setError('');
+    setSubmitting(true);
+    try {
+      const response = await onExecuteAction(action);
+      setConversation(current => current.map(entry => entry.id === entryId
+        ? { ...entry, text: response.answer, citations: response.citations, action: response.action }
+        : entry));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'MAXI n’a pas pu confirmer cette action.');
     } finally {
       setSubmitting(false);
     }
@@ -258,17 +294,17 @@ export function MaximusAssistantPage({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-[hsl(var(--primary)/.12)] px-3 py-1.5 text-[11px] font-bold text-[hsl(var(--primary))]">
                 <Sparkles size={13} />
-                Assistant administratif
+                 MAXI
               </span>
               <span className="mono text-[10px] uppercase tracking-[.13em] text-[hsl(var(--muted-foreground))]">
-                Contexte MAXIMUS contrôlé
+                 Assistant sécurisé MAXIMUS
               </span>
             </div>
             <h1 className="mt-5 max-w-3xl text-3xl font-black leading-[1.02] tracking-[-.055em] sm:text-5xl">
-              Comprendre et configurer MAXIMUS.
+              MAXI, votre assistant de gouvernance.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))] sm:text-base">
-              {workspaceContext.description ?? `Posez une question sur ${workspaceContext.name}. MAXIMUS vous aide à comprendre les mécanismes de la plateforme et à distinguer clairement ce qui demande une validation humaine.`}
+              {workspaceContext.description ?? `Posez une question sur ${workspaceContext.name}. MAXI vous aide à comprendre, préparer et confirmer les actions autorisées sans contourner les règles de sécurité.`}
             </p>
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[hsl(var(--muted-foreground))]">
               {workspaceContext.scopeLabel && (
@@ -297,9 +333,9 @@ export function MaximusAssistantPage({
                 <LockKeyhole size={16} />
               </span>
               <div>
-                <p className="text-sm font-bold">Un cadre explicite</p>
+                <p className="text-sm font-bold">Une action contrôlée</p>
                 <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                  Il explique ses sources, signale les angles morts et ne décide jamais à votre place.
+                   MAXI prépare les actions, vérifie leurs règles et demande votre confirmation avant toute écriture.
                 </p>
               </div>
             </div>
@@ -326,7 +362,7 @@ export function MaximusAssistantPage({
                   }
                 }}
                 rows={1}
-                placeholder="Ex. Quels sujets dois-je vérifier avant la clôture ?"
+                 placeholder="Message à MAXI…"
                 className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm outline-none placeholder:text-[hsl(var(--muted-foreground)/.7)]"
                 disabled={loading || submitting}
               />
@@ -350,7 +386,7 @@ export function MaximusAssistantPage({
         <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
           <CircleAlert size={17} className="mt-0.5 shrink-0" />
           <div className="flex-1">
-            <p className="font-bold">Impossible de transmettre la question</p>
+             <p className="font-bold">MAXI ne peut pas répondre</p>
             <p className="mt-0.5 text-xs">{error}</p>
           </div>
           <button type="button" aria-label="Fermer l’erreur" onClick={() => setError('')} className="rounded p-1 hover:bg-rose-100">
@@ -362,14 +398,24 @@ export function MaximusAssistantPage({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(20rem,.82fr)]">
         <section className="card-surface overflow-hidden rounded-2xl" aria-labelledby="assistant-conversation-title">
           <div className="flex items-start justify-between gap-4 border-b border-[hsl(var(--border))] p-5">
-            <div>
-              <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Échange</p>
-              <h2 id="assistant-conversation-title" className="mt-1 text-lg font-bold">Conversation de travail</h2>
-            </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-              Espace privé
-            </span>
+             <div className="flex items-center gap-3">
+               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--primary))] text-xs font-black text-[hsl(var(--primary-foreground))]">M</span>
+               <div>
+                 <p className="text-sm font-black">MAXI</p>
+                 <p className="text-[11px] text-[hsl(var(--muted-foreground))]">Assistant de gouvernance MAXIMUS</p>
+               </div>
+             </div>
+             <button
+               type="button"
+               onClick={() => {
+                 setConversation([]);
+                 setError('');
+               }}
+               className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] px-2.5 py-2 text-[11px] font-bold text-[hsl(var(--muted-foreground))] transition hover:border-[hsl(var(--primary)/.45)] hover:text-[hsl(var(--primary))]"
+             >
+               <Plus size={13} />
+               Nouvelle conversation
+             </button>
           </div>
           <div className="min-h-[270px] p-5">
             {conversation.length === 0 ? (
@@ -410,8 +456,40 @@ export function MaximusAssistantPage({
                         <Sparkles size={15} />
                       </span>
                     )}
-                    <div className={`max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 ${entry.kind === 'user' ? 'rounded-br-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'rounded-bl-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/.6)]'}`}>
-                      {entry.text}
+                     <div className={`max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 ${entry.kind === 'user' ? 'rounded-br-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'rounded-bl-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/.6)]'}`}>
+                       <p className="whitespace-pre-wrap">{entry.text}</p>
+                       {entry.kind === 'assistant' && entry.citations && entry.citations.length > 0 && (
+                         <details className="mt-3 border-t border-[hsl(var(--border))] pt-2 text-xs">
+                           <summary className="cursor-pointer font-bold text-[hsl(var(--primary))]">Sources consultées</summary>
+                           <ul className="mt-2 space-y-1 text-[hsl(var(--muted-foreground))]">
+                             {entry.citations.map(citation => <li key={citation}>• {citation}</li>)}
+                           </ul>
+                         </details>
+                       )}
+                       {entry.action && (
+                         <div className="mt-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-3">
+                           <div className="flex items-start gap-2">
+                             <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
+                             <div className="min-w-0 flex-1">
+                               <p className="text-[11px] font-black uppercase tracking-[.12em] text-[hsl(var(--primary))]">Action vérifiée</p>
+                               <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                                 {entry.action.type === 'create_module' && `Créer le module « ${entry.action.name} » dans le brouillon du catalogue.`}
+                                 {entry.action.type === 'create_pack' && `Créer le pack « ${entry.action.name} » dans « ${entry.action.moduleId} ».`}
+                                 {entry.action.type === 'create_organization_unit' && `Créer l’unité « ${entry.action.name} » dans « ${entry.action.companyName} ».`}
+                               </p>
+                               <button
+                                 type="button"
+                                 disabled={entry.action.status === 'EXECUTED' || submitting || loading}
+                                 onClick={() => void confirmAction(entry.id, entry.action!)}
+                                 className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-black text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                               >
+                                 {entry.action.status === 'EXECUTED' ? <CircleCheck size={14} /> : <Check size={14} />}
+                                 {entry.action.status === 'EXECUTED' ? 'Action confirmée' : 'Confirmer et enregistrer'}
+                               </button>
+                             </div>
+                           </div>
+                         </div>
+                       )}
                     </div>
                   </div>
                 ))}
@@ -436,7 +514,7 @@ export function MaximusAssistantPage({
               </span>
               <div>
                 <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Garde-fou</p>
-                <h2 id="assistant-boundary-title" className="mt-1 text-base font-bold">Ce que MAXIMUS ne décide pas</h2>
+               <h2 id="assistant-boundary-title" className="mt-1 text-base font-bold">Ce que MAXI ne décide pas</h2>
               </div>
             </div>
             <p className="mt-4 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
@@ -464,7 +542,7 @@ export function MaximusAssistantPage({
               <p className="text-xs font-bold">Propositions à revoir</p>
               <p className="mt-2 text-2xl font-black tracking-[-.04em]">{actionCount}</p>
               <p className="mt-1 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
-                MAXIMUS peut les signaler, pas les exécuter.
+                 MAXI peut les préparer, mais une confirmation humaine est toujours requise.
               </p>
               {selectedAction && (
                 <div className="mt-4 border-t border-[hsl(var(--border))] pt-3 text-xs text-emerald-800">

@@ -123,6 +123,7 @@ export interface StoreData {
   sectorPresets: SectorPreset[];
   moduleStatuses?: ModuleStatusMap;
   moduleOverrides?: ModuleOverrides;
+  customModules?: Module[];
   removedModules?: ModuleId[];
   catalogDraft?: CatalogDraft;
   catalogVersion?: number;
@@ -257,8 +258,17 @@ export const retiredSectorPresetIds = ['distribution', 'agroalimentaire', 'servi
 const isRetiredSectorPreset = (preset: Pick<SectorPreset, 'id'>) =>
   retiredSectorPresetIds.includes(preset.id as (typeof retiredSectorPresetIds)[number]);
 
-export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'>): Module[] {
-  return modules
+export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'> & {
+  catalogDraft?: StoreData['catalogDraft'];
+  customModules?: StoreData['customModules'];
+}): Module[] {
+  const draftModules = data.catalogDraft?.customModules ?? [];
+  const publishedModules = data.customModules ?? [];
+  const customModules = [...publishedModules, ...draftModules].filter(
+    (module, index, all) => all.findIndex(candidate => candidate.id === module.id) === index,
+  );
+  const catalogModules = [...modules, ...customModules];
+  return catalogModules
     .filter(module => !data.removedModules?.includes(module.id))
     .map(module => {
       const override = data.moduleOverrides?.[module.id];
@@ -338,8 +348,8 @@ export function emptyStoreData(): StoreData {
     purchaseOrders: [], accountingEntries: [], payrollSlips: [], crmOpportunities: [], supplierRecords: [],
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
     sectorPresets: structuredClone(sectorPresets.filter((preset) => !isRetiredSectorPreset(preset))),
-    moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
-    moduleOverrides: {}, removedModules: [], catalogVersion: 1, organizationVersion: 1,
+     moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
+     moduleOverrides: {}, customModules: [], removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
 }
 

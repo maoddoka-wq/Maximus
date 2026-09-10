@@ -116,7 +116,7 @@ final class ModuleCatalog
 
     public static function ensureCatalog(): void
     {
-        foreach (self::definitions() as $definition) {
+        foreach (self::definitionsWithCustom() as $definition) {
             DB::table('maximus_modules')->updateOrInsert(
                 ['id' => $definition['id']],
                 [
@@ -135,9 +135,10 @@ final class ModuleCatalog
     public static function ensureCompanyAccess(string $companyId, ?array $moduleIds = null, string $status = 'ACTIF'): void
     {
         self::ensureCatalog();
-        $allowed = $moduleIds ?? array_column(self::definitions(), 'id');
+        $definitions = self::definitionsWithCustom();
+        $allowed = $moduleIds ?? array_column($definitions, 'id');
         foreach ($allowed as $moduleId) {
-            if (! collect(self::definitions())->contains('id', $moduleId)) {
+            if (! collect($definitions)->contains('id', $moduleId)) {
                 continue;
             }
 
@@ -176,7 +177,7 @@ final class ModuleCatalog
             ->get()
             ->keyBy('module_id');
 
-        return collect(self::definitions())->map(function (array $definition) use ($access): array {
+        return collect(self::definitionsWithCustom())->map(function (array $definition) use ($access): array {
             $row = $access->get($definition['id']);
 
             return [
@@ -197,5 +198,53 @@ final class ModuleCatalog
                 'featureDependencies' => $definition['feature_dependencies'] ?? [],
             ];
         })->all();
+    }
+
+    /**
+     * Published custom modules live in the workspace catalog because they are
+     * created through the MAXI draft workflow. Built-in definitions remain the
+     * source of truth for the standard modules.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function definitionsWithCustom(): array
+    {
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = is_string($row?->payload)
+            ? json_decode($row->payload, true)
+            : ($row?->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+        $custom = is_array($state['customModules'] ?? null) ? $state['customModules'] : [];
+
+        $normalizedCustom = collect($custom)
+            ->filter(static fn (mixed $module): bool => is_array($module) && is_string($module['id'] ?? null))
+            ->map(static fn (array $module): array => [
+                'id' => (string) $module['id'],
+                'name' => (string) ($module['name'] ?? $module['id']),
+                'description' => (string) ($module['description'] ?? ''),
+                'features' => is_array($module['features'] ?? null) ? $module['features'] : [],
+                'feature_packs' => collect(is_array($module['featurePacks'] ?? null) ? $module['featurePacks'] : [])
+                    ->map(static fn (mixed $pack): array => [
+                        'id' => (string) ($pack['id'] ?? ''),
+                        'name' => (string) ($pack['name'] ?? ''),
+                        'description' => (string) ($pack['description'] ?? ''),
+                        'feature_ids' => is_array($pack['featureIds'] ?? null) ? $pack['featureIds'] : [],
+                        'feature_permissions' => is_array($pack['featurePermissions'] ?? null) ? $pack['featurePermissions'] : [],
+                    ])
+                    ->filter(static fn (array $pack): bool => $pack['id'] !== '')
+                    ->values()
+                    ->all(),
+                'feature_dependencies' => is_array($module['featureDependencies'] ?? null) ? $module['featureDependencies'] : [],
+                'status' => in_array(($module['status'] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)
+                    ? ($module['status'] ?? 'ACTIF')
+                    : 'ACTIF',
+            ])
+            ->values()
+            ->all();
+
+        return [
+            ...self::definitions(),
+            ...$normalizedCustom,
+        ];
     }
 }

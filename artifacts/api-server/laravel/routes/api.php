@@ -93,6 +93,10 @@ Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (
 });
 
 Route::middleware('maximus.auth')->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
+Route::middleware('maximus.auth')->prefix('maximus-assistant/actions')->group(function (): void {
+    Route::post('/preview', [MaximusAssistantController::class, 'previewAction']);
+    Route::post('/execute', [MaximusAssistantController::class, 'executeAction']);
+});
 
 Route::middleware('maximus.diagnostic')->get('/diagnostics/health', [SystemHealthController::class, 'show']);
 

@@ -1,9 +1,13 @@
 import type { ModuleId, Status } from '@/lib/store';
 
-export type OperationalModuleId = Extract<
-  ModuleId,
-  'achats' | 'comptabilite' | 'paie' | 'crm' | 'fournisseurs' | 'logistique' | 'documents'
->;
+export type OperationalModuleId =
+  | 'achats'
+  | 'comptabilite'
+  | 'paie'
+  | 'crm'
+  | 'fournisseurs'
+  | 'logistique'
+  | 'documents';
 
 export type OperationalField = {
   key: string;

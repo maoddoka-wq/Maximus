@@ -40,7 +40,7 @@ class ModuleController extends Controller
             'configuration' => ['nullable', 'array'],
         ])->validate();
 
-        $definition = collect(ModuleCatalog::definitions())->firstWhere('id', $moduleId);
+        $definition = collect(ModuleCatalog::definitionsWithCustom())->firstWhere('id', $moduleId);
         if (!$definition) {
             return response()->json(['error' => 'Module introuvable.'], 404);
         }

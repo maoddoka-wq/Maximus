@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AnthropicAssistantService;
+use App\Services\MaximusAssistantActionService;
 use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class MaximusAssistantController extends Controller
         $actor = $request->attributes->get('authActor');
         if (! is_array($actor) || ($actor['role'] ?? null) !== 'maximus_admin') {
             return response()->json([
-                'error' => 'L’assistant Claude est réservé à l’administration principale MAXIMUS.',
+                'error' => 'MAXI est réservé à l’administration principale MAXIMUS.',
                 'code' => 'MAXIMUS_ADMIN_ONLY',
             ], 403);
         }
@@ -40,9 +41,61 @@ class MaximusAssistantController extends Controller
             return response()->json([
                 'error' => $exception instanceof \RuntimeException
                     ? $exception->getMessage()
-                    : 'Le service Claude est momentanément indisponible.',
+                    : 'MAXI est momentanément indisponible.',
             ], 503);
         }
+    }
+
+    public function previewAction(Request $request, MaximusAssistantActionService $actions): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return $this->adminOnlyResponse();
+        }
+
+        $data = $request->validate([
+            'action' => ['required', 'array'],
+        ]);
+
+        try {
+            return response()->json($actions->preview($data['action']));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function executeAction(Request $request, MaximusAssistantActionService $actions): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return $this->adminOnlyResponse();
+        }
+
+        $data = $request->validate([
+            'confirmed' => ['required', 'accepted'],
+            'action' => ['required', 'array'],
+        ]);
+
+        try {
+            return response()->json($actions->execute(
+                $data['action'],
+                (array) $request->attributes->get('authActor'),
+            ));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 422);
+        }
+    }
+
+    private function isMaximusAdmin(Request $request): bool
+    {
+        $actor = $request->attributes->get('authActor');
+        return is_array($actor) && ($actor['role'] ?? null) === 'maximus_admin';
+    }
+
+    private function adminOnlyResponse(): JsonResponse
+    {
+        return response()->json([
+            'error' => 'MAXI est réservé à l’administration principale MAXIMUS.',
+            'code' => 'MAXIMUS_ADMIN_ONLY',
+        ], 403);
     }
 
     /**

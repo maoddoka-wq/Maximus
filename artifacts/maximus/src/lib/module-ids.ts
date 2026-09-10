@@ -16,4 +16,6 @@ export const moduleIds = [
   'rapports',
 ] as const;
 
-export type ModuleId = (typeof moduleIds)[number];
+// Built-in ids remain listed above for menus and routing. Catalog-created
+// modules use the same string contract after server validation.
+export type ModuleId = string;

@@ -7,6 +7,7 @@ import { normalizeRoutePath } from '@/lib/navigation';
 import { buildAdminAssistantInsights } from '@/lib/local-assistant';
 import type { AdminAssistantScope } from '@/lib/local-assistant';
 import { normalizePayrollFeatureId } from '@/lib/payroll-features';
+import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -50,6 +51,8 @@ export function AdminRouter({
   onTestSector,
   assistantScope,
   onAskAssistant,
+  onPreviewAssistantAction,
+  onExecuteAssistantAction,
   screens,
 }: {
   location: string;
@@ -61,7 +64,9 @@ export function AdminRouter({
   onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>;
   onTestSector: (preset: SectorPreset) => void;
   assistantScope: AdminAssistantScope;
-  onAskAssistant: (question: string) => string | Promise<string>;
+  onAskAssistant: (question: string, history?: MaximusAssistantMessage[]) => MaximusAssistantResponse | Promise<MaximusAssistantResponse>;
+  onPreviewAssistantAction: (action: MaximusAssistantAction) => Promise<MaximusAssistantResponse>;
+  onExecuteAssistantAction: (action: MaximusAssistantAction) => Promise<MaximusAssistantResponse>;
   screens: AdminRouteScreens;
 }) {
   const routePath = normalizeRoutePath(location);
@@ -77,6 +82,8 @@ export function AdminRouter({
       },
       insightCards: buildAdminAssistantInsights(assistantScope),
       onAsk: onAskAssistant,
+      onPreviewAction: onPreviewAssistantAction,
+      onExecuteAction: onExecuteAssistantAction,
     });
   }
   if (routePath === '/maximus/controle') {

@@ -128,7 +128,7 @@ import { buildAppAccessContext } from '@/lib/app-access';
 import {
   buildAdminAssistantScope,
 } from '@/lib/local-assistant';
-import { maximusAssistantApi } from '@/lib/maximus-assistant-api';
+import { maximusAssistantApi, type MaximusAssistantAction, type MaximusAssistantMessage } from '@/lib/maximus-assistant-api';
 
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
@@ -166,7 +166,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   },
   '/maximus/assistant': {
     kicker: 'Administration principale',
-    title: 'Assistant administratif MAXIMUS',
+    title: 'MAXI',
     description: 'Comprenez les modules, les packs, les organisations et les règles d’accès avant de décider.',
   },
   '/maximus/controle': {
@@ -464,6 +464,7 @@ function AppContent() {
               : {}),
             moduleOverrides: catalog.moduleOverrides ?? previous.moduleOverrides,
             moduleStatuses: catalog.moduleStatuses ?? previous.moduleStatuses,
+            customModules: catalog.customModules ?? previous.customModules,
             removedModules: catalog.removedModules ?? previous.removedModules,
             catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
           }),
@@ -1043,13 +1044,13 @@ function AppContent() {
                   onBack={goBack}
                   onModuleAccess={updateCompanyModuleAccess}
                    assistantScope={adminAssistantScope}
-                    onAskAssistant={(question) =>
-                      maximusAssistantApi.ask(question).then(response => [
-                        response.answer,
-                        '',
-                        'Sources consultées :',
-                        ...response.citations.map(citation => `- ${citation}`),
-                      ].join('\n'))
+                    onAskAssistant={(question, history) => maximusAssistantApi.ask(question, history)}
+                    onPreviewAssistantAction={(action: MaximusAssistantAction) => maximusAssistantApi.previewAction(action)}
+                    onExecuteAssistantAction={(action: MaximusAssistantAction) =>
+                      maximusAssistantApi.executeAction(action).then(async response => {
+                        await refreshAppState();
+                        return response;
+                      })
                     }
                    onTestSector={startSectorTest}
                   screens={{

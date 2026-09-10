@@ -11,6 +11,7 @@ export interface CatalogDraft {
   moduleOverrides: ModuleOverrides;
   moduleStatuses: ModuleStatusMap;
   removedModules: ModuleId[];
+  customModules: StoreData['customModules'];
   sectorPresets: SectorPreset[];
   updatedAt: string;
 }
@@ -19,6 +20,7 @@ export interface CatalogSnapshot {
   moduleOverrides: ModuleOverrides;
   moduleStatuses: ModuleStatusMap;
   removedModules: ModuleId[];
+  customModules: StoreData['customModules'];
   sectorPresets: SectorPreset[];
 }
 
@@ -42,6 +44,7 @@ export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
     moduleOverrides: clone(draft?.moduleOverrides ?? data.moduleOverrides ?? {}),
     moduleStatuses: clone(draft?.moduleStatuses ?? data.moduleStatuses ?? {}),
     removedModules: clone(draft?.removedModules ?? data.removedModules ?? []),
+    customModules: clone(draft?.customModules ?? data.customModules ?? []),
     sectorPresets: clone(draft?.sectorPresets ?? data.sectorPresets ?? []),
   };
 }
@@ -51,6 +54,7 @@ export function ensureCatalogDraft(data: StoreData): CatalogDraft {
     const published = getCatalogSnapshot(data);
     data.catalogDraft = {
       ...published,
+      customModules: clone(published.customModules ?? []),
       updatedAt: new Date().toISOString(),
     };
   }
@@ -76,6 +80,7 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   const configuredModules = getConfiguredModules({
     moduleOverrides: snapshot.moduleOverrides,
     removedModules: [],
+    customModules: snapshot.customModules,
   });
 
   snapshot.sectorPresets.forEach(sector => {
@@ -134,17 +139,20 @@ export function getCatalogImpact(data: StoreData): CatalogImpact {
     moduleOverrides: data.moduleOverrides ?? {},
     moduleStatuses: data.moduleStatuses ?? {},
     removedModules: data.removedModules ?? [],
+    customModules: data.customModules ?? [],
     sectorPresets: data.sectorPresets ?? [],
   };
-  const changedModules = modules.filter(module =>
+  const changedModules = [...modules, ...(draft.customModules ?? [])].filter(module =>
     JSON.stringify({
       override: draft.moduleOverrides[module.id] ?? null,
       status: draft.moduleStatuses[module.id] ?? module.status,
       removed: draft.removedModules.includes(module.id),
+      custom: draft.customModules?.find(item => item.id === module.id) ?? null,
     }) !== JSON.stringify({
       override: published.moduleOverrides[module.id] ?? null,
       status: published.moduleStatuses[module.id] ?? module.status,
       removed: published.removedModules.includes(module.id),
+      custom: published.customModules?.find(item => item.id === module.id) ?? null,
     }),
   ).length;
   const changedSectors = draft.sectorPresets.filter(sector => {
@@ -170,6 +178,7 @@ export function publishCatalogDraft(data: StoreData) {
   data.moduleOverrides = draft.moduleOverrides;
   data.moduleStatuses = draft.moduleStatuses;
   data.removedModules = draft.removedModules;
+  data.customModules = draft.customModules ?? [];
   data.sectorPresets = draft.sectorPresets;
   const removedModules = new Set(draft.removedModules);
   data.companies.forEach(company => {

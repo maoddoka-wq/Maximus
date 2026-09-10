@@ -7,6 +7,7 @@ use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MaximusAssistantTest extends TestCase
@@ -114,5 +115,91 @@ class MaximusAssistantTest extends TestCase
                 'error',
                 'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
             );
+    }
+
+    public function test_maxi_previews_and_confirms_catalog_and_organization_actions(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'assistant-action-admin',
+            'email' => 'action-admin@maximus.test',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+
+        $moduleAction = [
+            'type' => 'create_module',
+            'name' => 'Gestion des projets',
+            'description' => 'Planifier les projets et suivre leurs livrables.',
+            'features' => ['Pilotage', 'Rapports'],
+        ];
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $moduleAction])
+            ->assertOk()
+            ->assertJsonPath('provider', 'maxi')
+            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/execute', [
+                'action' => $moduleAction,
+                'confirmed' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'EXECUTED');
+
+        $packAction = [
+            'type' => 'create_pack',
+            'moduleId' => 'gestion-des-projets',
+            'name' => 'Suivi de projets',
+            'description' => 'Suivre les projets et leurs rapports.',
+            'featureIds' => ['Pilotage', 'Rapports'],
+        ];
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/execute', [
+                'action' => $packAction,
+                'confirmed' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'EXECUTED');
+
+        $stateRow = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $statePayload = json_decode((string) $stateRow->payload, true);
+        $statePayload['companies'] = [['id' => 'company-action', 'name' => 'Entreprise Action']];
+        $statePayload['orgNodes'] = [];
+        DB::table('maximus_app_states')->where('scope', 'workspace')->update([
+            'payload' => json_encode($statePayload, JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
+
+        $organizationAction = [
+            'type' => 'create_organization_unit',
+            'companyId' => 'company-action',
+            'name' => 'Équipe projets',
+            'code' => 'PROJ',
+            'moduleIds' => ['gestion-des-projets'],
+            'modulePackIds' => ['gestion-des-projets' => ['gestion-des-projets-suivi-de-projets']],
+        ];
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/execute', [
+                'action' => $organizationAction,
+                'confirmed' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'EXECUTED');
+
+        $payload = json_decode((string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'), true);
+        $this->assertSame('gestion-des-projets', $payload['catalogDraft']['customModules'][0]['id']);
+        $this->assertSame('company-action', $payload['orgNodes'][0]['companyId']);
+        $this->assertCount(3, $payload['auditEntries']);
     }
 }

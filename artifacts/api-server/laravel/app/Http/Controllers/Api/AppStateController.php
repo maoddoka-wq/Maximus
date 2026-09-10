@@ -37,6 +37,7 @@ class AppStateController extends Controller
                 'sectorPresets' => $sectorPresets,
                 'moduleOverrides' => $state['moduleOverrides'] ?? [],
                 'moduleStatuses' => $state['moduleStatuses'] ?? [],
+                'customModules' => $state['customModules'] ?? [],
                 'removedModules' => $state['removedModules'] ?? [],
                 'catalogVersion' => $state['catalogVersion'] ?? null,
             ],
