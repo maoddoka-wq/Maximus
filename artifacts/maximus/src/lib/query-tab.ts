@@ -18,7 +18,7 @@ export function parseQueryTab<T extends string>(search: string, aliases: Record<
  * forcing a document reload when only the query string changes.
  */
 export function useQueryTab<T extends string>({ tabs, defaultTab, aliases, isAllowed }: QueryTabOptions<T>) {
-  const [search] = useSearch();
+  const search = useSearch();
   const [, navigate] = useLocation();
   const readRequestedTab = (value: string) => {
     const requested = parseQueryTab(value, aliases);

@@ -381,7 +381,7 @@ function AppContent() {
     () => localStorage.getItem('maximus-sidebar-collapsed') === 'true',
   );
   const [pathname, setLocation] = useLocation();
-  const [search] = useSearch();
+  const search = useSearch();
   const location = search ? `${pathname}?${search}` : pathname;
   const dataRef = useRef(data);
   const appStateSaveQueue = useRef(Promise.resolve());
@@ -5525,7 +5525,7 @@ function InteractiveModulesPage({
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
   notify: (message: string) => void;
 }) {
-  const [search] = useSearch();
+  const search = useSearch();
   const [, setLocation] = useLocation();
   const readSelectedModule = (value: string) => {
     const requested = new URLSearchParams(value).get('module');

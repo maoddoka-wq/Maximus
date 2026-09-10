@@ -40,3 +40,4 @@
 - [Frontière financière de la paie](payroll-financial-boundary.md) — créditer le solde uniquement après webhook signé, chiffrer les comptes et réserver les fonds avant virement.
 - [Catalogue Paie](payroll-catalog.md) — les packs doivent utiliser les slugs des libellés et matérialiser leurs permissions lors du provisionnement entreprise.
 - [Assistant local contrôlé](local-assistant.md) — l’assistant entreprise doit répondre depuis un contexte filtré par session, entreprise et modules autorisés, sans mutation implicite.
+- [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.
