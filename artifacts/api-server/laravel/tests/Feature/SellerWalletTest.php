@@ -118,6 +118,34 @@ class SellerWalletTest extends TestCase
         $this->assertDatabaseCount('maximus_wallet_ledger', 1);
     }
 
+    public function test_maximus_wallet_bootstrap_repairs_a_paid_order_without_financial_ledger_entries(): void
+    {
+        $this->createOrder('order-maximus-reconcile', 'kora', 2500, 'charge-maximus-reconcile');
+        DB::table('ecommerce_orders')->where('id', 'order-maximus-reconcile')->update([
+            'payment_status' => 'PAID',
+            'paid_at' => now(),
+        ]);
+
+        $this->asMaximusAdmin()
+            ->getJson('/api/platform-settings/maximus-wallet')
+            ->assertOk()
+            ->assertJsonPath('wallet.availableBalance', 50)
+            ->assertJsonPath('wallet.totalCredited', 50);
+
+        $this->assertDatabaseHas('seller_wallet_ledger', [
+            'company_id' => 'kora',
+            'reference_id' => 'order-maximus-reconcile',
+            'type' => 'SALE_CREDIT',
+            'amount' => 2375,
+        ]);
+        $this->assertDatabaseHas('maximus_wallet_ledger', [
+            'reference_id' => 'order-maximus-reconcile',
+            'type' => 'SALE_COMMISSION',
+            'amount' => 50,
+            'idempotency_key' => 'sale-commission:order-maximus-reconcile',
+        ]);
+    }
+
     public function test_maximus_commission_is_idempotent_and_configuration_is_validated(): void
     {
         $this->asMaximusAdmin()

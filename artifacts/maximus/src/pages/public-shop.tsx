@@ -507,6 +507,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     showAppToast('Action en cours…', 'info');
     try {
       await action();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'L’action n’a pas pu être effectuée.';
+      setError(message);
+      showAppToast(message, 'error');
     } finally {
       setCustomerActionPending(false);
     }

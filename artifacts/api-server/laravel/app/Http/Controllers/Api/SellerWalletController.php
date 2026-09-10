@@ -91,6 +91,55 @@ final class SellerWalletController extends Controller
         ]);
     }
 
+    public function reconcilePaidSales(): int
+    {
+        $orders = DB::table('ecommerce_orders')
+            ->where('payment_status', 'PAID')
+            ->orderBy('created_at')
+            ->get();
+        $repaired = 0;
+
+        foreach ($orders as $order) {
+            $wasRepaired = DB::transaction(function () use ($order): bool {
+                $locked = DB::table('ecommerce_orders')
+                    ->where('id', $order->id)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $locked || $locked->payment_status !== 'PAID') {
+                    return false;
+                }
+
+                $commission = $this->commissionPolicy->calculate((int) $locked->total);
+                $sellerLedgerExists = DB::table('seller_wallet_ledger')
+                    ->where('company_id', $locked->company_id)
+                    ->where('idempotency_key', 'sale:'.$locked->id)
+                    ->exists();
+                $maximusLedgerExists = (int) $commission['maximusCommission'] <= 0
+                    || DB::table('maximus_wallet_ledger')
+                        ->where('idempotency_key', 'sale-commission:'.$locked->id)
+                        ->exists();
+                if ($sellerLedgerExists && $maximusLedgerExists) {
+                    return false;
+                }
+
+                $availableAt = $locked->funds_available_at
+                    ?? $this->maturityPolicy->availableAt(
+                        (string) $locked->status,
+                        $locked->paid_at ?? $locked->created_at,
+                    );
+                $this->creditPaidOrder($locked, ['reconciled' => true], $availableAt);
+
+                return true;
+            });
+
+            if ($wasRepaired) {
+                $repaired++;
+            }
+        }
+
+        return $repaired;
+    }
+
     public function refreshOrderPaymentStatus(object $order): void
     {
         if ($order->payment_status !== 'PENDING' || trim((string) ($order->payment_charge_id ?? '')) === '') {
@@ -630,25 +679,24 @@ final class SellerWalletController extends Controller
     private function creditPaidOrder(object $order, array $data, mixed $availableAt = null): void
     {
         $key = 'sale:'.$order->id;
-        if (DB::table('seller_wallet_ledger')->where('company_id', $order->company_id)->where('idempotency_key', $key)->exists()) {
-            return;
-        }
-        $wallet = $this->wallet($order->company_id);
-        $available = $order->status === 'LIVRÉE';
         $commission = $this->commissionPolicy->calculate((int) $order->total);
-        $sellerAmount = (int) $commission['sellerNet'];
-        DB::table('seller_wallets')->where('id', $wallet->id)->update([
-            $available ? 'available_balance' : 'pending_balance' => DB::raw(($available ? 'available_balance' : 'pending_balance').' + '.$sellerAmount),
-            'total_credited' => DB::raw('total_credited + '.$sellerAmount),
-            'updated_at' => now(),
-        ]);
-        $this->ledgerInsert($wallet, 'SALE_CREDIT', $available ? 'AVAILABLE' : 'PENDING', 'CREDIT', $sellerAmount, $order->id, $key, $availableAt, [
-            ...$data,
-            'grossAmount' => (int) $commission['grossAmount'],
-            'providerFee' => (int) $commission['providerFee'],
-            'maximusCommission' => (int) $commission['maximusCommission'],
-            'sellerNet' => $sellerAmount,
-        ]);
+        if (! DB::table('seller_wallet_ledger')->where('company_id', $order->company_id)->where('idempotency_key', $key)->exists()) {
+            $wallet = $this->wallet($order->company_id);
+            $available = $order->status === 'LIVRÉE';
+            $sellerAmount = (int) $commission['sellerNet'];
+            DB::table('seller_wallets')->where('id', $wallet->id)->update([
+                $available ? 'available_balance' : 'pending_balance' => DB::raw(($available ? 'available_balance' : 'pending_balance').' + '.$sellerAmount),
+                'total_credited' => DB::raw('total_credited + '.$sellerAmount),
+                'updated_at' => now(),
+            ]);
+            $this->ledgerInsert($wallet, 'SALE_CREDIT', $available ? 'AVAILABLE' : 'PENDING', 'CREDIT', $sellerAmount, $order->id, $key, $availableAt, [
+                ...$data,
+                'grossAmount' => (int) $commission['grossAmount'],
+                'providerFee' => (int) $commission['providerFee'],
+                'maximusCommission' => (int) $commission['maximusCommission'],
+                'sellerNet' => $sellerAmount,
+            ]);
+        }
         $this->maximusWallet->creditCommission((string) $order->company_id, (string) $order->id, $commission, $data);
     }
 

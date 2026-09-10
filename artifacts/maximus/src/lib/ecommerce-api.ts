@@ -590,15 +590,15 @@ export const createCustomerApi = (slug?: string) => {
         }
         const blob = await response.blob();
         const disposition = response.headers.get('content-disposition') ?? '';
-        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = match?.[1] ?? 'produit-numerique';
+        anchor.download = decodeURIComponent(match?.[1] ?? match?.[2] ?? 'produit-numerique');
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        URL.revokeObjectURL(url);
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       }),
     updateProfile: (body: { name: string; phone?: string }) =>
       request<EcommerceCustomer>(endpoint('/profile'), { method: 'PATCH', body: JSON.stringify(body) }),

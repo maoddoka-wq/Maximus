@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\SellerWalletController;
 use App\Services\DiamanoPayService;
 use App\Services\MaximusWalletService;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ final class MaximusWalletController extends Controller
     public function __construct(
         private readonly DiamanoPayService $diamanoPay,
         private readonly MaximusWalletService $wallet,
+        private readonly SellerWalletController $sellerWallet,
     ) {}
 
     public function bootstrap(Request $request): JsonResponse
@@ -22,6 +24,8 @@ final class MaximusWalletController extends Controller
         if (! $this->isMaximusAdmin($request)) {
             return $this->forbidden();
         }
+
+        $this->sellerWallet->reconcilePaidSales();
 
         return response()->json($this->wallet->bootstrap());
     }
