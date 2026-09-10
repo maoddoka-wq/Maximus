@@ -7,7 +7,7 @@ export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION'
 export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COURS' | 'LIVREE' | 'ANNULEE';
 export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
-export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY' | 'MASTERCARD';
+export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY';
 
 export interface EcommerceStore {
   id: string;

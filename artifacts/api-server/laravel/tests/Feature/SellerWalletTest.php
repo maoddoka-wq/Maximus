@@ -683,14 +683,12 @@ class SellerWalletTest extends TestCase
         Http::fake([
             'https://api.diamanopay.com/api/charges' => Http::sequence()
                 ->push(['id' => 'charge-wave', 'checkout_url' => 'https://checkout.example.test/wave'], 200)
-                ->push(['id' => 'charge-orange', 'checkout_url' => 'https://checkout.example.test/orange'], 200)
-                ->push(['id' => 'charge-card', 'checkout_url' => 'https://checkout.example.test/card'], 200),
+                ->push(['id' => 'charge-orange', 'checkout_url' => 'https://checkout.example.test/orange'], 200),
         ]);
 
         foreach ([
             ['slug' => 'kora-choice-wave', 'order' => 'order-choice-wave', 'provider' => 'WAVE'],
             ['slug' => 'kora-choice-orange', 'order' => 'order-choice-orange', 'provider' => 'ORANGE_MONEY'],
-            ['slug' => 'kora-choice-card', 'order' => 'order-choice-card', 'provider' => 'MASTERCARD'],
         ] as $choice) {
             $this->createStore('kora', $choice['slug']);
             $this->createOrder($choice['order'], 'kora', 2500, '');
@@ -700,10 +698,9 @@ class SellerWalletTest extends TestCase
             ])->assertCreated();
         }
 
-        Http::assertSentCount(3);
+        Http::assertSentCount(2);
         Http::assertSent(fn ($request): bool => $request['provider'] === 'WAVE');
         Http::assertSent(fn ($request): bool => $request['provider'] === 'ORANGE_MONEY');
-        Http::assertSent(fn ($request): bool => $request['provider'] === 'MASTERCARD');
     }
 
     public function test_public_payment_rejects_an_unknown_provider(): void

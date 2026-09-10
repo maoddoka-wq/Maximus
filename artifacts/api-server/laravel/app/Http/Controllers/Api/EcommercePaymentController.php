@@ -68,7 +68,7 @@ final class EcommercePaymentController extends Controller
     {
         Validator::make($request->all(), [
             'redirectUrl' => ['nullable', 'url', 'max:500'],
-            'provider' => ['sometimes', 'string', 'in:WAVE,ORANGE_MONEY,MASTERCARD'],
+            'provider' => ['sometimes', 'string', 'in:WAVE,ORANGE_MONEY'],
         ])->validate();
 
         try {
@@ -98,7 +98,7 @@ final class EcommercePaymentController extends Controller
                 $requestedProvider = trim((string) $request->input('provider', ''));
                 $configuredProvider = trim((string) config('services.diamanopay.provider', ''));
                 $provider = strtoupper($requestedProvider !== '' ? $requestedProvider : ($configuredProvider !== '' ? $configuredProvider : 'WAVE'));
-                if (! in_array($provider, ['WAVE', 'ORANGE_MONEY', 'MASTERCARD'], true)) {
+                if (! in_array($provider, ['WAVE', 'ORANGE_MONEY'], true)) {
                     return response()->json(['error' => 'Moyen de paiement DiamanoPay non disponible.'], 422);
                 }
                 $webhookUrl = trim((string) config('services.diamanopay.webhook_url', ''));
