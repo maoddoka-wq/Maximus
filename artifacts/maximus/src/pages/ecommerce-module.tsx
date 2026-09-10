@@ -37,7 +37,6 @@ import {
   type EcommerceOrder,
   type EcommerceOrderStatus,
   type EcommerceProduct,
-  type EcommerceProductType,
   type EcommerceRental,
   type EcommerceRentalPeriod,
   type EcommerceRentalStatus,
@@ -123,8 +122,7 @@ type ProductForm = {
   price: string;
   compareAtPrice: string;
   stock: string;
-  productType: EcommerceProductType;
-  rentalPeriod: EcommerceRentalPeriod;
+  productType: 'SALE' | 'DIGITAL';
   imageUrl: string;
   imageFile: File | null;
   digitalFile: File | null;
@@ -167,7 +165,6 @@ const blankProduct: ProductForm = {
   compareAtPrice: '',
   stock: '0',
   productType: 'SALE',
-  rentalPeriod: 'JOUR',
   imageUrl: '',
   imageFile: null,
   digitalFile: null,
@@ -517,10 +514,13 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
   const [status, setStatus] = useState<'ALL' | EcommerceProduct['status']>('ALL');
   const [modal, setModal] = useState<EcommerceProduct | 'new' | null>(null);
   const [form, setForm] = useState<ProductForm>(blankProduct);
-  const filtered = data.products.filter(product => status === 'ALL' || product.status === status).filter(product => `${product.name} ${product.sku} ${product.category}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
+  const filtered = data.products
+    .filter(product => product.productType !== 'RENTAL')
+    .filter(product => status === 'ALL' || product.status === status)
+    .filter(product => `${product.name} ${product.sku} ${product.category}`.toLocaleLowerCase('fr-FR').includes(query.toLocaleLowerCase('fr-FR')));
   const open = (product?: EcommerceProduct) => {
     setModal(product ?? 'new');
-    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, categoryId: product.categoryId ?? '', price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), productType: product.productType, rentalPeriod: product.rentalPeriod ?? 'JOUR', imageUrl: product.imageUrl, imageFile: null, digitalFile: null, featured: product.featured, status: product.status } : blankProduct);
+    setForm(product ? { name: product.name, slug: product.slug, sku: product.sku, description: product.description, category: product.category, categoryId: product.categoryId ?? '', price: String(product.price), compareAtPrice: product.compareAtPrice === null ? '' : String(product.compareAtPrice), stock: String(product.stock), productType: product.productType === 'DIGITAL' ? 'DIGITAL' : 'SALE', imageUrl: product.imageUrl, imageFile: null, digitalFile: null, featured: product.featured, status: product.status } : blankProduct);
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -536,8 +536,7 @@ function Catalogue({ data, canCreate, canModify, run }: { data: EcommerceBootstr
       return;
     }
     const productType = form.productType;
-    const rentalPeriod = productType === 'RENTAL' ? form.rentalPeriod : null;
-    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, rentalPeriod, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
+    const body = { name: form.name.trim(), ...(form.slug.trim() ? { slug: slugify(form.slug) } : {}), sku: form.sku.trim(), description: form.description.trim(), category: form.category.trim() || 'Divers', categoryId: form.categoryId || null, price, compareAtPrice, stock, productType, imageUrl: form.imageUrl.trim(), featured: form.featured, status: form.status };
     const api = createEcommerceApi(data.store.companyId);
     const saved = modal === 'new'
       ? await run(() => api.createProduct(body), 'Produit ajouté au catalogue.')
@@ -580,14 +579,14 @@ function ProductModal({ modal, form, categories, setForm, onClose, onSave }: { m
           <select value={form.categoryId} onChange={event => { const categoryId = event.target.value; const category = categories.find(item => item.id === categoryId); patch({ categoryId, category: category?.name ?? form.category }); }} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sans catégorie</option>{categories.filter(category => category.isActive).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         </label>
         <Field label="Slug public (optionnel)" value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} placeholder="généré automatiquement si vide" />
-        <label className="block text-xs font-bold">Type de produit<select value={form.productType} onChange={event => patch({ productType: event.target.value as ProductForm['productType'], stock: event.target.value === 'DIGITAL' ? '0' : form.stock })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="SALE">Physique</option><option value="DIGITAL">Numérique</option><option value="RENTAL">Location</option></select></label>
+        <label className="block text-xs font-bold">Type de produit<select value={form.productType} onChange={event => patch({ productType: event.target.value as ProductForm['productType'], stock: event.target.value === 'DIGITAL' ? '0' : form.stock })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="SALE">Physique</option><option value="DIGITAL">Numérique</option></select></label>
         <Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
         <Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" />
         {form.productType !== 'DIGITAL' ? <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /> : <label className="block rounded-lg border border-dashed bg-[hsl(var(--muted)/.35)] px-3 py-2.5 text-xs font-semibold text-[hsl(var(--muted-foreground))]">Stock physique<div className="mt-1 text-sm font-bold text-[hsl(var(--foreground))]">Non applicable</div></label>}
         <label className="block text-xs font-bold">Photo du produit<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => patch({ imageFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 5 Mo maximum · envoyée à l’enregistrement</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.imageFile.name}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label>
         {form.productType === 'DIGITAL' && <label className="block text-xs font-bold sm:col-span-2">Fichier remis après paiement<input type="file" accept=".pdf,.zip,.epub,.docx,.xlsx,.pptx,.csv,.mp3,.mp4,.png,.jpg,.jpeg,application/pdf,application/zip,audio/mpeg,video/mp4" onChange={event => patch({ digitalFile: event.target.files?.[0] ?? null })} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">PDF, ZIP, EPUB, bureautique, audio ou vidéo · 50 Mo maximum · téléchargement débloqué après paiement confirmé.</span>{form.digitalFile ? <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFile.name}</span> : modal !== 'new' && modal.digitalFileName ? <span className="mt-1 block truncate text-[11px] font-semibold text-emerald-700">Fichier actuel : {modal.digitalFileName}</span> : null}</label>}
       </div>
-      <label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur ou le locataire..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+       <label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => patch({ description: event.target.value })} rows={3} placeholder="Quelques mots utiles pour l’acheteur..." className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
       <div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Statut<select value={form.status} onChange={event => patch({ status: event.target.value as ProductForm['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publié</option><option value="ARCHIVED">Archivé</option></select></label><label className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs font-bold"><input type="checkbox" checked={form.featured} onChange={event => patch({ featured: event.target.checked })} className="h-4 w-4 accent-[hsl(var(--primary))]" />Mettre en avant dans la boutique</label></div>
       <div className="modal-footer flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Check className="mr-1 inline" size={14} />Enregistrer</button></div>
     </form>
