@@ -315,23 +315,28 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     if (loading || !data || !paymentReturn) return;
     let cancelled = false;
     const loadPaymentStatus = async () => {
-      if (customer) {
-        const customerOrderPath = shopPath(`/compte/commandes/${encodeURIComponent(paymentReturn.orderId)}`);
-        if (routePath !== customerOrderPath) setLocation(customerOrderPath);
-        return;
-      }
+      const customerOrderPath = shopPath(`/compte/commandes/${encodeURIComponent(paymentReturn.orderId)}`);
+      if (customer && routePath !== customerOrderPath) setLocation(customerOrderPath);
       for (let attempt = 0; attempt < 6; attempt += 1) {
         try {
           const status = domain
             ? await publicEcommerceApi.domainPaymentStatus(paymentReturn.orderId)
             : await publicEcommerceApi.paymentStatus(slug ?? '', paymentReturn.orderId);
           if (cancelled) return;
-          setSubmitted({
-            reference: status.reference,
-            total: status.total,
-            paymentStatus: status.paymentStatus,
-            failureReason: status.failureReason,
-          });
+          if (customer) {
+            const refreshedOrder = await api.order(paymentReturn.orderId);
+            if (cancelled) return;
+            setCustomerData(current => current
+              ? { ...current, orders: [refreshedOrder, ...current.orders.filter(order => order.id !== refreshedOrder.id)] }
+              : current);
+          } else {
+            setSubmitted({
+              reference: status.reference,
+              total: status.total,
+              paymentStatus: status.paymentStatus,
+              failureReason: status.failureReason,
+            });
+          }
           if (['PAID', 'FAILED', 'REFUNDED'].includes(status.paymentStatus)) return;
         } catch (cause) {
           if (!cancelled) setError(cause instanceof Error ? cause.message : 'Le statut du paiement est indisponible.');
