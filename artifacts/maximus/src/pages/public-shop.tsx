@@ -324,11 +324,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             : await publicEcommerceApi.paymentStatus(slug ?? '', paymentReturn.orderId);
           if (cancelled) return;
           if (customer) {
-            const refreshedOrder = await api.order(paymentReturn.orderId);
+            const refreshedCustomerData = await api.bootstrap();
             if (cancelled) return;
-            setCustomerData(current => current
-              ? { ...current, orders: [refreshedOrder, ...current.orders.filter(order => order.id !== refreshedOrder.id)] }
-              : current);
+            setCustomerData(refreshedCustomerData);
           } else {
             setSubmitted({
               reference: status.reference,
@@ -416,6 +414,12 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 
   const submitOrder = async () => {
     if (!data || cart.length === 0 || submittingOrder) return;
+    if (!customer && cart.some(line => line.product.fulfillmentType === 'DIGITAL')) {
+      setError('Connectez-vous avant de payer un produit numérique afin de retrouver son téléchargement dans votre compte.');
+      showAppToast('Connexion requise pour un produit numérique.', 'info');
+      go('/connexion');
+      return;
+    }
     setSubmittingOrder(true);
     setError('');
     const currentKey = checkoutKey ?? crypto.randomUUID();
@@ -656,7 +660,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       </div>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} store={store} orderId={paymentReturn?.orderId ?? ''} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
-         : isCartRoute ? <CartPanelV2 cart={cart} total={total} requiresShipping={requiresShipping} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
+             : isCartRoute ? <CartPanelV2 cart={cart} total={total} requiresShipping={requiresShipping} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
@@ -1065,7 +1069,39 @@ function FavoriteSection({ products, favoriteSlugs, onToggle, onNavigate }: { pr
 }
 
 function OrderSection({ orders, selectedOrder, onOrder, onDownload }: { orders: EcommerceCustomerBootstrap['orders']; selectedOrder?: EcommerceCustomerBootstrap['orders'][number]; onOrder: (id: string) => void; onDownload: (orderId: string, itemId: string) => void }) {
-  return <div className="min-w-0"><div className="flex min-w-0 items-end justify-between gap-3"><div className="min-w-0"><h1 className="break-words text-2xl font-bold">Vos commandes</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Le statut du paiement, de la préparation et de la livraison communiqué par la boutique.</p></div></div>{selectedOrder ? <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-4 shadow-sm sm:p-5"><button type="button" onClick={() => onOrder('')} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={15} />Toutes les commandes</button><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-[hsl(var(--muted-foreground))]">{readableDate(selectedOrder.createdAt)}</p><h2 className="mt-1 break-words text-xl font-bold">{selectedOrder.reference}</h2></div><div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{selectedOrder.status}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Paiement : {selectedOrder.paymentStatus}</p></div></div><div className="mt-6 divide-y border-y">{selectedOrder.items.map(item => <div key={item.id} className="flex min-w-0 items-center justify-between gap-3 py-4 text-sm"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))] sm:h-12 sm:w-12">{item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-cover" /> : item.productType === 'RENTAL' ? <Home size={18} /> : item.fulfillmentType === 'DIGITAL' ? <ArrowDownToLine size={18} /> : <Package size={18} />}</span><span className="min-w-0"><strong className="block truncate">{item.productName}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{item.fulfillmentType === 'DIGITAL' ? 'Produit numérique' : item.productType === 'RENTAL' ? 'Location' : 'Produit physique'} · × {item.quantity}</small></span></div><div className="flex shrink-0 items-center gap-3"><strong className="text-right">{item.lineTotal}</strong>{item.fulfillmentType === 'DIGITAL' && item.downloadUrl && selectedOrder.paymentStatus === 'PAID' && <button type="button" onClick={() => onDownload(selectedOrder.id, item.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--primary))]"><Download size={14} />Télécharger</button>}</div></div>)}</div><div className="mt-5 flex flex-wrap justify-between gap-2 font-bold"><span>Total</span><span>{money(selectedOrder.total, 'XOF')}</span></div>{selectedOrder.shippingAddress && <p className="mt-5 break-words rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-sm">{selectedOrder.shippingAddress}</p>}</div> : orders.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))] sm:p-10">Aucune commande liée à ce compte.</div> : <div className="mt-6 grid gap-3">{orders.map(order => <button type="button" key={order.id} onClick={() => onOrder(order.id)} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border bg-[hsl(var(--card))] p-4 text-left shadow-sm hover:border-[var(--shop-primary)] sm:gap-4 sm:p-5"><div className="min-w-0"><p className="truncate text-sm font-bold">{order.reference}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{readableDate(order.createdAt)} · {order.items.length} article(s)</p></div><div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{order.total}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{order.status} · Paiement {order.paymentStatus}</p></div></button>)}</div>}</div>;
+  return <div className="min-w-0">
+    <div className="flex min-w-0 items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="break-words text-2xl font-bold">Vos commandes</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Le statut du paiement, de la préparation et de la livraison communiqué par la boutique.</p>
+      </div>
+    </div>
+    {selectedOrder ? <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-4 shadow-sm sm:p-5">
+      <button type="button" onClick={() => onOrder('')} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={15} />Toutes les commandes</button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0"><p className="text-xs text-[hsl(var(--muted-foreground))]">{readableDate(selectedOrder.createdAt)}</p><h2 className="mt-1 break-words text-xl font-bold">{selectedOrder.reference}</h2></div>
+        <div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{selectedOrder.status}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Paiement : {selectedOrder.paymentStatus}</p></div>
+      </div>
+      <div className="mt-6 divide-y border-y">
+        {selectedOrder.items.map(item => {
+          const isDigital = item.fulfillmentType === 'DIGITAL';
+          const canDownload = isDigital && selectedOrder.paymentStatus === 'PAID';
+          return <div key={item.id} className="flex min-w-0 items-center justify-between gap-3 py-4 text-sm">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))] sm:h-12 sm:w-12">{item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-cover" /> : item.productType === 'RENTAL' ? <Home size={18} /> : isDigital ? <ArrowDownToLine size={18} /> : <Package size={18} />}</span>
+              <span className="min-w-0"><strong className="block truncate">{item.productName}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{isDigital ? 'Produit numérique' : item.productType === 'RENTAL' ? 'Location' : 'Produit physique'} · × {item.quantity}</small></span>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <strong className="text-right">{item.lineTotal}</strong>
+              {canDownload && <button type="button" onClick={() => onDownload(selectedOrder.id, item.id)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--primary))]"><Download size={14} />Télécharger</button>}
+            </div>
+          </div>;
+        })}
+      </div>
+      <div className="mt-5 flex flex-wrap justify-between gap-2 font-bold"><span>Total</span><span>{money(selectedOrder.total, 'XOF')}</span></div>
+      {selectedOrder.shippingAddress && <p className="mt-5 break-words rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-sm">{selectedOrder.shippingAddress}</p>}
+    </div> : orders.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))] sm:p-10">Aucune commande liée à ce compte.</div> : <div className="mt-6 grid gap-3">{orders.map(order => <button type="button" key={order.id} onClick={() => onOrder(order.id)} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border bg-[hsl(var(--card))] p-4 text-left shadow-sm hover:border-[var(--shop-primary)] sm:gap-4 sm:p-5"><div className="min-w-0"><p className="truncate text-sm font-bold">{order.reference}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{readableDate(order.createdAt)} · {order.items.length} article(s)</p></div><div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{order.total}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{order.status} · Paiement {order.paymentStatus}</p></div></button>)}</div>}
+  </div>;
 }
 
 function ProfileSection({ customer, profileForm, setProfileForm, passwordForm, setPasswordForm, onProfile, onPassword }: { customer: EcommerceCustomer; profileForm: { name: string; phone: string }; setProfileForm: (form: { name: string; phone: string }) => void; passwordForm: { currentPassword: string; newPassword: string }; setPasswordForm: (form: { currentPassword: string; newPassword: string }) => void; onProfile: () => void; onPassword: () => void }) {

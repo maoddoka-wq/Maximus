@@ -43,6 +43,7 @@
 - [Assistant local contrôlé](local-assistant.md) — l’assistant entreprise doit répondre depuis un contexte filtré par session, entreprise et modules autorisés, sans mutation implicite.
 - [Frontière serveur Anthropic](anthropic-server-boundary.md) — une clé Claude reste côté serveur, nommée pour son fournisseur, avec accès MAXIMUS-admin et validation humaine.
 - [Publication des produits numériques](digital-product-publication.md) — créer en brouillon, envoyer le fichier, puis publier ; l’API refuse une création numérique publiée sans fichier.
+- [Affichage du téléchargement numérique](digital-download-display.md) — afficher après paiement confirmé sans dépendre d’une URL optionnelle dans le payload.
 - [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.
 - [Réservations automobiles](car-rental-payment-boundary.md) — un créneau n’est confirmé qu’après paiement valide avant expiration, sans chevauchement actif.
 - [Isolation des PWA boutiques](pwa-shop-isolation.md) — deux boutiques sur une même origine exigent un start_url/id distinct et un état client indexé par boutique.
