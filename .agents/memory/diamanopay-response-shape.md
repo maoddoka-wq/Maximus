@@ -16,3 +16,9 @@ Un retour client avec une commande `PENDING` doit aussi déclencher une consulta
 **Why:** Une commande réelle de 200 XOF est restée `PENDING` sans aucune écriture `SALE_CREDIT`, malgré un checkout terminé côté acheteur.
 
 **How to apply:** Réconcilier une charge `PENDING` depuis l’endpoint public de statut, sans créditer tant que DiamanoPay ne renvoie pas un statut terminal de succès.
+
+L’espace client doit aussi réconcilier les commandes numériques `PENDING` à l’ouverture, car un retour navigateur ou un webhook peut être retardé ou absent. Une fois le statut fournisseur terminal, le payload client doit exposer `PAID`, `LIVRÉE` et la ligne `DIGITAL`.
+
+**Why:** Sur Render, des charges DiamanoPay finalisées sont restées `PENDING` dans l’espace client tant que l’endpoint de statut n’était pas appelé.
+
+**How to apply:** Limiter cette réconciliation aux commandes du client courant contenant une ligne numérique, puis réutiliser le chemin idempotent de `SellerWalletController` avant de construire le bootstrap client.

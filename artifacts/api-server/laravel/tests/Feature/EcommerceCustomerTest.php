@@ -6,6 +6,7 @@ use App\Support\EcommerceCustomerAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -96,6 +97,67 @@ class EcommerceCustomerTest extends TestCase
         $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $otherToken)
             ->getJson('/api/shop/kora-client/customer/orders/'.$orderId)
             ->assertNotFound();
+    }
+
+    public function test_customer_bootstrap_reconciles_paid_digital_payment_before_rendering_orders(): void
+    {
+        config([
+            'services.diamanopay.access_token' => 'test-token',
+            'services.diamanopay.webhook_secret' => 'test-secret',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.com/api/charges/charge-customer-digital' => Http::response([
+                'data' => ['id' => 'charge-customer-digital', 'status' => 'SUCCEEDED'],
+            ]),
+        ]);
+
+        $this->createStore('kora', 'kora-digital-customer');
+        $productId = $this->createProduct('kora', 'digital-customer', 2500, 0);
+        DB::table('ecommerce_products')->where('id', $productId)->update([
+            'fulfillment_type' => 'DIGITAL',
+            'digital_file_path' => 'digital/kora/customer.pdf',
+            'digital_file_name' => 'customer.pdf',
+            'digital_file_mime' => 'application/pdf',
+        ]);
+        $customer = $this->createCustomer('customer-digital', 'kora', 'digital@example.test');
+        DB::table('ecommerce_orders')->insert([
+            'id' => 'order-customer-digital',
+            'company_id' => 'kora',
+            'customer_id' => $customer->id,
+            'reference' => 'CMD-CUSTOMER-DIGITAL',
+            'customer_name' => $customer->name,
+            'customer_email' => $customer->email,
+            'customer_phone' => '',
+            'shipping_address' => '',
+            'note' => '',
+            'total' => 2500,
+            'status' => 'NOUVELLE',
+            'payment_status' => 'PENDING',
+            'payment_charge_id' => 'charge-customer-digital',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('ecommerce_order_items')->insert([
+            'id' => 'order-line-customer-digital',
+            'order_id' => 'order-customer-digital',
+            'product_id' => $productId,
+            'product_name' => 'Produit numérique client',
+            'unit_price' => 2500,
+            'quantity' => 1,
+            'line_total' => 2500,
+            'fulfillment_type' => 'DIGITAL',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $token = EcommerceCustomerAuth::issueSession($customer);
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->getJson('/api/shop/kora-digital-customer/customer/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('orders.0.status', 'LIVRÉE')
+            ->assertJsonPath('orders.0.paymentStatus', 'PAID')
+            ->assertJsonPath('orders.0.items.0.fulfillmentType', 'DIGITAL')
+            ->assertJsonPath('orders.0.items.0.downloadUrl', '/customer/orders/order-customer-digital/items/order-line-customer-digital/download');
     }
 
     public function test_customer_checkout_consumes_the_persistent_cart(): void

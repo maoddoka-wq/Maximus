@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+use Throwable;
 
 class EcommerceCustomerController extends Controller
 {
@@ -116,6 +117,7 @@ class EcommerceCustomerController extends Controller
         if ($customer instanceof JsonResponse) {
             return $customer;
         }
+        $this->refreshCustomerDigitalPayments($customer);
 
         return response()->json([
             'customer' => $this->customer($customer),
@@ -342,9 +344,13 @@ class EcommerceCustomerController extends Controller
 
     public function orders(Request $request, ?string $slug = null): JsonResponse
     {
-        return $this->withCustomer($request, $slug, fn (object $store, object $customer): JsonResponse => response()->json([
-            'orders' => $this->customerOrders($customer),
-        ]));
+        return $this->withCustomer($request, $slug, function (object $store, object $customer): JsonResponse {
+            $this->refreshCustomerDigitalPayments($customer);
+
+            return response()->json([
+                'orders' => $this->customerOrders($customer),
+            ]);
+        });
     }
 
     public function order(Request $request, string $id, ?string $slug = null): JsonResponse
@@ -358,6 +364,12 @@ class EcommerceCustomerController extends Controller
             if (! $order) {
                 return response()->json(['error' => 'Commande introuvable.'], 404);
             }
+            $this->refreshCustomerDigitalPayments($customer);
+            $order = DB::table('ecommerce_orders')
+                ->where('id', $id)
+                ->where('company_id', $store->company_id)
+                ->where('customer_id', $customer->id)
+                ->first() ?? $order;
 
             return response()->json($this->orderPayload($order));
         });
@@ -634,6 +646,38 @@ class EcommerceCustomerController extends Controller
             ->get();
 
         return $rows->map(fn (object $row): array => $this->orderPayload($row))->values()->all();
+    }
+
+    private function refreshCustomerDigitalPayments(object $customer): void
+    {
+        $orders = DB::table('ecommerce_orders')
+            ->where('company_id', $customer->company_id)
+            ->where('customer_id', $customer->id)
+            ->where(function ($query): void {
+                $query->where(function ($pending): void {
+                    $pending->where('payment_status', 'PENDING')
+                        ->whereNotNull('payment_charge_id')
+                        ->where('payment_charge_id', '<>', '');
+                })->orWhere('payment_status', 'PAID');
+            })
+            ->whereExists(function ($query): void {
+                $query->select(DB::raw(1))
+                    ->from('ecommerce_order_items')
+                    ->whereColumn('ecommerce_order_items.order_id', 'ecommerce_orders.id')
+                    ->where('ecommerce_order_items.fulfillment_type', 'DIGITAL');
+            })
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        $sellerWallet = app(SellerWalletController::class);
+        foreach ($orders as $order) {
+            try {
+                $sellerWallet->refreshOrderPaymentStatus($order);
+            } catch (Throwable $error) {
+                report($error);
+            }
+        }
     }
 
     private function customerDeliveryRequests(object $customer): array
