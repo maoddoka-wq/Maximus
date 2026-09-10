@@ -28,7 +28,7 @@ test('refuse une réponse modules provenant d’une autre entreprise', async () 
   );
 });
 
-test('refuse un accès attendu absent ou inactif', async () => {
+test('refuse un accès attendu absent mais accepte un module désactivé', async () => {
   globalThis.fetch = async () =>
     jsonResponse({
       companyId: 'ana',
@@ -45,10 +45,8 @@ test('refuse un accès attendu absent ou inactif', async () => {
       ],
     });
 
-  await assert.rejects(
-    () => loadCompanyModuleAccess('ana', ['stocks']),
-    /accès serveur sont incomplets/,
-  );
+  const access = await loadCompanyModuleAccess('ana', ['stocks']);
+  assert.equal(access[0]?.status, 'INACTIF');
 });
 
 test('ignore les anciens identifiants de modules sans masquer les modules actifs', async () => {

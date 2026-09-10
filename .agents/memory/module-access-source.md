@@ -8,3 +8,9 @@ L’autorisation effective d’un module doit être reconstruite depuis les lign
 **Why:** Une entreprise peut recevoir un module après son inscription. Utiliser uniquement la demande initiale masque alors un module pourtant actif côté serveur.
 
 **How to apply:** Pour charger un espace entreprise, utiliser les statuts d’accès persistés (`ACTIF`/`BETA`) avec un repli sur la demande initiale uniquement lorsqu’aucune ligne d’accès n’existe encore.
+
+Une sélection de fonctionnalités persistée avec `featureScope=explicit` est une liste d’autorisation, y compris lorsqu’elle est vide. Les écritures d’initialisation doivent créer une ligne absente sans réinitialiser une ligne existante.
+
+**Why:** Une liste vide non distinguée d’une absence de restriction réactivait Location et pouvait effacer les droits d’une entreprise lors d’une synchronisation.
+
+**How to apply:** Les contrôles serveur et le frontend doivent lire la ligne d’accès entreprise, préserver ses fonctionnalités lors d’un changement de statut et ne jamais utiliser une initialisation globale pour écraser cette configuration.

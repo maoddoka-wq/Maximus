@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
+use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -1085,13 +1086,15 @@ class EcommerceController extends Controller
                 ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'SALE')
                 ->map(fn ($row) => $this->publicProduct($row))
                 ->values(),
-            'rentals' => collect($this->listRentals((string) $store->company_id))
-                ->concat(
-                    $publishedProducts
-                        ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'RENTAL')
-                        ->map(fn ($row) => $this->publicRentalProduct($row))
-                )
-                ->values(),
+            'rentals' => $this->publicEnabledFeatures((string) $store->company_id)['location']
+                ? collect($this->listRentals((string) $store->company_id))
+                    ->concat(
+                        $publishedProducts
+                            ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'RENTAL')
+                            ->map(fn ($row) => $this->publicRentalProduct($row))
+                    )
+                    ->values()
+                : collect(),
             'deliveryZones' => $this->publicDeliveryZones((string) $store->company_id),
         ])->getData(true);
     }
@@ -1164,19 +1167,9 @@ class EcommerceController extends Controller
 
     private function publicEnabledFeatures(string $companyId): array
     {
-        $access = DB::table('maximus_company_modules')
-            ->where('company_id', $companyId)
-            ->where('module_id', 'ecommerce')
-            ->first();
-        $status = (string) ($access->status ?? 'INACTIF');
-        $featureIds = $access ? json_decode($access->feature_ids ?? '[]', true) : [];
-        $featureIds = is_array($featureIds) ? $featureIds : [];
-        $unrestricted = $featureIds === [];
-        $enabled = in_array($status, ['ACTIF', 'BETA'], true);
-
         return [
-            'location' => $enabled && ($unrestricted || in_array('location', $featureIds, true)),
-            'livraisons' => $enabled && ($unrestricted || in_array('livraisons', $featureIds, true)),
+            'location' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'location'),
+            'livraisons' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'livraisons'),
         ];
     }
 

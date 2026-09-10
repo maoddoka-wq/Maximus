@@ -33,7 +33,21 @@ final class ModuleAuthorization
         string $action,
         ?string $feature = null,
     ): bool {
-        if (in_array($actor['role'] ?? null, ['maximus_admin', 'company_admin'], true)) {
+        if (($actor['role'] ?? null) === 'maximus_admin') {
+            return true;
+        }
+
+        $companyId = (string) ($actor['companyId'] ?? '');
+        if ($companyId === '' || ! ModuleCatalog::isEnabled($companyId, $module)) {
+            return false;
+        }
+        // Store settings are the administrative control plane for the module:
+        // an owner must still be able to publish or repair the store while
+        // optional business features such as Location are disabled.
+        if ($feature !== null && $feature !== 'settings' && ! ModuleCatalog::allowsFeature($companyId, $module, $feature)) {
+            return false;
+        }
+        if (($actor['role'] ?? null) === 'company_admin') {
             return true;
         }
 

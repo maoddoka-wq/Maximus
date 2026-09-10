@@ -113,6 +113,7 @@ import {
   loadCompanyModuleAccess,
   setCompanyModuleAccess,
   synchronizeCompanyModuleAccess,
+  type ServerModuleAccess,
 } from '@/lib/module-api';
 import {
   buildModulePack,
@@ -379,6 +380,7 @@ function AppContent() {
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
+  const [serverModuleAccess, setServerModuleAccess] = useState<ServerModuleAccess[] | null>(null);
   const [serverModuleAccessReady, setServerModuleAccessReady] = useState(false);
   const [serverModuleAccessCompanyId, setServerModuleAccessCompanyId] = useState<string | null>(null);
   const [serverModuleAccessError, setServerModuleAccessError] = useState('');
@@ -569,8 +571,13 @@ function AppContent() {
       notify(successMessage, 'success');
     }
   };
-  const updateCompanyModuleAccess = async (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => {
-    await setCompanyModuleAccess(companyId, moduleId, status);
+  const updateCompanyModuleAccess = async (
+    companyId: string,
+    moduleId: ModuleId,
+    status: ModuleAvailability,
+    options: { featureIds?: string[]; configuration?: Record<string, unknown> } = {},
+  ) => {
+    await setCompanyModuleAccess(companyId, moduleId, status, options);
     mutate((draft) => {
       const company = draft.companies.find((item) => item.id === companyId);
       if (!company) return;
@@ -579,6 +586,19 @@ function AppContent() {
           ? [...new Set([...company.allowedModules, moduleId])]
           : company.allowedModules.filter((item) => item !== moduleId);
       company.refusedModules = company.requestedModules.filter((item) => !company.allowedModules.includes(item));
+      if (options.featureIds) {
+        company.requestedModuleFeatures = {
+          ...(company.requestedModuleFeatures ?? {}),
+          [moduleId]: [...options.featureIds],
+        };
+      }
+      const configuredPackIds = options.configuration?.packIds;
+      if (Array.isArray(configuredPackIds)) {
+        company.requestedModulePackIds = {
+          ...(company.requestedModulePackIds ?? {}),
+          [moduleId]: configuredPackIds.filter((value): value is string => typeof value === 'string'),
+        };
+      }
     });
     notify(
       status === 'MAINTENANCE'
@@ -604,6 +624,7 @@ function AppContent() {
   useEffect(() => {
     if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
       setServerModuleStatuses(null);
+      setServerModuleAccess(null);
       setServerModuleAccessReady(true);
       setServerModuleAccessCompanyId(null);
       setServerModuleAccessError('');
@@ -617,6 +638,7 @@ function AppContent() {
     void loadCompanyModuleAccess(activeCompanyId, activeCompany?.allowedModules ?? [])
       .then((access) => {
         if (!cancelled) {
+          setServerModuleAccess(access);
           setServerModuleStatuses(Object.fromEntries(access.map((module) => [module.id, module.status])));
           setServerModuleAccessReady(true);
           setServerModuleAccessCompanyId(activeCompanyId);
@@ -625,6 +647,7 @@ function AppContent() {
       .catch((error) => {
         if (!cancelled) {
            setServerModuleStatuses(null);
+           setServerModuleAccess(null);
            setServerModuleAccessReady(false);
           setServerModuleAccessCompanyId(activeCompanyId);
           setServerModuleAccessError(
@@ -913,6 +936,7 @@ function AppContent() {
     activeCompany: currentCompany,
     sectorTestCompanyId,
     serverModuleStatuses,
+    serverModuleAccess,
     serverModuleAccessReady:
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
@@ -1098,6 +1122,7 @@ function AppContent() {
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
+                   serverModuleAccess={serverModuleAccess}
                   singleModuleNavigation={verticalModuleNavigation}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
@@ -6887,7 +6912,12 @@ function CompanyModulesDetail({
   company: Company;
   data: StoreData;
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
-  onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>;
+   onModuleAccess: (
+     companyId: string,
+     moduleId: ModuleId,
+     status: ModuleAvailability,
+     options?: { featureIds?: string[]; configuration?: Record<string, unknown> },
+   ) => Promise<void>;
   onBack: () => void;
 }) {
   const defaultStatuses = () =>
@@ -6896,6 +6926,10 @@ function CompanyModulesDetail({
     ) as Record<ModuleId, ModuleAvailability>;
   const [moduleStatuses, setModuleStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
   const [savedStatuses, setSavedStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
+  const [featureSelections, setFeatureSelections] = useState<Record<ModuleId, string[]>>({});
+  const [savedFeatureSelections, setSavedFeatureSelections] = useState<Record<ModuleId, string[]>>({});
+  const [packSelections, setPackSelections] = useState<Record<ModuleId, string[]>>({});
+  const [savedPackSelections, setSavedPackSelections] = useState<Record<ModuleId, string[]>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -6913,6 +6947,31 @@ function CompanyModulesDetail({
         } as Record<ModuleId, ModuleAvailability>;
         setModuleStatuses(next);
         setSavedStatuses(next);
+        const nextFeatures = Object.fromEntries(
+          modules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const serverHasExplicitSelection =
+              Boolean(serverModule)
+              && (serverModule?.featureIds?.length || serverModule?.configuration?.featureScope === 'explicit');
+            const configured = serverHasExplicitSelection
+              ? serverModule?.featureIds ?? []
+              : company.requestedModuleFeatures?.[module.id];
+            const featureIds = configured?.length
+              ? configured
+              : getModuleFeatureOptions(module).map((feature) => feature.id);
+            return [module.id, [...new Set(featureIds)]];
+          }),
+        ) as Record<ModuleId, string[]>;
+        const nextPacks = Object.fromEntries(
+          modules.map((module) => [
+            module.id,
+            [...(company.requestedModulePackIds?.[module.id] ?? [])],
+          ]),
+        ) as Record<ModuleId, string[]>;
+        setFeatureSelections(nextFeatures);
+        setSavedFeatureSelections(nextFeatures);
+        setPackSelections(nextPacks);
+        setSavedPackSelections(nextPacks);
       })
       .catch(() => {
         // The local company model remains a safe fallback while the server is unavailable.
@@ -6920,22 +6979,65 @@ function CompanyModulesDetail({
     return () => {
       cancelled = true;
     };
-  }, [company.id, company.allowedModules.join('|')]);
+  }, [
+    company.id,
+    company.allowedModules.join('|'),
+    JSON.stringify(company.requestedModuleFeatures ?? {}),
+    JSON.stringify(company.requestedModulePackIds ?? {}),
+  ]);
 
   const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
+  };
+
+  const toggleFeature = (moduleId: ModuleId, featureId: string) => {
+    setFeatureSelections((previous) => {
+      const selected = new Set(previous[moduleId] ?? []);
+      if (selected.has(featureId)) selected.delete(featureId);
+      else selected.add(featureId);
+      return { ...previous, [moduleId]: [...selected] };
+    });
+  };
+
+  const setModulePacks = (moduleId: ModuleId, packIds: string[]) => {
+    const module = modules.find((item) => item.id === moduleId);
+    const featureIds = module
+      ? [...new Set(
+          (module.featurePacks ?? [])
+            .filter((pack) => packIds.includes(pack.id))
+            .flatMap((pack) => pack.featureIds),
+        )]
+      : [];
+    setPackSelections((previous) => ({ ...previous, [moduleId]: packIds }));
+    if (packIds.length > 0) {
+      setFeatureSelections((previous) => ({ ...previous, [moduleId]: featureIds }));
+    }
   };
 
   const save = async () => {
     setSaving(true);
     try {
       const changes = modules
-        .filter((module) => moduleStatuses[module.id] !== savedStatuses[module.id])
-        .map((module) => onModuleAccess(company.id, module.id, moduleStatuses[module.id]));
+        .filter((module) =>
+          moduleStatuses[module.id] !== savedStatuses[module.id]
+          || JSON.stringify(featureSelections[module.id] ?? []) !== JSON.stringify(savedFeatureSelections[module.id] ?? [])
+          || JSON.stringify(packSelections[module.id] ?? []) !== JSON.stringify(savedPackSelections[module.id] ?? []),
+        )
+        .map((module) => onModuleAccess(company.id, module.id, moduleStatuses[module.id], {
+          featureIds: featureSelections[module.id] ?? [],
+          configuration: {
+            featureScope: 'explicit',
+            packIds: packSelections[module.id] ?? [],
+          },
+        }));
       await Promise.all(changes);
       setSavedStatuses(moduleStatuses);
+      setSavedFeatureSelections(featureSelections);
+      setSavedPackSelections(packSelections);
     } catch (error) {
-      setModuleStatuses(savedStatuses);
+       setModuleStatuses(savedStatuses);
+       setFeatureSelections(savedFeatureSelections);
+       setPackSelections(savedPackSelections);
       window.alert(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.');
     } finally {
       setSaving(false);
@@ -7022,28 +7124,73 @@ function CompanyModulesDetail({
               <div
                 data-testid={`card-company-module-${module.id}`}
                 key={module.id}
-                className={`flex items-center justify-between gap-4 rounded-xl border p-4 ${status === 'INACTIF' ? 'bg-[hsl(var(--muted)/.4)] opacity-65' : 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]'}`}
+                 className={`rounded-xl border p-4 ${status === 'INACTIF' ? 'bg-[hsl(var(--muted)/.4)] opacity-65' : 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]'}`}
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="rounded-lg bg-[hsl(var(--muted))] p-2">
-                    <LayoutGrid size={16} />
-                  </span>
-                  <div className="min-w-0">
-                    <strong className="block text-sm">{module.name}</strong>
-                    <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</p>
+                 <div className="flex items-start justify-between gap-4">
+                   <div className="flex min-w-0 items-center gap-3">
+                     <span className="rounded-lg bg-[hsl(var(--muted))] p-2">
+                       <LayoutGrid size={16} />
+                     </span>
+                     <div className="min-w-0">
+                       <strong className="block text-sm">{module.name}</strong>
+                       <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</p>
+                     </div>
                   </div>
-                </div>
-                <select
-                  data-testid={`select-company-module-status-${module.id}`}
-                  value={status}
-                  onChange={(event) => setModuleStatus(module.id, event.target.value as ModuleAvailability)}
-                  className="shrink-0 rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold"
-                >
-                  <option value="ACTIF">Actif</option>
-                  <option value="BETA">Bêta</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="INACTIF">Désactivé</option>
-                </select>
+                   <select
+                     data-testid={`select-company-module-status-${module.id}`}
+                     value={status}
+                     onChange={(event) => setModuleStatus(module.id, event.target.value as ModuleAvailability)}
+                     className="shrink-0 rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold"
+                   >
+                     <option value="ACTIF">Actif</option>
+                     <option value="BETA">Bêta</option>
+                     <option value="MAINTENANCE">Maintenance</option>
+                     <option value="INACTIF">Désactivé</option>
+                   </select>
+                 </div>
+                 {status !== 'INACTIF' && (module.featurePacks?.length || getModuleFeatureOptions(module).length) ? (
+                   <div className="mt-4 space-y-3 border-t border-[hsl(var(--border)/.7)] pt-3">
+                     {(module.featurePacks ?? []).length > 0 && (
+                       <div>
+                         <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Packs autorisés</p>
+                         <div className="grid gap-2 sm:grid-cols-2">
+                           {(module.featurePacks ?? []).map((pack) => (
+                             <label key={pack.id} className="flex items-start gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card)/.65)] p-2 text-xs">
+                               <input
+                                 type="checkbox"
+                                 checked={(packSelections[module.id] ?? []).includes(pack.id)}
+                                 onChange={(event) => setModulePacks(
+                                   module.id,
+                                   event.target.checked
+                                     ? [...new Set([...(packSelections[module.id] ?? []), pack.id])]
+                                     : (packSelections[module.id] ?? []).filter((id) => id !== pack.id),
+                                 )}
+                                 className="mt-0.5"
+                               />
+                               <span><strong className="block">{pack.name}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{pack.description}</span></span>
+                             </label>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                     <div>
+                       <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Fonctionnalités autorisées</p>
+                       <div className="grid gap-2 sm:grid-cols-2">
+                         {getModuleFeatureOptions(module).map((feature) => (
+                           <label key={feature.id} className="flex items-center gap-2 text-xs">
+                             <input
+                               type="checkbox"
+                               checked={(featureSelections[module.id] ?? []).includes(feature.id)}
+                               onChange={() => toggleFeature(module.id, feature.id)}
+                               className="rounded"
+                             />
+                             <span>{feature.label}</span>
+                           </label>
+                         ))}
+                       </div>
+                     </div>
+                   </div>
+                 ) : null}
               </div>
             );
           })}

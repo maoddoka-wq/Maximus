@@ -135,6 +135,69 @@ class ModuleAccessTest extends TestCase
             ->assertJsonPath('modules.4.featurePacks.2.featurePermissions.virements.1', 'modifier');
     }
 
+    public function test_status_only_update_preserves_company_feature_selection(): void
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'ecommerce')
+            ->update([
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['dashboard', 'catalogue']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+            ]);
+
+        $maximusAdmin = AuthUser::query()->create([
+            'id' => 'preserve-feature-admin',
+            'email' => 'preserve-feature-admin@maximus.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'company_id' => null,
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        $this->withCredentials()->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($maximusAdmin))
+            ->patchJson('/api/modules/ecommerce/access?companyId=kora', ['status' => 'MAINTENANCE'])
+            ->assertOk()
+            ->assertJsonPath('module.status', 'MAINTENANCE')
+            ->assertJsonPath('module.featureIds.0', 'dashboard')
+            ->assertJsonPath('module.configuration.featureScope', 'explicit');
+    }
+
+    public function test_feature_selection_isolated_and_blocks_location_api_for_one_company(): void
+    {
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'kora', 'module_id' => 'ecommerce'],
+            [
+                'id' => 'company-module-kora-ecommerce',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['dashboard', 'catalogue']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'other-company', 'module_id' => 'ecommerce'],
+            [
+                'id' => 'company-module-other-ecommerce',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['dashboard', 'catalogue', 'location']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->assertFalse(ModuleCatalog::allowsFeature('kora', 'ecommerce', 'location'));
+        $this->assertTrue(ModuleCatalog::allowsFeature('other-company', 'ecommerce', 'location'));
+
+        $this->asCompanyAdmin()
+            ->getJson('/api/ecommerce/location/settings?companyId=kora')
+            ->assertForbidden();
+    }
+
     private function asCompanyAdmin(): self
     {
         $user = AuthUser::query()->create([

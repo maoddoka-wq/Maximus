@@ -189,6 +189,7 @@ export function CompanyRouter({
   stockPermissions,
   commerceTabIds,
   moduleStatuses,
+  serverModuleAccess,
   singleModuleNavigation,
   screens,
 }: {
@@ -214,6 +215,7 @@ export function CompanyRouter({
   stockPermissions?: Record<string, string[]>;
   commerceTabIds?: string[];
   moduleStatuses: Record<string, ModuleAvailability>;
+  serverModuleAccess?: import('@/lib/module-api').ServerModuleAccess[] | null;
   singleModuleNavigation?: boolean;
   screens: CompanyRouteScreens;
 }) {
@@ -222,7 +224,7 @@ export function CompanyRouter({
   const requiredModule = moduleIdForPath(routePath);
   const maintenanceModule: ModuleId | 'controle' | undefined =
     routePath === '/entreprise/controle' ? 'controle' : requiredModule;
-  if (maintenanceModule && moduleStatuses[maintenanceModule] === 'MAINTENANCE') {
+  if (maintenanceModule && (serverModuleAccess?.find((item) => item.id === maintenanceModule)?.status ?? moduleStatuses[maintenanceModule]) === 'MAINTENANCE') {
     return renderScreen(screens.empty, {
       title: 'Module en maintenance',
       text: 'Ce module est temporairement indisponible pendant une opération de maintenance. Les autres modules restent accessibles.',

@@ -39,7 +39,7 @@ export async function loadCompanyModuleAccess(companyId: string, expectedModuleI
   const missing = expectedModuleIds.filter((moduleId) => {
     if (!knownModuleIds.has(moduleId as (typeof modules)[number]['id'])) return false;
     const module = result.modules.find((item) => item.id === moduleId);
-    return !module || module.status === 'INACTIF';
+    return !module;
   });
   if (missing.length > 0) {
     throw new Error(`Les accès serveur sont incomplets pour : ${missing.join(', ')}.`);
@@ -47,12 +47,17 @@ export async function loadCompanyModuleAccess(companyId: string, expectedModuleI
   return result.modules;
 }
 
-export async function setCompanyModuleAccess(companyId: string, moduleId: string, status: ModuleAvailability): Promise<ServerModuleAccess> {
+export async function setCompanyModuleAccess(
+  companyId: string,
+  moduleId: string,
+  status: ModuleAvailability,
+  options: { featureIds?: string[]; configuration?: Record<string, unknown> } = {},
+): Promise<ServerModuleAccess> {
   const response = await fetch(`/api/modules/${encodeURIComponent(moduleId)}/access?companyId=${encodeURIComponent(companyId)}`, {
     method: 'PATCH',
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...options }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {

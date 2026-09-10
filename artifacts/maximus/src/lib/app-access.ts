@@ -15,6 +15,7 @@ import {
 import { getConfiguredModules } from './store';
 import { getModuleFeatureOptions } from './module-features';
 import { buildSidebarFeatureGroups } from './sidebar-navigation';
+import type { ServerModuleAccess } from './module-api';
 
 export type AppAccessInput = {
   data: StoreData;
@@ -24,6 +25,7 @@ export type AppAccessInput = {
   activeCompany?: Company;
   sectorTestCompanyId: string | null;
   serverModuleStatuses: Record<string, ModuleAvailability> | null;
+  serverModuleAccess?: ServerModuleAccess[] | null;
   serverModuleAccessReady?: boolean;
 };
 
@@ -55,6 +57,7 @@ export function buildAppAccessContext({
   activeCompany,
   sectorTestCompanyId,
   serverModuleStatuses,
+  serverModuleAccess = null,
   serverModuleAccessReady = true,
 }: AppAccessInput): AppAccessContext {
   const companyId = activeCompanyId ?? '';
@@ -68,6 +71,7 @@ export function buildAppAccessContext({
       : null;
   const accessRole = restrictRoleToCompany(rawEmployeeRole ?? rawTestCompanyRole, activeCompany);
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability =>
+    serverModuleAccess?.find((item) => item.id === moduleId)?.status ??
     serverModuleStatuses?.[moduleId] ??
     data.moduleStatuses?.[moduleId] ??
     configuredModules.find(module => module.id === moduleId)?.status ??
@@ -77,22 +81,43 @@ export function buildAppAccessContext({
   const companyAllowed = (sectorTestCompanyId || serverModuleAccessReady ? localCompanyAllowed : [])
     .filter(isModuleActive);
   const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
-  const keepCompanySettings = (module: NonNullable<typeof configuredModules[number]>, featureIds: string[]) =>
-    module.id === 'ecommerce' && companyAdmin
+  const keepCompanySettings = (
+    module: NonNullable<typeof configuredModules[number]>,
+    featureIds: string[],
+    preserveAdminSettings = true,
+  ) =>
+    preserveAdminSettings && module.id === 'ecommerce' && companyAdmin
       ? [...new Set([...featureIds, 'parametres'])]
       : featureIds;
   const companySelectedFeatureIds = (module: NonNullable<typeof configuredModules[number]>) => {
     if (!companyAdmin || !activeCompany) return undefined;
 
+    const serverAccess = serverModuleAccess?.find((item) => item.id === module.id);
+    const serverConfiguration = serverAccess?.configuration;
+    const serverFeatureIds = serverAccess?.featureIds;
+    const hasExplicitServerSelection =
+      Array.isArray(serverFeatureIds)
+      && (serverFeatureIds.length > 0 || serverConfiguration?.featureScope === 'explicit');
     const selectedPackIds = activeCompany.requestedModulePackIds?.[module.id] ?? [];
     if (selectedPackIds.length > 0) {
-      return keepCompanySettings(module, [
+      const packFeatures = [
         ...new Set(
           (module.featurePacks ?? [])
             .filter(pack => selectedPackIds.includes(pack.id))
             .flatMap(pack => pack.featureIds),
         ),
-      ]);
+      ];
+      return keepCompanySettings(
+        module,
+        hasExplicitServerSelection
+          ? serverFeatureIds ?? []
+          : packFeatures,
+        !hasExplicitServerSelection,
+      );
+    }
+
+    if (hasExplicitServerSelection) {
+      return keepCompanySettings(module, serverFeatureIds ?? [], false);
     }
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;

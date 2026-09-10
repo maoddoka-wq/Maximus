@@ -52,16 +52,25 @@ class ModuleController extends Controller
         if (!CompanyRegistry::exists($companyId)) {
             CompanyRegistry::ensureActive($companyId);
         }
+        $existing = DB::table('maximus_company_modules')
+            ->where('company_id', $companyId)
+            ->where('module_id', $moduleId)
+            ->first();
+        $values = [
+            'id' => 'company-module-'.Str::slug($companyId.'-'.$moduleId),
+            'status' => $input['status'],
+            'feature_ids' => array_key_exists('featureIds', $input)
+                ? json_encode($input['featureIds'] ?? [], JSON_UNESCAPED_UNICODE)
+                : ($existing?->feature_ids ?? json_encode([], JSON_UNESCAPED_UNICODE)),
+            'configuration' => array_key_exists('configuration', $input)
+                ? json_encode($input['configuration'] ?? [], JSON_UNESCAPED_UNICODE)
+                : ($existing?->configuration ?? json_encode([], JSON_UNESCAPED_UNICODE)),
+            'updated_at' => now(),
+            'created_at' => $existing?->created_at ?? now(),
+        ];
         DB::table('maximus_company_modules')->updateOrInsert(
             ['company_id' => $companyId, 'module_id' => $moduleId],
-            [
-                'id' => 'company-module-'.Str::slug($companyId.'-'.$moduleId),
-                'status' => $input['status'],
-                'feature_ids' => json_encode($input['featureIds'] ?? [], JSON_UNESCAPED_UNICODE),
-                'configuration' => json_encode($input['configuration'] ?? [], JSON_UNESCAPED_UNICODE),
-                'updated_at' => now(),
-                'created_at' => now(),
-            ],
+            $values,
         );
 
         return response()->json([

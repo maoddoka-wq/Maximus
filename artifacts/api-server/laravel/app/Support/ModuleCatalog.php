@@ -117,18 +117,22 @@ final class ModuleCatalog
     public static function ensureCatalog(): void
     {
         foreach (self::definitionsWithCustom() as $definition) {
-            DB::table('maximus_modules')->updateOrInsert(
-                ['id' => $definition['id']],
-                [
-                    'name' => $definition['name'],
-                    'description' => $definition['description'],
-                    'features' => json_encode($definition['features'], JSON_UNESCAPED_UNICODE),
-                    'feature_dependencies' => json_encode($definition['feature_dependencies'] ?? [], JSON_UNESCAPED_UNICODE),
+            $values = [
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'features' => json_encode($definition['features'], JSON_UNESCAPED_UNICODE),
+                'feature_dependencies' => json_encode($definition['feature_dependencies'] ?? [], JSON_UNESCAPED_UNICODE),
+                'updated_at' => now(),
+            ];
+            if (DB::table('maximus_modules')->where('id', $definition['id'])->exists()) {
+                DB::table('maximus_modules')->where('id', $definition['id'])->update($values);
+            } else {
+                DB::table('maximus_modules')->insert($values + [
+                    'id' => $definition['id'],
                     'status' => 'ACTIF',
-                    'updated_at' => now(),
                     'created_at' => now(),
-                ],
-            );
+                ]);
+            }
         }
     }
 
@@ -142,23 +146,59 @@ final class ModuleCatalog
                 continue;
             }
 
-            DB::table('maximus_company_modules')->updateOrInsert(
-                ['company_id' => $companyId, 'module_id' => $moduleId],
-                [
+            if (! DB::table('maximus_company_modules')
+                ->where('company_id', $companyId)
+                ->where('module_id', $moduleId)
+                ->exists()) {
+                DB::table('maximus_company_modules')->insert([
                     'id' => 'company-module-'.Str::slug($companyId.'-'.$moduleId),
+                    'company_id' => $companyId,
+                    'module_id' => $moduleId,
                     'status' => $status,
                     'feature_ids' => json_encode([], JSON_UNESCAPED_UNICODE),
                     'configuration' => json_encode([], JSON_UNESCAPED_UNICODE),
                     'updated_at' => now(),
                     'created_at' => now(),
-                ],
-            );
+                ]);
+            }
         }
     }
 
     public static function isEnabled(string $companyId, string $moduleId): bool
     {
         return in_array(self::statusFor($companyId, $moduleId), ['ACTIF', 'BETA'], true);
+    }
+
+    public static function allowsFeature(string $companyId, string $moduleId, string $featureId): bool
+    {
+        if (! self::isEnabled($companyId, $moduleId)) {
+            return false;
+        }
+
+        $row = DB::table('maximus_company_modules')
+            ->where('company_id', $companyId)
+            ->where('module_id', $moduleId)
+            ->first(['feature_ids', 'configuration']);
+        if (! $row) {
+            return false;
+        }
+
+        $featureIds = json_decode($row->feature_ids ?? '[]', true);
+        $configuration = json_decode($row->configuration ?? '{}', true);
+        if (! is_array($featureIds)) {
+            $featureIds = [];
+        }
+        if (! is_array($configuration)) {
+            $configuration = [];
+        }
+
+        // Legacy rows with no explicit scope mean the complete module is enabled.
+        // New writes set featureScope=explicit, including an intentionally empty list.
+        if (($configuration['featureScope'] ?? null) === 'explicit' || $featureIds !== []) {
+            return in_array($featureId, $featureIds, true);
+        }
+
+        return true;
     }
 
     public static function statusFor(string $companyId, string $moduleId): string
