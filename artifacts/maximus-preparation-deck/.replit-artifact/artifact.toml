@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/maximus-preparation-deck/"
+title = "MAXIMUS ERP — Présentation de préparation"
+description = "Présentation professionnelle complète de MAXIMUS ERP pour préparer une démonstration et expliquer sa vision, ses modules, ses parcours métier, sa sécurité et son déploiement en production."
+version = "1.0.0"
+id = "artifacts/maximus-preparation-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-preparation-deck/" ]
+localPort = 18546
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-preparation-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/maximus-preparation-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/maximus-preparation-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18546"
+BASE_PATH = "/maximus-preparation-deck/"

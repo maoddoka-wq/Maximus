@@ -112,3 +112,31 @@ mtime_ms = 1788967859823
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/22ca4932-39bf-4bf8-81ab-31712e81f55d/ff0763bc-4398-4ccb-93b4-3dbb6a32ccbb"
 storage_version_token = "1788967868986313"
 content_type = "image/png"
+
+[[outputs]]
+id = "9_q67TavI74idEui7VM9e"
+uri = "file://.local/outputs/MAXIMUS-ERP---Presentation-de-preparation.pptx"
+type = "slides"
+title = "MAXIMUS ERP — PowerPoint (PPTX)"
+description = "Présentation complète de préparation de MAXIMUS ERP, prête à présenter et à modifier."
+logical_id = "2d8fd5da-110c-4f56-87ef-a08ff5a31edf"
+content_hash = "sha256:fb9909d51f360e8ef407fa667923663b7383b462ed6f262390339779c2dbcae5"
+size = 7322042
+mtime_ms = 1789155836757
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/2d8fd5da-110c-4f56-87ef-a08ff5a31edf/8d2a4027-42e4-4cd7-833d-5e3abf81c852"
+storage_version_token = "1789155837275982"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "2F_ZC1vTwK22_GZpdpaHS"
+uri = "file://.local/outputs/MAXIMUS-ERP---Presentation-de-preparation.pdf"
+type = "pdf"
+title = "MAXIMUS ERP — PDF"
+description = "Version PDF de la présentation complète de préparation de MAXIMUS ERP."
+logical_id = "42629034-b5af-4d47-b655-b61160976ee3"
+content_hash = "sha256:a552b34f886cbceacd543b02435852174edc0d6c292abd90df213a0bd338f936"
+size = 764505
+mtime_ms = 1789155839897
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/42629034-b5af-4d47-b655-b61160976ee3/7701aab8-bfa2-44bd-b176-88b0603a449f"
+storage_version_token = "1789155840301989"
+content_type = "application/pdf"
