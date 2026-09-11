@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Throwable;
 
 final class EcommercePaymentController extends Controller
@@ -32,7 +33,10 @@ final class EcommercePaymentController extends Controller
 
     public function createByDomain(Request $request, string $orderId): JsonResponse
     {
-        $host = strtolower(trim($request->getHost()));
+        $host = $this->normalizeDomain($request->getHost());
+        if (! $host) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
         $domain = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE')->first();
         $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)->where('status', 'PUBLISHED')->first() : null;
         if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
@@ -54,7 +58,10 @@ final class EcommercePaymentController extends Controller
 
     public function statusByDomain(Request $request, string $orderId): JsonResponse
     {
-        $host = strtolower(trim($request->getHost()));
+        $host = $this->normalizeDomain($request->getHost());
+        if (! $host) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
         $domain = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE')->first();
         $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)->where('status', 'PUBLISHED')->first() : null;
         if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
@@ -198,5 +205,19 @@ final class EcommercePaymentController extends Controller
             'orderStatus' => $order->status,
             'failureReason' => $order->payment_failure_reason ?? '',
         ])->header('Cache-Control', 'private, no-store');
+    }
+
+    private function normalizeDomain(string $value): ?string
+    {
+        $domain = Str::lower(trim($value));
+        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
+        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
+        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
+        $domain = rtrim($domain, '.');
+        if ($domain === '' || strlen($domain) > 253 || ! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+            return null;
+        }
+
+        return $domain;
     }
 }
