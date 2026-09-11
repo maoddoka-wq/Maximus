@@ -228,6 +228,9 @@ export interface EcommerceOrder {
   customerPhone: string;
   shippingAddress: string;
   note: string;
+  deliveryZoneId?: string | null;
+  deliveryZoneName?: string | null;
+  deliveryZoneFee?: number;
   total: number;
   status: EcommerceOrderStatus;
   paymentStatus: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
@@ -417,6 +420,9 @@ export interface EcommerceCustomerOrder {
   customerPhone: string;
   shippingAddress: string;
   note: string;
+  deliveryZoneId?: string | null;
+  deliveryZoneName?: string | null;
+  deliveryZoneFee?: number;
   total: number;
   status: EcommerceOrderStatus;
   paymentStatus: EcommerceOrder['paymentStatus'];
@@ -556,8 +562,8 @@ export const publicEcommerceApi = {
   quoteDomainLocation: (id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<EcommerceCarQuote>(`/shop-domain/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
   reserveLocation: (slug: string, body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>(`/shop/${encodeURIComponent(slug)}/location/reservations`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
   reserveDomainLocation: (body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>('/shop-domain/location/reservations', { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; deliveryZoneId?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
+  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; deliveryZoneId?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
   createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>

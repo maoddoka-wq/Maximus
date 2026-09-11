@@ -1496,6 +1496,7 @@ class EcommerceController extends Controller
             'customerPhone' => ['nullable', 'string', 'max:40'],
             'shippingAddress' => ['nullable', 'string', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
+            'deliveryZoneId' => ['nullable', 'string', 'max:160'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.productSlug' => ['nullable', 'string', 'min:2', 'max:160'],
             'items.*.rentalId' => ['nullable', 'string', 'min:2', 'max:160'],
@@ -1519,6 +1520,9 @@ class EcommerceController extends Controller
                     'total' => (int) $existing->total,
                     'paymentStatus' => $existing->payment_status ?? 'UNPAID',
                     'paymentCheckoutUrl' => $existing->payment_checkout_url ?? null,
+                    'deliveryZoneId' => $existing->delivery_zone_id ?? null,
+                    'deliveryZoneName' => $existing->delivery_zone_name ?? null,
+                    'deliveryZoneFee' => (int) ($existing->delivery_zone_fee ?? 0),
                 ]);
             }
         }
@@ -1541,10 +1545,26 @@ class EcommerceController extends Controller
                 ])->all();
             }
         }
+        $activeDeliveryZones = $this->publicEnabledFeatures((string) $store->company_id)['livraisons']
+            ? DB::table('ecommerce_delivery_zones')
+                ->where('company_id', $store->company_id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+            : collect();
+        $deliveryZone = null;
+        if (! empty($input['deliveryZoneId'])) {
+            $deliveryZone = $activeDeliveryZones->firstWhere('id', $input['deliveryZoneId']);
+            if (! $deliveryZone) {
+                return response()->json(['error' => 'La zone de livraison sélectionnée est indisponible.'], 422);
+            }
+        }
         try {
-            $order = DB::transaction(function () use ($input, $store, $customer, $idempotencyKey): array {
+            $order = DB::transaction(function () use ($input, $store, $customer, $idempotencyKey, $activeDeliveryZones, $deliveryZone): array {
                 $lines = [];
                 $total = 0;
+                $hasPhysicalProduct = false;
                 foreach ($input['items'] as $item) {
                     if (! empty($item['rentalId'])) {
                         $rental = DB::table('ecommerce_rentals')
@@ -1599,6 +1619,9 @@ class EcommerceController extends Controller
                     if ($fulfillmentType === 'PHYSICAL' && trim((string) ($input['shippingAddress'] ?? '')) === '') {
                         throw new \RuntimeException('SHIPPING_ADDRESS_REQUIRED');
                     }
+                    if ($fulfillmentType === 'PHYSICAL') {
+                        $hasPhysicalProduct = true;
+                    }
                     $quantity = $fulfillmentType === 'DIGITAL' ? 1 : (int) $item['quantity'];
                     if ($fulfillmentType === 'PHYSICAL' && $product->stock < $quantity) {
                         throw new \RuntimeException('STOCK_INSUFFICIENT');
@@ -1627,6 +1650,11 @@ class EcommerceController extends Controller
                         ]);
                     }
                 }
+                if ($hasPhysicalProduct && $activeDeliveryZones->isNotEmpty() && ! $deliveryZone) {
+                    throw new \RuntimeException('DELIVERY_ZONE_REQUIRED');
+                }
+                $deliveryFee = $hasPhysicalProduct ? (int) ($deliveryZone->fee ?? 0) : 0;
+                $total += $deliveryFee;
 
                 $id = $this->id('order');
                 $reference = 'CMD-'.strtoupper(Str::substr(str_replace('-', '', $id), -8));
@@ -1641,6 +1669,9 @@ class EcommerceController extends Controller
                     'customer_phone' => $input['customerPhone'] ?? '',
                     'shipping_address' => trim((string) ($input['shippingAddress'] ?? '')),
                     'note' => $input['note'] ?? '',
+                    'delivery_zone_id' => $hasPhysicalProduct ? $deliveryZone?->id : null,
+                    'delivery_zone_name' => $hasPhysicalProduct ? $deliveryZone?->name : null,
+                    'delivery_zone_fee' => $deliveryFee,
                     'total' => $total,
                     'status' => 'NOUVELLE',
                     'created_at' => now(),
@@ -1656,7 +1687,15 @@ class EcommerceController extends Controller
                         ->delete();
                 }
 
-                return ['id' => $id, 'reference' => $reference, 'total' => $total, 'paymentStatus' => 'UNPAID'];
+                return [
+                    'id' => $id,
+                    'reference' => $reference,
+                    'total' => $total,
+                    'paymentStatus' => 'UNPAID',
+                    'deliveryZoneId' => $hasPhysicalProduct ? $deliveryZone?->id : null,
+                    'deliveryZoneName' => $hasPhysicalProduct ? $deliveryZone?->name : null,
+                    'deliveryZoneFee' => $deliveryFee,
+                ];
             });
 
             return response()->json($order, 201);
@@ -1666,6 +1705,7 @@ class EcommerceController extends Controller
                 'RENTAL_UNAVAILABLE' => 'Cette location n’est plus disponible dans la quantité demandée.',
                 'PRODUCT_TYPE_NOT_AUTHORIZED' => 'Ce type de produit n’est pas activé pour cette boutique.',
                 'SHIPPING_ADDRESS_REQUIRED' => 'Une adresse est nécessaire pour une commande physique.',
+                'DELIVERY_ZONE_REQUIRED' => 'Veuillez sélectionner une zone de livraison.',
                 default => 'La commande n’a pas pu être enregistrée.',
             };
 
@@ -1847,6 +1887,9 @@ class EcommerceController extends Controller
             'customerPhone' => $row->customer_phone,
             'shippingAddress' => $row->shipping_address,
             'note' => $row->note,
+            'deliveryZoneId' => $row->delivery_zone_id ?? null,
+            'deliveryZoneName' => $row->delivery_zone_name ?? null,
+            'deliveryZoneFee' => (int) ($row->delivery_zone_fee ?? 0),
             'total' => (int) $row->total,
             'status' => $row->status,
             'paymentStatus' => $row->payment_status ?? 'UNPAID',

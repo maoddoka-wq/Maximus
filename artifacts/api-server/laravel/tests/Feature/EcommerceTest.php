@@ -857,6 +857,39 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('deliveryZones.0.name', 'Dakar centre')
             ->assertJsonPath('deliveryZones.0.fee', 1500);
 
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit livré par zone',
+            'sku' => 'ZONE-DELIVERY-01',
+            'category' => 'Épicerie',
+            'price' => 5000,
+            'stock' => 2,
+            'status' => 'PUBLISHED',
+        ])->assertCreated()->json();
+        $this->postJson('/api/shop/boutique-zones/orders', [
+            'customerName' => 'Client Zone',
+            'customerEmail' => 'order-zone@example.test',
+            'shippingAddress' => 'Plateau, Dakar',
+            'items' => [['productSlug' => $product['slug'], 'quantity' => 1]],
+        ])->assertStatus(400)
+            ->assertJsonPath('error', 'Veuillez sélectionner une zone de livraison.');
+        $this->postJson('/api/shop/boutique-zones/orders', [
+            'customerName' => 'Client Zone',
+            'customerEmail' => 'order-zone@example.test',
+            'shippingAddress' => 'Plateau, Dakar',
+            'deliveryZoneId' => $zoneId,
+            'items' => [['productSlug' => $product['slug'], 'quantity' => 1]],
+        ])->assertCreated()
+            ->assertJsonPath('total', 6500)
+            ->assertJsonPath('deliveryZoneId', $zoneId)
+            ->assertJsonPath('deliveryZoneName', 'Dakar centre')
+            ->assertJsonPath('deliveryZoneFee', 1500);
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'delivery_zone_id' => $zoneId,
+            'delivery_zone_name' => 'Dakar centre',
+            'delivery_zone_fee' => 1500,
+            'total' => 6500,
+        ]);
+
         $this->postJson('/api/shop/boutique-zones/delivery-requests', [
             'requesterName' => 'Client Zone',
             'requesterEmail' => 'zone@example.test',
