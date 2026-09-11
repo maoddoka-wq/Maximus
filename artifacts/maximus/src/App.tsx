@@ -374,6 +374,9 @@ function AppContent() {
       || window.location.pathname === '/connexion'
       || window.location.pathname === '/inscription-client'
       || window.location.pathname === '/panier'
+      || window.location.pathname === '/location'
+      || window.location.pathname === '/livraison'
+      || window.location.pathname.startsWith('/produit/')
       || window.location.pathname.startsWith('/compte'))
       ? 'checking'
       : 'none',
@@ -410,6 +413,9 @@ function AppContent() {
       || pathname === '/connexion'
       || pathname === '/inscription-client'
       || pathname === '/panier'
+      || pathname === '/location'
+      || pathname === '/livraison'
+      || pathname.startsWith('/produit/')
       || pathname.startsWith('/compte');
     if (!isPotentialCustomShopPath || session) {
       setCustomDomainState('none');
@@ -904,6 +910,9 @@ function AppContent() {
     || pathname === '/connexion'
     || pathname === '/inscription-client'
     || pathname === '/panier'
+    || pathname === '/location'
+    || pathname === '/livraison'
+    || pathname.startsWith('/produit/')
     || pathname.startsWith('/compte');
   if (isPotentialCustomShopPath && !session && customDomainState === 'checking') {
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de la boutique…</div>;
