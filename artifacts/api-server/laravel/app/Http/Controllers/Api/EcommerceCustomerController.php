@@ -718,6 +718,7 @@ class EcommerceCustomerController extends Controller
             'total' => (int) $row->total,
             'status' => $row->status,
             'paymentStatus' => $row->payment_status ?? 'UNPAID',
+            'paymentFailureReason' => $row->payment_failure_reason ?? '',
             'createdAt' => $row->created_at,
             'items' => $items->map(fn (object $item): array => [
                 'id' => $item->id,

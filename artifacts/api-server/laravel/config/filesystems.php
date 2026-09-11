@@ -49,7 +49,12 @@ return [
 
         'digital' => [
             'driver' => 'local',
-            'root' => env('DIGITAL_STORAGE_PATH', storage_path('app/private/digital-products')),
+            'root' => env(
+                'DIGITAL_STORAGE_PATH',
+                env('APP_ENV') === 'production'
+                    ? '/var/data/digital-products'
+                    : storage_path('app/private/digital-products'),
+            ),
             'visibility' => 'private',
             'throw' => false,
             'report' => false,

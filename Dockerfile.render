@@ -21,6 +21,7 @@ ENV APP_ENV=production \
     LOG_CHANNEL=stderr \
     LOG_LEVEL=warning \
     DB_CONNECTION=pgsql \
+    DIGITAL_STORAGE_PATH=/var/data/digital-products \
     COMPOSER_MAX_PARALLEL_HTTP=4 \
     COMPOSER_PROCESS_TIMEOUT=900
 

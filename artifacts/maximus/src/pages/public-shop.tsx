@@ -465,7 +465,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        // The browser leaves immediately instead of waiting for a cart refresh.
       window.location.assign(payment.checkoutUrl);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'La commande n’a pas pu être envoyée.';
+      const message = paymentErrorMessage(cause);
       setError(message);
       showAppToast(message, 'error');
       setCheckoutKey(null);
@@ -763,6 +763,21 @@ function PaymentResultPanel({ summary, currency, store, orderId, slug, domain, o
       {paid && rentalData && store.locationSettings?.whatsapp && <a href={getWhatsappUrl()} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: '#25D366' }}>WhatsApp</a>}
     </div>
   </section>;
+}
+
+function paymentErrorMessage(cause: unknown): string {
+  const raw = cause instanceof Error ? cause.message.trim() : '';
+  const normalized = raw.toLocaleLowerCase('fr-FR');
+  if (normalized.includes('insuff') || normalized.includes('insufficient') || normalized.includes('funds') || normalized.includes('solde')) {
+    return 'Paiement refusé : le solde Wave est insuffisant. Rechargez votre compte puis réessayez.';
+  }
+  if (normalized.includes('cancel') || normalized.includes('annul')) {
+    return 'Paiement annulé. Votre commande n’a pas été débitée. Vous pouvez réessayer.';
+  }
+  if (normalized.includes('declin') || normalized.includes('reject') || normalized.includes('denied') || normalized.includes('échou') || normalized.includes('echec') || normalized.includes('failed')) {
+    return 'Paiement refusé par Wave. Vérifiez les informations de paiement puis réessayez.';
+  }
+  return raw || 'Le paiement n’a pas pu être lancé. Vous pouvez réessayer.';
 }
 
 function ProductDetail({ product, store, onBack, onAdd }: { product: PublicProduct; store: PublicShopBootstrap['store']; onBack: () => void; onAdd: () => void }) {
@@ -1088,6 +1103,7 @@ function FavoriteSection({ products, favoriteSlugs, onToggle, onNavigate }: { pr
 
 function OrderSection({ orders, selectedOrder, onOrder, onDownload }: { orders: EcommerceCustomerBootstrap['orders']; selectedOrder?: EcommerceCustomerBootstrap['orders'][number]; onOrder: (id: string) => void; onDownload: (orderId: string, itemId: string) => void }) {
   const selectedOrderIsDigital = Boolean(selectedOrder?.items.length) && selectedOrder?.items.every(item => item.fulfillmentType === 'DIGITAL');
+  const paymentFailed = selectedOrder ? ['FAILED', 'REFUNDED'].includes(selectedOrder.paymentStatus) : false;
   return <div className="min-w-0">
     <div className="flex min-w-0 items-end justify-between gap-3">
       <div className="min-w-0">
@@ -1101,6 +1117,11 @@ function OrderSection({ orders, selectedOrder, onOrder, onDownload }: { orders: 
         <div className="min-w-0"><p className="text-xs text-[hsl(var(--muted-foreground))]">{readableDate(selectedOrder.createdAt)}</p><h2 className="mt-1 break-words text-xl font-bold">{selectedOrder.reference}</h2></div>
         <div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{selectedOrder.status}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Paiement : {selectedOrder.paymentStatus}</p></div>
       </div>
+       {paymentFailed && <div role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+         <strong className="block">Paiement échoué</strong>
+         <span className="mt-1 block">{selectedOrder.paymentFailureReason || 'Le paiement Wave n’a pas été confirmé. Votre commande n’a pas été débitée.'}</span>
+         <span className="mt-2 block text-xs">Vous pouvez retourner au panier et réessayer le paiement.</span>
+       </div>}
       <div className="mt-6 divide-y border-y">
         {selectedOrder.items.map(item => {
           const isDigital = item.fulfillmentType === 'DIGITAL';

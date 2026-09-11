@@ -1851,6 +1851,7 @@ class EcommerceController extends Controller
             'status' => $row->status,
             'paymentStatus' => $row->payment_status ?? 'UNPAID',
             'paymentCheckoutUrl' => $row->payment_checkout_url ?? null,
+            'paymentFailureReason' => $row->payment_failure_reason ?? '',
             'createdAt' => $row->created_at,
             'items' => array_map(fn ($item) => [
                 'id' => $item->id,

@@ -232,6 +232,7 @@ export interface EcommerceOrder {
   status: EcommerceOrderStatus;
   paymentStatus: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
   paymentCheckoutUrl: string | null;
+  paymentFailureReason: string;
   createdAt: string;
   items: EcommerceOrderItem[];
 }
@@ -419,6 +420,7 @@ export interface EcommerceCustomerOrder {
   total: number;
   status: EcommerceOrderStatus;
   paymentStatus: EcommerceOrder['paymentStatus'];
+  paymentFailureReason: string;
   createdAt: string;
   items: EcommerceOrderItem[];
 }

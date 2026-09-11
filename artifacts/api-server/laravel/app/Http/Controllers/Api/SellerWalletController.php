@@ -616,7 +616,26 @@ final class SellerWalletController extends Controller
             ?? ''
         ));
 
-        return $reason !== '' ? $reason : 'Le paiement DiamanoPay a échoué.';
+        $normalized = Str::lower($reason);
+        if ($normalized !== '' && str_contains($normalized, 'solde insuffisant')) {
+            return $reason;
+        }
+        if ($normalized !== '' && (
+            str_contains($normalized, 'insuff')
+            || str_contains($normalized, 'insufficient')
+            || str_contains($normalized, 'funds')
+            || str_contains($normalized, 'solde')
+        )) {
+            return 'Solde Wave insuffisant.';
+        }
+        if ($normalized !== '' && (str_contains($normalized, 'cancel') || str_contains($normalized, 'annul'))) {
+            return 'Paiement Wave annulé.';
+        }
+        if ($normalized !== '') {
+            return $reason;
+        }
+
+        return 'Le paiement DiamanoPay a échoué.';
     }
 
     public function releaseOrderFunds(object $order): void

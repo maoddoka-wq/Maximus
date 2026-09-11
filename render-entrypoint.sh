@@ -19,7 +19,19 @@ for variable in DIAMANOPAY_CLIENT_ID DIAMANOPAY_CLIENT_SECRET DIAMANOPAY_WEBHOOK
     fi
 done
 
-mkdir -p "${DIGITAL_STORAGE_PATH:-/var/data/digital-products}"
+digital_storage_path="${DIGITAL_STORAGE_PATH:-/var/data/digital-products}"
+case "$digital_storage_path" in
+    /var/data/*) ;;
+    *)
+        echo "Render startup error: DIGITAL_STORAGE_PATH must use the persistent /var/data disk in production." >&2
+        exit 1
+        ;;
+esac
+mkdir -p "$digital_storage_path"
+if [ ! -w "$digital_storage_path" ]; then
+    echo "Render startup error: digital storage is not writable: $digital_storage_path" >&2
+    exit 1
+fi
 
 attempt=1
 max_attempts=30
