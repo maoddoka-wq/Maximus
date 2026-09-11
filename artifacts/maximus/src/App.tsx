@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -366,6 +366,9 @@ function AppContent() {
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
   const [appStateVersion, setAppStateVersion] = useState(0);
+  const [appStateReady, setAppStateReady] = useState(
+    () => !localStorage.getItem('maximus-session'),
+  );
   const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>(
     () => (window.location.pathname === '/'
       || window.location.pathname === '/connexion'
@@ -520,7 +523,12 @@ function AppContent() {
   };
 
   useEffect(() => {
-    void refreshAppState();
+    if (!session || session.startsWith('company:sector-test-')) {
+      setAppStateReady(true);
+      return;
+    }
+    setAppStateReady(false);
+    void refreshAppState().finally(() => setAppStateReady(true));
   }, [session]);
   useAutoRefresh(() => refreshAppState(), {
     enabled: Boolean(session && !session.startsWith('company:sector-test-')),
@@ -679,12 +687,13 @@ function AppContent() {
         color: `hsl(${activeCompanyTheme['--sidebar-active-foreground']})`,
       }
     : undefined;
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
   const applyAuthenticatedUser = (user: AuthUser) => {
     const nextSession = sessionFromAuthUser(user);
+    setAppStateReady(false);
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
@@ -901,6 +910,9 @@ function AppContent() {
   }
   if (isPotentialCustomShopPath && !session && customDomainState === 'shop') {
     return <PublicShopPage domain />;
+  }
+  if (session && !appStateReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>;
   }
   const loginEmployees = [
     ...data.employees,
