@@ -390,6 +390,7 @@ function AppContent() {
   const appStateVersionRef = useRef(appStateVersion);
   const appStateRefreshRef = useRef<Promise<void> | null>(null);
   const localMutationVersionRef = useRef(0);
+  const loginTransitionRef = useRef(false);
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
   useEffect(() => {
@@ -510,7 +511,9 @@ function AppContent() {
       setAppStateReady(true);
       return;
     }
-    setAppStateReady(false);
+    const shouldBlockForInitialLoad = !loginTransitionRef.current && !appStateReady;
+    loginTransitionRef.current = false;
+    if (shouldBlockForInitialLoad) setAppStateReady(false);
     void refreshAppState().finally(() => setAppStateReady(true));
   }, [session]);
   useAutoRefresh(() => refreshAppState(), {
@@ -676,7 +679,8 @@ function AppContent() {
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
   const applyAuthenticatedUser = (user: AuthUser) => {
     const nextSession = sessionFromAuthUser(user);
-    setAppStateReady(false);
+    loginTransitionRef.current = true;
+    setAppStateReady(true);
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
@@ -819,11 +823,12 @@ function AppContent() {
     notify('Test réel terminé. Retour à la configuration des secteurs.', 'success');
   };
   const logout = () => {
-    void authApi.logout().finally(() => {
-      setSession(null);
-      localStorage.removeItem('maximus-session');
-      setLocation('/');
-    });
+    applyCompanyTheme(undefined);
+    setAppStateReady(true);
+    setSession(null);
+    localStorage.removeItem('maximus-session');
+    setLocation('/');
+    void authApi.logout().catch(() => undefined);
   };
   useEffect(() => {
     const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
