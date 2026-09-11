@@ -445,7 +445,7 @@ class EcommerceTest extends TestCase
         ])->assertCreated();
 
         $first = $request->post('/api/ecommerce/products/'.$product->json('id').'/image?companyId=kora', [
-            'image' => UploadedFile::fake()->image('premiere-photo.jpg'),
+            'image' => UploadedFile::fake()->image('premiere-photo.jpg')->size(6000),
         ])->assertOk();
         $firstUrl = $first->json('imageUrl');
         $this->assertStringStartsWith('/api/product-images/kora/', $firstUrl);

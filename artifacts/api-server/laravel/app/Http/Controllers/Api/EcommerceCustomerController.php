@@ -705,6 +705,7 @@ class EcommerceCustomerController extends Controller
             ->get([
                 'ecommerce_order_items.*',
                 'product.image_url',
+                'product.slug as product_slug',
             ]);
 
         return [
@@ -722,6 +723,7 @@ class EcommerceCustomerController extends Controller
             'items' => $items->map(fn (object $item): array => [
                 'id' => $item->id,
                 'productId' => $item->product_id,
+                 'productSlug' => $item->product_slug ?? null,
                  'rentalId' => $item->rental_id ?? null,
                 'productName' => $item->product_name,
                 'unitPrice' => (int) $item->unit_price,

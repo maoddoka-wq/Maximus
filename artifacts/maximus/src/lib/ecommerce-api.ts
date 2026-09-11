@@ -175,6 +175,7 @@ export interface EcommerceRental {
 export interface EcommerceOrderItem {
   id: string;
   productId: string | null;
+  productSlug?: string | null;
   rentalId?: string | null;
   productName: string;
   unitPrice: number;

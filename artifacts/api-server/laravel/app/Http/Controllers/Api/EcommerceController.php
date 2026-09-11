@@ -479,7 +479,7 @@ class EcommerceController extends Controller
         }
 
         $input = Validator::make($request->all(), [
-            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ])->validate();
         $path = $input['image']->store('ecommerce/products/'.$company, 'public');
         if (! is_string($path) || $path === '') {

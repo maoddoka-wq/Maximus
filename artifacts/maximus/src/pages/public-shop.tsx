@@ -155,6 +155,18 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const shopStorageKey = useMemo(() => clientPwaStorageKey(slug, domain), [domain, slug]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
+  const purchasedDigitalProducts = useMemo(() => {
+    const downloads = new Map<string, { orderId: string; itemId: string }>();
+    for (const order of customerData?.orders ?? []) {
+      if (order.paymentStatus !== 'PAID') continue;
+      for (const item of order.items) {
+        if (item.fulfillmentType === 'DIGITAL' && item.productSlug) {
+          downloads.set(item.productSlug, { orderId: order.id, itemId: item.id });
+        }
+      }
+    }
+    return downloads;
+  }, [customerData]);
   const accountSection = useMemo<AccountSection>(() => {
     if (routePath.includes('/compte/commandes')) return 'orders';
     if (routePath.endsWith('/profil')) return 'profile';
@@ -684,7 +696,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
-        : <><div id="shop-catalog-search" className="mb-8 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]"><label className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={17} /><input aria-label="Rechercher un produit" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher un produit" className="w-full rounded-2xl border border-black/5 bg-white py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10" /></label><select aria-label="Filtrer par catégorie" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-2xl border border-black/5 bg-white px-4 py-3.5 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
+         : <><div id="shop-catalog-search" className="mb-8 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]"><label className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={17} /><input aria-label="Rechercher un produit" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher un produit" className="w-full rounded-2xl border border-black/5 bg-white py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10" /></label><select aria-label="Filtrer par catégorie" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-2xl border border-black/5 bg-white px-4 py-3.5 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onDownload={download => void runCustomerAction(() => api.downloadDigitalProduct(download.orderId, download.itemId))} purchasedDigitalProducts={purchasedDigitalProducts} />}</>}
     </main>
       {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
        {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-20 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:bottom-4 sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
@@ -784,6 +796,7 @@ function PublicOfferCard({
   store,
   onOpen,
   onAdd,
+  onDownload,
 }: {
   imageUrl: string;
   icon: typeof Package;
@@ -797,6 +810,7 @@ function PublicOfferCard({
   store: PublicShopBootstrap['store'];
   onOpen?: () => void;
   onAdd?: () => void;
+  onDownload?: () => void;
 }) {
   const isAvailable = availability !== 'Indisponible';
   const discount = compareAtPrice && compareAtPrice > priceValue ? Math.round((1 - priceValue / compareAtPrice) * 100) : null;
@@ -811,8 +825,8 @@ function PublicOfferCard({
        {onOpen ? <button type="button" onClick={onOpen} className="mt-1 line-clamp-2 min-h-8 w-full break-words text-left text-xs font-semibold leading-4 text-[hsl(var(--foreground))] sm:text-sm">{name}</button> : <h3 className="mt-1 line-clamp-2 min-h-8 break-words text-xs font-semibold leading-4 text-[hsl(var(--foreground))] sm:text-sm">{name}</h3>}
        <p className="mt-1.5 text-sm font-bold leading-4 text-[hsl(var(--foreground))] sm:text-base">{price}{priceSuffix && <span className="ml-0.5 text-[9px] font-medium text-[hsl(var(--muted-foreground))]">{priceSuffix}</span>}</p>
        {compareAtPrice && compareAtPrice > priceValue && <div className="mt-1 flex items-center gap-1.5"><span className="truncate text-[10px] text-[hsl(var(--muted-foreground))] line-through">{money(compareAtPrice, store.currency)}</span><span className="rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700">-{discount}%</span></div>}
-       {onAdd && <div className="mt-2.5 flex items-center gap-1.5">
-          {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-white shadow-sm transition hover:brightness-95 sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}><ShoppingBag size={12} className="mr-1 inline-block" />Ajouter</button>}
+        {(onAdd || onDownload) && <div className="mt-2.5 flex items-center gap-1.5">
+           {onDownload ? <button type="button" onClick={onDownload} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-white shadow-sm transition hover:brightness-95 sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}><Download size={12} className="mr-1 inline-block" />Télécharger</button> : isAvailable && onAdd && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-white shadow-sm transition hover:brightness-95 sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}><ShoppingBag size={12} className="mr-1 inline-block" />Ajouter</button>}
       </div>}
     </div>
   </article>;
@@ -825,6 +839,8 @@ function CatalogSections({
   store,
   onProduct,
   onAdd,
+  onDownload,
+  purchasedDigitalProducts,
 }: {
   products: PublicProduct[];
   rentals: PublicRental[];
@@ -832,6 +848,8 @@ function CatalogSections({
   store: PublicShopBootstrap['store'];
   onProduct: (product: PublicProduct) => void;
   onAdd: (product: PublicProduct) => void;
+  onDownload: (download: { orderId: string; itemId: string }) => void;
+  purchasedDigitalProducts: Map<string, { orderId: string; itemId: string }>;
 }) {
   return <div className="space-y-8">
     {categories.map(category => {
@@ -841,7 +859,7 @@ function CatalogSections({
        return <section key={category}>
          <div className="mb-3 flex items-end justify-between gap-3 border-b border-black/5 pb-2"><div><p className="text-[9px] font-bold uppercase tracking-[.15em]" style={{ color: 'var(--shop-primary)' }}>Catégorie</p><h2 className="mt-1 text-lg font-bold tracking-[-.02em] sm:text-xl">{category}</h2></div><span className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{categoryProducts.length + categoryRentals.length} offre{categoryProducts.length + categoryRentals.length > 1 ? 's' : ''}</span></div>
            <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-3 sm:grid-cols-4 sm:gap-3 lg:grid-cols-5 xl:grid-cols-6">
-              {categoryProducts.map(product => <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} price={money(product.price, store.currency)} priceValue={product.price} compareAtPrice={product.compareAtPrice} availability={product.stock > 0 ? `${product.stock} en stock` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} />)}
+               {categoryProducts.map(product => { const download = product.fulfillmentType === 'DIGITAL' ? purchasedDigitalProducts.get(product.slug) : undefined; return <PublicOfferCard key={`product-${product.slug}`} imageUrl={product.imageUrl} icon={Package} badge={`Produit · ${product.category}`} name={product.name} price={money(product.price, store.currency)} priceValue={product.price} compareAtPrice={product.compareAtPrice} availability={product.stock > 0 ? `${product.stock} en stock` : 'Indisponible'} store={store} onOpen={() => onProduct(product)} onAdd={() => onAdd(product)} onDownload={download ? () => onDownload(download) : undefined} />; })}
            {categoryRentals.map(rental => <PublicOfferCard key={`rental-${rental.name}`} imageUrl={rental.imageUrl} icon={Home} badge={`Location · ${rental.category}`} name={rental.name} price={money(rental.price, store.currency)} priceValue={rental.price} priceSuffix={`/ ${rental.billingUnit === 'MOIS' ? 'mois' : rental.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`} availability={rental.isAvailable ? `${rental.availability} en stock` : 'Indisponible'} store={store} />)}
         </div>
       </section>;
