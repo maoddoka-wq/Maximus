@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Services\EcommerceDomainVerifier;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleCatalog;
 use App\Support\MaximusAuth;
@@ -678,6 +679,67 @@ class EcommerceTest extends TestCase
         $this->getJson('http://unknown-domain.test/api/shop-domain')
             ->assertOk()
             ->assertJson(['available' => false]);
+    }
+
+    public function test_active_custom_domain_is_disabled_when_dns_proof_disappears_and_can_be_reverified(): void
+    {
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique revalidation DNS',
+            'slug' => 'dns-revalidation-test',
+            'description' => 'Boutique de test de propriété DNS.',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $domain = 'dns-revalidation.kora.test';
+        $token = 'dns-revalidation-token';
+        DB::table('ecommerce_domains')->insert([
+            'id' => 'domain-dns-revalidation',
+            'company_id' => 'kora',
+            'domain' => $domain,
+            'target_host' => 'maximus.test',
+            'verification_token' => $token,
+            'status' => 'ACTIVE',
+            'last_error' => '',
+            'verified_at' => now()->subHour(),
+            'created_at' => now()->subHour(),
+            'updated_at' => now()->subHour(),
+        ]);
+
+        app()->instance(
+            EcommerceDomainVerifier::class,
+            new EcommerceDomainVerifier(static fn (string $name, int $type): array => []),
+        );
+
+        $this->getJson('http://'.$domain.'/api/shop-domain')
+            ->assertOk()
+            ->assertJson(['available' => false]);
+        $this->assertDatabaseHas('ecommerce_domains', [
+            'id' => 'domain-dns-revalidation',
+            'status' => 'PENDING',
+        ]);
+
+        app()->instance(
+            EcommerceDomainVerifier::class,
+            new EcommerceDomainVerifier(
+                static function (string $name, int $type) use ($domain, $token): array {
+                    return $type === DNS_TXT && $name === '_maximus-verification.'.$domain
+                        ? [['txt' => $token]]
+                        : [];
+                },
+            ),
+        );
+
+        $request->postJson('/api/ecommerce/domains/domain-dns-revalidation/verify?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('status', 'ACTIVE');
+
+        $this->getJson('http://'.$domain.'/api/shop-domain')
+            ->assertOk()
+            ->assertJsonPath('store.slug', 'dns-revalidation-test');
     }
 
     public function test_public_manifests_have_an_isolated_pwa_start_path_per_store(): void

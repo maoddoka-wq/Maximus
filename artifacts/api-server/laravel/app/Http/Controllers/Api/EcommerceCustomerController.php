@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\CompanyRegistry;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\MaximusPassword;
+use App\Services\EcommerceDomainVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -18,6 +19,11 @@ use Throwable;
 
 class EcommerceCustomerController extends Controller
 {
+    public function __construct(
+        private readonly EcommerceDomainVerifier $domainVerifier,
+    ) {
+    }
+
     public function session(Request $request, ?string $slug = null): JsonResponse
     {
         $store = $this->publishedStore($request, $slug);
@@ -462,11 +468,7 @@ class EcommerceCustomerController extends Controller
                 ->first();
             return $store && CompanyRegistry::isActive((string) $store->company_id) ? $store : null;
         }
-        $domain = $this->normalizeDomain($request->getHost());
-        if (! $domain) {
-            return null;
-        }
-        $domainRow = DB::table('ecommerce_domains')->where('domain', $domain)->where('status', 'ACTIVE')->first();
+        $domainRow = $this->domainVerifier->activeForHost($request->getHost());
         if (! $domainRow) {
             return null;
         }
@@ -476,20 +478,6 @@ class EcommerceCustomerController extends Controller
             ->where('status', 'PUBLISHED')
             ->first();
         return $store && CompanyRegistry::isActive((string) $store->company_id) ? $store : null;
-    }
-
-    private function normalizeDomain(string $value): ?string
-    {
-        $domain = Str::lower(trim($value));
-        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
-        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
-        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
-        $domain = rtrim($domain, '.');
-        if ($domain === '' || strlen($domain) > 253 || ! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
-            return null;
-        }
-
-        return $domain;
     }
 
     private function addresses(object $customer): array

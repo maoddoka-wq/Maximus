@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
+use App\Services\EcommerceDomainVerifier;
 use App\Support\CompanyRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Throwable;
 
 final class EcommercePaymentController extends Controller
@@ -17,6 +17,7 @@ final class EcommercePaymentController extends Controller
     public function __construct(
         private readonly DiamanoPayService $diamanoPay,
         private readonly SellerWalletController $sellerWallet,
+        private readonly EcommerceDomainVerifier $domainVerifier,
     )
     {
     }
@@ -33,11 +34,7 @@ final class EcommercePaymentController extends Controller
 
     public function createByDomain(Request $request, string $orderId): JsonResponse
     {
-        $host = $this->normalizeDomain($request->getHost());
-        if (! $host) {
-            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
-        }
-        $domain = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE')->first();
+        $domain = $this->domainVerifier->activeForHost($request->getHost());
         $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)->where('status', 'PUBLISHED')->first() : null;
         if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
@@ -58,11 +55,7 @@ final class EcommercePaymentController extends Controller
 
     public function statusByDomain(Request $request, string $orderId): JsonResponse
     {
-        $host = $this->normalizeDomain($request->getHost());
-        if (! $host) {
-            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
-        }
-        $domain = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE')->first();
+        $domain = $this->domainVerifier->activeForHost($request->getHost());
         $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)->where('status', 'PUBLISHED')->first() : null;
         if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
@@ -207,17 +200,4 @@ final class EcommercePaymentController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    private function normalizeDomain(string $value): ?string
-    {
-        $domain = Str::lower(trim($value));
-        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
-        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
-        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
-        $domain = rtrim($domain, '.');
-        if ($domain === '' || strlen($domain) > 253 || ! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
-            return null;
-        }
-
-        return $domain;
-    }
 }

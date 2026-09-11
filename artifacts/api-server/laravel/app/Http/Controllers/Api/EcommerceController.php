@@ -7,6 +7,7 @@ use App\Support\EcommerceCustomerAuth;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
+use App\Services\EcommerceDomainVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,11 @@ use Throwable;
 
 class EcommerceController extends Controller
 {
+    public function __construct(
+        private readonly EcommerceDomainVerifier $domainVerifier,
+    ) {
+    }
+
     private const STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
     private const ORDER_STATUSES = ['NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'EXPÉDIÉE', 'LIVRÉE', 'ANNULÉE'];
     private const PRODUCT_TYPES = ['SALE', 'RENTAL'];
@@ -254,7 +260,7 @@ class EcommerceController extends Controller
         $input = Validator::make($request->all(), [
             'domain' => ['required', 'string', 'max:253'],
         ])->validate();
-        $domain = $this->normalizeDomain($input['domain']);
+        $domain = $this->domainVerifier->normalize($input['domain']);
         if (! $domain) {
             return response()->json(['error' => 'Saisissez un nom de domaine valide, sans http:// ni chemin.'], 422);
         }
@@ -295,23 +301,7 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Domaine introuvable.'], 404);
         }
 
-        $verificationName = '_maximus-verification.'.$row->domain;
-        $verifiedByTxt = false;
-        $verifiedByCname = false;
-        if (function_exists('dns_get_record')) {
-            $txtRecords = @dns_get_record($verificationName, DNS_TXT) ?: [];
-            $verifiedByTxt = collect($txtRecords)->contains(
-                fn (array $record): bool => trim((string) ($record['txt'] ?? '')) === $row->verification_token,
-            );
-
-            $cnameRecords = @dns_get_record($row->domain, DNS_CNAME) ?: [];
-            $expectedTarget = rtrim(Str::lower($row->target_host), '.');
-            $verifiedByCname = collect($cnameRecords)->contains(
-                fn (array $record): bool => rtrim(Str::lower((string) ($record['target'] ?? '')), '.') === $expectedTarget,
-            );
-        }
-
-        if (! $verifiedByTxt && ! $verifiedByCname) {
+        if (! $this->domainVerifier->hasValidDnsProof($row)) {
             DB::table('ecommerce_domains')->where('id', $row->id)->update([
                 'status' => 'PENDING',
                 'last_error' => 'Aucun enregistrement TXT ou CNAME correspondant n’a été trouvé.',
@@ -1717,15 +1707,7 @@ class EcommerceController extends Controller
 
     private function publishedStoreByDomain(string $host): ?object
     {
-        $domain = $this->normalizeDomain($host);
-        if (! $domain) {
-            return null;
-        }
-
-        $domainRow = DB::table('ecommerce_domains')
-            ->where('domain', $domain)
-            ->where('status', 'ACTIVE')
-            ->first();
+        $domainRow = $this->domainVerifier->activeForHost($host);
         if (! $domainRow) {
             return null;
         }
@@ -1761,20 +1743,6 @@ class EcommerceController extends Controller
             'lastError' => $row->last_error,
             'verifiedAt' => $row->verified_at,
         ];
-    }
-
-    private function normalizeDomain(string $value): ?string
-    {
-        $domain = Str::lower(trim($value));
-        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
-        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
-        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
-        $domain = rtrim($domain, '.');
-        if ($domain === '' || strlen($domain) > 253 || ! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
-            return null;
-        }
-
-        return $domain;
     }
 
     private function deleteStoredImage(?string $imageUrl, string $replacement): void
@@ -1819,7 +1787,7 @@ class EcommerceController extends Controller
             return rtrim(Str::lower($configured), '.');
         }
 
-        return $this->normalizeDomain($request->getHost()) ?? $request->getHost();
+        return $this->domainVerifier->normalize($request->getHost()) ?? $request->getHost();
     }
 
     private function orders(string $company): array

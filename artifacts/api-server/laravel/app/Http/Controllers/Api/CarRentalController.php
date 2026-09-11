@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\EcommerceDomainVerifier;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\ModuleAuthorization;
 use App\Support\CompanyRegistry;
@@ -16,6 +17,11 @@ use Throwable;
 
 final class CarRentalController extends Controller
 {
+    public function __construct(
+        private readonly EcommerceDomainVerifier $domainVerifier,
+    ) {
+    }
+
     public const TRIP_TYPES = ['FAMILY', 'BUSINESS'];
     public const STATUSES = [
         'PENDING_PAYMENT', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED',
@@ -405,12 +411,7 @@ final class CarRentalController extends Controller
             $store = DB::table('ecommerce_stores')->where('slug', $slug)->where('status', 'PUBLISHED')->first();
             return $store && $this->publicLocationEnabled((string) $store->company_id) ? $store : null;
         }
-        $domainName = $this->normalizeDomain($request->getHost());
-        if (! $domainName) {
-            return null;
-        }
-        $domain = DB::table('ecommerce_domains')->where('domain', $domainName)
-            ->where('status', 'ACTIVE')->first();
+        $domain = $this->domainVerifier->activeForHost($request->getHost());
 
         $store = $domain ? DB::table('ecommerce_stores')->where('company_id', $domain->company_id)
             ->where('status', 'PUBLISHED')->first() : null;
@@ -481,20 +482,6 @@ final class CarRentalController extends Controller
         $features = is_array($features) ? $features : [];
         return in_array($access->status ?? '', ['ACTIF', 'BETA'], true)
             && ($features === [] || in_array('location', $features, true));
-    }
-
-    private function normalizeDomain(string $value): ?string
-    {
-        $domain = Str::lower(trim($value));
-        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
-        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
-        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
-        $domain = rtrim($domain, '.');
-        if ($domain === '' || strlen($domain) > 253 || ! filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
-            return null;
-        }
-
-        return $domain;
     }
 
     private function forbidden(): JsonResponse
