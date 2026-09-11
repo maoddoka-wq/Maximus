@@ -369,18 +369,7 @@ function AppContent() {
   const [appStateReady, setAppStateReady] = useState(
     () => !localStorage.getItem('maximus-session'),
   );
-  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>(
-    () => (window.location.pathname === '/'
-      || window.location.pathname === '/connexion'
-      || window.location.pathname === '/inscription-client'
-      || window.location.pathname === '/panier'
-      || window.location.pathname === '/location'
-      || window.location.pathname === '/livraison'
-      || window.location.pathname.startsWith('/produit/')
-      || window.location.pathname.startsWith('/compte'))
-      ? 'checking'
-      : 'none',
-  );
+  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>('checking');
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
@@ -409,22 +398,9 @@ function AppContent() {
   const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
     showAppToast(message, kind);
   useEffect(() => {
-    const isPotentialCustomShopPath = pathname === '/'
-      || pathname === '/connexion'
-      || pathname === '/inscription-client'
-      || pathname === '/panier'
-      || pathname === '/location'
-      || pathname === '/livraison'
-      || pathname.startsWith('/produit/')
-      || pathname.startsWith('/compte');
-    if (!isPotentialCustomShopPath || session) {
-      setCustomDomainState('none');
-      return undefined;
-    }
-    if (customDomainState === 'shop') return undefined;
+    if (customDomainState !== 'checking') return undefined;
 
     let active = true;
-    setCustomDomainState('checking');
     void publicEcommerceApi.bootstrapDomain()
       .then((result) => {
         if (active) setCustomDomainState('store' in result ? 'shop' : 'none');
@@ -435,7 +411,7 @@ function AppContent() {
     return () => {
       active = false;
     };
-  }, [customDomainState, pathname, session]);
+  }, [customDomainState]);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
@@ -907,18 +883,10 @@ function AppContent() {
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
-  const isPotentialCustomShopPath = pathname === '/'
-    || pathname === '/connexion'
-    || pathname === '/inscription-client'
-    || pathname === '/panier'
-    || pathname === '/location'
-    || pathname === '/livraison'
-    || pathname.startsWith('/produit/')
-    || pathname.startsWith('/compte');
-  if (isPotentialCustomShopPath && !session && customDomainState === 'checking') {
+  if (customDomainState === 'checking') {
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de la boutique…</div>;
   }
-  if (isPotentialCustomShopPath && !session && customDomainState === 'shop') {
+  if (customDomainState === 'shop') {
     return <PublicShopPage domain />;
   }
   if (session && !appStateReady) {
