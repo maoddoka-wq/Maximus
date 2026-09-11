@@ -1,3 +1,5 @@
+import { requestJson } from './api-request';
+
 export type StockMovementType = 'ENTRÉE' | 'SORTIE' | 'VENTE' | 'ACHAT' | 'TRANSFERT' | 'AJUSTEMENT+' | 'AJUSTEMENT-' | 'PERTE' | 'RETOUR CLIENT' | 'RETOUR FOURNISSEUR';
 
 export interface StockProduct {
@@ -39,10 +41,7 @@ export interface StockInventoryLine { id: string; inventoryId: string; productId
 export interface StockBootstrap { products: StockProduct[]; warehouses: StockWarehouse[]; locations: StockLocation[]; suppliers: StockSupplier[]; balances: StockBalance[]; movements: StockMovement[]; requests: StockRequest[]; inventories: StockInventory[]; inventoryLines: StockInventoryLine[]; }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, { ...init, cache: 'no-store', headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error ?? 'Une erreur est survenue.');
-  return body as T;
+  return requestJson<T>(path, init, { fallbackMessage: 'Une erreur est survenue.' });
 }
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });

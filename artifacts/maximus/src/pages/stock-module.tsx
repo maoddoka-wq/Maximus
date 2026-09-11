@@ -74,7 +74,13 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     if (pendingAction) return;
     setPendingAction(true);
     showAppToast('Action en cours…', 'info');
-    try { await action(); await load(true); showAppToast(success, 'success'); }
+    try {
+      await action();
+      showAppToast(success, 'success');
+      // The mutation is complete; do not make the user wait for the
+      // consistency refresh. Keep the existing view usable while it runs.
+      void load(true);
+    }
     catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Opération impossible.', 'error'); }
     finally { setPendingAction(false); }
   };

@@ -309,9 +309,11 @@ export default function EcommerceModulePage({
     showAppToast('Action en cours…', 'info');
     try {
       const result = await action();
-      await load(true);
       showAppToast(success, 'success');
       setError('');
+      // Refresh in the background. The mutation response already confirms
+      // the action, so a second bootstrap request must not block the UI.
+      void load(true);
       return result;
     } catch (cause) {
       showAppToast(cause instanceof Error ? cause.message : 'Opération impossible.', 'error');

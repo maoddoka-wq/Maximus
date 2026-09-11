@@ -172,7 +172,7 @@ export function ControlCenterPage({
         if (localTask) Object.assign(localTask, updated);
         else draft.controlTasks.unshift(updated);
       }, undefined, false);
-      await refreshControl();
+      void refreshControl();
       notify(`Tâche « ${updated.title} » mise à jour.`);
     } catch (error) {
       notify(error instanceof Error ? error.message : 'La mise à jour de la tâche a échoué.');
@@ -216,7 +216,7 @@ export function ControlCenterPage({
       setShowCreateDialog(false);
       setForm(initialForm(configuredModules[0]?.id ?? 'commerce'));
       setAssigneeEmployeeId('');
-      await refreshControl();
+      void refreshControl();
       notify('Tâche créée et tracée.');
     } catch (error) {
       notify(error instanceof Error ? error.message : 'La création de la tâche a échoué.');

@@ -1,3 +1,5 @@
+import { requestJson } from './api-request';
+
 export type MaximusAssistantResponse = {
   answer: string;
   citations: string[];
@@ -52,21 +54,7 @@ export type MaximusAssistantAction = {
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body.error === 'string' ? body.error : 'MAXI est momentanément indisponible.');
-  }
-
-  return response.json() as Promise<T>;
+  return requestJson<T>(path, options, { fallbackMessage: 'MAXI est momentanément indisponible.', timeoutMs: 60_000 });
 }
 
 export const maximusAssistantApi = {

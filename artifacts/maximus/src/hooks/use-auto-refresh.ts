@@ -26,9 +26,14 @@ export function useAutoRefresh(
     const run = () => {
       if (document.visibilityState !== 'visible' || runningRef.current) return;
       runningRef.current = true;
-      Promise.resolve(refreshRef.current()).finally(() => {
-        runningRef.current = false;
-      });
+      void Promise.resolve(refreshRef.current()).then(
+        () => {
+          runningRef.current = false;
+        },
+        () => {
+          runningRef.current = false;
+        },
+      );
     };
 
     const onFocus = () => run();

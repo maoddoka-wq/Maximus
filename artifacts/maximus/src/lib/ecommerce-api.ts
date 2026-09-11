@@ -1,3 +1,5 @@
+import { requestJson } from './api-request';
+
 export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceProductType = 'SALE' | 'RENTAL';
@@ -441,20 +443,7 @@ export interface EcommerceCustomerBootstrap {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    cache: 'no-store',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const validationErrors = body.errors && typeof body.errors === 'object'
-      ? Object.values(body.errors).flat().filter((value): value is string => typeof value === 'string').join(' ')
-      : '';
-    throw new Error(body.error ?? body.message ?? validationErrors ?? 'Une erreur est survenue.');
-  }
-  return body as T;
+  return requestJson<T>(path, init, { fallbackMessage: 'Une erreur est survenue.' });
 }
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
@@ -474,15 +463,10 @@ export const createEcommerceApi = (companyId: string) => {
     uploadStoreLogo: async (file: File) => {
       const formData = new FormData();
       formData.append('image', file);
-      const response = await fetch(`/api${withCompany('/ecommerce/store/logo')}`, {
+      return requestJson<EcommerceStore>(withCompany('/ecommerce/store/logo'), {
         method: 'POST',
-        cache: 'no-store',
-        credentials: 'include',
         body: formData,
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? 'Le logo de la boutique n’a pas pu être envoyé.');
-      return body as EcommerceStore;
+      }, { fallbackMessage: 'Le logo de la boutique n’a pas pu être envoyé.', timeoutMs: 90_000 });
     },
     createCategory: (body: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) => request<EcommerceCategory>(withCompany('/ecommerce/categories'), json(body)),
     updateCategory: (id: string, body: Partial<Omit<EcommerceCategory, 'id' | 'companyId'>>) => request<EcommerceCategory>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
@@ -495,42 +479,27 @@ export const createEcommerceApi = (companyId: string) => {
     uploadDigitalFile: async (id: string, file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await fetch(`/api${withCompany(`/ecommerce/products/${encodeURIComponent(id)}/digital-file`)}`, {
+      return requestJson<EcommerceProduct>(withCompany(`/ecommerce/products/${encodeURIComponent(id)}/digital-file`), {
         method: 'POST',
-        cache: 'no-store',
-        credentials: 'include',
         body: formData,
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? 'Le fichier numérique n’a pas pu être envoyé.');
-      return body as EcommerceProduct;
+      }, { fallbackMessage: 'Le fichier numérique n’a pas pu être envoyé.', timeoutMs: 90_000 });
     },
     uploadProductImage: async (id: string, file: File) => {
       const formData = new FormData();
       formData.append('image', file);
-      const response = await fetch(`/api${withCompany(`/ecommerce/products/${encodeURIComponent(id)}/image`)}`, {
+      return requestJson<EcommerceProduct>(withCompany(`/ecommerce/products/${encodeURIComponent(id)}/image`), {
         method: 'POST',
-        cache: 'no-store',
-        credentials: 'include',
         body: formData,
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? 'La photo n’a pas pu être envoyée.');
-      return body as EcommerceProduct;
+      }, { fallbackMessage: 'La photo n’a pas pu être envoyée.', timeoutMs: 90_000 });
     },
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
       uploadRentalImage: async (id: string, file: File) => {
         const formData = new FormData();
         formData.append('image', file);
-        const response = await fetch(`/api${withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/image`)}`, {
+        return requestJson<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/image`), {
           method: 'POST',
-          cache: 'no-store',
-          credentials: 'include',
           body: formData,
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error ?? 'La photo n’a pas pu être envoyée.');
-        return body as EcommerceRental;
+        }, { fallbackMessage: 'La photo n’a pas pu être envoyée.', timeoutMs: 90_000 });
       },
       createRental: (body: any) =>
        request<EcommerceRental>(withCompany('/ecommerce/rentals'), json(body)),

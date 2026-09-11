@@ -1,3 +1,5 @@
+import { requestJson } from './api-request';
+
 export type AuthUser = {
   role: 'maximus_admin' | 'company_admin' | 'sector_manager' | 'employee';
   displayName: string;
@@ -8,12 +10,7 @@ export type AuthUser = {
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, { ...options, credentials: 'include' });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body.error === 'string' ? body.error : 'La connexion MAXIMUS a échoué.');
-  }
-  return response.status === 204 ? (undefined as T) : response.json() as Promise<T>;
+  return requestJson<T>(path, options, { fallbackMessage: 'La connexion MAXIMUS a échoué.' });
 }
 
 export const authApi = {

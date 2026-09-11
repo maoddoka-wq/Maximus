@@ -1,3 +1,5 @@
+import { ApiRequestError, requestJson } from './api-request';
+
 export type SellerWalletMaturityMode = 'AUTOMATIC' | 'DAYS' | 'WEEKS';
 
 export type SellerWalletMaturityPolicy = {
@@ -97,22 +99,14 @@ export class PlatformSettingsRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new PlatformSettingsRequestError(
-      typeof body.error === 'string' ? body.error : 'Les paramètres plateforme sont indisponibles.',
-      response.status,
-    );
+  try {
+    return await requestJson<T>(path, init, { fallbackMessage: 'Les paramètres plateforme sont indisponibles.' });
+  } catch (cause) {
+    if (cause instanceof ApiRequestError) {
+      throw new PlatformSettingsRequestError(cause.message, cause.status);
+    }
+    throw cause;
   }
-  return body as T;
 }
 
 export const platformSettingsApi = {

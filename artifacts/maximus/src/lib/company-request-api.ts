@@ -1,3 +1,4 @@
+import { requestJson } from './api-request';
 import type { Company, ModuleId } from './store';
 
 export type CompanyRequest = {
@@ -10,18 +11,7 @@ export type CompanyRequest = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData;
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    cache: 'no-store',
-    credentials: 'include',
-    headers: isFormData ? { ...(init?.headers ?? {}) } : { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(typeof body.error === 'string' ? body.error : 'La demande d’entreprise est indisponible.');
-  }
-  return body as T;
+  return requestJson<T>(path, init, { fallbackMessage: 'La demande d’entreprise est indisponible.' });
 }
 
 export const companyRequestApi = {

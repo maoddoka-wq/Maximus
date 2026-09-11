@@ -1,3 +1,4 @@
+import { ApiRequestError, requestJson } from './api-request';
 import type { StoreData } from './store';
 
 type AppStateResponse = {
@@ -17,23 +18,14 @@ export class AppStateRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    cache: 'no-store',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new AppStateRequestError(
-      typeof body.error === 'string' ? body.error : 'Les données métier sont indisponibles.',
-      response.status,
-    );
+  try {
+    return await requestJson<T>(path, init, { fallbackMessage: 'Les données métier sont indisponibles.' });
+  } catch (cause) {
+    if (cause instanceof ApiRequestError) {
+      throw new AppStateRequestError(cause.message, cause.status);
+    }
+    throw cause;
   }
-  return body as T;
 }
 
 export const appStateApi = {

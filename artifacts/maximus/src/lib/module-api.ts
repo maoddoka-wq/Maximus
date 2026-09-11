@@ -1,3 +1,4 @@
+import { requestJson } from './api-request';
 import { modules, type ModuleAvailability, type ModuleFeaturePack } from './store';
 
 export type ServerModuleAccess = {
@@ -18,15 +19,7 @@ type ModuleBootstrap = {
 };
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    credentials: 'include',
-    cache: 'no-store',
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(typeof body.error === 'string' ? body.error : 'Les accès modules sont indisponibles.');
-  }
-  return body as T;
+  return requestJson<T>(path, undefined, { fallbackMessage: 'Les accès modules sont indisponibles.' });
 }
 
 export async function loadCompanyModuleAccess(companyId: string, expectedModuleIds: string[] = []): Promise<ServerModuleAccess[]> {
@@ -53,17 +46,12 @@ export async function setCompanyModuleAccess(
   status: ModuleAvailability,
   options: { featureIds?: string[]; configuration?: Record<string, unknown> } = {},
 ): Promise<ServerModuleAccess> {
-  const response = await fetch(`/api/modules/${encodeURIComponent(moduleId)}/access?companyId=${encodeURIComponent(companyId)}`, {
+  const body = await requestJson<{ module: ServerModuleAccess }>(`/modules/${encodeURIComponent(moduleId)}/access?companyId=${encodeURIComponent(companyId)}`, {
     method: 'PATCH',
-    cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, ...options }),
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(typeof body.error === 'string' ? body.error : 'La configuration du module est indisponible.');
-  }
-  return (body as { module: ServerModuleAccess }).module;
+  }, { fallbackMessage: 'La configuration du module est indisponible.' });
+  return body.module;
 }
 
 export async function synchronizeCompanyModuleAccess(companyId: string, moduleIds: string[]) {

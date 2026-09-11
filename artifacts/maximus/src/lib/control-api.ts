@@ -1,3 +1,4 @@
+import { requestJson } from './api-request';
 import type { AuditEntry, ControlTask, DomainEvent } from '@/lib/store';
 
 type ControlScope = 'admin' | 'all' | 'assigned' | 'sector';
@@ -68,12 +69,7 @@ function normalizeHealth(payload: unknown): SystemHealth {
 type NewTaskInput = Omit<ControlTask, 'id' | 'status' | 'createdAt' | 'updatedAt'>;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, { ...options, cache: 'no-store' });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body.error === 'string' ? body.error : 'La persistance du contrôle est indisponible.');
-  }
-  return response.json() as Promise<T>;
+  return requestJson<T>(path, options, { fallbackMessage: 'La persistance du contrôle est indisponible.' });
 }
 
 const json = (body: unknown, method = 'POST'): RequestInit => ({

@@ -1,3 +1,5 @@
+import { requestJson } from './api-request';
+
 export type PayrollWallet = {
   currency: string;
   availableBalance: number;
@@ -73,15 +75,11 @@ type RequestOptions = RequestInit & { json?: unknown };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { json, headers, ...init } = options;
-  const response = await fetch(`/api/payroll${path}`, {
+  return requestJson<T>(`/payroll${path}`, {
     ...init,
-    cache: 'no-store',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(headers ?? {}) },
     body: json === undefined ? init.body : JSON.stringify(json),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error ?? 'La demande Paie a échoué.');
-  return payload as T;
+  }, { fallbackMessage: 'La demande Paie a échoué.' });
 }
 
 export function createPayrollApi() {

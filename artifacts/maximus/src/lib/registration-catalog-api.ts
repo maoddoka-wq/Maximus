@@ -1,3 +1,4 @@
+import { requestJson } from './api-request';
 import type { StoreData } from './store';
 
 type RegistrationCatalog = Pick<
@@ -14,13 +15,9 @@ type RegistrationCatalogResponse = {
 
 export const registrationCatalogApi = {
   bootstrap: async (): Promise<RegistrationCatalogResponse> => {
-    const response = await fetch('/api/registration-catalog', {
-      credentials: 'include',
+    const body = await requestJson<Partial<RegistrationCatalogResponse>>('/registration-catalog', undefined, {
+      fallbackMessage: 'Le catalogue d’inscription est indisponible.',
     });
-    const body = (await response.json().catch(() => ({}))) as Partial<RegistrationCatalogResponse>;
-    if (!response.ok) {
-      throw new Error('Le catalogue d’inscription est indisponible.');
-    }
     return {
       version: typeof body.version === 'number' ? body.version : 0,
       catalog: body.catalog ?? {},

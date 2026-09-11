@@ -354,7 +354,9 @@ export default function PayrollModulePage({
     try {
       await work();
       showAppToast(message, 'success');
-      await refresh();
+      // Keep the current screen interactive while the follow-up snapshot
+      // catches up with the server.
+      void refresh(true);
       return true;
     } catch (cause) {
       showAppToast(cause instanceof Error ? cause.message : 'Action impossible.', 'error');
@@ -453,7 +455,7 @@ export default function PayrollModulePage({
       showAppToast('Checkout DiamanoPay ouvert. Le solde sera crédité après confirmation.', 'info');
       if (result.topup.checkoutUrl) window.open(result.topup.checkoutUrl, '_blank', 'noopener,noreferrer');
       setTopupAmount('');
-      await refresh();
+      void refresh(true);
     } catch (cause) {
       showAppToast(cause instanceof Error ? cause.message : 'Recharge impossible.', 'error');
     } finally {
