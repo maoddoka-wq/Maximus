@@ -421,6 +421,7 @@ function AppContent() {
       setCustomDomainState('none');
       return undefined;
     }
+    if (customDomainState === 'shop') return undefined;
 
     let active = true;
     setCustomDomainState('checking');
@@ -434,7 +435,7 @@ function AppContent() {
     return () => {
       active = false;
     };
-  }, [pathname, session]);
+  }, [customDomainState, pathname, session]);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
