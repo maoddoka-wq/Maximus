@@ -670,10 +670,15 @@ export function MaximusAssistantPage({
                             <div className="flex items-start gap-2">
                               <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
                               <div className="min-w-0 flex-1">
-                                <p className="text-[11px] font-black uppercase tracking-[.12em] text-[hsl(var(--primary))]">Action vérifiée</p>
+                                 <p className="text-[11px] font-black uppercase tracking-[.12em] text-[hsl(var(--primary))]">Aperçu serveur · confirmation requise</p>
                                 <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
                                    {actionDescription(entry.action)}
                                 </p>
+                                 {entry.action.expiresAt && entry.action.status !== 'EXECUTED' && (
+                                   <p className="mt-2 text-[11px] font-semibold text-amber-700">
+                                     Cet aperçu est valable 10 minutes et ne peut être confirmé qu’une seule fois.
+                                   </p>
+                                 )}
                                 <button
                                   type="button"
                                   disabled={entry.action.status === 'EXECUTED' || submitting || loading}
@@ -681,7 +686,7 @@ export function MaximusAssistantPage({
                                   className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-black text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {entry.action.status === 'EXECUTED' ? <CircleCheck size={14} /> : <Check size={14} />}
-                                  {entry.action.status === 'EXECUTED' ? 'Action confirmée' : 'Confirmer et enregistrer'}
+                                   {entry.action.status === 'EXECUTED' ? 'Confirmation serveur enregistrée' : 'Confirmer côté serveur'}
                                 </button>
                               </div>
                             </div>

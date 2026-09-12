@@ -57,7 +57,10 @@ class MaximusAssistantController extends Controller
         ]);
 
         try {
-            return response()->json($actions->preview($data['action']));
+            return response()->json($actions->preview(
+                $data['action'],
+                (array) $request->attributes->get('authActor'),
+            ));
         } catch (\RuntimeException $exception) {
             return response()->json(['error' => $exception->getMessage()], 422);
         }
@@ -71,12 +74,12 @@ class MaximusAssistantController extends Controller
 
         $data = $request->validate([
             'confirmed' => ['required', 'accepted'],
-            'action' => ['required', 'array'],
+            'confirmationToken' => ['required', 'string', 'max:128'],
         ]);
 
         try {
             return response()->json($actions->execute(
-                $data['action'],
+                $data['confirmationToken'],
                 (array) $request->attributes->get('authActor'),
             ));
         } catch (\RuntimeException $exception) {

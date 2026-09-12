@@ -136,17 +136,19 @@ class MaximusAssistantTest extends TestCase
             'features' => ['Pilotage', 'Rapports'],
         ];
 
-        $this->withCredentials()
+        $modulePreview = $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/preview', ['action' => $moduleAction])
             ->assertOk()
             ->assertJsonPath('provider', 'maxi')
             ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
+        $moduleConfirmationToken = $modulePreview->json('action.confirmationToken');
+        $this->assertIsString($moduleConfirmationToken);
 
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'action' => $moduleAction,
+                'confirmationToken' => $moduleConfirmationToken,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -160,10 +162,16 @@ class MaximusAssistantTest extends TestCase
             'featureIds' => ['Pilotage', 'Rapports'],
         ];
 
+        $packPreview = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $packAction])
+            ->assertOk();
+        $packConfirmationToken = $packPreview->json('action.confirmationToken');
+        $this->assertIsString($packConfirmationToken);
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'action' => $packAction,
+                'confirmationToken' => $packConfirmationToken,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -187,10 +195,17 @@ class MaximusAssistantTest extends TestCase
             'modulePackIds' => ['gestion-des-projets' => ['gestion-des-projets-suivi-de-projets']],
         ];
 
+        $organizationPreview = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $organizationAction])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
+        $organizationConfirmationToken = $organizationPreview->json('action.confirmationToken');
+        $this->assertIsString($organizationConfirmationToken);
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'action' => $organizationAction,
+                'confirmationToken' => $organizationConfirmationToken,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -231,10 +246,17 @@ class MaximusAssistantTest extends TestCase
         ];
 
         foreach ([$featureAction, $sectorAction] as $action) {
+            $preview = $this->withCredentials()
+                ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+                ->postJson('/api/maximus-assistant/actions/preview', ['action' => $action])
+                ->assertOk()
+                ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
+            $confirmationToken = $preview->json('action.confirmationToken');
+            $this->assertIsString($confirmationToken);
             $this->withCredentials()
                 ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
                 ->postJson('/api/maximus-assistant/actions/execute', [
-                    'action' => $action,
+                    'confirmationToken' => $confirmationToken,
                     'confirmed' => true,
                 ])
                 ->assertOk()
@@ -250,10 +272,17 @@ class MaximusAssistantTest extends TestCase
             'requirements' => ['suivi des commandes', 'planning des équipes'],
         ];
 
+        $companyPlanPreview = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $companyPlan])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
+        $companyPlanConfirmationToken = $companyPlanPreview->json('action.confirmationToken');
+        $this->assertIsString($companyPlanConfirmationToken);
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'action' => $companyPlan,
+                'confirmationToken' => $companyPlanConfirmationToken,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -314,21 +343,31 @@ class MaximusAssistantTest extends TestCase
             ],
         ];
 
-        $this->withCredentials()
+        $companyPreview = $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/preview', ['action' => $action])
             ->assertOk()
             ->assertJsonPath('action.status', 'PENDING_CONFIRMATION')
             ->assertJsonPath('action.type', 'update_company');
+        $companyConfirmationToken = $companyPreview->json('action.confirmationToken');
+        $this->assertIsString($companyConfirmationToken);
 
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'action' => $action,
+                'confirmationToken' => $companyConfirmationToken,
                 'confirmed' => true,
             ])
             ->assertOk()
             ->assertJsonPath('action.status', 'EXECUTED');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/execute', [
+                'confirmationToken' => $companyConfirmationToken,
+                'confirmed' => true,
+            ])
+            ->assertStatus(422);
 
         $this->assertDatabaseHas('companies', [
             'id' => 'company-to-update',

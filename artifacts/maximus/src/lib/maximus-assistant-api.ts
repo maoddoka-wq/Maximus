@@ -27,6 +27,8 @@ export type MaximusAssistantAction = {
   type: MaximusAssistantActionType;
   status?: MaximusAssistantActionStatus;
   requiresConfirmation?: boolean;
+  confirmationToken?: string;
+  expiresAt?: string;
   id?: string;
   name: string;
   description?: string;
@@ -83,6 +85,6 @@ export const maximusAssistantApi = {
   executeAction: (action: MaximusAssistantAction) =>
     request<MaximusAssistantResponse>('/maximus-assistant/actions/execute', {
       method: 'POST',
-      body: JSON.stringify({ action, confirmed: true }),
+      body: JSON.stringify({ confirmationToken: action.confirmationToken, confirmed: true }),
     }),
 };

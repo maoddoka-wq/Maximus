@@ -13,19 +13,34 @@ final class MaximusAssistantActionService
 {
     /**
      * @param array<string, mixed> $action
+     * @param array<string, mixed> $actor
      * @return array{answer: string, citations: array<int, string>, provider: string, model: string, action: array<string, mixed>}
      */
-    public function preview(array $action): array
+    public function preview(array $action, array $actor = []): array
     {
         $state = $this->workspaceState();
         $normalized = $this->normalizeAndValidate($action, $state);
+        $confirmationToken = Str::random(64);
+        $expiresAt = now()->addMinutes(10);
+
+        DB::table('maximus_assistant_action_previews')->insert([
+            'id' => (string) Str::uuid(),
+            'token_hash' => hash('sha256', $confirmationToken),
+            'action' => json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'status' => 'PENDING',
+            'expires_at' => $expiresAt,
+            'created_by' => (string) ($actor['id'] ?? $actor['email'] ?? 'Administration MAXIMUS'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return [
-            'answer' => $this->previewMessage($normalized),
+            'answer' => $this->previewMessage($normalized).' Cet aperçu serveur expire dans 10 minutes et doit être confirmé depuis cette session.',
             'citations' => [
                 'Catalogue administratif MAXI',
                 'Règles de validation et de publication',
                 'Organisation et accès',
+                'Aperçu serveur à usage unique',
             ],
             'provider' => 'maxi',
             'model' => 'MAXI',
@@ -33,23 +48,40 @@ final class MaximusAssistantActionService
                 ...$normalized,
                 'status' => 'PENDING_CONFIRMATION',
                 'requiresConfirmation' => true,
+                'confirmationToken' => $confirmationToken,
+                'expiresAt' => $expiresAt->toISOString(),
             ],
         ];
     }
 
     /**
-     * @param array<string, mixed> $action
      * @param array<string, mixed> $actor
      * @return array{answer: string, citations: array<int, string>, provider: string, model: string, action: array<string, mixed>}
      */
-    public function execute(array $action, array $actor): array
+    public function execute(string $confirmationToken, array $actor): array
     {
-        return DB::transaction(function () use ($action, $actor): array {
+        return DB::transaction(function () use ($confirmationToken, $actor): array {
+            $preview = DB::table('maximus_assistant_action_previews')
+                ->where('token_hash', hash('sha256', $confirmationToken))
+                ->where('status', 'PENDING')
+                ->lockForUpdate()
+                ->first();
+            if (! $preview) {
+                throw new RuntimeException('Cet aperçu serveur est introuvable, déjà confirmé ou déjà expiré.');
+            }
+            if (now()->greaterThan($preview->expires_at)) {
+                DB::table('maximus_assistant_action_previews')
+                    ->where('id', $preview->id)
+                    ->update(['status' => 'EXPIRED', 'updated_at' => now()]);
+                throw new RuntimeException('Cet aperçu serveur a expiré. Préparez une nouvelle action.');
+            }
+
             $row = DB::table('maximus_app_states')
                 ->where('scope', 'workspace')
                 ->lockForUpdate()
                 ->first();
             $state = $this->decodePayload($row?->payload);
+            $action = $this->decodePayload($preview->action);
             $normalized = $this->normalizeAndValidate($action, $state);
 
             if ($normalized['type'] === 'update_company') {
@@ -57,6 +89,13 @@ final class MaximusAssistantActionService
             }
             $this->apply($state, $normalized);
             $this->appendAudit($state, $normalized, $actor);
+            DB::table('maximus_assistant_action_previews')
+                ->where('id', $preview->id)
+                ->update([
+                    'status' => 'CONFIRMED',
+                    'confirmed_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
             $nextVersion = ((int) ($row->version ?? 0)) + 1;
             DB::table('maximus_app_states')->updateOrInsert(
@@ -76,6 +115,7 @@ final class MaximusAssistantActionService
                     'Catalogue administratif MAXI',
                     'Journal d’audit MAXIMUS',
                     'Organisation et accès',
+                    'Confirmation serveur à usage unique',
                 ],
                 'provider' => 'maxi',
                 'model' => 'MAXI',
