@@ -3,25 +3,18 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use RuntimeException;
 
-final class AnthropicAssistantService
+final class ReplitOpenAiService
 {
     /**
-     * @param array<int, array{role: string, content: string}> $history
      * @param array<string, mixed> $context
+     * @param array<int, array{role: string, content: string}> $history
      * @return array{answer: string, citations: array<int, string>, provider: string, model: string}
      */
     public function ask(string $question, array $context, array $history = []): array
     {
-        $apiKey = (string) config('services.anthropic.key');
-        $model = (string) config('services.anthropic.model', 'claude-sonnet-4-5');
-        $url = (string) config('services.anthropic.url', 'https://api.anthropic.com/v1/messages');
-
-        if (trim($apiKey) === '') {
-            throw new RuntimeException('MAXI n’est pas configuré sur le serveur.');
-        }
-
         $messages = [];
         foreach (array_slice($history, -8) as $message) {
             if (! in_array($message['role'] ?? '', ['user', 'assistant'], true)) {
@@ -38,62 +31,93 @@ final class AnthropicAssistantService
         }
         $messages[] = ['role' => 'user', 'content' => $question];
 
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => '2023-06-01',
-            'accept' => 'application/json',
-        ])->timeout(35)->post($url, [
-            'model' => $model,
-            'max_tokens' => 2048,
-            'system' => $this->systemPrompt($context),
-            'messages' => $messages,
-        ]);
-
-        if ($response->failed()) {
-            $errorMessage = strtolower((string) $response->json('error.message', ''));
-            $errorType = (string) $response->json('error.type', 'unknown_error');
-            report(new RuntimeException(
-                'Anthropic request failed with HTTP '.$response->status().' ('.$errorType.').'
-            ));
-
-            if (
-                str_contains($errorMessage, 'credit balance')
-                || str_contains($errorMessage, 'purchase credits')
-            ) {
-                throw new RuntimeException(
-                    'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
-                );
-            }
-
-            if ($response->status() === 401) {
-                throw new RuntimeException('La clé Anthropic configurée sur le serveur est invalide.');
-            }
-
-            if ($response->status() === 429) {
-                throw new RuntimeException('MAXI a atteint une limite temporaire. Réessayez dans quelques instants.');
-            }
-
-            throw new RuntimeException('MAXI n’a pas pu répondre pour le moment.');
-        }
-
-        $text = collect($response->json('content', []))
-            ->filter(fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'text')
-            ->pluck('text')
-            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
-            ->implode("\n\n");
-
-        if (trim($text) === '') {
-            throw new RuntimeException('MAXI a retourné une réponse vide.');
-        }
+        $completion = $this->complete($this->systemPrompt($context), $messages, 2048);
 
         return [
-            'answer' => trim($text),
+            'answer' => $completion['text'],
             'citations' => [
                 'Contexte administratif MAXIMUS',
                 'Catalogue des modules et packs',
                 'Organisation et accès',
             ],
-            'provider' => 'anthropic',
+            'provider' => $completion['provider'],
+            'model' => $completion['model'],
+        ];
+    }
+
+    /**
+     * @param array<int, array{role: string, content: string}> $messages
+     * @return array{text: string, provider: string, model: string}
+     */
+    public function complete(string $systemPrompt, array $messages, int $maxCompletionTokens): array
+    {
+        $apiKey = (string) config('services.replit_ai.api_key');
+        $baseUrl = rtrim((string) config('services.replit_ai.base_url'), '/');
+        $model = (string) config('services.replit_ai.model', 'gpt-5.6-terra');
+
+        if ($apiKey === '' || $baseUrl === '') {
+            throw new RuntimeException('Le service IA Replit n’est pas configuré sur le serveur.');
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$apiKey,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ])->timeout(35)->post($baseUrl.'/chat/completions', [
+            'model' => $model,
+            'max_completion_tokens' => $maxCompletionTokens,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ...$messages,
+            ],
+        ]);
+
+        if ($response->failed()) {
+            $errorMessage = Str::lower(trim((string) data_get(
+                $response->json(),
+                'error.message',
+                $response->json('message', ''),
+            )));
+
+            report(new RuntimeException(
+                'Replit AI request failed with HTTP '.$response->status().'.',
+            ));
+
+            if (
+                str_contains($errorMessage, 'credit')
+                || str_contains($errorMessage, 'quota')
+                || str_contains($errorMessage, 'billing')
+                || str_contains($errorMessage, 'insufficient')
+            ) {
+                throw new RuntimeException('Le service IA Replit n’a plus de crédit disponible.');
+            }
+
+            if ($response->status() === 401) {
+                throw new RuntimeException('La configuration IA Replit sur le serveur est invalide.');
+            }
+
+            if ($response->status() === 429) {
+                throw new RuntimeException('Le service IA Replit a atteint une limite temporaire. Réessayez dans quelques instants.');
+            }
+
+            throw new RuntimeException('Le service IA Replit n’a pas pu répondre pour le moment.');
+        }
+
+        $content = $response->json('choices.0.message.content');
+        $text = is_string($content)
+            ? trim($content)
+            : collect(is_array($content) ? $content : [])
+                ->map(fn (mixed $part): string => is_array($part) ? (string) ($part['text'] ?? '') : '')
+                ->filter(fn (string $part): bool => trim($part) !== '')
+                ->implode("\n");
+
+        if ($text === '') {
+            throw new RuntimeException('Le service IA Replit a retourné une réponse vide.');
+        }
+
+        return [
+            'text' => $text,
+            'provider' => 'replit-openai',
             'model' => $model,
         ];
     }

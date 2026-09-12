@@ -50,10 +50,10 @@ return [
         'base_url' => env('OPENROUTESERVICE_BASE_URL', 'https://api.openrouteservice.org'),
     ],
 
-    'anthropic' => [
-        'url' => env('ANTHROPIC_API_URL', 'https://api.anthropic.com/v1/messages'),
-        'key' => env('ANTHROPIC_API_KEY'),
-        'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
+    'replit_ai' => [
+        'base_url' => env('AI_INTEGRATIONS_OPENAI_BASE_URL'),
+        'api_key' => env('AI_INTEGRATIONS_OPENAI_API_KEY'),
+        'model' => env('AI_INTEGRATIONS_OPENAI_MODEL', 'gpt-5.6-terra'),
     ],
 
 ];

@@ -14,7 +14,7 @@ class MaximusAssistantTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_only_the_main_maximus_admin_can_use_the_claude_assistant(): void
+    public function test_only_the_main_maximus_admin_can_use_the_maxi_assistant(): void
     {
         $companyAdmin = AuthUser::query()->create([
             'id' => 'assistant-company-admin',
@@ -37,15 +37,19 @@ class MaximusAssistantTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_main_maximus_admin_receives_a_claude_answer_from_server_context(): void
+    public function test_main_maximus_admin_receives_a_replit_ai_answer_from_server_context(): void
     {
-        config()->set('services.anthropic.key', 'test-anthropic-key');
-        config()->set('services.anthropic.model', 'claude-sonnet-4-5');
+        config()->set('services.replit_ai.api_key', 'test-replit-ai-key');
+        config()->set('services.replit_ai.base_url', 'https://replit-ai.test/v1');
+        config()->set('services.replit_ai.model', 'gpt-5.6-terra');
         Http::fake([
-            'https://api.anthropic.com/v1/messages' => Http::response([
-                'content' => [
-                    ['type' => 'text', 'text' => 'Le catalogue contient plusieurs modules configurables.'],
-                ],
+            'https://replit-ai.test/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => 'Le catalogue contient plusieurs modules configurables.',
+                    ],
+                ]],
             ], 200),
         ]);
 
@@ -70,26 +74,25 @@ class MaximusAssistantTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('answer', 'Le catalogue contient plusieurs modules configurables.')
-            ->assertJsonPath('provider', 'anthropic')
-            ->assertJsonPath('model', 'claude-sonnet-4-5');
+            ->assertJsonPath('provider', 'replit-openai')
+            ->assertJsonPath('model', 'gpt-5.6-terra');
 
         Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://api.anthropic.com/v1/messages'
-                && $request->header('x-api-key')[0] === 'test-anthropic-key'
-                && $request['messages'][0]['content'] === 'Quels modules sont disponibles ?'
-                && str_contains($request['system'], 'administration principale');
+            return $request->url() === 'https://replit-ai.test/v1/chat/completions'
+                && $request->header('Authorization')[0] === 'Bearer test-replit-ai-key'
+                && $request['messages'][1]['content'] === 'Quels modules sont disponibles ?'
+                && str_contains($request['messages'][0]['content'], 'administration principale');
         });
     }
 
-    public function test_it_explains_when_anthropic_has_no_available_credit(): void
+    public function test_it_explains_when_replit_ai_has_no_available_credit(): void
     {
-        config()->set('services.anthropic.key', 'test-anthropic-key');
+        config()->set('services.replit_ai.api_key', 'test-replit-ai-key');
+        config()->set('services.replit_ai.base_url', 'https://replit-ai.test/v1');
         Http::fake([
-            'https://api.anthropic.com/v1/messages' => Http::response([
-                'type' => 'error',
+            'https://replit-ai.test/v1/chat/completions' => Http::response([
                 'error' => [
-                    'type' => 'invalid_request_error',
-                    'message' => 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
+                    'message' => 'insufficient_quota: credit balance is too low.',
                 ],
             ], 400),
         ]);
@@ -108,12 +111,12 @@ class MaximusAssistantTest extends TestCase
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/ask', [
-                'question' => 'Vérifier la disponibilité de Claude',
+                'question' => 'Vérifier la disponibilité de MAXI',
             ])
             ->assertStatus(503)
             ->assertJsonPath(
                 'error',
-                'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
+                'Le service IA Replit n’a plus de crédit disponible.'
             );
     }
 
