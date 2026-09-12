@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\AuthUser;
-use App\Models\Company;
 use App\Support\ModuleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,34 +11,19 @@ final class MaximusAssistantActionService
 {
     /**
      * @param array<string, mixed> $action
-     * @param array<string, mixed> $actor
      * @return array{answer: string, citations: array<int, string>, provider: string, model: string, action: array<string, mixed>}
      */
-    public function preview(array $action, array $actor = []): array
+    public function preview(array $action): array
     {
         $state = $this->workspaceState();
         $normalized = $this->normalizeAndValidate($action, $state);
-        $confirmationToken = Str::random(64);
-        $expiresAt = now()->addMinutes(10);
-
-        DB::table('maximus_assistant_action_previews')->insert([
-            'id' => (string) Str::uuid(),
-            'token_hash' => hash('sha256', $confirmationToken),
-            'action' => json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-            'status' => 'PENDING',
-            'expires_at' => $expiresAt,
-            'created_by' => (string) ($actor['id'] ?? $actor['email'] ?? 'Administration MAXIMUS'),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
 
         return [
-            'answer' => $this->previewMessage($normalized).' Cet aperçu serveur expire dans 10 minutes et doit être confirmé depuis cette session.',
+            'answer' => $this->previewMessage($normalized),
             'citations' => [
                 'Catalogue administratif MAXI',
                 'Règles de validation et de publication',
                 'Organisation et accès',
-                'Aperçu serveur à usage unique',
             ],
             'provider' => 'maxi',
             'model' => 'MAXI',
@@ -48,54 +31,27 @@ final class MaximusAssistantActionService
                 ...$normalized,
                 'status' => 'PENDING_CONFIRMATION',
                 'requiresConfirmation' => true,
-                'confirmationToken' => $confirmationToken,
-                'expiresAt' => $expiresAt->toISOString(),
             ],
         ];
     }
 
     /**
+     * @param array<string, mixed> $action
      * @param array<string, mixed> $actor
      * @return array{answer: string, citations: array<int, string>, provider: string, model: string, action: array<string, mixed>}
      */
-    public function execute(string $confirmationToken, array $actor): array
+    public function execute(array $action, array $actor): array
     {
-        return DB::transaction(function () use ($confirmationToken, $actor): array {
-            $preview = DB::table('maximus_assistant_action_previews')
-                ->where('token_hash', hash('sha256', $confirmationToken))
-                ->where('status', 'PENDING')
-                ->lockForUpdate()
-                ->first();
-            if (! $preview) {
-                throw new RuntimeException('Cet aperçu serveur est introuvable, déjà confirmé ou déjà expiré.');
-            }
-            if (now()->greaterThan($preview->expires_at)) {
-                DB::table('maximus_assistant_action_previews')
-                    ->where('id', $preview->id)
-                    ->update(['status' => 'EXPIRED', 'updated_at' => now()]);
-                throw new RuntimeException('Cet aperçu serveur a expiré. Préparez une nouvelle action.');
-            }
-
+        return DB::transaction(function () use ($action, $actor): array {
             $row = DB::table('maximus_app_states')
                 ->where('scope', 'workspace')
                 ->lockForUpdate()
                 ->first();
             $state = $this->decodePayload($row?->payload);
-            $action = $this->decodePayload($preview->action);
             $normalized = $this->normalizeAndValidate($action, $state);
 
-            if ($normalized['type'] === 'update_company') {
-                $this->updateCompany($normalized);
-            }
             $this->apply($state, $normalized);
             $this->appendAudit($state, $normalized, $actor);
-            DB::table('maximus_assistant_action_previews')
-                ->where('id', $preview->id)
-                ->update([
-                    'status' => 'CONFIRMED',
-                    'confirmed_at' => now(),
-                    'updated_at' => now(),
-                ]);
 
             $nextVersion = ((int) ($row->version ?? 0)) + 1;
             DB::table('maximus_app_states')->updateOrInsert(
@@ -115,7 +71,6 @@ final class MaximusAssistantActionService
                     'Catalogue administratif MAXI',
                     'Journal d’audit MAXIMUS',
                     'Organisation et accès',
-                    'Confirmation serveur à usage unique',
                 ],
                 'provider' => 'maxi',
                 'model' => 'MAXI',
@@ -145,108 +100,8 @@ final class MaximusAssistantActionService
             'create_sector' => $this->normalizeSectorAction($action, $state),
             'create_company_plan' => $this->normalizeCompanyPlanAction($action, $state),
             'create_organization_unit' => $this->normalizeOrganizationAction($action, $state),
-            'update_company' => $this->normalizeCompanyUpdateAction($action, $state),
             default => throw new RuntimeException('MAXI ne peut pas exécuter cette action de sécurité.'),
         };
-    }
-
-    /**
-     * @param array<string, mixed> $action
-     * @param array<string, mixed> $state
-     * @return array<string, mixed>
-     */
-    private function normalizeCompanyUpdateAction(array $action, array $state): array
-    {
-        $reference = trim((string) ($action['companyId'] ?? $action['companyName'] ?? $action['name'] ?? ''));
-        $companies = collect(is_array($state['companies'] ?? null) ? $state['companies'] : []);
-        $stateCompany = $companies->first(static fn (mixed $item): bool => is_array($item)
-            && (
-                (string) ($item['id'] ?? '') === $reference
-                || strtolower(trim((string) ($item['name'] ?? ''))) === strtolower($reference)
-            ));
-
-        $companyQuery = Company::query()->whereNull('deleted_at');
-        $company = $reference === ''
-            ? null
-            : $companyQuery->where(function ($query) use ($reference): void {
-                $query->whereKey($reference)->orWhereRaw('LOWER(name) = ?', [strtolower($reference)]);
-            })->first();
-
-        if (! $company && is_array($stateCompany)) {
-            $company = Company::query()
-                ->whereKey((string) ($stateCompany['id'] ?? ''))
-                ->whereNull('deleted_at')
-                ->first();
-        }
-        if (! $company) {
-            throw new RuntimeException('L’entreprise à modifier est introuvable ou inactive.');
-        }
-
-        $allowedFields = [
-            'name',
-            'manager',
-            'email',
-            'phone',
-            'country',
-            'sector',
-            'primaryColor',
-            'accentColor',
-            'sidebarColor',
-        ];
-        $changes = [];
-        $requestedChanges = is_array($action['changes'] ?? null) ? $action['changes'] : $action;
-        foreach ($allowedFields as $field) {
-            if (! array_key_exists($field, $requestedChanges)) {
-                continue;
-            }
-            $value = trim((string) ($requestedChanges[$field] ?? ''));
-            if ($value === '') {
-                throw new RuntimeException("La valeur du champ « {$field} » ne peut pas être vide.");
-            }
-            $changes[$field] = $value;
-        }
-
-        if ($changes === []) {
-            throw new RuntimeException('Indiquez au moins une modification à appliquer à l’entreprise.');
-        }
-        foreach (['name' => 160, 'manager' => 180, 'email' => 255, 'phone' => 40, 'country' => 100, 'sector' => 120] as $field => $maxLength) {
-            if (isset($changes[$field]) && mb_strlen($changes[$field]) > $maxLength) {
-                throw new RuntimeException("Le champ « {$field} » dépasse {$maxLength} caractères.");
-            }
-        }
-        if (isset($changes['name']) && mb_strlen($changes['name']) < 2) {
-            throw new RuntimeException('Le nom de l’entreprise doit contenir au moins 2 caractères.');
-        }
-        if (isset($changes['manager']) && mb_strlen($changes['manager']) < 2) {
-            throw new RuntimeException('Le nom du responsable doit contenir au moins 2 caractères.');
-        }
-        if (isset($changes['email'])) {
-            $changes['email'] = Str::lower($changes['email']);
-            if (! filter_var($changes['email'], FILTER_VALIDATE_EMAIL)) {
-                throw new RuntimeException('L’adresse email de l’entreprise est invalide.');
-            }
-            if (Company::query()
-                ->whereNull('deleted_at')
-                ->where('email', $changes['email'])
-                ->where('id', '!=', $company->id)
-                ->exists()) {
-                throw new RuntimeException('Une autre entreprise utilise déjà cette adresse email.');
-            }
-        }
-        foreach (['primaryColor', 'accentColor', 'sidebarColor'] as $field) {
-            if (isset($changes[$field]) && ! preg_match('/^#[0-9a-fA-F]{6}$/', $changes[$field])) {
-                throw new RuntimeException("La couleur « {$field} » doit être au format hexadécimal.");
-            }
-        }
-
-        return [
-            'type' => 'update_company',
-            'id' => (string) $company->id,
-            'companyId' => (string) $company->id,
-            'companyName' => (string) $company->name,
-            'name' => (string) $company->name,
-            'changes' => $changes,
-        ];
     }
 
     /**
@@ -606,54 +461,6 @@ final class MaximusAssistantActionService
     }
 
     /**
-     * @param array<string, mixed> $action
-     */
-    private function updateCompany(array $action): void
-    {
-        $company = Company::query()
-            ->whereKey((string) $action['companyId'])
-            ->whereNull('deleted_at')
-            ->lockForUpdate()
-            ->first();
-        if (! $company) {
-            throw new RuntimeException('L’entreprise à modifier est introuvable ou inactive.');
-        }
-
-        $changes = [];
-        foreach ([
-            'name' => 'name',
-            'manager' => 'manager',
-            'email' => 'email',
-            'phone' => 'phone',
-            'country' => 'country',
-            'sector' => 'sector',
-            'primaryColor' => 'primary_color',
-            'accentColor' => 'accent_color',
-            'sidebarColor' => 'sidebar_color',
-        ] as $inputKey => $column) {
-            if (! array_key_exists($inputKey, $action['changes'])) {
-                continue;
-            }
-            $value = (string) $action['changes'][$inputKey];
-            $changes[$column] = in_array($inputKey, ['primaryColor', 'accentColor', 'sidebarColor'], true)
-                ? strtoupper($value)
-                : $value;
-        }
-
-        $company->update($changes);
-        if (isset($changes['email']) || isset($changes['manager'])) {
-            AuthUser::query()
-                ->where('company_id', $company->id)
-                ->where('role', 'company_admin')
-                ->update([
-                    ...(isset($changes['email']) ? ['email' => $changes['email']] : []),
-                    ...(isset($changes['manager']) ? ['display_name' => $changes['manager']] : []),
-                    'updated_at' => now(),
-                ]);
-        }
-    }
-
-    /**
      * @param array<string, mixed> $state
      * @param array<string, mixed> $action
      */
@@ -773,17 +580,6 @@ final class MaximusAssistantActionService
                 'status' => 'DRAFT',
                 'createdAt' => now()->toISOString(),
             ];
-        } elseif ($action['type'] === 'update_company') {
-            $state['companies'] ??= [];
-            $companyIndex = collect($state['companies'])->search(
-                static fn (mixed $company): bool => is_array($company)
-                    && (string) ($company['id'] ?? '') === (string) $action['companyId'],
-            );
-            if ($companyIndex !== false) {
-                foreach ($action['changes'] as $field => $value) {
-                    $state['companies'][$companyIndex][$field] = $value;
-                }
-            }
         }
 
         $state['catalogDraft']['updatedAt'] = now()->toISOString();
@@ -972,7 +768,6 @@ final class MaximusAssistantActionService
             'create_sector' => "MAXI a préparé le secteur « {$action['name']} » avec {$this->count($action['moduleIds'] ?? [])} module(s). Confirmez pour l’enregistrer dans le brouillon.",
             'create_company_plan' => "MAXI a préparé le plan de configuration de l’entreprise « {$action['name']} ». Confirmez pour enregistrer ce plan sans activer l’entreprise.",
             'create_organization_unit' => "MAXI a préparé la création de l’unité « {$action['name']} » dans « {$action['companyName']} ». Confirmez pour l’enregistrer.",
-            'update_company' => "MAXI a préparé la modification de l’entreprise « {$action['companyName']} ». Champs concernés : {$this->changedFields($action)}. Confirmez pour l’enregistrer.",
             default => 'MAXI a préparé une action contrôlée. Confirmez pour continuer.',
         };
     }
@@ -987,29 +782,8 @@ final class MaximusAssistantActionService
             'create_sector' => "Le secteur « {$action['name']} » a été ajouté au brouillon du catalogue. Vérifiez ses packs et publiez le catalogue avant de le proposer à une entreprise.",
             'create_company_plan' => "Le plan de configuration de « {$action['name']} » est enregistré en brouillon. Complétez le contact, puis soumettez la demande d’entreprise pour approbation.",
             'create_organization_unit' => "L’unité « {$action['name']} » a été créée dans « {$action['companyName']} » avec les modules et packs validés.",
-            'update_company' => "L’entreprise « {$action['companyName']} » a été modifiée. Les informations ont été synchronisées avec son compte administrateur.",
             default => 'L’action MAXI a été exécutée.',
         };
-    }
-
-    /** @param array<string, mixed> $action */
-    private function changedFields(array $action): string
-    {
-        $labels = [
-            'name' => 'nom',
-            'manager' => 'responsable',
-            'email' => 'email',
-            'phone' => 'téléphone',
-            'country' => 'pays',
-            'sector' => 'secteur',
-            'primaryColor' => 'couleur principale',
-            'accentColor' => 'couleur d’accent',
-            'sidebarColor' => 'couleur du menu',
-        ];
-
-        return collect(array_keys(is_array($action['changes'] ?? null) ? $action['changes'] : []))
-            ->map(fn (string $field): string => $labels[$field] ?? $field)
-            ->implode(', ');
     }
 
     private function count(mixed $value): int

@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
-use App\Models\Company;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,18 +37,15 @@ class MaximusAssistantTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_main_maximus_admin_receives_a_replit_openai_answer_from_server_context(): void
+    public function test_main_maximus_admin_receives_a_claude_answer_from_server_context(): void
     {
-        config()->set('services.replit_ai.key', 'test-replit-ai-key');
-        config()->set('services.replit_ai.base_url', 'https://openai.test/v1');
-        config()->set('services.replit_ai.model', 'gpt-5.6-terra');
+        config()->set('services.anthropic.key', 'test-anthropic-key');
+        config()->set('services.anthropic.model', 'claude-sonnet-4-5');
         Http::fake([
-            'https://openai.test/v1/chat/completions' => Http::response([
-                'choices' => [[
-                    'message' => [
-                        'content' => 'Le catalogue contient plusieurs modules configurables.',
-                    ],
-                ]],
+            'https://api.anthropic.com/v1/messages' => Http::response([
+                'content' => [
+                    ['type' => 'text', 'text' => 'Le catalogue contient plusieurs modules configurables.'],
+                ],
             ], 200),
         ]);
 
@@ -74,23 +70,28 @@ class MaximusAssistantTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('answer', 'Le catalogue contient plusieurs modules configurables.')
-            ->assertJsonPath('provider', 'replit-openai')
-            ->assertJsonPath('model', 'gpt-5.6-terra');
+            ->assertJsonPath('provider', 'anthropic')
+            ->assertJsonPath('model', 'claude-sonnet-4-5');
 
         Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://openai.test/v1/chat/completions'
-                && $request->header('Authorization')[0] === 'Bearer test-replit-ai-key'
-                && $request['messages'][1]['content'] === 'Quels modules sont disponibles ?'
-                && str_contains($request['messages'][0]['content'], 'administration principale');
+            return $request->url() === 'https://api.anthropic.com/v1/messages'
+                && $request->header('x-api-key')[0] === 'test-anthropic-key'
+                && $request['messages'][0]['content'] === 'Quels modules sont disponibles ?'
+                && str_contains($request['system'], 'administration principale');
         });
     }
 
-    public function test_it_explains_when_replit_ai_reaches_a_limit(): void
+    public function test_it_explains_when_anthropic_has_no_available_credit(): void
     {
-        config()->set('services.replit_ai.key', 'test-replit-ai-key');
-        config()->set('services.replit_ai.base_url', 'https://openai.test/v1');
+        config()->set('services.anthropic.key', 'test-anthropic-key');
         Http::fake([
-            'https://openai.test/v1/chat/completions' => Http::response([], 429),
+            'https://api.anthropic.com/v1/messages' => Http::response([
+                'type' => 'error',
+                'error' => [
+                    'type' => 'invalid_request_error',
+                    'message' => 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
+                ],
+            ], 400),
         ]);
 
         $admin = AuthUser::query()->create([
@@ -112,7 +113,7 @@ class MaximusAssistantTest extends TestCase
             ->assertStatus(503)
             ->assertJsonPath(
                 'error',
-                'L’IA Replit a atteint une limite temporaire. Réessayez dans quelques instants.'
+                'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
             );
     }
 
@@ -136,19 +137,17 @@ class MaximusAssistantTest extends TestCase
             'features' => ['Pilotage', 'Rapports'],
         ];
 
-        $modulePreview = $this->withCredentials()
+        $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/preview', ['action' => $moduleAction])
             ->assertOk()
             ->assertJsonPath('provider', 'maxi')
             ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
-        $moduleConfirmationToken = $modulePreview->json('action.confirmationToken');
-        $this->assertIsString($moduleConfirmationToken);
 
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'confirmationToken' => $moduleConfirmationToken,
+                'action' => $moduleAction,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -162,16 +161,10 @@ class MaximusAssistantTest extends TestCase
             'featureIds' => ['Pilotage', 'Rapports'],
         ];
 
-        $packPreview = $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $packAction])
-            ->assertOk();
-        $packConfirmationToken = $packPreview->json('action.confirmationToken');
-        $this->assertIsString($packConfirmationToken);
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'confirmationToken' => $packConfirmationToken,
+                'action' => $packAction,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -195,17 +188,10 @@ class MaximusAssistantTest extends TestCase
             'modulePackIds' => ['gestion-des-projets' => ['gestion-des-projets-suivi-de-projets']],
         ];
 
-        $organizationPreview = $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $organizationAction])
-            ->assertOk()
-            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
-        $organizationConfirmationToken = $organizationPreview->json('action.confirmationToken');
-        $this->assertIsString($organizationConfirmationToken);
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'confirmationToken' => $organizationConfirmationToken,
+                'action' => $organizationAction,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -246,17 +232,10 @@ class MaximusAssistantTest extends TestCase
         ];
 
         foreach ([$featureAction, $sectorAction] as $action) {
-            $preview = $this->withCredentials()
-                ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-                ->postJson('/api/maximus-assistant/actions/preview', ['action' => $action])
-                ->assertOk()
-                ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
-            $confirmationToken = $preview->json('action.confirmationToken');
-            $this->assertIsString($confirmationToken);
             $this->withCredentials()
                 ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
                 ->postJson('/api/maximus-assistant/actions/execute', [
-                    'confirmationToken' => $confirmationToken,
+                    'action' => $action,
                     'confirmed' => true,
                 ])
                 ->assertOk()
@@ -272,17 +251,10 @@ class MaximusAssistantTest extends TestCase
             'requirements' => ['suivi des commandes', 'planning des équipes'],
         ];
 
-        $companyPlanPreview = $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $companyPlan])
-            ->assertOk()
-            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION');
-        $companyPlanConfirmationToken = $companyPlanPreview->json('action.confirmationToken');
-        $this->assertIsString($companyPlanConfirmationToken);
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/actions/execute', [
-                'confirmationToken' => $companyPlanConfirmationToken,
+                'action' => $companyPlan,
                 'confirmed' => true,
             ])
             ->assertOk()
@@ -293,96 +265,5 @@ class MaximusAssistantTest extends TestCase
         $this->assertContains('Export comptable', $payload['catalogDraft']['moduleOverrides']['commerce']['features']);
         $this->assertSame('DRAFT', $payload['companySetupPlans'][0]['status']);
         $this->assertSame([], $payload['companies'] ?? []);
-    }
-
-    public function test_maxi_can_modify_an_existing_company_after_confirmation(): void
-    {
-        $admin = AuthUser::query()->create([
-            'id' => 'assistant-company-update-admin',
-            'email' => 'company-update-admin@maximus.test',
-            'password_hash' => MaximusPassword::hash('Admin123!'),
-            'display_name' => 'Administration MAXIMUS',
-            'role' => 'maximus_admin',
-            'sector_ids' => [],
-            'status' => 'ACTIF',
-        ]);
-        Company::query()->create([
-            'id' => 'company-to-update',
-            'name' => 'Atelier initial',
-            'manager' => 'Responsable initial',
-            'email' => 'initial@example.com',
-            'phone' => '',
-            'country' => 'Sénégal',
-            'sector' => 'Commerce',
-            'status' => 'ACTIF',
-            'requested_modules' => ['commerce'],
-            'requested_module_pack_ids' => [],
-            'requested_module_features' => [],
-            'requested_module_permissions' => [],
-        ]);
-        AuthUser::query()->create([
-            'id' => 'company-admin:company-to-update',
-            'email' => 'initial@example.com',
-            'password_hash' => MaximusPassword::hash('Admin123!'),
-            'display_name' => 'Responsable initial',
-            'role' => 'company_admin',
-            'company_id' => 'company-to-update',
-            'sector_ids' => [],
-            'status' => 'ACTIF',
-        ]);
-        $token = MaximusAuth::issueSession($admin);
-        $action = [
-            'type' => 'update_company',
-            'companyId' => 'company-to-update',
-            'changes' => [
-                'name' => 'Atelier rénové',
-                'manager' => 'Nouvelle responsable',
-                'email' => 'nouvelle@example.com',
-                'sector' => 'Conseil',
-                'primaryColor' => '#123456',
-            ],
-        ];
-
-        $companyPreview = $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $action])
-            ->assertOk()
-            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION')
-            ->assertJsonPath('action.type', 'update_company');
-        $companyConfirmationToken = $companyPreview->json('action.confirmationToken');
-        $this->assertIsString($companyConfirmationToken);
-
-        $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-            ->postJson('/api/maximus-assistant/actions/execute', [
-                'confirmationToken' => $companyConfirmationToken,
-                'confirmed' => true,
-            ])
-            ->assertOk()
-            ->assertJsonPath('action.status', 'EXECUTED');
-
-        $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
-            ->postJson('/api/maximus-assistant/actions/execute', [
-                'confirmationToken' => $companyConfirmationToken,
-                'confirmed' => true,
-            ])
-            ->assertStatus(422);
-
-        $this->assertDatabaseHas('companies', [
-            'id' => 'company-to-update',
-            'name' => 'Atelier rénové',
-            'manager' => 'Nouvelle responsable',
-            'email' => 'nouvelle@example.com',
-            'sector' => 'Conseil',
-            'primary_color' => '#123456',
-        ]);
-        $this->assertDatabaseHas('auth_users', [
-            'id' => 'company-admin:company-to-update',
-            'email' => 'nouvelle@example.com',
-            'display_name' => 'Nouvelle responsable',
-        ]);
-        $payload = json_decode((string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'), true);
-        $this->assertCount(1, $payload['auditEntries']);
     }
 }

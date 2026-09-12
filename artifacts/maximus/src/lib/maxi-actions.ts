@@ -20,38 +20,7 @@ function matchValue(source: string, expression: RegExp) {
 
 export function parseMaxiActionRequest(question: string): MaximusAssistantAction | null {
   const normalized = normalize(question);
-  const isUpdate = /(?:^|\s)(?:modifie|modifier|actualise|actualiser|mets?\s+a\s+jour|mettre\s+a\s+jour)(?:\s|$)/.test(normalized);
-  const isCreate = /(?:^|\s)(cree|creer|ajoute|ajouter|configurer|monter|preparer)(?:\s|$)/.test(normalized);
-  if (!isCreate && !isUpdate) return null;
-
-  if (isUpdate && /\bentreprise\b|\bsociete\b/.test(normalized)) {
-    const companyName = matchValue(question, /\b(?:entreprise|soci[eé]t[eé])\s+["«]?(.+?)(?=\s+(?:nom|responsable|manager|email|telephone|t[eé]l[eé]phone|pays|secteur|couleur)|[.!?]|$)/i);
-    const companyId = matchValue(question, /\b(?:identifiant|id)\s*:?\s*([A-Za-z0-9_-]+)/i);
-    const changes: Record<string, string> = {};
-    const fields: Array<[string, RegExp]> = [
-      ['name', /\bnom\s*:?\s*["«]?(.+?)(?=\s+(?:responsable|manager|email|telephone|t[eé]l[eé]phone|pays|secteur|couleur)|[.!?]|$)/i],
-      ['manager', /\b(?:responsable|manager)\s*:?\s*["«]?(.+?)(?=\s+(?:nom|email|telephone|t[eé]l[eé]phone|pays|secteur|couleur)|[.!?]|$)/i],
-      ['email', /\bemail\s*:?\s*([^\s,;]+)/i],
-      ['phone', /\b(?:telephone|t[eé]l[eé]phone)\s*:?\s*([^\s,;]+)/i],
-      ['country', /\bpays\s*:?\s*["«]?(.+?)(?=\s+(?:nom|responsable|manager|email|telephone|t[eé]l[eé]phone|secteur|couleur)|[.!?]|$)/i],
-      ['sector', /\bsecteur\s*:?\s*["«]?(.+?)(?=\s+(?:nom|responsable|manager|email|telephone|t[eé]l[eé]phone|pays|couleur)|[.!?]|$)/i],
-      ['primaryColor', /\bcouleur\s+principale\s*:?\s*(#[0-9a-f]{6})/i],
-      ['accentColor', /\bcouleur\s+d['’]?accent\s*:?\s*(#[0-9a-f]{6})/i],
-      ['sidebarColor', /\bcouleur\s+(?:du\s+)?menu\s*:?\s*(#[0-9a-f]{6})/i],
-    ];
-    for (const [field, expression] of fields) {
-      const value = matchValue(question, expression);
-      if (value) changes[field] = value;
-    }
-    if ((!companyName && !companyId) || Object.keys(changes).length === 0) return null;
-    return {
-      type: 'update_company',
-      name: companyName || companyId,
-      companyName: companyName || undefined,
-      companyId: companyId || companyName,
-      changes,
-    };
-  }
+  if (!/(?:^|\s)(cree|creer|ajoute|ajouter|configurer|monter|preparer)(?:\s|$)/.test(normalized)) return null;
 
   if (/\bfonctionnalit/.test(normalized) && /\bdans\s+(?:le\s+)?module\b/.test(normalized)) {
     const name = matchValue(question, /fonctionnalit(?:e|é)s?(?:\s+(?:nommee|nommée|appelee|appelée|intitulee|intitulée))?\s+["«]?(.+?)(?=\s+(?:dans|description|depend|dépend)|[.!?]|$)/i);

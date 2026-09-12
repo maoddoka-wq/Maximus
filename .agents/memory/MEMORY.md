@@ -42,7 +42,7 @@
 - [Frontière financière de la paie](payroll-financial-boundary.md) — créditer le solde uniquement après webhook signé, chiffrer les comptes et réserver les fonds avant virement.
 - [Catalogue Paie](payroll-catalog.md) — les packs doivent utiliser les slugs des libellés et matérialiser leurs permissions lors du provisionnement entreprise.
 - [Assistant local contrôlé](local-assistant.md) — l’assistant entreprise doit répondre depuis un contexte filtré par session, entreprise et modules autorisés, sans mutation implicite.
-- [Fournisseur IA Replit](anthropic-server-boundary.md) — utiliser en priorité l’intégration IA Replit côté serveur ; aucune clé fournisseur personnelle dans le frontend.
+- [Frontière serveur Anthropic](anthropic-server-boundary.md) — une clé Claude reste côté serveur, nommée pour son fournisseur, avec accès MAXIMUS-admin et validation humaine.
 - [Publication des produits numériques](digital-product-publication.md) — créer en brouillon, envoyer le fichier, puis publier ; l’API refuse une création numérique publiée sans fichier.
 - [Affichage du téléchargement numérique](digital-download-display.md) — afficher après paiement confirmé sans dépendre d’une URL optionnelle dans le payload.
 - [Recherche Wouter](wouter-search-hook.md) — avec Wouter 3, `useSearch()` renvoie une chaîne directe, pas un tuple à déstructurer.

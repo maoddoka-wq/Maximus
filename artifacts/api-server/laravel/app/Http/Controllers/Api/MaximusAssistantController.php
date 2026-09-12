@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AnthropicAssistantService;
 use App\Services\MaximusAssistantActionService;
-use App\Services\OpenAIAssistantService;
 use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class MaximusAssistantController extends Controller
 {
-    public function ask(Request $request, OpenAIAssistantService $assistant): JsonResponse
+    public function ask(Request $request, AnthropicAssistantService $assistant): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
         if (! is_array($actor) || ($actor['role'] ?? null) !== 'maximus_admin') {
@@ -57,10 +57,7 @@ class MaximusAssistantController extends Controller
         ]);
 
         try {
-            return response()->json($actions->preview(
-                $data['action'],
-                (array) $request->attributes->get('authActor'),
-            ));
+            return response()->json($actions->preview($data['action']));
         } catch (\RuntimeException $exception) {
             return response()->json(['error' => $exception->getMessage()], 422);
         }
@@ -74,12 +71,12 @@ class MaximusAssistantController extends Controller
 
         $data = $request->validate([
             'confirmed' => ['required', 'accepted'],
-            'confirmationToken' => ['required', 'string', 'max:128'],
+            'action' => ['required', 'array'],
         ]);
 
         try {
             return response()->json($actions->execute(
-                $data['confirmationToken'],
+                $data['action'],
                 (array) $request->attributes->get('authActor'),
             ));
         } catch (\RuntimeException $exception) {

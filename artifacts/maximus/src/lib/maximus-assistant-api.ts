@@ -19,16 +19,13 @@ export type MaximusAssistantActionType =
   | 'create_feature'
   | 'create_sector'
   | 'create_company_plan'
-  | 'create_organization_unit'
-  | 'update_company';
+  | 'create_organization_unit';
 export type MaximusAssistantActionStatus = 'PENDING_CONFIRMATION' | 'EXECUTED';
 
 export type MaximusAssistantAction = {
   type: MaximusAssistantActionType;
   status?: MaximusAssistantActionStatus;
   requiresConfirmation?: boolean;
-  confirmationToken?: string;
-  expiresAt?: string;
   id?: string;
   name: string;
   description?: string;
@@ -53,17 +50,6 @@ export type MaximusAssistantAction = {
   moduleIds?: string[];
   modulePackIds?: Record<string, string[]>;
   moduleFeatures?: Record<string, string[]>;
-  changes?: Partial<{
-    name: string;
-    manager: string;
-    email: string;
-    phone: string;
-    country: string;
-    sector: string;
-    primaryColor: string;
-    accentColor: string;
-    sidebarColor: string;
-  }>;
   version?: number;
 };
 
@@ -85,6 +71,6 @@ export const maximusAssistantApi = {
   executeAction: (action: MaximusAssistantAction) =>
     request<MaximusAssistantResponse>('/maximus-assistant/actions/execute', {
       method: 'POST',
-      body: JSON.stringify({ confirmationToken: action.confirmationToken, confirmed: true }),
+      body: JSON.stringify({ action, confirmed: true }),
     }),
 };
