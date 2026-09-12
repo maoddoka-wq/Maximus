@@ -10,7 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "cd laravel && DB_CONNECTION=pgsql php artisan migrate --force --no-interaction && DB_CONNECTION=pgsql php artisan maximus:provision-admin --no-interaction && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php"
+run = "cd laravel && DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php"
 
 [services.production]
 

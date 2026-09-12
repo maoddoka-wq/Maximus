@@ -15,33 +15,28 @@ final class OnboardingAnalysisService
      */
     public function analyze(string $description): array
     {
-        $apiKey = (string) config('services.replit_ai.key');
-        $model = (string) config('services.replit_ai.model', 'gpt-5.6-terra');
-        $url = (string) config('services.replit_ai.url', 'https://api.openai.com/v1/chat/completions');
+        $apiKey = (string) config('services.anthropic.key');
+        $model = (string) config('services.anthropic.model', 'claude-sonnet-4-5');
+        $url = (string) config('services.anthropic.url', 'https://api.anthropic.com/v1/messages');
 
         if (trim($apiKey) === '') {
             throw new RuntimeException('L’analyse intelligente est momentanément indisponible. Utilisez la configuration manuelle.');
         }
 
         try {
-            $response = Http::withToken($apiKey)
-                ->acceptJson()
-                ->timeout(35)
-                ->post($url, [
-                    'model' => $model,
-                    'max_completion_tokens' => 8192,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => $this->systemPrompt(),
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => 'Description de l’entreprise à analyser :'.PHP_EOL.PHP_EOL.$description,
-                        ],
-                    ],
-                ]);
+            $response = Http::withHeaders([
+                'x-api-key' => $apiKey,
+                'anthropic-version' => '2023-06-01',
+                'accept' => 'application/json',
+            ])->timeout(35)->post($url, [
+                'model' => $model,
+                'max_tokens' => 2400,
+                'system' => $this->systemPrompt(),
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => 'Description de l’entreprise à analyser :'.PHP_EOL.PHP_EOL.$description,
+                ]],
+            ]);
         } catch (\Throwable $exception) {
             report($exception);
             throw new RuntimeException('L’analyse intelligente est momentanément indisponible. Utilisez la configuration manuelle.', 0, $exception);
@@ -50,7 +45,7 @@ final class OnboardingAnalysisService
         if ($response->failed()) {
             $providerMessage = trim((string) data_get($response->json(), 'error.message', $response->json('message', '')));
             report(new RuntimeException(
-                'Onboarding Replit AI request failed with HTTP '.$response->status().'. '.$providerMessage,
+                'Onboarding Anthropic request failed with HTTP '.$response->status().'. '.$providerMessage,
             ));
             $normalizedMessage = Str::lower($providerMessage);
             if (
@@ -59,12 +54,16 @@ final class OnboardingAnalysisService
                 || str_contains($normalizedMessage, 'billing')
                 || str_contains($normalizedMessage, 'crédit')
             ) {
-                throw new RuntimeException('Le crédit IA Replit est insuffisant. Vous pouvez continuer avec la configuration manuelle.');
+                throw new RuntimeException('Le compte Anthropic configuré n’a plus de crédit. Vous pouvez continuer avec la configuration manuelle.');
             }
             throw new RuntimeException('L’analyse intelligente est momentanément indisponible. Utilisez la configuration manuelle.');
         }
 
-        $text = (string) $response->json('choices.0.message.content', '');
+        $text = collect($response->json('content', []))
+            ->filter(fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'text')
+            ->pluck('text')
+            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+            ->implode("\n");
 
         $decoded = $this->decodeJson($text);
         if (! is_array($decoded)) {

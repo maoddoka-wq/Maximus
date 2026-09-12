@@ -15,11 +15,10 @@ class OnboardingTest extends TestCase
     public function test_it_creates_a_catalog_bound_onboarding_draft_without_credentials(): void
     {
         Http::fake([
-            '*chat/completions' => Http::response([
-                'choices' => [[
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => json_encode([
+            '*anthropic.com/*' => Http::response([
+                'content' => [[
+                    'type' => 'text',
+                    'text' => json_encode([
                         'companyProfile' => [
                             'businessType' => 'Boutique de vêtements',
                             'sector' => 'Commerce',
@@ -54,12 +53,11 @@ class OnboardingTest extends TestCase
                             ],
                         ],
                         'unknowns' => ['Confirmer le pays de facturation.'],
-                        ], JSON_UNESCAPED_UNICODE),
-                    ],
+                    ], JSON_UNESCAPED_UNICODE),
                 ]],
             ], 200),
         ]);
-        config()->set('services.replit_ai.key', 'test-replit-ai-key');
+        config()->set('services.anthropic.key', 'test-anthropic-key');
 
         $response = $this->postJson('/api/onboarding/drafts', [
             'description' => 'Nous sommes une boutique de vêtements avec une équipe de quatre personnes, un stock et des ventes en ligne.',
@@ -81,11 +79,10 @@ class OnboardingTest extends TestCase
     public function test_it_confirms_a_draft_once_and_reuses_the_company_request(): void
     {
         Http::fake([
-            '*chat/completions' => Http::response([
-                'choices' => [[
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => json_encode([
+            '*anthropic.com/*' => Http::response([
+                'content' => [[
+                    'type' => 'text',
+                    'text' => json_encode([
                         'companyProfile' => [
                             'businessType' => 'Atelier',
                             'sector' => 'Production',
@@ -101,12 +98,11 @@ class OnboardingTest extends TestCase
                         ]],
                         'suggestedSettings' => [],
                         'unknowns' => [],
-                        ], JSON_UNESCAPED_UNICODE),
-                    ],
+                    ], JSON_UNESCAPED_UNICODE),
                 ]],
             ], 200),
         ]);
-        config()->set('services.replit_ai.key', 'test-replit-ai-key');
+        config()->set('services.anthropic.key', 'test-anthropic-key');
 
         $draftResponse = $this->postJson('/api/onboarding/drafts', [
             'description' => 'Nous sommes un atelier qui fabrique des produits et veut suivre ses ventes.',
@@ -143,7 +139,7 @@ class OnboardingTest extends TestCase
 
     public function test_it_falls_back_when_the_ai_provider_is_not_configured(): void
     {
-        config()->set('services.replit_ai.key', null);
+        config()->set('services.anthropic.key', null);
 
         $this->postJson('/api/onboarding/drafts', [
             'description' => 'Nous sommes une petite entreprise de services avec plusieurs collaborateurs.',
@@ -157,16 +153,14 @@ class OnboardingTest extends TestCase
     public function test_it_rejects_an_invalid_ai_json_response_without_creating_a_draft(): void
     {
         Http::fake([
-            '*chat/completions' => Http::response([
-                'choices' => [[
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => 'Voici une proposition non structurée.',
-                    ],
+            '*anthropic.com/*' => Http::response([
+                'content' => [[
+                    'type' => 'text',
+                    'text' => 'Voici une proposition non structurée.',
                 ]],
             ], 200),
         ]);
-        config()->set('services.replit_ai.key', 'test-replit-ai-key');
+        config()->set('services.anthropic.key', 'test-anthropic-key');
 
         $this->postJson('/api/onboarding/drafts', [
             'description' => 'Nous sommes une entreprise de services avec une équipe de plusieurs personnes.',
@@ -177,23 +171,23 @@ class OnboardingTest extends TestCase
         $this->assertDatabaseCount('onboarding_drafts', 0);
     }
 
-    public function test_it_explains_when_replit_ai_has_no_available_credit(): void
+    public function test_it_explains_when_anthropic_has_no_available_credit(): void
     {
         Http::fake([
-            '*chat/completions' => Http::response([
+            '*anthropic.com/*' => Http::response([
                 'error' => [
-                    'type' => 'billing_error',
-                    'message' => 'Your Replit AI credit balance is too low.',
+                    'type' => 'invalid_request_error',
+                    'message' => 'Your credit balance is too low to access the Anthropic API.',
                 ],
             ], 400),
         ]);
-        config()->set('services.replit_ai.key', 'test-replit-ai-key');
+        config()->set('services.anthropic.key', 'test-anthropic-key');
 
         $this->postJson('/api/onboarding/drafts', [
             'description' => 'Nous sommes une entreprise de services avec une équipe de plusieurs personnes.',
         ])
             ->assertStatus(503)
             ->assertJsonPath('code', 'ONBOARDING_ANALYSIS_CREDITS_EXHAUSTED')
-            ->assertJsonPath('error', 'Le crédit IA Replit est insuffisant. Vous pouvez continuer avec la configuration manuelle.');
+            ->assertJsonPath('error', 'Le compte Anthropic configuré n’a plus de crédit. Vous pouvez continuer avec la configuration manuelle.');
     }
 }
