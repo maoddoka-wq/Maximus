@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
+use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
@@ -33,6 +34,12 @@ Route::get('/healthz', function () {
 
 Route::get('/registration-catalog', [AppStateController::class, 'registrationCatalog']);
 Route::post('/company-requests', [CompanyController::class, 'createRequest'])->middleware('throttle:login');
+Route::prefix('onboarding/drafts')->middleware('throttle:onboarding')->group(function (): void {
+    Route::post('/', [OnboardingDraftController::class, 'store']);
+    Route::get('/{draftId}', [OnboardingDraftController::class, 'show']);
+    Route::put('/{draftId}', [OnboardingDraftController::class, 'update']);
+    Route::post('/{draftId}/confirm', [OnboardingDraftController::class, 'confirm']);
+});
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');

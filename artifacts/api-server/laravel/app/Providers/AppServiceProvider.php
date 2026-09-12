@@ -32,6 +32,13 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('onboarding', function (Request $request): array {
+            return [
+                Limit::perMinute(4)->by('ip:'.$request->ip()),
+                Limit::perHour(20)->by('ip:'.$request->ip()),
+            ];
+        });
+
         RateLimiter::for('orders', function (Request $request): Limit {
             return Limit::perMinute(20)->by($request->ip());
         });

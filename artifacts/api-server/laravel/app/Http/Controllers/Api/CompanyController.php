@@ -10,6 +10,7 @@ use App\Models\CompanyRequest;
 use App\Support\CompanyRegistry;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
+use App\Services\CompanyRequestCreationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ use Illuminate\Support\Str;
 
 class CompanyController extends Controller
 {
-    public function createRequest(Request $request): JsonResponse
+    public function createRequest(Request $request, CompanyRequestCreationService $companyRequests): JsonResponse
     {
         $input = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:2', 'max:160'],
@@ -36,47 +37,16 @@ class CompanyController extends Controller
             'requestedModulePermissions' => ['nullable', 'array'],
         ])->validate();
 
-        $email = Str::lower(trim($input['email']));
-        if (Company::query()->where('email', $email)->whereNull('deleted_at')->exists()) {
-            return response()->json(['error' => 'Une demande ou une entreprise utilise déjà cette adresse email.'], 409);
+        try {
+            $created = $companyRequests->create($input);
+        } catch (\RuntimeException $exception) {
+            $status = str_contains($exception->getMessage(), 'email') ? 409 : 422;
+            return response()->json(['error' => $exception->getMessage()], $status);
         }
-
-        $knownModules = collect(ModuleCatalog::definitions())->pluck('id')->all();
-        $requestedModules = array_values(array_unique(array_intersect($input['requestedModules'], $knownModules)));
-        if ($requestedModules === []) {
-            return response()->json(['error' => 'Sélectionnez au moins un module valide.'], 422);
-        }
-
-        $companyId = (string) Str::uuid();
-        $company = DB::transaction(function () use ($input, $email, $requestedModules, $companyId): Company {
-            $company = Company::query()->create([
-                'id' => $companyId,
-                'name' => trim($input['name']),
-                'manager' => trim($input['manager']),
-                'email' => $email,
-                'phone' => trim((string) ($input['phone'] ?? '')),
-                'country' => trim((string) ($input['country'] ?? '')),
-                'sector' => trim((string) ($input['sector'] ?? '')),
-                'status' => 'EN ATTENTE',
-                'requested_modules' => $requestedModules,
-                'requested_module_pack_ids' => $input['requestedModulePackIds'] ?? [],
-                'requested_module_features' => $input['requestedModuleFeatures'] ?? [],
-                'requested_module_permissions' => $input['requestedModulePermissions'] ?? [],
-            ]);
-
-            CompanyRequest::query()->create([
-                'id' => (string) Str::uuid(),
-                'company_id' => $company->id,
-                'status' => 'PENDING',
-                'admin_password_hash' => MaximusPassword::hash($input['password']),
-            ]);
-
-            return $company;
-        });
 
         return response()->json([
             'ok' => true,
-            'requestId' => CompanyRequest::query()->where('company_id', $company->id)->value('id'),
+            'requestId' => $created['request']->id,
             'status' => 'PENDING',
         ], 201);
     }

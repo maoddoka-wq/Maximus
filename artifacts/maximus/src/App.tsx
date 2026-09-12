@@ -131,6 +131,7 @@ import {
   buildAdminAssistantScope,
 } from '@/lib/local-assistant';
 import { maximusAssistantApi, type MaximusAssistantAction, type MaximusAssistantMessage } from '@/lib/maximus-assistant-api';
+import { onboardingApi } from '@/lib/onboarding-api';
 import { mutationSuccessMessage } from '@/lib/mutation-feedback';
 
 const queryClient = new QueryClient();
@@ -150,6 +151,9 @@ const CompanySetupGuide = lazy(() => import('@/pages/company-setup-guide'));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const PayrollModulePage = lazy(() => import('@/pages/payroll-module'));
 const MaximusAssistantPage = lazy(() => import('@/pages/maximus-assistant'));
+const IntelligentOnboardingPage = lazy(() =>
+  import('@/pages/intelligent-onboarding').then((module) => ({ default: module.IntelligentOnboardingPage })),
+);
 const ControlCenterPage = lazy(() =>
   import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
 );
@@ -873,12 +877,29 @@ function AppContent() {
       <Signup
         key={`signup-${registrationCatalogVersion}`}
         data={data}
+        onIntelligent={() => setLocation('/onboarding')}
         onComplete={() => {
           notify('Votre demande a bien été envoyée.', 'success');
           setLocation('/');
         }}
       />
     );
+  if (location === '/onboarding' && !session) {
+    return (
+      <IntelligentOnboardingPage
+        data={data}
+        onManual={() => setLocation('/inscription')}
+        onComplete={() => {
+          notify('Votre demande a bien été envoyée.', 'success');
+          setLocation('/');
+        }}
+        onSubmitRequest={async ({ draftId, identity }) => {
+          const { passwordConfirm: _passwordConfirm, ...requestIdentity } = identity;
+          await onboardingApi.confirmDraft(draftId, requestIdentity);
+        }}
+      />
+    );
+  }
   if (pathname === '/client-app' || pathname.startsWith('/client-app/')) {
     const pwaEntry = parseClientPwaPath(pathname);
     if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
@@ -1331,9 +1352,11 @@ function Login({
 
 function Signup({
   data,
+  onIntelligent,
   onComplete,
 }: {
   data: StoreData;
+  onIntelligent: () => void;
   onComplete: () => void;
 }) {
   const fallbackPreset: SectorPreset = {
@@ -1595,6 +1618,14 @@ function Signup({
             Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
             être construite après l’activation de votre espace.
           </p>
+          <button
+            type="button"
+            onClick={onIntelligent}
+            className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.06)] px-4 py-2.5 text-sm font-bold text-[hsl(var(--primary))] transition hover:bg-[hsl(var(--primary)/.12)]"
+          >
+            <Sparkles size={16} />
+            Décrire mon entreprise à MAXIMUS
+          </button>
         </div>
         <div className="mb-10 flex items-center gap-3">
           <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />
