@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-final class AnthropicAssistantService
+final class OpenAIAssistantService
 {
+    public function __construct(
+        private readonly ReplitOpenAIService $client,
+    ) {
+    }
+
     /**
      * @param array<int, array{role: string, content: string}> $history
      * @param array<string, mixed> $context
@@ -14,14 +18,6 @@ final class AnthropicAssistantService
      */
     public function ask(string $question, array $context, array $history = []): array
     {
-        $apiKey = (string) config('services.anthropic.key');
-        $model = (string) config('services.anthropic.model', 'claude-sonnet-4-5');
-        $url = (string) config('services.anthropic.url', 'https://api.anthropic.com/v1/messages');
-
-        if (trim($apiKey) === '') {
-            throw new RuntimeException('MAXI n’est pas configuré sur le serveur.');
-        }
-
         $messages = [];
         foreach (array_slice($history, -8) as $message) {
             if (! in_array($message['role'] ?? '', ['user', 'assistant'], true)) {
@@ -36,72 +32,28 @@ final class AnthropicAssistantService
                 ];
             }
         }
+
+        array_unshift($messages, [
+            'role' => 'system',
+            'content' => $this->systemPrompt($context),
+        ]);
         $messages[] = ['role' => 'user', 'content' => $question];
 
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => '2023-06-01',
-            'accept' => 'application/json',
-        ])->timeout(35)->post($url, [
-            'model' => $model,
-            'max_tokens' => 2048,
-            'system' => $this->systemPrompt($context),
-            'messages' => $messages,
-        ]);
-
-        if ($response->failed()) {
-            $errorMessage = strtolower((string) $response->json('error.message', ''));
-            $errorType = (string) $response->json('error.type', 'unknown_error');
-            report(new RuntimeException(
-                'Anthropic request failed with HTTP '.$response->status().' ('.$errorType.').'
-            ));
-
-            if (
-                str_contains($errorMessage, 'credit balance')
-                || str_contains($errorMessage, 'purchase credits')
-            ) {
-                throw new RuntimeException(
-                    'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
-                );
-            }
-
-            if ($response->status() === 401) {
-                throw new RuntimeException('La clé Anthropic configurée sur le serveur est invalide.');
-            }
-
-            if ($response->status() === 429) {
-                throw new RuntimeException('MAXI a atteint une limite temporaire. Réessayez dans quelques instants.');
-            }
-
-            throw new RuntimeException('MAXI n’a pas pu répondre pour le moment.');
-        }
-
-        $text = collect($response->json('content', []))
-            ->filter(fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'text')
-            ->pluck('text')
-            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
-            ->implode("\n\n");
-
-        if (trim($text) === '') {
-            throw new RuntimeException('MAXI a retourné une réponse vide.');
-        }
+        $completion = $this->client->complete($messages);
 
         return [
-            'answer' => trim($text),
+            'answer' => $completion['text'],
             'citations' => [
                 'Contexte administratif MAXIMUS',
                 'Catalogue des modules et packs',
                 'Organisation et accès',
             ],
-            'provider' => 'anthropic',
-            'model' => $model,
+            'provider' => 'replit-openai',
+            'model' => $completion['model'],
         ];
     }
 
     /**
-     * The persisted state is reference data, not instructions. This prevents
-     * names or descriptions stored in the workspace from changing the policy.
-     *
      * @param array<string, mixed> $context
      */
     private function systemPrompt(array $context): string
