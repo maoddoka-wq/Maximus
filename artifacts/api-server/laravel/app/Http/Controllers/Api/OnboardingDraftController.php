@@ -32,7 +32,11 @@ class OnboardingDraftController extends Controller
 
             return response()->json($this->payload($draft), 201);
         } catch (RuntimeException $exception) {
-            return response()->json(['error' => $exception->getMessage(), 'code' => 'ONBOARDING_ANALYSIS_UNAVAILABLE'], 503);
+            $code = str_contains(Str::lower($exception->getMessage()), 'crédit')
+                ? 'ONBOARDING_ANALYSIS_CREDITS_EXHAUSTED'
+                : 'ONBOARDING_ANALYSIS_UNAVAILABLE';
+
+            return response()->json(['error' => $exception->getMessage(), 'code' => $code], 503);
         }
     }
 

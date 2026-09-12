@@ -170,4 +170,24 @@ class OnboardingTest extends TestCase
 
         $this->assertDatabaseCount('onboarding_drafts', 0);
     }
+
+    public function test_it_explains_when_anthropic_has_no_available_credit(): void
+    {
+        Http::fake([
+            '*anthropic.com/*' => Http::response([
+                'error' => [
+                    'type' => 'invalid_request_error',
+                    'message' => 'Your credit balance is too low to access the Anthropic API.',
+                ],
+            ], 400),
+        ]);
+        config()->set('services.anthropic.key', 'test-anthropic-key');
+
+        $this->postJson('/api/onboarding/drafts', [
+            'description' => 'Nous sommes une entreprise de services avec une équipe de plusieurs personnes.',
+        ])
+            ->assertStatus(503)
+            ->assertJsonPath('code', 'ONBOARDING_ANALYSIS_CREDITS_EXHAUSTED')
+            ->assertJsonPath('error', 'Le compte Anthropic configuré n’a plus de crédit. Vous pouvez continuer avec la configuration manuelle.');
+    }
 }

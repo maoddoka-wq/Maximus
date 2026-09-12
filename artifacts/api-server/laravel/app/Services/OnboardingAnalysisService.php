@@ -43,7 +43,19 @@ final class OnboardingAnalysisService
         }
 
         if ($response->failed()) {
-            report(new RuntimeException('Onboarding Anthropic request failed with HTTP '.$response->status().'.'));
+            $providerMessage = trim((string) data_get($response->json(), 'error.message', $response->json('message', '')));
+            report(new RuntimeException(
+                'Onboarding Anthropic request failed with HTTP '.$response->status().'. '.$providerMessage,
+            ));
+            $normalizedMessage = Str::lower($providerMessage);
+            if (
+                str_contains($normalizedMessage, 'credit')
+                || str_contains($normalizedMessage, 'balance')
+                || str_contains($normalizedMessage, 'billing')
+                || str_contains($normalizedMessage, 'crédit')
+            ) {
+                throw new RuntimeException('Le compte Anthropic configuré n’a plus de crédit. Vous pouvez continuer avec la configuration manuelle.');
+            }
             throw new RuntimeException('L’analyse intelligente est momentanément indisponible. Utilisez la configuration manuelle.');
         }
 
