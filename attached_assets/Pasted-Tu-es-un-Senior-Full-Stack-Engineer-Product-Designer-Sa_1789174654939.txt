@@ -1,0 +1,566 @@
+Tu es un Senior Full-Stack Engineer, Product Designer SaaS et Architecte ERP.
+
+MISSION :
+Transformer l'onboarding actuel de MAXIMUS en un système intelligent permettant à un nouveau client de décrire simplement son entreprise en langage naturel, puis de laisser MAXIMUS analyser cette description et proposer automatiquement une configuration adaptée.
+
+IMPORTANT :
+MAXIMUS EXISTE DÉJÀ. Il possède déjà une architecture, des entreprises, utilisateurs, rôles, permissions, modules, paramètres, dashboard, système multi-tenant et fonctionnalités métier.
+
+NE RECONSTRUIS PAS MAXIMUS.
+NE SUPPRIME AUCUNE FONCTIONNALITÉ EXISTANTE.
+NE MODIFIE PAS inutilement l'architecture.
+NE CASSE PAS les modules existants.
+NE CRÉE PAS de fausses données de démonstration.
+NE remplace pas les fonctionnalités existantes par des simulations frontend.
+
+Avant de coder, inspecte réellement le projet et comprends :
+
+- architecture frontend/backend
+- système d'authentification
+- modèle Company/Entreprise
+- utilisateurs
+- rôles et permissions
+- système multi-tenant
+- modules existants
+- activation/désactivation des modules
+- paramètres entreprise
+- dashboard
+- API existantes
+- intégration IA déjà présente
+- base de données
+- système d'abonnement si présent
+
+Réutilise au maximum les mécanismes existants.
+
+==================================================
+
+1. NOUVELLE EXPÉRIENCE D'ONBOARDING
+   ==================================================
+
+Pour une nouvelle entreprise non configurée, après inscription, afficher un onboarding moderne à :
+
+/onboarding
+
+Le client ne doit pas voir immédiatement toute la complexité de MAXIMUS.
+
+Écran :
+
+"Bienvenue dans MAXIMUS 👋"
+
+"Simplifiez la gestion de votre entreprise."
+
+"Expliquez-nous simplement comment fonctionne votre entreprise. MAXIMUS vous proposera automatiquement l'espace de gestion adapté."
+
+Zone de texte principale :
+
+"Parlez-nous de votre entreprise..."
+
+Placeholder :
+
+"Exemple : Je possède une boutique de vêtements à Dakar avec 3 employés. Je vends des pantalons, chemises et chaussures. Je souhaite gérer mes ventes, mon stock, mes clients et vendre également en ligne."
+
+Bouton :
+
+"✨ Configurer mon entreprise"
+
+Ajouter également une option secondaire :
+
+"⚙️ Je préfère configurer manuellement"
+
+Cette option doit ouvrir le wizard classique/manual onboarding sans supprimer les paramètres avancés existants.
+
+==================================================
+2. ANALYSE DE L'ENTREPRISE
+
+Lorsque le client soumet sa description, envoyer le texte à l'IA déjà intégrée à MAXIMUS si celle-ci existe.
+
+NE PAS exposer au client les détails techniques de l'IA.
+
+L'IA doit analyser notamment :
+
+- secteur d'activité
+- type d'entreprise
+- activités principales
+- produits/services
+- nombre approximatif d'employés si mentionné
+- besoins de gestion
+- présence physique
+- vente en ligne
+- stock
+- clients
+- fournisseurs
+- véhicules
+- locations
+- finances
+- RH
+- logistique
+- autres besoins identifiables
+
+IMPORTANT :
+L'IA ne doit PAS directement modifier la base de données à cette étape.
+
+Elle doit d'abord produire une PROPOSITION DE CONFIGURATION structurée.
+
+==================================================
+3. RÉPONSE STRUCTURÉE DE L'IA
+
+Faire produire à l'IA une réponse structurée et exploitable par le backend, par exemple :
+
+{
+"company_profile": {
+"sector": "...",
+"business_type": "...",
+"description": "..."
+},
+"recommended_modules": [
+{
+"module": "...",
+"reason": "..."
+}
+],
+"suggested_settings": {},
+"suggested_structure": {},
+"confidence": 0.0
+}
+
+NE PAS laisser l'IA inventer des noms de modules.
+
+Elle doit utiliser uniquement les modules réellement présents dans MAXIMUS.
+
+Créer une couche de mapping entre les recommandations IA et les identifiants internes réels des modules.
+
+Si l'IA recommande quelque chose qui n'existe pas :
+
+- ne pas créer automatiquement un faux module
+- ignorer la recommandation ou proposer une alternative existante
+- conserver la stabilité du système
+
+==================================================
+4. ÉCRAN "VOICI CE QUE J'AI COMPRIS"
+
+Après analyse, ne pas appliquer immédiatement la configuration.
+
+Afficher au client :
+
+"Voici ce que j'ai compris 👇"
+
+Exemple :
+
+🏪 Boutique de vêtements
+📍 Dakar
+👥 3 employés
+📦 Gestion de stock
+🛒 Vente en magasin
+👤 Gestion des clients
+🌐 Vente en ligne
+
+Puis :
+
+"Configuration recommandée"
+
+✓ Commerce
+✓ Stock
+✓ Clients
+✓ Ressources humaines
+✓ E-commerce
+
+Sous chaque module, afficher une explication très courte :
+
+"Stock — pour suivre vos produits et quantités."
+
+"Commerce — pour gérer vos ventes et encaissements."
+
+"Clients — pour conserver vos clients et leur historique."
+
+Boutons :
+
+"🚀 Appliquer cette configuration"
+
+"✏️ Modifier"
+
+"← Recommencer"
+
+==================================================
+5. MODIFICATION AVANT APPLICATION
+
+Si le client clique sur "Modifier", lui permettre :
+
+- retirer un module
+- ajouter un module
+- modifier les informations principales
+- corriger le secteur
+- modifier certaines informations proposées par l'IA
+
+L'interface doit rester simple.
+
+Ne pas afficher les détails techniques.
+
+Exemple :
+
+"Quels outils voulez-vous utiliser ?"
+
+[✓ Commerce]
+[✓ Stock]
+[✓ Clients]
+[ ] RH
+[✓ E-commerce]
+
+Puis :
+
+"Appliquer"
+
+==================================================
+6. APPLICATION RÉELLE DE LA CONFIGURATION
+
+Lorsque le client confirme :
+
+"Appliquer cette configuration"
+
+le backend doit réellement effectuer les opérations nécessaires avec les mécanismes existants.
+
+Selon les capacités actuelles de MAXIMUS :
+
+- enregistrer le profil de l'entreprise
+- associer correctement l'utilisateur à l'entreprise
+- définir l'administrateur principal
+- activer les modules choisis
+- appliquer les permissions appropriées
+- initialiser les paramètres nécessaires
+- créer les structures nécessaires
+- préparer le dashboard
+- configurer les paramètres métier pertinents
+
+NE PAS créer de doublons.
+
+Toutes les opérations doivent être idempotentes.
+
+Si l'opération est exécutée deux fois, elle ne doit pas créer deux entreprises, deux rôles, deux paramètres ou deux configurations identiques.
+
+==================================================
+7. CONFIGURATION INTELLIGENTE
+
+Utiliser des valeurs par défaut raisonnables uniquement lorsque cela est sûr.
+
+Exemples :
+
+Devise :
+FCFA/XOF si aucune devise n'a été indiquée.
+
+Langue :
+Français.
+
+Pays :
+Sénégal si le contexte le permet et si aucune information contradictoire n'est fournie.
+
+Mais ne jamais inventer des informations importantes.
+
+Pour les informations incertaines :
+
+"À compléter plus tard"
+
+Ne jamais présenter une supposition comme une information certaine.
+
+==================================================
+8. PREMIERS ÉLÉMENTS DE DONNÉES
+
+Après configuration, proposer des actions simples selon les modules activés.
+
+Exemple Commerce + Stock :
+
+"Votre espace est prêt."
+
+"Voulez-vous ajouter votre premier produit ?"
+
+Champs minimum :
+
+Nom
+Prix
+Quantité
+Catégorie
+
+Boutons :
+
+"Ajouter"
+"Passer"
+
+Pour Clients :
+
+"Ajouter votre premier client"
+
+Pour Employés :
+
+"Ajouter votre premier employé"
+
+Pour E-commerce :
+
+"Configurer votre boutique"
+
+IMPORTANT :
+Aucune de ces étapes ne doit être obligatoire pour accéder au dashboard.
+
+==================================================
+9. ÉCRAN FINAL
+
+Afficher :
+
+"🎉 Votre espace MAXIMUS est prêt !"
+
+"Nous avons configuré votre environnement selon votre activité."
+
+Afficher les modules actifs.
+
+Bouton principal :
+
+"🚀 Accéder à mon espace"
+
+Puis une checklist :
+
+"Pour bien commencer"
+
+✓ Entreprise configurée
+✓ Modules configurés
+○ Ajouter vos produits
+○ Ajouter vos clients
+○ Ajouter vos fournisseurs
+○ Ajouter votre équipe
+○ Effectuer votre première vente
+
+Cette checklist doit être basée sur les données réelles.
+
+==================================================
+10. ASSISTANT IA APRÈS L'ONBOARDING
+
+Après l'installation, permettre au client de continuer à utiliser l'IA comme assistant MAXIMUS.
+
+Exemples :
+
+"Ajoute le module RH."
+
+"Je veux vendre mes produits en ligne."
+
+"J'ai 5 employés et je veux gérer leurs présences."
+
+"Je veux commencer à gérer mon stock."
+
+"Comment faire ma première vente ?"
+
+L'IA peut expliquer et guider.
+
+Pour toute action sensible ou modification importante, demander confirmation avant exécution.
+
+Exemple :
+
+"Je peux activer le module RH pour votre entreprise. Voulez-vous continuer ?"
+
+[Oui, activer]
+[Annuler]
+
+IMPORTANT :
+L'IA ne doit jamais prétendre avoir effectué une action si le backend ne l'a pas réellement effectuée.
+
+==================================================
+11. SÉCURITÉ
+
+L'IA ne doit jamais pouvoir contourner les permissions.
+
+Toutes les actions doivent être vérifiées côté backend.
+
+Vérifier :
+
+- entreprise courante
+- utilisateur courant
+- rôle
+- permissions
+- isolation multi-tenant
+- modules autorisés
+- abonnement éventuel
+- accès aux endpoints
+
+Une entreprise ne doit jamais pouvoir configurer ou consulter les données d'une autre entreprise.
+
+Ne jamais faire confiance à un company_id envoyé uniquement par le frontend.
+
+==================================================
+12. ENTREPRISES EXISTANTES
+
+NE PAS lancer ce nouvel onboarding pour les entreprises déjà configurées.
+
+Détecter correctement :
+
+- entreprise existante
+- utilisateur existant
+- modules existants
+- configuration existante
+
+Les utilisateurs actuels doivent continuer à fonctionner normalement.
+
+Ne pas réinitialiser leurs paramètres.
+
+Ne pas remplacer leurs modules.
+
+Ne pas modifier leurs données.
+
+==================================================
+13. REPRISE
+
+Si le client quitte pendant l'onboarding :
+
+sauvegarder son état.
+
+Lorsqu'il revient :
+
+"Bienvenue à nouveau 👋"
+
+"Votre configuration est presque terminée."
+
+Bouton :
+
+"Continuer"
+
+Il doit retrouver sa proposition précédente si elle existe.
+
+==================================================
+14. GESTION DES ERREURS IA
+
+Si l'IA est indisponible :
+
+NE PAS bloquer l'inscription.
+
+Afficher :
+
+"Nous ne pouvons pas analyser automatiquement votre activité pour le moment."
+
+Puis proposer :
+
+"Configurer manuellement"
+
+Le système doit donc toujours avoir un fallback fonctionnel.
+
+Si l'IA retourne une réponse invalide :
+
+- ne pas appliquer la configuration
+- journaliser l'erreur
+- demander une nouvelle analyse ou passer au mode manuel
+
+==================================================
+15. UX / DESIGN
+
+Le design doit être premium mais extrêmement simple.
+
+Mobile-first.
+
+Le client doit comprendre chaque écran immédiatement.
+
+Utiliser :
+
+- cartes
+- icônes cohérentes
+- gros boutons
+- textes courts
+- progression visuelle
+- espaces suffisants
+- animations légères
+- états loading/success/error
+
+Ne pas transformer l'onboarding en panneau d'administration.
+
+L'utilisateur doit sentir que MAXIMUS travaille pour lui.
+
+Message central :
+
+"Vous expliquez. MAXIMUS configure."
+
+==================================================
+16. CHECKLIST DE VALIDATION
+
+Avant de considérer la tâche terminée, tester :
+
+1. Nouveau client → inscription.
+2. Nouveau client → description de son entreprise.
+3. IA → analyse.
+4. Proposition affichée.
+5. Client → modification.
+6. Client → confirmation.
+7. Configuration réelle en base.
+8. Modules réellement activés.
+9. Permissions réellement appliquées.
+10. Dashboard correctement adapté.
+11. Aucun doublon.
+12. Isolation multi-tenant.
+13. Abandon → reprise.
+14. IA indisponible → mode manuel.
+15. Réponse IA invalide → aucun changement dangereux.
+16. Entreprise existante → aucun nouvel onboarding forcé.
+17. Mobile.
+18. Desktop.
+19. Upload logo si déjà supporté.
+20. Déconnexion/reconnexion pendant le processus.
+
+==================================================
+17. AUDIT FINAL
+
+Après implémentation, vérifier qu'aucune fonctionnalité existante de MAXIMUS n'a été cassée.
+
+Tester notamment :
+
+- authentification
+- création entreprise
+- connexion
+- dashboard
+- modules
+- rôles
+- permissions
+- e-commerce
+- stock
+- finance
+- RH
+- utilisateurs
+- paramètres
+- domaines
+- données multi-tenant
+
+Ne pas modifier les fonctionnalités qui ne sont pas nécessaires à cet objectif.
+
+À la fin, fournir :
+
+1. Résumé des changements.
+2. Fichiers modifiés.
+3. Routes ajoutées/modifiées.
+4. API ajoutées/modifiées.
+5. Tables/migrations éventuelles.
+6. Intégration IA utilisée.
+7. Mapping IA → modules réels.
+8. Tests réalisés.
+9. Problèmes détectés.
+10. Éventuelles actions manuelles nécessaires.
+
+OBJECTIF ABSOLU :
+
+Un entrepreneur qui ne connaît rien à MAXIMUS doit pouvoir :
+
+INSCRIPTION
+↓
+"Parlez-nous de votre entreprise"
+↓
+MAXIMUS comprend
+↓
+"Voici ce que j'ai compris"
+↓
+"Voici ce que je vous recommande"
+↓
+Le client confirme
+↓
+MAXIMUS configure réellement son espace
+↓
+"Votre espace est prêt"
+↓
+Dashboard personnalisé
+
+Le client ne doit pas apprendre MAXIMUS avant de pouvoir utiliser MAXIMUS.
+
+MAXIMUS doit absorber la complexité technique et présenter une expérience extrêmement simple.
+
+PHILOSOPHIE PRODUIT :
+
+"MAXIMUS est complexe à l'intérieur, simple à l'extérieur."
+"Vous expliquez votre entreprise. MAXIMUS s'occupe du reste."
