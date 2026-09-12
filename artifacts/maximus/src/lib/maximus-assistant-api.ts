@@ -19,7 +19,8 @@ export type MaximusAssistantActionType =
   | 'create_feature'
   | 'create_sector'
   | 'create_company_plan'
-  | 'create_organization_unit';
+  | 'create_organization_unit'
+  | 'update_company';
 export type MaximusAssistantActionStatus = 'PENDING_CONFIRMATION' | 'EXECUTED';
 
 export type MaximusAssistantAction = {
@@ -50,6 +51,17 @@ export type MaximusAssistantAction = {
   moduleIds?: string[];
   modulePackIds?: Record<string, string[]>;
   moduleFeatures?: Record<string, string[]>;
+  changes?: Partial<{
+    name: string;
+    manager: string;
+    email: string;
+    phone: string;
+    country: string;
+    sector: string;
+    primaryColor: string;
+    accentColor: string;
+    sidebarColor: string;
+  }>;
   version?: number;
 };
 

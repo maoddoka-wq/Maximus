@@ -96,3 +96,23 @@ test('parse une proposition de configuration d’entreprise', () => {
     },
   );
 });
+
+test('parse une demande de modification d’entreprise', () => {
+  assert.deepEqual(
+    parseMaxiActionRequest(
+      'Modifier l’entreprise « Atelier Kora » responsable : Nouvelle responsable email : contact@example.com secteur : Conseil couleur principale : #123456.',
+    ),
+    {
+      type: 'update_company',
+      name: 'Atelier Kora',
+      companyName: 'Atelier Kora',
+      companyId: 'Atelier Kora',
+      changes: {
+        manager: 'Nouvelle responsable',
+        email: 'contact@example.com',
+        sector: 'Conseil',
+        primaryColor: '#123456',
+      },
+    },
+  );
+});

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -263,5 +264,86 @@ class MaximusAssistantTest extends TestCase
         $this->assertContains('Export comptable', $payload['catalogDraft']['moduleOverrides']['commerce']['features']);
         $this->assertSame('DRAFT', $payload['companySetupPlans'][0]['status']);
         $this->assertSame([], $payload['companies'] ?? []);
+    }
+
+    public function test_maxi_can_modify_an_existing_company_after_confirmation(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'assistant-company-update-admin',
+            'email' => 'company-update-admin@maximus.test',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        Company::query()->create([
+            'id' => 'company-to-update',
+            'name' => 'Atelier initial',
+            'manager' => 'Responsable initial',
+            'email' => 'initial@example.com',
+            'phone' => '',
+            'country' => 'Sénégal',
+            'sector' => 'Commerce',
+            'status' => 'ACTIF',
+            'requested_modules' => ['commerce'],
+            'requested_module_pack_ids' => [],
+            'requested_module_features' => [],
+            'requested_module_permissions' => [],
+        ]);
+        AuthUser::query()->create([
+            'id' => 'company-admin:company-to-update',
+            'email' => 'initial@example.com',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Responsable initial',
+            'role' => 'company_admin',
+            'company_id' => 'company-to-update',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+        $action = [
+            'type' => 'update_company',
+            'companyId' => 'company-to-update',
+            'changes' => [
+                'name' => 'Atelier rénové',
+                'manager' => 'Nouvelle responsable',
+                'email' => 'nouvelle@example.com',
+                'sector' => 'Conseil',
+                'primaryColor' => '#123456',
+            ],
+        ];
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/preview', ['action' => $action])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'PENDING_CONFIRMATION')
+            ->assertJsonPath('action.type', 'update_company');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->postJson('/api/maximus-assistant/actions/execute', [
+                'action' => $action,
+                'confirmed' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('action.status', 'EXECUTED');
+
+        $this->assertDatabaseHas('companies', [
+            'id' => 'company-to-update',
+            'name' => 'Atelier rénové',
+            'manager' => 'Nouvelle responsable',
+            'email' => 'nouvelle@example.com',
+            'sector' => 'Conseil',
+            'primary_color' => '#123456',
+        ]);
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'company-admin:company-to-update',
+            'email' => 'nouvelle@example.com',
+            'display_name' => 'Nouvelle responsable',
+        ]);
+        $payload = json_decode((string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'), true);
+        $this->assertCount(1, $payload['auditEntries']);
     }
 }

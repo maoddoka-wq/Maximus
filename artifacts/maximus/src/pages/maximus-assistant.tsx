@@ -110,6 +110,10 @@ const guidedPrompts = [
     label: 'Monter un secteur',
     prompt: 'Créer le secteur « Nom du secteur » modules : module-1, module-2 fonctionnalités : fonctionnalité-1, fonctionnalité-2.',
   },
+  {
+    label: 'Modifier une entreprise',
+    prompt: 'Modifier l’entreprise « Nom de l’entreprise » responsable : Nouveau responsable email : contact@example.com secteur : Nouveau secteur.',
+  },
 ];
 
 const conversationStorageKey = 'maximus-maxi-conversations';
@@ -217,6 +221,8 @@ function actionDescription(action: MaximusAssistantAction) {
       return `Enregistrer le plan de configuration de « ${action.name} » pour le secteur « ${action.sector} », sans activer l’entreprise.`;
     case 'create_organization_unit':
       return `Créer l’unité « ${action.name} » dans « ${action.companyName} ».`;
+    case 'update_company':
+      return `Modifier l’entreprise « ${action.companyName ?? action.name} » avec les champs confirmés.`;
     default:
       return 'Préparer une action contrôlée dans le périmètre MAXIMUS.';
   }
