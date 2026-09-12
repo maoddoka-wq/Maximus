@@ -10,6 +10,7 @@ type RegistrationCatalogResponse = {
   version: number;
   catalog: Partial<RegistrationCatalog> & {
     sectorPresets: RegistrationCatalog['sectorPresets'] | null;
+    registrationEnabled?: boolean;
   };
 };
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OnboardingDraft;
 use App\Services\CompanyRequestCreationService;
 use App\Services\OnboardingAnalysisService;
+use App\Services\PublicRegistrationPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,8 +15,16 @@ use RuntimeException;
 
 class OnboardingDraftController extends Controller
 {
-    public function store(Request $request, OnboardingAnalysisService $analysis): JsonResponse
+    public function store(
+        Request $request,
+        OnboardingAnalysisService $analysis,
+        PublicRegistrationPolicy $registrationPolicy,
+    ): JsonResponse
     {
+        if (! $registrationPolicy->enabled()) {
+            return $this->registrationDisabledResponse();
+        }
+
         $data = $request->validate([
             'description' => ['required', 'string', 'min:40', 'max:6000'],
         ]);
@@ -46,8 +55,17 @@ class OnboardingDraftController extends Controller
         return response()->json($this->payload($draft));
     }
 
-    public function update(Request $request, string $draftId, OnboardingAnalysisService $analysis): JsonResponse
+    public function update(
+        Request $request,
+        string $draftId,
+        OnboardingAnalysisService $analysis,
+        PublicRegistrationPolicy $registrationPolicy,
+    ): JsonResponse
     {
+        if (! $registrationPolicy->enabled()) {
+            return $this->registrationDisabledResponse();
+        }
+
         $data = $request->validate([
             'description' => ['nullable', 'string', 'min:8', 'max:4000'],
             'proposal' => ['required', 'array'],
@@ -77,6 +95,7 @@ class OnboardingDraftController extends Controller
         string $draftId,
         OnboardingAnalysisService $analysis,
         CompanyRequestCreationService $companyRequests,
+        PublicRegistrationPolicy $registrationPolicy,
     ): JsonResponse {
         $data = $request->validate([
             'name' => ['required', 'string', 'min:2', 'max:160'],
@@ -89,7 +108,7 @@ class OnboardingDraftController extends Controller
         ]);
 
         try {
-            $result = DB::transaction(function () use ($draftId, $data, $analysis, $companyRequests): array {
+            $result = DB::transaction(function () use ($draftId, $data, $analysis, $companyRequests, $registrationPolicy): array {
                 $draft = OnboardingDraft::query()->whereKey($draftId)->lockForUpdate()->first();
                 if (! $draft || ($draft->expires_at && $draft->expires_at->isPast())) {
                     throw new RuntimeException('Ce brouillon d’onboarding a expiré. Recommencez ou utilisez la configuration manuelle.');
@@ -97,6 +116,9 @@ class OnboardingDraftController extends Controller
                 if ($draft->request_id) {
                     $requestRow = \App\Models\CompanyRequest::query()->whereKey($draft->request_id)->firstOrFail();
                     return ['draft' => $draft, 'request' => $requestRow, 'company' => $requestRow->company];
+                }
+                if (! $registrationPolicy->enabled()) {
+                    throw new RuntimeException('L’inscription publique est actuellement masquée par l’administration MAXIMUS.');
                 }
 
                 $proposal = $analysis->normalizeProposal((array) $draft->proposal);
@@ -157,6 +179,14 @@ class OnboardingDraftController extends Controller
             ], 404));
         }
         return $draft;
+    }
+
+    private function registrationDisabledResponse(): JsonResponse
+    {
+        return response()->json([
+            'error' => 'L’inscription publique est actuellement masquée par l’administration MAXIMUS.',
+            'code' => 'PUBLIC_REGISTRATION_DISABLED',
+        ], 403);
     }
 
     /** @return array<string, mixed> */

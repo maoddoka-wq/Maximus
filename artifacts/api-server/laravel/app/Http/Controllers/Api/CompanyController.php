@@ -8,6 +8,7 @@ use App\Models\AuthUser;
 use App\Models\Company;
 use App\Models\CompanyRequest;
 use App\Support\CompanyRegistry;
+use App\Services\PublicRegistrationPolicy;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
 use App\Services\CompanyRequestCreationService;
@@ -20,8 +21,19 @@ use Illuminate\Support\Str;
 
 class CompanyController extends Controller
 {
-    public function createRequest(Request $request, CompanyRequestCreationService $companyRequests): JsonResponse
+    public function createRequest(
+        Request $request,
+        CompanyRequestCreationService $companyRequests,
+        PublicRegistrationPolicy $registrationPolicy,
+    ): JsonResponse
     {
+        if (! $registrationPolicy->enabled()) {
+            return response()->json([
+                'error' => 'L’inscription publique est actuellement masquée par l’administration MAXIMUS.',
+                'code' => 'PUBLIC_REGISTRATION_DISABLED',
+            ], 403);
+        }
+
         $input = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:2', 'max:160'],
             'manager' => ['required', 'string', 'min:2', 'max:180'],

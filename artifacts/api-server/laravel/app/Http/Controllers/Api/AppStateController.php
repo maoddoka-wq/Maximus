@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Models\Company;
 use App\Support\ModuleCatalog;
+use App\Services\PublicRegistrationPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ use Illuminate\Support\Str;
 
 class AppStateController extends Controller
 {
-    public function registrationCatalog(): JsonResponse
+    public function registrationCatalog(PublicRegistrationPolicy $registrationPolicy): JsonResponse
     {
         $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
         $payload = is_string($row?->payload)
@@ -34,6 +35,7 @@ class AppStateController extends Controller
         return response()->json([
             'version' => (int) ($row?->version ?? 0),
             'catalog' => [
+                'registrationEnabled' => $registrationPolicy->enabled(),
                 'sectorPresets' => $sectorPresets,
                 'moduleOverrides' => $state['moduleOverrides'] ?? [],
                 'moduleStatuses' => $state['moduleStatuses'] ?? [],

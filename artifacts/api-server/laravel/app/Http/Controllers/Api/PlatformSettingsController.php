@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\EcommerceCommissionPolicy;
+use App\Services\PublicRegistrationPolicy;
 use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ final class PlatformSettingsController extends Controller
         private readonly SellerWalletMaturityPolicy $maturityPolicy,
         private readonly SellerWalletFeePolicy $feePolicy,
         private readonly EcommerceCommissionPolicy $commissionPolicy,
+        private readonly PublicRegistrationPolicy $registrationPolicy,
     ) {}
 
     public function sellerWalletMaturity(Request $request): JsonResponse
@@ -77,6 +79,28 @@ final class PlatformSettingsController extends Controller
         }
 
         return response()->json($this->commissionPolicy->payload());
+    }
+
+    public function publicRegistration(Request $request): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Cette configuration est réservée à l’administration MAXIMUS.'], 403);
+        }
+
+        return response()->json($this->registrationPolicy->payload());
+    }
+
+    public function updatePublicRegistration(Request $request): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Cette configuration est réservée à l’administration MAXIMUS.'], 403);
+        }
+
+        $input = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+
+        return response()->json($this->registrationPolicy->update((bool) $input['enabled']));
     }
 
     public function updateEcommerceCommission(Request $request): JsonResponse

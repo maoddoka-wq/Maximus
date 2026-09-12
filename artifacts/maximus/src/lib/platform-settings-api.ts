@@ -13,6 +13,11 @@ export type SellerWalletWithdrawalFeePolicy = {
   label: string;
 };
 
+export type PublicRegistrationPolicy = {
+  enabled: boolean;
+  label: string;
+};
+
 export type EcommerceCommissionPolicy = {
   providerPercent: number;
   maximusPercent: number;
@@ -110,6 +115,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const platformSettingsApi = {
+  publicRegistration: () => request<PublicRegistrationPolicy>('/platform-settings/public-registration'),
+  updatePublicRegistration: (payload: { enabled: boolean }) =>
+    request<PublicRegistrationPolicy>('/platform-settings/public-registration', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   sellerWalletMaturity: () => request<SellerWalletMaturityPolicy>('/platform-settings/seller-wallet-maturity'),
   updateSellerWalletMaturity: (payload: {
     mode: SellerWalletMaturityMode;

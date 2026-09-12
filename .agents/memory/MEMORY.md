@@ -54,3 +54,4 @@
 - [Quantité des produits numériques](digital-cart-quantity.md) — le panier et la commande imposent une unité, avec le type de fulfillment présent dans le panier client.
 - [Notifications mobiles](mobile-feedback.md) — ancrer les toasts en bas avec la safe area pour garantir la visibilité des succès et erreurs.
 - [Performance réseau frontend](frontend-network-performance.md) — confirmer la mutation puis rafraîchir en arrière-plan, en partageant uniquement les GET simultanés.
+- [Inscription publique](public-registration-policy.md) — le réglage global masque les parcours manuel et intelligent, sans bloquer la création manuelle depuis MAXIMUS.

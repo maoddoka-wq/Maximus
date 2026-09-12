@@ -85,6 +85,8 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
 });
 
 Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (): void {
+    Route::get('/public-registration', [PlatformSettingsController::class, 'publicRegistration']);
+    Route::put('/public-registration', [PlatformSettingsController::class, 'updatePublicRegistration']);
     Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);
     Route::put('/seller-wallet-maturity', [PlatformSettingsController::class, 'updateSellerWalletMaturity']);
     Route::get('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'sellerWalletWithdrawalFee']);

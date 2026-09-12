@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { AlertTriangle, Banknote, Check, Clock3, Copy, KeyRound, RefreshCw, Settings2, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, Banknote, Check, Clock3, Copy, KeyRound, LockKeyhole, RefreshCw, Settings2, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import {
   platformSettingsApi,
   type DiagnosticTokenSummary,
@@ -7,6 +7,7 @@ import {
   type SellerWalletMaturityMode,
   type SellerWalletMaturityPolicy,
   type SellerWalletWithdrawalFeePolicy,
+  type PublicRegistrationPolicy,
 } from '@/lib/platform-settings-api';
 import { showAppToast } from '@/hooks/use-toast';
 
@@ -35,12 +36,14 @@ const modeOptions: Array<{
 export default function PlatformSettingsPage() {
   const [policy, setPolicy] = useState<SellerWalletMaturityPolicy | null>(null);
   const [feePolicy, setFeePolicy] = useState<SellerWalletWithdrawalFeePolicy | null>(null);
+  const [registrationPolicy, setRegistrationPolicy] = useState<PublicRegistrationPolicy | null>(null);
   const [mode, setMode] = useState<SellerWalletMaturityMode>('DAYS');
   const [value, setValue] = useState('7');
   const [feeAmount, setFeeAmount] = useState('100');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingFee, setSavingFee] = useState(false);
+  const [savingRegistration, setSavingRegistration] = useState(false);
   const [error, setError] = useState('');
   const [diagnosticTokens, setDiagnosticTokens] = useState<DiagnosticTokenSummary[]>([]);
   const [diagnosticLabel, setDiagnosticLabel] = useState('Accès diagnostic');
@@ -52,13 +55,15 @@ export default function PlatformSettingsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [nextPolicy, nextFeePolicy, tokenResponse] = await Promise.all([
+      const [nextPolicy, nextFeePolicy, nextRegistrationPolicy, tokenResponse] = await Promise.all([
         platformSettingsApi.sellerWalletMaturity(),
         platformSettingsApi.sellerWalletWithdrawalFee(),
+        platformSettingsApi.publicRegistration(),
         platformSettingsApi.diagnosticTokens(),
       ]);
       setPolicy(nextPolicy);
       setFeePolicy(nextFeePolicy);
+      setRegistrationPolicy(nextRegistrationPolicy);
       setFeeAmount(String(nextFeePolicy.amount));
       setMode(nextPolicy.mode);
       setValue(nextPolicy.value === null ? '' : String(nextPolicy.value));
@@ -173,6 +178,20 @@ export default function PlatformSettingsPage() {
     }
   };
 
+  const saveRegistration = async (enabled: boolean) => {
+    setSavingRegistration(true);
+    try {
+      const nextPolicy = await platformSettingsApi.updatePublicRegistration({ enabled });
+      setRegistrationPolicy(nextPolicy);
+      showAppToast(enabled ? 'Les inscriptions publiques sont activées.' : 'Les inscriptions publiques sont masquées.', 'success');
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Le réglage des inscriptions n’a pas pu être enregistré.');
+    } finally {
+      setSavingRegistration(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="card-surface rounded-2xl p-8 text-sm text-[hsl(var(--muted-foreground))]">
@@ -202,6 +221,42 @@ export default function PlatformSettingsPage() {
             <Settings2 size={21} />
           </span>
         </div>
+      </section>
+
+      <section className="card-surface rounded-2xl border p-5 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+              <UserPlus size={19} />
+            </span>
+            <div>
+              <h2 className="font-bold">Inscription automatique des entreprises</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Contrôlez l’accès public à la configuration manuelle et à l’onboarding intelligent. La création manuelle depuis l’administration MAXIMUS reste toujours disponible.
+              </p>
+              {registrationPolicy && (
+                <p className="mt-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{registrationPolicy.label}</p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={registrationPolicy?.enabled ?? false}
+            disabled={!registrationPolicy || savingRegistration}
+            onClick={() => registrationPolicy && void saveRegistration(!registrationPolicy.enabled)}
+            className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition ${registrationPolicy?.enabled ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.35)]'} disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            <span className={`h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${registrationPolicy?.enabled ? 'translate-x-6' : 'translate-x-0'}`} />
+            <span className="sr-only">{registrationPolicy?.enabled ? 'Désactiver les inscriptions publiques' : 'Activer les inscriptions publiques'}</span>
+          </button>
+        </div>
+        {!registrationPolicy?.enabled && registrationPolicy && (
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+            <LockKeyhole size={15} className="mt-0.5 shrink-0" />
+            Les routes publiques /inscription et /onboarding affichent un écran de fermeture et les API refusent toute nouvelle demande.
+          </div>
+        )}
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">

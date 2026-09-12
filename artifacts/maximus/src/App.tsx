@@ -22,6 +22,7 @@ import {
   GitBranch,
   History,
   KeyRound,
+  LockKeyhole,
   LayoutGrid,
   LogIn,
   Package,
@@ -369,6 +370,7 @@ function AppContent() {
   const { alert, confirm } = useAppDialog();
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
+  const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [appStateReady, setAppStateReady] = useState(
     () => !localStorage.getItem('maximus-session'),
@@ -449,7 +451,7 @@ function AppContent() {
       });
   }, []);
   useEffect(() => {
-    if (session || pathname !== '/inscription') return undefined;
+    if (session || !['/', '/inscription', '/onboarding'].includes(pathname)) return undefined;
     let cancelled = false;
     void registrationCatalogApi.bootstrap()
       .then(({ catalog, version }) => {
@@ -467,10 +469,12 @@ function AppContent() {
             catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
           }),
         );
+        setPublicRegistrationEnabled(catalog.registrationEnabled !== false);
         setRegistrationCatalogVersion(version);
       })
       .catch(() => {
         // Les secteurs intégrés restent disponibles si le catalogue distant est indisponible.
+        setPublicRegistrationEnabled(true);
       });
     return () => {
       cancelled = true;
@@ -874,17 +878,24 @@ function AppContent() {
         onCancel={() => setLocation('/maximus/entreprises')}
       />
     ) : (
-      <Signup
-        key={`signup-${registrationCatalogVersion}`}
-        data={data}
-        onIntelligent={() => setLocation('/onboarding')}
-        onComplete={() => {
-          notify('Votre demande a bien été envoyée.', 'success');
-          setLocation('/');
-        }}
-      />
+      publicRegistrationEnabled ? (
+        <Signup
+          key={`signup-${registrationCatalogVersion}`}
+          data={data}
+          onIntelligent={() => setLocation('/onboarding')}
+          onComplete={() => {
+            notify('Votre demande a bien été envoyée.', 'success');
+            setLocation('/');
+          }}
+        />
+      ) : (
+        <PublicRegistrationClosed onBack={() => setLocation('/')} />
+      )
     );
   if (location === '/onboarding' && !session) {
+    if (!publicRegistrationEnabled) {
+      return <PublicRegistrationClosed onBack={() => setLocation('/')} />;
+    }
     return (
       <IntelligentOnboardingPage
         data={data}
@@ -921,7 +932,15 @@ function AppContent() {
   const loginEmployees = [
     ...data.employees,
   ];
-  if (location === '/' || !session) return <Login onLogin={login} employees={loginEmployees} />;
+  if (location === '/' || !session) {
+    return (
+      <Login
+        onLogin={login}
+        employees={loginEmployees}
+        registrationEnabled={publicRegistrationEnabled}
+      />
+    );
+  }
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
   const employeeId = sessionEmployeeId;
@@ -1171,9 +1190,11 @@ function AppContent() {
 function Login({
   onLogin,
   employees,
+  registrationEnabled,
 }: {
   onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
   employees: StoreData['employees'];
+  registrationEnabled: boolean;
 }) {
   const showDemoAccounts = false;
   const [email, setEmail] = useState('');
@@ -1309,12 +1330,14 @@ function Login({
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
-          <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-            Pas encore d’espace ?{' '}
-            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-              Créer une entreprise
-            </Link>
-          </div>
+          {registrationEnabled && (
+            <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+              Pas encore d’espace ?{' '}
+              <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
+                Créer une entreprise
+              </Link>
+            </div>
+          )}
           {showDemoAccounts && demoAccounts.length > 0 && (
             <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
               <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
@@ -2009,6 +2032,40 @@ function Signup({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PublicRegistrationClosed({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="flex min-h-[100dvh] flex-col bg-[hsl(var(--background))]">
+      <header className="flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
+            <Building2 size={18} />
+          </div>
+          <span className="font-bold tracking-tight">MAXIMUS</span>
+        </div>
+        <span className="text-sm text-[hsl(var(--muted-foreground))]">Inscription</span>
+      </header>
+      <main className="flex flex-1 items-center justify-center p-6">
+        <section className="card-surface w-full max-w-lg rounded-2xl border p-8 text-center sm:p-10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+            <LockKeyhole size={26} />
+          </div>
+          <h1 className="mt-6 text-2xl font-bold tracking-tight">Les inscriptions sont momentanément fermées</h1>
+          <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            L’administration MAXIMUS n’accepte pas de nouvelles demandes pour le moment. Réessayez ultérieurement.
+          </p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-7 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+          >
+            Retour à la connexion
+          </button>
+        </section>
+      </main>
     </div>
   );
 }
