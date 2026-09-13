@@ -396,6 +396,7 @@ export function CompanyRouter({
       canDelete: hasPresencePermission('delete'),
       visibleFeatureIds: presenceFeatureIds,
       singleModuleNavigation,
+      selfOnly: Boolean(employee && !companyAdmin && !sectorManager),
     });
   }
   if (routePath === '/entreprise/rapports') {
