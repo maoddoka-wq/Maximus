@@ -918,18 +918,18 @@ function PublicOfferCard({
 }) {
   const isAvailable = availability !== 'Indisponible';
   const discount = compareAtPrice && compareAtPrice > priceValue ? Math.round((1 - priceValue / compareAtPrice) * 100) : null;
-  return <article className="group min-w-0 overflow-hidden rounded-xl border border-black/5 bg-white shadow-[0_3px_12px_rgba(15,23,42,.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,.1)]">
+  return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-black/5 bg-white shadow-[0_3px_12px_rgba(15,23,42,.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,.1)]">
      <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.35)] p-1.5 disabled:cursor-default sm:p-2">
-       {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]" /> : <Icon size={28} className="text-[hsl(var(--muted-foreground))]" />}
+        {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" /> : <Icon size={28} className="text-[hsl(var(--muted-foreground))]" />}
        {discount !== null && <span className="absolute left-1.5 top-1.5 rounded-md bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white sm:left-2 sm:top-2 sm:text-[10px]">-{discount}%</span>}
        {availability && <span className={`absolute bottom-1.5 left-1.5 max-w-[calc(100%-.75rem)] truncate rounded-md px-1.5 py-0.5 text-[9px] font-bold sm:bottom-2 sm:left-2 ${isAvailable ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800'}`}>{availability}</span>}
     </button>
-      <div className="border-t border-black/5 bg-white p-2.5 sm:p-3">
+      <div className="flex flex-1 flex-col border-t border-black/5 bg-white p-2.5 sm:p-3">
        <p className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">{badge.split(' · ')[1] || badge}</p>
        {onOpen ? <button type="button" onClick={onOpen} className="mt-1 line-clamp-2 min-h-8 w-full break-words text-left text-xs font-semibold leading-4 text-[hsl(var(--foreground))] sm:text-sm">{name}</button> : <h3 className="mt-1 line-clamp-2 min-h-8 break-words text-xs font-semibold leading-4 text-[hsl(var(--foreground))] sm:text-sm">{name}</h3>}
        <p className="mt-1.5 text-sm font-bold leading-4 text-[hsl(var(--foreground))] sm:text-base">{price}{priceSuffix && <span className="ml-0.5 text-[9px] font-medium text-[hsl(var(--muted-foreground))]">{priceSuffix}</span>}</p>
        {compareAtPrice && compareAtPrice > priceValue && <div className="mt-1 flex items-center gap-1.5"><span className="truncate text-[10px] text-[hsl(var(--muted-foreground))] line-through">{money(compareAtPrice, store.currency)}</span><span className="rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700">-{discount}%</span></div>}
-        {onAdd && <div className="mt-2.5 flex items-center gap-1.5">
+         {onAdd && <div className="mt-auto flex items-center gap-1.5 pt-2.5">
            {isAvailable && <button type="button" onClick={onAdd} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-white shadow-sm transition hover:brightness-95 sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}><ShoppingBag size={12} className="mr-1 inline-block" />Ajouter</button>}
       </div>}
     </div>
