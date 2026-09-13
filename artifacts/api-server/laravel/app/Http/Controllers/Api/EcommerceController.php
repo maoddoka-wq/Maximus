@@ -505,6 +505,14 @@ class EcommerceController extends Controller
         $extension = strtolower($input['image']->getClientOriginalExtension() ?: 'bin');
         $filename = Str::uuid()->toString().'.'.$extension;
         $imageUrl = '/api/product-images/'.rawurlencode($company).'/'.rawurlencode($filename);
+        $this->preservePrimaryImageInGallery(
+            $company,
+            'product',
+            $id,
+            (string) ($product->image_url ?? ''),
+            (string) ($product->image_data ?? ''),
+            (string) ($product->image_mime ?? ''),
+        );
         DB::table('ecommerce_products')->where('id', $id)->update([
             'image_url' => $imageUrl,
             'image_data' => base64_encode($contents),
@@ -835,6 +843,14 @@ class EcommerceController extends Controller
         $extension = strtolower($input['image']->getClientOriginalExtension() ?: 'bin');
         $filename = Str::uuid()->toString().'.'.$extension;
         $imageUrl = '/api/rental-images/'.rawurlencode($company).'/'.rawurlencode($filename);
+        $this->preservePrimaryImageInGallery(
+            $company,
+            'rental',
+            $id,
+            (string) ($rental->image_url ?? ''),
+            (string) ($rental->image_data ?? ''),
+            (string) ($rental->image_mime ?? ''),
+        );
         DB::table('ecommerce_rentals')->where('id', $id)->update([
             'image_url' => $imageUrl,
             'image_data' => base64_encode($contents),
@@ -1964,6 +1980,39 @@ class EcommerceController extends Controller
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    private function preservePrimaryImageInGallery(
+        string $company,
+        string $ownerType,
+        string $ownerId,
+        string $imageUrl,
+        string $imageData,
+        string $imageMime,
+    ): void {
+        if (trim($imageUrl) === '' || trim($imageData) === '') {
+            return;
+        }
+
+        $nextOrder = (int) DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
+            ->where('collection', 'gallery')
+            ->max('sort_order') + 1;
+
+        DB::table('ecommerce_gallery_images')->insert([
+            'id' => $this->id('gallery'),
+            'company_id' => $company,
+            'owner_type' => $ownerType,
+            'owner_id' => $ownerId,
+            'collection' => 'gallery',
+            'image_data' => $imageData,
+            'image_mime' => $imageMime !== '' ? $imageMime : 'application/octet-stream',
+            'sort_order' => $nextOrder,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function deleteGalleryImage(

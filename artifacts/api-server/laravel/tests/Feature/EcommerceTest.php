@@ -465,6 +465,10 @@ class EcommerceTest extends TestCase
         ])->assertOk();
         $secondUrl = $second->json('imageUrl');
         $this->assertNotSame($firstUrl, $secondUrl);
+        $preservedGallery = $second->json('gallery');
+        $this->assertCount(1, $preservedGallery);
+        $this->assertStringStartsWith('/api/gallery-images/kora/', $preservedGallery[0]);
+        $this->get($preservedGallery[0])->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         Storage::disk('public')->assertMissing($firstPath);
         Storage::disk('public')->assertMissing('ecommerce/products/kora/'.basename($secondUrl));
         $this->assertDatabaseHas('ecommerce_products', [
