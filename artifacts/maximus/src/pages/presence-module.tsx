@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
-import { createPresenceApi, type PresenceItem, type PresenceItemInput, type PresencePayload } from '@/lib/presence-api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
+import QRCode from 'qrcode';
+import QrScanner from 'qr-scanner';
+import { createPresenceApi, type PresenceClockQr, type PresenceItem, type PresenceItemInput, type PresencePayload } from '@/lib/presence-api';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { featureSlug } from '@/lib/permission-keys';
 import { useQueryTab } from '@/lib/query-tab';
@@ -34,25 +36,6 @@ const displayTime = (date: string | null | undefined) => date ? new Intl.DateTim
 const minutes = (value: string) => { const [h, m] = value.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 const duration = (value: number) => `${Math.floor(Math.max(0, value) / 60)} h ${Math.max(0, value) % 60} min`;
 const currentTime = (timestamp: number) => new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(timestamp));
-const clockMoment = (date: string, time: unknown) => {
-  if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) return null;
-  const value = new Date(`${date}T${time}:00`);
-  return Number.isNaN(value.getTime()) ? null : value.getTime();
-};
-const recordedMoment = (date: string, time: unknown, timestamp: unknown) => {
-  if (typeof timestamp === 'string') {
-    const value = Date.parse(timestamp);
-    if (!Number.isNaN(value)) return value;
-  }
-  return clockMoment(date, time);
-};
-const liveDuration = (milliseconds: number) => {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-  const remainingMinutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${hours}:${remainingMinutes}:${seconds}`;
-};
 const nightMinutes = (arrival: unknown, exit: unknown) => {
   if (!arrival || !exit) return 0;
   const start = minutes(String(arrival));
@@ -180,14 +163,14 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const create = async (input: Parameters<typeof api.create>[0]) => { try { await api.create(input); showAppToast('Enregistrement créé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Création impossible.', 'error'); } };
   const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => { try { await api.update(item.id, { payload, status, actor }); setSelected(null); showAppToast('Modification enregistrée.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Modification impossible.', 'error'); } };
   const remove = async (item: PresenceItem) => { if (!canDelete || !await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return; try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); } };
-  const clock = async (action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd') => { if (!canCreate) return; try { await api.clock({ employeeId: selectedEmployee, workDate: date, action, actor, expectedStart: String(settings.expectedStart ?? '08:00'), tolerance: Number(settings.tolerance ?? 10) }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée.' : action === 'exit' ? 'Sortie enregistrée.' : action === 'pauseStart' ? 'Pause commencée.' : 'Pause terminée.', 'success'); await refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Pointage impossible.', 'error'); } };
+  const scanClock = async (token: string, action: 'arrival' | 'exit') => { try { await api.clockScan({ token, action }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée après scan.' : 'Sortie enregistrée après scan.', 'success'); await refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Scan de pointage impossible.', 'error'); throw cause; } };
   const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExport) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
   const kpis = { active: employees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
   const render = () => {
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
     if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(employees.map(employee => meta(employee).unit))]} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
-    if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} employees={employees} date={date} setDate={setDate} settings={settings} onClock={clock} selfOnly={selfOnly} />;
+    if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canManage={canManage} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} onExport={() => exportRows(rows, `presences-${date}.csv`)} onSelect={setSelected} />;
     if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreate} canValidate={canValidate} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
     if (tab === 'schedules') return <SchedulesPanel items={items} employees={employees} canCreate={canCreate} canEdit={canEdit} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
@@ -212,31 +195,147 @@ function Dashboard({ rows, kpis, date, setDate, period, setPeriod, sector, setSe
      <div className="mobile-stat-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"><Kpi label="Employés actifs" value={kpis.active} detail="dans le périmètre"/><Kpi label="Présents aujourd’hui" value={kpis.present} detail={`${rate}% de présence`} tone="text-emerald-700"/><Kpi label="Absents" value={kpis.absent} detail="non pointés inclus" tone="text-red-700"/><Kpi label="Retardataires" value={kpis.late} detail="arrivée après tolérance" tone="text-amber-700"/><Kpi label="En pause" value={kpis.pause} detail="pause en cours"/><Kpi label="En congé" value={kpis.leave} detail="validés"/><Kpi label="En mission" value={kpis.mission} detail="actifs"/><Kpi label="Heures travaillées" value={duration(kpis.worked)} detail="sur la journée"/><Kpi label="Heures supplémentaires" value={duration(kpis.overtime)} detail="calculées"/><Kpi label="Taux de présence" value={`${rate}%`} detail={`période : ${period}`} tone="text-[hsl(var(--primary))]"/></div>
     <div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><Panel title="Dernières entrées / sorties">{rows.filter(row => row.attendance).slice(0, 8).length ? <div className="divide-y">{rows.filter(row => row.attendance).slice(0, 8).map(row => <div key={row.employee.id} className="flex items-center justify-between gap-3 py-3 text-sm"><div><strong>{personName(row.employee)}</strong><p className="text-xs text-[hsl(var(--muted-foreground))]">{row.payload.arrival ?? '—'} → {row.payload.exit ?? '—'}</p></div><Badge tone={row.late ? 'warn' : 'good'}>{row.status}</Badge></div>)}</div> : <Empty/>}</Panel><Panel title="Alertes opérationnelles"><div className="space-y-3">{rows.filter(row => row.late > 0 || row.status === 'Non pointé' || row.payload.arrival && !row.payload.exit).slice(0, 8).map(row => <div key={row.employee.id} className="flex gap-3 rounded-lg bg-[hsl(var(--muted)/.45)] p-3"><AlertTriangle size={16} className="mt-0.5 text-amber-600"/><div><p className="text-sm font-bold">{personName(row.employee)}</p><p className="text-xs text-[hsl(var(--muted-foreground))]">{row.late ? `Retard de ${row.late} min` : row.payload.arrival && !row.payload.exit ? 'Sortie oubliée' : 'Journée non pointée'}</p></div></div>)}{!rows.some(row => row.late > 0 || row.status === 'Non pointé' || row.payload.arrival && !row.payload.exit) && <Empty text="Aucune alerte active."/>}</div></Panel></div></div>;
 }
-function ClockPanel({ rows, selectedEmployee, setSelectedEmployee, employees, date, setDate, settings, onClock, selfOnly }: { rows: PresenceRow[]; selectedEmployee: string; setSelectedEmployee: (value: string) => void; employees: Employee[]; date: string; setDate: (value: string) => void; settings: PresenceSettings; onClock: (action: 'arrival' | 'exit') => Promise<void>; selfOnly: boolean }) {
-  const row = rows.find(item => item.employee.id === selectedEmployee);
-  const payload = row?.payload ?? {};
+type ClockPanelProps = {
+  rows: PresenceRow[];
+  selectedEmployee: string;
+  date: string;
+  setDate: (value: string) => void;
+  settings: PresenceSettings;
+  canManage: boolean;
+  selfOnly: boolean;
+  onRequestQr: (workDate: string) => Promise<PresenceClockQr>;
+  onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void>;
+};
+
+function ClockPanel({ rows, selectedEmployee, date, setDate, settings, canManage, selfOnly, onRequestQr, onScanClock }: ClockPanelProps) {
+  if (canManage && !selfOnly) {
+    return <ManagerClockPanel date={date} setDate={setDate} settings={settings} onRequestQr={onRequestQr} />;
+  }
+
+  return <EmployeeScannerPanel row={rows.find(item => item.employee.id === selectedEmployee)} date={date} onScanClock={onScanClock} />;
+}
+
+function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: string; setDate: (value: string) => void; settings: PresenceSettings; onRequestQr: (workDate: string) => Promise<PresenceClockQr> }) {
   const [now, setNow] = useState(() => Date.now());
-  const [busyAction, setBusyAction] = useState<'arrival' | 'exit' | null>(null);
+  const [qr, setQr] = useState<PresenceClockQr | null>(null);
+  const [qrImage, setQrImage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
   useEffect(() => {
-    setNow(Date.now());
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
-  const arrivalAt = recordedMoment(date, payload.arrival, payload.arrivalAt);
-  const exitAt = recordedMoment(date, payload.exit, payload.exitAt);
-  const elapsedMilliseconds = arrivalAt === null
-    ? 0
-    : Math.max(0, (exitAt ?? now) - arrivalAt - Number(payload.pauseMinutes ?? 0) * 60_000);
-  const runClock = async (action: 'arrival' | 'exit') => {
-    setBusyAction(action);
-    try {
-      await onClock(action);
-    } finally {
-      setBusyAction(null);
-    }
-  };
-  const status = payload.exit ? 'Journée terminée' : payload.arrival ? 'Arrivée enregistrée' : 'En attente du pointage';
-  return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]"><Panel title="Pointage du jour"><div className="space-y-4">{selfOnly ? <div className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5"><p className="text-xs font-bold">Compte de pointage</p><p className="mt-1 text-sm">{row ? personName(row.employee) : 'Votre compte employé'}</p></div> : <SelectField label="Employé" value={selectedEmployee} onChange={setSelectedEmployee} options={employees.map(employee => [employee.id, personName(employee)])}/>}<Field label="Date" value={date} onChange={setDate} type="date"/><div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Heure actuelle</p><p className="mt-2 font-mono text-4xl font-bold tracking-tight">{currentTime(now)}</p></div><Badge tone={payload.exit ? 'good' : payload.arrival ? 'info' : 'neutral'}>{status}</Badge></div><p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">{payload.arrival ? `Arrivée enregistrée à ${payload.arrival}${payload.exit ? ` · sortie à ${payload.exit}` : ' · cliquez sur Sortie en fin de journée'}` : 'Cette heure suit l’horloge réelle. Cliquez sur Arrivée pour enregistrer le pointage.'}</p></div><div className="grid gap-2 sm:grid-cols-2"><Button primary disabled={Boolean(payload.arrival) || busyAction !== null} onClick={() => void runClock('arrival')}><ArrowDownToLine size={15}/>Arrivée</Button><Button disabled={!payload.arrival || Boolean(payload.exit) || busyAction !== null} onClick={() => void runClock('exit')}><ArrowUpFromLine size={15}/>Sortie</Button></div><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Horaire prévu : {settings.expectedStart ?? '08:00'} – {settings.expectedEnd ?? '17:00'} · Tolérance : {settings.tolerance ?? 10} min.</p></div></Panel><Panel title={`Journée de ${row ? personName(row.employee) : 'l’employé'}`}><div className="grid gap-3 sm:grid-cols-2">{[['Date', displayDate(date)], ['Heure actuelle', currentTime(now)], ['Arrivée', payload.arrival ?? '—'], ['Sortie', payload.exit ?? '—'], ['Durée pause', duration(Number(payload.pauseMinutes ?? 0))], ['Temps depuis l’arrivée', payload.arrival ? liveDuration(elapsedMilliseconds) : '—'], ['Temps travaillé', duration(row?.work ?? 0)], ['Retard', `${row?.late ?? 0} min`], ['Départ anticipé', `${row?.early ?? 0} min`]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-[10px] text-[hsl(var(--muted-foreground))]">{String(label)}</p><p className="mt-1 font-bold">{value}</p></div>)}</div></Panel></div>;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    void onRequestQr(date)
+      .then(async nextQr => {
+        const image = await QRCode.toDataURL(nextQr.token, { width: 300, margin: 2, errorCorrectionLevel: 'M' });
+        if (active) {
+          setQr(nextQr);
+          setQrImage(image);
+        }
+      })
+      .catch(cause => {
+        if (active) setError(cause instanceof Error ? cause.message : 'QR code indisponible.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [date]);
+
+  return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+    <Panel title="Pointage par QR code">
+      <div className="space-y-4">
+        <Field label="Date de pointage" value={date} onChange={setDate} type="date" />
+        <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-5">
+          <p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Heure actuelle</p>
+          <p className="mt-2 font-mono text-4xl font-bold tracking-tight">{currentTime(now)}</p>
+          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{displayDate(date)}</p>
+        </div>
+        <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Présentez ce QR code aux employés à leur arrivée et à leur sortie. Le serveur associe chaque scan au compte employé connecté.</p>
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">Horaire prévu : {settings.expectedStart ?? '08:00'} – {settings.expectedEnd ?? '17:00'} · Tolérance : {settings.tolerance ?? 10} min.</p>
+      </div>
+    </Panel>
+    <Panel title="QR code de pointage">
+      <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 rounded-2xl border bg-white p-5 text-center">
+        {loading ? <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]"><RefreshCw size={16} className="animate-spin" />Génération du QR code…</div> : qrImage ? <img src={qrImage} alt={`QR code de pointage du ${displayDate(date)}`} className="h-72 w-72 max-w-full rounded-xl" /> : <div className="text-sm text-red-700">{error || 'QR code indisponible.'}</div>}
+        {qr ? <p className="text-xs text-[hsl(var(--muted-foreground))]">Valide jusqu’à {new Date(qr.expiresAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.</p> : null}
+        {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      </div>
+    </Panel>
+  </div>;
+}
+
+function EmployeeScannerPanel({ row, date, onScanClock }: { row?: PresenceRow; date: string; onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void> }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const payload = row?.payload ?? {};
+  const action: 'arrival' | 'exit' | null = payload.exit ? null : payload.arrival ? 'exit' : 'arrival';
+  const actionLabel = action === 'arrival' ? 'enregistrer votre arrivée' : action === 'exit' ? 'enregistrer votre sortie' : 'journée terminée';
+
+  useEffect(() => {
+    if (!scannerOpen || !videoRef.current || !action) return;
+    let handled = false;
+    const scanAction = action;
+    const scanner = new QrScanner(videoRef.current, result => {
+      if (handled || !result.data) return;
+      handled = true;
+      setScannerOpen(false);
+      setBusy(true);
+      setError('');
+      void onScanClock(result.data, scanAction)
+        .then(() => setMessage(scanAction === 'arrival' ? 'Arrivée enregistrée.' : 'Sortie enregistrée.'))
+        .catch(cause => setError(cause instanceof Error ? cause.message : 'Le QR code n’a pas pu être validé.'))
+        .finally(() => setBusy(false));
+    }, { highlightScanRegion: true, highlightCodeOutline: true, returnDetailedScanResult: true });
+    void scanner.start().catch(cause => {
+      setScannerOpen(false);
+      setError(cause instanceof Error ? cause.message : 'Accès à la caméra impossible.');
+    });
+    return () => {
+      scanner.stop();
+      scanner.destroy();
+    };
+  }, [scannerOpen, action, onScanClock]);
+
+  return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+    <Panel title="Pointage employé">
+      <div className="space-y-4">
+        <div className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5">
+          <p className="text-xs font-bold">Compte de pointage</p>
+          <p className="mt-1 text-sm">{row ? personName(row.employee) : 'Votre compte employé'}</p>
+        </div>
+        <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-5">
+          <p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Action attendue</p>
+          <p className="mt-2 text-lg font-bold">{action === null ? 'Journée terminée' : `Scanner pour ${actionLabel}`}</p>
+          <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Le QR code est présenté par le gérant des Présences. Votre compte connecté est utilisé automatiquement.</p>
+        </div>
+        <Button primary disabled={action === null || busy || scannerOpen} onClick={() => { setMessage(''); setError(''); setScannerOpen(true); }}>
+          <QrCodeIcon />{scannerOpen ? 'Scanner en cours…' : busy ? 'Validation…' : 'Scanner le QR code'}
+        </Button>
+        {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p> : null}
+        {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+        <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Date sélectionnée : {displayDate(date)}. Le serveur vérifie la validité du QR code et la séquence arrivée puis sortie.</p>
+      </div>
+    </Panel>
+    <Panel title="Scanner">
+      {scannerOpen ? <div className="space-y-3"><div className="overflow-hidden rounded-2xl bg-black"><video ref={videoRef} className="aspect-square w-full object-cover" muted playsInline /></div><p className="text-center text-xs text-[hsl(var(--muted-foreground))]">Cadrez le QR code du gérant dans la zone caméra.</p><Button onClick={() => setScannerOpen(false)}>Fermer le scanner</Button></div> : <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed p-6 text-center"><QrCodeIcon size={52} /><p className="mt-4 font-bold">Scanner le QR code du gérant</p><p className="mt-2 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">Le scan est disponible uniquement tant que l’arrivée ou la sortie attendue n’est pas déjà enregistrée.</p></div>}
+    </Panel>
+  </div>;
+}
+
+function QrCodeIcon({ size = 16 }: { size?: number }) {
+  return <span className="inline-flex" aria-hidden="true"><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h-3zM21 15v6M15 21h3M12 3v3M12 9v3M15 12h6M3 12h3M9 12v3M12 18h3" /></svg></span>;
 }
 function PresenceList({ rows, calendar, query, setQuery, onExport, onSelect }: { rows: PresenceRow[]; calendar: { view: string; days: { date: string; rows: PresenceRow[] }[] }[]; query: string; setQuery: (value: string) => void; onExport: () => void; onSelect: (item: PresenceItem) => void }) {
   const [view, setView] = useState('day');

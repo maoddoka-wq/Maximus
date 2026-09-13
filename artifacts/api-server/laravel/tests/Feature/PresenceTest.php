@@ -205,11 +205,50 @@ class PresenceTest extends TestCase
         ])->assertCreated();
     }
 
+    public function test_manager_qr_is_scanned_by_the_authenticated_employee(): void
+    {
+        $workDate = now()->format('Y-m-d');
+        $qr = $this->asActor()
+            ->getJson('/api/presence/clock-qr?workDate='.$workDate)
+            ->assertOk()
+            ->assertJsonPath('workDate', $workDate);
+
+        $token = $qr->json('token');
+        $this->assertIsString($token);
+        $this->assertStringContainsString('.', $token);
+
+        $employee = $this->asActor('employee', 'presence-employee', ['presences' => ['voir', 'créer']]);
+        $employee
+            ->postJson('/api/presence/clock-scan', [
+                'token' => $token,
+                'action' => 'arrival',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('employeeId', 'presence-employee')
+            ->assertJsonPath('payload.status', 'Présent');
+
+        $employee
+            ->postJson('/api/presence/clock-scan', [
+                'token' => $token,
+                'action' => 'exit',
+            ])
+            ->assertOk()
+            ->assertJsonPath('employeeId', 'presence-employee')
+            ->assertJsonPath('payload.exitAt', fn ($value) => is_string($value) && $value !== '');
+    }
+
+    public function test_employee_cannot_generate_the_manager_qr(): void
+    {
+        $this->asActor('employee', 'presence-employee', ['presences' => ['voir', 'créer']])
+            ->getJson('/api/presence/clock-qr')
+            ->assertForbidden();
+    }
+
     private function asActor(string $role = 'company_admin', string $employeeId = 'presence-admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([
-            'id' => 'presence-admin',
-            'email' => 'presence-admin@kora.demo',
+            'id' => $role === 'employee' ? $employeeId : 'presence-admin',
+            'email' => $role === 'employee' ? $employeeId.'@kora.demo' : 'presence-admin@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'RH Kora',
             'role' => $role,

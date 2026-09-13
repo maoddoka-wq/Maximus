@@ -240,12 +240,12 @@ class PresenceController extends Controller
             return response()->json(['error' => 'QR code invalide ou expiré.'], 422);
         }
 
-        $settings = PresenceItem::query()
+        $settingsItem = PresenceItem::query()
             ->where('company_id', $companyId)
             ->where('type', 'settings')
             ->latest('updated_at')
-            ->value('payload');
-        $settings = is_array($settings) ? $settings : [];
+            ->first();
+        $settings = is_array($settingsItem?->payload) ? $settingsItem->payload : [];
 
         return $this->recordClock([
             'employeeId' => $employeeId,
