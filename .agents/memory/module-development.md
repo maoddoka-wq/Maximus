@@ -62,3 +62,9 @@ Les capacités de fulfillment d’un module e-commerce, comme la vente physique 
 **Why:** Une permission de type produit sert à contrôler les opérations autorisées dans le catalogue ; l’exposer comme page crée des liens dupliqués et des routes sans écran correspondant.
 
 **How to apply:** Garder ces identifiants dans le manifeste et les contrôles d’accès, mais les exclure des menus et des onglets ; utiliser uniquement les capacités autorisées pour afficher les choix de création correspondants.
+
+Le bootstrap public des accès modules doit rester strictement en lecture ; la synchronisation ou la création du catalogue doit être réservée au provisioning et aux mutations d’administration.
+
+**Why:** Une lecture des droits qui réécrit chaque définition de module ralentit les connexions, augmente la contention PostgreSQL et peut provoquer un timeout sous Render.
+
+**How to apply:** Dans les endpoints de bootstrap, charger l’état du catalogue et les accès de l’entreprise sans appeler de méthode `ensure*`; tester explicitement qu’un chargement ne modifie pas `updated_at`.

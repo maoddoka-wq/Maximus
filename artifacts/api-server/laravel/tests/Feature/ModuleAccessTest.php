@@ -120,6 +120,10 @@ class ModuleAccessTest extends TestCase
 
     public function test_module_bootstrap_exposes_descriptions_for_modules_and_packs(): void
     {
+        $updatedAtBefore = DB::table('maximus_modules')
+            ->where('id', 'commerce')
+            ->value('updated_at');
+
         $response = $this->asCompanyAdmin()
             ->getJson('/api/modules/bootstrap?companyId=kora')
             ->assertOk();
@@ -133,6 +137,12 @@ class ModuleAccessTest extends TestCase
             ->assertJsonCount(3, 'modules.4.featurePacks')
             ->assertJsonPath('modules.4.featurePacks.1.featurePermissions.préparer-une-paie.1', 'créer')
             ->assertJsonPath('modules.4.featurePacks.2.featurePermissions.virements.1', 'modifier');
+
+        $this->assertSame(
+            $updatedAtBefore,
+            DB::table('maximus_modules')->where('id', 'commerce')->value('updated_at'),
+            'Le bootstrap des accès modules doit rester en lecture seule.',
+        );
     }
 
     public function test_status_only_update_preserves_company_feature_selection(): void

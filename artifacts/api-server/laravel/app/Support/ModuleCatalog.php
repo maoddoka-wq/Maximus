@@ -225,7 +225,6 @@ final class ModuleCatalog
 
     public static function bootstrap(string $companyId): array
     {
-        self::ensureCatalog();
         $access = DB::table('maximus_company_modules')
             ->where('company_id', $companyId)
             ->get()
