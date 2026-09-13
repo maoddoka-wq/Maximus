@@ -14,7 +14,7 @@ COPY attached_assets ./attached_assets
 RUN pnpm install --frozen-lockfile
 RUN PORT=10000 BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/maximus run build
 
-FROM php:8.2-cli-bookworm
+FROM php:8.2-apache
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
@@ -28,6 +28,7 @@ ENV APP_ENV=production \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq-dev unzip \
     && docker-php-ext-install pdo_pgsql \
+    && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -49,7 +50,20 @@ RUN cd laravel \
     done \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
     && chmod -R ug+rw storage bootstrap/cache \
-    && chmod +x /usr/local/bin/render-entrypoint.sh
+    && chmod +x /usr/local/bin/render-entrypoint.sh \
+    && printf '%s\n' \
+       '<VirtualHost *:10000>' \
+       '    DocumentRoot /app/laravel/public' \
+       '    <Directory /app/laravel/public>' \
+       '        AllowOverride All' \
+       '        Require all granted' \
+       '        Options -Indexes +FollowSymLinks' \
+       '    </Directory>' \
+       '    ErrorLog /proc/self/fd/2' \
+       '    CustomLog /proc/self/fd/1 combined' \
+       '</VirtualHost>' \
+       > /etc/apache2/sites-available/000-default.conf \
+    && printf 'Listen 10000\n' > /etc/apache2/ports.conf
 
 COPY --from=frontend-build /workspace/artifacts/maximus/dist/public/ ./laravel/public/
 
