@@ -63,6 +63,7 @@ class PresenceTest extends TestCase
             'now' => '2026-09-05T08:15:00Z',
         ]);
         $arrival->assertCreated()->assertJsonPath('payload.arrival', '08:15');
+        $this->assertNotEmpty($arrival->json('payload.arrivalAt'));
         $this->assertSame(5, $arrival->json('payload.lateMinutes'));
 
         $request->postJson('/api/presence/clock', $base + [
@@ -76,12 +77,19 @@ class PresenceTest extends TestCase
         ]);
         $pauseEnd->assertOk()->assertJsonPath('payload.pauseMinutes', 30);
 
+        $exit = $request->postJson('/api/presence/clock', $base + [
+            'action' => 'exit',
+            'now' => '2026-09-05T17:00:00Z',
+        ]);
+        $exit->assertOk()->assertJsonPath('payload.exit', '17:00');
+        $this->assertNotEmpty($exit->json('payload.exitAt'));
+
         $request->postJson('/api/presence/clock', $base + [
             'action' => 'arrival',
             'now' => '2026-09-05T13:00:00Z',
         ])->assertStatus(409);
 
-        $this->assertSame(3, PresenceItem::query()->where('type', 'history')->count());
+        $this->assertSame(4, PresenceItem::query()->where('type', 'history')->count());
     }
 
     public function test_update_and_delete_are_limited_to_the_company_in_the_request(): void

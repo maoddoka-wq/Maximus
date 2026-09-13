@@ -199,7 +199,9 @@ class PresenceController extends Controller
             ->orderByDesc('updated_at')
             ->first();
         $payload = $item?->payload ?? [];
-        $clockTime = Carbon::parse($input['now'] ?? now())->format('H:i');
+        $clockMoment = Carbon::parse($input['now'] ?? now());
+        $clockTime = $clockMoment->format('H:i');
+        $clockAt = $clockMoment->toISOString();
 
         if ($input['action'] === 'arrival' && ! empty($payload['arrival'])) {
             return response()->json(['error' => 'Arrivée déjà enregistrée pour cette journée.'], 409);
@@ -216,12 +218,14 @@ class PresenceController extends Controller
 
         if ($input['action'] === 'arrival') {
             $payload['arrival'] = $clockTime;
+            $payload['arrivalAt'] = $clockAt;
             $payload['lateMinutes'] = isset($input['expectedStart'])
                 ? max(0, $this->minutes($clockTime) - $this->minutes($input['expectedStart']) - $tolerance)
                 : 0;
             $payload['status'] = 'Présent';
         } elseif ($input['action'] === 'exit') {
             $payload['exit'] = $clockTime;
+            $payload['exitAt'] = $clockAt;
             $payload['status'] = 'Présent';
         } elseif ($input['action'] === 'pauseStart') {
             $payload['pauseStart'] = $clockTime;
@@ -256,7 +260,7 @@ class PresenceController extends Controller
 
         $this->writeHistory($companyId, $actor, 'clock.'.$input['action'], [
             'itemId' => $item->id,
-            'newValue' => [$input['action'] => $clockTime],
+            'newValue' => [$input['action'] => $clockTime, $input['action'].'At' => $clockAt],
             'employeeId' => $input['employeeId'],
             'workDate' => $input['workDate'],
         ]);

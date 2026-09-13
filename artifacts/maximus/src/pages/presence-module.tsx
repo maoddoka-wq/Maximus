@@ -23,12 +23,35 @@ const presenceTabIcons: Partial<Record<Tab, LucideIcon>> = {
 };
 const tabs: [Tab, string, LucideIcon][] = presenceFeatureDefinitions.map(feature => [feature.tab, feature.label, presenceTabIcons[feature.tab] ?? CalendarDays]);
 const typeLabel: Record<PresenceItem['type'], string> = { attendance: 'Pointage', absence: 'Absence', schedule: 'Horaire', planning: 'Planning', mission: 'Mission', leave: 'Congé', holiday: 'Jour férié', settings: 'Paramètres', history: 'Historique' };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const value = new Date();
+  const localDate = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
+};
 const addDays = (date: string, amount: number) => { const value = new Date(`${date}T12:00:00`); value.setDate(value.getDate() + amount); return value.toISOString().slice(0, 10); };
 const displayDate = (date: string | null | undefined) => date ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(`${date}T12:00:00`)) : '—';
 const displayTime = (date: string | null | undefined) => date ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(date)) : '—';
 const minutes = (value: string) => { const [h, m] = value.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 const duration = (value: number) => `${Math.floor(Math.max(0, value) / 60)} h ${Math.max(0, value) % 60} min`;
+const clockMoment = (date: string, time: unknown) => {
+  if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) return null;
+  const value = new Date(`${date}T${time}:00`);
+  return Number.isNaN(value.getTime()) ? null : value.getTime();
+};
+const recordedMoment = (date: string, time: unknown, timestamp: unknown) => {
+  if (typeof timestamp === 'string') {
+    const value = Date.parse(timestamp);
+    if (!Number.isNaN(value)) return value;
+  }
+  return clockMoment(date, time);
+};
+const liveDuration = (milliseconds: number) => {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+  const remainingMinutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${hours}:${remainingMinutes}:${seconds}`;
+};
 const nightMinutes = (arrival: unknown, exit: unknown) => {
   if (!arrival || !exit) return 0;
   const start = minutes(String(arrival));
@@ -156,7 +179,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const create = async (input: Parameters<typeof api.create>[0]) => { try { await api.create(input); showAppToast('Enregistrement créé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Création impossible.', 'error'); } };
   const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => { try { await api.update(item.id, { payload, status, actor }); setSelected(null); showAppToast('Modification enregistrée.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Modification impossible.', 'error'); } };
   const remove = async (item: PresenceItem) => { if (!canDelete || !await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return; try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); } };
-  const clock = async (action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd') => { if (!canCreate) return; try { await api.clock({ employeeId: selectedEmployee, workDate: date, action, actor, expectedStart: String(settings.expectedStart ?? '08:00'), tolerance: Number(settings.tolerance ?? 10) }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée.' : action === 'exit' ? 'Sortie enregistrée.' : action === 'pauseStart' ? 'Pause commencée.' : 'Pause terminée.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Pointage impossible.', 'error'); } };
+  const clock = async (action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd') => { if (!canCreate) return; try { await api.clock({ employeeId: selectedEmployee, workDate: date, action, actor, expectedStart: String(settings.expectedStart ?? '08:00'), tolerance: Number(settings.tolerance ?? 10) }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée.' : action === 'exit' ? 'Sortie enregistrée.' : action === 'pauseStart' ? 'Pause commencée.' : 'Pause terminée.', 'success'); await refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Pointage impossible.', 'error'); } };
   const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExport) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
   const kpis = { active: employees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
   const render = () => {
@@ -188,10 +211,32 @@ function Dashboard({ rows, kpis, date, setDate, period, setPeriod, sector, setSe
      <div className="mobile-stat-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"><Kpi label="Employés actifs" value={kpis.active} detail="dans le périmètre"/><Kpi label="Présents aujourd’hui" value={kpis.present} detail={`${rate}% de présence`} tone="text-emerald-700"/><Kpi label="Absents" value={kpis.absent} detail="non pointés inclus" tone="text-red-700"/><Kpi label="Retardataires" value={kpis.late} detail="arrivée après tolérance" tone="text-amber-700"/><Kpi label="En pause" value={kpis.pause} detail="pause en cours"/><Kpi label="En congé" value={kpis.leave} detail="validés"/><Kpi label="En mission" value={kpis.mission} detail="actifs"/><Kpi label="Heures travaillées" value={duration(kpis.worked)} detail="sur la journée"/><Kpi label="Heures supplémentaires" value={duration(kpis.overtime)} detail="calculées"/><Kpi label="Taux de présence" value={`${rate}%`} detail={`période : ${period}`} tone="text-[hsl(var(--primary))]"/></div>
     <div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><Panel title="Dernières entrées / sorties">{rows.filter(row => row.attendance).slice(0, 8).length ? <div className="divide-y">{rows.filter(row => row.attendance).slice(0, 8).map(row => <div key={row.employee.id} className="flex items-center justify-between gap-3 py-3 text-sm"><div><strong>{personName(row.employee)}</strong><p className="text-xs text-[hsl(var(--muted-foreground))]">{row.payload.arrival ?? '—'} → {row.payload.exit ?? '—'}</p></div><Badge tone={row.late ? 'warn' : 'good'}>{row.status}</Badge></div>)}</div> : <Empty/>}</Panel><Panel title="Alertes opérationnelles"><div className="space-y-3">{rows.filter(row => row.late > 0 || row.status === 'Non pointé' || row.payload.arrival && !row.payload.exit).slice(0, 8).map(row => <div key={row.employee.id} className="flex gap-3 rounded-lg bg-[hsl(var(--muted)/.45)] p-3"><AlertTriangle size={16} className="mt-0.5 text-amber-600"/><div><p className="text-sm font-bold">{personName(row.employee)}</p><p className="text-xs text-[hsl(var(--muted-foreground))]">{row.late ? `Retard de ${row.late} min` : row.payload.arrival && !row.payload.exit ? 'Sortie oubliée' : 'Journée non pointée'}</p></div></div>)}{!rows.some(row => row.late > 0 || row.status === 'Non pointé' || row.payload.arrival && !row.payload.exit) && <Empty text="Aucune alerte active."/>}</div></Panel></div></div>;
 }
-function ClockPanel({ rows, selectedEmployee, setSelectedEmployee, employees, date, setDate, settings, onClock }: { rows: PresenceRow[]; selectedEmployee: string; setSelectedEmployee: (value: string) => void; employees: Employee[]; date: string; setDate: (value: string) => void; settings: PresenceSettings; onClock: (action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd') => void }) {
+function ClockPanel({ rows, selectedEmployee, setSelectedEmployee, employees, date, setDate, settings, onClock }: { rows: PresenceRow[]; selectedEmployee: string; setSelectedEmployee: (value: string) => void; employees: Employee[]; date: string; setDate: (value: string) => void; settings: PresenceSettings; onClock: (action: 'arrival' | 'exit') => Promise<void> }) {
   const row = rows.find(item => item.employee.id === selectedEmployee);
   const payload = row?.payload ?? {};
-  return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]"><Panel title="Pointage du jour"><div className="space-y-4"><SelectField label="Employé" value={selectedEmployee} onChange={setSelectedEmployee} options={employees.map(employee => [employee.id, personName(employee)])}/><Field label="Date" value={date} onChange={setDate} type="date"/><div className="grid grid-cols-2 gap-2"><Button primary disabled={Boolean(payload.arrival)} onClick={() => onClock('arrival')}><ArrowDownToLine size={15}/>Pointer arrivée</Button><Button disabled={!payload.arrival || Boolean(payload.exit)} onClick={() => onClock('exit')}><ArrowUpFromLine size={15}/>Pointer sortie</Button><Button disabled={!payload.arrival || Boolean(payload.exit) || Boolean(payload.pauseStart && !payload.pauseEnd)} onClick={() => onClock('pauseStart')}><Pause size={15}/>Commencer pause</Button><Button disabled={!payload.pauseStart || Boolean(payload.pauseEnd)} onClick={() => onClock('pauseEnd')}><Play size={15}/>Terminer pause</Button></div><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Horaire prévu : {settings.expectedStart ?? '08:00'} – {settings.expectedEnd ?? '17:00'} · Tolérance : {settings.tolerance ?? 10} min.</p></div></Panel><Panel title={`Journée de ${row ? personName(row.employee) : 'l’employé'}`}><div className="grid gap-3 sm:grid-cols-2">{[['Arrivée', payload.arrival ?? '—'], ['Sortie', payload.exit ?? '—'], ['Début pause', payload.pauseStart ?? '—'], ['Fin pause', payload.pauseEnd ?? '—'], ['Durée pause', duration(Number(payload.pauseMinutes ?? 0))], ['Temps travaillé', duration(row?.work ?? 0)], ['Retard', `${row?.late ?? 0} min`], ['Départ anticipé', `${row?.early ?? 0} min`]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-[10px] text-[hsl(var(--muted-foreground))]">{String(label)}</p><p className="mt-1 font-bold">{value}</p></div>)}</div></Panel></div>;
+  const [now, setNow] = useState(() => Date.now());
+  const [busyAction, setBusyAction] = useState<'arrival' | 'exit' | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    if (!payload.arrival || payload.exit) return;
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [date, payload.arrival, payload.arrivalAt, payload.exit]);
+  const arrivalAt = recordedMoment(date, payload.arrival, payload.arrivalAt);
+  const exitAt = recordedMoment(date, payload.exit, payload.exitAt);
+  const elapsedMilliseconds = arrivalAt === null
+    ? 0
+    : Math.max(0, (exitAt ?? now) - arrivalAt - Number(payload.pauseMinutes ?? 0) * 60_000);
+  const runClock = async (action: 'arrival' | 'exit') => {
+    setBusyAction(action);
+    try {
+      await onClock(action);
+    } finally {
+      setBusyAction(null);
+    }
+  };
+  const status = payload.exit ? 'Journée terminée' : payload.arrival ? 'Compteur en cours' : 'En attente du pointage';
+  return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]"><Panel title="Pointage du jour"><div className="space-y-4"><SelectField label="Employé" value={selectedEmployee} onChange={setSelectedEmployee} options={employees.map(employee => [employee.id, personName(employee)])}/><Field label="Date" value={date} onChange={setDate} type="date"/><div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Compteur d’heures en direct</p><p className="mt-2 font-mono text-4xl font-bold tracking-tight">{liveDuration(elapsedMilliseconds)}</p></div><Badge tone={payload.exit ? 'good' : payload.arrival ? 'info' : 'neutral'}>{status}</Badge></div><p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">{payload.arrival ? `Arrivée enregistrée à ${payload.arrival}${payload.exit ? ` · sortie à ${payload.exit}` : ' · le compteur tourne'}` : 'Cliquez sur Arrivée pour démarrer le compteur.'}</p></div><div className="grid gap-2 sm:grid-cols-2"><Button primary disabled={Boolean(payload.arrival) || busyAction !== null} onClick={() => void runClock('arrival')}><ArrowDownToLine size={15}/>Arrivée</Button><Button disabled={!payload.arrival || Boolean(payload.exit) || busyAction !== null} onClick={() => void runClock('exit')}><ArrowUpFromLine size={15}/>Sortie</Button></div><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Horaire prévu : {settings.expectedStart ?? '08:00'} – {settings.expectedEnd ?? '17:00'} · Tolérance : {settings.tolerance ?? 10} min.</p></div></Panel><Panel title={`Journée de ${row ? personName(row.employee) : 'l’employé'}`}><div className="grid gap-3 sm:grid-cols-2">{[['Date', displayDate(date)], ['Arrivée', payload.arrival ?? '—'], ['Sortie', payload.exit ?? '—'], ['Durée pause', duration(Number(payload.pauseMinutes ?? 0))], ['Temps travaillé', duration(row?.work ?? 0)], ['Compteur affiché', liveDuration(elapsedMilliseconds)], ['Retard', `${row?.late ?? 0} min`], ['Départ anticipé', `${row?.early ?? 0} min`]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-[10px] text-[hsl(var(--muted-foreground))]">{String(label)}</p><p className="mt-1 font-bold">{value}</p></div>)}</div></Panel></div>;
 }
 function PresenceList({ rows, calendar, query, setQuery, onExport, onSelect }: { rows: PresenceRow[]; calendar: { view: string; days: { date: string; rows: PresenceRow[] }[] }[]; query: string; setQuery: (value: string) => void; onExport: () => void; onSelect: (item: PresenceItem) => void }) {
   const [view, setView] = useState('day');
