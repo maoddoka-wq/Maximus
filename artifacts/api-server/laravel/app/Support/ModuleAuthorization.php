@@ -61,7 +61,7 @@ final class ModuleAuthorization
         }
 
         if ($module === 'presences') {
-            return self::allowsPresence($permissions, $action);
+            return self::allowsPresence($permissions, $action, $feature);
         }
 
         if ($module === 'ecommerce') {
@@ -71,14 +71,30 @@ final class ModuleAuthorization
         return self::allowsGeneric($permissions, $module, $action, $feature);
     }
 
-    public static function allowsPresenceClock(array $actor, string $employeeId): bool
+    public static function allowsPresenceClock(array $actor, string $employeeId, ?array $employeeSectorIds = null): bool
     {
         if (($actor['role'] ?? null) === 'employee'
             && ($actor['employeeId'] ?? null) !== $employeeId) {
             return false;
         }
 
-        return self::allows($actor, 'presences', 'create');
+        if (($actor['role'] ?? null) === 'sector_manager'
+            && ($employeeSectorIds === null
+                || $employeeSectorIds === []
+                || array_diff($employeeSectorIds, $actor['sectorIds'] ?? []) !== [])) {
+            return false;
+        }
+
+        return self::allows($actor, 'presences', 'create', 'pointage');
+    }
+
+    public static function allowsPresenceQr(array $actor): bool
+    {
+        if (! in_array($actor['role'] ?? null, ['maximus_admin', 'company_admin', 'sector_manager'], true)) {
+            return false;
+        }
+
+        return self::allows($actor, 'presences', 'create', 'pointage');
     }
 
     public static function canViewModule(array $actor, string $module): bool
@@ -106,8 +122,12 @@ final class ModuleAuthorization
         return self::contains($permissions['stocks'] ?? [], $required);
     }
 
-    private static function allowsPresence(array $permissions, string $action): bool
+    private static function allowsPresence(array $permissions, string $action, ?string $feature = null): bool
     {
+        if ($feature !== null && array_key_exists('presence.'.$feature, $permissions)) {
+            return self::contains($permissions['presence.'.$feature], self::stockAction($action));
+        }
+
         $explicitKey = 'presence.'.$action;
         $hasExplicitActions = array_key_exists($explicitKey, $permissions)
             || count(array_filter(

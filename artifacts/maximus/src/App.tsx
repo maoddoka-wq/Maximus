@@ -5528,6 +5528,7 @@ function PresencesPage({ data, companyId, visibleFeatureIds, preview = false }: 
       canCorrect={!preview}
       canValidate={!preview}
       canManage={!preview}
+      canGenerateQr={false}
       canExport
       canDelete={!preview}
       visibleFeatureIds={visibleFeatureIds}

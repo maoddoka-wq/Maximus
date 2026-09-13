@@ -132,7 +132,11 @@ export function employeeHasPresencePermission(
   const hasExplicitPermissions = operationalPermissions.some(key => Object.prototype.hasOwnProperty.call(role.modulePermissions, `presence.${key}`));
 
   if (hasExplicitPermissions) {
-    return Boolean(explicitPermission?.length);
+    if (explicitPermission?.length) return true;
+    const required = permission === 'view' ? 'voir' : permission === 'create' ? 'créer' : 'modifier';
+    return Object.entries(role.modulePermissions)
+      .filter(([key]) => key.startsWith('presence.'))
+      .some(([, permissions]) => permissions.includes(required));
   }
 
   if (permission === 'view') return hasPermission('presences', 'voir');

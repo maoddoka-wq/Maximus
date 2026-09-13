@@ -103,7 +103,7 @@ function Panel({ title, children, action }: { title: string; children: React.Rea
 }
 function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { text?: string }) { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }
 
-export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canExport, canDelete, canView, visibleFeatureIds, singleModuleNavigation = false, preview = false, selfOnly = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; singleModuleNavigation?: boolean; preview?: boolean; selfOnly?: boolean }) {
+export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canGenerateQr, canExport, canDelete, canView, visibleFeatureIds, singleModuleNavigation = false, preview = false, selfOnly = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canGenerateQr: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; singleModuleNavigation?: boolean; preview?: boolean; selfOnly?: boolean }) {
   const { confirm } = useAppDialog();
   const api = useMemo(() => createPresenceApi(companyId), [companyId]);
   const [items, setItems] = useState<PresenceItem[]>([]);
@@ -170,7 +170,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
     if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(employees.map(employee => meta(employee).unit))]} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
-    if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canManage={canManage} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
+    if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canGenerateQr={canGenerateQr} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} onExport={() => exportRows(rows, `presences-${date}.csv`)} onSelect={setSelected} />;
     if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreate} canValidate={canValidate} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
     if (tab === 'schedules') return <SchedulesPanel items={items} employees={employees} canCreate={canCreate} canEdit={canEdit} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
@@ -201,14 +201,14 @@ type ClockPanelProps = {
   date: string;
   setDate: (value: string) => void;
   settings: PresenceSettings;
-  canManage: boolean;
+  canGenerateQr: boolean;
   selfOnly: boolean;
   onRequestQr: (workDate: string) => Promise<PresenceClockQr>;
   onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void>;
 };
 
-function ClockPanel({ rows, selectedEmployee, date, setDate, settings, canManage, selfOnly, onRequestQr, onScanClock }: ClockPanelProps) {
-  if (canManage && !selfOnly) {
+function ClockPanel({ rows, selectedEmployee, date, setDate, settings, canGenerateQr, selfOnly, onRequestQr, onScanClock }: ClockPanelProps) {
+  if (canGenerateQr && !selfOnly) {
     return <ManagerClockPanel date={date} setDate={setDate} settings={settings} onRequestQr={onRequestQr} />;
   }
 

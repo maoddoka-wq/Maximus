@@ -244,7 +244,36 @@ class PresenceTest extends TestCase
             ->assertForbidden();
     }
 
-    private function asActor(string $role = 'company_admin', string $employeeId = 'presence-admin', array $permissions = []): self
+    public function test_sector_manager_qr_is_limited_to_the_manager_sector(): void
+    {
+        $workDate = now()->format('Y-m-d');
+        $qr = $this->asActor('sector_manager', 'presence-manager', [
+            'presence.pointage' => ['voir', 'créer'],
+        ], ['sector-a'])
+            ->getJson('/api/presence/clock-qr?workDate='.$workDate)
+            ->assertOk();
+
+        $token = $qr->json('token');
+        $this->asActor('employee', 'presence-employee', [
+            'presence.pointage' => ['voir', 'créer'],
+        ], ['sector-a'])
+            ->postJson('/api/presence/clock-scan', [
+                'token' => $token,
+                'action' => 'arrival',
+            ])
+            ->assertCreated();
+
+        $this->asActor('employee', 'other-employee', [
+            'presence.pointage' => ['voir', 'créer'],
+        ], ['sector-b'])
+            ->postJson('/api/presence/clock-scan', [
+                'token' => $token,
+                'action' => 'arrival',
+            ])
+            ->assertForbidden();
+    }
+
+    private function asActor(string $role = 'company_admin', string $employeeId = 'presence-admin', array $permissions = [], array $sectorIds = []): self
     {
         $user = AuthUser::query()->create([
             'id' => $role === 'employee' ? $employeeId : 'presence-admin',
@@ -254,7 +283,7 @@ class PresenceTest extends TestCase
             'role' => $role,
             'company_id' => 'kora',
             'employee_id' => $role === 'employee' ? $employeeId : null,
-            'sector_ids' => [],
+            'sector_ids' => $sectorIds,
             'permissions' => $permissions,
             'status' => 'ACTIF',
         ]);

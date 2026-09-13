@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuthUser;
 use App\Models\PresenceItem;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
@@ -176,7 +177,7 @@ class PresenceController extends Controller
         ])->validate();
         $companyId = $this->company($request);
         $actorData = $request->attributes->get('authActor');
-        if (! $companyId || ! is_array($actorData) || ! ModuleAuthorization::allows($actorData, 'presences', 'manage')) {
+        if (! $companyId || ! is_array($actorData) || ! ModuleAuthorization::allowsPresenceQr($actorData)) {
             return $this->forbidden();
         }
 
@@ -191,6 +192,9 @@ class PresenceController extends Controller
             'companyId' => $companyId,
             'workDate' => $workDate,
             'expiresAt' => $expiresAt->timestamp,
+            'sectorIds' => ($actorData['role'] ?? null) === 'sector_manager'
+                ? array_values(array_filter($actorData['sectorIds'] ?? [], 'is_string'))
+                : [],
         ]);
         $token = $encoded.'.'.hash_hmac('sha256', $encoded, $this->clockQrKey());
 
@@ -213,12 +217,13 @@ class PresenceController extends Controller
         ])->validate();
         $companyId = $this->company($request);
         $actorData = $request->attributes->get('authActor');
+        $employeeSectorIds = $companyId ? $this->employeeSectorIds($companyId, $input['employeeId']) : [];
         if (! $companyId || ! is_array($actorData)
-            || ! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'])) {
+            || ! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'], $employeeSectorIds)) {
             return $this->forbidden();
         }
 
-        return $this->recordClock($input, $companyId, $actorData);
+        return $this->recordClock($input, $companyId, $actorData, $employeeSectorIds);
     }
 
     public function clockScan(Request $request): JsonResponse
@@ -239,6 +244,11 @@ class PresenceController extends Controller
             || ($tokenPayload['expiresAt'] ?? 0) < now()->timestamp) {
             return response()->json(['error' => 'QR code invalide ou expiré.'], 422);
         }
+        $tokenSectorIds = array_values(array_filter($tokenPayload['sectorIds'] ?? [], 'is_string'));
+        $employeeSectorIds = array_values(array_filter($actorData['sectorIds'] ?? [], 'is_string'));
+        if ($tokenSectorIds !== [] && ($employeeSectorIds === [] || array_diff($employeeSectorIds, $tokenSectorIds) !== [])) {
+            return response()->json(['error' => 'Ce QR code ne correspond pas à votre secteur.'], 403);
+        }
 
         $settingsItem = PresenceItem::query()
             ->where('company_id', $companyId)
@@ -253,12 +263,12 @@ class PresenceController extends Controller
             'action' => $input['action'],
             'expectedStart' => $settings['expectedStart'] ?? null,
             'tolerance' => isset($settings['tolerance']) ? (int) $settings['tolerance'] : 10,
-        ], $companyId, $actorData);
+        ], $companyId, $actorData, $employeeSectorIds);
     }
 
-    private function recordClock(array $input, string $companyId, array $actorData): JsonResponse
+    private function recordClock(array $input, string $companyId, array $actorData, ?array $employeeSectorIds = null): JsonResponse
     {
-        if (! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'])) {
+        if (! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'], $employeeSectorIds)) {
             return $this->forbidden();
         }
 
@@ -344,6 +354,16 @@ class PresenceController extends Controller
     private function clockQrKey(): string
     {
         return (string) config('app.key');
+    }
+
+    private function employeeSectorIds(string $companyId, string $employeeId): array
+    {
+        $user = AuthUser::query()
+            ->where('company_id', $companyId)
+            ->where('employee_id', $employeeId)
+            ->first();
+
+        return is_array($user?->sector_ids) ? $user->sector_ids : [];
     }
 
     private function encodeClockQrPayload(array $payload): string
