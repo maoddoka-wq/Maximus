@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AnthropicAssistantService;
 use App\Services\MaximusAssistantActionService;
-use App\Services\ReplitOpenAiService;
 use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class MaximusAssistantController extends Controller
 {
-    public function ask(Request $request, ReplitOpenAiService $assistant): JsonResponse
+    public function ask(Request $request, AnthropicAssistantService $assistant): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
         if (! is_array($actor) || ($actor['role'] ?? null) !== 'maximus_admin') {

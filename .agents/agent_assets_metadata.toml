@@ -140,3 +140,17 @@ mtime_ms = 1789155839897
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/42629034-b5af-4d47-b655-b61160976ee3/7701aab8-bfa2-44bd-b176-88b0603a449f"
 storage_version_token = "1789155840301989"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "3a1DC9_VL-ZyMvP8gCJ1Q"
+uri = "file://attached_assets/generated_images/maximus-affiche-publicite.png"
+type = "image"
+title = "Affiche publicitaire MAXIMUS"
+description = "Affiche verticale prête pour WhatsApp, Facebook et Instagram : slogan MAXIMUS, fonctionnalités principales et appel à demander une démonstration."
+logical_id = "097bc0a6-df49-4eec-a18e-b963ff6ac611"
+content_hash = "sha256:8c73e4c744c9c6a24a07f380e171d967e4d56fa12e642e55d31887ed2cc85ea0"
+size = 1170389
+mtime_ms = 1789256552579
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/097bc0a6-df49-4eec-a18e-b963ff6ac611/40c85ecd-b2e9-4c00-a1d7-65697f309f1e"
+storage_version_token = "1789256559841999"
+content_type = "image/png"
