@@ -917,7 +917,7 @@ function DiscoveryRail({
       <div className="-mx-4 flex snap-x snap-mandatory overflow-x-auto px-4 pb-6 pt-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 [&::-webkit-scrollbar]:hidden">
         <div className="flex gap-4">
           {items.map(item => (
-            <div key={'slug' in item ? item.slug : item.id} className="w-[220px] shrink-0 snap-start sm:w-[240px]">
+            <div key={'slug' in item ? item.slug : item.id} className="w-[180px] shrink-0 snap-start sm:w-[240px]">
               {type === 'product' ? (
                 (() => {
                   if (!('slug' in item)) return null;
@@ -994,7 +994,7 @@ function PublicOfferCard({
   const isAvailable = availability !== 'Indisponible';
   const discount = compareAtPrice && compareAtPrice > priceValue ? Math.round((1 - priceValue / compareAtPrice) * 100) : null;
   return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-black/5 bg-white shadow-[0_3px_12px_rgba(15,23,42,.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,.1)]">
-     <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.35)] p-1.5 disabled:cursor-default sm:p-2">
+     <button type="button" onClick={onOpen} disabled={!onOpen} className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[hsl(var(--muted)/.35)] p-1.5 disabled:cursor-default sm:aspect-square sm:p-2">
         {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" /> : <Icon size={28} className="text-[hsl(var(--muted-foreground))]" />}
        {discount !== null && <span className="absolute left-1.5 top-1.5 rounded-md bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white sm:left-2 sm:top-2 sm:text-[10px]">-{discount}%</span>}
        {availability && <span className={`absolute bottom-1.5 left-1.5 max-w-[calc(100%-.75rem)] truncate rounded-md px-1.5 py-0.5 text-[9px] font-bold sm:bottom-2 sm:left-2 ${isAvailable ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800'}`}>{availability}</span>}
