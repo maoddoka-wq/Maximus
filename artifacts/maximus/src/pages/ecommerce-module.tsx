@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Copy,
   House,
+  ImagePlus,
   LayoutDashboard,
   Megaphone,
   Package,
@@ -57,10 +58,11 @@ import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
+type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+  { id: 'accueil', label: 'Accueil', icon: House },
   { id: 'catalogue', label: 'Catalogue', icon: Package },
   { id: 'categories', label: 'Catégories', icon: Tags },
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
@@ -252,7 +254,13 @@ export default function EcommerceModulePage({
 }) {
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
-  const visibleTabs = allowedFeatureIds ? tabs.filter(item => allowedFeatureIds.includes(item.id) || (item.id === 'categories' && allowedFeatureIds.includes('catalogue'))) : tabs;
+  const visibleTabs = allowedFeatureIds
+    ? tabs.filter(item =>
+        allowedFeatureIds.includes(item.id)
+        || (item.id === 'accueil' && allowedFeatureIds.includes('parametres'))
+        || (item.id === 'categories' && allowedFeatureIds.includes('catalogue')),
+      )
+    : tabs;
   const visibleTabIds = visibleTabs.map(item => item.id);
   const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
   const [loading, setLoading] = useState(true);
@@ -387,6 +395,7 @@ export default function EcommerceModulePage({
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
+      {tab === 'accueil' && <HomePanel store={store} canModify={canModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'categories' && <CategoryManager data={data} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'commandes' && <Orders data={data} canModify={canModify} run={run} />}
@@ -431,7 +440,7 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
           {lowStock.length === 0 && <Empty icon={Check} title="Tout est sous contrôle" text="Aucune référence ne se trouve sous le seuil de surveillance." />}
           {lowStock.slice(0, 5).map(product => <div key={product.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--accent)/.3)] bg-[hsl(var(--accent)/.08)] p-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]"><Package size={16} /></span><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}</p><p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">{product.stock} unité{product.stock > 1 ? 's' : ''} restante{product.stock > 1 ? 's' : ''}</p></div><span className="mono ml-auto text-xs font-bold">{product.sku}</span></div>)}
         </div>
-        <div className="mt-5 rounded-xl border border-dashed p-4"><p className="mono text-[9px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Vitrine</p><p className="mt-2 text-sm font-bold">Votre boutique est {data.store.status === 'PUBLISHED' ? 'ouverte au public' : 'en préparation'}.</p><button type="button" onClick={() => onTab('parametres')} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Gérer la vitrine <ArrowUpRight size={13} /></button></div>
+         <div className="mt-5 rounded-xl border border-dashed p-4"><p className="mono text-[9px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Vitrine</p><p className="mt-2 text-sm font-bold">Votre boutique est {data.store.status === 'PUBLISHED' ? 'ouverte au public' : 'en préparation'}.</p><button type="button" onClick={() => onTab('accueil')} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Gérer l’accueil <ArrowUpRight size={13} /></button></div>
       </Panel>
     </div>
     <Panel title="Performance du catalogue" description="Une lecture rapide de la couverture de votre assortiment.">
@@ -1072,6 +1081,49 @@ function DeliveryZoneManager({ data, canCreate, canModify, run }: { data: Ecomme
     {data.deliveryZones.length === 0 ? <Empty icon={Truck} title="Aucune zone configurée" text="Créez une zone pour permettre aux clients de choisir leur secteur de livraison." action={canCreate ? <button type="button" onClick={() => open()} className="text-xs font-bold text-[hsl(var(--primary))]">Créer la première zone</button> : undefined} /> : <div className="grid gap-3 md:grid-cols-2">{data.deliveryZones.map(zone => <article key={zone.id} className={`rounded-xl border p-4 ${zone.isActive ? '' : 'opacity-60'}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{zone.name}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{zone.description || 'Aucune précision'}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${zone.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>{zone.isActive ? 'Active' : 'Inactive'}</span></div><div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-lg bg-[hsl(var(--muted)/.55)] px-2.5 py-1.5">{zone.fee > 0 ? money(zone.fee, data.store.currency) : 'Gratuit'}</span><span className="rounded-lg bg-[hsl(var(--muted)/.55)] px-2.5 py-1.5">{duration(zone.estimatedMinutes)}</span></div>{canModify && <div className="mt-4 flex gap-2 border-t pt-3"><button type="button" onClick={() => open(zone)} className="rounded-lg border px-2.5 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button><button type="button" onClick={() => void remove(zone)} className="rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><Archive size={13} className="mr-1 inline" />Supprimer</button></div>}</article>)}</div>}
     {editing && <Modal title={editing === 'new' ? 'Nouvelle zone de livraison' : `Modifier ${editing.name}`} onClose={() => setEditing(null)}><form onSubmit={save} className="space-y-4"><Field label="Nom de la zone" required value={form.name} onChange={value => setForm({ ...form, name: value })} placeholder="Ex. Dakar centre" /><label className="block text-xs font-bold">Description<textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} rows={2} placeholder="Quartiers, communes ou repères desservis" className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><div className="grid gap-4 sm:grid-cols-2"><Field label={`Frais (${data.store.currency})`} type="number" value={String(form.fee)} onChange={value => setForm({ ...form, fee: Math.max(0, Number(value) || 0) })} /><Field label="Délai indicatif (minutes)" type="number" value={String(form.estimatedMinutes)} onChange={value => setForm({ ...form, estimatedMinutes: Math.max(0, Number(value) || 0) })} /><Field label="Ordre d’affichage" type="number" value={String(form.sortOrder)} onChange={value => setForm({ ...form, sortOrder: Math.max(0, Number(value) || 0) })} /><label className="flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><input type="checkbox" checked={form.isActive} onChange={event => setForm({ ...form, isActive: event.target.checked })} />Zone active</label></div><div className="modal-footer flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Enregistrer</button></div></form></Modal>}
   </Panel>;
+}
+
+function HomePanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [heroFiles, setHeroFiles] = useState<File[]>([]);
+  const api = createEcommerceApi(store.companyId);
+  const remainingSlots = Math.max(0, 12 - store.heroImages.length);
+
+  const upload = async () => {
+    if (heroFiles.length === 0 || !canModify) return;
+    const result = await run(() => api.uploadStoreHeroImages(heroFiles), 'Images de l’accueil ajoutées.');
+    if (result) setHeroFiles([]);
+  };
+
+  const remove = (url: string) => {
+    const imageId = url.split('/').pop();
+    if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de l’accueil.');
+  };
+
+  return <div className="space-y-5 fade-up">
+    <Panel title="Accueil de la boutique" description="Ajoutez les images qui s’affichent dans la bannière de votre accueil public.">
+      <div className="max-w-4xl space-y-5">
+        <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.05)] p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-bold"><ImagePlus size={17} className="text-[hsl(var(--primary))]" />Images de la bannière</div>
+              <p className="mt-1.5 max-w-xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Sélectionnez une ou plusieurs images. Elles seront ajoutées à celles déjà présentes et défileront horizontalement sur l’accueil public.</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{store.heroImages.length}/12 images</span>
+          </div>
+          <label className={`mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-8 text-center transition ${!canModify || remainingSlots === 0 ? 'cursor-not-allowed opacity-50' : 'border-[hsl(var(--primary)/.35)] hover:bg-[hsl(var(--primary)/.06)]'}`}>
+            <ImagePlus size={24} className="text-[hsl(var(--primary))]" />
+            <span className="mt-2 text-sm font-bold">{remainingSlots === 0 ? 'Limite de 12 images atteinte' : 'Ajouter des images à l’accueil'}</span>
+            <span className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{remainingSlots > 0 ? `Jusqu’à ${remainingSlots} image(s) supplémentaire(s) · JPG, PNG ou WebP` : 'Supprimez une image pour en ajouter une nouvelle.'}</span>
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || remainingSlots === 0} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, remainingSlots))} className="sr-only" />
+          </label>
+          {heroFiles.length > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5"><p className="text-xs font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p><button type="button" onClick={() => void upload()} disabled={!canModify} className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les images</button></div>}
+        </div>
+        {store.heroImages.length > 0
+          ? <div><p className="text-xs font-bold">Images actuellement affichées</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{store.heroImages.map((url, index) => <div key={url} className="group relative overflow-hidden rounded-xl border bg-[hsl(var(--muted)/.25)]"><img src={url} alt={`Image d’accueil ${index + 1}`} className="aspect-[4/3] w-full object-cover" /><button type="button" disabled={!canModify} onClick={() => remove(url)} className="absolute right-2 top-2 rounded-full bg-[hsl(var(--destructive))] px-2 py-1 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Supprimer l’image d’accueil ${index + 1}`}>×</button></div>)}</div></div>
+          : <div className="rounded-xl border border-dashed px-5 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune image personnalisée. L’accueil public utilise actuellement son visuel par défaut.</div>}
+      </div>
+    </Panel>
+  </div>;
 }
 
 function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
