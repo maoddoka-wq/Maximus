@@ -127,17 +127,14 @@ class EcommerceController extends Controller
             'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ])->validate();
 
-        $path = $input['image']->store('ecommerce/stores/'.$company, 'public');
-        if (! is_string($path) || $path === '') {
-            return response()->json(['error' => 'Le logo n’a pas pu être enregistré.'], 500);
-        }
-
-        $contents = file_get_contents($input['image']->getRealPath());
-        if ($contents === false) {
+        $contents = $input['image']->get();
+        if (! is_string($contents) || $contents === '') {
             return response()->json(['error' => 'Le logo n’a pas pu être lu après son envoi.'], 500);
         }
 
-        $logoUrl = '/api/store-logos/'.rawurlencode($company).'/'.rawurlencode(basename($path));
+        $extension = strtolower($input['image']->getClientOriginalExtension() ?: 'bin');
+        $filename = Str::uuid()->toString().'.'.$extension;
+        $logoUrl = '/api/store-logos/'.rawurlencode($company).'/'.rawurlencode($filename);
         $logoValues = [
             'logo_url' => $logoUrl,
             'logo_data' => base64_encode($contents),
@@ -471,16 +468,14 @@ class EcommerceController extends Controller
         $input = Validator::make($request->all(), [
             'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ])->validate();
-        $path = $input['image']->store('ecommerce/products/'.$company, 'public');
-        if (! is_string($path) || $path === '') {
-            return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
-        }
-        $contents = file_get_contents($input['image']->getRealPath());
-        if ($contents === false) {
+        $contents = $input['image']->get();
+        if (! is_string($contents) || $contents === '') {
             return response()->json(['error' => 'La photo n’a pas pu être lue après son envoi.'], 500);
         }
 
-        $imageUrl = '/api/product-images/'.rawurlencode($company).'/'.rawurlencode(basename($path));
+        $extension = strtolower($input['image']->getClientOriginalExtension() ?: 'bin');
+        $filename = Str::uuid()->toString().'.'.$extension;
+        $imageUrl = '/api/product-images/'.rawurlencode($company).'/'.rawurlencode($filename);
         DB::table('ecommerce_products')->where('id', $id)->update([
             'image_url' => $imageUrl,
             'image_data' => base64_encode($contents),
@@ -743,16 +738,14 @@ class EcommerceController extends Controller
         $input = Validator::make($request->all(), [
             'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ])->validate();
-        $path = $input['image']->store('ecommerce/rentals/'.$company, 'public');
-        if (! is_string($path) || $path === '') {
-            return response()->json(['error' => 'La photo n’a pas pu être enregistrée.'], 500);
-        }
-        $contents = file_get_contents($input['image']->getRealPath());
-        if ($contents === false) {
+        $contents = $input['image']->get();
+        if (! is_string($contents) || $contents === '') {
             return response()->json(['error' => 'La photo n’a pas pu être lue après son envoi.'], 500);
         }
 
-        $imageUrl = '/api/rental-images/'.rawurlencode($company).'/'.rawurlencode(basename($path));
+        $extension = strtolower($input['image']->getClientOriginalExtension() ?: 'bin');
+        $filename = Str::uuid()->toString().'.'.$extension;
+        $imageUrl = '/api/rental-images/'.rawurlencode($company).'/'.rawurlencode($filename);
         DB::table('ecommerce_rentals')->where('id', $id)->update([
             'image_url' => $imageUrl,
             'image_data' => base64_encode($contents),

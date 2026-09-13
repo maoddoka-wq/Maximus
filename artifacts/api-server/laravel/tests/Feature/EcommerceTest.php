@@ -451,8 +451,12 @@ class EcommerceTest extends TestCase
         $firstUrl = $first->json('imageUrl');
         $this->assertStringStartsWith('/api/product-images/kora/', $firstUrl);
         $firstPath = 'ecommerce/products/kora/'.basename($firstUrl);
-        Storage::disk('public')->assertExists($firstPath);
-        $this->getJson($firstUrl)->assertOk();
+        Storage::disk('public')->assertMissing($firstPath);
+        $this->assertDatabaseHas('ecommerce_products', [
+            'id' => $product->json('id'),
+            'image_url' => $firstUrl,
+        ]);
+        $this->assertNotEmpty(DB::table('ecommerce_products')->where('id', $product->json('id'))->value('image_data'));
         Storage::disk('public')->delete($firstPath);
         $this->get($firstUrl)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
 
@@ -462,11 +466,12 @@ class EcommerceTest extends TestCase
         $secondUrl = $second->json('imageUrl');
         $this->assertNotSame($firstUrl, $secondUrl);
         Storage::disk('public')->assertMissing($firstPath);
-        Storage::disk('public')->assertExists('ecommerce/products/kora/'.basename($secondUrl));
+        Storage::disk('public')->assertMissing('ecommerce/products/kora/'.basename($secondUrl));
         $this->assertDatabaseHas('ecommerce_products', [
             'id' => $product->json('id'),
             'image_url' => $secondUrl,
         ]);
+        $this->assertNotEmpty(DB::table('ecommerce_products')->where('id', $product->json('id'))->value('image_data'));
     }
 
     public function test_company_admin_can_upload_a_store_logo_without_using_the_company_logo(): void
@@ -489,9 +494,10 @@ class EcommerceTest extends TestCase
             'id' => 'ecommerce-store-kora',
             'logo_url' => $logoUrl,
         ]);
+        $this->assertNotEmpty(DB::table('ecommerce_stores')->where('id', 'ecommerce-store-kora')->value('logo_data'));
 
         $logoPath = 'ecommerce/stores/kora/'.basename($logoUrl);
-        Storage::disk('public')->assertExists($logoPath);
+        Storage::disk('public')->assertMissing($logoPath);
         $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
 
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
@@ -591,11 +597,13 @@ class EcommerceTest extends TestCase
 
         $imageUrl = $response->json('imageUrl');
         $this->assertStringStartsWith('/api/rental-images/kora/', $imageUrl);
+        $this->assertNotEmpty(DB::table('ecommerce_rentals')->where('id', $rental['id'])->value('image_data'));
         $this->assertDatabaseHas('ecommerce_rentals', [
             'id' => $rental['id'],
             'category_id' => $category['id'],
             'image_url' => $imageUrl,
         ]);
+        Storage::disk('public')->assertMissing('ecommerce/rentals/kora/'.basename($imageUrl));
         $this->getJson($imageUrl)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
     }
 

@@ -14,3 +14,9 @@ Les logos d’entreprise et de boutique sont traités comme deux ressources ind�
 **Why:** Le profil entreprise et la vitrine peuvent avoir des identités visuelles différentes, et les fichiers doivent rester disponibles après redémarrage, changement d’instance ou changement de machine.
 
 **How to apply:** Pour chaque logo, servir d’abord la copie en base et ne garder le disque local que pour lire les anciennes images déjà enregistrées; ne jamais réintroduire un fallback entre entreprise et boutique.
+
+Les nouveaux uploads publics (photos produits, logos boutique et photos de location) doivent lire les octets du fichier temporaire puis les enregistrer directement avec leurs métadonnées en PostgreSQL ; le disque public ne sert qu’à la compatibilité des anciennes URLs.
+
+**Why:** Écrire d’abord sur le disque local Render crée une dépendance inutile à un volume éphémère et peut laisser une ressource non récupérable après redémarrage si l’écriture en base échoue.
+
+**How to apply:** Générer une URL stable avec un identifiant unique, persister `image_data`/`logo_data` et le MIME dans la même mutation que l’URL, puis tester la lecture après suppression de toute copie sur le disque public.
