@@ -286,9 +286,13 @@ export default function EcommerceModulePage({
       return;
     }
     try {
-      const nextData = normalizeEcommerceBootstrap(await api.bootstrap(), companyId);
+      const [bootstrap, nextWalletData] = await Promise.all([
+        api.bootstrap(),
+        visibleTabIds.includes('finances') ? api.wallet() : Promise.resolve(null),
+      ]);
+      const nextData = normalizeEcommerceBootstrap(bootstrap, companyId);
       setData(nextData);
-      setWalletData(visibleTabIds.includes('finances') ? await api.wallet() : null);
+      setWalletData(nextWalletData);
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace e-commerce.');

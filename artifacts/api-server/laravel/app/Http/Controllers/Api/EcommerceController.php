@@ -1140,23 +1140,44 @@ class EcommerceController extends Controller
 
     private function publicStore(object $store): array
     {
+        $company = (string) $store->company_id;
+        $features = $this->publicEnabledFeatures($company);
         $publishedProducts = DB::table('ecommerce_products')
-            ->where('company_id', $store->company_id)
+            ->select([
+                'id',
+                'slug',
+                'name',
+                'description',
+                'category',
+                'category_id',
+                'price',
+                'compare_at_price',
+                'stock',
+                'image_url',
+                'featured',
+                'product_type',
+                'rental_period',
+                'fulfillment_type',
+                'digital_file_path',
+                'created_at',
+                'updated_at',
+            ])
+            ->where('company_id', $company)
             ->where('status', 'PUBLISHED')
             ->orderByDesc('featured')
             ->orderBy('name')
             ->get();
 
         return response()->json([
-            'store' => $this->publicStorePayload($store),
+            'store' => $this->publicStorePayload($store, $features),
             'products' => $publishedProducts
                 ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'SALE')
-                ->filter(fn (object $row): bool => $this->allowsProductFulfillment((string) $store->company_id, (string) ($row->fulfillment_type ?? 'PHYSICAL')))
+                ->filter(fn (object $row): bool => $this->allowsProductFulfillment($company, (string) ($row->fulfillment_type ?? 'PHYSICAL')))
             ->filter(fn (object $row): bool => ($row->fulfillment_type ?? 'PHYSICAL') !== 'DIGITAL' || ! empty($row->digital_file_path))
                 ->map(fn ($row) => $this->publicProduct($row))
                 ->values(),
-            'rentals' => $this->publicEnabledFeatures((string) $store->company_id)['location']
-                ? collect($this->listRentals((string) $store->company_id))
+            'rentals' => $features['location']
+                ? collect($this->listRentals($company))
                     ->concat(
                         $publishedProducts
                             ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'RENTAL')
@@ -1164,12 +1185,13 @@ class EcommerceController extends Controller
                     )
                     ->values()
                 : collect(),
-            'deliveryZones' => $this->publicDeliveryZones((string) $store->company_id),
+            'deliveryZones' => $this->publicDeliveryZones($company, $features),
         ])->getData(true);
     }
 
-    private function publicStorePayload(object $row): array
+    private function publicStorePayload(object $row, ?array $features = null): array
     {
+        $features ??= $this->publicEnabledFeatures((string) $row->company_id);
         $company = DB::table('companies')
             ->where('id', $row->company_id)
             ->whereNull('deleted_at')
@@ -1190,7 +1212,7 @@ class EcommerceController extends Controller
                 'phone' => (string) ($company->phone ?? ''),
                 'photoUrl' => (string) ($company->profile_photo ?? ''),
             ],
-            'enabledFeatures' => $this->publicEnabledFeatures((string) $row->company_id),
+            'enabledFeatures' => $features,
             'locationSettings' => $this->publicLocationSettings((string) $row->company_id),
         ];
     }
@@ -1966,9 +1988,9 @@ class EcommerceController extends Controller
             ->all();
     }
 
-    private function publicDeliveryZones(string $company): array
+    private function publicDeliveryZones(string $company, ?array $features = null): array
     {
-        $features = $this->publicEnabledFeatures($company);
+        $features ??= $this->publicEnabledFeatures($company);
         if (! $features['livraisons']) {
             return [];
         }

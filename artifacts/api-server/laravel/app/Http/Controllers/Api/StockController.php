@@ -20,26 +20,42 @@ class StockController extends Controller
         if (! $this->allowed($request, 'view')) {
             return $this->forbidden();
         }
+        $scope = (string) $request->query('scope', 'all');
+        if (! in_array($scope, ['all', 'core', 'operations', 'inventory'], true)) {
+            return response()->json(['error' => 'Périmètre Stocks invalide.'], 422);
+        }
         $companyId = (string) $request->attributes->get('companyId');
         $where = fn (string $table) => DB::table($table)->where('company_id', $companyId);
+        $includeCore = in_array($scope, ['all', 'core'], true);
+        $includeOperations = in_array($scope, ['all', 'operations'], true);
+        $includeInventory = in_array($scope, ['all', 'inventory'], true);
 
-        $inventories = $where('stock_inventories')->orderByDesc('inventory_date')->get();
+        $inventories = $includeInventory
+            ? $where('stock_inventories')->orderByDesc('inventory_date')->get()
+            : collect();
         $inventoryIds = $inventories->pluck('id')->all();
         $lines = $inventoryIds
             ? DB::table('stock_inventory_lines')->whereIn('inventory_id', $inventoryIds)->get()
             : collect();
 
-        return response()->json([
-            'products' => $where('stock_products')->orderBy('name')->get()->map(fn ($row) => $this->product($row))->values(),
-            'warehouses' => $where('stock_warehouses')->orderBy('name')->get()->map(fn ($row) => $this->warehouse($row))->values(),
-            'locations' => $where('stock_locations')->orderBy('name')->get()->map(fn ($row) => $this->location($row))->values(),
-            'suppliers' => $where('stock_suppliers')->orderBy('name')->get()->map(fn ($row) => $this->supplier($row))->values(),
-            'balances' => $where('stock_balances')->get()->map(fn ($row) => $this->balance($row))->values(),
-            'movements' => $where('stock_movements')->orderByDesc('movement_date')->limit(250)->get()->map(fn ($row) => $this->movement($row))->values(),
-            'requests' => $where('stock_requests')->orderByDesc('created_at')->get()->map(fn ($row) => $this->requestRow($row))->values(),
-            'inventories' => $inventories->map(fn ($row) => $this->inventory($row))->values(),
-            'inventoryLines' => $lines->map(fn ($row) => $this->inventoryLine($row))->values(),
-        ]);
+        $payload = [];
+        if ($includeCore) {
+            $payload['products'] = $where('stock_products')->orderBy('name')->get()->map(fn ($row) => $this->product($row))->values();
+            $payload['warehouses'] = $where('stock_warehouses')->orderBy('name')->get()->map(fn ($row) => $this->warehouse($row))->values();
+            $payload['locations'] = $where('stock_locations')->orderBy('name')->get()->map(fn ($row) => $this->location($row))->values();
+            $payload['suppliers'] = $where('stock_suppliers')->orderBy('name')->get()->map(fn ($row) => $this->supplier($row))->values();
+            $payload['balances'] = $where('stock_balances')->get()->map(fn ($row) => $this->balance($row))->values();
+        }
+        if ($includeOperations) {
+            $payload['movements'] = $where('stock_movements')->orderByDesc('movement_date')->limit(250)->get()->map(fn ($row) => $this->movement($row))->values();
+            $payload['requests'] = $where('stock_requests')->orderByDesc('created_at')->get()->map(fn ($row) => $this->requestRow($row))->values();
+        }
+        if ($includeInventory) {
+            $payload['inventories'] = $inventories->map(fn ($row) => $this->inventory($row))->values();
+            $payload['inventoryLines'] = $lines->map(fn ($row) => $this->inventoryLine($row))->values();
+        }
+
+        return response()->json($payload);
     }
 
     public function createProduct(Request $request): JsonResponse

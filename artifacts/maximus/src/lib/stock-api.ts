@@ -39,6 +39,7 @@ export interface StockRequest { id: string; companyId: string; productId: string
 export interface StockInventory { id: string; companyId: string; warehouseId: string; status: string; inventoryDate: string; notes: string; createdBy: string; validatedAt: string | null; }
 export interface StockInventoryLine { id: string; inventoryId: string; productId: string; theoreticalQuantity: number; actualQuantity: number; difference: number; }
 export interface StockBootstrap { products: StockProduct[]; warehouses: StockWarehouse[]; locations: StockLocation[]; suppliers: StockSupplier[]; balances: StockBalance[]; movements: StockMovement[]; requests: StockRequest[]; inventories: StockInventory[]; inventoryLines: StockInventoryLine[]; }
+export type StockBootstrapScope = 'all' | 'core' | 'operations' | 'inventory';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return requestJson<T>(path, init, { fallbackMessage: 'Une erreur est survenue.' });
@@ -51,7 +52,7 @@ export type StockApi = ReturnType<typeof createStockApi>;
 export const createStockApi = (companyId: string) => {
   const withCompany = (path: string) => `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
   return {
-    bootstrap: () => request<StockBootstrap>(withCompany('/stock/bootstrap')),
+    bootstrap: (scope: StockBootstrapScope = 'all') => request<Partial<StockBootstrap>>(withCompany(`/stock/bootstrap?scope=${scope}`)),
     createProduct: (body: Omit<StockProduct, 'id' | 'companyId' | 'archived'>) => request<StockProduct>(withCompany('/stock/products'), json(body)),
     updateProduct: (id: string, body: Partial<StockProduct>) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
     archiveProduct: (id: string) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'DELETE' }),

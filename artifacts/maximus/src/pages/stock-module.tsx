@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
-import { createStockApi, type StockApi, type StockBootstrap, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
+import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrapScope, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
@@ -32,6 +32,7 @@ type MovementForm = { productId: string; warehouseId: string; destinationWarehou
 const blankProduct: ProductForm = { name: '', category: 'Divers', subcategory: '', brand: '', sku: '', barcode: '', imageUrl: '', unit: 'unité', purchasePrice: 0, salePrice: 0, minStock: 0, maxStock: 0, supplierId: null, description: '' };
 const blankWarehouse: WarehouseForm = { name: '', manager: '', address: '' };
 const blankSupplier: SupplierForm = { name: '', contactName: '', email: '', phone: '', address: '', notes: '' };
+const emptyStockBootstrap: StockBootstrap = { products: [], warehouses: [], locations: [], suppliers: [], balances: [], movements: [], requests: [], inventories: [], inventoryLines: [] };
 const StockApiContext = createContext<StockApi | null>(null);
 const StockAccessContext = createContext({ canCreate: true, canModify: true });
 const useStockApi = () => {
@@ -53,23 +54,51 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   const [pendingAction, setPendingAction] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const api = createStockApi(companyId);
+  const loadedScopes = useRef(new Set<StockBootstrapScope>());
+  const loadingScopes = useRef(new Set<StockBootstrapScope>());
 
-  const load = async (silent = false) => {
-    if (silent) setRefreshing(true); else setLoading(true);
-    try { setData(await api.bootstrap()); setError(''); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger le module Stocks.'); }
-    finally { setLoading(false); setRefreshing(false); }
+  const scopeForTab = (currentTab: Tab): StockBootstrapScope => {
+    if (currentTab === 'inventory') return 'inventory';
+    if (currentTab === 'entries' || currentTab === 'exits' || currentTab === 'requests' || currentTab === 'reports') return 'operations';
+    return 'core';
+  };
+
+  const load = async (silent = false, requestedScope: StockBootstrapScope = 'core') => {
+    if (loadingScopes.current.has(requestedScope)) return;
+    loadingScopes.current.add(requestedScope);
+    if (requestedScope === 'core' && !data && !silent) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const nextData = await api.bootstrap(requestedScope);
+      loadedScopes.current.add(requestedScope);
+      setData(current => ({ ...emptyStockBootstrap, ...current, ...nextData }));
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger le module Stocks.');
+    } finally {
+      loadingScopes.current.delete(requestedScope);
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
   useEffect(() => {
     if (preview) {
-      setData({ products: [], warehouses: [], locations: [], suppliers: [], balances: [], movements: [], requests: [], inventories: [], inventoryLines: [] });
+      setData(emptyStockBootstrap);
       setError('');
       setLoading(false);
       return;
     }
-    void load();
+    loadedScopes.current.clear();
+    loadingScopes.current.clear();
+    setData(null);
+    void load(false, 'core');
   }, [companyId, preview]);
-  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
+  useEffect(() => {
+    if (preview || !data) return;
+    const scope = scopeForTab(tab);
+    if (!loadedScopes.current.has(scope)) void load(false, scope);
+  }, [tab, preview, data]);
+  useAutoRefresh(() => load(true, scopeForTab(tab)), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
   const run = async (action: () => Promise<unknown>, success: string) => {
     if (pendingAction) return;
     setPendingAction(true);
@@ -79,7 +108,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
       showAppToast(success, 'success');
       // The mutation is complete; do not make the user wait for the
       // consistency refresh. Keep the existing view usable while it runs.
-      void load(true);
+      void load(true, scopeForTab(tab));
     }
     catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Opération impossible.', 'error'); }
     finally { setPendingAction(false); }

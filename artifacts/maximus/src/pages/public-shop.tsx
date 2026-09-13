@@ -266,45 +266,51 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       },
       3,
     );
+    const sessionLoad = retryRequest(() => api.session(), 2);
     void shopLoad
-      .then(async result => {
+      .then(result => {
         if (cancelled) return;
         setData(result);
-        let session: { customer: EcommerceCustomer | null };
-        try {
-          session = await retryRequest(() => api.session(), 2);
-        } catch {
-          if (cancelled) return;
-          setCustomer(null);
-          setCustomerData(null);
-          setError('La boutique est disponible, mais la session client n’a pas pu être restaurée.');
-          try {
-             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${shopStorageKey}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
-             setCart(restoreGuestCart(saved, result));
-          } catch {
-            setCart([]);
-          }
-          return;
-        }
-        if (cancelled) return;
-        setCustomer(session.customer);
-        if (session.customer) {
-          const bootstrap = await retryRequest(() => api.bootstrap(), 2);
-          if (cancelled) return;
-          setCustomerData(bootstrap);
-          setCart(customerCartToLines(bootstrap.cart, result.products));
-          setProfileForm({ name: bootstrap.customer.name, phone: bootstrap.customer.phone });
-        } else {
-          try {
-             const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${shopStorageKey}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
-             setCart(restoreGuestCart(saved, result));
-          } catch {
-            setCart([]);
-          }
-        }
+        setLoading(false);
+
+        void sessionLoad
+          .then(async session => {
+            if (cancelled) return;
+            setCustomer(session.customer);
+            if (session.customer) {
+              const bootstrap = await retryRequest(() => api.bootstrap(), 2);
+              if (cancelled) return;
+              setCustomerData(bootstrap);
+              setCart(customerCartToLines(bootstrap.cart, result.products));
+              setProfileForm({ name: bootstrap.customer.name, phone: bootstrap.customer.phone });
+              return;
+            }
+            try {
+              const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${shopStorageKey}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
+              setCart(restoreGuestCart(saved, result));
+            } catch {
+              setCart([]);
+            }
+          })
+          .catch(() => {
+            if (cancelled) return;
+            setCustomer(null);
+            setCustomerData(null);
+            setError('La boutique est disponible, mais la session client n’a pas pu être restaurée.');
+            try {
+              const saved = JSON.parse(localStorage.getItem(`ecommerce-cart:${shopStorageKey}`) ?? '[]') as Array<{ productSlug?: string; rentalId?: string; quantity: number }>;
+              setCart(restoreGuestCart(saved, result));
+            } catch {
+              setCart([]);
+            }
+          });
       })
-      .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Boutique indisponible.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch(cause => {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : 'Boutique indisponible.');
+          setLoading(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [api, domain, shopStorageKey, slug]);
 

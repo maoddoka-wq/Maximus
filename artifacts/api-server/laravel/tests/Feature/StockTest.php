@@ -12,6 +12,18 @@ class StockTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_stock_core_bootstrap_omits_heavy_history_sections(): void
+    {
+        $this->asActor()
+            ->getJson('/api/stock/bootstrap?scope=core')
+            ->assertOk()
+            ->assertJsonStructure(['products', 'warehouses', 'locations', 'suppliers', 'balances'])
+            ->assertJsonMissingPath('movements')
+            ->assertJsonMissingPath('requests')
+            ->assertJsonMissingPath('inventories')
+            ->assertJsonMissingPath('inventoryLines');
+    }
+
     public function test_stock_catalog_and_movements_preserve_the_json_contract(): void
     {
         $request = $this->asActor();
