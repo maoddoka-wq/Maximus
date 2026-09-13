@@ -5,7 +5,7 @@ import { clientPwaPath, clientPwaStartPath, clientPwaStorageKey, parseClientPwaP
 test('génère une URL de lancement et une identité propres à chaque boutique', () => {
   const startPath = clientPwaStartPath('boutique-senegal');
 
-  assert.equal(startPath, '/client-app/shop/boutique-senegal/');
+  assert.equal(startPath, '/client-app/shop/boutique-senegal/accueil');
   assert.deepEqual(parseClientPwaPath(startPath), { slug: 'boutique-senegal' });
   assert.notEqual(clientPwaStorageKey('boutique-senegal'), clientPwaStorageKey('autre-boutique'));
 });

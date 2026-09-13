@@ -15,7 +15,7 @@ export const clientPwaStorageKey = (slug?: string, domain = false) =>
   domain ? 'domain' : encodeURIComponent(slug ?? '');
 
 export const clientPwaStartPath = (slug: string) =>
-  `/client-app/shop/${encodeURIComponent(slug)}/`;
+  `/client-app/shop/${encodeURIComponent(slug)}/accueil`;
 
 export const clientPwaPath = (slug?: string, suffix = '', domain = false) => {
   const normalizedSuffix = suffix === ''

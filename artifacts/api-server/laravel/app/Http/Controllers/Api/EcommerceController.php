@@ -1224,17 +1224,18 @@ class EcommerceController extends Controller
     {
         $storeName = trim((string) $store->name);
         $logoUrl = trim((string) ($store->logo_url ?? ''));
-        $startPath = $customDomain
+        $scopePath = $customDomain
             ? '/client-app/'
             : '/client-app/shop/'.rawurlencode((string) $store->slug).'/';
+        $startPath = $scopePath.'accueil';
 
         return response()->json([
             'name' => $storeName,
             'short_name' => Str::substr($storeName ?: 'Boutique', 0, 12),
             'description' => 'La vitrine et l’espace client de '.($storeName ?: 'cette boutique').'.',
-            'id' => $startPath,
+            'id' => $scopePath,
             'start_url' => $startPath,
-            'scope' => $startPath,
+            'scope' => $scopePath,
             'display' => 'standalone',
             'orientation' => 'portrait-primary',
             'background_color' => '#f8f5ed',

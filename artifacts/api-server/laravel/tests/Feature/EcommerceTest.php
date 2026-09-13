@@ -787,9 +787,10 @@ class EcommerceTest extends TestCase
             ->json();
 
         $this->assertSame('/client-app/shop/kora-boutique/', $first['id']);
-        $this->assertSame($first['id'], $first['start_url']);
+        $this->assertSame('/client-app/shop/kora-boutique/accueil', $first['start_url']);
         $this->assertSame($first['id'], $first['scope']);
         $this->assertSame('/client-app/shop/autre-boutique/', $second['id']);
+        $this->assertSame('/client-app/shop/autre-boutique/accueil', $second['start_url']);
         $this->assertNotSame($first['id'], $second['id']);
     }
 
