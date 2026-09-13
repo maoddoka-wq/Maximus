@@ -1074,7 +1074,8 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     setLogoFile(null);
   }, [store]);
   const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
-  const publicUrl = `${window.location.origin}/shop/${encodeURIComponent(slugify(form.slug || form.name) || 'boutique')}`;
+  const publicBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const publicUrl = `${window.location.origin}${publicBasePath}/shop/${encodeURIComponent(slugify(form.slug || form.name) || 'boutique')}`;
   const save = (event: FormEvent) => {
     event.preventDefault();
     const selectedLogo = logoFile;
