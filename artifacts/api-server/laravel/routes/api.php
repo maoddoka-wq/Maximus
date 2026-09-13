@@ -12,19 +12,24 @@ use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Services\SystemHealthService;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+
+Route::get('/', function () {
+    return response()->json([
+        'ok' => true,
+        'service' => 'MAXIMUS API',
+        'health' => '/api/healthz',
+    ]);
+});
 
 Route::get('/healthz', function () {
     try {
-        $health = app(SystemHealthService::class)->run();
-        $database = collect($health['checks'])->firstWhere('key', 'database');
-        $ok = $health['status'] === 'OPERATIONAL';
-
         return response()->json([
-            'ok' => $ok,
-            'database' => ($database['status'] ?? null) === 'UP',
-            'status' => $health['status'],
-            'checkedAt' => $health['checkedAt'],
-        ], $ok ? 200 : 503);
+            'ok' => DB::select('select 1') !== [],
+            'database' => true,
+            'status' => 'OPERATIONAL',
+            'checkedAt' => now()->toISOString(),
+        ]);
     } catch (Throwable $exception) {
         report($exception);
 

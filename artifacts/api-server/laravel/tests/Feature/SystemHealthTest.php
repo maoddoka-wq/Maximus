@@ -20,6 +20,14 @@ class SystemHealthTest extends TestCase
             ->assertJsonPath('status', 'OPERATIONAL');
     }
 
+    public function test_api_root_is_a_fast_liveness_endpoint(): void
+    {
+        $this->getJson('/api')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('health', '/api/healthz');
+    }
+
     public function test_only_maximus_administration_can_read_system_health(): void
     {
         $this->asActor('company_admin')
