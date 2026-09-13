@@ -697,7 +697,17 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
        : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
-         : <><div id="shop-catalog-search" className="mb-8 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]"><label className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={17} /><input aria-label="Rechercher un produit" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher un produit" className="w-full rounded-2xl border border-black/5 bg-white py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10" /></label><select aria-label="Filtrer par catégorie" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-2xl border border-black/5 bg-white px-4 py-3.5 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
+          :
+          <>
+            {!searchQuery && categoryFilter === 'ALL' && (
+              <div className="mb-12 flex flex-col gap-10">
+                <DiscoveryRail title="À la une" items={products.filter(p => p.featured)} type="product" store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
+                <DiscoveryRail title="Nouveautés" items={products.filter(p => !p.featured).slice(0, 12)} type="product" store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
+                {enabledFeatures.location && <DiscoveryRail title="Locations disponibles" items={rentals} type="rental" store={store} onLocation={() => go('/location')} />}
+              </div>
+            )}
+            <div id="shop-catalog-search" className="mb-8 grid scroll-mt-20 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+<label className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={17} /><input aria-label="Rechercher un produit" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Rechercher un produit" className="w-full rounded-2xl border border-black/5 bg-white py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10" /></label><select aria-label="Filtrer par catégorie" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-2xl border border-black/5 bg-white px-4 py-3.5 text-sm shadow-sm outline-none transition focus:border-[var(--shop-primary)] focus:ring-4 focus:ring-[var(--shop-primary)]/10"><option value="ALL">Toutes les catégories</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}</select></div>{products.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit disponible dans la boutique pour le moment.</div> : visibleProducts.length === 0 ? <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun produit ne correspond à votre recherche.</div> : <CatalogSections products={visibleProducts} rentals={[]} categories={categories} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />}</>}
     </main>
       {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
        {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-20 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:bottom-4 sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
@@ -797,6 +807,86 @@ function ProductDetail({ product, store, zones, onBack, onAdd }: { product: Publ
   const isRental = product.productType === 'RENTAL';
   const rentalUnit = product.rentalPeriod === 'MOIS' ? 'mois' : product.rentalPeriod === 'SEMAINE' ? 'semaine' : 'jour';
   return <section className="mx-auto max-w-4xl"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour à la boutique</button><div className="mt-6 grid gap-6 rounded-3xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:grid-cols-2 sm:p-8"><div className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--muted)/.5)]">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain p-5" /> : <Package size={54} className="text-[hsl(var(--muted-foreground))]" />}</div><div className="flex flex-col justify-center"><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>{isRental ? `LOCATION · ${rentalUnit}` : 'VENTE'} · {product.category}</p><h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">{product.name}</h1><p className="mt-4 text-2xl font-bold" style={{ color: 'var(--shop-accent)' }}>{money(product.price, store.currency)}{isRental && <span className="ml-1 text-sm font-semibold">/ {rentalUnit}</span>}</p>{product.compareAtPrice && product.compareAtPrice > product.price && <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))] line-through">{money(product.compareAtPrice, store.currency)}</p>}<p className="mt-5 whitespace-pre-line text-sm leading-7 text-[hsl(var(--muted-foreground))]">{product.description || 'Une référence sélectionnée par votre boutique.'}</p><p className={`mt-5 text-xs font-semibold ${product.stock > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{product.stock > 0 ? `${product.stock} unité${product.stock > 1 ? 's' : ''} disponible${product.stock > 1 ? 's' : ''}` : 'Indisponible'}</p>{product.fulfillmentType !== 'DIGITAL' && zones.length > 0 && <div className="mt-5 rounded-2xl border border-[var(--shop-primary)]/20 bg-[var(--shop-primary)]/5 p-4"><p className="text-sm font-bold">Zones de livraison disponibles</p><div className="mt-3 grid gap-2">{zones.map(zone => <div key={zone.id} className="flex items-start justify-between gap-3 rounded-xl bg-white/70 px-3 py-2.5 text-xs"><span><strong className="block">{zone.name}</strong>{zone.description && <span className="mt-0.5 block text-[hsl(var(--muted-foreground))]">{zone.description}</span>}</span><strong className="shrink-0">{zone.fee > 0 ? money(zone.fee, store.currency) : 'Gratuit'}</strong></div>)}</div></div>}<button type="button" onClick={onAdd} disabled={product.stock <= 0} className="mt-6 rounded-xl px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: 'var(--shop-accent)' }}>{product.stock > 0 ? (isRental ? 'Ajouter une demande de location' : 'Ajouter au panier') : 'Indisponible'}</button></div></div></section>;
+}
+
+
+function DiscoveryRail({
+  title,
+  items,
+  type,
+  store,
+  onProduct,
+  onAdd,
+  onLocation,
+}: {
+  title: string;
+  items: Array<PublicProduct | PublicRental>;
+  type: 'product' | 'rental';
+  store: PublicShopBootstrap['store'];
+  onProduct?: (product: PublicProduct) => void;
+  onAdd?: (product: PublicProduct) => void;
+  onLocation?: () => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <section>
+      <div className="mb-4 flex items-center justify-between gap-3 px-1">
+        <h2 className="text-xl font-bold tracking-[-.02em] sm:text-2xl">{title}</h2>
+        {type === 'rental' && onLocation && (
+          <button type="button" onClick={onLocation} className="flex items-center gap-1 text-sm font-semibold transition hover:opacity-80" style={{ color: 'var(--shop-primary)' }}>
+            Voir tout <ArrowRight size={14} />
+          </button>
+        )}
+      </div>
+      <div className="-mx-4 flex snap-x snap-mandatory overflow-x-auto px-4 pb-6 pt-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-4">
+          {items.map(item => (
+            <div key={'slug' in item ? item.slug : item.id} className="w-[220px] shrink-0 snap-start sm:w-[240px]">
+              {type === 'product' ? (
+                (() => {
+                  if (!('slug' in item)) return null;
+                  return (
+                <PublicOfferCard
+                  imageUrl={item.imageUrl}
+                  icon={Package}
+                  badge={`Produit · ${item.category}`}
+                  name={item.name}
+                  price={money(item.price, store.currency)}
+                  priceValue={item.price}
+                  compareAtPrice={item.compareAtPrice}
+                  availability={item.stock > 0 ? `${item.stock} en stock` : 'Indisponible'}
+                  store={store}
+                  onOpen={onProduct ? () => onProduct(item) : undefined}
+                  onAdd={onAdd ? () => onAdd(item) : undefined}
+                />
+                  );
+                })()
+              ) : (
+                (() => {
+                  if ('slug' in item) return null;
+                  return (
+                <PublicOfferCard
+                  imageUrl={item.imageUrl}
+                  icon={Home}
+                  badge={`Location · ${item.category}`}
+                  name={item.name}
+                  price={money(item.price, store.currency)}
+                  priceValue={item.price}
+                  priceSuffix={`/ ${item.billingUnit === 'MOIS' ? 'mois' : item.billingUnit === 'SEMAINE' ? 'semaine' : 'jour'}`}
+                  availability={item.isAvailable ? `${item.availability} en stock` : 'Indisponible'}
+                  store={store}
+                  onOpen={onLocation}
+                />
+                  );
+                })()
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function PublicOfferCard({
