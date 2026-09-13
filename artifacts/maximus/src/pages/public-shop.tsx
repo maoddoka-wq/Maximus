@@ -838,8 +838,7 @@ function ShopHomePage({
       </div>
     </div>
     <div className="flex flex-col gap-10">
-      <DiscoveryRail title="À la une" items={products.filter(product => product.featured)} type="product" store={store} onProduct={onProduct} onAdd={onAdd} />
-      <DiscoveryRail title="Nouveautés" items={products.filter(product => !product.featured).slice(0, 12)} type="product" store={store} onProduct={onProduct} onAdd={onAdd} />
+      <DiscoveryRail title="Tous les produits" items={products} type="product" store={store} onProduct={onProduct} onAdd={onAdd} />
       {locationEnabled && <DiscoveryRail title="Locations disponibles" items={rentals} type="rental" store={store} onLocation={onLocation} />}
     </div>
   </section>;
