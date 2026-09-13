@@ -169,6 +169,38 @@ class PresenceController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function clockQr(Request $request): JsonResponse
+    {
+        $input = Validator::make($request->all(), [
+            'workDate' => ['nullable', 'regex:/^\d{4}-\d{2}-\d{2}$/'],
+        ])->validate();
+        $companyId = $this->company($request);
+        $actorData = $request->attributes->get('authActor');
+        if (! $companyId || ! is_array($actorData) || ! ModuleAuthorization::allows($actorData, 'presences', 'manage')) {
+            return $this->forbidden();
+        }
+
+        $workDate = $input['workDate'] ?? now()->format('Y-m-d');
+        $expiresAt = Carbon::createFromFormat('Y-m-d H:i:s', $workDate.' 23:59:59');
+        if ($expiresAt === false || $expiresAt->isPast()) {
+            return response()->json(['error' => 'La date de pointage est déjà expirée.'], 422);
+        }
+
+        $encoded = $this->encodeClockQrPayload([
+            'version' => 1,
+            'companyId' => $companyId,
+            'workDate' => $workDate,
+            'expiresAt' => $expiresAt->timestamp,
+        ]);
+        $token = $encoded.'.'.hash_hmac('sha256', $encoded, $this->clockQrKey());
+
+        return response()->json([
+            'token' => $token,
+            'workDate' => $workDate,
+            'expiresAt' => $expiresAt->toISOString(),
+        ]);
+    }
+
     public function clock(Request $request): JsonResponse
     {
         $input = Validator::make($request->all(), [
@@ -180,17 +212,58 @@ class PresenceController extends Controller
             'tolerance' => ['nullable', 'integer', 'min:0'],
         ])->validate();
         $companyId = $this->company($request);
-        if (! $companyId) {
-            return response()->json(['error' => 'Contexte entreprise requis.'], 400);
-        }
         $actorData = $request->attributes->get('authActor');
-        if (! is_array($actorData)
+        if (! $companyId || ! is_array($actorData)
             || ! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'])) {
             return $this->forbidden();
         }
-        $actor = $this->actorName($request);
-        $tolerance = $input['tolerance'] ?? 10;
 
+        return $this->recordClock($input, $companyId, $actorData);
+    }
+
+    public function clockScan(Request $request): JsonResponse
+    {
+        $input = Validator::make($request->all(), [
+            'token' => ['required', 'string', 'min:20'],
+            'action' => ['required', 'in:arrival,exit'],
+        ])->validate();
+        $companyId = $this->company($request);
+        $actorData = $request->attributes->get('authActor');
+        if (! $companyId || ! is_array($actorData) || ($actorData['role'] ?? null) !== 'employee') {
+            return $this->forbidden();
+        }
+        $employeeId = (string) ($actorData['employeeId'] ?? '');
+        $tokenPayload = $this->decodeClockQrPayload($input['token']);
+        if ($employeeId === '' || ! is_array($tokenPayload)
+            || ($tokenPayload['companyId'] ?? null) !== $companyId
+            || ($tokenPayload['expiresAt'] ?? 0) < now()->timestamp) {
+            return response()->json(['error' => 'QR code invalide ou expiré.'], 422);
+        }
+
+        $settings = PresenceItem::query()
+            ->where('company_id', $companyId)
+            ->where('type', 'settings')
+            ->latest('updated_at')
+            ->value('payload');
+        $settings = is_array($settings) ? $settings : [];
+
+        return $this->recordClock([
+            'employeeId' => $employeeId,
+            'workDate' => $tokenPayload['workDate'],
+            'action' => $input['action'],
+            'expectedStart' => $settings['expectedStart'] ?? null,
+            'tolerance' => isset($settings['tolerance']) ? (int) $settings['tolerance'] : 10,
+        ], $companyId, $actorData);
+    }
+
+    private function recordClock(array $input, string $companyId, array $actorData): JsonResponse
+    {
+        if (! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'])) {
+            return $this->forbidden();
+        }
+
+        $actor = (string) ($actorData['displayName'] ?? 'Utilisateur MAXIMUS');
+        $tolerance = $input['tolerance'] ?? 10;
         $item = PresenceItem::query()
             ->where('company_id', $companyId)
             ->where('type', 'attendance')
@@ -219,7 +292,7 @@ class PresenceController extends Controller
         if ($input['action'] === 'arrival') {
             $payload['arrival'] = $clockTime;
             $payload['arrivalAt'] = $clockAt;
-            $payload['lateMinutes'] = isset($input['expectedStart'])
+            $payload['lateMinutes'] = isset($input['expectedStart']) && is_string($input['expectedStart'])
                 ? max(0, $this->minutes($clockTime) - $this->minutes($input['expectedStart']) - $tolerance)
                 : 0;
             $payload['status'] = 'Présent';
@@ -266,6 +339,39 @@ class PresenceController extends Controller
         ]);
 
         return response()->json($this->item($item->refresh()), $httpStatus);
+    }
+
+    private function clockQrKey(): string
+    {
+        return (string) config('app.key');
+    }
+
+    private function encodeClockQrPayload(array $payload): string
+    {
+        $encoded = base64_encode(json_encode($payload, JSON_THROW_ON_ERROR));
+
+        return rtrim(strtr($encoded, '+/', '-_'), '=');
+    }
+
+    private function decodeClockQrPayload(string $token): ?array
+    {
+        [$encoded, $signature] = array_pad(explode('.', $token, 2), 2, null);
+        if (! is_string($encoded) || ! is_string($signature) || ! hash_equals(hash_hmac('sha256', $encoded, $this->clockQrKey()), $signature)) {
+            return null;
+        }
+
+        $base64 = strtr($encoded, '-_', '+/');
+        $base64 .= str_repeat('=', (4 - strlen($base64) % 4) % 4);
+        $decoded = base64_decode($base64, true);
+        $payload = is_string($decoded) ? json_decode($decoded, true) : null;
+
+        return is_array($payload)
+            && ($payload['version'] ?? null) === 1
+            && is_string($payload['companyId'] ?? null)
+            && is_string($payload['workDate'] ?? null)
+            && is_numeric($payload['expiresAt'] ?? null)
+            ? $payload
+            : null;
     }
 
     private function validateItem(Request $request, bool $partial = false): array

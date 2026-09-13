@@ -5,6 +5,7 @@ export type PresenceWriteType = Exclude<PresenceItemType, 'history'>;
 export type PresencePayload = Record<string, unknown>;
 export type PresenceItem = { id: string; companyId: string; type: PresenceItemType; employeeId: string | null; workDate: string | null; startDate: string | null; endDate: string | null; status: string; payload: PresencePayload; createdBy: string; updatedBy: string; createdAt: string; updatedAt: string };
 export type PresenceItemInput = { type: PresenceWriteType; companyId?: string; employeeId?: string | null; workDate?: string | null; startDate?: string | null; endDate?: string | null; status: string; payload: PresencePayload; actor?: string };
+export type PresenceClockQr = { token: string; workDate: string; expiresAt: string };
 const json = (body: unknown) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return requestJson<T>(path, options, { fallbackMessage: 'Opération impossible.' });
@@ -17,5 +18,7 @@ export const createPresenceApi = (companyId: string) => {
     update: (id: string, body: Partial<PresenceItemInput>) => request<PresenceItem>(query(`/presence/items/${id}`), { ...json(body), method: 'PATCH' }),
     remove: (id: string, actor: string) => request<{ ok: boolean }>(query(`/presence/items/${id}`), { ...json({ actor }), method: 'DELETE' }),
     clock: (body: { employeeId: string; workDate: string; action: 'arrival' | 'exit' | 'pauseStart' | 'pauseEnd'; actor: string; expectedStart?: string; tolerance?: number }) => request<PresenceItem>(query('/presence/clock'), json(body)),
+    clockQr: (workDate: string) => request<PresenceClockQr>(query(`/presence/clock-qr?workDate=${encodeURIComponent(workDate)}`)),
+    clockScan: (body: { token: string; action: 'arrival' | 'exit' }) => request<PresenceItem>(query('/presence/clock-scan'), json(body)),
   };
 };

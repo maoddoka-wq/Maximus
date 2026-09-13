@@ -74,5 +74,9 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4"
   }
 }
