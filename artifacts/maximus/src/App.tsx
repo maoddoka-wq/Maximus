@@ -372,6 +372,7 @@ function AppContent() {
   const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
   const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
   const [appStateVersion, setAppStateVersion] = useState(0);
+  const [appStateError, setAppStateError] = useState('');
   const [appStateReady, setAppStateReady] = useState(
     () => !localStorage.getItem('maximus-session'),
   );
@@ -394,7 +395,7 @@ function AppContent() {
   const dataRef = useRef(data);
   const appStateSaveQueue = useRef(Promise.resolve());
   const appStateVersionRef = useRef(appStateVersion);
-  const appStateRefreshRef = useRef<Promise<void> | null>(null);
+  const appStateRefreshRef = useRef<Promise<boolean> | null>(null);
   const localMutationVersionRef = useRef(0);
   const loginTransitionRef = useRef(false);
   dataRef.current = data;
@@ -481,7 +482,7 @@ function AppContent() {
     };
   }, [pathname, session]);
   const refreshAppState = async (waitForPendingSave = true) => {
-    if (!session || session.startsWith('company:sector-test-')) return;
+    if (!session || session.startsWith('company:sector-test-')) return true;
     if (appStateRefreshRef.current) return appStateRefreshRef.current;
 
     const pendingSave = waitForPendingSave
@@ -493,8 +494,10 @@ function AppContent() {
         const nextData = sanitizeStoreData(remoteData);
         dataRef.current = nextData;
         setData(nextData);
+        setAppStateError('');
         appStateVersionRef.current = version;
         setAppStateVersion(version);
+        return true;
       })
       .catch((error) => {
         if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
@@ -502,9 +505,11 @@ function AppContent() {
           localStorage.removeItem('maximus-session');
           localStorage.removeItem('maximus-sector-test-company');
           notify('Votre session MAXIMUS n’est plus active.', 'warning');
-          return;
+          return false;
         }
-        notify(error instanceof Error ? error.message : 'Les données métier sont indisponibles.', 'error');
+        const message = error instanceof Error ? error.message : 'Les données métier sont indisponibles.';
+        setAppStateError(message);
+        return false;
       })
       .finally(() => {
         appStateRefreshRef.current = null;
@@ -522,9 +527,11 @@ function AppContent() {
     const shouldBlockForInitialLoad = !loginTransitionRef.current && !appStateReady;
     loginTransitionRef.current = false;
     if (shouldBlockForInitialLoad) setAppStateReady(false);
-    void refreshAppState().finally(() => setAppStateReady(true));
+    void refreshAppState().then((ready) => setAppStateReady(ready));
   }, [session]);
-  useAutoRefresh(() => refreshAppState(), {
+  useAutoRefresh(() => {
+    void refreshAppState();
+  }, {
     enabled: Boolean(session && !session.startsWith('company:sector-test-')),
     intervalMs: 30_000,
   });
@@ -927,7 +934,18 @@ function AppContent() {
     return <PublicShopPage domain />;
   }
   if (session && !appStateReady) {
-    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de l’espace…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
+        <h1 className="text-lg font-bold">{appStateError ? 'Les données métier ne sont pas accessibles' : 'Chargement de l’espace…'}</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          {appStateError || 'Connexion à votre espace entreprise en cours.'}
+        </p>
+        {appStateError && <button type="button" onClick={() => {
+          setAppStateError('');
+          void refreshAppState().then((ready) => setAppStateReady(ready));
+        }} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button>}
+      </section>
+    </div>;
   }
   const loginEmployees = [
     ...data.employees,

@@ -573,6 +573,11 @@ class AppStateController extends Controller
             'activities',
             'purchaseOrders',
             'supplierRecords',
+            'deliveries',
+            'businessDocuments',
+            'accountingEntries',
+            'payrollSlips',
+            'crmOpportunities',
         ] as $key) {
             if (!isset($state[$key]) || !is_array($state[$key])) {
                 continue;

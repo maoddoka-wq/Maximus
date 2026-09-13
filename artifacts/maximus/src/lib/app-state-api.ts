@@ -17,19 +17,30 @@ export class AppStateRequestError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  try {
-    return await requestJson<T>(path, init, { fallbackMessage: 'Les données métier sont indisponibles.' });
-  } catch (cause) {
-    if (cause instanceof ApiRequestError) {
-      throw new AppStateRequestError(cause.message, cause.status);
+async function request<T>(path: string, init?: RequestInit, options: { timeoutMs?: number } = {}): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await requestJson<T>(path, init, {
+        fallbackMessage: 'Les données métier sont indisponibles.',
+        timeoutMs: options.timeoutMs,
+      });
+    } catch (cause) {
+      if (cause instanceof ApiRequestError && cause.status === 0 && attempt < 1) {
+        attempt += 1;
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        continue;
+      }
+      if (cause instanceof ApiRequestError) {
+        throw new AppStateRequestError(cause.message, cause.status);
+      }
+      throw cause;
     }
-    throw cause;
   }
 }
 
 export const appStateApi = {
-  bootstrap: () => request<AppStateResponse>('/app-state/bootstrap'),
+  bootstrap: () => request<AppStateResponse>('/app-state/bootstrap', undefined, { timeoutMs: 20_000 }),
   save: (data: StoreData, version: number) =>
     request<{ ok: true; version: number }>('/app-state', {
       method: 'PUT',
