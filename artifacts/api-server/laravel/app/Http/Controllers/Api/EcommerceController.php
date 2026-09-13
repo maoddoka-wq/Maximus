@@ -162,6 +162,35 @@ class EcommerceController extends Controller
         return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $store->id)->first()));
     }
 
+    public function uploadStoreHeroImages(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'settings')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $store = $this->ensureStore($company);
+        $this->storeGalleryImages($request, $company, 'store', (string) $store->id, 'hero', 12, 10240);
+
+        return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $store->id)->where('company_id', $company)->first()));
+    }
+
+    public function deleteStoreHeroImage(Request $request, string $imageId): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'settings')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $store = $this->ensureStore($company);
+        $deleted = $this->deleteGalleryImage($company, $imageId, 'store', (string) $store->id, 'hero');
+        if (! $deleted) {
+            return response()->json(['error' => 'Image de bannière introuvable.'], 404);
+        }
+
+        return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $store->id)->where('company_id', $company)->first()));
+    }
+
     public function createCategory(Request $request): JsonResponse
     {
         if (! $this->allowed($request, 'create', 'catalogue')) {
@@ -487,6 +516,41 @@ class EcommerceController extends Controller
         return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
     }
 
+    public function uploadProductGallery(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $product = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $company)->first();
+        if (! $product) {
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
+        }
+
+        $this->storeGalleryImages($request, $company, 'product', $id, 'gallery', 20, 10240);
+
+        return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
+    }
+
+    public function deleteProductGalleryImage(Request $request, string $id, string $imageId): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $product = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $company)->first();
+        if (! $product) {
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
+        }
+        if (! $this->deleteGalleryImage($company, $imageId, 'product', $id, 'gallery')) {
+            return response()->json(['error' => 'Image du produit introuvable.'], 404);
+        }
+
+        return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
+    }
+
     public function uploadDigitalFile(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
@@ -595,6 +659,31 @@ class EcommerceController extends Controller
         }
 
         return response()->file(Storage::disk('public')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
+    }
+
+    public function serveGalleryImage(string $company, string $imageId)
+    {
+        if (! preg_match('/^[A-Za-z0-9_-]+$/', $company) || ! preg_match('/^[A-Za-z0-9_-]+$/', $imageId)) {
+            abort(404);
+        }
+
+        $image = DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where('id', $imageId)
+            ->first(['image_data', 'image_mime']);
+        if (! $image || ! is_string($image->image_data) || $image->image_data === '') {
+            abort(404);
+        }
+
+        $contents = base64_decode($image->image_data, true);
+        if ($contents === false) {
+            abort(404);
+        }
+
+        return response($contents, 200, [
+            'Content-Type' => $image->image_mime ?: 'application/octet-stream',
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
     }
@@ -753,6 +842,41 @@ class EcommerceController extends Controller
             'updated_at' => now(),
         ]);
         $this->deleteStoredImage($rental->image_url ?? '', $imageUrl);
+
+        return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
+    public function uploadRentalGallery(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'location') && ! $this->allowed($request, 'create', 'location')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $rental = DB::table('ecommerce_rentals')->where('id', $id)->where('company_id', $company)->first();
+        if (! $rental) {
+            return response()->json(['error' => 'Location introuvable.'], 404);
+        }
+
+        $this->storeGalleryImages($request, $company, 'rental', $id, 'gallery', 20, 5120);
+
+        return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
+    }
+
+    public function deleteRentalGalleryImage(Request $request, string $id, string $imageId): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'location') && ! $this->allowed($request, 'create', 'location')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $rental = DB::table('ecommerce_rentals')->where('id', $id)->where('company_id', $company)->first();
+        if (! $rental) {
+            return response()->json(['error' => 'Location introuvable.'], 404);
+        }
+        if (! $this->deleteGalleryImage($company, $imageId, 'rental', $id, 'gallery')) {
+            return response()->json(['error' => 'Image de la location introuvable.'], 404);
+        }
 
         return response()->json($this->rental(DB::table('ecommerce_rentals')->where('id', $id)->first()));
     }
@@ -1138,6 +1262,7 @@ class EcommerceController extends Controller
         $publishedProducts = DB::table('ecommerce_products')
             ->select([
                 'id',
+                'company_id',
                 'slug',
                 'name',
                 'description',
@@ -1199,6 +1324,7 @@ class EcommerceController extends Controller
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
+            'heroImages' => $this->galleryUrls((string) $row->company_id, 'store', (string) ($row->id ?? ''), 'hero'),
             'seller' => [
                 'name' => (string) ($company->name ?? $row->name ?? ''),
                 'email' => (string) ($company->email ?? ''),
@@ -1271,6 +1397,7 @@ class EcommerceController extends Controller
             'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
             'stock' => (int) $row->stock,
             'imageUrl' => $row->image_url,
+            'gallery' => $this->galleryUrls((string) $row->company_id, 'product', (string) $row->id, 'gallery'),
             'featured' => (bool) $row->featured,
             'productType' => $row->product_type ?? 'SALE',
             'rentalPeriod' => $row->rental_period,
@@ -1302,6 +1429,7 @@ class EcommerceController extends Controller
             'category' => trim((string) ($row->category ?? '')) ?: 'Général',
             'categoryId' => $row->category_id ?? null,
             'imageUrl' => $row->image_url ?? '',
+            'gallery' => $this->galleryUrls((string) $row->company_id, 'rental', (string) $row->id, 'gallery', json_decode($row->gallery ?? '[]', true) ?: []),
             'price' => (int) $row->price,
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
@@ -1313,7 +1441,6 @@ class EcommerceController extends Controller
             'transmission' => $row->transmission ?? null,
             'fuel' => $row->fuel ?? null,
             'equipment' => json_decode($row->equipment ?? '[]', true) ?: [],
-            'gallery' => json_decode($row->gallery ?? '[]', true) ?: [],
             'dailyRate' => (int) ($row->daily_rate ?? $row->price),
             'kmRate' => (int) ($row->km_rate ?? 0),
             'deposit' => (int) ($row->deposit ?? 0),
@@ -1336,6 +1463,7 @@ class EcommerceController extends Controller
             'category' => trim((string) ($row->category ?? '')) ?: 'Général',
             'categoryId' => $row->category_id ?? null,
             'imageUrl' => $row->image_url ?? '',
+            'gallery' => $this->galleryUrls((string) $row->company_id, 'product', (string) $row->id, 'gallery'),
             'price' => (int) $row->price,
             'billingUnit' => $row->rental_period ?: 'JOUR',
             'availability' => (int) $row->stock,
@@ -1355,6 +1483,7 @@ class EcommerceController extends Controller
             'category' => $row->category,
             'categoryId' => $row->category_id ?? null,
             'imageUrl' => $row->image_url ?? '',
+            'gallery' => $this->galleryUrls((string) $row->company_id, 'rental', (string) $row->id, 'gallery', json_decode($row->gallery ?? '[]', true) ?: []),
             'price' => (int) $row->price,
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
@@ -1367,7 +1496,6 @@ class EcommerceController extends Controller
             'transmission' => $row->transmission ?? null,
             'fuel' => $row->fuel ?? null,
             'equipment' => json_decode($row->equipment ?? '[]', true) ?: [],
-            'gallery' => json_decode($row->gallery ?? '[]', true) ?: [],
             'dailyRate' => (int) ($row->daily_rate ?? $row->price),
             'kmRate' => (int) ($row->km_rate ?? 0),
             'deposit' => (int) ($row->deposit ?? 0),
@@ -1796,6 +1924,85 @@ class EcommerceController extends Controller
         }
     }
 
+    private function storeGalleryImages(
+        Request $request,
+        string $company,
+        string $ownerType,
+        string $ownerId,
+        string $collection,
+        int $maxFiles,
+        int $maxKilobytes,
+    ): void {
+        $input = Validator::make($request->all(), [
+            'images' => ['required', 'array', 'min:1', 'max:'.$maxFiles],
+            'images.*' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.$maxKilobytes],
+        ])->validate();
+
+        $nextOrder = (int) DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
+            ->where('collection', $collection)
+            ->max('sort_order') + 1;
+
+        foreach ($input['images'] as $file) {
+            $contents = $file->get();
+            if (! is_string($contents) || $contents === '') {
+                continue;
+            }
+            $id = $this->id('gallery');
+            DB::table('ecommerce_gallery_images')->insert([
+                'id' => $id,
+                'company_id' => $company,
+                'owner_type' => $ownerType,
+                'owner_id' => $ownerId,
+                'collection' => $collection,
+                'image_data' => base64_encode($contents),
+                'image_mime' => $file->getMimeType() ?: 'application/octet-stream',
+                'sort_order' => $nextOrder++,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function deleteGalleryImage(
+        string $company,
+        string $imageId,
+        string $ownerType,
+        string $ownerId,
+        string $collection,
+    ): bool {
+        return DB::table('ecommerce_gallery_images')
+            ->where('id', $imageId)
+            ->where('company_id', $company)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
+            ->where('collection', $collection)
+            ->delete() > 0;
+    }
+
+    private function galleryUrls(
+        string $company,
+        string $ownerType,
+        string $ownerId,
+        string $collection,
+        array $legacy = [],
+    ): array {
+        $uploaded = DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
+            ->where('collection', $collection)
+            ->orderBy('sort_order')
+            ->orderBy('created_at')
+            ->pluck('id')
+            ->map(fn ($id) => '/api/gallery-images/'.rawurlencode($company).'/'.rawurlencode((string) $id))
+            ->all();
+
+        return array_values(array_unique(array_filter(array_merge($legacy, $uploaded), fn ($url) => is_string($url) && trim($url) !== '')));
+    }
+
     private function domainTarget(Request $request): string
     {
         $configured = (string) env('MAXIMUS_CUSTOM_DOMAIN_TARGET', '');
@@ -1827,6 +2034,7 @@ class EcommerceController extends Controller
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
+            'heroImages' => $this->galleryUrls((string) $row->company_id, 'store', (string) $row->id, 'hero'),
         ];
     }
 
@@ -1845,6 +2053,7 @@ class EcommerceController extends Controller
             'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
             'stock' => (int) $row->stock,
             'imageUrl' => $row->image_url,
+            'gallery' => $this->galleryUrls((string) $row->company_id, 'product', (string) $row->id, 'gallery'),
             'featured' => (bool) $row->featured,
             'status' => $row->status,
             'productType' => $row->product_type ?? 'SALE',

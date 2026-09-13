@@ -84,6 +84,7 @@ export interface EcommerceStore {
   primaryColor: string;
   accentColor: string;
   logoUrl: string;
+  heroImages: string[];
 }
 
 export interface PublicShopFeatures {
@@ -125,6 +126,7 @@ export interface EcommerceProduct {
   productType: EcommerceProductType;
   rentalPeriod: EcommerceRentalPeriod | null;
   fulfillmentType: EcommerceProductFulfillmentType;
+  gallery?: string[];
   digitalFile?: {
     name: string;
     mime: string;
@@ -355,7 +357,7 @@ export interface PublicShopBootstrap {
     transmission?: EcommerceRentalTransmission | null;
     fuel?: EcommerceRentalFuel | null;
     equipment?: string | null;
-    gallery?: string | null;
+     gallery?: string[] | null;
     dailyRate?: number;
     kmRate?: number;
     deposit?: number;
@@ -468,6 +470,12 @@ export const createEcommerceApi = (companyId: string) => {
         body: formData,
       }, { fallbackMessage: 'Le logo de la boutique n’a pas pu être envoyé.', timeoutMs: 90_000 });
     },
+    uploadStoreHeroImages: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach(file => formData.append('images[]', file));
+      return requestJson<EcommerceStore>(withCompany('/ecommerce/store/hero-images'), { method: 'POST', body: formData }, { fallbackMessage: 'Les images de bannière n’ont pas pu être envoyées.', timeoutMs: 120_000 });
+    },
+    deleteStoreHeroImage: (imageId: string) => request<EcommerceStore>(withCompany(`/ecommerce/store/hero-images/${encodeURIComponent(imageId)}`), { method: 'DELETE' }),
     createCategory: (body: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) => request<EcommerceCategory>(withCompany('/ecommerce/categories'), json(body)),
     updateCategory: (id: string, body: Partial<Omit<EcommerceCategory, 'id' | 'companyId'>>) => request<EcommerceCategory>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
     deleteCategory: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'DELETE' }),
@@ -492,6 +500,12 @@ export const createEcommerceApi = (companyId: string) => {
         body: formData,
       }, { fallbackMessage: 'La photo n’a pas pu être envoyée.', timeoutMs: 90_000 });
     },
+    uploadProductGallery: async (id: string, files: File[]) => {
+      const formData = new FormData();
+      files.forEach(file => formData.append('images[]', file));
+      return requestJson<EcommerceProduct>(withCompany(`/ecommerce/products/${encodeURIComponent(id)}/gallery`), { method: 'POST', body: formData }, { fallbackMessage: 'Les images du produit n’ont pas pu être envoyées.', timeoutMs: 120_000 });
+    },
+    deleteProductGalleryImage: (id: string, imageId: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${encodeURIComponent(id)}/gallery/${encodeURIComponent(imageId)}`), { method: 'DELETE' }),
     archiveProduct: (id: string) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'DELETE' }),
       uploadRentalImage: async (id: string, file: File) => {
         const formData = new FormData();
@@ -501,6 +515,12 @@ export const createEcommerceApi = (companyId: string) => {
           body: formData,
         }, { fallbackMessage: 'La photo n’a pas pu être envoyée.', timeoutMs: 90_000 });
       },
+      uploadRentalGallery: async (id: string, files: File[]) => {
+        const formData = new FormData();
+        files.forEach(file => formData.append('images[]', file));
+        return requestJson<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/gallery`), { method: 'POST', body: formData }, { fallbackMessage: 'Les images de la location n’ont pas pu être envoyées.', timeoutMs: 120_000 });
+      },
+      deleteRentalGalleryImage: (id: string, imageId: string) => request<EcommerceRental>(withCompany(`/ecommerce/rentals/${encodeURIComponent(id)}/gallery/${encodeURIComponent(imageId)}`), { method: 'DELETE' }),
       createRental: (body: any) =>
        request<EcommerceRental>(withCompany('/ecommerce/rentals'), json(body)),
       updateRental: (id: string, body: any) =>

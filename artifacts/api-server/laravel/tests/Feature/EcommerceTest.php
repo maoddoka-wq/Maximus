@@ -517,6 +517,64 @@ class EcommerceTest extends TestCase
         $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
     }
 
+    public function test_company_gallery_images_are_stored_per_owner_and_exposed_to_public_shop(): void
+    {
+        Storage::fake('public');
+        $request = $this->asActor();
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique galerie',
+            'slug' => 'boutique-galerie',
+            'description' => 'Boutique avec plusieurs visuels',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Sac galerie',
+            'sku' => 'GALLERY-01',
+            'price' => 18000,
+            'stock' => 3,
+            'status' => 'PUBLISHED',
+        ])->assertCreated();
+
+        $hero = $request->post('/api/ecommerce/store/hero-images?companyId=kora', [
+            'images' => [
+                UploadedFile::fake()->image('hero-une.jpg'),
+                UploadedFile::fake()->image('hero-deux.png'),
+            ],
+        ])->assertOk();
+        $heroUrls = $hero->json('heroImages');
+        $this->assertCount(2, $heroUrls);
+        $this->assertStringStartsWith('/api/gallery-images/kora/', $heroUrls[0]);
+        $this->get($heroUrls[0])->assertOk();
+
+        $productResponse = $request->post('/api/ecommerce/products/'.$product->json('id').'/gallery?companyId=kora', [
+            'images' => [
+                UploadedFile::fake()->image('sac-face.jpg'),
+                UploadedFile::fake()->image('sac-profil.webp'),
+            ],
+        ])->assertOk();
+        $productGallery = $productResponse->json('gallery');
+        $this->assertCount(2, $productGallery);
+        $this->assertStringStartsWith('/api/gallery-images/kora/', $productGallery[0]);
+        $this->assertDatabaseHas('ecommerce_gallery_images', [
+            'company_id' => 'kora',
+            'owner_type' => 'product',
+            'owner_id' => $product->json('id'),
+            'collection' => 'gallery',
+        ]);
+
+        $this->getJson('/api/shop/boutique-galerie')
+            ->assertOk()
+            ->assertJsonPath('store.heroImages.0', $heroUrls[0])
+            ->assertJsonPath('products.0.gallery.0', $productGallery[0]);
+
+        $this->asActor('employee')->delete('/api/ecommerce/products/'.$product->json('id').'/gallery/'.basename($productGallery[0]).'?companyId=another-company')
+            ->assertForbidden();
+    }
+
     public function test_public_shop_exposes_all_published_sale_products_including_out_of_stock_items(): void
     {
         $request = $this->asActor();

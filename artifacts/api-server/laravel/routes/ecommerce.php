@@ -19,6 +19,8 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
         Route::post('/store/logo', [EcommerceController::class, 'uploadStoreLogo']);
+        Route::post('/store/hero-images', [EcommerceController::class, 'uploadStoreHeroImages']);
+        Route::delete('/store/hero-images/{imageId}', [EcommerceController::class, 'deleteStoreHeroImage']);
         Route::post('/categories', [EcommerceController::class, 'createCategory']);
         Route::patch('/categories/{id}', [EcommerceController::class, 'updateCategory']);
         Route::delete('/categories/{id}', [EcommerceController::class, 'deleteCategory']);
@@ -27,11 +29,15 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);
         Route::post('/products', [EcommerceController::class, 'createProduct']);
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
+        Route::post('/products/{id}/gallery', [EcommerceController::class, 'uploadProductGallery']);
+        Route::delete('/products/{id}/gallery/{imageId}', [EcommerceController::class, 'deleteProductGalleryImage']);
         Route::post('/products/{id}/digital-file', [EcommerceController::class, 'uploadDigitalFile']);
         Route::patch('/products/{id}', [EcommerceController::class, 'updateProduct']);
         Route::delete('/products/{id}', [EcommerceController::class, 'archiveProduct']);
           Route::post('/rentals', [EcommerceController::class, 'createRental']);
           Route::post('/rentals/{id}/image', [EcommerceController::class, 'uploadRentalImage']);
+          Route::post('/rentals/{id}/gallery', [EcommerceController::class, 'uploadRentalGallery']);
+          Route::delete('/rentals/{id}/gallery/{imageId}', [EcommerceController::class, 'deleteRentalGalleryImage']);
          Route::patch('/rentals/{id}', [EcommerceController::class, 'updateRental']);
          Route::patch('/rentals/{id}/availability', [EcommerceController::class, 'setRentalAvailability']);
          Route::delete('/rentals/{id}', [EcommerceController::class, 'archiveRental']);
@@ -62,6 +68,8 @@ Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'se
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, 'serveRentalImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+Route::get('/gallery-images/{company}/{imageId}', [EcommerceController::class, 'serveGalleryImage'])
+    ->where(['company' => '[A-Za-z0-9_-]+', 'imageId' => '[A-Za-z0-9_-]+']);
 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/manifest.webmanifest', [EcommerceController::class, 'publicManifest']);
