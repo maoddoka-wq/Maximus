@@ -826,8 +826,10 @@ function ShopHomePage({
   onShop: () => void;
 }) {
   return <section className="space-y-10">
-    <div className="relative overflow-hidden rounded-3xl p-6 text-white shadow-xl sm:p-9" style={{ background: `linear-gradient(120deg, ${store.accentColor}, ${store.primaryColor})` }}>
-      <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[22px] border-white/10" />
+    <div className="relative min-h-[300px] overflow-hidden rounded-3xl p-6 text-white shadow-xl sm:min-h-[340px] sm:p-9">
+      <img src="/family-lunch-hero.jpg" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover object-[68%_center] sm:object-[58%_center] lg:object-center" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(11,27,43,.9)_0%,rgba(11,27,43,.68)_44%,rgba(11,27,43,.15)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0b1b2b]/10 via-transparent to-[#d69e2e]/35" />
       <div className="relative max-w-2xl">
         <p className="text-xs font-bold uppercase tracking-[.18em] text-white/70">Bienvenue chez {store.name}</p>
         <h1 className="mt-3 text-3xl font-bold tracking-[-.05em] sm:text-4xl">Découvrez nos offres</h1>
