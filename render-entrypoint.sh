@@ -28,7 +28,11 @@ case "$digital_storage_path" in
         ;;
 esac
 mkdir -p "$digital_storage_path"
-if [ ! -w "$digital_storage_path" ]; then
+# Apache/PHP handles uploaded files as www-data, while this entrypoint runs as
+# root. Fix the ownership on every boot so an existing Render disk works too.
+chown -R www-data:www-data "$digital_storage_path"
+chmod -R ug+rwX "$digital_storage_path"
+if ! su -s /bin/sh -c "test -w '$digital_storage_path'" www-data; then
     echo "Render startup error: digital storage is not writable: $digital_storage_path" >&2
     exit 1
 fi
