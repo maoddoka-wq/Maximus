@@ -7,6 +7,7 @@ use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class TransportTest extends TestCase
@@ -277,6 +278,73 @@ class TransportTest extends TestCase
             'status' => 'ASSIGNED',
         ]);
         $this->assertDatabaseMissing('transport_trips', ['driver_id' => $staleDriver]);
+    }
+
+    public function test_public_taxi_quote_uses_a_real_route_and_signed_quote_at_creation(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-quote',
+            'company_id' => 'kora',
+            'slug' => 'kora-quote',
+            'name' => 'Kora Quote',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        Http::fake([
+            'https://nominatim.openstreetmap.org/*' => Http::response([
+                ['lat' => '14.7300', 'lon' => '-17.4500'],
+            ]),
+            'https://router.project-osrm.org/*' => Http::response([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 4200,
+                    'duration' => 900,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [
+                            [-17.4677, 14.7167],
+                            [-17.4500, 14.7300],
+                        ],
+                    ],
+                ]],
+            ]),
+        ]);
+
+        $quote = $this->postJson('/api/shop/kora-quote/transport/quote', [
+            'destination' => 'Point de destination',
+            'pickupLatitude' => 14.7167,
+            'pickupLongitude' => -17.4677,
+        ])->assertOk()
+            ->assertJsonPath('distanceKm', 4.2)
+            ->assertJsonPath('durationMinutes', 15)
+            ->assertJsonPath('fare', 2000);
+
+        $trip = $this->postJson('/api/shop/kora-quote/transport/trips', [
+            'pickup' => 'Plateau',
+            'destination' => 'Point de destination',
+            'passengerName' => 'Moussa Fall',
+            'passengerPhone' => '+221771111111',
+            'pickupLatitude' => 14.7167,
+            'pickupLongitude' => -17.4677,
+            'quoteToken' => $quote->json('quoteToken'),
+        ])->assertCreated()
+            ->assertJsonPath('trip.routeDistanceKm', 4.2)
+            ->assertJsonPath('trip.routeDurationMinutes', 15)
+            ->assertJsonPath('trip.fare', 2000);
+
+        $this->assertDatabaseHas('transport_trips', [
+            'id' => $trip->json('trip.id'),
+            'route_distance_km' => 4.2,
+            'route_duration_minutes' => 15,
+        ]);
+        Http::assertSentCount(2);
     }
 
     private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string

@@ -18,7 +18,8 @@ import {
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
 import { ApiRequestError } from '@/lib/api-request';
-import { createPublicTransportApi, type PublicTransportTrip } from '@/lib/transport-api';
+import { createPublicTransportApi, type GeoJsonLineString, type PublicTransportQuote, type PublicTransportTrip } from '@/lib/transport-api';
+import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
@@ -844,6 +845,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [error, setError] = useState('');
   const [trip, setTrip] = useState<PublicTransportTrip | null>(null);
   const [tripMessage, setTripMessage] = useState('');
+  const [quote, setQuote] = useState<PublicTransportQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('/taxi-transport-hero.jpg');
 
   useEffect(() => {
@@ -863,6 +867,34 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       // Keep the last known position visible while the next refresh retries.
     });
   }, { enabled: Boolean(trip), intervalMs: 5_000 });
+
+  useEffect(() => {
+    if (!position || trip || form.destination.trim().length < 2) {
+      setQuote(null);
+      setQuoteError('');
+      setQuoteLoading(false);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setQuoteLoading(true);
+      setQuoteError('');
+      void api.quote({
+        destination: form.destination.trim(),
+        pickupLatitude: position.latitude,
+        pickupLongitude: position.longitude,
+      }).then(result => {
+        setQuote(result);
+      }).catch(cause => {
+        setQuote(null);
+        setQuoteError(cause instanceof Error ? cause.message : 'L’itinéraire n’a pas pu être calculé.');
+      }).finally(() => {
+        setQuoteLoading(false);
+      });
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [api, form.destination, position, trip]);
 
   const locate = () => {
     if (!navigator.geolocation) {
@@ -922,6 +954,10 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       return;
     }
     if (!form.destination.trim() || !form.passengerName.trim() || !form.passengerPhone.trim()) return;
+    if (!quote) {
+      setError(quoteLoading ? 'Calcul de l’itinéraire en cours…' : (quoteError || 'Renseignez une destination valide pour calculer le trajet.'));
+      return;
+    }
     setSubmitting(true);
     setError('');
     setTrip(null);
@@ -934,6 +970,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         passengerPhone: form.passengerPhone.trim(),
         pickupLatitude: position.latitude,
         pickupLongitude: position.longitude,
+        quoteToken: quote?.quoteToken,
       });
       window.localStorage.setItem(customerStorageKey, JSON.stringify({
         tripId: result.trip.id,
@@ -984,6 +1021,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Étape finale</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] sm:text-2xl">Où allez-vous ?</h2></div><button type="button" onClick={() => setFormOpen(false)} className="text-xs font-bold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">Retour</button></div>
           <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><MapPin size={18} className="shrink-0" /><div><p className="font-bold">Départ : votre position actuelle</p><p className="mt-0.5 text-xs text-emerald-800">Position précise partagée automatiquement</p></div></div>
           <label className="block text-sm font-bold">Destination<input required autoFocus value={form.destination} onChange={event => setForm({ ...form, destination: event.target.value })} className="mt-2 w-full rounded-xl border px-4 py-3.5 text-sm outline-none transition focus:border-[var(--shop-accent)] focus:ring-2 focus:ring-[var(--shop-accent)]/15" placeholder="Ex. Aéroport Blaise Diagne" /></label>
+          {quoteLoading && <p className="inline-flex items-center gap-2 rounded-xl bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800"><RefreshCw size={14} className="animate-spin" />Calcul de la route et du tarif…</p>}
+          {quoteError && !quoteLoading && <p role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-900">{quoteError}</p>}
+          {quote && <div className="space-y-3 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/5 p-3"><div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Distance</p><p className="mt-1 text-sm font-black">{quote.distanceKm.toFixed(1)} km</p></div><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Durée</p><p className="mt-1 text-sm font-black">{quote.durationMinutes} min</p></div><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Tarif</p><p className="mt-1 text-sm font-black text-[var(--shop-accent)]">{money(quote.fare, store.currency)}</p></div></div><TaxiRouteMap pickup={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="h-56" /><p className="text-[11px] text-[hsl(var(--muted-foreground))]">Le tarif est calculé côté serveur à partir de la distance routière OpenStreetMap/OpenRouteService.</p></div>}
           <label className="block text-sm font-bold">Votre téléphone<input required type="tel" value={form.passengerPhone} onChange={event => setForm({ ...form, passengerPhone: event.target.value })} className="mt-2 w-full rounded-xl border px-4 py-3.5 text-sm outline-none transition focus:border-[var(--shop-accent)] focus:ring-2 focus:ring-[var(--shop-accent)]/15" placeholder="+221 77 000 00 00" /></label>
           <details className="rounded-xl border bg-[hsl(var(--muted)/.25)] px-4 py-3"><summary className="cursor-pointer text-xs font-bold text-[hsl(var(--muted-foreground))]">Ajouter un nom (facultatif)</summary><input value={form.passengerName === 'Client Taxi' ? '' : form.passengerName} onChange={event => setForm({ ...form, passengerName: event.target.value || 'Client Taxi' })} className="mt-3 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Nom du passager" /></details>
           {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-800">{error}</p>}
@@ -1001,9 +1041,27 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
 }
 
 function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
-  const hasPosition = trip.driverLatitude !== null && trip.driverLongitude !== null && trip.pickupLatitude !== null && trip.pickupLongitude !== null;
-  const vehicleLeft = hasPosition ? Math.max(16, Math.min(84, 50 + ((trip.driverLongitude! - trip.pickupLongitude!) * 700))) : 50;
-  return <div className="mt-5 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left"><div className="flex items-center justify-between gap-3 px-1"><p className="text-xs font-black">Suivi en direct</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span></div><div className="relative mt-3 h-36 overflow-hidden rounded-xl border bg-[linear-gradient(135deg,#e8eef2,#fff,#eef3ed)]"><div className="absolute inset-x-[10%] top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--shop-primary)]/25" /><div className="absolute left-[10%] top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-white shadow"><MapPin size={14} /></span><span>Vous</span></div><div className="absolute top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold transition-[left] duration-1000 ease-out" style={{ left: `${vehicleLeft}%` }}><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--shop-accent)] text-white shadow"><CarFront size={15} /></span><span>Taxi</span></div><div className="absolute bottom-2 left-2 rounded-md bg-white/85 px-2 py-1 text-[9px] font-semibold text-slate-600 backdrop-blur-sm">{hasPosition ? 'Le véhicule se déplace vers vous' : 'Position du chauffeur en attente'}</div></div></div>;
+  const pickup = trip.pickupLatitude !== null && trip.pickupLongitude !== null
+    ? { latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }
+    : null;
+  const destination = trip.destinationLatitude !== null && trip.destinationLongitude !== null
+    ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude }
+    : null;
+  const driver = trip.driverLatitude !== null && trip.driverLongitude !== null
+    ? { latitude: trip.driverLatitude, longitude: trip.driverLongitude }
+    : null;
+
+  return <div className="mt-5 space-y-3 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left">
+    <div className="flex items-center justify-between gap-3 px-1"><p className="text-xs font-black">Suivi en direct</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span></div>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Voiture → vous</p><p className="mt-1 text-sm font-black">{trip.pickupRouteDistanceKm !== null && trip.pickupRouteDistanceKm !== undefined ? `${trip.pickupRouteDistanceKm.toFixed(1)} km` : 'Calcul…'}</p></div>
+      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Arrivée estimée</p><p className="mt-1 text-sm font-black">{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined ? `${trip.pickupEtaMinutes} min` : 'GPS en attente'}</p></div>
+      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Votre trajet</p><p className="mt-1 text-sm font-black">{trip.routeDistanceKm !== null && trip.routeDistanceKm !== undefined ? `${trip.routeDistanceKm.toFixed(1)} km` : '—'}</p></div>
+      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Tarif</p><p className="mt-1 text-sm font-black">{trip.fare > 0 ? `${new Intl.NumberFormat('fr-FR').format(trip.fare)} XOF` : 'À calculer'}</p></div>
+    </div>
+    {pickup && <TaxiRouteMap pickup={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-72" />}
+    {!trip.pickupRouteDistanceKm && <p className="px-1 text-[11px] text-[hsl(var(--muted-foreground))]">La distance et le temps d’arrivée seront recalculés dès que la position GPS du chauffeur est reçue.</p>}
+  </div>;
 }
 
 function ShopHomePage({

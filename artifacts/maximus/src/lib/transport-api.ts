@@ -50,8 +50,21 @@ export interface Trip {
   pickupLatitude?: number | null;
   pickupLongitude?: number | null;
   matchedDistanceKm?: number | null;
+  destinationLatitude?: number | null;
+  destinationLongitude?: number | null;
+  routeDistanceKm?: number | null;
+  routeDurationMinutes?: number | null;
+  routeGeometry?: GeoJsonLineString | null;
+  pickupRouteDistanceKm?: number | null;
+  pickupEtaMinutes?: number | null;
+  pickupRouteGeometry?: GeoJsonLineString | null;
   driverName?: string | null;
   driverPhone?: string | null;
+}
+
+export interface GeoJsonLineString {
+  type: 'LineString';
+  coordinates: Array<[number, number]>;
 }
 
 export interface TransportMetrics {
@@ -112,12 +125,31 @@ export interface PublicTransportTrip {
   driverPhone: string | null;
   pickupLatitude: number | null;
   pickupLongitude: number | null;
+  destinationLatitude: number | null;
+  destinationLongitude: number | null;
+  routeDistanceKm: number | null;
+  routeDurationMinutes: number | null;
+  routeGeometry: GeoJsonLineString | null;
+  pickupRouteDistanceKm: number | null;
+  pickupEtaMinutes: number | null;
+  pickupRouteGeometry: GeoJsonLineString | null;
   driverLatitude: number | null;
   driverLongitude: number | null;
   vehicleModel: string | null;
   vehicleRegistration: string | null;
   vehicleType: string | null;
   vehicleImageUrl: string | null;
+}
+
+export interface PublicTransportQuote {
+  quoteToken: string;
+  destination: string;
+  destinationLatitude: number;
+  destinationLongitude: number;
+  distanceKm: number;
+  durationMinutes: number;
+  fare: number;
+  geometry: GeoJsonLineString;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -164,6 +196,14 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
   getSettings: () => request<{ heroImageUrl: string }>(
     domain ? '/shop-domain/transport/settings' : `/shop/${encodeURIComponent(slug ?? '')}/transport/settings`,
   ),
+  quote: (body: {
+    destination: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+  }) => request<PublicTransportQuote>(
+    domain ? '/shop-domain/transport/quote' : `/shop/${encodeURIComponent(slug ?? '')}/transport/quote`,
+    json(body),
+  ),
   createTrip: (body: {
     pickup: string;
     destination: string;
@@ -171,6 +211,7 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
     passengerPhone: string;
     pickupLatitude: number;
     pickupLongitude: number;
+    quoteToken?: string;
   }) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
     domain ? '/shop-domain/transport/trips' : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips`,
     json(body),

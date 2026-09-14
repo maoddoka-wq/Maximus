@@ -9,7 +9,9 @@ use App\Support\ModuleCatalog;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -197,6 +199,36 @@ class TransportController extends Controller
             'updated_at' => now(),
         ]);
 
+        $activeTrips = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('driver_id', $id)
+            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS'])
+            ->where(function ($query): void {
+                $query->whereNull('pickup_route_updated_at')
+                    ->orWhere('pickup_route_updated_at', '<', now()->subSeconds(15));
+            })
+            ->get();
+        foreach ($activeTrips as $activeTrip) {
+            if ($activeTrip->pickup_latitude === null || $activeTrip->pickup_longitude === null) {
+                continue;
+            }
+            try {
+                $route = $this->calculateRouteCoordinates(
+                    [(float) $input['longitude'], (float) $input['latitude']],
+                    [(float) $activeTrip->pickup_longitude, (float) $activeTrip->pickup_latitude],
+                );
+                DB::table('transport_trips')->where('id', $activeTrip->id)->update([
+                    'pickup_route_distance_km' => $route['distanceKm'],
+                    'pickup_eta_minutes' => $route['durationMinutes'],
+                    'pickup_route_geometry' => json_encode($route['geometry'], JSON_THROW_ON_ERROR),
+                    'pickup_route_updated_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } catch (\Throwable) {
+                // Keep the last valid route when the routing provider is temporarily unavailable.
+            }
+        }
+
         return response()->json($this->driver(DB::table('transport_drivers')->where('id', $id)->first()));
     }
 
@@ -330,6 +362,19 @@ class TransportController extends Controller
         return $this->createPublicTripForStore($request, $store);
     }
 
+    public function quotePublicTrip(Request $request, string $slug): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->quotePublicTripForStore($request, $store);
+    }
+
     public function createPublicDomainTrip(Request $request): JsonResponse
     {
         $domain = DB::table('ecommerce_domains')
@@ -348,6 +393,26 @@ class TransportController extends Controller
         }
 
         return $this->createPublicTripForStore($request, $store, true);
+    }
+
+    public function quotePublicDomainTrip(Request $request): JsonResponse
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->quotePublicTripForStore($request, $store);
     }
 
     public function getPublicTrip(Request $request, string $slug, string $id): JsonResponse
@@ -570,6 +635,10 @@ class TransportController extends Controller
     private function trip(object $row, ?object $driver = null): array
     {
         $matchedDistance = $row->matched_distance_km ?? null;
+        $routeDistance = $row->route_distance_km ?? null;
+        $routeDuration = $row->route_duration_minutes ?? null;
+        $pickupRouteDistance = $row->pickup_route_distance_km ?? null;
+        $pickupEta = $row->pickup_eta_minutes ?? null;
         $driver ??= $row->driver_id
             ? DB::table('transport_drivers')
                 ->where('company_id', $row->company_id)
@@ -592,6 +661,14 @@ class TransportController extends Controller
             'pickupLatitude' => $row->pickup_latitude ?? null,
             'pickupLongitude' => $row->pickup_longitude ?? null,
             'matchedDistanceKm' => $matchedDistance === null ? null : (float) $matchedDistance,
+            'destinationLatitude' => $row->destination_latitude ?? null,
+            'destinationLongitude' => $row->destination_longitude ?? null,
+            'routeDistanceKm' => $routeDistance === null ? null : (float) $routeDistance,
+            'routeDurationMinutes' => $routeDuration === null ? null : (int) $routeDuration,
+            'routeGeometry' => $this->decodeGeometry($row->route_geometry ?? null),
+            'pickupRouteDistanceKm' => $pickupRouteDistance === null ? null : (float) $pickupRouteDistance,
+            'pickupEtaMinutes' => $pickupEta === null ? null : (int) $pickupEta,
+            'pickupRouteGeometry' => $this->decodeGeometry($row->pickup_route_geometry ?? null),
             'driverName' => $driver?->name,
             'driverPhone' => $driver?->phone,
             'vehicleModel' => null,
@@ -646,6 +723,49 @@ class TransportController extends Controller
         ];
     }
 
+    private function quotePublicTripForStore(Request $request, object $store): JsonResponse
+    {
+        $company = (string) $store->company_id;
+        if (! ModuleCatalog::allowsFeature($company, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        $input = $this->validated($request, [
+            'destination' => ['required', 'string', 'min:2', 'max:180'],
+            'pickupLatitude' => ['required', 'numeric', 'between:-90,90'],
+            'pickupLongitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+        try {
+            $route = $this->calculateRouteToAddress(
+                (float) $input['pickupLatitude'],
+                (float) $input['pickupLongitude'],
+                trim($input['destination']),
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['error' => 'La destination n’a pas pu être localisée ou l’itinéraire est indisponible.'], 422);
+        }
+        $payload = [
+            'companyId' => $company,
+            'destination' => trim($input['destination']),
+            'pickupLatitude' => (float) $input['pickupLatitude'],
+            'pickupLongitude' => (float) $input['pickupLongitude'],
+            'expiresAt' => now()->addMinutes(5)->timestamp,
+            'route' => $route,
+        ];
+
+        return response()->json([
+            'quoteToken' => Crypt::encryptString(json_encode($payload, JSON_THROW_ON_ERROR)),
+            'destination' => $route['destination'],
+            'destinationLatitude' => $route['destinationLatitude'],
+            'destinationLongitude' => $route['destinationLongitude'],
+            'distanceKm' => $route['distanceKm'],
+            'durationMinutes' => $route['durationMinutes'],
+            'fare' => $this->taxiFare($route['distanceKm']),
+            'geometry' => $route['geometry'],
+        ]);
+    }
+
     private function createPublicTripForStore(Request $request, object $store, bool $domain = false): JsonResponse
     {
         $company = (string) $store->company_id;
@@ -660,12 +780,26 @@ class TransportController extends Controller
             'passengerPhone' => ['required', 'string', 'max:40'],
             'pickupLatitude' => ['required', 'numeric', 'between:-90,90'],
             'pickupLongitude' => ['required', 'numeric', 'between:-180,180'],
+            'quoteToken' => ['nullable', 'string', 'max:20000'],
         ]);
         $latitude = (float) $input['pickupLatitude'];
         $longitude = (float) $input['pickupLongitude'];
+        $destination = trim($input['destination']);
+        $route = $this->routeFromQuote($input['quoteToken'] ?? null, $company, $destination, $latitude, $longitude);
+        if (($input['quoteToken'] ?? null) !== null && $route === null) {
+            return response()->json(['error' => 'Le devis Taxi est invalide ou expiré.'], 422);
+        }
+        if ($route === null && trim((string) config('services.openrouteservice.api_key')) !== '') {
+            try {
+                $route = $this->calculateRouteToAddress($latitude, $longitude, $destination);
+            } catch (\Throwable $exception) {
+                report($exception);
+                return response()->json(['error' => 'La destination n’a pas pu être localisée ou l’itinéraire est indisponible.'], 422);
+            }
+        }
         $row = null;
 
-        DB::transaction(function () use (&$row, $company, $input, $latitude, $longitude): void {
+        DB::transaction(function () use (&$row, $company, $input, $latitude, $longitude, $destination, $route): void {
             $drivers = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('status', 'ACTIVE')
@@ -707,10 +841,10 @@ class TransportController extends Controller
                 'company_id' => $company,
                 'reference' => 'TAXI-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4)),
                 'pickup' => trim($input['pickup']),
-                'destination' => trim($input['destination']),
+                'destination' => $destination,
                 'passenger_name' => trim($input['passengerName']),
                 'passenger_phone' => trim($input['passengerPhone']),
-                'fare' => 0,
+                'fare' => $route ? $this->taxiFare($route['distanceKm']) : 0,
                 'driver_id' => $driver?->id,
                 'vehicle_id' => $vehicle?->id,
                 'status' => $status,
@@ -718,11 +852,16 @@ class TransportController extends Controller
                 'pickup_latitude' => $latitude,
                 'pickup_longitude' => $longitude,
                 'matched_distance_km' => $match['distance'] ?? null,
+                'destination_latitude' => $route['destinationLatitude'] ?? null,
+                'destination_longitude' => $route['destinationLongitude'] ?? null,
+                'route_distance_km' => $route['distanceKm'] ?? null,
+                'route_duration_minutes' => $route['durationMinutes'] ?? null,
+                'route_geometry' => $route ? json_encode($route['geometry'], JSON_THROW_ON_ERROR) : null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
             DB::table('transport_trips')->insert($row);
-                if ($vehicle && $status === 'ASSIGNED') {
+            if ($vehicle && $status === 'ASSIGNED') {
                 DB::table('transport_vehicles')->where('id', $vehicle->id)->update([
                     'status' => 'ON_TRIP',
                     'updated_at' => now(),
@@ -730,11 +869,34 @@ class TransportController extends Controller
             }
         });
 
+        $tripRow = DB::table('transport_trips')->where('id', $row['id'])->first();
+        $driver = $tripRow->driver_id
+            ? DB::table('transport_drivers')->where('company_id', $company)->where('id', $tripRow->driver_id)->first()
+            : null;
+        if ($driver && $tripRow->pickup_latitude !== null && $tripRow->pickup_longitude !== null) {
+            try {
+                $pickupRoute = $this->calculateRouteCoordinates(
+                    [(float) $driver->longitude, (float) $driver->latitude],
+                    [(float) $tripRow->pickup_longitude, (float) $tripRow->pickup_latitude],
+                );
+                DB::table('transport_trips')->where('id', $tripRow->id)->update([
+                    'pickup_route_distance_km' => $pickupRoute['distanceKm'],
+                    'pickup_eta_minutes' => $pickupRoute['durationMinutes'],
+                    'pickup_route_geometry' => json_encode($pickupRoute['geometry'], JSON_THROW_ON_ERROR),
+                    'pickup_route_updated_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $tripRow = DB::table('transport_trips')->where('id', $tripRow->id)->first();
+            } catch (\Throwable) {
+                // The trip remains valid even when live routing is temporarily unavailable.
+            }
+        }
+
         $response = $this->publicTrip(
-            (object) $row,
-            $row['driver_id'] ? DB::table('transport_drivers')->where('company_id', $company)->where('id', $row['driver_id'])->first() : null,
-            $row['vehicle_id'] ? DB::table('transport_vehicles')->where('company_id', $company)->where('id', $row['vehicle_id'])->first() : null,
-            $row['vehicle_id'] ? $this->vehicleImageUrl($company, $row['vehicle_id'], $domain) : null,
+            $tripRow,
+            $driver,
+            $tripRow->vehicle_id ? DB::table('transport_vehicles')->where('company_id', $company)->where('id', $tripRow->vehicle_id)->first() : null,
+            $tripRow->vehicle_id ? $this->vehicleImageUrl($company, $tripRow->vehicle_id, $domain) : null,
         );
         return response()->json([
             'trip' => $response,
@@ -745,6 +907,157 @@ class TransportController extends Controller
                     ? 'Le chauffeur le plus proche a reçu votre demande. Il doit la valider pour démarrer la course.'
                     : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.'),
         ], 201);
+    }
+
+    /**
+     * @return array{
+     *   destination: string,
+     *   destinationLatitude: float,
+     *   destinationLongitude: float,
+     *   distanceKm: float,
+     *   durationMinutes: int,
+     *   geometry: array<string, mixed>
+     * }
+     */
+    private function calculateRouteToAddress(float $originLatitude, float $originLongitude, string $destination): array
+    {
+        $key = trim((string) config('services.openrouteservice.api_key'));
+        $destinationCoordinates = $key !== ''
+            ? $this->geocode(
+                rtrim((string) config('services.openrouteservice.base_url', 'https://api.openrouteservice.org'), '/'),
+                ['Authorization' => $key, 'Accept' => 'application/json'],
+                $destination,
+            )
+            : $this->geocodeWithOpenStreetMap($destination);
+        $route = $this->calculateRouteCoordinates(
+            [$originLongitude, $originLatitude],
+            $destinationCoordinates,
+        );
+
+        return [
+            ...$route,
+            'destination' => $destination,
+            'destinationLatitude' => $destinationCoordinates[1],
+            'destinationLongitude' => $destinationCoordinates[0],
+        ];
+    }
+
+    /**
+     * @param  array{0: float, 1: float}  $origin
+     * @param  array{0: float, 1: float}  $destination
+     * @return array{distanceKm: float, durationMinutes: int, geometry: array<string, mixed>}
+     */
+    private function calculateRouteCoordinates(array $origin, array $destination): array
+    {
+        $key = trim((string) config('services.openrouteservice.api_key'));
+        if ($key !== '') {
+            $baseUrl = rtrim((string) config('services.openrouteservice.base_url', 'https://api.openrouteservice.org'), '/');
+            $response = Http::timeout(10)
+                ->withHeaders([
+                    'Authorization' => $key,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($baseUrl.'/v2/directions/driving-car/geojson', [
+                    'coordinates' => [$origin, $destination],
+                    'instructions' => false,
+                    'units' => 'km',
+                ]);
+            $feature = $response->json('features.0');
+            $distance = data_get($feature, 'properties.summary.distance');
+            $duration = data_get($feature, 'properties.summary.duration');
+            $geometry = data_get($feature, 'geometry');
+        } else {
+            $response = Http::timeout(10)
+                ->withHeaders(['Accept' => 'application/json', 'User-Agent' => 'MAXIMUS Taxi'])
+                ->get('https://router.project-osrm.org/route/v1/driving/'.implode(',', $origin).';'.implode(',', $destination), [
+                    'overview' => 'full',
+                    'geometries' => 'geojson',
+                    'steps' => 'false',
+                ]);
+            $distance = $response->json('routes.0.distance');
+            $duration = $response->json('routes.0.duration');
+            $geometry = $response->json('routes.0.geometry');
+            if (is_numeric($distance)) {
+                $distance = (float) $distance / 1000;
+            }
+        }
+        if (! $response->successful() || ! is_numeric($distance) || ! is_numeric($duration) || ! is_array($geometry)
+            || ($geometry['type'] ?? null) !== 'LineString' || ! is_array($geometry['coordinates'] ?? null)) {
+            throw new \RuntimeException('Le service cartographique n’a pas pu calculer l’itinéraire Taxi.');
+        }
+
+        return [
+            'distanceKm' => round($key !== '' ? (float) $distance : (float) $distance, 2),
+            'durationMinutes' => max(1, (int) ceil(((float) $duration) / 60)),
+            'geometry' => $geometry,
+        ];
+    }
+
+    /**
+     * @return array{0: float, 1: float}
+     */
+    private function geocodeWithOpenStreetMap(string $address): array
+    {
+        $response = Http::timeout(10)
+            ->withHeaders(['Accept' => 'application/json', 'User-Agent' => 'MAXIMUS Taxi'])
+            ->get('https://nominatim.openstreetmap.org/search', [
+                'format' => 'jsonv2',
+                'limit' => 1,
+                'q' => $address,
+            ]);
+        $result = $response->json('0');
+        if (! $response->successful() || ! is_array($result) || ! is_numeric($result['lon'] ?? null) || ! is_numeric($result['lat'] ?? null)) {
+            throw new \RuntimeException('OpenStreetMap n’a pas pu localiser la destination.');
+        }
+
+        return [(float) $result['lon'], (float) $result['lat']];
+    }
+
+    private function taxiFare(float $distanceKm): int
+    {
+        $baseFare = 500;
+        $perKilometre = 300;
+        return max(1000, $baseFare + ((int) ceil($distanceKm) * $perKilometre));
+    }
+
+    private function routeFromQuote(?string $token, string $company, string $destination, float $latitude, float $longitude): ?array
+    {
+        if (! $token) {
+            return null;
+        }
+
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
+            $validCoordinates = isset($payload['pickupLatitude'], $payload['pickupLongitude'])
+                && abs((float) $payload['pickupLatitude'] - $latitude) < 0.00001
+                && abs((float) $payload['pickupLongitude'] - $longitude) < 0.00001;
+            if (($payload['companyId'] ?? null) !== $company
+                || ($payload['destination'] ?? null) !== $destination
+                || ($payload['expiresAt'] ?? 0) < now()->timestamp
+                || ! $validCoordinates
+                || ! is_array($payload['route'] ?? null)) {
+                return null;
+            }
+
+            return $payload['route'];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function decodeGeometry(?string $geometry): ?array
+    {
+        if (! $geometry) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($geometry, true, 512, JSON_THROW_ON_ERROR);
+            return is_array($decoded) ? $decoded : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function distanceInKm(float $latitudeA, float $longitudeA, float $latitudeB, float $longitudeB): float
