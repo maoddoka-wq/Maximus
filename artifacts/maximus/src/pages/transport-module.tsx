@@ -304,24 +304,24 @@ export default function TransportModulePage({
       {pendingAction && <div className="flex items-center gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm font-semibold text-sky-700"><RefreshCw size={15} className="animate-spin" />Enregistrement en cours…</div>}
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/25 bg-rose-500/5 px-4 py-3 text-sm text-rose-700"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer le message"><X size={16} /></button></div>}
 
-      <header className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 px-5 py-6 text-slate-100 shadow-[0_18px_45px_rgba(15,23,42,.16)] sm:px-7">
-        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full border border-amber-300/15" />
-        <div className="absolute right-8 top-8 h-36 w-36 rounded-full border border-sky-300/10" />
+      <header className="relative overflow-hidden rounded-2xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] px-5 py-6 text-[hsl(var(--sidebar-foreground))] shadow-[0_18px_45px_rgba(15,23,42,.16)] sm:px-7">
+        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full border border-[hsl(var(--primary)/.25)]" />
+        <div className="absolute right-8 top-8 h-36 w-36 rounded-full border border-[hsl(var(--accent)/.2)]" />
         <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
-            <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.18em] text-amber-300"><CarFront size={15} />Opérations taxi</div>
+            <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]"><CarFront size={15} />Opérations taxi</div>
             <h1 className="max-w-2xl text-2xl font-black tracking-[-.04em] sm:text-3xl">La flotte en mouvement, sans angles morts.</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">Suivez les demandes, les équipages et la disponibilité des véhicules depuis un seul poste de pilotage.</p>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[hsl(var(--sidebar-foreground)/.72)]">Suivez les demandes, les équipages et la disponibilité des véhicules depuis un seul poste de pilotage.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => void load(true)} className="btn inline-flex items-center gap-2 border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700" title="Actualiser"><RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser</button>
-            {canCreateTrips && <button type="button" onClick={() => setDialog('trip')} className="btn inline-flex items-center gap-2 bg-amber-300 px-3.5 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-200"><Plus size={15} />Nouvelle course</button>}
+            <button type="button" onClick={() => void load(true)} className="btn inline-flex items-center gap-2 border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--sidebar-foreground))] hover:opacity-90" title="Actualiser"><RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser</button>
+            {canCreateTrips && <button type="button" onClick={() => setDialog('trip')} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-black text-[hsl(var(--primary-foreground))] hover:opacity-90"><Plus size={15} />Nouvelle course</button>}
           </div>
         </div>
       </header>
 
       {!singleModuleNavigation && <nav aria-label="Navigation transport" className="module-tabs flex gap-1.5 overflow-x-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.9)] p-1.5 shadow-sm">
-        {visibleTabs.map(item => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'active bg-slate-900 text-white shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.6)] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>; })}
+        {visibleTabs.map(item => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.6)] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>; })}
       </nav>}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
@@ -343,21 +343,21 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
   const recentTrips = data.trips.slice(0, 5);
   return <div className="fade-up space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Chauffeurs actifs" value={data.metrics.activeDrivers} detail="Prêts à prendre une course" icon={UsersRound} accent="amber" />
+      <Metric label="Chauffeurs actifs" value={data.metrics.activeDrivers} detail="Prêts à prendre une course" icon={UsersRound} accent="brand" />
       <Metric label="Véhicules disponibles" value={data.metrics.availableVehicles} detail="À la station ou en attente" icon={CarFront} accent="sky" />
       <Metric label="Courses aujourd’hui" value={data.metrics.todayTrips} detail={`${activeTrips.length} demande${activeTrips.length > 1 ? 's' : ''} ouverte${activeTrips.length > 1 ? 's' : ''}`} icon={Route} accent="violet" />
       <Metric label="Recettes du jour" value={money(data.metrics.todayRevenue)} detail="Courses non annulées" icon={CircleDollarSign} accent="emerald" />
     </div>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,.6fr)]">
       <section className="card-surface overflow-hidden">
-        <div className="section-heading border-b px-5 py-4"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Flux opérationnel</p><h2 className="mt-1 text-base font-bold">Dernières courses</h2></div><button type="button" onClick={() => onTab('courses')} className="text-xs font-bold text-sky-700 hover:underline">Voir toutes les courses</button></div>
+        <div className="section-heading border-b px-5 py-4"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Flux opérationnel</p><h2 className="mt-1 text-base font-bold">Dernières courses</h2></div><button type="button" onClick={() => onTab('courses')} className="text-xs font-bold text-[hsl(var(--primary))] hover:underline">Voir toutes les courses</button></div>
         {recentTrips.length ? <TripTable trips={recentTrips} compact onStatusChange={() => undefined} /> : <EmptyState icon={Route} title="Aucune course aujourd’hui" text="Les nouvelles demandes apparaîtront ici dès leur création." />}
       </section>
       <section className="card-surface overflow-hidden">
         <div className="border-b px-5 py-4"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Disponibilité</p><h2 className="mt-1 text-base font-bold">État de la flotte</h2></div>
         <div className="space-y-4 p-5">
           <AvailabilityRow label="Véhicules disponibles" value={data.vehicles.filter(item => item.status === 'AVAILABLE').length} total={data.vehicles.length} color="bg-emerald-500" />
-          <AvailabilityRow label="Chauffeurs actifs" value={data.drivers.filter(item => item.status === 'ACTIVE').length} total={data.drivers.length} color="bg-amber-400" />
+          <AvailabilityRow label="Chauffeurs actifs" value={data.drivers.filter(item => item.status === 'ACTIVE').length} total={data.drivers.length} color="bg-[hsl(var(--primary))]" />
           <AvailabilityRow label="En maintenance" value={data.vehicles.filter(item => item.status === 'MAINTENANCE').length} total={data.vehicles.length} color="bg-rose-400" />
         </div>
       </section>
@@ -366,7 +366,7 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
 }
 
 function Metric({ label, value, detail, icon: Icon, accent }: { label: string; value: string | number; detail: string; icon: typeof Gauge; accent: string }) {
-  const colors: Record<string, string> = { amber: 'bg-amber-400/15 text-amber-700', sky: 'bg-sky-500/12 text-sky-700', violet: 'bg-violet-500/12 text-violet-700', emerald: 'bg-emerald-500/12 text-emerald-700' };
+  const colors: Record<string, string> = { brand: 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]', sky: 'bg-sky-500/12 text-sky-700', violet: 'bg-violet-500/12 text-violet-700', emerald: 'bg-emerald-500/12 text-emerald-700' };
   return <div className="metric-card card-surface metric-accent p-4"><div className="flex items-start justify-between gap-3"><div className={`flex h-9 w-9 items-center justify-center rounded-lg ${colors[accent]}`}><Icon size={18} /></div><Activity size={15} className="text-[hsl(var(--muted-foreground)/.5)]" /></div><p className="mt-5 text-[11px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-2xl font-black tracking-[-.05em]">{value}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{detail}</p></div>;
 }
 
@@ -401,7 +401,7 @@ function DriverLocationPanel({ driver, active, error }: { driver: Driver | null;
 }
 
 function DriversPanel({ drivers, canCreate, onCreate }: { drivers: Driver[]; canCreate: boolean; onCreate: () => void }) {
-  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Équipage</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Chauffeurs</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les profils autorisés à prendre le volant.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button>}</div><section className="card-surface overflow-hidden">{drivers.length ? <div className="table-scroll"><table className="data-table w-full text-left text-sm"><thead><tr><th className="px-4">Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Statut</th></tr></thead><tbody>{drivers.map(driver => <tr key={driver.id} className="border-t"><td className="px-4"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/15 text-xs font-black text-amber-800">{driver.name.slice(0, 2).toUpperCase()}</div><span className="font-semibold">{driver.name}</span></div></td><td><a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"><Phone size={13} />{driver.phone}</a></td><td className="mono text-xs">{driver.licenseNumber}</td><td><StatusBadge status={driver.status} label={driverStatusLabel[driver.status]} /></td></tr>)}</tbody></table></div> : <EmptyState icon={UserRound} title="Aucun chauffeur enregistré" text="Ajoutez les chauffeurs habilités à rejoindre votre flotte." />}</section></div>;
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Équipage</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Chauffeurs</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les profils autorisés à prendre le volant.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button>}</div><section className="card-surface overflow-hidden">{drivers.length ? <div className="table-scroll"><table className="data-table w-full text-left text-sm"><thead><tr><th className="px-4">Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Statut</th></tr></thead><tbody>{drivers.map(driver => <tr key={driver.id} className="border-t"><td className="px-4"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--primary)/.12)] text-xs font-black text-[hsl(var(--primary))]">{driver.name.slice(0, 2).toUpperCase()}</div><span className="font-semibold">{driver.name}</span></div></td><td><a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"><Phone size={13} />{driver.phone}</a></td><td className="mono text-xs">{driver.licenseNumber}</td><td><StatusBadge status={driver.status} label={driverStatusLabel[driver.status]} /></td></tr>)}</tbody></table></div> : <EmptyState icon={UserRound} title="Aucun chauffeur enregistré" text="Ajoutez les chauffeurs habilités à rejoindre votre flotte." />}</section></div>;
 }
 
 function VehiclesPanel({ vehicles, drivers, canCreate, onCreate }: { vehicles: Vehicle[]; drivers: Driver[]; canCreate: boolean; onCreate: () => void }) {
@@ -464,5 +464,5 @@ function TripDialog({ busy, drivers, vehicles, onClose, onSubmit }: { busy: bool
 }
 
 function DialogActions({ busy, disabled = false, onClose, label }: { busy: boolean; disabled?: boolean; onClose: () => void; label: string }) {
-  return <div className="modal-footer flex items-center justify-end gap-2"><button type="button" onClick={onClose} className="px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" disabled={busy}>Annuler</button><button type="submit" disabled={busy || disabled} className="btn inline-flex items-center gap-2 bg-slate-900 px-4 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">{busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}{busy ? 'Enregistrement…' : label}</button></div>;
+  return <div className="modal-footer flex items-center justify-end gap-2"><button type="button" onClick={onClose} className="px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" disabled={busy}>Annuler</button><button type="submit" disabled={busy || disabled} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}{busy ? 'Enregistrement…' : label}</button></div>;
 }
