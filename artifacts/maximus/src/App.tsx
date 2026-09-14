@@ -1262,41 +1262,41 @@ function Login({
     loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
   };
   return (
-    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
-      <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
-        <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
+    <div className="grid min-h-[100dvh] bg-[#f8f5ed] text-[#172033] lg:grid-cols-[1.1fr_.9fr]">
+      <section className="relative hidden overflow-hidden bg-[#0b1b2b] p-12 text-[#f8f5ed] lg:flex lg:flex-col lg:justify-start">
+        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[#f6c85f]/15" />
+        <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[#f6c85f]/45" />
         <Brand inverse large />
         <div className="relative mt-32 max-w-xl pb-16">
-          <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">
+          <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[#f6c85f]">
             La gestion d’entreprise, simplement
           </p>
           <h1 className="text-6xl font-bold leading-[.98] tracking-[-.06em]">
             Toute votre entreprise.
             <br />
-            <span className="text-[hsl(var(--accent))]">Au même endroit.</span>
+            <span className="text-[#f6c85f]">Au même endroit.</span>
           </h1>
-          <p className="mt-8 max-w-md text-lg leading-8 text-[hsl(var(--sidebar-foreground)/.7)]">
+          <p className="mt-8 max-w-md text-lg leading-8 text-[#f8f5ed]/70">
             MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer
             aujourd’hui et à grandir demain.
           </p>
         </div>
-        <p className="mt-auto mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">
+        <p className="mt-auto mono text-[10px] uppercase tracking-[.18em] text-[#f8f5ed]/50">
           Sénégal · Côte d’Ivoire · UEMOA
         </p>
       </section>
-      <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12">
+      <section className="flex items-center justify-center bg-[#f8f5ed] p-6 sm:p-12">
         <div className="w-full max-w-md fade-up">
           <div className="mb-10 lg:hidden">
             <Brand large />
           </div>
           <div className="mb-8">
-            <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
-              Accédez à votre espace
+            <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[#667085]">
+              Connexion
             </p>
-            <h2 className="text-3xl font-bold tracking-[-.04em]">Gérez votre activité en toute simplicité</h2>
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.
+            <h2 className="text-3xl font-bold tracking-[-.04em] text-[#172033]">Accédez à votre espace</h2>
+            <p className="mt-2 text-sm text-[#667085]">
+              Connectez-vous pour gérer votre entreprise.
             </p>
           </div>
           <form
@@ -1312,7 +1312,7 @@ function Login({
               onChange={setEmail}
               type="email"
               testId="input-login-email"
-              help="Adresse du compte MAXIMUS, de l’entreprise ou de l’employé."
+              help="Adresse de votre compte entreprise ou employé."
             />
             <Field
               label="Mot de passe"
@@ -1320,22 +1320,21 @@ function Login({
               onChange={setPassword}
               type="password"
               testId="input-login-password"
-              help="Mot de passe associé à l’adresse email saisie."
+              help="Mot de passe associé à cette adresse."
             />
             <div className="flex justify-end">
               <button
                 type="button"
                 data-testid="button-forgot-password"
                 onClick={() => setLoginHelp((value) => !value)}
-                className="text-xs font-semibold text-[hsl(var(--primary))]"
+                className="text-xs font-semibold text-[#0b1b2b] hover:text-[#9b6813]"
               >
-                Aide à la connexion
+                Besoin d’aide ?
               </button>
             </div>
             {loginHelp && (
-              <p className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                Utilisez l’adresse email et le mot de passe fournis par votre administrateur. Tous les comptes se
-                connectent depuis ce même formulaire.
+              <p className="rounded-lg bg-[#e9e4d8] px-3 py-2 text-xs leading-5 text-[#667085]">
+                Utilisez les identifiants fournis par votre administrateur.
               </p>
             )}
             {error && (
@@ -1349,17 +1348,17 @@ function Login({
             <button
               data-testid="button-login"
               disabled={Boolean(pendingEmail)}
-              className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)] disabled:cursor-wait disabled:opacity-70"
+              className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[#0b1b2b] px-4 py-3.5 text-sm font-bold text-[#f8f5ed] shadow-lg shadow-[#0b1b2b]/20 hover:bg-[#102940] disabled:cursor-wait disabled:opacity-70"
               type="submit"
             >
               <LogIn size={17} className={pendingEmail ? 'animate-pulse' : ''} />
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
-          <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-            Pas encore d’espace ?{' '}
-            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-              Créer une entreprise
+          <div className="mt-8 border-t border-[#d7d0c2] pt-6 text-center text-sm text-[#667085]">
+            Nouveau compte ?{' '}
+            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[#9b6813] hover:text-[#0b1b2b]">
+              Ouvrir un espace entreprise
             </Link>
             {!registrationEnabled && (
               <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
