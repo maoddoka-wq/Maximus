@@ -303,7 +303,7 @@ export default function EcommerceModulePage({
     }
     try {
       const [bootstrap, nextWalletData] = await Promise.all([
-        api.bootstrap({ fresh: silent }),
+        api.bootstrap(),
         visibleTabIds.includes('finances') ? api.wallet() : Promise.resolve(null),
       ]);
       const nextData = normalizeEcommerceBootstrap(bootstrap, companyId);
