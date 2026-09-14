@@ -24,7 +24,7 @@ import {
   commerceTabDefinitions,
   type CommerceTabId,
 } from './commerce-permissions';
-import { getSelectedFeatureIds } from './employee-permissions';
+import { getSelectedFeatureIds, roleHasFeaturePermission } from './employee-permissions';
 import { getModuleFeatureOptions } from './module-features';
 import { featureSlug } from './permission-keys';
 import { presenceFeatureDefinitions } from './presence-features';
@@ -199,7 +199,11 @@ export function buildSidebarFeatureGroups({
             }))
           : moduleId === 'transport'
             ? getModuleFeatureOptions(module)
-              .filter(feature => selectedFeatureIds.has(feature.id))
+              .filter(feature =>
+                selectedFeatureIds.has(feature.id)
+                && (companyAdmin && !employeeRole
+                  ? true
+                  : roleHasFeaturePermission(employeeRole, employeeNode, module.id, feature.id, 'voir')))
               .map(feature => ({
                 href: `/entreprise/transport?tab=${feature.id}`,
                 label: feature.label,

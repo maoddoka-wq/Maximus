@@ -79,6 +79,39 @@ test('le menu Transport utilise les identifiants canoniques des fonctionnalités
   ]);
 });
 
+test('le menu Transport retire les fonctionnalités sans permission de lecture', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['transport'],
+    configuredModules,
+    employeeRole: {
+      id: 'chauffeur',
+      name: 'Chauffeur',
+      description: '',
+      modulePermissions: {
+        transport: ['voir'],
+        'transport:menu:overview': ['voir'],
+        'transport:menu:trips': ['voir', 'modifier'],
+      },
+    },
+    employeeNode: {
+      id: 'unit-transport',
+      companyId: 'company-test',
+      name: 'Transport',
+      type: 'service',
+      parentId: null,
+      moduleIds: ['transport'],
+      moduleFeatures: {
+        transport: ['overview', 'trips', 'drivers', 'vehicles'],
+      },
+    },
+  });
+
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
+    '/entreprise/transport?tab=overview',
+    '/entreprise/transport?tab=trips',
+  ]);
+});
+
 test('le menu Paie utilise une icône distincte pour chaque fonctionnalité', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['paie'],

@@ -127,7 +127,12 @@ export function roleHasFeaturePermission(
   permission: ModulePermission,
 ) {
   if (!role || !unitAllowsModule(employeeNode, moduleId)) return false;
-  if (role.modulePermissions[moduleId]?.includes(permission)) return true;
+  const featurePrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:menu:`;
+  const hasDetailedPermissions = Object.keys(role.modulePermissions)
+    .some(key => key.startsWith(featurePrefix));
+  if (!hasDetailedPermissions) {
+    return role.modulePermissions[moduleId]?.includes(permission) ?? false;
+  }
 
   return role.modulePermissions[permissionFeatureKey(moduleId, featureId)]?.includes(permission) ?? false;
 }

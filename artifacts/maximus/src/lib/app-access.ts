@@ -197,6 +197,7 @@ export function buildAppAccessContext({
       ? companySelectedFeatureIds(transportModule)
       : accessRole && transportModule
         ? [...getSelectedFeatureIds(accessRole, transportModule, employeeNode?.moduleFeatures?.[transportModule.id])]
+          .filter(featureId => roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, featureId, 'voir'))
         : undefined;
   const transportFeaturePermissions = transportModule
     ? Object.fromEntries(

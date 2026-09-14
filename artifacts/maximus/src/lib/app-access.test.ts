@@ -121,6 +121,39 @@ test('calcule les permissions Transport séparément pour chaque rubrique', () =
   assert.equal(access.transportFeaturePermissions?.vehicles?.canModify, false);
 });
 
+test('retire du menu Transport une fonctionnalité sélectionnée mais sans droit de lecture', () => {
+  const { data, company, employee } = createAccessFixture();
+  const node = data.orgNodes[0]!;
+  const role = data.roles[0]!;
+  company.allowedModules = ['transport'];
+  company.requestedModuleFeatures = {
+    transport: ['overview', 'trips', 'drivers', 'vehicles'],
+  };
+  node.moduleIds = ['transport'];
+  node.moduleFeatures = {
+    transport: ['overview', 'trips', 'drivers', 'vehicles'],
+  };
+  role.modulePermissions = {
+    transport: ['voir'],
+    'transport:menu:overview': ['voir'],
+    'transport:menu:trips': ['voir'],
+    'transport:menu:drivers': ['voir', 'créer', 'modifier'],
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `employee:${employee.id}`,
+    employee,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.selectedTransportFeatureIds, ['overview', 'trips', 'drivers']);
+  assert.equal(access.selectedTransportFeatureIds?.includes('vehicles'), false);
+});
+
 test('affiche les modules dans le menu de l’administrateur d’entreprise', () => {
   const { data, company } = createAccessFixture();
 
