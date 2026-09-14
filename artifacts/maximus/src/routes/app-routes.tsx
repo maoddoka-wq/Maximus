@@ -161,6 +161,7 @@ export type CompanyRouteScreens = {
   finance: Screen;
   commerce: Screen;
   operational: Screen;
+  transport: Screen;
   payroll: Screen;
   humanResources: Screen;
   presence: Screen;
@@ -185,6 +186,7 @@ export function CompanyRouter({
   presenceFeatureIds,
   ecommerceFeatureIds,
   payrollFeatureIds,
+  transportFeatureIds,
   hasPermission,
   hasPresencePermission,
   stockPermissions,
@@ -212,6 +214,7 @@ export function CompanyRouter({
   presenceFeatureIds?: string[];
   ecommerceFeatureIds?: string[];
   payrollFeatureIds?: string[];
+  transportFeatureIds?: string[];
   hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean;
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
@@ -388,6 +391,15 @@ export function CompanyRouter({
       visibleFeatureIds: payrollFeatureIds,
       activeFeatureId: normalizePayrollFeatureId(query.get('feature') ?? '') ?? 'tableau-de-bord',
       onNavigate,
+      singleModuleNavigation,
+    });
+  }
+  if (routePath === '/entreprise/transport') {
+    return renderScreen(screens.transport, {
+      companyId,
+      canCreate: hasPermission('transport', 'créer'),
+      canModify: hasPermission('transport', 'modifier'),
+      allowedFeatureIds: transportFeatureIds,
       singleModuleNavigation,
     });
   }

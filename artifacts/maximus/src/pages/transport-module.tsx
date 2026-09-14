@@ -41,7 +41,7 @@ const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: st
   { id: 'overview', label: 'Vue d’ensemble', icon: Gauge, featureId: 'overview' },
   { id: 'courses', label: 'Courses', icon: Route, featureId: 'courses' },
   { id: 'chauffeurs', label: 'Chauffeurs', icon: UserRound, featureId: 'chauffeurs' },
-  { id: 'vehicules', label: 'Véhicules', icon: CarFront, featureId: 'vehicules' },
+  { id: 'vehicules', label: 'Véhicules', icon: CarFront, featureId: 'vehicles' },
 ];
 
 const tripStatuses: TripStatus[] = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];

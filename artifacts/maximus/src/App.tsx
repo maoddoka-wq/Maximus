@@ -159,6 +159,7 @@ const PublicShopPage = lazy(() => import('@/pages/public-shop'));
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
 );
+const TransportModulePage = lazy(() => import('@/pages/transport-module'));
 const CompanyOrganizationAdmin = lazy(() =>
   import('@/pages/company-organization').then((module) => ({ default: module.CompanyOrganizationAdmin })),
 );
@@ -980,6 +981,7 @@ function AppContent() {
     selectedPresenceFeatureIds,
     selectedEcommerceFeatureIds,
     selectedPayrollFeatureIds,
+    selectedTransportFeatureIds,
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
@@ -1176,6 +1178,7 @@ function AppContent() {
                   presenceFeatureIds={selectedPresenceFeatureIds}
                   ecommerceFeatureIds={selectedEcommerceFeatureIds}
                   payrollFeatureIds={selectedPayrollFeatureIds}
+                  transportFeatureIds={selectedTransportFeatureIds}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
@@ -1194,6 +1197,7 @@ function AppContent() {
                     finance: FinancePage,
                     commerce: CommerceModulePage,
                     operational: OperationalModulePage,
+                    transport: TransportModulePage,
                     payroll: PayrollModulePage,
                     humanResources: HumanResourcesWorkspace,
                     presence: PresenceModulePage,
@@ -6597,6 +6601,14 @@ function ModulePackTestWorkbench({
                preview
              />
            )}
+          {module.id === 'transport' && (
+            <TransportModulePage
+              companyId={previewCompanyId || 'module-preview'}
+              canCreate={false}
+              canModify={false}
+              preview
+            />
+          )}
           {operationalModules.includes(module.id) && module.id !== 'paie' && (
             <OperationalModulePage
               moduleId={module.id}
@@ -6606,7 +6618,7 @@ function ModulePackTestWorkbench({
             />
           )}
           {module.id === 'rapports' && <OperationalReportsPage data={data} />}
-           {!['stocks', 'commerce', 'ventes', 'ecommerce', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
+          {!['stocks', 'commerce', 'ventes', 'ecommerce', 'transport', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
             module.id,
           ) && (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">

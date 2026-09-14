@@ -1,5 +1,6 @@
 import {
   Boxes,
+  CarFront,
   CreditCard,
   FileBarChart,
   FileClock,
@@ -26,6 +27,7 @@ export type ModuleRouteKind =
   | 'presence'
   | 'payroll'
   | 'reports'
+  | 'transport'
   | 'operational';
 
 export type ModuleDescriptor = {
@@ -55,6 +57,7 @@ const moduleRouteConfig: Record<
   fournisseurs: { icon: Store, routeKind: 'operational' },
   logistique: { icon: Warehouse, routeKind: 'operational' },
   documents: { icon: FolderKanban, routeKind: 'operational' },
+  transport: { icon: CarFront, routeKind: 'transport' },
   rapports: { icon: FileBarChart, routeKind: 'reports' },
 };
 

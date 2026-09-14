@@ -143,6 +143,10 @@ export const modules: Module[] = [
     { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
   ], status: 'ACTIF' },
+  { id: 'transport', name: 'Transport', description: 'Organiser les chauffeurs, les véhicules et les courses Taxi.', features: ['Vue d’ensemble', 'Courses', 'Chauffeurs', 'Véhicules'], featurePacks: [
+    { id: 'transport-consultation', name: 'Consultation Taxi', description: 'Suivre l’activité Taxi, les courses et la flotte.', featureIds: ['overview', 'trips', 'drivers', 'vehicles'] },
+    { id: 'transport-gestion', name: 'Gestionnaire Taxi', description: 'Gérer les courses, les chauffeurs et les véhicules.', featureIds: ['overview', 'trips', 'drivers', 'vehicles'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'] } },
+  ], status: 'ACTIF' },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: payrollFeatureDefinitions.map(feature => feature.label), featurePacks: [
     {

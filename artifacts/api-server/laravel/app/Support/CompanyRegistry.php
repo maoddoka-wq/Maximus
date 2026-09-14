@@ -60,5 +60,10 @@ final class CompanyRegistry
                 'updated_at' => now(),
             ]);
         }
+        foreach (['transport_trips', 'transport_vehicles', 'transport_drivers'] as $table) {
+            if (DB::getSchemaBuilder()->hasTable($table)) {
+                DB::table($table)->where('company_id', $companyId)->delete();
+            }
+        }
     }
 }

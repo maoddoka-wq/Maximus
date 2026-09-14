@@ -13,6 +13,7 @@ export const moduleIds = [
   'fournisseurs',
   'logistique',
   'documents',
+  'transport',
   'rapports',
 ] as const;
 

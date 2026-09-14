@@ -18,6 +18,14 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
   if (module.id === 'ecommerce') {
     return ecommerceFeatureDefinitions.map(feature => ({ id: feature.id, label: feature.label }));
   }
+  if (module.id === 'transport') {
+    return [
+      { id: 'overview', label: 'Vue d’ensemble' },
+      { id: 'trips', label: 'Courses' },
+      { id: 'drivers', label: 'Chauffeurs' },
+      { id: 'vehicles', label: 'Véhicules' },
+    ];
+  }
   return (Array.isArray(module.features) ? module.features : []).map(feature => ({ id: featureSlug(feature), label: feature }));
 }
 

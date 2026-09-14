@@ -115,6 +115,27 @@ final class ModuleCatalog
                     ],
                 ],
             ],
+            [
+                'id' => 'transport',
+                'name' => 'Transport',
+                'description' => 'Organiser les chauffeurs, les véhicules et les courses Taxi.',
+                'features' => ['Vue d’ensemble', 'Courses', 'Chauffeurs', 'Véhicules'],
+                'feature_packs' => [
+                    ['id' => 'transport-consultation', 'name' => 'Consultation Taxi', 'description' => 'Suivre l’activité Taxi, les courses et la flotte.', 'feature_ids' => ['overview', 'trips', 'drivers', 'vehicles']],
+                    [
+                        'id' => 'transport-gestion',
+                        'name' => 'Gestionnaire Taxi',
+                        'description' => 'Gérer les courses, les chauffeurs et les véhicules.',
+                        'feature_ids' => ['overview', 'trips', 'drivers', 'vehicles'],
+                        'feature_permissions' => [
+                            'overview' => ['voir'],
+                            'trips' => ['voir', 'créer', 'modifier'],
+                            'drivers' => ['voir', 'créer', 'modifier'],
+                            'vehicles' => ['voir', 'créer', 'modifier'],
+                        ],
+                    ],
+                ],
+            ],
         ];
     }
 
