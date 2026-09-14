@@ -1356,14 +1356,17 @@ function Login({
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
-          {registrationEnabled && (
-            <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-              Pas encore d’espace ?{' '}
-              <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-                Créer une entreprise
-              </Link>
-            </div>
-          )}
+          <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+            Pas encore d’espace ?{' '}
+            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
+              Créer une entreprise
+            </Link>
+            {!registrationEnabled && (
+              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                Les inscriptions sont momentanément fermées.
+              </p>
+            )}
+          </div>
           {showDemoAccounts && demoAccounts.length > 0 && (
             <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
               <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
