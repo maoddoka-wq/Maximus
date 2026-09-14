@@ -1133,7 +1133,7 @@ class EcommerceController extends Controller
 
     public function updateTaxiDriver(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'livraisons')) {
+        if (! $this->allowed($request, 'modify', 'transport')) {
             return $this->forbidden();
         }
 

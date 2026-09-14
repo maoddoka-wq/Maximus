@@ -1166,6 +1166,24 @@ class EcommerceTest extends TestCase
         ]);
     }
 
+    public function test_transport_employee_management_does_not_depend_on_delivery_permission(): void
+    {
+        $this->enableTransportFeature();
+        $this->asActor('employee');
+        $admin = $this->asActor();
+        $driver = $admin->postJson('/api/ecommerce/taxi/drivers?companyId=kora', [
+            'employeeId' => 'ecommerce-employee',
+            'licensePlate' => 'DK-9090-ZZ',
+        ])->assertCreated()->json();
+
+        $this->asActor('employee', [
+            'ecommerce:menu:transport' => ['voir', 'modifier'],
+        ])->patchJson('/api/ecommerce/taxi/drivers/'.$driver['id'].'?companyId=kora', [
+            'verificationStatus' => 'VERIFIED',
+        ])->assertOk()
+            ->assertJsonPath('verificationStatus', 'VERIFIED');
+    }
+
     public function test_delivery_can_remain_enabled_without_enabling_transport(): void
     {
         DB::table('maximus_company_modules')

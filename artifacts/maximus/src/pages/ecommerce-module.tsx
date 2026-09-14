@@ -32,6 +32,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import { Link } from 'wouter';
 import {
   createEcommerceApi,
   type EcommerceBootstrap,
@@ -1199,6 +1200,23 @@ function TaxiPanel({ data, canCreate, canModify, run }: { data: EcommerceBootstr
       <Metric label="À valider" value={String(drivers.filter(driver => driver.verificationStatus === 'PENDING').length)} detail="Documents à contrôler" icon={ShieldCheck} warning />
     </div>
     {taxiError && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-xs text-[hsl(var(--destructive))]" role="alert" data-testid="status-taxi-error"><span>{taxiError}</span><button type="button" onClick={() => setTaxiError('')} aria-label="Fermer l’erreur Taxi"><X size={15} /></button></div>}
+    <Panel
+      title="Employés chauffeurs"
+      description="Un chauffeur Taxi est toujours un compte employé actif de cette entreprise. Créez d’abord le compte dans Organisation, puis rattachez-le ici à un véhicule."
+      action={<Link href="/entreprise/organisation?tab=employees" className="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted)/.5)]">Gérer les comptes employés <ArrowUpRight size={14} /></Link>}
+    >
+      {availableEmployees.length === 0
+        ? <div className="rounded-xl border border-dashed px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]">Tous les comptes employés actifs sont déjà rattachés ou aucun compte employé actif n’existe encore. Utilisez « Gérer les comptes employés » pour créer ou activer le compte du chauffeur.</div>
+        : <div className="grid gap-3 sm:grid-cols-2">
+          {availableEmployees.map(employee => <div key={employee.employeeId} className="flex items-center justify-between gap-3 rounded-xl border p-3.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold">{employee.displayName}</p>
+              <p className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">{employee.email}</p>
+            </div>
+            {canCreate && <button type="button" onClick={() => { setEditing('new'); setForm({ ...blankTaxiDriverForm, employeeId: employee.employeeId }); }} className="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]">Rattacher</button>}
+          </div>)}
+        </div>}
+    </Panel>
     <Panel title="Taxi" description="Pilotez la flotte de chauffeurs et visualisez les courses reçues depuis la boutique." action={canCreate ? <button type="button" onClick={openNew} data-testid="button-add-taxi-driver" className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button> : undefined}>
       <div className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
         <section aria-labelledby="taxi-drivers-heading">
@@ -1225,9 +1243,9 @@ function TaxiPanel({ data, canCreate, canModify, run }: { data: EcommerceBootstr
         </section>
       </div>
     </Panel>
-    {editing && <Modal title={editing === 'new' ? 'Ajouter un chauffeur Taxi' : `Modifier ${editing.displayName}`} onClose={() => setEditing(null)}>
+    {editing && <Modal title={editing === 'new' ? 'Rattacher un employé comme chauffeur' : `Modifier ${editing.displayName}`} onClose={() => setEditing(null)}>
       <form onSubmit={saveDriver} className="space-y-4">
-        {editing === 'new' ? <label className="block text-xs font-bold">Employé éligible<span className="ml-1 text-[hsl(var(--destructive))]">*</span><select required value={form.employeeId} onChange={event => setForm({ ...form, employeeId: event.target.value })} data-testid="select-taxi-employee" className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="">Sélectionner un employé</option>{availableEmployees.map(employee => <option key={employee.employeeId} value={employee.employeeId}>{employee.displayName} · {employee.email}</option>)}</select>{availableEmployees.length === 0 && <span className="mt-1.5 block text-xs font-normal text-[hsl(var(--muted-foreground))]">Aucun employé éligible disponible.</span>}</label> : <div className="rounded-lg border bg-[hsl(var(--muted)/.28)] px-3 py-2.5"><span className="block text-[11px] font-bold text-[hsl(var(--muted-foreground))]">Employé rattaché</span><span className="mt-1 block text-sm font-bold">{editing.displayName}</span></div>}
+        {editing === 'new' ? <label className="block text-xs font-bold">Employé chauffeur<span className="ml-1 text-[hsl(var(--destructive))]">*</span><select required value={form.employeeId} onChange={event => setForm({ ...form, employeeId: event.target.value })} data-testid="select-taxi-employee" className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="">Sélectionner un compte employé actif</option>{availableEmployees.map(employee => <option key={employee.employeeId} value={employee.employeeId}>{employee.displayName} · {employee.email}</option>)}</select>{availableEmployees.length === 0 && <span className="mt-1.5 block text-xs font-normal text-[hsl(var(--muted-foreground))]">Créez d’abord un compte employé actif dans Organisation.</span>}</label> : <div className="rounded-lg border bg-[hsl(var(--muted)/.28)] px-3 py-2.5"><span className="block text-[11px] font-bold text-[hsl(var(--muted-foreground))]">Employé chauffeur rattaché</span><span className="mt-1 block text-sm font-bold">{editing.displayName}</span></div>}
         <div className="grid gap-4 sm:grid-cols-2"><Field label="Marque du véhicule" value={form.vehicleMake} onChange={value => setForm({ ...form, vehicleMake: value })} placeholder="Ex. Toyota" /><Field label="Modèle" value={form.vehicleModel} onChange={value => setForm({ ...form, vehicleModel: value })} placeholder="Ex. Corolla" /><Field label="Couleur" value={form.vehicleColor} onChange={value => setForm({ ...form, vehicleColor: value })} placeholder="Ex. Gris" /><Field label="Plaque d’immatriculation" required value={form.licensePlate} onChange={value => setForm({ ...form, licensePlate: value })} placeholder="Ex. DK-4821-AB" /></div>
         <div className="modal-footer flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" disabled={!canModify || (editing === 'new' && (!availableEmployees.length || !form.employeeId))} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">Enregistrer la fiche</button></div>
       </form>
