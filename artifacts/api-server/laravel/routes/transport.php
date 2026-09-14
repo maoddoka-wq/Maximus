@@ -7,6 +7,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::get('/bootstrap', [TransportController::class, 'bootstrap']);
     Route::post('/drivers', [TransportController::class, 'createDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
+    Route::patch('/drivers/{id}/availability', [TransportController::class, 'updateDriverAvailability']);
     Route::patch('/settings', [TransportController::class, 'updateSettings']);
     Route::get('/settings/hero-image', [TransportController::class, 'transportHeroImage']);
     Route::post('/vehicles', [TransportController::class, 'createVehicle']);
@@ -14,6 +15,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::delete('/vehicles/{id}', [TransportController::class, 'deleteVehicle']);
     Route::get('/vehicles/{id}/image', [TransportController::class, 'vehicleImage']);
     Route::post('/trips', [TransportController::class, 'createTrip']);
+    Route::patch('/trips/{id}/assignment', [TransportController::class, 'assignTrip']);
     Route::patch('/trips/{id}/status', [TransportController::class, 'updateTripStatus']);
 });
 

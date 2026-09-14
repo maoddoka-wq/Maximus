@@ -1,6 +1,7 @@
 import { requestJson } from '@/lib/api-request';
 
 export type DriverStatus = 'ACTIVE' | 'INACTIVE';
+export type DriverAvailability = 'AVAILABLE' | 'PAUSED' | 'ON_TRIP';
 export type VehicleStatus = 'AVAILABLE' | 'ON_TRIP' | 'MAINTENANCE';
 export type TripStatus = 'REQUESTED' | 'OFFERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export interface TransportSettings {
@@ -19,6 +20,8 @@ export interface Driver {
   phone: string;
   licenseNumber: string;
   status: DriverStatus;
+  availability: DriverAvailability;
+  availabilityUpdatedAt: string | null;
   employeeId: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -62,6 +65,8 @@ export interface Trip {
   pickupRouteGeometry?: GeoJsonLineString | null;
   driverName?: string | null;
   driverPhone?: string | null;
+  offerExpiresAt?: string | null;
+  pickupCode?: string | null;
 }
 
 export interface GeoJsonLineString {
@@ -157,6 +162,7 @@ export interface PublicTransportTrip {
   vehicleRegistration: string | null;
   vehicleType: string | null;
   vehicleImageUrl: string | null;
+  pickupCode?: string | null;
 }
 
 export interface PublicTransportQuote {
@@ -199,6 +205,12 @@ export const createTransportApi = (companyId: string) => {
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
       }),
+    updateDriverAvailability: (id: string, availability: DriverAvailability) =>
+      request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/availability`), {
+        method: 'PATCH',
+        body: JSON.stringify({ availability }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
     createVehicle: (body: CreateVehicleInput) => request<Vehicle>(withCompany('/transport/vehicles'), json(body)),
     updateVehicle: (id: string, body: UpdateVehicleInput) => request<Vehicle>(withCompany(`/transport/vehicles/${encodeURIComponent(id)}`), {
       method: 'PATCH',
@@ -209,10 +221,16 @@ export const createTransportApi = (companyId: string) => {
       method: 'DELETE',
     }),
     createTrip: (body: CreateTripInput) => request<Trip>(withCompany('/transport/trips'), json(body)),
-    updateTripStatus: (id: string, status: TripStatus) =>
+    assignTrip: (id: string, body: { driverId: string; vehicleId: string }) =>
+      request<Trip>(withCompany(`/transport/trips/${encodeURIComponent(id)}/assignment`), {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    updateTripStatus: (id: string, status: TripStatus, pickupCode?: string) =>
       request<Trip>(withCompany(`/transport/trips/${encodeURIComponent(id)}/status`), {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(pickupCode ? { pickupCode } : {}) }),
         headers: { 'Content-Type': 'application/json' },
       }),
   };

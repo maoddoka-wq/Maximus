@@ -30,6 +30,7 @@ import {
   type CreateTripInput,
   type CreateVehicleInput,
   type Driver,
+  type DriverAvailability,
   type DriverStatus,
   type TransportBootstrap,
   type TransportSettings,
@@ -100,8 +101,8 @@ const statusLabels: Record<TripStatus, string> = {
 };
 
 const nextTripStatuses = (status: TripStatus): TripStatus[] => ({
-  REQUESTED: ['REQUESTED', 'ASSIGNED', 'CANCELLED'],
-  OFFERED: ['OFFERED', 'ASSIGNED', 'CANCELLED'],
+  REQUESTED: ['REQUESTED', 'CANCELLED'],
+  OFFERED: ['OFFERED', 'ASSIGNED', 'REQUESTED', 'CANCELLED'],
   ASSIGNED: ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED'],
   IN_PROGRESS: ['IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
   COMPLETED: ['COMPLETED'],
@@ -300,6 +301,8 @@ export default function TransportModulePage({
       phone: employee?.phone ?? '',
       licenseNumber: input.licenseNumber,
       status: input.status,
+      availability: 'AVAILABLE',
+      availabilityUpdatedAt: null,
       employeeId: input.employeeId,
       latitude: null,
       longitude: null,
@@ -360,8 +363,12 @@ export default function TransportModulePage({
       return;
     }
     if (pendingAction) return;
+    const pickupCode = status === 'IN_PROGRESS' && trip.pickupCode
+      ? window.prompt('Saisissez le code de prise en charge communiqué par le client.')
+      : undefined;
+    if (status === 'IN_PROGRESS' && trip.pickupCode && !pickupCode) return;
     setPendingAction(`trip:${trip.id}`);
-    void api.updateTripStatus(trip.id, status).then(updatedTrip => {
+    void api.updateTripStatus(trip.id, status, pickupCode ?? undefined).then(updatedTrip => {
       setData(current => {
         if (!current) return current;
         const previousVehicleOnTrip = ['ASSIGNED', 'IN_PROGRESS'].includes(trip.status);
@@ -394,6 +401,38 @@ export default function TransportModulePage({
     }).finally(() => {
       setPendingAction('');
     });
+  };
+
+  const updateAvailability = (availability: DriverAvailability) => {
+    if (!currentDriver || pendingAction) return;
+    if (preview) {
+      setData(current => current ? {
+        ...current,
+        drivers: current.drivers.map(driver => driver.id === currentDriver.id ? { ...driver, availability } : driver),
+      } : current);
+      showAppToast(availability === 'AVAILABLE' ? 'Vous êtes disponible pour recevoir des courses.' : 'Vous êtes maintenant en pause.', 'success');
+      return;
+    }
+    void run(
+      () => api.updateDriverAvailability(currentDriver.id, availability),
+      availability === 'AVAILABLE' ? 'Vous êtes disponible pour recevoir des courses.' : 'Vous êtes maintenant en pause.',
+    );
+  };
+
+  const assignTrip = (trip: Trip, driverId: string, vehicleId: string) => {
+    if (!canModifyTrips || !driverId || !vehicleId || pendingAction) return;
+    if (preview) {
+      setData(current => current ? {
+        ...current,
+        trips: current.trips.map(item => item.id === trip.id ? { ...item, driverId, vehicleId, status: 'ASSIGNED', pickupCode: item.pickupCode ?? '0000' } : item),
+      } : current);
+      showAppToast('Course affectée dans l’aperçu local.', 'success');
+      return;
+    }
+    void run(
+      () => api.assignTrip(trip.id, { driverId, vehicleId }),
+      'Course affectée au chauffeur sélectionné.',
+    );
   };
 
   const removeVehicle = (vehicle: Vehicle) => {
@@ -435,11 +474,11 @@ export default function TransportModulePage({
       </nav>}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
-        {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} />}
+        {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}
         {canOperateTrips && tab === 'courses' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
-        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}</>}
-        {tab === 'courses' && <TripsPanel data={data} canCreate={canOperateTrips} canModify={canOperateTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
-        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
+        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} />}</>}
+        {tab === 'courses' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canOperateTrips || canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
+        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} /></>}
         {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
         {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
@@ -489,10 +528,12 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
   </div>;
 }
 
-function DriverRequestCard({ trip, vehicle, driver, pending, onAccept }: { trip: Trip | null; vehicle: Vehicle | null; driver: Driver | null; pending: boolean; onAccept: (trip: Trip) => void }) {
+function DriverRequestCard({ trip, vehicle, driver, pending, onAccept, onDecline }: { trip: Trip | null; vehicle: Vehicle | null; driver: Driver | null; pending: boolean; onAccept: (trip: Trip) => void; onDecline: (trip: Trip) => void }) {
   if (!trip) return null;
   const routeUrl = buildGoogleTripRouteUrl(trip, driver);
-  return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p></div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onAccept(trip)} disabled={pending} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm disabled:cursor-wait disabled:opacity-70">{pending ? <RefreshCw size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}{pending ? 'Validation…' : 'Valider la course'}</button></div></div></section>;
+  const expiresAt = trip.offerExpiresAt ? new Date(trip.offerExpiresAt) : null;
+  const remainingSeconds = expiresAt ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000)) : null;
+  return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p>{remainingSeconds !== null && <p className={`mt-2 text-xs font-black ${remainingSeconds <= 20 ? 'text-rose-700' : 'text-amber-700'}`}>Réponse requise dans {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}</p>}</div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onDecline(trip)} disabled={pending} className="inline-flex items-center justify-center rounded-xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-70">Refuser</button><button type="button" onClick={() => onAccept(trip)} disabled={pending} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm disabled:cursor-wait disabled:opacity-70">{pending ? <RefreshCw size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}{pending ? 'Validation…' : 'Valider la course'}</button></div></div></section>;
 }
 
 function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driver: Driver | null; vehicle: Vehicle | null }) {
@@ -595,7 +636,7 @@ function AvailabilityRow({ label, value, total, color }: { label: string; value:
   return <div><div className="flex items-center justify-between gap-3 text-xs"><span className="font-semibold">{label}</span><span className="mono text-[11px] text-[hsl(var(--muted-foreground))]">{value}/{total}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-[hsl(var(--muted))]"><div className={`h-full rounded-full ${color}`} style={{ width: `${width}%` }} /></div></div>;
 }
 
-function TripsPanel({ data, canCreate, canModify, onCreate, onStatusChange }: { data: TransportBootstrap; canCreate: boolean; canModify: boolean; onCreate: () => void; onStatusChange: (trip: Trip, status: TripStatus) => void }) {
+function TripsPanel({ data, drivers, vehicles, canCreate, canModify, onCreate, onStatusChange, onAssign }: { data: TransportBootstrap; drivers: Driver[]; vehicles: Vehicle[]; canCreate: boolean; canModify: boolean; onCreate: () => void; onStatusChange: (trip: Trip, status: TripStatus) => void; onAssign: (trip: Trip, driverId: string, vehicleId: string) => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<TripStatus | 'ALL'>('ALL');
   const trips = useMemo(() => data.trips.filter(trip => {
@@ -607,22 +648,31 @@ function TripsPanel({ data, canCreate, canModify, onCreate, onStatusChange }: { 
      <div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Dispatch en cours</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Courses</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Seules les courses actuellement ouvertes sont affichées ici. Les courses terminées ou annulées sont dans Historique.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Créer une course</button>}</div>
     <section className="card-surface overflow-hidden">
        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center"><div className="relative min-w-0 flex-1"><MapPin size={15} className="absolute left-3 top-3 text-[hsl(var(--muted-foreground))]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une course en cours" className="w-full border px-9 py-2.5 text-sm" /></div><select value={filter} onChange={event => setFilter(event.target.value as TripStatus | 'ALL')} className="border px-3 py-2.5 text-sm sm:w-48"><option value="ALL">Tous les statuts actifs</option>{['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].map(status => <option key={status} value={status}>{statusLabels[status as TripStatus]}</option>)}</select></div>
-      {trips.length ? <TripTable trips={trips} canModify={canModify} onStatusChange={onStatusChange} /> : <EmptyState icon={Route} title={query || filter !== 'ALL' ? 'Aucun résultat' : 'Le carnet de courses est vide'} text={query || filter !== 'ALL' ? 'Essayez un autre filtre ou une autre recherche.' : 'Créez une course pour commencer à organiser le dispatch.'} />}
+       {trips.length ? <TripTable trips={trips} drivers={drivers} vehicles={vehicles} canModify={canModify} onStatusChange={onStatusChange} onAssign={onAssign} /> : <EmptyState icon={Route} title={query || filter !== 'ALL' ? 'Aucun résultat' : 'Le carnet de courses est vide'} text={query || filter !== 'ALL' ? 'Essayez un autre filtre ou une autre recherche.' : 'Créez une course pour commencer à organiser le dispatch.'} />}
     </section>
   </div>;
 }
 
-function TripTable({ trips, canModify = false, compact = false, onStatusChange }: { trips: Trip[]; canModify?: boolean; compact?: boolean; onStatusChange: (trip: Trip, status: TripStatus) => void }) {
-  return <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Course</th><th>Trajet</th><th>Passager</th><th>Montant</th><th>Statut</th>{!compact && <th className="px-3 sm:px-4">Action</th>}</tr></thead><tbody>{trips.map(trip => <tr key={trip.id} className="border-t"><td className="px-3 sm:px-4"><span className="mono text-[11px] font-bold sm:text-xs">{trip.reference}</span><span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))] sm:text-[11px]">{dateLabel(trip.requestedAt)}</span></td><td><div className="max-w-[150px] sm:max-w-[220px]"><span className="block truncate font-semibold">{trip.pickup}</span><span className="mt-1 block truncate text-[11px] text-[hsl(var(--muted-foreground))] sm:text-xs">→ {trip.destination}</span></div></td><td><span className="font-semibold">{trip.passengerName}</span><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))] sm:text-xs">{trip.passengerPhone}</span></td><td className="whitespace-nowrap font-bold">{money(trip.fare)}</td><td><StatusBadge status={trip.status} label={statusLabels[trip.status]} /></td>{!compact && <td className="px-3 sm:px-4">{canModify && <select aria-label={`Modifier le statut de ${trip.reference}`} value={trip.status} onChange={event => onStatusChange(trip, event.target.value as TripStatus)} className="border px-2 py-2 text-xs">{nextTripStatuses(trip.status).map(status => <option key={status} value={status}>{statusLabels[status]}</option>)}</select>}</td>}</tr>)}</tbody></table></div>;
+function TripTable({ trips, drivers, vehicles, canModify = false, compact = false, onStatusChange, onAssign }: { trips: Trip[]; drivers?: Driver[]; vehicles?: Vehicle[]; canModify?: boolean; compact?: boolean; onStatusChange: (trip: Trip, status: TripStatus) => void; onAssign?: (trip: Trip, driverId: string, vehicleId: string) => void }) {
+  return <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Course</th><th>Trajet</th><th>Passager</th><th>Montant</th><th>Statut</th>{!compact && <th className="px-3 sm:px-4">Dispatch</th>}</tr></thead><tbody>{trips.map(trip => <tr key={trip.id} className="border-t"><td className="px-3 sm:px-4"><span className="mono text-[11px] font-bold sm:text-xs">{trip.reference}</span><span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))] sm:text-[11px]">{dateLabel(trip.requestedAt)}</span></td><td><div className="max-w-[150px] sm:max-w-[220px]"><span className="block truncate font-semibold">{trip.pickup}</span><span className="mt-1 block truncate text-[11px] text-[hsl(var(--muted-foreground))] sm:text-xs">→ {trip.destination}</span></div></td><td><span className="font-semibold">{trip.passengerName}</span><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))] sm:text-xs">{trip.passengerPhone}</span></td><td className="whitespace-nowrap font-bold">{money(trip.fare)}</td><td><StatusBadge status={trip.status} label={statusLabels[trip.status]} /></td>{!compact && <td className="px-3 sm:px-4">{canModify && <div className="min-w-[13rem] space-y-2"><TripAssignment trip={trip} drivers={drivers ?? []} vehicles={vehicles ?? []} onAssign={onAssign} /><select aria-label={`Modifier le statut de ${trip.reference}`} value={trip.status} onChange={event => onStatusChange(trip, event.target.value as TripStatus)} className="w-full border px-2 py-2 text-xs">{nextTripStatuses(trip.status).map(status => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></div>}</td>}</tr>)}</tbody></table></div>;
 }
 
-function DriverLocationPanel({ driver, active, error }: { driver: Driver | null; active: boolean; error: string }) {
+function TripAssignment({ trip, drivers, vehicles, onAssign }: { trip: Trip; drivers: Driver[]; vehicles: Vehicle[]; onAssign?: (trip: Trip, driverId: string, vehicleId: string) => void }) {
+  const [driverId, setDriverId] = useState(trip.driverId ?? '');
+  const [vehicleId, setVehicleId] = useState(trip.vehicleId ?? '');
+  const availableDrivers = drivers.filter(driver => driver.status === 'ACTIVE' && (driver.availability === 'AVAILABLE' || driver.id === trip.driverId));
+  const availableVehicles = vehicles.filter(vehicle => vehicle.status === 'AVAILABLE' && (!driverId || vehicle.driverId === driverId) || vehicle.id === trip.vehicleId);
+  if (!['REQUESTED', 'OFFERED'].includes(trip.status)) return <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Affectation verrouillée</span>;
+  return <div className="space-y-1.5"><select value={driverId} onChange={event => { setDriverId(event.target.value); setVehicleId(''); }} className="w-full border px-2 py-1.5 text-[11px]" aria-label={`Chauffeur de ${trip.reference}`}><option value="">Chauffeur à choisir</option>{availableDrivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name} · {driver.availability === 'PAUSED' ? 'pause' : 'disponible'}</option>)}</select><select value={vehicleId} onChange={event => setVehicleId(event.target.value)} disabled={!driverId} className="w-full border px-2 py-1.5 text-[11px]" aria-label={`Véhicule de ${trip.reference}`}><option value="">Véhicule à choisir</option>{availableVehicles.filter(vehicle => !driverId || vehicle.driverId === driverId).map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration} · {vehicle.model}</option>)}</select>{driverId && vehicleId && onAssign && <button type="button" onClick={() => onAssign(trip, driverId, vehicleId)} className="w-full rounded-md bg-[hsl(var(--primary))] px-2 py-1.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))]">Affecter</button>}</div>;
+}
+
+function DriverLocationPanel({ driver, active, error, onAvailabilityChange }: { driver: Driver | null; active: boolean; error: string; onAvailabilityChange?: (availability: DriverAvailability) => void }) {
   if (!driver) return <section className="card-surface border-dashed p-5"><div className="flex items-start gap-3"><MapPin className="mt-0.5 text-amber-600" size={19} /><div><h2 className="font-bold">Position chauffeur non configurée</h2><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Un administrateur doit lier votre compte employé à votre fiche chauffeur. La localisation GPS sera ensuite partagée automatiquement pendant que cette application est ouverte.</p></div></div></section>;
-  return <section className={`card-surface border p-5 ${active ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'}`}><div className="flex items-start gap-3"><MapPin className={`mt-0.5 ${active ? 'text-emerald-600' : 'text-amber-600'}`} size={19} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Localisation du chauffeur</h2><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{active ? 'Active' : 'À activer'}</span></div><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{active ? 'Votre position GPS est partagée automatiquement. Les clients peuvent être orientés vers vous si votre véhicule est disponible.' : error || 'Autorisez la localisation dans votre navigateur pour recevoir les demandes proches.'}</p>{error && <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>}</div></div></section>;
+  return <section className={`card-surface border p-5 ${active ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-start gap-3"><MapPin className={`mt-0.5 ${active ? 'text-emerald-600' : 'text-amber-600'}`} size={19} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Localisation du chauffeur</h2><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{active ? 'Active' : 'À activer'}</span></div><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{active ? 'Votre position GPS est partagée automatiquement. Les clients peuvent être orientés vers vous si votre véhicule est disponible.' : error || 'Autorisez la localisation dans votre navigateur pour recevoir les demandes proches.'}</p>{error && <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>}</div></div>{onAvailabilityChange && <div className="shrink-0 rounded-xl border bg-white/70 p-2"><p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Disponibilité</p><div className="flex gap-1"><button type="button" disabled={driver?.availability === 'ON_TRIP'} onClick={() => onAvailabilityChange('AVAILABLE')} className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${driver?.availability === 'AVAILABLE' ? 'bg-emerald-600 text-white' : 'border text-slate-600'} disabled:cursor-not-allowed disabled:opacity-50`}>Disponible</button><button type="button" disabled={driver?.availability === 'ON_TRIP'} onClick={() => onAvailabilityChange('PAUSED')} className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${driver?.availability === 'PAUSED' ? 'bg-amber-500 text-white' : 'border text-slate-600'} disabled:cursor-not-allowed disabled:opacity-50`}>Pause</button></div></div>}</div></section>;
 }
 
 function DriversPanel({ drivers, canCreate, onCreate }: { drivers: Driver[]; canCreate: boolean; onCreate: () => void }) {
-  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Équipage</p><h2 className="mt-1 text-lg font-black tracking-[-.03em] sm:text-xl">Chauffeurs</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les profils autorisés à prendre le volant.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button>}</div><section className="card-surface overflow-hidden">{drivers.length ? <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Statut</th></tr></thead><tbody>{drivers.map(driver => <tr key={driver.id} className="border-t"><td className="px-3 sm:px-4"><div className="flex items-center gap-2 sm:gap-3"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(var(--primary)/.12)] text-[11px] font-black text-[hsl(var(--primary))] sm:h-8 sm:w-8 sm:text-xs">{driver.name.slice(0, 2).toUpperCase()}</div><span className="font-semibold">{driver.name}</span></div></td><td><a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"><Phone size={13} />{driver.phone}</a></td><td className="mono text-[11px] sm:text-xs">{driver.licenseNumber}</td><td><StatusBadge status={driver.status} label={driverStatusLabel[driver.status]} /></td></tr>)}</tbody></table></div> : <EmptyState icon={UserRound} title="Aucun chauffeur enregistré" text="Ajoutez les chauffeurs habilités à rejoindre votre flotte." />}</section></div>;
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Équipage</p><h2 className="mt-1 text-lg font-black tracking-[-.03em] sm:text-xl">Chauffeurs</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les profils autorisés à prendre le volant.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button>}</div><section className="card-surface overflow-hidden">{drivers.length ? <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Disponibilité</th><th>GPS</th></tr></thead><tbody>{drivers.map(driver => { const gpsFresh = driver.locationUpdatedAt ? Date.now() - new Date(driver.locationUpdatedAt).getTime() <= 5 * 60 * 1000 : false; return <tr key={driver.id} className="border-t"><td className="px-3 sm:px-4"><div className="flex items-center gap-2 sm:gap-3"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(var(--primary)/.12)] text-[11px] font-black text-[hsl(var(--primary))] sm:h-8 sm:w-8 sm:text-xs">{driver.name.slice(0, 2).toUpperCase()}</div><span className="font-semibold">{driver.name}</span></div></td><td><a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"><Phone size={13} />{driver.phone}</a></td><td className="mono text-[11px] sm:text-xs">{driver.licenseNumber}</td><td><div className="space-y-1"><StatusBadge status={driver.status} label={driverStatusLabel[driver.status]} /><span className={`block text-[10px] font-bold ${driver.availability === 'AVAILABLE' ? 'text-emerald-700' : driver.availability === 'ON_TRIP' ? 'text-sky-700' : 'text-amber-700'}`}>{driver.availability === 'AVAILABLE' ? 'Disponible' : driver.availability === 'ON_TRIP' ? 'En course' : 'En pause'}</span></div></td><td><span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${gpsFresh ? 'text-emerald-700' : 'text-rose-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${gpsFresh ? 'bg-emerald-500' : 'bg-rose-500'}`} />{gpsFresh ? 'Récent' : 'Obsolète'}</span></td></tr>; })}</tbody></table></div> : <EmptyState icon={UserRound} title="Aucun chauffeur enregistré" text="Ajoutez les chauffeurs habilités à rejoindre votre flotte." />}</section></div>;
 }
 
 function VehiclesPanel({ vehicles, drivers, canCreate, canModify, onCreate, onEdit, onDelete }: { vehicles: Vehicle[]; drivers: Driver[]; canCreate: boolean; canModify: boolean; onCreate: () => void; onEdit: (vehicle: Vehicle) => void; onDelete: (vehicle: Vehicle) => void }) {

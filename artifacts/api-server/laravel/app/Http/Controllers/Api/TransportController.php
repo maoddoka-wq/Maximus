@@ -41,6 +41,7 @@ class TransportController extends Controller
         }
 
         $company = $this->company($request);
+        $this->expireOffers($company);
         $drivers = DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get();
         $vehicles = DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get();
         $trips = DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get();
@@ -175,6 +176,8 @@ class TransportController extends Controller
             'license_number' => trim($input['licenseNumber']),
             'employee_id' => $employeeId,
             'status' => $input['status'] ?? 'ACTIVE',
+            'availability' => 'AVAILABLE',
+            'availability_updated_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -246,6 +249,48 @@ class TransportController extends Controller
                 // Keep the last valid route when the routing provider is temporarily unavailable.
             }
         }
+
+        return response()->json($this->driver(DB::table('transport_drivers')->where('id', $id)->first()));
+    }
+
+    public function updateDriverAvailability(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->validated($request, [
+            'availability' => ['required', Rule::in(['AVAILABLE', 'PAUSED'])],
+        ]);
+        $company = $this->company($request);
+        $driver = DB::table('transport_drivers')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $driver) {
+            return response()->json(['error' => 'Chauffeur introuvable.'], 404);
+        }
+
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) === 'employee' && ($driver->employee_id ?? null) !== ($actor['employeeId'] ?? null)) {
+            return response()->json(['error' => 'Vous ne pouvez modifier que votre propre disponibilité.'], 403);
+        }
+        if ($driver->status !== 'ACTIVE') {
+            return response()->json(['error' => 'Un chauffeur inactif ne peut pas se rendre disponible.'], 422);
+        }
+        if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('driver_id', $id)
+            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS'])
+            ->exists()) {
+            return response()->json(['error' => 'Terminez la course en cours avant de passer en pause.'], 422);
+        }
+
+        DB::table('transport_drivers')->where('company_id', $company)->where('id', $id)->update([
+            'availability' => $input['availability'],
+            'availability_updated_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return response()->json($this->driver(DB::table('transport_drivers')->where('id', $id)->first()));
     }
@@ -455,6 +500,7 @@ class TransportController extends Controller
             return response()->json(['error' => 'Le véhicule sélectionné n’est pas rattaché à ce chauffeur.'], 422);
         }
         $status = $driverId !== null && $vehicleId !== null ? 'ASSIGNED' : 'REQUESTED';
+        $now = now();
         $row = [
             'id' => $this->id('trip'),
             'company_id' => $company,
@@ -467,15 +513,25 @@ class TransportController extends Controller
             'driver_id' => $driverId,
             'vehicle_id' => $vehicleId,
             'status' => $status,
-            'requested_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'requested_at' => $now,
+            'pickup_code' => (string) random_int(1000, 9999),
+            'assigned_at' => $status === 'ASSIGNED' ? $now : null,
+            'created_at' => $now,
+            'updated_at' => $now,
         ];
-        DB::transaction(function () use ($row, $vehicleId): void {
+        DB::transaction(function () use ($row, $vehicleId, $driverId): void {
             DB::table('transport_trips')->insert($row);
             if ($vehicleId !== null) {
                 DB::table('transport_vehicles')->where('id', $vehicleId)->update(['status' => 'ON_TRIP', 'updated_at' => now()]);
             }
+            if ($driverId !== null) {
+                DB::table('transport_drivers')->where('id', $driverId)->update([
+                    'availability' => 'ON_TRIP',
+                    'availability_updated_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+            $this->logTripEvent((string) $row['company_id'], (string) $row['id'], 'created', null, $row['status']);
         });
 
         return response()->json($this->trip((object) $row), 201);
@@ -646,13 +702,88 @@ class TransportController extends Controller
         return $this->cancelPublicTripForStore($request, $store, $id, true);
     }
 
+    public function assignTrip(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'trips')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->validated($request, [
+            'driverId' => ['required', 'string'],
+            'vehicleId' => ['required', 'string'],
+        ]);
+        $company = $this->company($request);
+        $failure = null;
+        DB::transaction(function () use ($id, $company, $input, &$failure): void {
+            $trip = DB::table('transport_trips')
+                ->where('company_id', $company)
+                ->where('id', $id)
+                ->lockForUpdate()
+                ->first();
+            if (! $trip || ! in_array($trip->status, ['REQUESTED', 'OFFERED'], true)) {
+                $failure = 'Cette course ne peut plus être affectée.';
+                return;
+            }
+            $driver = DB::table('transport_drivers')
+                ->where('company_id', $company)
+                ->where('id', $input['driverId'])
+                ->where('status', 'ACTIVE')
+                ->lockForUpdate()
+                ->first();
+            $vehicle = DB::table('transport_vehicles')
+                ->where('company_id', $company)
+                ->where('id', $input['vehicleId'])
+                ->where('driver_id', $input['driverId'])
+                ->where('status', 'AVAILABLE')
+                ->lockForUpdate()
+                ->first();
+            if (! $driver || ! in_array($driver->availability ?? 'AVAILABLE', ['AVAILABLE', null], true)) {
+                $failure = 'Le chauffeur sélectionné n’est pas disponible.';
+                return;
+            }
+            if (! $vehicle) {
+                $failure = 'Le véhicule sélectionné n’est plus disponible ou n’est pas rattaché au chauffeur.';
+                return;
+            }
+            DB::table('transport_trips')->where('id', $id)->update([
+                'driver_id' => $driver->id,
+                'vehicle_id' => $vehicle->id,
+                'status' => 'ASSIGNED',
+                'offer_expires_at' => null,
+                'assigned_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('transport_vehicles')->where('id', $vehicle->id)->update([
+                'status' => 'ON_TRIP',
+                'updated_at' => now(),
+            ]);
+            DB::table('transport_drivers')->where('id', $driver->id)->update([
+                'availability' => 'ON_TRIP',
+                'availability_updated_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->logTripEvent($company, $id, 'assigned', $trip->status, 'ASSIGNED', [
+                'driverId' => $driver->id,
+                'vehicleId' => $vehicle->id,
+            ]);
+        });
+        if ($failure !== null) {
+            return response()->json(['error' => $failure], 422);
+        }
+
+        return response()->json($this->trip(DB::table('transport_trips')->where('company_id', $company)->where('id', $id)->first()));
+    }
+
     public function updateTripStatus(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'trips')) {
             return $this->forbidden();
         }
 
-        $input = $this->validated($request, ['status' => ['required', Rule::in(self::TRIP_STATUSES)]]);
+        $input = $this->validated($request, [
+            'status' => ['required', Rule::in(self::TRIP_STATUSES)],
+            'pickupCode' => ['nullable', 'string', 'size:4'],
+        ]);
         $company = $this->company($request);
         $trip = DB::table('transport_trips')->where('id', $id)->where('company_id', $company)->first();
         if (! $trip) {
@@ -670,6 +801,26 @@ class TransportController extends Controller
         }
         $failure = null;
         DB::transaction(function () use ($trip, $input, &$failure): void {
+            $allowedTransitions = [
+                'REQUESTED' => ['REQUESTED', 'ASSIGNED', 'CANCELLED'],
+                'OFFERED' => ['OFFERED', 'ASSIGNED', 'REQUESTED', 'CANCELLED'],
+                'ASSIGNED' => ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+                'IN_PROGRESS' => ['IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+                'COMPLETED' => ['COMPLETED'],
+                'CANCELLED' => ['CANCELLED'],
+            ];
+            if (! in_array($input['status'], $allowedTransitions[$trip->status] ?? [], true)) {
+                $failure = 'Cette transition de course n’est pas autorisée.';
+                return;
+            }
+            if ($input['status'] === 'IN_PROGRESS' && $trip->pickup_code !== null && ($input['pickupCode'] ?? '') !== $trip->pickup_code) {
+                $failure = 'Le code de prise en charge est incorrect.';
+                return;
+            }
+            if ($input['status'] === 'ASSIGNED' && $trip->status === 'REQUESTED') {
+                $failure = 'Affectez un chauffeur et un véhicule avant de valider cette course.';
+                return;
+            }
             if ($input['status'] === 'ASSIGNED' && $trip->status === 'OFFERED') {
                 $vehicle = DB::table('transport_vehicles')
                     ->where('id', $trip->vehicle_id)
@@ -684,11 +835,43 @@ class TransportController extends Controller
                     'status' => 'ON_TRIP',
                     'updated_at' => now(),
                 ]);
+                if ($trip->driver_id !== null) {
+                    DB::table('transport_drivers')->where('id', $trip->driver_id)->update([
+                        'availability' => 'ON_TRIP',
+                        'availability_updated_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
             }
-            DB::table('transport_trips')->where('id', $trip->id)->update(['status' => $input['status'], 'updated_at' => now()]);
+            $updates = ['status' => $input['status'], 'updated_at' => now()];
+            if ($input['status'] === 'REQUESTED' && $trip->status === 'OFFERED') {
+                $updates['driver_id'] = null;
+                $updates['vehicle_id'] = null;
+                $updates['offer_expires_at'] = null;
+                if ($trip->driver_id !== null) {
+                    DB::table('transport_drivers')->where('id', $trip->driver_id)->update([
+                        'availability' => 'AVAILABLE',
+                        'availability_updated_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+            if ($input['status'] === 'IN_PROGRESS') {
+                $updates['started_at'] = now();
+            }
+            if ($input['status'] === 'COMPLETED') {
+                $updates['completed_at'] = now();
+            }
+            DB::table('transport_trips')->where('id', $trip->id)->update($updates);
             if ($trip->vehicle_id !== null && in_array($input['status'], ['COMPLETED', 'CANCELLED'], true)) {
                 DB::table('transport_vehicles')->where('id', $trip->vehicle_id)->where('status', 'ON_TRIP')->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
+                DB::table('transport_drivers')->where('id', $trip->driver_id)->where('availability', 'ON_TRIP')->update([
+                    'availability' => 'AVAILABLE',
+                    'availability_updated_at' => now(),
+                    'updated_at' => now(),
+                ]);
             }
+            $this->logTripEvent((string) $trip->company_id, (string) $trip->id, 'status_changed', $trip->status, $input['status']);
         });
         if ($failure !== null) {
             return response()->json(['error' => $failure], 422);
@@ -810,6 +993,8 @@ class TransportController extends Controller
             'licenseNumber' => $row->license_number,
             'status' => $row->status,
             'employeeId' => $row->employee_id ?? null,
+            'availability' => $row->availability ?? 'AVAILABLE',
+            'availabilityUpdatedAt' => $row->availability_updated_at ?? null,
             'latitude' => $latitude === null ? null : (float) $latitude,
             'longitude' => $longitude === null ? null : (float) $longitude,
             'locationUpdatedAt' => $row->location_updated_at ?? null,
@@ -856,6 +1041,8 @@ class TransportController extends Controller
             'vehicleId' => $row->vehicle_id,
             'status' => $row->status,
             'requestedAt' => $row->requested_at,
+            'offerExpiresAt' => $row->offer_expires_at ?? null,
+            'pickupCode' => $row->pickup_code ?? null,
             'pickupLatitude' => $row->pickup_latitude ?? null,
             'pickupLongitude' => $row->pickup_longitude ?? null,
             'matchedDistanceKm' => $matchedDistance === null ? null : (float) $matchedDistance,
@@ -995,6 +1182,7 @@ class TransportController extends Controller
         $trip = $this->trip($row, $driver);
         return [
             ...$trip,
+            'pickupCode' => $row->pickup_code ?? null,
             'driverLatitude' => $driver?->latitude === null ? null : (float) $driver->latitude,
             'driverLongitude' => $driver?->longitude === null ? null : (float) $driver->longitude,
             'vehicleModel' => $vehicle?->model,
@@ -1161,6 +1349,9 @@ class TransportController extends Controller
             $drivers = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('status', 'ACTIVE')
+                ->where(function ($query): void {
+                    $query->whereNull('availability')->orWhere('availability', 'AVAILABLE');
+                })
                 ->whereNotNull('employee_id')
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
@@ -1207,6 +1398,9 @@ class TransportController extends Controller
                 'vehicle_id' => $vehicle?->id,
                 'status' => $status,
                 'requested_at' => now(),
+                'pickup_code' => (string) random_int(1000, 9999),
+                'offer_expires_at' => $status === 'OFFERED' ? now()->addMinutes(2) : null,
+                'assigned_at' => null,
                 'pickup_latitude' => $latitude,
                 'pickup_longitude' => $longitude,
                 'matched_distance_km' => $match['distance'] ?? null,
@@ -1225,6 +1419,7 @@ class TransportController extends Controller
                     'updated_at' => now(),
                 ]);
             }
+            $this->logTripEvent($company, (string) $row['id'], 'created', null, $status);
         });
 
         $tripRow = DB::table('transport_trips')->where('id', $row['id'])->first();
@@ -1624,6 +1819,62 @@ class TransportController extends Controller
                 ? '/taxi-transport-hero.jpg'
                 : '/api/transport/settings/hero-image',
         ];
+    }
+
+    private function expireOffers(string $company): void
+    {
+        $expired = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('status', 'OFFERED')
+            ->whereNotNull('offer_expires_at')
+            ->where('offer_expires_at', '<=', now())
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($expired as $trip) {
+            DB::transaction(function () use ($company, $trip): void {
+                DB::table('transport_trips')->where('id', $trip->id)->update([
+                    'status' => 'REQUESTED',
+                    'driver_id' => null,
+                    'vehicle_id' => null,
+                    'offer_expires_at' => null,
+                    'updated_at' => now(),
+                ]);
+                if ($trip->driver_id !== null) {
+                    DB::table('transport_drivers')->where('company_id', $company)->where('id', $trip->driver_id)->update([
+                        'availability' => 'AVAILABLE',
+                        'availability_updated_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+                $this->logTripEvent($company, (string) $trip->id, 'offer_expired', 'OFFERED', 'REQUESTED');
+            });
+        }
+    }
+
+    private function logTripEvent(
+        string $company,
+        string $tripId,
+        string $eventType,
+        ?string $fromStatus,
+        ?string $toStatus,
+        array $metadata = [],
+    ): void {
+        if (! DB::getSchemaBuilder()->hasTable('transport_trip_events')) {
+            return;
+        }
+        DB::table('transport_trip_events')->insert([
+            'id' => $this->id('trip-event'),
+            'company_id' => $company,
+            'trip_id' => $tripId,
+            'actor_type' => 'system',
+            'actor_id' => null,
+            'event_type' => $eventType,
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'metadata' => $metadata === [] ? null : json_encode($metadata, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+        ]);
     }
 
     private function isWithinDakar(float $latitude, float $longitude): bool

@@ -127,6 +127,68 @@ class TransportTest extends TestCase
         $this->assertDatabaseMissing('transport_vehicles', ['id' => $vehicle->json('id')]);
     }
 
+    public function test_dispatch_assigns_a_trip_and_requires_the_pickup_code_to_start(): void
+    {
+        $request = $this->asActor();
+        $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $this->createDriverEmployee('dispatch-driver'),
+            'licenseNumber' => 'SN-DISPATCH-001',
+        ])->assertCreated();
+        $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-DISPATCH-01',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
+        $trip = $request->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Point E',
+            'destination' => 'Plateau',
+            'passengerName' => 'Passager Dispatch',
+            'passengerPhone' => '+221770000088',
+            'fare' => 2500,
+        ])->assertCreated()->assertJsonPath('status', 'REQUESTED');
+
+        $request->patchJson('/api/transport/trips/'.$trip->json('id').'/assignment?companyId=kora', [
+            'driverId' => $driver->json('id'),
+            'vehicleId' => $vehicle->json('id'),
+        ])->assertOk()
+            ->assertJsonPath('status', 'ASSIGNED')
+            ->assertJsonPath('driverId', $driver->json('id'));
+
+        $pickupCode = $request->getJson('/api/transport/bootstrap?companyId=kora')
+            ->assertOk()
+            ->json('trips.0.pickupCode');
+        $this->assertNotEmpty($pickupCode);
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $driver->json('id'),
+            'availability' => 'ON_TRIP',
+        ]);
+
+        $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'IN_PROGRESS',
+            'pickupCode' => '0000',
+        ])->assertStatus(422)->assertJsonPath('error', 'Le code de prise en charge est incorrect.');
+
+        $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'IN_PROGRESS',
+            'pickupCode' => $pickupCode,
+        ])->assertOk()->assertJsonPath('status', 'IN_PROGRESS');
+
+        $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'COMPLETED',
+        ])->assertOk();
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $driver->json('id'),
+            'availability' => 'AVAILABLE',
+        ]);
+        $this->assertDatabaseHas('transport_trip_events', [
+            'trip_id' => $trip->json('id'),
+            'event_type' => 'status_changed',
+            'to_status' => 'COMPLETED',
+        ]);
+    }
+
     public function test_transport_ignores_client_company_id_for_tenant_scope(): void
     {
         $request = $this->asActor();
