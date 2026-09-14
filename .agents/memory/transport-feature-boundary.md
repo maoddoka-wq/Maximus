@@ -7,4 +7,4 @@ La fonctionnalité `transport` est une autorisation d’entreprise distincte de 
 
 **Why:** une entreprise peut proposer les livraisons sans autoriser le transport, et les permissions administratives de livraison ne doivent pas donner implicitement accès aux profils ou courses Taxi.
 
-**How to apply:** toute nouvelle route, vue ou capacité Taxi doit vérifier `transport`; le matching et les données restent en plus bornés par l’entreprise issue de la session.
+**How to apply:** toute nouvelle route, vue ou capacité Taxi doit vérifier `transport`; le matching et les données restent en plus bornés par l’entreprise issue de la session. Après connexion, un employé avec un profil Taxi valide ouvre directement son dashboard chauffeur; les autres employés restent sur le dashboard entreprise.
