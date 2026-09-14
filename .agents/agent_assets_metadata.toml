@@ -154,3 +154,17 @@ mtime_ms = 1789256552579
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/097bc0a6-df49-4eec-a18e-b963ff6ac611/40c85ecd-b2e9-4c00-a1d7-65697f309f1e"
 storage_version_token = "1789256559841999"
 content_type = "image/png"
+
+[[outputs]]
+id = "uXui4vDkR6k3z7nnY6Il-"
+uri = "file://artifacts/maximus/public/taxi-transport-hero.jpg"
+type = "image"
+title = "Photo Taxi — couverture Transport"
+description = "Image utilisée par défaut en arrière-plan du bandeau Taxi public. Elle peut ensuite être remplacée depuis Transport → Paramètres."
+logical_id = "8c0f3eff-9e53-42ed-8fbe-e6115a65b08e"
+content_hash = "sha256:4e4a24f51f088183b22a536647aa0d48dce9d3cce98f2a94b706101999e5d088"
+size = 99991
+mtime_ms = 1789410814336
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/8c0f3eff-9e53-42ed-8fbe-e6115a65b08e/244cb048-8284-497e-bc42-5f1096062a26"
+storage_version_token = "1789411411791731"
+content_type = "image/jpeg"
