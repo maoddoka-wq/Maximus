@@ -982,6 +982,7 @@ function AppContent() {
     selectedEcommerceFeatureIds,
     selectedPayrollFeatureIds,
     selectedTransportFeatureIds,
+    transportFeaturePermissions,
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
@@ -1180,6 +1181,7 @@ function AppContent() {
                   ecommerceFeatureIds={selectedEcommerceFeatureIds}
                   payrollFeatureIds={selectedPayrollFeatureIds}
                   transportFeatureIds={selectedTransportFeatureIds}
+                  transportFeaturePermissions={transportFeaturePermissions}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}

@@ -39,8 +39,8 @@ type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
 
 const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: string }[] = [
   { id: 'overview', label: 'Vue d’ensemble', icon: Gauge, featureId: 'overview' },
-  { id: 'courses', label: 'Courses', icon: Route, featureId: 'courses' },
-  { id: 'chauffeurs', label: 'Chauffeurs', icon: UserRound, featureId: 'chauffeurs' },
+  { id: 'courses', label: 'Courses', icon: Route, featureId: 'trips' },
+  { id: 'chauffeurs', label: 'Chauffeurs', icon: UserRound, featureId: 'drivers' },
   { id: 'vehicules', label: 'Véhicules', icon: CarFront, featureId: 'vehicles' },
 ];
 
@@ -97,6 +97,7 @@ export default function TransportModulePage({
   canCreate = true,
   canModify = true,
   allowedFeatureIds,
+  featurePermissions,
   employees = [],
   currentEmployeeId = null,
   singleModuleNavigation = false,
@@ -106,6 +107,7 @@ export default function TransportModulePage({
   canCreate?: boolean;
   canModify?: boolean;
   allowedFeatureIds?: string[];
+  featurePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
   employees?: Array<{ id: string; firstName: string; lastName: string }>;
   currentEmployeeId?: string | null;
   singleModuleNavigation?: boolean;
@@ -114,7 +116,7 @@ export default function TransportModulePage({
   const api = useMemo(() => createTransportApi(companyId), [companyId]);
   const visibleTabs = useMemo(
     () => allowedFeatureIds
-      ? tabs.filter(tab => tab.id === 'overview' || allowedFeatureIds.includes(tab.featureId) || allowedFeatureIds.includes(tab.id))
+      ? tabs.filter(tab => allowedFeatureIds.includes(tab.featureId) || allowedFeatureIds.includes(tab.id))
       : tabs,
     [allowedFeatureIds],
   );
@@ -133,6 +135,11 @@ export default function TransportModulePage({
     [currentEmployeeId, data?.drivers],
   );
   const currentDriverId = currentDriver?.id ?? null;
+  const canCreateTrips = featurePermissions ? Boolean(featurePermissions.trips?.canCreate) : canCreate;
+  const canModifyTrips = featurePermissions ? Boolean(featurePermissions.trips?.canModify) : canModify;
+  const canCreateDrivers = featurePermissions ? Boolean(featurePermissions.drivers?.canCreate) : canCreate;
+  const canModifyDrivers = featurePermissions ? Boolean(featurePermissions.drivers?.canModify) : canModify;
+  const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
 
   useEffect(() => {
     if (!visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0]?.id ?? 'overview');
@@ -168,7 +175,7 @@ export default function TransportModulePage({
   useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
 
   useEffect(() => {
-    if (preview || !currentDriverId || !navigator.geolocation) {
+    if (preview || !currentDriverId || !canModifyDrivers || !navigator.geolocation) {
       setLocationActive(false);
       return undefined;
     }
@@ -204,7 +211,7 @@ export default function TransportModulePage({
       navigator.geolocation.clearWatch(watchId);
       window.clearInterval(refreshId);
     };
-  }, [api, currentDriverId, preview]);
+  }, [api, currentDriverId, canModifyDrivers, preview]);
 
   const run = async <T,>(action: () => Promise<T>, success: string) => {
     if (pendingAction) return;
@@ -246,7 +253,7 @@ export default function TransportModulePage({
   };
 
   const updateStatus = (trip: Trip, status: TripStatus) => {
-    if (status === trip.status || !canModify) return;
+    if (status === trip.status || !canModifyTrips) return;
     if (preview) {
       setData(current => current ? { ...current, trips: current.trips.map(item => item.id === trip.id ? { ...item, status } : item) } : current);
       showAppToast('Statut de la course mis à jour.', 'success');
@@ -274,7 +281,7 @@ export default function TransportModulePage({
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => void load(true)} className="btn inline-flex items-center gap-2 border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700" title="Actualiser"><RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser</button>
-            {canCreate && <button type="button" onClick={() => setDialog('trip')} className="btn inline-flex items-center gap-2 bg-amber-300 px-3.5 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-200"><Plus size={15} />Nouvelle course</button>}
+            {canCreateTrips && <button type="button" onClick={() => setDialog('trip')} className="btn inline-flex items-center gap-2 bg-amber-300 px-3.5 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-200"><Plus size={15} />Nouvelle course</button>}
           </div>
         </div>
       </header>
@@ -285,9 +292,9 @@ export default function TransportModulePage({
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {tab === 'overview' && <Overview data={data} onTab={setTab} />}
-        {tab === 'courses' && <TripsPanel data={data} canCreate={canCreate} canModify={canModify} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
-        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreate} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
-        {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} canCreate={canCreate} onCreate={() => setDialog('vehicle')} />}
+        {tab === 'courses' && <TripsPanel data={data} canCreate={canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
+        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
+        {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} canCreate={canCreateVehicles} onCreate={() => setDialog('vehicle')} />}
       </>}
 
       {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} employees={employees} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}

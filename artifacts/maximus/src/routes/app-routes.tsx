@@ -188,6 +188,7 @@ export function CompanyRouter({
   ecommerceFeatureIds,
   payrollFeatureIds,
   transportFeatureIds,
+  transportFeaturePermissions,
   hasPermission,
   hasPresencePermission,
   stockPermissions,
@@ -217,6 +218,7 @@ export function CompanyRouter({
   ecommerceFeatureIds?: string[];
   payrollFeatureIds?: string[];
   transportFeatureIds?: string[];
+  transportFeaturePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
   hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean;
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
@@ -404,6 +406,7 @@ export function CompanyRouter({
       canCreate: hasPermission('transport', 'créer'),
       canModify: hasPermission('transport', 'modifier'),
       allowedFeatureIds: transportFeatureIds,
+      featurePermissions: transportFeaturePermissions,
       singleModuleNavigation,
     });
   }

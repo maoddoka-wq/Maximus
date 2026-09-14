@@ -80,6 +80,34 @@ class TransportTest extends TestCase
         ]);
     }
 
+    public function test_transport_permissions_are_scoped_to_each_feature(): void
+    {
+        $request = $this->asActor('employee', [
+            'transport:menu:drivers' => ['voir', 'créer', 'modifier'],
+        ]);
+
+        $request->getJson('/api/transport/bootstrap?companyId=kora')->assertOk();
+        $request->postJson('/api/transport/drivers?companyId=kora', [
+            'name' => 'Chauffeur autorisé',
+            'phone' => '+221773333333',
+            'licenseNumber' => 'SN-TAXI-003',
+        ])->assertCreated();
+
+        $request->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-3333-CC',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'TAXI',
+        ])->assertForbidden();
+
+        $request->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Plateau',
+            'destination' => 'Almadies',
+            'passengerName' => 'Passager',
+            'passengerPhone' => '+221774444444',
+            'fare' => 3500,
+        ])->assertForbidden();
+    }
+
     public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
     {
         ModuleCatalog::ensureCompanyAccess('kora');

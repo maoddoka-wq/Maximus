@@ -8,6 +8,7 @@ import {
   getSelectedFeatureIds,
   getStockPermissions,
   restrictRoleToCompany,
+  roleHasFeaturePermission,
   roleHasPermission,
   type ModulePermission,
   type PresencePermission,
@@ -42,6 +43,7 @@ export type AppAccessContext = {
   selectedEcommerceFeatureIds?: string[];
   selectedPayrollFeatureIds?: string[];
   selectedTransportFeatureIds?: string[];
+  transportFeaturePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
   stockPermissions?: Record<string, string[]>;
   commerceTabIds?: string[];
   sidebarFeatureGroups: SidebarFeatureGroup[];
@@ -196,6 +198,17 @@ export function buildAppAccessContext({
       : accessRole && transportModule
         ? [...getSelectedFeatureIds(accessRole, transportModule, employeeNode?.moduleFeatures?.[transportModule.id])]
         : undefined;
+  const transportFeaturePermissions = transportModule
+    ? Object.fromEntries(
+      getModuleFeatureOptions(transportModule).map(feature => [
+        feature.id,
+        {
+          canCreate: companyAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'créer'),
+          canModify: companyAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'modifier'),
+        },
+      ]),
+    )
+    : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
@@ -273,6 +286,7 @@ export function buildAppAccessContext({
     selectedEcommerceFeatureIds,
     selectedPayrollFeatureIds,
     selectedTransportFeatureIds,
+    transportFeaturePermissions,
     stockPermissions,
     commerceTabIds,
     sidebarFeatureGroups,

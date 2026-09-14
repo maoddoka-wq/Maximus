@@ -119,6 +119,19 @@ export function roleHasPermission(
     .some(([, permissions]) => permissions.includes(permission));
 }
 
+export function roleHasFeaturePermission(
+  role: Role | null | undefined,
+  employeeNode: OrgNode | null | undefined,
+  moduleId: ModuleId,
+  featureId: string,
+  permission: ModulePermission,
+) {
+  if (!role || !unitAllowsModule(employeeNode, moduleId)) return false;
+  if (role.modulePermissions[moduleId]?.includes(permission)) return true;
+
+  return role.modulePermissions[permissionFeatureKey(moduleId, featureId)]?.includes(permission) ?? false;
+}
+
 export function employeeHasPresencePermission(
   role: Role | null | undefined,
   employeeNode: OrgNode | null | undefined,

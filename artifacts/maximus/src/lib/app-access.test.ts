@@ -78,6 +78,49 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
+test('calcule les permissions Transport séparément pour chaque rubrique', () => {
+  const { data, company, employee } = createAccessFixture();
+  const node = data.orgNodes[0]!;
+  const role = data.roles[0]!;
+
+  company.requestedModules = ['transport'];
+  company.allowedModules = ['transport'];
+  company.requestedModuleFeatures = {
+    transport: ['overview', 'trips', 'drivers', 'vehicles'],
+  };
+  company.requestedModulePermissions = {
+    transport: {
+      overview: ['voir'],
+      trips: ['voir'],
+      drivers: ['voir', 'créer', 'modifier'],
+      vehicles: ['voir'],
+    },
+  };
+  node.moduleIds = ['transport'];
+  role.modulePermissions = {
+    transport: ['voir'],
+    'transport:menu:overview': ['voir'],
+    'transport:menu:trips': ['voir'],
+    'transport:menu:drivers': ['voir', 'créer', 'modifier'],
+    'transport:menu:vehicles': ['voir'],
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `employee:${employee.id}`,
+    employee,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.equal(access.transportFeaturePermissions?.trips?.canCreate, false);
+  assert.equal(access.transportFeaturePermissions?.drivers?.canCreate, true);
+  assert.equal(access.transportFeaturePermissions?.drivers?.canModify, true);
+  assert.equal(access.transportFeaturePermissions?.vehicles?.canModify, false);
+});
+
 test('affiche les modules dans le menu de l’administrateur d’entreprise', () => {
   const { data, company } = createAccessFixture();
 
