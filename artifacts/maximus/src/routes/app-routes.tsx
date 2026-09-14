@@ -365,6 +365,17 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/taxi') {
+    const ecommerceAccess = serverModuleAccess?.find((module) => module.id === 'ecommerce');
+    const transportEnabled = ecommerceAccess
+      ? ecommerceAccess.featureIds.includes('transport')
+      : ecommerceFeatureIds?.includes('transport') ?? false;
+    if (!transportEnabled) {
+      return renderScreen(screens.empty, {
+        title: 'Transport non activé',
+        text: 'Cette entreprise n’a pas autorisé la fonctionnalité Transport.',
+        action: () => onBack('/entreprise/ecommerce'),
+      });
+    }
     return renderScreen(screens.taxi, { companyId });
   }
   if (routePath === '/entreprise/finance') {

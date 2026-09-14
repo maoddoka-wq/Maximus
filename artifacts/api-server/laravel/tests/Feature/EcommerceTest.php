@@ -1083,6 +1083,7 @@ class EcommerceTest extends TestCase
         $this->getJson('/api/shop/boutique-sans-livraison')
             ->assertOk()
             ->assertJsonPath('store.enabledFeatures.livraisons', false)
+            ->assertJsonPath('store.enabledFeatures.transport', false)
             ->assertJsonPath('store.enabledFeatures.location', true);
         $this->postJson('/api/shop/boutique-sans-livraison/delivery-requests', [
             'requesterName' => 'Client',
@@ -1090,10 +1091,20 @@ class EcommerceTest extends TestCase
             'address' => 'Dakar',
             'serviceType' => 'STANDARD',
         ])->assertForbidden();
+        $this->postJson('/api/shop/boutique-sans-livraison/taxi-requests', [
+            'requesterName' => 'Client Taxi',
+            'requesterEmail' => 'taxi@example.test',
+            'pickupAddress' => 'Dakar',
+            'pickupLatitude' => 14.7,
+            'pickupLongitude' => -17.4,
+            'destinationAddress' => 'Almadies',
+            'passengerCount' => 1,
+        ])->assertForbidden();
     }
 
     public function test_taxi_matches_the_nearest_verified_driver_and_keeps_the_driver_scope(): void
     {
+        $this->enableTransportFeature();
         $this->asActor('employee');
         $admin = $this->asActor();
         $admin->patchJson('/api/ecommerce/store?companyId=kora', [
@@ -1157,6 +1168,7 @@ class EcommerceTest extends TestCase
 
     public function test_taxi_refusal_reassigns_and_driver_can_complete_the_full_course_cycle(): void
     {
+        $this->enableTransportFeature();
         $this->asEmployeeActor('taxi-driver-one');
         $this->asEmployeeActor('taxi-driver-two');
         $admin = $this->asActor();
@@ -1368,5 +1380,16 @@ class EcommerceTest extends TestCase
         return $this
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    private function enableTransportFeature(): void
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'ecommerce')
+            ->update([
+                'feature_ids' => json_encode(['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'livraisons', 'transport', 'finances', 'parametres']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+            ]);
     }
 }

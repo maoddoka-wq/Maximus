@@ -62,3 +62,4 @@
 - [Routage domaine boutique](custom-domain-routing.md) — un domaine personnalisé doit ouvrir directement la vitrine, avant tout rendu de la connexion MAXIMUS.
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
 - [Service Taxi isolé](taxi-service-isolation.md) — les chauffeurs, positions, propositions et transitions Taxi restent bornés à l’entreprise du compte.
+- [Frontière Transport](transport-feature-boundary.md) — Taxi possède une autorisation d’entreprise distincte de Livraisons, avec Livraisons comme dépendance.

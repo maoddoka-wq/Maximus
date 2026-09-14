@@ -268,7 +268,8 @@ export default function EcommerceModulePage({
     ? tabs.filter(item =>
         allowedFeatureIds.includes(item.id)
         || (item.id === 'accueil' && allowedFeatureIds.includes('parametres'))
-        || (item.id === 'categories' && allowedFeatureIds.includes('catalogue')),
+        || (item.id === 'categories' && allowedFeatureIds.includes('catalogue'))
+        || (item.id === 'livraisons' && allowedFeatureIds.includes('transport')),
       )
     : tabs;
   const visibleTabIds = visibleTabs.map(item => item.id);
@@ -414,7 +415,7 @@ export default function EcommerceModulePage({
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
        {tab === 'location' && <RentalPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />}
-      {tab === 'livraisons' && <Deliveries data={data} canCreate={canCreate} canModify={canModify} run={run} />}
+       {tab === 'livraisons' && <Deliveries data={data} allowedFeatureIds={allowedFeatureIds} canCreate={canCreate} canModify={canModify} run={run} />}
       {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} pendingAction={pendingAction} />}
       {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
       </>}
@@ -1040,19 +1041,21 @@ function Promotions() {
   return <div className="fade-up"><Panel title="Promotions" description="Préparez vos temps forts commerciaux sans perdre de vue la cohérence de votre catalogue."><div className="mx-auto max-w-2xl py-8 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Megaphone size={24} /></span><h2 className="mt-5 text-xl font-bold">Les promotions arrivent dans votre cockpit</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Cette vue est prête pour vos futures campagnes. En attendant, gérez vos prix et vos prix barrés directement depuis le catalogue.</p></div></Panel></div>;
 }
 
-function Deliveries({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+function Deliveries({ data, allowedFeatureIds, canCreate, canModify, run }: { data: EcommerceBootstrap; allowedFeatureIds?: string[]; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const canDeliveries = !allowedFeatureIds || allowedFeatureIds.includes('livraisons');
+  const canTransport = !allowedFeatureIds || allowedFeatureIds.includes('transport');
   const shipments = data.orders.filter(order => !['NOUVELLE', 'CONFIRMÉE', 'ANNULÉE'].includes(order.status));
   const change = (order: EcommerceOrder, status: EcommerceOrderStatus) => run(() => createEcommerceApi(data.store.companyId).updateOrderStatus(order.id, status), 'Flux de livraison mis à jour.');
   const changeRequest = (request: EcommerceDeliveryRequest, status: EcommerceDeliveryRequestStatus) => run(() => createEcommerceApi(data.store.companyId).updateDeliveryRequestStatus(request.id, status), 'Demande de livraison mise à jour.');
   return <div className="space-y-5 fade-up">
-     <DeliveryZoneManager data={data} canCreate={canCreate} canModify={canModify} run={run} />
-    <TaxiPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />
-    <Panel title="Demandes de services" description="Les clients peuvent demander une livraison même sans panier.">
+     {canDeliveries && <DeliveryZoneManager data={data} canCreate={canCreate} canModify={canModify} run={run} />}
+    {canTransport && <TaxiPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />}
+    {canDeliveries && <Panel title="Demandes de services" description="Les clients peuvent demander une livraison même sans panier.">
        {data.deliveryRequests.length === 0 ? <Empty icon={Truck} title="Aucune demande de livraison" text="Les demandes déposées depuis la vitrine apparaîtront ici." /> : <div className="grid gap-3 md:grid-cols-2">{data.deliveryRequests.map(request => <div key={request.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{request.reference}</p><h3 className="mt-1 font-bold">{request.requesterName}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{request.requesterEmail} · {request.requesterPhone || 'Téléphone non renseigné'}</p></div><StatusPill value={request.status} /></div><p className="mt-3 text-sm">{request.address}</p>{request.deliveryZoneName && <p className="mt-2 text-xs font-bold text-[hsl(var(--primary))]">Zone : {request.deliveryZoneName}{request.deliveryZoneFee ? ` · ${money(request.deliveryZoneFee, data.store.currency)}` : ''}</p>}<p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{request.serviceType === 'URGENT' ? 'Demande urgente' : 'Livraison standard'}{request.desiredDate ? ` · souhaitée le ${dateLabel(request.desiredDate)}` : ''}</p>{request.note && <p className="mt-2 rounded-lg bg-[hsl(var(--muted)/.45)] p-2 text-xs">{request.note}</p>}<div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(request.createdAt)}</span>{canModify && <select aria-label={`Changer le statut de ${request.reference}`} value={request.status} onChange={event => void changeRequest(request, event.target.value as EcommerceDeliveryRequestStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{(['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'] as EcommerceDeliveryRequestStatus[]).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
-    </Panel>
-    <Panel title="Livraisons de commandes" description="Le flux des commandes qui ont quitté le bureau pour rejoindre vos clients.">
+    </Panel>}
+    {canDeliveries && <Panel title="Livraisons de commandes" description="Le flux des commandes qui ont quitté le bureau pour rejoindre vos clients.">
       {shipments.length === 0 ? <Empty icon={Truck} title="Aucune livraison de commande en cours" text="Les commandes en préparation et expédiées seront suivies ici." /> : <div className="grid gap-3 md:grid-cols-2">{shipments.map(order => <div key={order.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><h3 className="mt-1 font-bold">{order.customerName}</h3></div><StatusPill value={order.status} /></div><p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{order.shippingAddress || 'Adresse de livraison non renseignée'}</p><div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs font-bold">{money(order.total, data.store.currency)}</span>{canModify && <select aria-label={`Avancer la livraison ${order.reference}`} value={order.status} onChange={event => void change(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.filter(item => !['NOUVELLE', 'ANNULÉE'].includes(item)).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
-    </Panel>
+    </Panel>}
   </div>;
 }
 

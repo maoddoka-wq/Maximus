@@ -93,6 +93,7 @@ export interface EcommerceStore {
 export interface PublicShopFeatures {
   location: boolean;
   livraisons: boolean;
+  transport: boolean;
   ventePhysique: boolean;
   venteNumerique: boolean;
 }

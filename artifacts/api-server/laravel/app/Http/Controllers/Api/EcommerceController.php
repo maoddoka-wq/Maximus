@@ -67,8 +67,8 @@ class EcommerceController extends Controller
             'orders' => $this->orders($company),
             'deliveryZones' => $this->listDeliveryZones($company),
             'deliveryRequests' => $this->listDeliveryRequests($company),
-            'taxiDrivers' => $this->listTaxiDrivers($company),
-            'taxiRequests' => $this->listTaxiRequests($company),
+            'taxiDrivers' => ModuleCatalog::allowsFeature($company, 'ecommerce', 'transport') ? $this->listTaxiDrivers($company) : [],
+            'taxiRequests' => ModuleCatalog::allowsFeature($company, 'ecommerce', 'transport') ? $this->listTaxiRequests($company) : [],
         ]);
     }
 
@@ -1048,7 +1048,7 @@ class EcommerceController extends Controller
 
     public function taxiEligibleEmployees(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'view', 'livraisons')) {
+        if (! $this->allowed($request, 'view', 'transport')) {
             return $this->forbidden();
         }
 
@@ -1077,7 +1077,7 @@ class EcommerceController extends Controller
 
     public function taxiDrivers(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'view', 'livraisons')) {
+        if (! $this->allowed($request, 'view', 'transport')) {
             return $this->forbidden();
         }
 
@@ -1086,7 +1086,7 @@ class EcommerceController extends Controller
 
     public function createTaxiDriver(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'livraisons')) {
+        if (! $this->allowed($request, 'modify', 'transport')) {
             return $this->forbidden();
         }
 
@@ -1184,7 +1184,10 @@ class EcommerceController extends Controller
     public function taxiDriverSession(Request $request): JsonResponse
     {
         $driver = $this->currentTaxiDriver($request);
-        if (! $driver && ! $this->allowed($request, 'view', 'livraisons')) {
+        if (! ModuleCatalog::allowsFeature($this->company($request), 'ecommerce', 'transport')) {
+            return $this->forbidden('Le transport n’est pas activé pour cette entreprise.');
+        }
+        if (! $driver && ! $this->allowed($request, 'view', 'transport')) {
             return response()->json(['error' => 'Ce compte n’est pas enregistré comme chauffeur Taxi.'], 404);
         }
         if (! $driver) return $this->forbidden();
@@ -1198,7 +1201,10 @@ class EcommerceController extends Controller
     public function updateTaxiDriverSession(Request $request): JsonResponse
     {
         $driver = $this->currentTaxiDriver($request);
-        if (! $driver && ! $this->allowed($request, 'view', 'livraisons')) {
+        if (! ModuleCatalog::allowsFeature($this->company($request), 'ecommerce', 'transport')) {
+            return $this->forbidden('Le transport n’est pas activé pour cette entreprise.');
+        }
+        if (! $driver && ! $this->allowed($request, 'view', 'transport')) {
             return response()->json(['error' => 'Ce compte n’est pas enregistré comme chauffeur Taxi.'], 404);
         }
         if (! $driver) return $this->forbidden();
@@ -1227,7 +1233,10 @@ class EcommerceController extends Controller
     public function taxiDriverRequests(Request $request): JsonResponse
     {
         $driver = $this->currentTaxiDriver($request);
-        if (! $driver && ! $this->allowed($request, 'view', 'livraisons')) {
+        if (! ModuleCatalog::allowsFeature($this->company($request), 'ecommerce', 'transport')) {
+            return $this->forbidden('Le transport n’est pas activé pour cette entreprise.');
+        }
+        if (! $driver && ! $this->allowed($request, 'view', 'transport')) {
             return response()->json(['error' => 'Ce compte n’est pas enregistré comme chauffeur Taxi.'], 404);
         }
         if (! $driver) return $this->forbidden();
@@ -1238,7 +1247,10 @@ class EcommerceController extends Controller
     public function updateTaxiRequestByDriver(Request $request, string $id): JsonResponse
     {
         $driver = $this->currentTaxiDriver($request);
-        if (! $driver && ! $this->allowed($request, 'view', 'livraisons')) {
+        if (! ModuleCatalog::allowsFeature($this->company($request), 'ecommerce', 'transport')) {
+            return $this->forbidden('Le transport n’est pas activé pour cette entreprise.');
+        }
+        if (! $driver && ! $this->allowed($request, 'view', 'transport')) {
             return response()->json(['error' => 'Ce compte n’est pas enregistré comme chauffeur Taxi.'], 404);
         }
         if (! $driver) return $this->forbidden();
@@ -1497,8 +1509,8 @@ class EcommerceController extends Controller
     private function createDeliveryRequestForStore(Request $request, object $store): JsonResponse
     {
         $features = $this->publicEnabledFeatures((string) $store->company_id);
-        if (! $features['livraisons']) {
-            return response()->json(['error' => 'Le service de livraison n’est pas activé pour cette boutique.'], 403);
+        if (! $features['transport']) {
+            return response()->json(['error' => 'Le transport n’est pas activé pour cette boutique.'], 403);
         }
 
         $input = Validator::make($request->all(), [
@@ -1769,6 +1781,7 @@ class EcommerceController extends Controller
         return [
             'location' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'location'),
             'livraisons' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'livraisons'),
+            'transport' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'transport'),
             'ventePhysique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-physique'),
             'venteNumerique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-numerique'),
         ];
