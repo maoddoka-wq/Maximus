@@ -57,3 +57,4 @@
 - [Performance réseau frontend](frontend-network-performance.md) — confirmer la mutation puis rafraîchir en arrière-plan, en partageant uniquement les GET simultanés.
 - [Inscription publique](public-registration-policy.md) — le réglage global masque les parcours manuel et intelligent, sans bloquer la création manuelle depuis MAXIMUS.
 - [Routage Apache des PWA](apache-pwa-routing.md) — ne jamais rediriger les routes SPA profondes vers le port Apache interne de Render.
+- [Publication GitHub de secours](github-push-fallback.md) — si le push Git refuse l’authentification, publier via l’intégration GitHub puis resynchroniser la branche locale.
