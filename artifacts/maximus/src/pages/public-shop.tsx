@@ -21,6 +21,7 @@ import { ApiRequestError } from '@/lib/api-request';
 import { createPublicTransportApi, type PublicTransportTrip } from '@/lib/transport-api';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type PublicProduct = PublicShopBootstrap['products'][number];
 type PublicRental = PublicShopBootstrap['rentals'][number];
@@ -853,24 +854,15 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     });
   }, [api]);
 
-  useEffect(() => {
-    if (!trip) return undefined;
-    let active = true;
-    const refresh = () => {
-      void api.getTrip(trip.id).then(result => {
-        if (!active) return;
-        setTrip(result.trip);
-        setTripMessage(result.message);
-      }).catch(() => {
-        // Keep the last known position visible while the next poll retries.
-      });
-    };
-    const interval = window.setInterval(refresh, 10_000);
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-    };
-  }, [api, trip?.id]);
+  useAutoRefresh(() => {
+    if (!trip) return;
+    return api.getTrip(trip.id).then(result => {
+      setTrip(result.trip);
+      setTripMessage(result.message);
+    }).catch(() => {
+      // Keep the last known position visible while the next refresh retries.
+    });
+  }, { enabled: Boolean(trip), intervalMs: 5_000 });
 
   const locate = () => {
     if (!navigator.geolocation) {
@@ -1011,7 +1003,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
 function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
   const hasPosition = trip.driverLatitude !== null && trip.driverLongitude !== null && trip.pickupLatitude !== null && trip.pickupLongitude !== null;
   const vehicleLeft = hasPosition ? Math.max(16, Math.min(84, 50 + ((trip.driverLongitude! - trip.pickupLongitude!) * 700))) : 50;
-  return <div className="mt-5 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left"><div className="flex items-center justify-between gap-3 px-1"><p className="text-xs font-black">Suivi en direct</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 10 s</span></div><div className="relative mt-3 h-36 overflow-hidden rounded-xl border bg-[linear-gradient(135deg,#e8eef2,#fff,#eef3ed)]"><div className="absolute inset-x-[10%] top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--shop-primary)]/25" /><div className="absolute left-[10%] top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-white shadow"><MapPin size={14} /></span><span>Vous</span></div><div className="absolute top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold transition-[left] duration-1000 ease-out" style={{ left: `${vehicleLeft}%` }}><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--shop-accent)] text-white shadow"><CarFront size={15} /></span><span>Taxi</span></div><div className="absolute bottom-2 left-2 rounded-md bg-white/85 px-2 py-1 text-[9px] font-semibold text-slate-600 backdrop-blur-sm">{hasPosition ? 'Le véhicule se déplace vers vous' : 'Position du chauffeur en attente'}</div></div></div>;
+  return <div className="mt-5 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left"><div className="flex items-center justify-between gap-3 px-1"><p className="text-xs font-black">Suivi en direct</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span></div><div className="relative mt-3 h-36 overflow-hidden rounded-xl border bg-[linear-gradient(135deg,#e8eef2,#fff,#eef3ed)]"><div className="absolute inset-x-[10%] top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--shop-primary)]/25" /><div className="absolute left-[10%] top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-white shadow"><MapPin size={14} /></span><span>Vous</span></div><div className="absolute top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold transition-[left] duration-1000 ease-out" style={{ left: `${vehicleLeft}%` }}><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--shop-accent)] text-white shadow"><CarFront size={15} /></span><span>Taxi</span></div><div className="absolute bottom-2 left-2 rounded-md bg-white/85 px-2 py-1 text-[9px] font-semibold text-slate-600 backdrop-blur-sm">{hasPosition ? 'Le véhicule se déplace vers vous' : 'Position du chauffeur en attente'}</div></div></div>;
 }
 
 function ShopHomePage({
