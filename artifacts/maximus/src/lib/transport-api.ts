@@ -238,4 +238,13 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
   getTrip: (id: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
     domain ? `/shop-domain/transport/trips/${encodeURIComponent(id)}` : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}`,
   ),
+  getHistory: () => request<{ trips: PublicTransportTrip[] }>(
+    domain ? '/shop-domain/transport/history' : `/shop/${encodeURIComponent(slug ?? '')}/transport/history`,
+  ),
+  cancelTrip: (id: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+    domain
+      ? `/shop-domain/transport/trips/${encodeURIComponent(id)}/cancel`
+      : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}/cancel`,
+    { method: 'POST' },
+  ),
 });

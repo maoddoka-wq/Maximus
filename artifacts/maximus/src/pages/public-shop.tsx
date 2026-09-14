@@ -723,7 +723,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
-              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
+              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} customer={customer} onBack={() => go('')} onLogin={() => go('/connexion')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
@@ -843,7 +843,7 @@ function GalleryCarousel({ mainImage, gallery, alt, icon: Icon }: { mainImage: s
   </div>;
 }
 
-function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void }) {
+function TransportPublicPage({ store, slug, domain, customer, onBack, onLogin }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; customer: EcommerceCustomer | null; onBack: () => void; onLogin: () => void }) {
   const phone = store.seller?.phone?.trim() ?? '';
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
@@ -863,6 +863,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('/taxi-transport-hero.jpg');
+  const [cancelling, setCancelling] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [history, setHistory] = useState<PublicTransportTrip[]>([]);
+  const [tripOwnedByCustomer, setTripOwnedByCustomer] = useState(false);
 
   useEffect(() => {
     void api.getSettings().then(result => {
@@ -878,12 +884,49 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       window.localStorage.removeItem(customerStorageKey);
       setTrip(null);
       setTripEnded(result.trip);
+      setTripOwnedByCustomer(false);
       setFormOpen(false);
       return;
     }
     setTripEnded(null);
     setTrip(result.trip);
     setFormOpen(false);
+  };
+
+  const cancelTrip = async () => {
+    if (!trip || !customer || cancelling) return;
+    if (!window.confirm('Annuler cette course Taxi ?')) return;
+    setCancelling(true);
+    setError('');
+    try {
+      applyTripResult(await api.cancelTrip(trip.id));
+      if (historyOpen) {
+        setHistory(current => current.map(item => item.id === trip.id ? { ...item, status: 'CANCELLED' } : item));
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'La course n’a pas pu être annulée.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    if (!customer || historyLoading) return;
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      setHistory((await api.getHistory()).trips);
+    } catch (cause) {
+      setHistoryError(cause instanceof Error ? cause.message : 'L’historique Taxi n’a pas pu être chargé.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleHistory = () => {
+    const nextOpen = !historyOpen;
+    setHistoryOpen(nextOpen);
+    if (nextOpen) void loadHistory();
   };
 
   const refreshTrip = async () => {
@@ -961,14 +1004,15 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     try {
       const saved = window.localStorage.getItem(customerStorageKey);
       if (!saved) return;
-      const customer = JSON.parse(saved) as { tripId?: string; passengerName?: string; passengerPhone?: string };
+      const savedCustomer = JSON.parse(saved) as { tripId?: string; passengerName?: string; passengerPhone?: string; customerId?: string | null };
       setForm(current => ({
         ...current,
-        passengerName: customer.passengerName?.trim() || current.passengerName,
-        passengerPhone: customer.passengerPhone?.trim() || current.passengerPhone,
+        passengerName: savedCustomer.passengerName?.trim() || current.passengerName,
+        passengerPhone: savedCustomer.passengerPhone?.trim() || current.passengerPhone,
       }));
-      if (customer.tripId) {
-        void api.getTrip(customer.tripId).then(result => {
+      setTripOwnedByCustomer(Boolean(customer && savedCustomer.customerId === customer.id));
+      if (savedCustomer.tripId) {
+        void api.getTrip(savedCustomer.tripId).then(result => {
           applyTripResult(result);
         }).catch(() => {
           window.localStorage.removeItem(customerStorageKey);
@@ -995,6 +1039,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     setError('');
     setTrip(null);
     setTripEnded(null);
+    setTripOwnedByCustomer(false);
     try {
       const result = await api.createTrip({
         ...form,
@@ -1010,7 +1055,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         tripId: result.trip.id,
         passengerName: form.passengerName.trim(),
         passengerPhone: form.passengerPhone.trim(),
+        customerId: customer?.id ?? null,
       }));
+      setTripOwnedByCustomer(Boolean(customer));
        applyTripResult(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La demande de course n’a pas pu être envoyée.');
@@ -1066,19 +1113,20 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
            <button type="submit" disabled={submitting || locationState !== 'ready'} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--shop-accent)] px-5 py-4 text-sm font-black text-white shadow-[0_12px_24px_rgba(15,23,42,.14)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(15,23,42,.18)] disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={17} className="animate-spin" /> : <CarFront size={17} />}{submitting ? 'Recherche du chauffeur…' : 'Confirmer ma course'}<ArrowRight size={16} /></button>
            <p className="flex items-center justify-center gap-1.5 text-center text-[11px] leading-4 text-slate-400"><ShieldCheck size={13} /> Vos coordonnées servent uniquement à vous mettre en relation avec le chauffeur affecté.</p>
         </form>}
-          {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-xl font-black tracking-[-.04em] sm:text-2xl">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
+           {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-xl font-black tracking-[-.04em] sm:text-2xl">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'REQUESTED' || trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} onCancel={customer && tripOwnedByCustomer && ['REQUESTED', 'OFFERED', 'ASSIGNED'].includes(trip.status) ? cancelTrip : undefined} cancelling={cancelling} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setTrip(null); setTripOwnedByCustomer(false); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
         </div>
       </div>
       <aside className="space-y-4">
         <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-950 p-5 text-white shadow-sm sm:rounded-[1.75rem]"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-[var(--shop-primary)]">Zone couverte</p><h2 className="mt-2 text-xl font-black tracking-[-.04em]">Dakar, simplement.</h2></div><MapPin size={20} className="text-[var(--shop-primary)]" /></div><p className="mt-4 text-xs leading-5 text-white/60">Les départs GPS et les arrivées sont contrôlés dans la zone de Dakar.</p></div>
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-[1.75rem] sm:p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)]/15 text-[var(--shop-accent)]"><Sparkles size={19} /></div><div><h2 className="font-black text-slate-950">Comment ça marche</h2><p className="text-xs text-slate-500">Trois étapes, pas plus.</p></div></div><div className="mt-6 space-y-5"><div className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--shop-primary)]/15 text-[10px] font-black text-[var(--shop-accent)]">01</span><p className="text-sm font-bold text-slate-800">Localisez-vous<span className="mt-1 block text-xs font-normal leading-5 text-slate-500">Votre départ est détecté automatiquement.</span></p></div><div className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--shop-primary)]/15 text-[10px] font-black text-[var(--shop-accent)]">02</span><p className="text-sm font-bold text-slate-800">Choisissez votre arrivée<span className="mt-1 block text-xs font-normal leading-5 text-slate-500">Obtenez la distance, la durée et le tarif.</span></p></div><div className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--shop-primary)]/15 text-[10px] font-black text-[var(--shop-accent)]">03</span><p className="text-sm font-bold text-slate-800">Restez en contact<span className="mt-1 block text-xs font-normal leading-5 text-slate-500">Suivez le taxi et appelez le chauffeur.</span></p></div></div></div>
+         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-[1.75rem] sm:p-6"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)]/15 text-[var(--shop-accent)]"><Clock3 size={19} /></div><div><h2 className="font-black text-slate-950">Historique Taxi</h2><p className="text-xs text-slate-500">{customer ? 'Retrouvez vos demandes sur cette boutique.' : 'Disponible avec un compte client.'}</p></div></div>{customer ? <><button type="button" onClick={toggleHistory} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white">{historyOpen ? 'Masquer l’historique' : 'Voir mon historique'}<ArrowRight size={15} className={historyOpen ? 'rotate-90' : ''} /></button>{historyOpen && <div className="mt-4 space-y-2">{historyLoading && <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-500">Chargement de vos courses…</p>}{historyError && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-3 text-xs font-semibold text-rose-800">{historyError}</p>}{!historyLoading && !historyError && history.length === 0 && <p className="rounded-xl bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">Aucune course enregistrée avec ce compte.</p>}{history.map(item => <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3"><div className="flex items-start justify-between gap-2"><p className="text-xs font-black text-slate-900">{item.destination}</p><span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase ${item.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : item.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{item.status === 'COMPLETED' ? 'Terminée' : item.status === 'CANCELLED' ? 'Annulée' : 'En cours'}</span></div><p className="mt-1 text-[11px] text-slate-500">{readableDate(item.requestedAt)} · {money(item.fare, store.currency)}</p><p className="mt-1 truncate text-[10px] text-slate-400">Réf. {item.reference}</p></div>)}</div>}</> : <button type="button" onClick={onLogin} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-[var(--shop-accent)] transition hover:bg-slate-50"><LogIn size={15} /> Se connecter pour accéder à l’historique</button>}</div>
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-[1.75rem] sm:p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)]/15 text-[var(--shop-accent)]"><Phone size={19} /></div><h2 className="mt-4 font-black text-slate-950">Besoin d’aide ?</h2><p className="mt-1 text-sm leading-6 text-slate-500">Contactez directement {store.name}.</p>{phone ? <a href={`tel:${phone}`} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-[var(--shop-accent)] transition hover:bg-slate-50"><Phone size={16} /> {phone}</a> : whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp boutique</a> : <p className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-center text-xs text-slate-500">Aucun numéro de téléphone public.</p>}</div>
       </aside>
     </div>
   </section>;
 }
 
-function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
+function PublicTaxiTracking({ trip, onCancel, cancelling }: { trip: PublicTransportTrip; onCancel?: () => void; cancelling?: boolean }) {
   const pickup = trip.pickupLatitude !== null && trip.pickupLongitude !== null
     ? { latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }
     : null;
@@ -1090,7 +1138,7 @@ function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
     : null;
 
   return <div className="mt-5 space-y-3 rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-3 text-left sm:p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1"><div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[var(--shop-accent)]">Suivi en direct</p><p className="mt-1 text-xs font-bold text-slate-800">Taxi → arrêt client → destination</p></div><div className="flex items-center gap-3"><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span><button type="button" onClick={() => window.dispatchEvent(new Event('maximus:refresh'))} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-500 transition hover:bg-slate-100"><RefreshCw size={12} />Actualiser</button></div></div>
+     <div className="flex flex-wrap items-center justify-between gap-2 px-1"><div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[var(--shop-accent)]">Suivi en direct</p><p className="mt-1 text-xs font-bold text-slate-800">Taxi → arrêt client → destination</p></div><div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span><button type="button" onClick={() => window.dispatchEvent(new Event('maximus:refresh'))} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-500 transition hover:bg-slate-100"><RefreshCw size={12} />Actualiser</button>{onCancel && <button type="button" onClick={onCancel} disabled={cancelling} className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60">{cancelling && <RefreshCw size={12} className="animate-spin" />} {cancelling ? 'Annulation…' : 'Annuler la course'}</button>}</div></div>
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-slate-400">Taxi → arrêt client</p><p className="mt-1 text-sm font-black text-slate-950">{trip.pickupRouteDistanceKm !== null && trip.pickupRouteDistanceKm !== undefined ? `${trip.pickupRouteDistanceKm.toFixed(1)} km` : 'Calcul…'}</p></div>
       <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-slate-400">Arrivée estimée</p><p className="mt-1 text-sm font-black text-slate-950">{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined ? `${trip.pickupEtaMinutes} min` : 'GPS en attente'}</p></div>
