@@ -962,7 +962,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       <ArrowLeft size={16} /> Retour à la boutique
     </button>
     <div className="relative overflow-hidden rounded-[1.25rem] bg-[#0b1b2b] p-4 text-white shadow-xl sm:rounded-[2rem] sm:p-10">
-      <div className="pointer-events-none absolute inset-0"><img src={heroImageUrl} alt="" aria-hidden="true" className="h-full w-full object-cover object-center opacity-75" /><div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,18,31,.96)_0%,rgba(5,18,31,.82)_48%,rgba(5,18,31,.42)_100%)]" /><div className="absolute inset-0 bg-gradient-to-br from-[#071522]/30 via-transparent to-[#d69e2e]/35" /></div>
+      <div className="pointer-events-none absolute inset-0"><img src={heroImageUrl} alt="" aria-hidden="true" className="h-full w-full object-cover object-center opacity-100" /><div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,18,31,.72)_0%,rgba(5,18,31,.46)_48%,rgba(5,18,31,.16)_100%)]" /><div className="absolute inset-0 bg-gradient-to-br from-[#071522]/10 via-transparent to-[#d69e2e]/20" /></div>
       <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[var(--shop-primary)]/25 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-5rem] right-1/3 h-40 w-40 rounded-full border border-white/10" />
       <div className="relative grid gap-5 sm:gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
