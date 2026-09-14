@@ -1166,6 +1166,43 @@ class EcommerceTest extends TestCase
         ]);
     }
 
+    public function test_delivery_can_remain_enabled_without_enabling_transport(): void
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'ecommerce')
+            ->update([
+                'feature_ids' => json_encode(['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'livraisons', 'finances', 'parametres']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+            ]);
+
+        $admin = $this->asActor();
+        $admin->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique Livraison Sans Taxi',
+            'slug' => 'boutique-livraison-sans-taxi',
+            'description' => 'Livraison uniquement',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+
+        $this->getJson('/api/shop/boutique-livraison-sans-taxi')
+            ->assertOk()
+            ->assertJsonPath('store.enabledFeatures.livraisons', true)
+            ->assertJsonPath('store.enabledFeatures.transport', false);
+
+        $this->postJson('/api/shop/boutique-livraison-sans-taxi/taxi-requests', [
+            'requesterName' => 'Client Taxi',
+            'requesterEmail' => 'taxi@example.test',
+            'pickupAddress' => 'Dakar',
+            'pickupLatitude' => 14.7,
+            'pickupLongitude' => -17.4,
+            'destinationAddress' => 'Almadies',
+            'passengerCount' => 1,
+        ])->assertForbidden();
+    }
+
     public function test_taxi_refusal_reassigns_and_driver_can_complete_the_full_course_cycle(): void
     {
         $this->enableTransportFeature();

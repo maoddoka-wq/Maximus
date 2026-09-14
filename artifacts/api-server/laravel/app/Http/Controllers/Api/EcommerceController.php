@@ -1575,8 +1575,8 @@ class EcommerceController extends Controller
     private function createTaxiRequestForStore(Request $request, object $store): JsonResponse
     {
         $features = $this->publicEnabledFeatures((string) $store->company_id);
-        if (! $features['livraisons']) {
-            return response()->json(['error' => 'Le service de livraison n’est pas activé pour cette boutique.'], 403);
+        if (! $features['transport']) {
+            return response()->json(['error' => 'Le transport n’est pas activé pour cette boutique.'], 403);
         }
 
         $input = Validator::make($request->all(), [
