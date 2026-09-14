@@ -155,6 +155,7 @@ function isPotentialCustomStoreHost(): boolean {
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
+const TaxiDriverPage = lazy(() => import('@/pages/taxi-driver-page'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
@@ -1194,6 +1195,7 @@ function AppContent() {
                     empty: EmptyState,
                     stocks: StockModulePage,
                     ecommerce: EcommerceModulePage,
+                     taxi: TaxiDriverPage,
                     finance: FinancePage,
                     commerce: CommerceModulePage,
                     operational: OperationalModulePage,

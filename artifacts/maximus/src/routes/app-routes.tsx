@@ -158,6 +158,7 @@ export type CompanyRouteScreens = {
   empty: Screen;
   stocks: Screen;
   ecommerce: Screen;
+  taxi: Screen;
   finance: Screen;
   commerce: Screen;
   operational: Screen;
@@ -362,6 +363,9 @@ export function CompanyRouter({
       allowedFeatureIds: ecommerceFeatureIds,
       singleModuleNavigation,
     });
+  }
+  if (routePath === '/entreprise/taxi') {
+    return renderScreen(screens.taxi, { companyId });
   }
   if (routePath === '/entreprise/finance') {
     return renderScreen(screens.finance, { data, mutate });

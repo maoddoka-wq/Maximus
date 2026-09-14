@@ -61,3 +61,4 @@
 - [Liaison PostgreSQL Render](render-database-binding.md) — la production doit utiliser la base Render gérée, pas une ancienne URL Neon fixe.
 - [Routage domaine boutique](custom-domain-routing.md) — un domaine personnalisé doit ouvrir directement la vitrine, avant tout rendu de la connexion MAXIMUS.
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
+- [Service Taxi isolé](taxi-service-isolation.md) — les chauffeurs, positions, propositions et transitions Taxi restent bornés à l’entreprise du compte.

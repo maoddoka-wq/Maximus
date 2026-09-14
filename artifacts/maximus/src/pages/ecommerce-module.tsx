@@ -3,6 +3,7 @@ import {
   Archive,
   ArrowUpRight,
   ArrowDownToLine,
+  CarFront,
   Clock3,
   Check,
   CheckCircle2,
@@ -13,13 +14,16 @@ import {
   House,
   ImagePlus,
   LayoutDashboard,
+  MapPin,
   Megaphone,
+  Navigation,
   Package,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   Settings,
+  ShieldCheck,
   ShoppingBag,
   Store,
   Tags,
@@ -51,6 +55,10 @@ import {
   type EcommerceCarReservationStatus,
   type EcommerceCarTripType,
   type EcommerceStore,
+  type EcommerceTaxiDriver,
+  type EcommerceTaxiEmployee,
+  type EcommerceTaxiRequest,
+  type EcommerceTaxiRequestStatus,
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
 import { useQueryTab } from '@/lib/query-tab';
@@ -122,6 +130,8 @@ function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: strin
     orders,
     deliveryZones: Array.isArray(payload.deliveryZones) ? payload.deliveryZones : [],
     deliveryRequests: Array.isArray(payload.deliveryRequests) ? payload.deliveryRequests : [],
+    taxiDrivers: Array.isArray(payload.taxiDrivers) ? payload.taxiDrivers : [],
+    taxiRequests: Array.isArray(payload.taxiRequests) ? payload.taxiRequests : [],
   };
 }
 
@@ -294,6 +304,8 @@ export default function EcommerceModulePage({
         orders: [],
         deliveryZones: [],
         deliveryRequests: [],
+         taxiDrivers: [],
+         taxiRequests: [],
       });
       setWalletData(null);
       setError('');
@@ -1034,6 +1046,7 @@ function Deliveries({ data, canCreate, canModify, run }: { data: EcommerceBootst
   const changeRequest = (request: EcommerceDeliveryRequest, status: EcommerceDeliveryRequestStatus) => run(() => createEcommerceApi(data.store.companyId).updateDeliveryRequestStatus(request.id, status), 'Demande de livraison mise à jour.');
   return <div className="space-y-5 fade-up">
      <DeliveryZoneManager data={data} canCreate={canCreate} canModify={canModify} run={run} />
+    <TaxiPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />
     <Panel title="Demandes de services" description="Les clients peuvent demander une livraison même sans panier.">
        {data.deliveryRequests.length === 0 ? <Empty icon={Truck} title="Aucune demande de livraison" text="Les demandes déposées depuis la vitrine apparaîtront ici." /> : <div className="grid gap-3 md:grid-cols-2">{data.deliveryRequests.map(request => <div key={request.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{request.reference}</p><h3 className="mt-1 font-bold">{request.requesterName}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{request.requesterEmail} · {request.requesterPhone || 'Téléphone non renseigné'}</p></div><StatusPill value={request.status} /></div><p className="mt-3 text-sm">{request.address}</p>{request.deliveryZoneName && <p className="mt-2 text-xs font-bold text-[hsl(var(--primary))]">Zone : {request.deliveryZoneName}{request.deliveryZoneFee ? ` · ${money(request.deliveryZoneFee, data.store.currency)}` : ''}</p>}<p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{request.serviceType === 'URGENT' ? 'Demande urgente' : 'Livraison standard'}{request.desiredDate ? ` · souhaitée le ${dateLabel(request.desiredDate)}` : ''}</p>{request.note && <p className="mt-2 rounded-lg bg-[hsl(var(--muted)/.45)] p-2 text-xs">{request.note}</p>}<div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(request.createdAt)}</span>{canModify && <select aria-label={`Changer le statut de ${request.reference}`} value={request.status} onChange={event => void changeRequest(request, event.target.value as EcommerceDeliveryRequestStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{(['DEMANDEE', 'CONFIRMEE', 'EN_COURS', 'LIVREE', 'ANNULEE'] as EcommerceDeliveryRequestStatus[]).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
     </Panel>
@@ -1041,6 +1054,190 @@ function Deliveries({ data, canCreate, canModify, run }: { data: EcommerceBootst
       {shipments.length === 0 ? <Empty icon={Truck} title="Aucune livraison de commande en cours" text="Les commandes en préparation et expédiées seront suivies ici." /> : <div className="grid gap-3 md:grid-cols-2">{shipments.map(order => <div key={order.id} className="rounded-xl border p-4 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><h3 className="mt-1 font-bold">{order.customerName}</h3></div><StatusPill value={order.status} /></div><p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{order.shippingAddress || 'Adresse de livraison non renseignée'}</p><div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><span className="text-xs font-bold">{money(order.total, data.store.currency)}</span>{canModify && <select aria-label={`Avancer la livraison ${order.reference}`} value={order.status} onChange={event => void change(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{orderStatuses.filter(item => !['NOUVELLE', 'ANNULÉE'].includes(item)).map(item => <option key={item} value={item}>{item}</option>)}</select>}</div></div>)}</div>}
     </Panel>
   </div>;
+}
+
+type TaxiDriverForm = {
+  employeeId: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleColor: string;
+  licensePlate: string;
+};
+
+const blankTaxiDriverForm: TaxiDriverForm = {
+  employeeId: '',
+  vehicleMake: '',
+  vehicleModel: '',
+  vehicleColor: '',
+  licensePlate: '',
+};
+
+const taxiDriverStatusLabels: Record<EcommerceTaxiDriver['status'], string> = {
+  OFFLINE: 'Hors ligne',
+  AVAILABLE: 'Disponible',
+  APPROACHING: 'En approche',
+  IN_TRIP: 'En course',
+};
+
+const taxiVerificationLabels: Record<EcommerceTaxiDriver['verificationStatus'], string> = {
+  PENDING: 'À valider',
+  VERIFIED: 'Validé',
+  REJECTED: 'Refusé',
+};
+
+const taxiRequestStatusLabels: Record<EcommerceTaxiRequestStatus, string> = {
+  DEMANDEE: 'Demandée',
+  PROPOSEE: 'Proposée',
+  ACCEPTEE: 'Acceptée',
+  CHAUFFEUR_EN_APPROCHE: 'Chauffeur en approche',
+  CLIENT_A_BORD: 'Client à bord',
+  TERMINEE: 'Terminée',
+  ANNULEE: 'Annulée',
+};
+
+const taxiRequestCycle: EcommerceTaxiRequestStatus[] = [
+  'DEMANDEE',
+  'PROPOSEE',
+  'ACCEPTEE',
+  'CHAUFFEUR_EN_APPROCHE',
+  'CLIENT_A_BORD',
+  'TERMINEE',
+];
+
+function TaxiPanel({ data, canCreate, canModify, run }: { data: EcommerceBootstrap; canCreate: boolean; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [employees, setEmployees] = useState<EcommerceTaxiEmployee[]>([]);
+  const [drivers, setDrivers] = useState<EcommerceTaxiDriver[]>(data.taxiDrivers ?? []);
+  const [loadingDrivers, setLoadingDrivers] = useState(true);
+  const [taxiError, setTaxiError] = useState('');
+  const [editing, setEditing] = useState<EcommerceTaxiDriver | 'new' | null>(null);
+  const [form, setForm] = useState<TaxiDriverForm>(blankTaxiDriverForm);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingDrivers(true);
+    setTaxiError('');
+    const api = createEcommerceApi(data.store.companyId);
+    void Promise.all([api.taxiEligibleEmployees(), api.taxiDrivers()])
+      .then(([employeeResult, driverResult]) => {
+        if (!mounted) return;
+        setEmployees(Array.isArray(employeeResult.employees) ? employeeResult.employees : []);
+        setDrivers(Array.isArray(driverResult.drivers) ? driverResult.drivers : []);
+      })
+      .catch(cause => {
+        if (mounted) setTaxiError(cause instanceof Error ? cause.message : 'Les données Taxi ne sont pas disponibles.');
+      })
+      .finally(() => {
+        if (mounted) setLoadingDrivers(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [data.store.companyId, data.taxiDrivers]);
+
+  const assignedEmployeeIds = useMemo(() => new Set(drivers.map(driver => driver.employeeId)), [drivers]);
+  const availableEmployees = useMemo(() => employees.filter(employee => !assignedEmployeeIds.has(employee.employeeId)), [employees, assignedEmployeeIds]);
+  const verifiedDrivers = drivers.filter(driver => driver.verificationStatus === 'VERIFIED');
+  const availableDrivers = drivers.filter(driver => driver.status === 'AVAILABLE');
+  const activeRequests = (data.taxiRequests ?? []).filter(request => !['TERMINEE', 'ANNULEE'].includes(request.status));
+
+  const openNew = () => {
+    setEditing('new');
+    setForm(blankTaxiDriverForm);
+  };
+
+  const openEdit = (driver: EcommerceTaxiDriver) => {
+    setEditing(driver);
+    setForm({
+      employeeId: driver.employeeId,
+      vehicleMake: driver.vehicleMake ?? '',
+      vehicleModel: driver.vehicleModel ?? '',
+      vehicleColor: driver.vehicleColor ?? '',
+      licensePlate: driver.licensePlate ?? '',
+    });
+  };
+
+  const saveDriver = async (event: FormEvent) => {
+    event.preventDefault();
+    const licensePlate = form.licensePlate.trim().toUpperCase();
+    if (!licensePlate || (editing === 'new' && !form.employeeId)) return;
+    const api = createEcommerceApi(data.store.companyId);
+    const body = {
+      ...(editing === 'new' ? { employeeId: form.employeeId } : {}),
+      vehicleMake: form.vehicleMake.trim() || undefined,
+      vehicleModel: form.vehicleModel.trim() || undefined,
+      vehicleColor: form.vehicleColor.trim() || undefined,
+      licensePlate,
+    };
+    const result = editing === 'new'
+      ? await run(() => api.createTaxiDriver({ ...body, employeeId: form.employeeId }), 'Chauffeur Taxi créé.')
+      : editing ? await run(() => api.updateTaxiDriver(editing.id, body), 'Fiche chauffeur mise à jour.') : undefined;
+    if (!result) return;
+    const driver = result as EcommerceTaxiDriver;
+    setDrivers(current => editing === 'new' ? [driver, ...current] : current.map(item => item.id === driver.id ? driver : item));
+    setEditing(null);
+  };
+
+  const updateDriver = async (driver: EcommerceTaxiDriver, body: Partial<Pick<EcommerceTaxiDriver, 'verificationStatus' | 'status'>>) => {
+    const result = await run(() => createEcommerceApi(data.store.companyId).updateTaxiDriver(driver.id, body), 'Chauffeur Taxi mis à jour.');
+    if (result) {
+      const updated = result as EcommerceTaxiDriver;
+      setDrivers(current => current.map(item => item.id === updated.id ? updated : item));
+    }
+  };
+
+  return <div className="space-y-5">
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Metric label="Chauffeurs" value={String(drivers.length)} detail="Fiches rattachées à la flotte" icon={CarFront} accent />
+      <Metric label="Disponibles" value={String(availableDrivers.length)} detail="Prêts à recevoir une course" icon={Navigation} />
+      <Metric label="À valider" value={String(drivers.filter(driver => driver.verificationStatus === 'PENDING').length)} detail="Documents à contrôler" icon={ShieldCheck} warning />
+    </div>
+    {taxiError && <div className="flex items-center justify-between gap-3 rounded-xl border border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-xs text-[hsl(var(--destructive))]" role="alert" data-testid="status-taxi-error"><span>{taxiError}</span><button type="button" onClick={() => setTaxiError('')} aria-label="Fermer l’erreur Taxi"><X size={15} /></button></div>}
+    <Panel title="Taxi" description="Pilotez la flotte de chauffeurs et visualisez les courses reçues depuis la boutique." action={canCreate ? <button type="button" onClick={openNew} data-testid="button-add-taxi-driver" className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button> : undefined}>
+      <div className="grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
+        <section aria-labelledby="taxi-drivers-heading">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div><h3 id="taxi-drivers-heading" className="text-sm font-bold">Chauffeurs enregistrés</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{verifiedDrivers.length} validé{verifiedDrivers.length > 1 ? 's' : ''} · {availableEmployees.length} employé{availableEmployees.length > 1 ? 's' : ''} éligible{availableEmployees.length > 1 ? 's' : ''}</p></div>
+            {canCreate && <button type="button" onClick={openNew} className="text-xs font-bold text-[hsl(var(--primary))]">Créer une fiche <Plus size={13} className="ml-1 inline" /></button>}
+          </div>
+          {loadingDrivers ? <div className="space-y-2" aria-label="Chargement des chauffeurs"><div className="h-20 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-20 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>
+            : drivers.length === 0 ? <Empty icon={CarFront} title="Aucun chauffeur Taxi" text="Ajoutez un employé éligible pour commencer à recevoir des demandes de course." action={canCreate ? <button type="button" onClick={openNew} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter le premier chauffeur</button> : undefined} />
+            : <div className="space-y-2">{drivers.map(driver => <article key={driver.id} className="rounded-xl border p-3.5 transition hover:border-[hsl(var(--primary)/.3)] hover:shadow-sm" data-testid={`card-taxi-driver-${driver.id}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0"><p className="truncate text-sm font-bold" data-testid={`text-taxi-driver-${driver.id}`}>{driver.displayName}</p><p className="mt-0.5 truncate text-xs text-[hsl(var(--muted-foreground))]">{driver.email}</p></div>
+                <div className="flex shrink-0 items-center gap-1.5"><StatusPill value={taxiVerificationLabels[driver.verificationStatus]} /><StatusPill value={taxiDriverStatusLabels[driver.status]} /></div>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3"><span className="inline-flex items-center gap-1.5 text-[hsl(var(--muted-foreground))]"><CarFront size={13} />{[driver.vehicleMake, driver.vehicleModel].filter(Boolean).join(' ') || 'Véhicule à renseigner'}</span><span className="font-bold tracking-[.08em]">{driver.licensePlate || 'Plaque non renseignée'}</span><span className="text-[hsl(var(--muted-foreground))]">{driver.vehicleColor || 'Couleur non renseignée'}</span></div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+                {canModify && <><button type="button" onClick={() => openEdit(driver)} data-testid={`button-edit-taxi-driver-${driver.id}`} className="rounded-lg border px-2.5 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button><select aria-label={`Disponibilité de ${driver.displayName}`} data-testid={`select-taxi-driver-status-${driver.id}`} value={driver.status} onChange={event => void updateDriver(driver, { status: event.target.value as EcommerceTaxiDriver['status'] })} className="rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-xs font-bold">{(['OFFLINE', 'AVAILABLE', 'APPROACHING', 'IN_TRIP'] as EcommerceTaxiDriver['status'][]).map(status => <option key={status} value={status}>{taxiDriverStatusLabels[status]}</option>)}</select><select aria-label={`Validation de ${driver.displayName}`} data-testid={`select-taxi-driver-verification-${driver.id}`} value={driver.verificationStatus} onChange={event => void updateDriver(driver, { verificationStatus: event.target.value as EcommerceTaxiDriver['verificationStatus'] })} className="rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-xs font-bold">{(['PENDING', 'VERIFIED', 'REJECTED'] as EcommerceTaxiDriver['verificationStatus'][]).map(status => <option key={status} value={status}>{taxiVerificationLabels[status]}</option>)}</select></>}
+              </div>
+            </article>)}</div>}
+        </section>
+        <section aria-labelledby="taxi-requests-heading">
+          <div className="mb-3"><h3 id="taxi-requests-heading" className="text-sm font-bold">Demandes Taxi</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{activeRequests.length} course{activeRequests.length > 1 ? 's' : ''} active{activeRequests.length > 1 ? 's' : ''} · historique inclus</p></div>
+          {(data.taxiRequests ?? []).length === 0 ? <Empty icon={Navigation} title="Aucune demande Taxi" text="Les demandes déposées depuis la vitrine seront visibles ici avec leur chauffeur affecté." /> : <div className="space-y-2">{(data.taxiRequests ?? []).map(request => <TaxiRequestCard key={request.id} request={request} drivers={drivers} />)}</div>}
+        </section>
+      </div>
+    </Panel>
+    {editing && <Modal title={editing === 'new' ? 'Ajouter un chauffeur Taxi' : `Modifier ${editing.displayName}`} onClose={() => setEditing(null)}>
+      <form onSubmit={saveDriver} className="space-y-4">
+        {editing === 'new' ? <label className="block text-xs font-bold">Employé éligible<span className="ml-1 text-[hsl(var(--destructive))]">*</span><select required value={form.employeeId} onChange={event => setForm({ ...form, employeeId: event.target.value })} data-testid="select-taxi-employee" className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="">Sélectionner un employé</option>{availableEmployees.map(employee => <option key={employee.employeeId} value={employee.employeeId}>{employee.displayName} · {employee.email}</option>)}</select>{availableEmployees.length === 0 && <span className="mt-1.5 block text-xs font-normal text-[hsl(var(--muted-foreground))]">Aucun employé éligible disponible.</span>}</label> : <div className="rounded-lg border bg-[hsl(var(--muted)/.28)] px-3 py-2.5"><span className="block text-[11px] font-bold text-[hsl(var(--muted-foreground))]">Employé rattaché</span><span className="mt-1 block text-sm font-bold">{editing.displayName}</span></div>}
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="Marque du véhicule" value={form.vehicleMake} onChange={value => setForm({ ...form, vehicleMake: value })} placeholder="Ex. Toyota" /><Field label="Modèle" value={form.vehicleModel} onChange={value => setForm({ ...form, vehicleModel: value })} placeholder="Ex. Corolla" /><Field label="Couleur" value={form.vehicleColor} onChange={value => setForm({ ...form, vehicleColor: value })} placeholder="Ex. Gris" /><Field label="Plaque d’immatriculation" required value={form.licensePlate} onChange={value => setForm({ ...form, licensePlate: value })} placeholder="Ex. DK-4821-AB" /></div>
+        <div className="modal-footer flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className="rounded-lg border px-4 py-2.5 text-xs font-bold">Annuler</button><button type="submit" disabled={!canModify || (editing === 'new' && (!availableEmployees.length || !form.employeeId))} className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">Enregistrer la fiche</button></div>
+      </form>
+    </Modal>}
+  </div>;
+}
+
+function TaxiRequestCard({ request, drivers }: { request: EcommerceTaxiRequest; drivers: EcommerceTaxiDriver[] }) {
+  const assignedDriver = request.assignedDriverId ? drivers.find(driver => driver.id === request.assignedDriverId) : undefined;
+  const currentStep = taxiRequestCycle.indexOf(request.status);
+  const isCancelled = request.status === 'ANNULEE';
+  return <article className="rounded-xl border p-3.5" data-testid={`card-taxi-request-${request.id}`}>
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{request.reference}</p><p className="mt-1 truncate text-sm font-bold">{request.requesterName}</p><p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">{request.requesterPhone || request.requesterEmail} · {request.passengerCount} passager{request.passengerCount > 1 ? 's' : ''}</p></div><StatusPill value={taxiRequestStatusLabels[request.status]} /></div>
+    <div className="mt-3 grid gap-2 text-xs"><div className="flex items-start gap-2"><MapPin size={14} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" /><span>{request.pickupAddress}</span></div><div className="flex items-start gap-2 text-[hsl(var(--muted-foreground))]"><Navigation size={14} className="mt-0.5 shrink-0" /><span>{request.destinationAddress}</span></div></div>
+    {!isCancelled && <div className="mt-3 flex items-center gap-1" aria-label={`Cycle de la demande ${request.reference}`}>{taxiRequestCycle.map((step, index) => <span key={step} className={`h-1.5 flex-1 rounded-full ${index <= currentStep ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))]'}`} title={taxiRequestStatusLabels[step]} />)}</div>}
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs"><span className="text-[hsl(var(--muted-foreground))]">{assignedDriver?.displayName ?? request.assignedDriverName ?? 'En attente d’affectation'}</span><span className="font-semibold text-[hsl(var(--muted-foreground))]">{request.assignedDistanceKm != null ? `${request.assignedDistanceKm.toFixed(1)} km` : dateLabel(request.createdAt)}</span></div>
+  </article>;
 }
 
 type DeliveryZoneForm = {
@@ -1249,9 +1446,9 @@ function Empty({ icon: Icon, title, text, action }: { icon: typeof Package; titl
 }
 
 function StatusPill({ value }: { value: string }) {
-  const positive = ['PUBLISHED', 'LIVRÉE', 'Disponible'];
-  const warning = ['DRAFT', 'NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION'];
-  const danger = ['ARCHIVED', 'ANNULÉE'];
+  const positive = ['PUBLISHED', 'LIVRÉE', 'Disponible', 'Validé', 'Terminée'];
+  const warning = ['DRAFT', 'NOUVELLE', 'CONFIRMÉE', 'EN PRÉPARATION', 'À valider', 'Demandée', 'Proposée', 'Acceptée', 'En approche', 'Client à bord'];
+  const danger = ['ARCHIVED', 'ANNULÉE', 'Refusé'];
   const tone = positive.includes(value) ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : warning.includes(value) ? 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--foreground))]' : danger.includes(value) ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]';
   return <span className={`inline-flex rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[.06em] ${tone}`}>{value}</span>;
 }

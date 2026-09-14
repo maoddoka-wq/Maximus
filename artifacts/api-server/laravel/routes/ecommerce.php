@@ -49,6 +49,14 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
         Route::get('/delivery-requests', [EcommerceController::class, 'deliveryRequests']);
         Route::patch('/delivery-requests/{id}/status', [EcommerceController::class, 'updateDeliveryRequestStatus']);
+         Route::get('/taxi/eligible-employees', [EcommerceController::class, 'taxiEligibleEmployees']);
+         Route::get('/taxi/drivers', [EcommerceController::class, 'taxiDrivers']);
+         Route::post('/taxi/drivers', [EcommerceController::class, 'createTaxiDriver']);
+         Route::patch('/taxi/drivers/{id}', [EcommerceController::class, 'updateTaxiDriver']);
+         Route::get('/taxi/driver-session', [EcommerceController::class, 'taxiDriverSession']);
+         Route::patch('/taxi/driver-session', [EcommerceController::class, 'updateTaxiDriverSession']);
+         Route::get('/taxi/requests', [EcommerceController::class, 'taxiDriverRequests']);
+         Route::patch('/taxi/requests/{id}', [EcommerceController::class, 'updateTaxiRequestByDriver']);
          Route::post('/delivery-zones', [EcommerceController::class, 'createDeliveryZone']);
          Route::patch('/delivery-zones/{id}', [EcommerceController::class, 'updateDeliveryZone']);
          Route::delete('/delivery-zones/{id}', [EcommerceController::class, 'deleteDeliveryZone']);
@@ -61,6 +69,7 @@ Route::get('/shop-domain/location/reservations/{id}/invoice', [CarRentalControll
 Route::get('/shop-domain/manifest.webmanifest', [EcommerceController::class, 'publicManifestByDomain']);
 Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
+     Route::post('/shop-domain/taxi-requests', [EcommerceController::class, 'createPublicDomainTaxiRequest'])->middleware('throttle:orders');
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
@@ -79,6 +88,7 @@ Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/location/reservations/{id}/invoice', [CarRentalController::class, 'publicInvoice']);
     Route::post('/orders', [EcommerceController::class, 'createPublicOrder'])->middleware('throttle:orders');
     Route::post('/delivery-requests', [EcommerceController::class, 'createPublicDeliveryRequest'])->middleware('throttle:orders');
+     Route::post('/taxi-requests', [EcommerceController::class, 'createPublicTaxiRequest'])->middleware('throttle:orders');
     Route::post('/orders/{orderId}/payment', [EcommercePaymentController::class, 'create'])->middleware('throttle:orders');
     Route::get('/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'status']);
     Route::get('/customer/session', [EcommerceCustomerController::class, 'session']);
