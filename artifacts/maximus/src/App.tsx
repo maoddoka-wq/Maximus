@@ -376,7 +376,7 @@ function AppContent() {
   const [appStateReady, setAppStateReady] = useState(
     () => !localStorage.getItem('maximus-session'),
   );
-  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>('checking');
+  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>('none');
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
@@ -398,6 +398,9 @@ function AppContent() {
   const appStateRefreshRef = useRef<Promise<boolean> | null>(null);
   const localMutationVersionRef = useRef(0);
   const loginTransitionRef = useRef(false);
+  const moduleAccessCacheRef = useRef(
+    new Map<string, { access: ServerModuleAccess[]; updatedAt: number }>(),
+  );
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
   useEffect(() => {
@@ -406,9 +409,16 @@ function AppContent() {
   const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
     showAppToast(message, kind);
   useEffect(() => {
-    if (customDomainState !== 'checking') return undefined;
+    // A connected MAXIMUS workspace must not wait for the public-domain probe.
+    // The probe is only relevant on the public root route and runs in the
+    // background so the normal login screen remains immediately interactive.
+    if (session || pathname !== '/') {
+      setCustomDomainState('none');
+      return undefined;
+    }
 
     let active = true;
+    setCustomDomainState('checking');
     void publicEcommerceApi.bootstrapDomain()
       .then((result) => {
         if (active) setCustomDomainState('store' in result ? 'shop' : 'none');
@@ -419,7 +429,7 @@ function AppContent() {
     return () => {
       active = false;
     };
-  }, [customDomainState]);
+  }, [pathname, session]);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
@@ -630,6 +640,7 @@ function AppContent() {
       : sessionEmployee?.companyId;
   const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
   const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
+  const activeCompanyAllowedModulesKey = activeCompany?.allowedModules.join(',') ?? '';
   useEffect(() => {
     if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
       setServerModuleStatuses(null);
@@ -641,12 +652,25 @@ function AppContent() {
     }
 
     let cancelled = false;
+    const cacheKey = `${activeCompanyId}:${activeCompanyAllowedModulesKey}`;
+    const cached = moduleAccessCacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.updatedAt < 30_000) {
+      setServerModuleAccess(cached.access);
+      setServerModuleStatuses(Object.fromEntries(cached.access.map((module) => [module.id, module.status])));
+      setServerModuleAccessReady(true);
+      setServerModuleAccessCompanyId(activeCompanyId);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setServerModuleAccessReady(false);
     setServerModuleAccessCompanyId(null);
     setServerModuleAccessError('');
     void loadCompanyModuleAccess(activeCompanyId, activeCompany?.allowedModules ?? [])
       .then((access) => {
         if (!cancelled) {
+          moduleAccessCacheRef.current.set(cacheKey, { access, updatedAt: Date.now() });
           setServerModuleAccess(access);
           setServerModuleStatuses(Object.fromEntries(access.map((module) => [module.id, module.status])));
           setServerModuleAccessReady(true);
@@ -671,13 +695,7 @@ function AppContent() {
     };
   }, [
     activeCompanyId,
-    activeCompany?.allowedModules.join(','),
-    activeCompany?.name,
-    activeCompany?.manager,
-    activeCompany?.primaryColor,
-    activeCompany?.accentColor,
-    activeCompany?.sidebarColor,
-    activeCompany?.profilePhoto,
+    activeCompanyAllowedModulesKey,
     sectorTestCompanyId,
     session,
   ]);
@@ -927,10 +945,7 @@ function AppContent() {
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
-  if (customDomainState === 'checking') {
-    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de la boutique…</div>;
-  }
-  if (customDomainState === 'shop') {
+  if (!session && customDomainState === 'shop') {
     return <PublicShopPage domain />;
   }
   if (session && !appStateReady) {

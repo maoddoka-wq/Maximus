@@ -17,6 +17,7 @@ import {
   type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
+import { ApiRequestError } from '@/lib/api-request';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
 
@@ -43,8 +44,11 @@ async function retryRequest<T>(request: () => Promise<T>, attempts = 3): Promise
       return await request();
     } catch (cause) {
       lastError = cause;
-      if (attempt < attempts - 1) {
+      const retryable = cause instanceof ApiRequestError && cause.status === 0;
+      if (retryable && attempt < attempts - 1) {
         await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
+      } else {
+        throw cause;
       }
     }
   }

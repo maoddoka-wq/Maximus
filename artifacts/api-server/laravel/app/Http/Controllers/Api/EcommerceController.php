@@ -1301,21 +1301,44 @@ class EcommerceController extends Controller
             ->orderByDesc('featured')
             ->orderBy('name')
             ->get();
+        $publishedRentals = $features['location']
+            ? DB::table('ecommerce_rentals')
+                ->where('company_id', $company)
+                ->where('status', 'PUBLISHED')
+                ->orderByDesc('availability')
+                ->orderBy('name')
+                ->get()
+            : collect();
+        $galleryOwners = [
+            ['ownerType' => 'store', 'ownerId' => (string) ($store->id ?? ''), 'collection' => 'hero'],
+            ...$publishedProducts->map(fn (object $row): array => [
+                'ownerType' => 'product',
+                'ownerId' => (string) $row->id,
+                'collection' => 'gallery',
+            ])->all(),
+            ...$publishedRentals->map(fn (object $row): array => [
+                'ownerType' => 'rental',
+                'ownerId' => (string) $row->id,
+                'collection' => 'gallery',
+            ])->all(),
+        ];
+        $galleryMap = $this->publicGalleryMap($company, $galleryOwners);
 
         return response()->json([
-            'store' => $this->publicStorePayload($store, $features),
+            'store' => $this->publicStorePayload($store, $features, $galleryMap),
             'products' => $publishedProducts
                 ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'SALE')
                 ->filter(fn (object $row): bool => $this->allowsProductFulfillment($company, (string) ($row->fulfillment_type ?? 'PHYSICAL')))
             ->filter(fn (object $row): bool => ($row->fulfillment_type ?? 'PHYSICAL') !== 'DIGITAL' || ! empty($row->digital_file_path))
-                ->map(fn ($row) => $this->publicProduct($row))
+                ->map(fn ($row) => $this->publicProduct($row, $galleryMap))
                 ->values(),
             'rentals' => $features['location']
-                ? collect($this->listRentals($company))
+                ? $publishedRentals
+                    ->map(fn ($row) => $this->publicRental($row, $galleryMap))
                     ->concat(
                         $publishedProducts
                             ->filter(fn (object $row): bool => ($row->product_type ?? 'SALE') === 'RENTAL')
-                            ->map(fn ($row) => $this->publicRentalProduct($row))
+                            ->map(fn ($row) => $this->publicRentalProduct($row, $galleryMap))
                     )
                     ->values()
                 : collect(),
@@ -1323,7 +1346,7 @@ class EcommerceController extends Controller
         ])->getData(true);
     }
 
-    private function publicStorePayload(object $row, ?array $features = null): array
+    private function publicStorePayload(object $row, ?array $features = null, array $galleryMap = []): array
     {
         $features ??= $this->publicEnabledFeatures((string) $row->company_id);
         $company = DB::table('companies')
@@ -1340,7 +1363,7 @@ class EcommerceController extends Controller
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
-            'heroImages' => $this->galleryUrls((string) $row->company_id, 'store', (string) ($row->id ?? ''), 'hero'),
+            'heroImages' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'store', (string) ($row->id ?? ''), 'hero'),
             'seller' => [
                 'name' => (string) ($company->name ?? $row->name ?? ''),
                 'email' => (string) ($company->email ?? ''),
@@ -1402,7 +1425,7 @@ class EcommerceController extends Controller
         ];
     }
 
-    private function publicProduct(object $row): array
+    private function publicProduct(object $row, array $galleryMap = []): array
     {
         return [
             'slug' => $row->slug,
@@ -1413,7 +1436,7 @@ class EcommerceController extends Controller
             'compareAtPrice' => $row->compare_at_price === null ? null : (int) $row->compare_at_price,
             'stock' => (int) $row->stock,
             'imageUrl' => $row->image_url,
-            'gallery' => $this->galleryUrls((string) $row->company_id, 'product', (string) $row->id, 'gallery'),
+            'gallery' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'product', (string) $row->id, 'gallery'),
             'featured' => (bool) $row->featured,
             'productType' => $row->product_type ?? 'SALE',
             'rentalPeriod' => $row->rental_period,
@@ -1436,7 +1459,7 @@ class EcommerceController extends Controller
             ->all();
     }
 
-    private function publicRental(object $row): array
+    private function publicRental(object $row, array $galleryMap = []): array
     {
         return [
             'id' => $row->id,
@@ -1445,7 +1468,7 @@ class EcommerceController extends Controller
             'category' => trim((string) ($row->category ?? '')) ?: 'Général',
             'categoryId' => $row->category_id ?? null,
             'imageUrl' => $row->image_url ?? '',
-            'gallery' => $this->galleryUrls((string) $row->company_id, 'rental', (string) $row->id, 'gallery', json_decode($row->gallery ?? '[]', true) ?: []),
+            'gallery' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'rental', (string) $row->id, 'gallery', json_decode($row->gallery ?? '[]', true) ?: []),
             'price' => (int) $row->price,
             'billingUnit' => $row->billing_unit,
             'availability' => (int) $row->availability,
@@ -1469,7 +1492,7 @@ class EcommerceController extends Controller
         ];
     }
 
-    private function publicRentalProduct(object $row): array
+    private function publicRentalProduct(object $row, array $galleryMap = []): array
     {
         return [
             'id' => $row->id,
@@ -1479,7 +1502,7 @@ class EcommerceController extends Controller
             'category' => trim((string) ($row->category ?? '')) ?: 'Général',
             'categoryId' => $row->category_id ?? null,
             'imageUrl' => $row->image_url ?? '',
-            'gallery' => $this->galleryUrls((string) $row->company_id, 'product', (string) $row->id, 'gallery'),
+            'gallery' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'product', (string) $row->id, 'gallery'),
             'price' => (int) $row->price,
             'billingUnit' => $row->rental_period ?: 'JOUR',
             'availability' => (int) $row->stock,
@@ -2050,6 +2073,53 @@ class EcommerceController extends Controller
             ->all();
 
         return array_values(array_unique(array_filter(array_merge($legacy, $uploaded), fn ($url) => is_string($url) && trim($url) !== '')));
+    }
+
+    private function publicGalleryMap(string $company, array $owners): array
+    {
+        if ($owners === []) {
+            return [];
+        }
+
+        $rows = DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where(function ($query) use ($owners): void {
+                foreach ($owners as $owner) {
+                    $query->orWhere(function ($ownerQuery) use ($owner): void {
+                        $ownerQuery
+                            ->where('owner_type', $owner['ownerType'])
+                            ->where('owner_id', $owner['ownerId'])
+                            ->where('collection', $owner['collection']);
+                    });
+                }
+            })
+            ->orderBy('sort_order')
+            ->orderBy('created_at')
+            ->get(['id', 'owner_type', 'owner_id', 'collection']);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $key = implode('|', [(string) $row->owner_type, (string) $row->owner_id, (string) $row->collection]);
+            $map[$key] ??= [];
+            $map[$key][] = '/api/gallery-images/'.rawurlencode($company).'/'.rawurlencode((string) $row->id);
+        }
+
+        return $map;
+    }
+
+    private function galleryUrlsFromMap(
+        array $galleryMap,
+        string $company,
+        string $ownerType,
+        string $ownerId,
+        string $collection,
+        array $legacy = [],
+    ): array {
+        $key = implode('|', [$ownerType, $ownerId, $collection]);
+        return array_values(array_unique(array_filter(
+            array_merge($legacy, $galleryMap[$key] ?? []),
+            fn ($url) => is_string($url) && trim($url) !== '',
+        )));
     }
 
     private function domainTarget(Request $request): string
