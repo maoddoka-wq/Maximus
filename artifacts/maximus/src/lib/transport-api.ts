@@ -2,7 +2,7 @@ import { requestJson } from '@/lib/api-request';
 
 export type DriverStatus = 'ACTIVE' | 'INACTIVE';
 export type VehicleStatus = 'AVAILABLE' | 'ON_TRIP' | 'MAINTENANCE';
-export type TripStatus = 'REQUESTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type TripStatus = 'REQUESTED' | 'OFFERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export interface TransportSettings {
   gpsValidityMinutes: number;
   trackingIntervalSeconds: number;
@@ -106,6 +106,14 @@ export interface PublicTransportTrip {
   matchedDistanceKm: number | null;
   driverName: string | null;
   driverPhone: string | null;
+  pickupLatitude: number | null;
+  pickupLongitude: number | null;
+  driverLatitude: number | null;
+  driverLongitude: number | null;
+  vehicleModel: string | null;
+  vehicleRegistration: string | null;
+  vehicleType: string | null;
+  vehicleImageUrl: string | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -159,5 +167,8 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
   }) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
     domain ? '/shop-domain/transport/trips' : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips`,
     json(body),
+  ),
+  getTrip: (id: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+    domain ? `/shop-domain/transport/trips/${encodeURIComponent(id)}` : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}`,
   ),
 });

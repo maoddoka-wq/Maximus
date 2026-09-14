@@ -111,19 +111,19 @@ class TransportTest extends TestCase
         $request->getJson('/api/transport/bootstrap?companyId=kora')
             ->assertOk()
             ->assertJsonPath('settings.gpsValidityMinutes', 5)
-            ->assertJsonPath('settings.trackingIntervalSeconds', 30);
+            ->assertJsonPath('settings.trackingIntervalSeconds', 10);
 
         $request->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,
-            'trackingIntervalSeconds' => 45,
+            'trackingIntervalSeconds' => 10,
         ])->assertOk()
             ->assertJsonPath('gpsValidityMinutes', 8)
-            ->assertJsonPath('trackingIntervalSeconds', 45);
+            ->assertJsonPath('trackingIntervalSeconds', 10);
 
         $request->getJson('/api/transport/bootstrap?companyId=kora')
             ->assertOk()
             ->assertJsonPath('settings.gpsValidityMinutes', 8)
-            ->assertJsonPath('settings.trackingIntervalSeconds', 45);
+            ->assertJsonPath('settings.trackingIntervalSeconds', 10);
     }
 
     public function test_transport_permissions_are_scoped_to_each_feature(): void
@@ -161,7 +161,7 @@ class TransportTest extends TestCase
             ->where('company_id', 'kora')
             ->where('module_id', 'transport')
             ->update([
-                'feature_ids' => json_encode(['overview']),
+                'feature_ids' => json_encode(['overview', 'trips']),
                 'configuration' => json_encode(['featureScope' => 'explicit']),
             ]);
         DB::table('ecommerce_stores')->insert([
@@ -224,7 +224,7 @@ class TransportTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->postJson('/api/shop/kora-taxi/transport/trips', [
+        $tripResponse = $this->postJson('/api/shop/kora-taxi/transport/trips', [
             'pickup' => 'Plateau',
             'destination' => 'Almadies',
             'passengerName' => 'Moussa Fall',
@@ -235,6 +235,21 @@ class TransportTest extends TestCase
             ->assertJsonPath('matched', true)
             ->assertJsonPath('trip.driverId', $freshDriver)
             ->assertJsonPath('trip.driverName', 'Chauffeur GPS');
+        $tripId = $tripResponse->json('trip.id');
+        $this->getJson('/api/shop/kora-taxi/transport/trips/'.$tripId)
+            ->assertOk()
+            ->assertJsonPath('trip.status', 'OFFERED')
+            ->assertJsonPath('trip.vehicleModel', 'Toyota GPS')
+            ->assertJsonPath('trip.vehicleImageUrl', '/taxi-car.svg');
+
+        $this->asActor('employee', [
+            'transport:menu:trips' => ['voir', 'modifier'],
+        ], $freshDriver)
+            ->patchJson('/api/transport/trips/'.$tripId.'/status?companyId=kora', [
+                'status' => 'ASSIGNED',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'ASSIGNED');
 
         $this->assertDatabaseHas('transport_trips', [
             'company_id' => 'kora',
@@ -264,7 +279,7 @@ class TransportTest extends TestCase
         return $id;
     }
 
-    private function asActor(string $role = 'company_admin', array $permissions = []): self
+    private function asActor(string $role = 'company_admin', array $permissions = [], ?string $employeeId = null): self
     {
         $user = AuthUser::query()->create([
             'id' => 'transport-'.strtolower($role),
@@ -274,7 +289,7 @@ class TransportTest extends TestCase
             'phone' => '',
             'role' => $role,
             'company_id' => 'kora',
-            'employee_id' => $role === 'employee' ? 'transport-employee' : null,
+            'employee_id' => $role === 'employee' ? ($employeeId ?? 'transport-employee') : null,
             'sector_ids' => [],
             'permissions' => $permissions,
             'status' => 'ACTIF',

@@ -18,10 +18,10 @@ class TransportController extends Controller
 {
     private const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE'];
     private const VEHICLE_STATUSES = ['AVAILABLE', 'ON_TRIP', 'MAINTENANCE'];
-    private const TRIP_STATUSES = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+    private const TRIP_STATUSES = ['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
     private const DEFAULT_SETTINGS = [
         'gpsValidityMinutes' => 5,
-        'trackingIntervalSeconds' => 30,
+        'trackingIntervalSeconds' => 10,
     ];
 
     public function bootstrap(Request $request): JsonResponse
@@ -79,7 +79,7 @@ class TransportController extends Controller
 
         $input = $this->validated($request, [
             'gpsValidityMinutes' => ['required', 'integer', 'min:1', 'max:60'],
-            'trackingIntervalSeconds' => ['required', 'integer', 'min:10', 'max:300'],
+            'trackingIntervalSeconds' => ['sometimes', 'integer', 'in:10'],
         ]);
         $company = $this->company($request);
         $module = DB::table('maximus_company_modules')
@@ -90,7 +90,7 @@ class TransportController extends Controller
         $configuration = is_array($configuration) ? $configuration : [];
         $configuration['transport'] = [
             'gpsValidityMinutes' => (int) $input['gpsValidityMinutes'],
-            'trackingIntervalSeconds' => (int) $input['trackingIntervalSeconds'],
+            'trackingIntervalSeconds' => 10,
         ];
         DB::table('maximus_company_modules')
             ->where('company_id', $company)
@@ -326,6 +326,39 @@ class TransportController extends Controller
         return $this->createPublicTripForStore($request, $store);
     }
 
+    public function getPublicTrip(Request $request, string $slug, string $id): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->publicTripForStore($store, $id);
+    }
+
+    public function publicDomainTrip(Request $request, string $id): JsonResponse
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->publicTripForStore($store, $id);
+    }
+
     public function updateTripStatus(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'trips')) {
@@ -348,12 +381,31 @@ class TransportController extends Controller
                 return response()->json(['error' => 'Vous ne pouvez modifier que vos propres courses.'], 403);
             }
         }
-        DB::transaction(function () use ($trip, $input): void {
+        $failure = null;
+        DB::transaction(function () use ($trip, $input, &$failure): void {
+            if ($input['status'] === 'ASSIGNED' && $trip->status === 'OFFERED') {
+                $vehicle = DB::table('transport_vehicles')
+                    ->where('id', $trip->vehicle_id)
+                    ->where('company_id', $trip->company_id)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $vehicle || $vehicle->status !== 'AVAILABLE') {
+                    $failure = 'Le véhicule proposé n’est plus disponible.';
+                    return;
+                }
+                DB::table('transport_vehicles')->where('id', $vehicle->id)->update([
+                    'status' => 'ON_TRIP',
+                    'updated_at' => now(),
+                ]);
+            }
             DB::table('transport_trips')->where('id', $trip->id)->update(['status' => $input['status'], 'updated_at' => now()]);
             if ($trip->vehicle_id !== null && in_array($input['status'], ['COMPLETED', 'CANCELLED'], true)) {
                 DB::table('transport_vehicles')->where('id', $trip->vehicle_id)->where('status', 'ON_TRIP')->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
             }
         });
+        if ($failure !== null) {
+            return response()->json(['error' => $failure], 422);
+        }
 
         return response()->json($this->trip(DB::table('transport_trips')->where('id', $id)->first()));
     }
@@ -419,6 +471,51 @@ class TransportController extends Controller
         ];
     }
 
+    private function publicTripForStore(object $store, string $id): JsonResponse
+    {
+        if (! ModuleCatalog::allowsFeature((string) $store->company_id, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+        $trip = DB::table('transport_trips')
+            ->where('company_id', $store->company_id)
+            ->where('id', $id)
+            ->first();
+        if (! $trip) {
+            return response()->json(['error' => 'Course introuvable.'], 404);
+        }
+
+        $driver = $trip->driver_id
+            ? DB::table('transport_drivers')->where('company_id', $store->company_id)->where('id', $trip->driver_id)->first()
+            : null;
+        $vehicle = $trip->vehicle_id
+            ? DB::table('transport_vehicles')->where('company_id', $store->company_id)->where('id', $trip->vehicle_id)->first()
+            : null;
+
+        return response()->json([
+            'trip' => $this->publicTrip($trip, $driver, $vehicle),
+            'matched' => in_array($trip->status, ['OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'], true),
+            'message' => $trip->status === 'OFFERED'
+                ? 'Le chauffeur le plus proche doit encore valider la demande.'
+                : ($trip->status === 'ASSIGNED' || $trip->status === 'IN_PROGRESS'
+                    ? 'Votre chauffeur est en route.'
+                    : 'Le suivi de votre course est disponible.'),
+        ]);
+    }
+
+    private function publicTrip(object $row, ?object $driver, ?object $vehicle): array
+    {
+        $trip = $this->trip($row, $driver);
+        return [
+            ...$trip,
+            'driverLatitude' => $driver?->latitude === null ? null : (float) $driver->latitude,
+            'driverLongitude' => $driver?->longitude === null ? null : (float) $driver->longitude,
+            'vehicleModel' => $vehicle?->model,
+            'vehicleRegistration' => $vehicle?->registration,
+            'vehicleType' => $vehicle?->vehicle_type,
+            'vehicleImageUrl' => '/taxi-car.svg',
+        ];
+    }
+
     private function createPublicTripForStore(Request $request, object $store): JsonResponse
     {
         $company = (string) $store->company_id;
@@ -451,7 +548,7 @@ class TransportController extends Controller
                         ->from('transport_trips as active_trip')
                         ->whereColumn('active_trip.driver_id', 'transport_drivers.id')
                         ->where('active_trip.company_id', $company)
-                        ->whereIn('active_trip.status', ['ASSIGNED', 'IN_PROGRESS']);
+                        ->whereIn('active_trip.status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS']);
                 })
                 ->lockForUpdate()
                 ->get();
@@ -474,7 +571,7 @@ class TransportController extends Controller
                 ->first(fn (array $candidate): bool => $candidate['vehicle'] !== null);
             $driver = $match['driver'] ?? null;
             $vehicle = $match['vehicle'] ?? null;
-            $status = $driver && $vehicle ? 'ASSIGNED' : 'REQUESTED';
+            $status = $driver && $vehicle ? 'OFFERED' : 'REQUESTED';
             $row = [
                 'id' => $this->id('trip'),
                 'company_id' => $company,
@@ -495,7 +592,7 @@ class TransportController extends Controller
                 'updated_at' => now(),
             ];
             DB::table('transport_trips')->insert($row);
-            if ($vehicle) {
+                if ($vehicle && $status === 'ASSIGNED') {
                 DB::table('transport_vehicles')->where('id', $vehicle->id)->update([
                     'status' => 'ON_TRIP',
                     'updated_at' => now(),
@@ -503,13 +600,19 @@ class TransportController extends Controller
             }
         });
 
-        $response = $this->trip((object) $row);
+        $response = $this->publicTrip(
+            (object) $row,
+            $row['driver_id'] ? DB::table('transport_drivers')->where('company_id', $company)->where('id', $row['driver_id'])->first() : null,
+            $row['vehicle_id'] ? DB::table('transport_vehicles')->where('company_id', $company)->where('id', $row['vehicle_id'])->first() : null,
+        );
         return response()->json([
             'trip' => $response,
-            'matched' => $response['status'] === 'ASSIGNED',
+            'matched' => in_array($response['status'], ['OFFERED', 'ASSIGNED'], true),
             'message' => $response['status'] === 'ASSIGNED'
                 ? 'Le chauffeur le plus proche a été trouvé. Vous pouvez le contacter directement.'
-                : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.',
+                : ($response['status'] === 'OFFERED'
+                    ? 'Le chauffeur le plus proche a reçu votre demande. Il doit la valider pour démarrer la course.'
+                    : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.'),
         ], 201);
     }
 
@@ -546,7 +649,7 @@ class TransportController extends Controller
 
         return [
             'gpsValidityMinutes' => max(1, min(60, (int) ($settings['gpsValidityMinutes'] ?? self::DEFAULT_SETTINGS['gpsValidityMinutes']))),
-            'trackingIntervalSeconds' => max(10, min(300, (int) ($settings['trackingIntervalSeconds'] ?? self::DEFAULT_SETTINGS['trackingIntervalSeconds']))),
+            'trackingIntervalSeconds' => 10,
         ];
     }
 

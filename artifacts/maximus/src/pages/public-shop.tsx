@@ -844,6 +844,25 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [trip, setTrip] = useState<PublicTransportTrip | null>(null);
   const [tripMessage, setTripMessage] = useState('');
 
+  useEffect(() => {
+    if (!trip) return undefined;
+    let active = true;
+    const refresh = () => {
+      void api.getTrip(trip.id).then(result => {
+        if (!active) return;
+        setTrip(result.trip);
+        setTripMessage(result.message);
+      }).catch(() => {
+        // Keep the last known position visible while the next poll retries.
+      });
+    };
+    const interval = window.setInterval(refresh, 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [api, trip?.id]);
+
   const locate = () => {
     if (!navigator.geolocation) {
       setLocationState('error');
@@ -959,7 +978,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           <button type="submit" disabled={submitting || locationState !== 'ready'} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-5 py-4 text-sm font-black text-white shadow-lg shadow-black/10 transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={17} className="animate-spin" /> : <CarFront size={17} />}{submitting ? 'Recherche du chauffeur…' : 'Confirmer ma course'}<ArrowRight size={16} /></button>
           <p className="text-center text-[11px] text-[hsl(var(--muted-foreground))]">Vos coordonnées servent uniquement à vous mettre en relation avec le chauffeur affecté.</p>
         </form>}
-        {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-2xl font-black tracking-[-.04em]">{trip.driverName ? 'Votre chauffeur est trouvé.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p><div className="mt-5 rounded-xl bg-[hsl(var(--muted)/.35)] px-4 py-3 text-left text-xs"><span className="font-bold">Référence {trip.reference}</span>{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined && <span className="float-right">{trip.matchedDistanceKm.toFixed(2)} km</span>}{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div>{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
+        {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-2xl font-black tracking-[-.04em]">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
       </div>
       <aside className="space-y-4">
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><ShieldCheck size={20} /></div><div><h2 className="font-bold">Simple et direct</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Aucun intermédiaire</p></div></div><div className="mt-5 space-y-3 text-sm"><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">1</span><p><span className="font-bold">Localisez-vous</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Votre départ est détecté automatiquement.</span></p></div><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">2</span><p><span className="font-bold">Confirmez la destination</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Deux informations suffisent.</span></p></div><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">3</span><p><span className="font-bold">Parlez au chauffeur</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Appelez-le directement après affectation.</span></p></div></div></div>
@@ -967,6 +986,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       </aside>
     </div>
   </section>;
+}
+
+function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
+  const hasPosition = trip.driverLatitude !== null && trip.driverLongitude !== null && trip.pickupLatitude !== null && trip.pickupLongitude !== null;
+  const vehicleLeft = hasPosition ? Math.max(16, Math.min(84, 50 + ((trip.driverLongitude! - trip.pickupLongitude!) * 700))) : 50;
+  return <div className="mt-5 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left"><div className="flex items-center justify-between gap-3 px-1"><p className="text-xs font-black">Suivi en direct</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 10 s</span></div><div className="relative mt-3 h-36 overflow-hidden rounded-xl border bg-[linear-gradient(135deg,#e8eef2,#fff,#eef3ed)]"><div className="absolute inset-x-[10%] top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--shop-primary)]/25" /><div className="absolute left-[10%] top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-white shadow"><MapPin size={14} /></span><span>Vous</span></div><div className="absolute top-[calc(50%-1.25rem)] flex flex-col items-center gap-1 text-[9px] font-bold transition-[left] duration-1000 ease-out" style={{ left: `${vehicleLeft}%` }}><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--shop-accent)] text-white shadow"><CarFront size={15} /></span><span>Taxi</span></div><div className="absolute bottom-2 left-2 rounded-md bg-white/85 px-2 py-1 text-[9px] font-semibold text-slate-600 backdrop-blur-sm">{hasPosition ? 'Le véhicule se déplace vers vous' : 'Position du chauffeur en attente'}</div></div></div>;
 }
 
 function ShopHomePage({

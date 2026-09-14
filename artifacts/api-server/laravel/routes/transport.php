@@ -14,4 +14,6 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
 });
 
 Route::post('/shop/{slug}/transport/trips', [TransportController::class, 'createPublicTrip'])->middleware('throttle:orders');
+Route::get('/shop/{slug}/transport/trips/{id}', [TransportController::class, 'getPublicTrip'])->middleware('throttle:orders');
 Route::post('/shop-domain/transport/trips', [TransportController::class, 'createPublicDomainTrip'])->middleware('throttle:orders');
+Route::get('/shop-domain/transport/trips/{id}', [TransportController::class, 'publicDomainTrip'])->middleware('throttle:orders');

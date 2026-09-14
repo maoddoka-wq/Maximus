@@ -84,6 +84,7 @@ const money = (value: number) => `${new Intl.NumberFormat('fr-FR', { maximumFrac
 
 const statusLabels: Record<TripStatus, string> = {
   REQUESTED: 'Demandée',
+  OFFERED: 'À valider',
   ASSIGNED: 'Assignée',
   IN_PROGRESS: 'En cours',
   COMPLETED: 'Terminée',
@@ -92,6 +93,7 @@ const statusLabels: Record<TripStatus, string> = {
 
 const nextTripStatuses = (status: TripStatus): TripStatus[] => ({
   REQUESTED: ['REQUESTED', 'ASSIGNED', 'CANCELLED'],
+  OFFERED: ['OFFERED', 'ASSIGNED', 'CANCELLED'],
   ASSIGNED: ['ASSIGNED', 'IN_PROGRESS', 'CANCELLED'],
   IN_PROGRESS: ['IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
   COMPLETED: ['COMPLETED'],
@@ -170,7 +172,8 @@ export default function TransportModulePage({
     : canModify;
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
   const canModifySettings = featurePermissions ? Boolean(featurePermissions.parametres?.canModify) : canModify;
-  const trackingIntervalSeconds = data?.settings.trackingIntervalSeconds ?? 30;
+  const canOperateTrips = Boolean(currentEmployeeId) && canModifyTrips;
+  const trackingIntervalSeconds = 10;
 
   useEffect(() => {
     const nextRequestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
@@ -209,7 +212,7 @@ export default function TransportModulePage({
   };
 
   useEffect(() => { void load(); }, [companyId, preview]);
-  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
+  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 10_000 });
 
   useEffect(() => {
     if (preview || !currentDriverId || !canModifyDrivers || !navigator.geolocation) {
@@ -340,8 +343,8 @@ export default function TransportModulePage({
       </nav>}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
-        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{!visibleTabs.some(item => item.id === 'chauffeurs') && currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}</>}
-        {tab === 'courses' && <TripsPanel data={data} canCreate={canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
+        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}{canOperateTrips && <DriverRequestCard trip={data.trips.find(item => item.status === 'OFFERED') ?? null} onAccept={trip => updateStatus(trip, 'ASSIGNED')} />}{canOperateTrips && <DriverTripTracking trip={data.trips.find(item => ['ASSIGNED', 'IN_PROGRESS'].includes(item.status)) ?? null} driver={currentDriver} />}</>}
+        {tab === 'courses' && <TripsPanel data={data} canCreate={canOperateTrips} canModify={canOperateTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
         {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
         {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} onCreate={() => setDialog('vehicle')} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
@@ -382,6 +385,22 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
   </div>;
 }
 
+function DriverRequestCard({ trip, onAccept }: { trip: Trip | null; onAccept: (trip: Trip) => void }) {
+  if (!trip) return null;
+  return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {money(trip.fare)}</p></div><button type="button" onClick={() => onAccept(trip)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm"><CheckCircle2 size={17} />Valider la course</button></div></section>;
+}
+
+function DriverTripTracking({ trip, driver }: { trip: Trip | null; driver: Driver | null }) {
+  if (!trip || !driver) return null;
+  return <section className="card-surface overflow-hidden p-5"><div className="flex items-center justify-between gap-3"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Suivi partagé</p><h2 className="mt-1 text-lg font-black">Votre position par rapport au client</h2></div><span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />GPS · 10 s</span></div><TrackingSurface pickupLatitude={trip.pickupLatitude ?? null} pickupLongitude={trip.pickupLongitude ?? null} driverLatitude={driver.latitude} driverLongitude={driver.longitude} driverLabel="Votre véhicule" clientLabel="Client" /><p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">La position est actualisée automatiquement. Aucun intermédiaire administratif n’est nécessaire.</p></section>;
+}
+
+function TrackingSurface({ pickupLatitude, pickupLongitude, driverLatitude, driverLongitude, driverLabel, clientLabel }: { pickupLatitude: number | null; pickupLongitude: number | null; driverLatitude: number | null; driverLongitude: number | null; driverLabel: string; clientLabel: string }) {
+  const hasBoth = pickupLatitude !== null && pickupLongitude !== null && driverLatitude !== null && driverLongitude !== null;
+  const vehicleLeft = hasBoth ? Math.max(15, Math.min(85, 50 + ((driverLongitude! - pickupLongitude!) * 700))) : 50;
+  return <div className="relative mt-5 h-48 overflow-hidden rounded-2xl border bg-[linear-gradient(135deg,hsl(var(--muted)/.85),hsl(var(--card)),hsl(var(--muted)/.65))]"><div className="absolute inset-x-[10%] top-1/2 h-1 -translate-y-1/2 rounded-full bg-[hsl(var(--primary)/.18)]" /><div className="absolute left-[12%] top-[calc(50%-1.5rem)] flex flex-col items-center gap-1 text-[10px] font-bold"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500 text-white shadow-lg"><MapPin size={16} /></span><span>{clientLabel}</span></div><div className="absolute top-[calc(50%-1.5rem)] flex flex-col items-center gap-1 text-[10px] font-bold transition-[left] duration-1000 ease-out" style={{ left: `${vehicleLeft}%` }}><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-lg"><CarFront size={17} /></span><span>{driverLabel}</span></div><div className="absolute bottom-3 left-3 rounded-lg bg-white/80 px-2.5 py-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))] backdrop-blur-sm">{hasBoth ? 'Position relative en direct' : 'En attente de position GPS'}</div></div>;
+}
+
 function HistoryPanel({ trips }: { trips: Trip[] }) {
   return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Traçabilité Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Historique</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Retrouvez les courses et leurs statuts enregistrés.</p></div></div><section className="card-surface overflow-hidden">{trips.length ? <TripTable trips={trips} compact onStatusChange={() => undefined} /> : <EmptyState icon={History} title="Aucun historique" text="Les courses terminées ou en cours apparaîtront ici." />}</section></div>;
 }
@@ -396,7 +415,7 @@ function SettingsPanel({ settings, canModify, onSave }: { settings: TransportSet
       trackingIntervalSeconds: Math.max(10, Math.min(300, Number(form.trackingIntervalSeconds))),
     });
   };
-  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Configuration Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Paramètres</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Définissez les règles de géolocalisation et de suivi des chauffeurs.</p></div></div><section className="card-surface p-5"><form onSubmit={submit} className="max-w-xl space-y-5"><Field label="Validité d’une position GPS (minutes)"><input required min="1" max="60" type="number" value={form.gpsValidityMinutes} onChange={event => setForm(current => ({ ...current, gpsValidityMinutes: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><Field label="Intervalle de suivi web (secondes)"><input required min="10" max="300" type="number" value={form.trackingIntervalSeconds} onChange={event => setForm(current => ({ ...current, trackingIntervalSeconds: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Une position plus ancienne que la durée choisie ne peut pas être utilisée pour affecter une course publique. Le suivi mobile en arrière-plan reste hors périmètre.</p>{canModify ? <DialogActions busy={false} onClose={() => setForm(settings)} label="Enregistrer les paramètres" /> : <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Ces paramètres sont consultables, mais votre rôle ne peut pas les modifier.</p>}</form></section></div>;
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Configuration Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Paramètres</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Définissez la règle de géolocalisation utilisée par le matching automatique.</p></div></div><section className="card-surface p-5"><form onSubmit={submit} className="max-w-xl space-y-5"><Field label="Validité d’une position GPS (minutes)"><input required min="1" max="60" type="number" value={form.gpsValidityMinutes} onChange={event => setForm(current => ({ ...current, gpsValidityMinutes: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><Field label="Intervalle de suivi web (secondes)"><input type="number" value={10} className={inputClass} disabled /></Field><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le GPS du chauffeur est envoyé automatiquement toutes les 10 secondes. Une position plus ancienne que la durée choisie ne peut pas être utilisée pour affecter une course publique.</p>{canModify ? <DialogActions busy={false} onClose={() => setForm(settings)} label="Enregistrer les paramètres" /> : <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Ces paramètres sont consultables, mais votre rôle ne peut pas les modifier.</p>}</form></section></div>;
 }
 
 function Metric({ label, value, detail, icon: Icon, accent }: { label: string; value: string | number; detail: string; icon: typeof Gauge; accent: string }) {
