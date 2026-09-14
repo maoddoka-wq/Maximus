@@ -69,6 +69,13 @@ export interface GeoJsonLineString {
   coordinates: Array<[number, number]>;
 }
 
+export interface PublicTransportPlace {
+  label: string;
+  latitude: number;
+  longitude: number;
+  type: string;
+}
+
 export interface TransportMetrics {
   activeDrivers: number;
   availableVehicles: number;
@@ -215,10 +222,17 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
   getSettings: () => request<{ heroImageUrl: string }>(
     domain ? '/shop-domain/transport/settings' : `/shop/${encodeURIComponent(slug ?? '')}/transport/settings`,
   ),
+  places: (query: string) => request<{ places: PublicTransportPlace[] }>(
+    domain
+      ? `/shop-domain/transport/places?q=${encodeURIComponent(query)}`
+      : `/shop/${encodeURIComponent(slug ?? '')}/transport/places?q=${encodeURIComponent(query)}`,
+  ),
   quote: (body: {
     destination: string;
     pickupLatitude: number;
     pickupLongitude: number;
+    destinationLatitude?: number;
+    destinationLongitude?: number;
   }) => request<PublicTransportQuote>(
     domain ? '/shop-domain/transport/quote' : `/shop/${encodeURIComponent(slug ?? '')}/transport/quote`,
     json(body),

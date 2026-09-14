@@ -355,7 +355,12 @@ class TransportTest extends TestCase
         ]);
         Http::fake([
             'https://nominatim.openstreetmap.org/*' => Http::response([
-                ['lat' => '14.7300', 'lon' => '-17.4500'],
+                [
+                    'lat' => '14.7300',
+                    'lon' => '-17.4500',
+                    'display_name' => 'Point de destination, Dakar, Sénégal',
+                    'type' => 'place',
+                ],
             ]),
             'https://router.project-osrm.org/*' => Http::response([
                 'code' => 'Ok',
@@ -373,10 +378,18 @@ class TransportTest extends TestCase
             ]),
         ]);
 
+        $this->getJson('/api/shop/kora-quote/transport/places?q=Point')
+            ->assertOk()
+            ->assertJsonPath('places.0.label', 'Point de destination, Dakar')
+            ->assertJsonPath('places.0.latitude', 14.73)
+            ->assertJsonPath('places.0.longitude', -17.45);
+
         $quote = $this->postJson('/api/shop/kora-quote/transport/quote', [
             'destination' => 'Point de destination',
             'pickupLatitude' => 14.7167,
             'pickupLongitude' => -17.4677,
+            'destinationLatitude' => 14.7300,
+            'destinationLongitude' => -17.4500,
         ])->assertOk()
             ->assertJsonPath('distanceKm', 4.2)
             ->assertJsonPath('durationMinutes', 15)

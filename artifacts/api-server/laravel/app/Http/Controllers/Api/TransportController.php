@@ -507,6 +507,19 @@ class TransportController extends Controller
         return $this->quotePublicTripForStore($request, $store);
     }
 
+    public function suggestPublicTransportPlaces(Request $request, string $slug): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->suggestPublicTransportPlacesForStore($request, $store);
+    }
+
     public function createPublicDomainTrip(Request $request): JsonResponse
     {
         $domain = DB::table('ecommerce_domains')
@@ -545,6 +558,26 @@ class TransportController extends Controller
         }
 
         return $this->quotePublicTripForStore($request, $store);
+    }
+
+    public function suggestPublicDomainTransportPlaces(Request $request): JsonResponse
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->suggestPublicTransportPlacesForStore($request, $store);
     }
 
     public function getPublicTrip(Request $request, string $slug, string $id): JsonResponse
@@ -982,16 +1015,36 @@ class TransportController extends Controller
             'destination' => ['required', 'string', 'min:2', 'max:180'],
             'pickupLatitude' => ['required', 'numeric', 'between:-90,90'],
             'pickupLongitude' => ['required', 'numeric', 'between:-180,180'],
+            'destinationLatitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:destinationLongitude'],
+            'destinationLongitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:destinationLatitude'],
         ]);
         if (! $this->isWithinDakar((float) $input['pickupLatitude'], (float) $input['pickupLongitude'])) {
             return response()->json(['error' => 'Le service Taxi est limité à la zone de Dakar.'], 422);
         }
         try {
-            $route = $this->calculateRouteToAddress(
-                (float) $input['pickupLatitude'],
-                (float) $input['pickupLongitude'],
-                trim($input['destination']),
-            );
+            $destination = trim($input['destination']);
+            if (isset($input['destinationLatitude'], $input['destinationLongitude'])) {
+                $destinationLatitude = (float) $input['destinationLatitude'];
+                $destinationLongitude = (float) $input['destinationLongitude'];
+                if (! $this->isWithinDakar($destinationLatitude, $destinationLongitude)) {
+                    return response()->json(['error' => 'La destination doit rester dans la zone de Dakar.'], 422);
+                }
+                $route = [
+                    ...$this->calculateRouteCoordinates(
+                        [(float) $input['pickupLongitude'], (float) $input['pickupLatitude']],
+                        [$destinationLongitude, $destinationLatitude],
+                    ),
+                    'destination' => $destination,
+                    'destinationLatitude' => $destinationLatitude,
+                    'destinationLongitude' => $destinationLongitude,
+                ];
+            } else {
+                $route = $this->calculateRouteToAddress(
+                    (float) $input['pickupLatitude'],
+                    (float) $input['pickupLongitude'],
+                    $destination,
+                );
+            }
         } catch (\Throwable $exception) {
             report($exception);
             return response()->json(['error' => $this->routeErrorMessage($exception)], 422);
@@ -1015,6 +1068,57 @@ class TransportController extends Controller
             'fare' => $this->taxiFare($route['distanceKm'], $company),
             'geometry' => $route['geometry'],
         ]);
+    }
+
+    private function suggestPublicTransportPlacesForStore(Request $request, object $store): JsonResponse
+    {
+        $company = (string) $store->company_id;
+        if (! ModuleCatalog::allowsFeature($company, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        $input = $this->validated($request, [
+            'q' => ['required', 'string', 'min:2', 'max:120'],
+        ]);
+        $query = trim($input['q']);
+        try {
+            $response = Http::timeout(6)
+                ->withHeaders(['Accept' => 'application/json', 'User-Agent' => 'MAXIMUS Taxi'])
+                ->get('https://nominatim.openstreetmap.org/search', [
+                    'format' => 'jsonv2',
+                    'limit' => 8,
+                    'addressdetails' => 1,
+                    'dedupe' => 1,
+                    'q' => $query.', Dakar, Sénégal',
+                    'countrycodes' => 'sn',
+                    'viewbox' => '-17.65,14.95,-16.95,14.55',
+                    'bounded' => 1,
+                ]);
+            $places = collect($response->json())
+                ->filter(fn ($place): bool => is_array($place)
+                    && is_numeric($place['lat'] ?? null)
+                    && is_numeric($place['lon'] ?? null)
+                    && $this->isWithinDakar((float) $place['lat'], (float) $place['lon']))
+                ->map(function (array $place): array {
+                    $label = trim((string) ($place['display_name'] ?? ''));
+                    $label = preg_replace('/,\s*(Sénégal|Senegal).*$/u', '', $label) ?: $label;
+                    return [
+                        'label' => Str::limit($label, 180, ''),
+                        'latitude' => (float) $place['lat'],
+                        'longitude' => (float) $place['lon'],
+                        'type' => (string) ($place['type'] ?? 'place'),
+                    ];
+                })
+                ->filter(fn (array $place): bool => $place['label'] !== '')
+                ->unique(fn (array $place): string => mb_strtolower($place['label']))
+                ->values()
+                ->all();
+
+            return response()->json(['places' => $places]);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['places' => []]);
+        }
     }
 
     private function createPublicTripForStore(Request $request, object $store, bool $domain = false): JsonResponse
@@ -1534,7 +1638,7 @@ class TransportController extends Controller
     {
         return str_contains($exception->getMessage(), 'OUTSIDE_DAKAR')
             ? 'Les destinations et départs Taxi sont limités à la zone de Dakar.'
-            : 'La destination n’a pas pu être localisée ou l’itinéraire est indisponible.';
+            : 'Précisez un quartier, une rue ou un repère de Dakar pour obtenir une adresse exacte.';
     }
 
     private function id(string $prefix): string

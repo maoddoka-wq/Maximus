@@ -18,7 +18,7 @@ import {
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
 import { ApiRequestError } from '@/lib/api-request';
-import { createPublicTransportApi, type PublicTransportQuote, type PublicTransportTrip } from '@/lib/transport-api';
+import { createPublicTransportApi, type PublicTransportPlace, type PublicTransportQuote, type PublicTransportTrip } from '@/lib/transport-api';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
@@ -865,6 +865,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [quote, setQuote] = useState<PublicTransportQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
+  const [destinationPlaces, setDestinationPlaces] = useState<PublicTransportPlace[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<PublicTransportPlace | null>(null);
   const [heroImageUrl, setHeroImageUrl] = useState('/taxi-transport-hero.jpg');
   const locationWatchRef = useRef<number | null>(null);
   const locationTimeoutRef = useRef<number | null>(null);
@@ -904,6 +907,30 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   useAutoRefresh(refreshTrip, { enabled: Boolean(trip), intervalMs: 5_000 });
 
   useEffect(() => {
+    const query = form.destination.trim();
+    if (trip || query.length < 2) {
+      setDestinationPlaces([]);
+      setPlacesLoading(false);
+      return undefined;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setPlacesLoading(true);
+      void api.places(query).then(result => {
+        if (active) setDestinationPlaces(result.places);
+      }).catch(() => {
+        if (active) setDestinationPlaces([]);
+      }).finally(() => {
+        if (active) setPlacesLoading(false);
+      });
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [api, form.destination, trip]);
+
+  useEffect(() => {
     if (!position || trip || form.destination.trim().length < 2) {
       setQuote(null);
       setQuoteError('');
@@ -918,18 +945,22 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         destination: form.destination.trim(),
         pickupLatitude: position.latitude,
         pickupLongitude: position.longitude,
+        ...(selectedPlace ? {
+          destinationLatitude: selectedPlace.latitude,
+          destinationLongitude: selectedPlace.longitude,
+        } : {}),
       }).then(result => {
         setQuote(result);
       }).catch(cause => {
         setQuote(null);
-        setQuoteError(cause instanceof Error ? cause.message : 'L’itinéraire n’a pas pu être calculé.');
+        setQuoteError(cause instanceof Error ? cause.message : 'Précisez un quartier, une rue ou un repère de Dakar.');
       }).finally(() => {
         setQuoteLoading(false);
       });
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [api, form.destination, position, trip]);
+  }, [api, form.destination, position, selectedPlace, trip]);
 
   const stopLocationTracking = () => {
     if (locationWatchRef.current !== null && navigator.geolocation) {
@@ -1111,7 +1142,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         {formOpen && !trip && <form onSubmit={submit} className="space-y-5">
            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Étape finale</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] sm:text-2xl">Où allez-vous ?</h2></div><button type="button" onClick={() => setFormOpen(false)} className="text-xs font-bold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">Retour</button></div>
           <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><MapPin size={18} className="shrink-0" /><div><p className="font-bold">Départ : votre position actuelle</p><p className="mt-0.5 text-xs text-emerald-800">Position précise partagée automatiquement</p></div></div>
-           <label className="block text-sm font-bold">Destination<input required autoFocus list="dakar-destinations" value={form.destination} onChange={event => setForm({ ...form, destination: event.target.value })} className="mt-2 w-full rounded-xl border px-4 py-3.5 text-sm outline-none transition focus:border-[var(--shop-accent)] focus:ring-2 focus:ring-[var(--shop-accent)]/15" placeholder="Ex. Plateau, Almadies ou Fann" /><datalist id="dakar-destinations"><option value="Plateau, Dakar" /><option value="Almadies, Dakar" /><option value="Fann, Dakar" /><option value="Ouakam, Dakar" /><option value="Parcelles Assainies, Dakar" /><option value="Aéroport Blaise Diagne" /></datalist><span className="mt-1.5 block text-xs font-normal text-[hsl(var(--muted-foreground))]">Recherche et arrivée limitées à la zone de Dakar.</span></label>
+            <label className="block text-sm font-bold">Destination<div className="relative mt-2"><input required autoFocus value={form.destination} onChange={event => { setSelectedPlace(null); setForm({ ...form, destination: event.target.value }); }} className="w-full rounded-xl border px-4 py-3.5 text-sm outline-none transition focus:border-[var(--shop-accent)] focus:ring-2 focus:ring-[var(--shop-accent)]/15" placeholder="Ex. Plateau, Almadies ou Fann" autoComplete="off" />{(placesLoading || destinationPlaces.length > 0) && <div className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-xl border bg-white text-left shadow-xl">{placesLoading && <p className="px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))]">Recherche des lieux à Dakar…</p>}{!placesLoading && destinationPlaces.map(place => <button key={`${place.latitude}-${place.longitude}-${place.label}`} type="button" role="option" onClick={() => { setSelectedPlace(place); setForm({ ...form, destination: place.label }); setDestinationPlaces([]); }} className="block w-full border-b px-4 py-3 text-left last:border-0 hover:bg-[var(--shop-primary)]/10"><span className="block text-sm font-bold text-slate-900">{place.label.split(',')[0]}</span><span className="mt-0.5 block text-[11px] font-normal text-slate-500">{place.label}</span></button>)}</div>}</div><span className="mt-1.5 block text-xs font-normal text-[hsl(var(--muted-foreground))]">Suggestions d’adresses et de repères dans Dakar. Sélectionnez le lieu proposé pour utiliser ses coordonnées exactes.</span></label>
           {quoteLoading && <p className="inline-flex items-center gap-2 rounded-xl bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800"><RefreshCw size={14} className="animate-spin" />Calcul de la route et du tarif…</p>}
           {quoteError && !quoteLoading && <p role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-900">{quoteError}</p>}
           {quote && <div className="space-y-3 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/5 p-3"><div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Distance</p><p className="mt-1 text-sm font-black">{quote.distanceKm.toFixed(1)} km</p></div><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Durée</p><p className="mt-1 text-sm font-black">{quote.durationMinutes} min</p></div><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Tarif</p><p className="mt-1 text-sm font-black text-[var(--shop-accent)]">{money(quote.fare, store.currency)}</p></div></div><TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="h-[clamp(20rem,70vw,28rem)]" /><p className="text-[11px] text-[hsl(var(--muted-foreground))]">Le tarif est calculé côté serveur à partir de la distance routière OpenStreetMap/OpenRouteService.</p></div>}
