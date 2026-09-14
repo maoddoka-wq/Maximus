@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, CarFront, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -619,7 +619,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const sellerCardImageUrl = store.logoUrl || seller.photoUrl;
   const canOpenSellerCard = Boolean(sellerCardImageUrl || seller.name || seller.email || seller.phone);
   const products = allProducts.filter(product => product.productType === 'SALE');
-  const enabledFeatures = store.enabledFeatures ?? { location: false, livraisons: false, ventePhysique: true, venteNumerique: false };
+  const enabledFeatures = store.enabledFeatures ?? { location: false, transport: false, livraisons: false, ventePhysique: true, venteNumerique: false };
   const requiresShipping = cart.some(line => Boolean(line.product.rentalId) || line.product.fulfillmentType !== 'DIGITAL');
   const selectedDeliveryZone = data.deliveryZones.find(zone => zone.id === checkoutDeliveryZoneId);
   const deliveryFee = requiresShipping ? selectedDeliveryZone?.fee ?? 0 : 0;
@@ -636,6 +636,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
      { label: 'Accueil', path: '/accueil' },
      { label: 'Boutique', path: '/boutique' },
      ...(enabledFeatures.location ? [{ label: 'Location', path: '/location' }] : []),
+     ...(enabledFeatures.transport ? [{ label: 'Transport', path: '/transport' }] : []),
      ...(enabledFeatures.livraisons ? [{ label: 'Livraison', path: '/livraison' }] : []),
      { label: 'Panier', path: '/panier' },
      { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
@@ -703,13 +704,14 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
               : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
-          : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
+              : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
+              : routePath.endsWith('/transport') ? enabledFeatures.transport ? <TransportPublicPage store={store} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
         : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />}
     </main>
-      {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
+       {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/transport' ? CarFront : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
        {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-20 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:bottom-4 sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
 }
@@ -821,6 +823,44 @@ function GalleryCarousel({ mainImage, gallery, alt, icon: Icon }: { mainImage: s
     </div>
     {images.length > 1 && <div className="flex gap-2 overflow-x-auto pb-1">{images.map((image, index) => <button type="button" key={image} onClick={() => setSelected(index)} className={`h-16 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${selected === index ? 'border-[var(--shop-primary)]' : 'border-transparent'}`}><img src={image} alt={`${alt} ${index + 1}`} className="h-full w-full object-cover" /></button>)}</div>}
   </div>;
+}
+
+function TransportPublicPage({ store, onBack }: { store: PublicShopBootstrap['store']; onBack: () => void }) {
+  const phone = store.seller?.phone?.trim() ?? '';
+  const whatsapp = whatsappNumber(phone);
+  const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
+
+  return <section className="space-y-6">
+    <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--shop-accent)]">
+      <ArrowLeft size={16} /> Retour à la boutique
+    </button>
+    <div className="relative overflow-hidden rounded-3xl bg-[#0b1b2b] p-6 text-white shadow-xl sm:p-10">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[var(--shop-primary)]/25 blur-3xl" />
+      <div className="relative max-w-2xl">
+        <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[.14em] text-white/80">
+          <CarFront size={15} /> Transport
+        </span>
+        <h1 className="mt-5 text-3xl font-bold tracking-[-.05em] sm:text-4xl">Réservez votre course Taxi</h1>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-white/75">
+          Contactez {store.name} pour organiser votre déplacement avec un chauffeur disponible.
+        </p>
+      </div>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><MapPin size={21} /></div>
+        <h2 className="mt-4 text-lg font-bold">Demander une course</h2>
+        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Indiquez votre départ, votre destination et l’heure souhaitée directement à l’équipe Taxi.</p>
+        {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={17} /> Écrire sur WhatsApp</a> : <p className="mt-5 rounded-xl bg-[hsl(var(--muted)/.55)] px-3 py-3 text-center text-xs text-[hsl(var(--muted-foreground))]">Le numéro de contact Taxi n’est pas encore renseigné.</p>}
+      </div>
+      <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><Phone size={21} /></div>
+        <h2 className="mt-4 text-lg font-bold">Contact direct</h2>
+        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Pour une demande urgente ou une précision sur votre trajet, appelez directement la boutique.</p>
+        {phone ? <a href={`tel:${phone}`} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={17} /> {phone}</a> : <p className="mt-5 rounded-xl bg-[hsl(var(--muted)/.55)] px-3 py-3 text-center text-xs text-[hsl(var(--muted-foreground))]">Aucun numéro de téléphone public.</p>}
+      </div>
+    </div>
+  </section>;
 }
 
 function ShopHomePage({

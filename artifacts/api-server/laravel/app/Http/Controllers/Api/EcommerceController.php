@@ -1419,6 +1419,7 @@ class EcommerceController extends Controller
     {
         return [
             'location' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'location'),
+            'transport' => ModuleCatalog::allowsFeature($companyId, 'transport', 'overview'),
             'livraisons' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'livraisons'),
             'ventePhysique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-physique'),
             'venteNumerique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-numerique'),

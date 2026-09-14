@@ -1111,6 +1111,37 @@ class EcommerceTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_public_shop_exposes_transport_when_the_transport_feature_is_active(): void
+    {
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'kora', 'module_id' => 'transport'],
+            [
+                'id' => 'company-module-kora-transport',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['overview', 'trips', 'drivers', 'vehicles']),
+                'configuration' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->asActor()
+            ->patchJson('/api/ecommerce/store?companyId=kora', [
+                'name' => 'Boutique Transport',
+                'slug' => 'boutique-transport',
+                'description' => 'Boutique Taxi',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primaryColor' => '#D69E2E',
+                'accentColor' => '#172033',
+            ])
+            ->assertOk();
+
+        $this->getJson('/api/shop/boutique-transport')
+            ->assertOk()
+            ->assertJsonPath('store.enabledFeatures.transport', true);
+    }
+
     public function test_rentals_are_autonomous_persistent_and_exposed_only_when_published(): void
     {
         $request = $this->asActor();
