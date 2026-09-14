@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, CarFront, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
@@ -855,14 +855,19 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [locationMessage, setLocationMessage] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
+  const [cancelError, setCancelError] = useState('');
   const [trip, setTrip] = useState<PublicTransportTrip | null>(null);
+  const [cancelToken, setCancelToken] = useState<string | null>(null);
   const [tripEnded, setTripEnded] = useState<PublicTransportTrip | null>(null);
   const [tripMessage, setTripMessage] = useState('');
   const [quote, setQuote] = useState<PublicTransportQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('/taxi-transport-hero.jpg');
+  const locationWatchRef = useRef<number | null>(null);
+  const locationTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     void api.getSettings().then(result => {
@@ -876,6 +881,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     setTripMessage(result.message);
     if (['COMPLETED', 'CANCELLED'].includes(result.trip.status)) {
       window.localStorage.removeItem(customerStorageKey);
+      setCancelToken(null);
       setTrip(null);
       setTripEnded(result.trip);
       setFormOpen(false);
@@ -925,48 +931,82 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     return () => window.clearTimeout(timer);
   }, [api, form.destination, position, trip]);
 
+  const stopLocationTracking = () => {
+    if (locationWatchRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatchRef.current);
+      locationWatchRef.current = null;
+    }
+    if (locationTimeoutRef.current !== null) {
+      window.clearTimeout(locationTimeoutRef.current);
+      locationTimeoutRef.current = null;
+    }
+  };
+
   const locate = () => {
     if (!navigator.geolocation) {
       setLocationState('error');
       setLocationMessage('La géolocalisation n’est pas disponible sur cet appareil.');
       return;
     }
+    stopLocationTracking();
     setLocationState('locating');
-    setLocationMessage('Localisation en cours…');
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        if (!isWithinDakar(coords.latitude, coords.longitude)) {
-          setPosition(null);
-          setLocationState('error');
-          setLocationMessage('Le service Taxi est actuellement limité à la zone de Dakar.');
-          return;
-        }
-        setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy });
-        setLocationState('ready');
-        setLocationMessage(`Position partagée avec une précision d’environ ${Math.round(coords.accuracy)} m.`);
-      },
-      ({ code }) => {
+    setLocationMessage('Recherche d’une position GPS précise dans la zone de Dakar…');
+    let bestAccuracy = Number.POSITIVE_INFINITY;
+    let outsideDakar = false;
+    const handlePosition = ({ coords }: GeolocationPosition) => {
+      if (!isWithinDakar(coords.latitude, coords.longitude)) {
+        outsideDakar = true;
+        return;
+      }
+      if (coords.accuracy >= bestAccuracy) return;
+      bestAccuracy = coords.accuracy;
+      setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy });
+      setLocationState('ready');
+      setLocationMessage(`Position GPS prête · précision actuelle d’environ ${Math.round(coords.accuracy)} m.`);
+      if (coords.accuracy <= 50) stopLocationTracking();
+    };
+    const handleError = ({ code }: GeolocationPositionError) => {
+      if (code === 1) {
+        stopLocationTracking();
         setLocationState('error');
-        setLocationMessage(code === 1 ? 'Autorisez la localisation pour trouver le chauffeur le plus proche.' : 'La position n’a pas pu être obtenue. Réessayez.');
-      },
-      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 15_000 },
-    );
+        setLocationMessage('Autorisez la localisation pour trouver le chauffeur le plus proche.');
+      }
+    };
+    locationWatchRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20_000,
+    });
+    locationTimeoutRef.current = window.setTimeout(() => {
+      const hasPosition = bestAccuracy < Number.POSITIVE_INFINITY;
+      stopLocationTracking();
+      if (hasPosition) {
+        setLocationMessage(`Meilleure position disponible · précision d’environ ${Math.round(bestAccuracy)} m.`);
+      } else {
+        setLocationState('error');
+        setLocationMessage(outsideDakar
+          ? 'La position reçue est hors de la zone de Dakar.'
+          : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+      }
+    }, 20_000);
   };
 
   useEffect(() => {
     locate();
+    return stopLocationTracking;
   }, []);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(customerStorageKey);
       if (!saved) return;
-      const customer = JSON.parse(saved) as { tripId?: string; passengerName?: string; passengerPhone?: string };
+      const customer = JSON.parse(saved) as { tripId?: string; cancelToken?: string; passengerName?: string; passengerPhone?: string };
       setForm(current => ({
         ...current,
         passengerName: customer.passengerName?.trim() || current.passengerName,
         passengerPhone: customer.passengerPhone?.trim() || current.passengerPhone,
       }));
+      if (customer.cancelToken) setCancelToken(customer.cancelToken);
       if (customer.tripId) {
         void api.getTrip(customer.tripId).then(result => {
           applyTripResult(result);
@@ -1008,14 +1048,30 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       });
       window.localStorage.setItem(customerStorageKey, JSON.stringify({
         tripId: result.trip.id,
+        cancelToken: result.cancelToken,
         passengerName: form.passengerName.trim(),
         passengerPhone: form.passengerPhone.trim(),
       }));
-       applyTripResult(result);
+      setCancelToken(result.cancelToken);
+      applyTripResult(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La demande de course n’a pas pu être envoyée.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const cancelTrip = async () => {
+    if (!trip || !cancelToken || cancelling) return;
+    if (!window.confirm('Annuler cette demande de course ?')) return;
+    setCancelling(true);
+    setCancelError('');
+    try {
+      applyTripResult(await api.cancelTrip(trip.id, cancelToken));
+    } catch (cause) {
+      setCancelError(cause instanceof Error ? cause.message : 'La demande n’a pas pu être annulée.');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -1036,7 +1092,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[.08] p-3 backdrop-blur-sm sm:rounded-2xl sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/65 sm:text-xs"><span>État de la localisation</span><span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 ${locationState === 'ready' ? 'bg-emerald-400/15 text-emerald-200' : locationState === 'error' ? 'bg-rose-400/15 text-rose-200' : 'bg-white/10 text-white/70'}`}><span className={`h-1.5 w-1.5 rounded-full ${locationState === 'ready' ? 'bg-emerald-300' : locationState === 'error' ? 'bg-rose-300' : 'bg-amber-300'}`} />{locationState === 'ready' ? 'Prête' : locationState === 'locating' ? 'Recherche…' : locationState === 'error' ? 'À autoriser' : 'En attente'}</span></div>
-          <p className="mt-2 text-[13px] leading-6 text-white/85 sm:mt-3 sm:text-sm">{locationState === 'ready' ? 'Votre position de départ est prête. Vous n’avez pas besoin de saisir une adresse.' : locationMessage || 'Nous préparons automatiquement votre position de départ.'}</p>
+           <p className="mt-2 text-[13px] leading-6 text-white/85 sm:mt-3 sm:text-sm">{locationState === 'ready' ? 'Votre position de départ est prête. Vous n’avez pas besoin de saisir une adresse.' : locationMessage || 'Nous préparons automatiquement votre position de départ.'}</p>
+           {locationState === 'ready' && position && <p className="mt-2 text-[11px] font-semibold text-white/65">Précision GPS : environ {Math.round(position.accuracy)} m</p>}
           {locationState === 'error' && <button type="button" onClick={locate} className="mt-2 text-xs font-bold text-[var(--shop-primary)] underline sm:mt-3">Autoriser ma position</button>}
         </div>
       </div>
@@ -1064,7 +1121,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           <button type="submit" disabled={submitting || locationState !== 'ready'} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-5 py-4 text-sm font-black text-white shadow-lg shadow-black/10 transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={17} className="animate-spin" /> : <CarFront size={17} />}{submitting ? 'Recherche du chauffeur…' : 'Confirmer ma course'}<ArrowRight size={16} /></button>
           <p className="text-center text-[11px] text-[hsl(var(--muted-foreground))]">Vos coordonnées servent uniquement à vous mettre en relation avec le chauffeur affecté.</p>
         </form>}
-         {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-xl font-black tracking-[-.04em] sm:text-2xl">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
+          {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-xl font-black tracking-[-.04em] sm:text-2xl">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}{cancelError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-left text-xs text-rose-800">{cancelError}</p>}{['REQUESTED', 'OFFERED', 'ASSIGNED'].includes(trip.status) && cancelToken && <button type="button" onClick={() => void cancelTrip()} disabled={cancelling} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60">{cancelling && <RefreshCw size={15} className="animate-spin" />}{cancelling ? 'Annulation…' : 'Annuler la demande'}</button>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setCancelToken(null); setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
       </div>
       <aside className="space-y-4">
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><ShieldCheck size={20} /></div><div><h2 className="font-bold">Simple et direct</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Aucun intermédiaire</p></div></div><div className="mt-5 space-y-3 text-sm"><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">1</span><p><span className="font-bold">Localisez-vous</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Votre départ est détecté automatiquement.</span></p></div><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">2</span><p><span className="font-bold">Confirmez la destination</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Deux informations suffisent.</span></p></div><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">3</span><p><span className="font-bold">Parlez au chauffeur</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Appelez-le directement après affectation.</span></p></div></div></div>

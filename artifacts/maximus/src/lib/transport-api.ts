@@ -231,9 +231,15 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
     pickupLatitude: number;
     pickupLongitude: number;
     quoteToken?: string;
-  }) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+  }) => request<{ trip: PublicTransportTrip; cancelToken: string; matched: boolean; message: string }>(
     domain ? '/shop-domain/transport/trips' : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips`,
     json(body),
+  ),
+  cancelTrip: (id: string, cancelToken: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+    domain
+      ? `/shop-domain/transport/trips/${encodeURIComponent(id)}/cancel`
+      : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}/cancel`,
+    json({ cancelToken }),
   ),
   getTrip: (id: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
     domain ? `/shop-domain/transport/trips/${encodeURIComponent(id)}` : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}`,

@@ -580,6 +580,39 @@ class TransportController extends Controller
         return $this->publicTripForStore($store, $id, true);
     }
 
+    public function cancelPublicTrip(Request $request, string $slug, string $id): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->cancelPublicTripForStore($request, $store, $id, false);
+    }
+
+    public function cancelPublicDomainTrip(Request $request, string $id): JsonResponse
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->cancelPublicTripForStore($request, $store, $id, true);
+    }
+
     public function updateTripStatus(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'trips')) {
@@ -833,11 +866,94 @@ class TransportController extends Controller
         return response()->json([
             'trip' => $this->publicTrip($trip, $driver, $vehicle, $this->vehicleImageUrl((string) $store->company_id, $trip->vehicle_id, $domain)),
             'matched' => in_array($trip->status, ['OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'], true),
-            'message' => $trip->status === 'OFFERED'
-                ? 'Le chauffeur le plus proche doit encore valider la demande.'
-                : ($trip->status === 'ASSIGNED' || $trip->status === 'IN_PROGRESS'
-                    ? 'Votre chauffeur est en route.'
-                    : 'Le suivi de votre course est disponible.'),
+            'message' => $trip->status === 'CANCELLED'
+                ? 'Cette demande a été annulée.'
+                : ($trip->status === 'OFFERED'
+                    ? 'Le chauffeur le plus proche doit encore valider la demande.'
+                    : ($trip->status === 'ASSIGNED' || $trip->status === 'IN_PROGRESS'
+                        ? 'Votre chauffeur est en route.'
+                        : 'Le suivi de votre course est disponible.')),
+        ]);
+    }
+
+    private function cancelPublicTripForStore(Request $request, object $store, string $id, bool $domain): JsonResponse
+    {
+        $company = (string) $store->company_id;
+        if (! ModuleCatalog::allowsFeature($company, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        $input = $this->validated($request, [
+            'cancelToken' => ['required', 'string', 'max:20000'],
+        ]);
+        try {
+            $payload = json_decode(Crypt::decryptString($input['cancelToken']), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return response()->json(['error' => 'Le lien d’annulation est invalide ou expiré.'], 403);
+        }
+        if (($payload['tripId'] ?? null) !== $id
+            || ($payload['companyId'] ?? null) !== $company
+            || (int) ($payload['expiresAt'] ?? 0) < now()->timestamp) {
+            return response()->json(['error' => 'Le lien d’annulation est invalide ou expiré.'], 403);
+        }
+
+        $trip = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $trip) {
+            return response()->json(['error' => 'Course introuvable.'], 404);
+        }
+        if (in_array($trip->status, ['COMPLETED', 'CANCELLED'], true)) {
+            return $this->publicTripCancellationResponse($store, $trip, $domain, 'Cette demande n’est plus active.');
+        }
+        if ($trip->status === 'IN_PROGRESS') {
+            return response()->json(['error' => 'Cette course a déjà commencé. Contactez directement le chauffeur.'], 422);
+        }
+
+        DB::transaction(function () use ($trip, $company): void {
+            $lockedTrip = DB::table('transport_trips')
+                ->where('company_id', $company)
+                ->where('id', $trip->id)
+                ->lockForUpdate()
+                ->first();
+            if (! $lockedTrip || in_array($lockedTrip->status, ['COMPLETED', 'CANCELLED'], true)) {
+                return;
+            }
+            DB::table('transport_trips')
+                ->where('company_id', $company)
+                ->where('id', $trip->id)
+                ->update(['status' => 'CANCELLED', 'updated_at' => now()]);
+            if ($lockedTrip->vehicle_id !== null) {
+                DB::table('transport_vehicles')
+                    ->where('company_id', $company)
+                    ->where('id', $lockedTrip->vehicle_id)
+                    ->where('status', 'ON_TRIP')
+                    ->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
+            }
+        });
+
+        $updatedTrip = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+
+        return $this->publicTripCancellationResponse($store, $updatedTrip, $domain, 'Votre demande a été annulée.');
+    }
+
+    private function publicTripCancellationResponse(object $store, object $trip, bool $domain, string $message): JsonResponse
+    {
+        $driver = $trip->driver_id
+            ? DB::table('transport_drivers')->where('company_id', $store->company_id)->where('id', $trip->driver_id)->first()
+            : null;
+        $vehicle = $trip->vehicle_id
+            ? DB::table('transport_vehicles')->where('company_id', $store->company_id)->where('id', $trip->vehicle_id)->first()
+            : null;
+
+        return response()->json([
+            'trip' => $this->publicTrip($trip, $driver, $vehicle, $this->vehicleImageUrl((string) $store->company_id, $trip->vehicle_id, $domain)),
+            'matched' => false,
+            'message' => $message,
         ]);
     }
 
@@ -1038,6 +1154,7 @@ class TransportController extends Controller
         );
         return response()->json([
             'trip' => $response,
+            'cancelToken' => $this->publicTripCancellationToken($company, $tripRow->id, trim($input['passengerPhone'])),
             'matched' => in_array($response['status'], ['OFFERED', 'ASSIGNED'], true),
             'message' => $response['status'] === 'ASSIGNED'
                 ? 'Le chauffeur le plus proche a été trouvé. Vous pouvez le contacter directement.'
@@ -1226,6 +1343,16 @@ class TransportController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function publicTripCancellationToken(string $company, string $tripId, string $passengerPhone): string
+    {
+        return Crypt::encryptString(json_encode([
+            'companyId' => $company,
+            'tripId' => $tripId,
+            'passengerPhone' => $passengerPhone,
+            'expiresAt' => now()->addDay()->timestamp,
+        ], JSON_THROW_ON_ERROR));
     }
 
     private function decodeGeometry(?string $geometry): ?array

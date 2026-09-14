@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Maximize2, X } from 'lucide-react';
+import { LocateFixed, Maximize2, X } from 'lucide-react';
 import type { GeoJsonLineString } from '@/lib/transport-api';
 
 type Point = { latitude: number; longitude: number };
@@ -72,6 +72,7 @@ export function TaxiRouteMap({
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
   const viewportKeyRef = useRef<string | null>(null);
+  const viewportBoundsRef = useRef<L.LatLngBounds | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -95,6 +96,7 @@ export function TaxiRouteMap({
       mapRef.current = null;
       layersRef.current = null;
       viewportKeyRef.current = null;
+      viewportBoundsRef.current = null;
     };
   }, []);
 
@@ -113,10 +115,22 @@ export function TaxiRouteMap({
 
     const viewportKey = JSON.stringify({ clientStop, destination, routeGeometry, pickupRouteGeometry });
     if (bounds.isValid() && viewportKeyRef.current !== viewportKey) {
+      viewportBoundsRef.current = bounds;
       map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
       viewportKeyRef.current = viewportKey;
     }
   }, [clientStop, destination, driver, pickupRouteGeometry, routeGeometry]);
+
+  const recenter = () => {
+    const map = mapRef.current;
+    const bounds = viewportBoundsRef.current;
+    if (!map) return;
+    if (bounds?.isValid()) {
+      map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
+    } else {
+      map.setView([14.7167, -17.4677], 12, { animate: true });
+    }
+  };
 
   useEffect(() => {
     if (!expanded) return undefined;
@@ -128,10 +142,10 @@ export function TaxiRouteMap({
   }, [expanded]);
 
   return <div className={expanded ? 'fixed inset-0 z-[70] flex flex-col bg-slate-950/80 p-3 sm:p-6' : 'space-y-2'}>
-    {expanded && <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-lg sm:px-4"><div><p className="text-sm font-black text-slate-900">GPS Taxi</p><p className="text-[11px] text-slate-500">Chauffeur → arrêt client → destination</p></div><button type="button" onClick={() => setExpanded(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-slate-700 hover:bg-slate-100" aria-label="Réduire la carte"><X size={18} /></button></div>}
+     {expanded && <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-lg sm:px-4"><div><p className="text-sm font-black text-slate-900">GPS Taxi</p><p className="text-[11px] text-slate-500">Chauffeur → arrêt client → destination</p></div><div className="flex items-center gap-2"><button type="button" onClick={recenter} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100" aria-label="Recentrer la carte"><LocateFixed size={15} />Recentrer</button><button type="button" onClick={() => setExpanded(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-slate-700 hover:bg-slate-100" aria-label="Réduire la carte"><X size={18} /></button></div></div>}
     <div className={expanded ? 'relative min-h-0 flex-1' : 'relative'}>
       <div ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${expanded ? 'h-full min-h-[20rem]' : className}`} aria-label="Carte du trajet Taxi" />
-      {!expanded && <button type="button" onClick={() => setExpanded(true)} className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] font-black text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Agrandir la carte"><Maximize2 size={14} />Agrandir</button>}
+       {!expanded && <div className="absolute right-3 top-3 flex items-center gap-1.5"><button type="button" onClick={recenter} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/95 text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Recentrer la carte"><LocateFixed size={15} /></button><button type="button" onClick={() => setExpanded(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] font-black text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Agrandir la carte"><Maximize2 size={14} />Agrandir</button></div>}
     </div>
     <div className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600 ${expanded ? 'rounded-xl bg-white px-3 py-2.5 shadow-lg' : ''}`}>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-600 ring-2 ring-sky-100" />Taxi → arrêt client</span>

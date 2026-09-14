@@ -410,6 +410,51 @@ class TransportTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_public_taxi_customer_can_cancel_only_with_the_signed_request_token(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-cancel',
+            'company_id' => 'kora',
+            'slug' => 'kora-cancel',
+            'name' => 'Kora Cancel',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $trip = $this->postJson('/api/shop/kora-cancel/transport/trips', [
+            'pickup' => 'Plateau',
+            'destination' => 'Fann',
+            'passengerName' => 'Client Annulation',
+            'passengerPhone' => '+221771234567',
+            'pickupLatitude' => 14.7167,
+            'pickupLongitude' => -17.4677,
+        ])->assertCreated()
+            ->assertJsonPath('trip.status', 'REQUESTED')
+            ->assertJsonPath('cancelToken', fn ($value) => is_string($value) && $value !== '');
+
+        $this->postJson('/api/shop/kora-cancel/transport/trips/'.$trip->json('trip.id').'/cancel', [
+            'cancelToken' => 'invalid-token',
+        ])->assertForbidden();
+
+        $this->postJson('/api/shop/kora-cancel/transport/trips/'.$trip->json('trip.id').'/cancel', [
+            'cancelToken' => $trip->json('cancelToken'),
+        ])->assertOk()
+            ->assertJsonPath('trip.status', 'CANCELLED')
+            ->assertJsonPath('message', 'Votre demande a été annulée.');
+
+        $this->assertDatabaseHas('transport_trips', [
+            'id' => $trip->json('trip.id'),
+            'status' => 'CANCELLED',
+        ]);
+    }
+
     private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string
     {
         AuthUser::query()->create([
