@@ -136,6 +136,34 @@ export function buildAppAccessContext({
       ...new Set((requestedFeatures[module.id] ?? []).filter(featureId => validFeatureIds.has(featureId))),
     ]);
   };
+  const companyFeatureCeiling = (module: NonNullable<typeof configuredModules[number]>) => {
+    if (!activeCompany) return undefined;
+
+    const serverAccess = serverModuleAccess?.find((item) => item.id === module.id);
+    const serverConfiguration = serverAccess?.configuration;
+    const serverFeatureIds = serverAccess?.featureIds;
+    const hasExplicitServerSelection =
+      Array.isArray(serverFeatureIds)
+      && (serverFeatureIds.length > 0 || serverConfiguration?.featureScope === 'explicit');
+    if (hasExplicitServerSelection) {
+      return new Set(serverFeatureIds ?? []);
+    }
+
+    const selectedPackIds = activeCompany.requestedModulePackIds?.[module.id] ?? [];
+    if (selectedPackIds.length > 0) {
+      return new Set(
+        (module.featurePacks ?? [])
+          .filter(pack => selectedPackIds.includes(pack.id))
+          .flatMap(pack => pack.featureIds),
+      );
+    }
+
+    const requestedFeatures = activeCompany.requestedModuleFeatures;
+    if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
+      return undefined;
+    }
+    return new Set(requestedFeatures[module.id] ?? []);
+  };
   const selectedFeatureIdsByModule = Object.fromEntries(
     configuredModules
       .map(module => [module.id, companySelectedFeatureIds(module)] as const)
@@ -197,7 +225,11 @@ export function buildAppAccessContext({
       ? companySelectedFeatureIds(transportModule)
       : accessRole && transportModule
         ? [...getSelectedFeatureIds(accessRole, transportModule, employeeNode?.moduleFeatures?.[transportModule.id])]
-          .filter(featureId => roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, featureId, 'voir'))
+          .filter(featureId => {
+            const ceiling = companyFeatureCeiling(transportModule);
+            return (!ceiling || ceiling.has(featureId))
+              && roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, featureId, 'voir');
+          })
         : undefined;
   const transportFeaturePermissions = transportModule
     ? Object.fromEntries(

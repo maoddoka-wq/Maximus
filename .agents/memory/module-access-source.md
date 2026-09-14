@@ -20,3 +20,9 @@ Les permissions détaillées d’une fonctionnalité priment sur le droit global
 **Why:** Un rôle chauffeur pouvait conserver une sélection de fonctionnalités complète tout en ne possédant des droits détaillés que sur quelques rubriques, ce qui affichait des onglets non autorisés.
 
 **How to apply:** Filtrer les menus, onglets et routes Transport par la permission détaillée `voir` lorsque des permissions détaillées sont présentes ; n’utiliser le droit global qu’en l’absence de détail.
+
+Pour un rôle issu d’un pack, les fonctionnalités du pack sont aussi une limite supérieure : une sélection de secteur plus large ne peut pas ajouter de fonctionnalité hors pack.
+
+**Why:** Les rôles chauffeur pouvaient hériter d’une liste de secteur contenant toutes les rubriques Transport, alors que le pack chauffeur n’en incluait que quatre.
+
+**How to apply:** Intersecter la sélection explicite de l’unité avec les `featureIds` du pack avant de calculer les fonctionnalités visibles.

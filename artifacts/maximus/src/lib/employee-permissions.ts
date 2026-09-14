@@ -282,14 +282,22 @@ export function getSelectedFeatureIds(
 
   const featureIds = getModuleFeatureOptions(module).map(feature => feature.id);
   const validFeatureIds = new Set(featureIds);
+  const packFeatureIds = role.packId && role.packModuleId === module.id
+    ? new Set(
+      module.featurePacks
+        ?.find(candidate => candidate.id === role.packId)
+        ?.featureIds
+        .filter(featureId => validFeatureIds.has(featureId)) ?? [],
+    )
+    : null;
   if (explicitFeatureIds) {
-    return new Set([...explicitFeatureIds].filter(featureId => validFeatureIds.has(featureId)));
+    const selected = [...explicitFeatureIds].filter(featureId => validFeatureIds.has(featureId));
+    return packFeatureIds
+      ? new Set(selected.filter(featureId => packFeatureIds.has(featureId)))
+      : new Set(selected);
   }
-  if (role.packId && role.packModuleId === module.id) {
-    const pack = module.featurePacks?.find(candidate => candidate.id === role.packId);
-    if (pack) {
-      return new Set(pack.featureIds.filter(featureId => validFeatureIds.has(featureId)));
-    }
+  if (packFeatureIds) {
+    return packFeatureIds;
   }
   const permissionKeyFor = (featureId: string) =>
     module.id === 'presences' ? `presence.${featureId}` : permissionFeatureKey(module.id, featureId);

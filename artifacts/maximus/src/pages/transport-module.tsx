@@ -141,8 +141,10 @@ export default function TransportModulePage({
   const visibleTabs = useMemo(
     () => allowedFeatureIds
       ? tabs.filter(tab => allowedFeatureIds.includes(tab.featureId) || allowedFeatureIds.includes(tab.id))
-      : tabs,
-    [allowedFeatureIds],
+      : currentEmployeeId
+        ? []
+        : tabs,
+    [allowedFeatureIds, currentEmployeeId],
   );
   const requestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
   const [tab, setTab] = useState<TransportTab>(
