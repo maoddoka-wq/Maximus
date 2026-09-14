@@ -163,6 +163,31 @@ export interface PublicTransportQuote {
   geometry: GeoJsonLineString;
 }
 
+export type PublicTransportTripResult = {
+  trip: PublicTransportTrip;
+  matched: boolean;
+  message: string;
+};
+
+function normalizePublicTripResult(payload: unknown): PublicTransportTripResult {
+  const body = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const nestedData = body.data && typeof body.data === 'object' ? body.data as Record<string, unknown> : null;
+  const candidate = body.trip && typeof body.trip === 'object'
+    ? body.trip
+    : nestedData?.trip && typeof nestedData.trip === 'object'
+      ? nestedData.trip
+      : nestedData ?? body;
+  if (!candidate || typeof candidate !== 'object' || typeof (candidate as { id?: unknown }).id !== 'string') {
+    throw new Error('La réponse du service Taxi est invalide. Réessayez.');
+  }
+
+  return {
+    trip: candidate as PublicTransportTrip,
+    matched: Boolean(body.matched ?? nestedData?.matched),
+    message: String(body.message ?? nestedData?.message ?? ''),
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return requestJson<T>(path, init, {
     fallbackMessage: 'Le service transport est momentanément indisponible.',
@@ -231,20 +256,20 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
     pickupLatitude: number;
     pickupLongitude: number;
     quoteToken?: string;
-  }) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+  }) => request<unknown>(
     domain ? '/shop-domain/transport/trips' : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips`,
     json(body),
-  ),
-  getTrip: (id: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+  ).then(normalizePublicTripResult),
+  getTrip: (id: string) => request<unknown>(
     domain ? `/shop-domain/transport/trips/${encodeURIComponent(id)}` : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}`,
-  ),
+  ).then(normalizePublicTripResult),
   getHistory: () => request<{ trips: PublicTransportTrip[] }>(
     domain ? '/shop-domain/transport/history' : `/shop/${encodeURIComponent(slug ?? '')}/transport/history`,
   ),
-  cancelTrip: (id: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+  cancelTrip: (id: string) => request<unknown>(
     domain
       ? `/shop-domain/transport/trips/${encodeURIComponent(id)}/cancel`
       : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}/cancel`,
     { method: 'POST' },
-  ),
+  ).then(normalizePublicTripResult),
 });
