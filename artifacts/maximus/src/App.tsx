@@ -136,36 +136,8 @@ import { onboardingApi } from '@/lib/onboarding-api';
 import { mutationSuccessMessage } from '@/lib/mutation-feedback';
 
 const queryClient = new QueryClient();
-const APP_STATE_CACHE_PREFIX = 'maximus-app-state-cache:';
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
-
-function appStateCacheKey(session: Session) {
-  return `${APP_STATE_CACHE_PREFIX}${session}`;
-}
-
-function readCachedAppState(session: Session): { data: StoreData; version: number } | null {
-  try {
-    const raw = localStorage.getItem(appStateCacheKey(session));
-    if (!raw) return null;
-    const cached = JSON.parse(raw) as { data?: unknown; version?: unknown };
-    if (!cached.data || typeof cached.data !== 'object') return null;
-    return {
-      data: sanitizeStoreData(cached.data as Partial<StoreData>),
-      version: typeof cached.version === 'number' && Number.isFinite(cached.version) ? cached.version : 0,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedAppState(session: Session, data: StoreData, version: number) {
-  try {
-    localStorage.setItem(appStateCacheKey(session), JSON.stringify({ data, version }));
-  } catch {
-    // Quota errors must not block the authenticated workspace.
-  }
-}
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
@@ -401,13 +373,12 @@ function AppContent() {
   const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [appStateError, setAppStateError] = useState('');
-  const initialSession = localStorage.getItem('maximus-session') as Session | null;
   const [appStateReady, setAppStateReady] = useState(
-    () => !initialSession || Boolean(readCachedAppState(initialSession)),
+    () => !localStorage.getItem('maximus-session'),
   );
   const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>('checking');
   const [session, setSession] = useState<Session | null>(
-    () => initialSession,
+    () => localStorage.getItem('maximus-session') as Session | null,
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
@@ -429,16 +400,6 @@ function AppContent() {
   const loginTransitionRef = useRef(false);
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
-  useEffect(() => {
-    if (!session || session.startsWith('company:sector-test-')) return;
-    const cached = readCachedAppState(session);
-    if (!cached) return;
-    dataRef.current = cached.data;
-    setData(cached.data);
-    appStateVersionRef.current = cached.version;
-    setAppStateVersion(cached.version);
-    setAppStateReady(true);
-  }, [session]);
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
@@ -531,7 +492,6 @@ function AppContent() {
       .then(async () => {
         const { data: remoteData, version } = await appStateApi.bootstrap();
         const nextData = sanitizeStoreData(remoteData);
-        writeCachedAppState(session, nextData, version);
         dataRef.current = nextData;
         setData(nextData);
         setAppStateError('');
@@ -548,15 +508,6 @@ function AppContent() {
           return false;
         }
         const message = error instanceof Error ? error.message : 'Les données métier sont indisponibles.';
-        const cached = readCachedAppState(session);
-        if (cached) {
-          dataRef.current = cached.data;
-          setData(cached.data);
-          appStateVersionRef.current = cached.version;
-          setAppStateVersion(cached.version);
-          setAppStateError(`Mode hors connexion : ${message}`);
-          return true;
-        }
         setAppStateError(message);
         return false;
       })
@@ -996,11 +947,6 @@ function AppContent() {
       </section>
     </div>;
   }
-  const staleAppStateNotice = appStateError && appStateReady ? (
-    <div role="status" className="mb-5 rounded-xl border border-[hsl(var(--accent)/.35)] bg-[hsl(var(--accent)/.1)] px-4 py-3 text-xs text-[hsl(var(--foreground))]">
-      {appStateError} Les données affichées peuvent être obsolètes ; une nouvelle tentative sera effectuée automatiquement.
-    </div>
-  ) : null;
   const loginEmployees = [
     ...data.employees,
   ];
@@ -1120,7 +1066,6 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
-          {staleAppStateNotice}
           {sectorTestCompanyId && (
             <div
               data-testid="sector-test-banner"
@@ -4069,12 +4014,12 @@ function SubscriptionsPage({
   if (subscriptions.length === 0) {
     return (
       <div className="space-y-6">
+        <MaximusWalletPanel formatAmount={formatAmount} />
         <EmptyState
           title="Aucun abonnement enregistré"
           text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
           action={() => onNavigate('/maximus/demandes')}
         />
-        <MaximusWalletPanel formatAmount={formatAmount} />
       </div>
     );
   }
