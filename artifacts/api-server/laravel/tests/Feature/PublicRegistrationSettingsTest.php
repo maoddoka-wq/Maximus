@@ -41,23 +41,30 @@ class PublicRegistrationSettingsTest extends TestCase
             ->assertJsonPath('catalog.registrationEnabled', false);
     }
 
-    public function test_public_company_requests_are_rejected_when_registration_is_disabled(): void
+    public function test_manual_company_requests_remain_available_when_automatic_registration_is_disabled(): void
     {
         $this->asMaximusAdmin()
             ->putJson('/api/platform-settings/public-registration', ['enabled' => false])
             ->assertOk();
 
-        $this->postJson('/api/company-requests', [
+        $response = $this->postJson('/api/company-requests', [
             'name' => 'Entreprise fermée',
             'manager' => 'Responsable',
             'email' => 'fermee@example.test',
             'password' => 'Secret2026!',
             'requestedModules' => ['commerce'],
         ])
-            ->assertForbidden()
-            ->assertJsonPath('code', 'PUBLIC_REGISTRATION_DISABLED');
+            ->assertCreated()
+            ->assertJsonPath('status', 'PENDING');
 
-        $this->assertDatabaseMissing('companies', ['email' => 'fermee@example.test']);
+        $this->assertDatabaseHas('companies', [
+            'email' => 'fermee@example.test',
+            'status' => 'EN ATTENTE',
+        ]);
+        $this->assertDatabaseHas('company_requests', [
+            'id' => $response->json('requestId'),
+            'status' => 'PENDING',
+        ]);
     }
 
     public function test_onboarding_drafts_are_rejected_when_registration_is_disabled(): void

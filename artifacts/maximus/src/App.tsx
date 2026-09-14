@@ -894,19 +894,16 @@ function AppContent() {
         onCancel={() => setLocation('/maximus/entreprises')}
       />
     ) : (
-      publicRegistrationEnabled ? (
-        <Signup
-          key={`signup-${registrationCatalogVersion}`}
-          data={data}
-          onIntelligent={() => setLocation('/onboarding')}
-          onComplete={() => {
-            notify('Votre demande a bien été envoyée.', 'success');
-            setLocation('/');
-          }}
-        />
-      ) : (
-        <PublicRegistrationClosed onBack={() => setLocation('/')} />
-      )
+      <Signup
+        key={`signup-${registrationCatalogVersion}`}
+        data={data}
+        intelligentRegistrationEnabled={publicRegistrationEnabled}
+        onIntelligent={() => setLocation('/onboarding')}
+        onComplete={() => {
+          notify('Votre demande a bien été envoyée.', 'success');
+          setLocation('/');
+        }}
+      />
     );
   if (location === '/onboarding' && !session) {
     if (!publicRegistrationEnabled) {
@@ -1363,7 +1360,7 @@ function Login({
             </Link>
             {!registrationEnabled && (
               <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                Les inscriptions sont momentanément fermées.
+                L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
               </p>
             )}
           </div>
@@ -1404,10 +1401,12 @@ function Login({
 
 function Signup({
   data,
+  intelligentRegistrationEnabled,
   onIntelligent,
   onComplete,
 }: {
   data: StoreData;
+  intelligentRegistrationEnabled: boolean;
   onIntelligent: () => void;
   onComplete: () => void;
 }) {
@@ -1670,14 +1669,20 @@ function Signup({
             Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
             être construite après l’activation de votre espace.
           </p>
-          <button
-            type="button"
-            onClick={onIntelligent}
-            className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.06)] px-4 py-2.5 text-sm font-bold text-[hsl(var(--primary))] transition hover:bg-[hsl(var(--primary)/.12)]"
-          >
-            <Sparkles size={16} />
-            Décrire mon entreprise à MAXIMUS
-          </button>
+          {intelligentRegistrationEnabled ? (
+            <button
+              type="button"
+              onClick={onIntelligent}
+              className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.06)] px-4 py-2.5 text-sm font-bold text-[hsl(var(--primary))] transition hover:bg-[hsl(var(--primary)/.12)]"
+            >
+              <Sparkles size={16} />
+              Décrire mon entreprise à MAXIMUS
+            </button>
+          ) : (
+            <p className="mt-5 rounded-lg bg-[hsl(var(--muted))] px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+              L’inscription automatique est temporairement indisponible. Vous pouvez continuer avec le formulaire manuel ci-dessous.
+            </p>
+          )}
         </div>
         <div className="mb-10 flex items-center gap-3">
           <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />

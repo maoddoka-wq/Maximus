@@ -232,7 +232,7 @@ export default function PlatformSettingsPage() {
             <div>
               <h2 className="font-bold">Inscription automatique des entreprises</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                Contrôlez l’accès public à la configuration manuelle et à l’onboarding intelligent. La création manuelle depuis l’administration MAXIMUS reste toujours disponible.
+                Contrôlez l’accès à l’onboarding intelligent. Le formulaire manuel public et la création depuis l’administration MAXIMUS restent disponibles.
               </p>
               {registrationPolicy && (
                 <p className="mt-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{registrationPolicy.label}</p>
@@ -248,13 +248,13 @@ export default function PlatformSettingsPage() {
             className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition ${registrationPolicy?.enabled ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.35)]'} disabled:cursor-not-allowed disabled:opacity-50`}
           >
             <span className={`h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${registrationPolicy?.enabled ? 'translate-x-6' : 'translate-x-0'}`} />
-            <span className="sr-only">{registrationPolicy?.enabled ? 'Désactiver les inscriptions publiques' : 'Activer les inscriptions publiques'}</span>
+            <span className="sr-only">{registrationPolicy?.enabled ? 'Désactiver l’inscription automatique' : 'Activer l’inscription automatique'}</span>
           </button>
         </div>
         {!registrationPolicy?.enabled && registrationPolicy && (
           <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
             <LockKeyhole size={15} className="mt-0.5 shrink-0" />
-            Les routes publiques /inscription et /onboarding affichent un écran de fermeture et les API refusent toute nouvelle demande.
+            La route /onboarding et ses API sont temporairement fermées. Le formulaire /inscription et son API manuelle restent disponibles.
           </div>
         )}
       </section>

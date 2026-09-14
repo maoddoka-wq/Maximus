@@ -28,8 +28,8 @@ final class PublicRegistrationPolicy
         return [
             'enabled' => $enabled,
             'label' => $enabled
-                ? 'Les nouvelles entreprises peuvent s’inscrire.'
-                : 'L’inscription publique est actuellement masquée.',
+                ? 'L’onboarding intelligent est disponible.'
+                : 'L’onboarding intelligent est actuellement masqué.',
         ];
     }
 
