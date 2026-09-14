@@ -6,6 +6,8 @@ export type TripStatus = 'REQUESTED' | 'OFFERED' | 'ASSIGNED' | 'IN_PROGRESS' | 
 export interface TransportSettings {
   gpsValidityMinutes: number;
   trackingIntervalSeconds: number;
+  heroImageUrl: string;
+  heroImageData?: string | null;
 }
 
 export interface Driver {
@@ -159,6 +161,9 @@ export const createTransportApi = (companyId: string) => {
 };
 
 export const createPublicTransportApi = (slug?: string, domain = false) => ({
+  getSettings: () => request<{ heroImageUrl: string }>(
+    domain ? '/shop-domain/transport/settings' : `/shop/${encodeURIComponent(slug ?? '')}/transport/settings`,
+  ),
   createTrip: (body: {
     pickup: string;
     destination: string;

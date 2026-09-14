@@ -115,19 +115,33 @@ class TransportTest extends TestCase
         $request->getJson('/api/transport/bootstrap?companyId=kora')
             ->assertOk()
             ->assertJsonPath('settings.gpsValidityMinutes', 5)
-            ->assertJsonPath('settings.trackingIntervalSeconds', 10);
+            ->assertJsonPath('settings.trackingIntervalSeconds', 10)
+            ->assertJsonPath('settings.heroImageUrl', '/taxi-transport-hero.jpg');
 
+        $heroImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
         $request->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,
             'trackingIntervalSeconds' => 10,
+            'heroImageData' => $heroImage,
         ])->assertOk()
             ->assertJsonPath('gpsValidityMinutes', 8)
-            ->assertJsonPath('trackingIntervalSeconds', 10);
+            ->assertJsonPath('trackingIntervalSeconds', 10)
+            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image');
+        $request->get('/api/transport/settings/hero-image?companyId=kora')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
 
         $request->getJson('/api/transport/bootstrap?companyId=kora')
             ->assertOk()
             ->assertJsonPath('settings.gpsValidityMinutes', 8)
-            ->assertJsonPath('settings.trackingIntervalSeconds', 10);
+            ->assertJsonPath('settings.trackingIntervalSeconds', 10)
+            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image');
+
+        $request->patchJson('/api/transport/settings?companyId=kora', [
+            'gpsValidityMinutes' => 8,
+            'trackingIntervalSeconds' => 10,
+            'heroImageData' => null,
+        ])->assertOk()->assertJsonPath('heroImageUrl', '/taxi-transport-hero.jpg');
     }
 
     public function test_transport_permissions_are_scoped_to_each_feature(): void

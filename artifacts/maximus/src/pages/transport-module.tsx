@@ -72,7 +72,7 @@ const emptyData = (): TransportBootstrap => ({
   vehicles: [],
   trips: [],
   metrics: { activeDrivers: 0, availableVehicles: 0, todayTrips: 0, todayRevenue: 0 },
-  settings: { gpsValidityMinutes: 5, trackingIntervalSeconds: 30 },
+  settings: { gpsValidityMinutes: 5, trackingIntervalSeconds: 10, heroImageUrl: '/taxi-transport-hero.jpg' },
 });
 
 const dateLabel = (value: string) => {
@@ -431,16 +431,40 @@ function HistoryPanel({ trips }: { trips: Trip[] }) {
 }
 
 function SettingsPanel({ settings, canModify, onSave }: { settings: TransportSettings; canModify: boolean; onSave: (settings: TransportSettings) => void }) {
-  const [form, setForm] = useState<TransportSettings>(settings);
-  useEffect(() => setForm(settings), [settings]);
+  const [form, setForm] = useState<TransportSettings>({ ...settings, heroImageData: undefined });
+  const [imageError, setImageError] = useState('');
+  useEffect(() => {
+    setForm({ ...settings, heroImageData: undefined });
+    setImageError('');
+  }, [settings]);
+  const handleHeroImage = (file: File | undefined) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setImageError('Sélectionnez une image JPG, PNG ou WebP.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setImageError('L’image doit faire 2 Mo maximum.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setForm(current => ({ ...current, heroImageData: reader.result as string }));
+        setImageError('');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     onSave({
+      ...form,
       gpsValidityMinutes: Math.max(1, Math.min(60, Number(form.gpsValidityMinutes))),
-      trackingIntervalSeconds: Math.max(10, Math.min(300, Number(form.trackingIntervalSeconds))),
+      trackingIntervalSeconds: 10,
     });
   };
-  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Configuration Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Paramètres</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Définissez la règle de géolocalisation utilisée par le matching automatique.</p></div></div><section className="card-surface p-5"><form onSubmit={submit} className="max-w-xl space-y-5"><Field label="Validité d’une position GPS (minutes)"><input required min="1" max="60" type="number" value={form.gpsValidityMinutes} onChange={event => setForm(current => ({ ...current, gpsValidityMinutes: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><Field label="Intervalle de suivi web (secondes)"><input type="number" value={10} className={inputClass} disabled /></Field><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le GPS du chauffeur est envoyé automatiquement toutes les 10 secondes. Une position plus ancienne que la durée choisie ne peut pas être utilisée pour affecter une course publique.</p>{canModify ? <DialogActions busy={false} onClose={() => setForm(settings)} label="Enregistrer les paramètres" /> : <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Ces paramètres sont consultables, mais votre rôle ne peut pas les modifier.</p>}</form></section></div>;
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Configuration Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Paramètres</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Définissez la règle de géolocalisation et l’image de couverture affichée dans la boutique publique.</p></div></div><section className="card-surface p-5"><form onSubmit={submit} className="max-w-xl space-y-5"><Field label="Image de couverture Taxi"><div className="overflow-hidden rounded-2xl border bg-slate-900"><img src={form.heroImageData || settings.heroImageUrl} alt="Aperçu de la couverture Taxi" className="h-40 w-full object-cover" /></div><div className="mt-3 flex flex-wrap gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><ImagePlus size={14} />Choisir une photo<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={!canModify} onChange={event => handleHeroImage(event.target.files?.[0])} /></label>{canModify && (form.heroImageData || settings.heroImageUrl !== '/taxi-transport-hero.jpg') && <button type="button" onClick={() => setForm(current => ({ ...current, heroImageData: null }))} className="rounded-lg border px-3 py-2 text-xs font-bold text-rose-700">Utiliser l’image par défaut</button>}</div>{imageError && <p className="mt-1 text-xs font-semibold text-rose-700">{imageError}</p>}<p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">La photo apparaît en arrière-plan du bandeau public · JPG, PNG ou WebP · 2 Mo maximum.</p></Field><Field label="Validité d’une position GPS (minutes)"><input required min="1" max="60" type="number" value={form.gpsValidityMinutes} onChange={event => setForm(current => ({ ...current, gpsValidityMinutes: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><Field label="Intervalle de suivi web (secondes)"><input type="number" value={10} className={inputClass} disabled /></Field><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le GPS du chauffeur est envoyé automatiquement toutes les 10 secondes. Une position plus ancienne que la durée choisie ne peut pas être utilisée pour affecter une course publique.</p>{canModify ? <DialogActions busy={false} onClose={() => setForm({ ...settings, heroImageData: undefined })} label="Enregistrer les paramètres" /> : <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Ces paramètres sont consultables, mais votre rôle ne peut pas les modifier.</p>}</form></section></div>;
 }
 
 function Metric({ label, value, detail, icon: Icon, accent }: { label: string; value: string | number; detail: string; icon: typeof Gauge; accent: string }) {

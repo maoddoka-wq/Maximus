@@ -80,6 +80,7 @@ class TransportController extends Controller
         $input = $this->validated($request, [
             'gpsValidityMinutes' => ['required', 'integer', 'min:1', 'max:60'],
             'trackingIntervalSeconds' => ['sometimes', 'integer', 'in:10'],
+            'heroImageData' => ['sometimes', 'nullable', 'string', 'max:4194304'],
         ]);
         $company = $this->company($request);
         $module = DB::table('maximus_company_modules')
@@ -88,10 +89,26 @@ class TransportController extends Controller
             ->first();
         $configuration = json_decode($module->configuration ?? '{}', true);
         $configuration = is_array($configuration) ? $configuration : [];
+        $transportConfiguration = is_array($configuration['transport'] ?? null)
+            ? $configuration['transport']
+            : [];
         $configuration['transport'] = [
+            ...$transportConfiguration,
             'gpsValidityMinutes' => (int) $input['gpsValidityMinutes'],
             'trackingIntervalSeconds' => 10,
         ];
+        if (array_key_exists('heroImageData', $input)) {
+            if ($input['heroImageData'] === null || trim((string) $input['heroImageData']) === '') {
+                unset($configuration['transport']['heroImageData'], $configuration['transport']['heroImageMime']);
+            } else {
+                $image = $this->decodeImageData((string) $input['heroImageData']);
+                if ($image === null) {
+                    return response()->json(['error' => 'Ajoutez une image JPG, PNG ou WebP valide de 2 Mo maximum.'], 422);
+                }
+                $configuration['transport']['heroImageData'] = base64_encode($image['contents']);
+                $configuration['transport']['heroImageMime'] = $image['mime'];
+            }
+        }
         DB::table('maximus_company_modules')
             ->where('company_id', $company)
             ->where('module_id', 'transport')
@@ -195,9 +212,9 @@ class TransportController extends Controller
             'vehicleType' => ['required', 'string', 'max:50'],
             'driverId' => ['required', 'string', 'max:120'],
             'status' => ['sometimes', Rule::in(self::VEHICLE_STATUSES)],
-            'imageData' => ['required', 'string', 'max:4096'],
+            'imageData' => ['required', 'string', 'max:4194304'],
         ]);
-        $image = $this->decodeVehicleImage($input['imageData']);
+        $image = $this->decodeImageData($input['imageData']);
         if ($image === null) {
             return response()->json(['error' => 'Ajoutez une image JPG, PNG ou WebP valide de 2 Mo maximum.'], 422);
         }
@@ -434,6 +451,67 @@ class TransportController extends Controller
     {
         $company = $this->company($request);
         return $this->serveVehicleImage($company, $id);
+    }
+
+    public function transportHeroImage(Request $request)
+    {
+        return $this->serveTransportHeroImage($this->company($request));
+    }
+
+    public function publicTransportSettings(Request $request, string $slug): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+        if (! ModuleCatalog::allowsFeature((string) $store->company_id, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        return response()->json([
+            'heroImageUrl' => $this->transportHeroImageUrl((string) $store->company_id, $slug),
+        ]);
+    }
+
+    public function publicDomainTransportSettings(Request $request): JsonResponse
+    {
+        $store = $this->publicDomainStore($request);
+        if (! $store) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        if (! ModuleCatalog::allowsFeature((string) $store->company_id, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        return response()->json([
+            'heroImageUrl' => $this->transportHeroImageUrl((string) $store->company_id, null, true),
+        ]);
+    }
+
+    public function publicTransportHeroImage(Request $request, string $slug)
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            abort(404);
+        }
+
+        return $this->serveTransportHeroImage((string) $store->company_id);
+    }
+
+    public function publicDomainTransportHeroImage(Request $request)
+    {
+        $store = $this->publicDomainStore($request);
+        if (! $store) {
+            abort(404);
+        }
+
+        return $this->serveTransportHeroImage((string) $store->company_id);
     }
 
     public function publicDomainVehicleImage(Request $request, string $id)
@@ -682,7 +760,7 @@ class TransportController extends Controller
     /**
      * @return array{contents: string, mime: string}|null
      */
-    private function decodeVehicleImage(string $imageData): ?array
+    private function decodeImageData(string $imageData): ?array
     {
         if (! preg_match('/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+\/=\r\n]+)$/', trim($imageData), $matches)) {
             return null;
@@ -739,6 +817,64 @@ class TransportController extends Controller
         ]);
     }
 
+    private function transportHeroImageUrl(string $companyId, ?string $slug = null, bool $domain = false): string
+    {
+        $settings = $this->rawTransportSettings($companyId);
+        if (empty($settings['heroImageData'])) {
+            return '/taxi-transport-hero.jpg';
+        }
+
+        return $domain
+            ? '/api/shop-domain/transport/hero-image'
+            : '/api/shop/'.rawurlencode((string) $slug).'/transport/hero-image';
+    }
+
+    private function serveTransportHeroImage(string $companyId)
+    {
+        $settings = $this->rawTransportSettings($companyId);
+        if (empty($settings['heroImageData'])) {
+            abort(404);
+        }
+        $contents = base64_decode((string) $settings['heroImageData'], true);
+        if (! is_string($contents)) {
+            abort(404);
+        }
+
+        return response($contents, 200, [
+            'Content-Type' => $settings['heroImageMime'] ?? 'application/octet-stream',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+
+    private function rawTransportSettings(string $company): array
+    {
+        $configuration = DB::table('maximus_company_modules')
+            ->where('company_id', $company)
+            ->where('module_id', 'transport')
+            ->value('configuration');
+        $configuration = json_decode($configuration ?? '{}', true);
+        return is_array($configuration) && is_array($configuration['transport'] ?? null)
+            ? $configuration['transport']
+            : [];
+    }
+
+    private function publicDomainStore(Request $request): ?object
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domain) {
+            return null;
+        }
+
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        return $store && CompanyRegistry::isActive((string) $store->company_id) ? $store : null;
+    }
+
     private function validated(Request $request, array $rules): array
     {
         return Validator::make($request->all(), $rules)->validate();
@@ -751,18 +887,14 @@ class TransportController extends Controller
 
     private function transportSettings(string $company): array
     {
-        $configuration = DB::table('maximus_company_modules')
-            ->where('company_id', $company)
-            ->where('module_id', 'transport')
-            ->value('configuration');
-        $configuration = json_decode($configuration ?? '{}', true);
-        $settings = is_array($configuration) && is_array($configuration['transport'] ?? null)
-            ? $configuration['transport']
-            : [];
+        $settings = $this->rawTransportSettings($company);
 
         return [
             'gpsValidityMinutes' => max(1, min(60, (int) ($settings['gpsValidityMinutes'] ?? self::DEFAULT_SETTINGS['gpsValidityMinutes']))),
             'trackingIntervalSeconds' => 10,
+            'heroImageUrl' => empty($settings['heroImageData'])
+                ? '/taxi-transport-hero.jpg'
+                : '/api/transport/settings/hero-image',
         ];
     }
 
