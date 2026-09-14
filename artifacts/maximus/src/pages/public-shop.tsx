@@ -174,6 +174,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const isCartRoute = routePath.endsWith('/panier');
   const isAccountRoute = routePath.includes('/compte');
   const isLocationRoute = routePath.endsWith('/location');
+  const isTransportRoute = routePath.endsWith('/transport');
   const isDeliveryRoute = routePath.endsWith('/livraison');
   const productDetailSlug = useMemo(() => {
     const match = routePath.match(/\/produit\/([^/]+)$/);
@@ -644,6 +645,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
    const isPublicNavActive = (path: string) => {
       if (path === '/accueil') return isHomeRoute;
       if (path === '/boutique') return isCatalogRoute || Boolean(productDetailSlug);
+     if (path === '/transport') return isTransportRoute;
      if (path === '/compte') return isAccountRoute;
      return routePath === shopPath(path);
    };
@@ -705,7 +707,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
-              : routePath.endsWith('/transport') ? enabledFeatures.transport ? <TransportPublicPage store={store} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
+              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
@@ -840,7 +842,7 @@ function TransportPublicPage({ store, onBack }: { store: PublicShopBootstrap['st
         <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[.14em] text-white/80">
           <CarFront size={15} /> Transport
         </span>
-        <h1 className="mt-5 text-3xl font-bold tracking-[-.05em] sm:text-4xl">Réservez votre course Taxi</h1>
+        <h1 className="mt-5 text-3xl font-bold tracking-[-.05em] sm:text-4xl">Demandez votre course Taxi</h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-white/75">
           Contactez {store.name} pour organiser votre déplacement avec un chauffeur disponible.
         </p>
