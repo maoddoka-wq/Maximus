@@ -167,6 +167,7 @@ body { min-width: 320px; }
 .table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; border-top: 1px solid hsl(var(--border)); }
 .overflow-x-auto { max-width: 100%; overscroll-behavior-inline: contain; }
 .table-scroll table { min-width: 680px; }
+.transport-table-scroll table { min-width: 620px; }
 .overflow-x-auto > table { min-width: 680px; }
 .table-scroll th { white-space: nowrap; }
 .table-scroll td, .table-scroll th { vertical-align: middle; }
@@ -228,6 +229,7 @@ body { min-width: 320px; }
   .modal-footer > button { width: 100%; justify-content: center; }
   .table-scroll { margin-inline: -1px; }
   .table-scroll table { min-width: 760px; }
+  .transport-table-scroll table { min-width: 620px; }
   .sidebar-section-label { padding-top: .9rem; }
 }
 
