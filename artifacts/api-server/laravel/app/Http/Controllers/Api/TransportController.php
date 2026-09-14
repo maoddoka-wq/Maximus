@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Support\CompanyRegistry;
-use App\Support\EcommerceCustomerAuth;
 use App\Support\ModuleCatalog;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +21,6 @@ class TransportController extends Controller
     private const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE'];
     private const VEHICLE_STATUSES = ['AVAILABLE', 'ON_TRIP', 'MAINTENANCE'];
     private const TRIP_STATUSES = ['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
-    private const CUSTOMER_CANCELLABLE_TRIP_STATUSES = ['REQUESTED', 'OFFERED', 'ASSIGNED'];
     private const DEFAULT_SETTINGS = [
         'gpsValidityMinutes' => 5,
         'trackingIntervalSeconds' => 10,
@@ -582,52 +580,6 @@ class TransportController extends Controller
         return $this->publicTripForStore($store, $id, true);
     }
 
-    public function customerTripHistory(Request $request, string $slug): JsonResponse
-    {
-        $store = DB::table('ecommerce_stores')
-            ->where('slug', $slug)
-            ->where('status', 'PUBLISHED')
-            ->first();
-        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
-            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
-        }
-
-        return $this->customerTripHistoryForStore($request, $store);
-    }
-
-    public function customerDomainTripHistory(Request $request): JsonResponse
-    {
-        $store = $this->publicDomainStore($request);
-        if (! $store) {
-            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
-        }
-
-        return $this->customerTripHistoryForStore($request, $store, true);
-    }
-
-    public function cancelCustomerTrip(Request $request, string $slug, string $id): JsonResponse
-    {
-        $store = DB::table('ecommerce_stores')
-            ->where('slug', $slug)
-            ->where('status', 'PUBLISHED')
-            ->first();
-        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
-            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
-        }
-
-        return $this->cancelCustomerTripForStore($request, $store, $id, false);
-    }
-
-    public function cancelCustomerDomainTrip(Request $request, string $id): JsonResponse
-    {
-        $store = $this->publicDomainStore($request);
-        if (! $store) {
-            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
-        }
-
-        return $this->cancelCustomerTripForStore($request, $store, $id, true);
-    }
-
     public function updateTripStatus(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'trips')) {
@@ -889,122 +841,6 @@ class TransportController extends Controller
         ]);
     }
 
-    private function customerTripHistoryForStore(Request $request, object $store, bool $domain = false): JsonResponse
-    {
-        if (! ModuleCatalog::allowsFeature((string) $store->company_id, 'transport', 'overview')) {
-            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
-        }
-
-        $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
-        if (! $customer) {
-            return response()->json(['error' => 'Connectez-vous pour consulter votre historique Taxi.'], 401);
-        }
-
-        $rows = DB::table('transport_trips')
-            ->where('company_id', $store->company_id)
-            ->where('customer_id', $customer->id)
-            ->orderByDesc('requested_at')
-            ->limit(50)
-            ->get();
-
-        $trips = $rows->map(function (object $row) use ($store, $domain): array {
-            $driver = $row->driver_id
-                ? DB::table('transport_drivers')
-                    ->where('company_id', $store->company_id)
-                    ->where('id', $row->driver_id)
-                    ->first()
-                : null;
-            $vehicle = $row->vehicle_id
-                ? DB::table('transport_vehicles')
-                    ->where('company_id', $store->company_id)
-                    ->where('id', $row->vehicle_id)
-                    ->first()
-                : null;
-
-            return $this->publicTrip(
-                $row,
-                $driver,
-                $vehicle,
-                $this->vehicleImageUrl((string) $store->company_id, $row->vehicle_id, $domain),
-            );
-        })->values();
-
-        return response()->json(['trips' => $trips]);
-    }
-
-    private function cancelCustomerTripForStore(Request $request, object $store, string $id, bool $domain = false): JsonResponse
-    {
-        if (! ModuleCatalog::allowsFeature((string) $store->company_id, 'transport', 'overview')) {
-            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
-        }
-
-        $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
-        if (! $customer) {
-            return response()->json(['error' => 'Connectez-vous pour annuler votre course.'], 401);
-        }
-
-        $failure = null;
-        $failureStatus = 422;
-        DB::transaction(function () use ($store, $id, $customer, &$failure, &$failureStatus): void {
-            $trip = DB::table('transport_trips')
-                ->where('company_id', $store->company_id)
-                ->where('id', $id)
-                ->lockForUpdate()
-                ->first();
-            if (! $trip) {
-                $failure = 'Course introuvable.';
-                $failureStatus = 404;
-                return;
-            }
-            if (($trip->customer_id ?? null) !== $customer->id) {
-                $failure = 'Cette course n’appartient pas à votre compte.';
-                $failureStatus = 403;
-                return;
-            }
-            if (! in_array($trip->status, self::CUSTOMER_CANCELLABLE_TRIP_STATUSES, true)) {
-                $failure = 'Cette course ne peut plus être annulée à ce stade.';
-                return;
-            }
-
-            DB::table('transport_trips')
-                ->where('id', $trip->id)
-                ->update(['status' => 'CANCELLED', 'updated_at' => now()]);
-            if ($trip->vehicle_id !== null) {
-                DB::table('transport_vehicles')
-                    ->where('company_id', $store->company_id)
-                    ->where('id', $trip->vehicle_id)
-                    ->where('status', 'ON_TRIP')
-                    ->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
-            }
-        });
-
-        if ($failure !== null) {
-            return response()->json(['error' => $failure], $failureStatus);
-        }
-
-        $trip = DB::table('transport_trips')
-            ->where('company_id', $store->company_id)
-            ->where('id', $id)
-            ->first();
-        $driver = $trip?->driver_id
-            ? DB::table('transport_drivers')->where('company_id', $store->company_id)->where('id', $trip->driver_id)->first()
-            : null;
-        $vehicle = $trip?->vehicle_id
-            ? DB::table('transport_vehicles')->where('company_id', $store->company_id)->where('id', $trip->vehicle_id)->first()
-            : null;
-
-        return response()->json([
-            'trip' => $this->publicTrip(
-                $trip,
-                $driver,
-                $vehicle,
-                $this->vehicleImageUrl((string) $store->company_id, $trip->vehicle_id, $domain),
-            ),
-            'matched' => false,
-            'message' => 'Votre course a été annulée.',
-        ]);
-    }
-
     private function publicTrip(object $row, ?object $driver, ?object $vehicle, ?string $vehicleImageUrl = null): array
     {
         $trip = $this->trip($row, $driver);
@@ -1084,7 +920,6 @@ class TransportController extends Controller
         $latitude = (float) $input['pickupLatitude'];
         $longitude = (float) $input['pickupLongitude'];
         $destination = trim($input['destination']);
-        $customer = EcommerceCustomerAuth::customerFromRequest($request, $company);
         if (! $this->isWithinDakar($latitude, $longitude)) {
             return response()->json(['error' => 'Le service Taxi est limité à la zone de Dakar.'], 422);
         }
@@ -1102,7 +937,7 @@ class TransportController extends Controller
         }
         $row = null;
 
-        DB::transaction(function () use (&$row, $company, $customer, $input, $latitude, $longitude, $destination, $route): void {
+        DB::transaction(function () use (&$row, $company, $input, $latitude, $longitude, $destination, $route): void {
             $drivers = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('status', 'ACTIVE')
@@ -1142,7 +977,6 @@ class TransportController extends Controller
             $row = [
                 'id' => $this->id('trip'),
                 'company_id' => $company,
-                'customer_id' => $customer?->id,
                 'reference' => 'TAXI-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4)),
                 'pickup' => trim($input['pickup']),
                 'destination' => $destination,

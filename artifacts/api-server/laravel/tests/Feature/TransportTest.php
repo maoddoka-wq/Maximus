@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
-use App\Support\EcommerceCustomerAuth;
 use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -409,95 +408,6 @@ class TransportTest extends TestCase
             'route_duration_minutes' => 15,
         ]);
         Http::assertSentCount(2);
-    }
-
-    public function test_authenticated_customer_can_view_and_cancel_only_its_own_taxi_history(): void
-    {
-        ModuleCatalog::ensureCompanyAccess('kora');
-        DB::table('ecommerce_stores')->insert([
-            'id' => 'store-kora-history',
-            'company_id' => 'kora',
-            'slug' => 'kora-history',
-            'name' => 'Kora History',
-            'description' => 'Taxi',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primary_color' => '#111827',
-            'accent_color' => '#f59e0b',
-            'logo_url' => '',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $customer = (object) [
-            'id' => 'customer-taxi-history',
-            'company_id' => 'kora',
-            'email' => 'taxi-history@example.test',
-            'name' => 'Client Taxi',
-            'phone' => '+221770000101',
-            'status' => 'ACTIF',
-        ];
-        DB::table('ecommerce_customers')->insert([
-            ...get_object_vars($customer),
-            'password_hash' => 'not-used-in-this-test',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $token = EcommerceCustomerAuth::issueSession($customer);
-
-        $trip = $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
-            ->postJson('/api/shop/kora-history/transport/trips', [
-                'pickup' => 'Ma position GPS',
-                'destination' => 'Plateau',
-                'passengerName' => 'Client Taxi',
-                'passengerPhone' => '+221770000101',
-                'pickupLatitude' => 14.7167,
-                'pickupLongitude' => -17.4677,
-            ])->assertCreated()
-            ->assertJsonPath('trip.status', 'REQUESTED')
-            ->assertJsonPath('trip.companyId', 'kora');
-
-        $tripId = $trip->json('trip.id');
-        $this->assertDatabaseHas('transport_trips', [
-            'id' => $tripId,
-            'customer_id' => $customer->id,
-        ]);
-
-        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
-            ->getJson('/api/shop/kora-history/transport/history')
-            ->assertOk()
-            ->assertJsonPath('trips.0.id', $tripId);
-
-        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
-            ->postJson('/api/shop/kora-history/transport/trips/'.$tripId.'/cancel')
-            ->assertOk()
-            ->assertJsonPath('trip.status', 'CANCELLED')
-            ->assertJsonPath('message', 'Votre course a été annulée.');
-
-        $this->assertDatabaseHas('transport_trips', [
-            'id' => $tripId,
-            'customer_id' => $customer->id,
-            'status' => 'CANCELLED',
-        ]);
-
-        $otherCustomer = (object) [
-            'id' => 'customer-taxi-other',
-            'company_id' => 'kora',
-            'email' => 'taxi-other@example.test',
-            'name' => 'Autre client',
-            'phone' => '+221770000102',
-            'status' => 'ACTIF',
-        ];
-        DB::table('ecommerce_customers')->insert([
-            ...get_object_vars($otherCustomer),
-            'password_hash' => 'not-used-in-this-test',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $otherToken = EcommerceCustomerAuth::issueSession($otherCustomer);
-
-        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $otherToken)
-            ->postJson('/api/shop/kora-history/transport/trips/'.$tripId.'/cancel')
-            ->assertForbidden();
     }
 
     private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string
