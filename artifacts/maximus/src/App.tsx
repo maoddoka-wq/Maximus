@@ -1172,6 +1172,7 @@ function AppContent() {
                   scopeNodeId={employeeNode?.id}
                   companyId={companyId}
                   employee={employee}
+                  employees={data.employees}
                   presenceEmployees={presenceEmployees}
                   hasPermission={hasPermission}
                   hasPresencePermission={hasPresencePermission}

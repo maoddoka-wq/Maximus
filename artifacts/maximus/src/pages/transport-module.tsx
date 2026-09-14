@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   Activity,
   CarFront,
@@ -97,6 +97,8 @@ export default function TransportModulePage({
   canCreate = true,
   canModify = true,
   allowedFeatureIds,
+  employees = [],
+  currentEmployeeId = null,
   singleModuleNavigation = false,
   preview = false,
 }: {
@@ -104,6 +106,8 @@ export default function TransportModulePage({
   canCreate?: boolean;
   canModify?: boolean;
   allowedFeatureIds?: string[];
+  employees?: Array<{ id: string; firstName: string; lastName: string }>;
+  currentEmployeeId?: string | null;
   singleModuleNavigation?: boolean;
   preview?: boolean;
 }) {
@@ -121,6 +125,13 @@ export default function TransportModulePage({
   const [error, setError] = useState('');
   const [pendingAction, setPendingAction] = useState('');
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const [locationError, setLocationError] = useState('');
+  const [locationActive, setLocationActive] = useState(false);
+  const latestPosition = useRef<{ latitude: number; longitude: number } | null>(null);
+  const currentDriver = useMemo(
+    () => currentEmployeeId ? data?.drivers.find(driver => driver.employeeId === currentEmployeeId) ?? null : null,
+    [currentEmployeeId, data?.drivers],
+  );
 
   useEffect(() => {
     if (!visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0]?.id ?? 'overview');
@@ -155,6 +166,45 @@ export default function TransportModulePage({
   useEffect(() => { void load(); }, [companyId, preview]);
   useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
 
+  useEffect(() => {
+    if (preview || !currentDriver || !navigator.geolocation) {
+      setLocationActive(false);
+      return undefined;
+    }
+    const sendLocation = (coords: { latitude: number; longitude: number }) => {
+      latestPosition.current = coords;
+      void api.updateDriverLocation(currentDriver.id, coords).then(driver => {
+        setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
+      }).catch(cause => {
+        setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
+      });
+    };
+    const watchId = navigator.geolocation.watchPosition(
+      ({ coords }) => {
+        setLocationError('');
+        setLocationActive(true);
+        sendLocation({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+      },
+      ({ code }) => {
+        setLocationActive(false);
+        setLocationError(code === 1
+          ? 'Autorisez la localisation pour être proposé aux clients proches.'
+          : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+      },
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 15_000 },
+    );
+    const refreshId = window.setInterval(() => {
+      if (latestPosition.current) sendLocation(latestPosition.current);
+    }, 30_000);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      window.clearInterval(refreshId);
+    };
+  }, [api, currentDriver, preview]);
+
   const run = async <T,>(action: () => Promise<T>, success: string) => {
     if (pendingAction) return;
     setPendingAction('action');
@@ -172,7 +222,7 @@ export default function TransportModulePage({
 
   const addPreviewDriver = (input: CreateDriverInput) => {
     if (!data) return;
-    const driver: Driver = { ...input, id: `preview-driver-${Date.now()}`, companyId };
+    const driver: Driver = { ...input, id: `preview-driver-${Date.now()}`, companyId, employeeId: input.employeeId ?? null, latitude: null, longitude: null, locationUpdatedAt: null };
     setData(current => current ? { ...current, drivers: [driver, ...current.drivers], metrics: { ...current.metrics, activeDrivers: current.metrics.activeDrivers + (input.status === 'ACTIVE' ? 1 : 0) } } : current);
     showAppToast('Chauffeur ajouté à l’aperçu local.', 'success');
     setDialog(null);
@@ -235,11 +285,11 @@ export default function TransportModulePage({
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {tab === 'overview' && <Overview data={data} onTab={setTab} />}
         {tab === 'courses' && <TripsPanel data={data} canCreate={canCreate} canModify={canModify} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
-        {tab === 'chauffeurs' && <DriversPanel drivers={data.drivers} canCreate={canCreate} onCreate={() => setDialog('driver')} />}
+        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreate} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
         {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} canCreate={canCreate} onCreate={() => setDialog('vehicle')} />}
       </>}
 
-      {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}
+      {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} employees={employees} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}
       {dialog === 'vehicle' && <VehicleDialog busy={Boolean(pendingAction)} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewVehicle(input) : void run(() => api.createVehicle(input), 'Véhicule enregistré.')} />}
       {dialog === 'trip' && <TripDialog busy={Boolean(pendingAction)} drivers={data.drivers} vehicles={data.vehicles} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewTrip(input) : void run(() => api.createTrip(input), 'Course créée.')} />}
     </div>
@@ -303,6 +353,11 @@ function TripTable({ trips, canModify = false, compact = false, onStatusChange }
   return <div className="table-scroll"><table className="data-table w-full text-left text-sm"><thead><tr><th className="px-4">Course</th><th>Trajet</th><th>Passager</th><th>Montant</th><th>Statut</th>{!compact && <th className="px-4">Action</th>}</tr></thead><tbody>{trips.map(trip => <tr key={trip.id} className="border-t"><td className="px-4"><span className="mono text-xs font-bold">{trip.reference}</span><span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">{dateLabel(trip.requestedAt)}</span></td><td><div className="max-w-[220px]"><span className="block truncate font-semibold">{trip.pickup}</span><span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">→ {trip.destination}</span></div></td><td><span className="font-semibold">{trip.passengerName}</span><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{trip.passengerPhone}</span></td><td className="whitespace-nowrap font-bold">{money(trip.fare)}</td><td><StatusBadge status={trip.status} label={statusLabels[trip.status]} /></td>{!compact && <td className="px-4">{canModify && <select aria-label={`Modifier le statut de ${trip.reference}`} value={trip.status} onChange={event => onStatusChange(trip, event.target.value as TripStatus)} className="border px-2 py-2 text-xs">{nextTripStatuses(trip.status).map(status => <option key={status} value={status}>{statusLabels[status]}</option>)}</select>}</td>}</tr>)}</tbody></table></div>;
 }
 
+function DriverLocationPanel({ driver, active, error }: { driver: Driver | null; active: boolean; error: string }) {
+  if (!driver) return <section className="card-surface border-dashed p-5"><div className="flex items-start gap-3"><MapPin className="mt-0.5 text-amber-600" size={19} /><div><h2 className="font-bold">Position chauffeur non configurée</h2><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Un administrateur doit lier votre compte employé à votre fiche chauffeur. La localisation GPS sera ensuite partagée automatiquement pendant que cette application est ouverte.</p></div></div></section>;
+  return <section className={`card-surface border p-5 ${active ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'}`}><div className="flex items-start gap-3"><MapPin className={`mt-0.5 ${active ? 'text-emerald-600' : 'text-amber-600'}`} size={19} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Localisation du chauffeur</h2><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{active ? 'Active' : 'À activer'}</span></div><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{active ? 'Votre position GPS est partagée automatiquement. Les clients peuvent être orientés vers vous si votre véhicule est disponible.' : error || 'Autorisez la localisation dans votre navigateur pour recevoir les demandes proches.'}</p>{error && <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>}</div></div></section>;
+}
+
 function DriversPanel({ drivers, canCreate, onCreate }: { drivers: Driver[]; canCreate: boolean; onCreate: () => void }) {
   return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Équipage</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Chauffeurs</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les profils autorisés à prendre le volant.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button>}</div><section className="card-surface overflow-hidden">{drivers.length ? <div className="table-scroll"><table className="data-table w-full text-left text-sm"><thead><tr><th className="px-4">Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Statut</th></tr></thead><tbody>{drivers.map(driver => <tr key={driver.id} className="border-t"><td className="px-4"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/15 text-xs font-black text-amber-800">{driver.name.slice(0, 2).toUpperCase()}</div><span className="font-semibold">{driver.name}</span></div></td><td><a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"><Phone size={13} />{driver.phone}</a></td><td className="mono text-xs">{driver.licenseNumber}</td><td><StatusBadge status={driver.status} label={driverStatusLabel[driver.status]} /></td></tr>)}</tbody></table></div> : <EmptyState icon={UserRound} title="Aucun chauffeur enregistré" text="Ajoutez les chauffeurs habilités à rejoindre votre flotte." />}</section></div>;
 }
@@ -337,10 +392,10 @@ function Field({ label, children, required = true }: { label: string; children: 
 
 const inputClass = 'w-full border px-3 py-2.5 text-sm';
 
-function DriverDialog({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (input: CreateDriverInput) => void }) {
-  const [form, setForm] = useState<CreateDriverInput>({ name: '', phone: '', licenseNumber: '', status: 'ACTIVE' });
+function DriverDialog({ busy, employees, onClose, onSubmit }: { busy: boolean; employees: Array<{ id: string; firstName: string; lastName: string }>; onClose: () => void; onSubmit: (input: CreateDriverInput) => void }) {
+  const [form, setForm] = useState<CreateDriverInput>({ name: '', phone: '', licenseNumber: '', status: 'ACTIVE', employeeId: '' });
   const submit = (event: FormEvent) => { event.preventDefault(); if (form.name.trim() && form.phone.trim() && form.licenseNumber.trim()) onSubmit({ ...form, name: form.name.trim(), phone: form.phone.trim(), licenseNumber: form.licenseNumber.trim() }); };
-  return <DialogShell title="Ajouter un chauffeur" description="Créez un profil pour l’équipage opérationnel." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><Field label="Nom complet"><input required autoFocus value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} className={inputClass} placeholder="Ex. Aïcha Diop" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Téléphone"><input required type="tel" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} className={inputClass} placeholder="+221 77 000 00 00" /></Field><Field label="Numéro de permis"><input required value={form.licenseNumber} onChange={event => setForm({ ...form, licenseNumber: event.target.value })} className={inputClass} placeholder="SN-TR-0000" /></Field></div><Field label="Statut"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as DriverStatus })} className={inputClass}><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option></select></Field><DialogActions busy={busy} onClose={onClose} label="Enregistrer le chauffeur" /></form></DialogShell>;
+  return <DialogShell title="Ajouter un chauffeur" description="Créez un profil et liez le compte qui partagera sa position GPS." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><Field label="Nom complet"><input required autoFocus value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} className={inputClass} placeholder="Ex. Aïcha Diop" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Téléphone"><input required type="tel" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} className={inputClass} placeholder="+221 77 000 00 00" /></Field><Field label="Numéro de permis"><input required value={form.licenseNumber} onChange={event => setForm({ ...form, licenseNumber: event.target.value })} className={inputClass} placeholder="SN-TR-0000" /></Field></div><Field label="Compte employé pour le GPS" required={false}><select value={form.employeeId ?? ''} onChange={event => setForm({ ...form, employeeId: event.target.value })} className={inputClass}><option value="">Lier plus tard</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}</select></Field><Field label="Statut"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as DriverStatus })} className={inputClass}><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option></select></Field><DialogActions busy={busy} onClose={onClose} label="Enregistrer le chauffeur" /></form></DialogShell>;
 }
 
 function VehicleDialog({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (input: CreateVehicleInput) => void }) {

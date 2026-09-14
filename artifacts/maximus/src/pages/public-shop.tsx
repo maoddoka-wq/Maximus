@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, CarFront, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
@@ -18,6 +18,7 @@ import {
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
 import { ApiRequestError } from '@/lib/api-request';
+import { createPublicTransportApi, type PublicTransportTrip } from '@/lib/transport-api';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { showAppToast } from '@/hooks/use-toast';
 
@@ -707,7 +708,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
-              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
+              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
@@ -827,10 +828,75 @@ function GalleryCarousel({ mainImage, gallery, alt, icon: Icon }: { mainImage: s
   </div>;
 }
 
-function TransportPublicPage({ store, onBack }: { store: PublicShopBootstrap['store']; onBack: () => void }) {
+function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void }) {
   const phone = store.seller?.phone?.trim() ?? '';
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
+  const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
+  const [form, setForm] = useState({ pickup: 'Ma position actuelle', destination: '', passengerName: '', passengerPhone: '' });
+  const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  const [locationState, setLocationState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
+  const [locationMessage, setLocationMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [trip, setTrip] = useState<PublicTransportTrip | null>(null);
+  const [tripMessage, setTripMessage] = useState('');
+
+  const locate = () => {
+    if (!navigator.geolocation) {
+      setLocationState('error');
+      setLocationMessage('La géolocalisation n’est pas disponible sur cet appareil.');
+      return;
+    }
+    setLocationState('locating');
+    setLocationMessage('Localisation en cours…');
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy });
+        setLocationState('ready');
+        setLocationMessage(`Position partagée avec une précision d’environ ${Math.round(coords.accuracy)} m.`);
+      },
+      ({ code }) => {
+        setLocationState('error');
+        setLocationMessage(code === 1 ? 'Autorisez la localisation pour trouver le chauffeur le plus proche.' : 'La position n’a pas pu être obtenue. Réessayez.');
+      },
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 15_000 },
+    );
+  };
+
+  useEffect(() => {
+    locate();
+  }, []);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!position) {
+      setLocationState('error');
+      setLocationMessage('Activez votre localisation avant de demander une course.');
+      return;
+    }
+    if (!form.destination.trim() || !form.passengerName.trim() || !form.passengerPhone.trim()) return;
+    setSubmitting(true);
+    setError('');
+    setTrip(null);
+    try {
+      const result = await api.createTrip({
+        ...form,
+        pickup: form.pickup.trim(),
+        destination: form.destination.trim(),
+        passengerName: form.passengerName.trim(),
+        passengerPhone: form.passengerPhone.trim(),
+        pickupLatitude: position.latitude,
+        pickupLongitude: position.longitude,
+      });
+      setTrip(result.trip);
+      setTripMessage(result.message);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'La demande de course n’a pas pu être envoyée.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return <section className="space-y-6">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--shop-accent)]">
@@ -851,9 +917,29 @@ function TransportPublicPage({ store, onBack }: { store: PublicShopBootstrap['st
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><MapPin size={21} /></div>
-        <h2 className="mt-4 text-lg font-bold">Demander une course</h2>
-        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Indiquez votre départ, votre destination et l’heure souhaitée directement à l’équipe Taxi.</p>
-        {whatsappHref ? <a href={whatsappHref} target="_blank" rel="noreferrer" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={17} /> Écrire sur WhatsApp</a> : <p className="mt-5 rounded-xl bg-[hsl(var(--muted)/.55)] px-3 py-3 text-center text-xs text-[hsl(var(--muted-foreground))]">Le numéro de contact Taxi n’est pas encore renseigné.</p>}
+        <h2 className="mt-4 text-lg font-bold">Trouver le chauffeur le plus proche</h2>
+        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Votre position est comparée en interne aux positions GPS récentes des chauffeurs disponibles.</p>
+        <form onSubmit={submit} className="mt-5 space-y-3">
+          <input required value={form.pickup} onChange={event => setForm({ ...form, pickup: event.target.value })} className="w-full rounded-xl border px-3 py-3 text-sm" placeholder="Point de départ" aria-label="Point de départ" />
+          <input required value={form.destination} onChange={event => setForm({ ...form, destination: event.target.value })} className="w-full rounded-xl border px-3 py-3 text-sm" placeholder="Destination" aria-label="Destination" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input required value={form.passengerName} onChange={event => setForm({ ...form, passengerName: event.target.value })} className="w-full rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" aria-label="Nom complet" />
+            <input required type="tel" value={form.passengerPhone} onChange={event => setForm({ ...form, passengerPhone: event.target.value })} className="w-full rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" aria-label="Téléphone" />
+          </div>
+          <div className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-xs ${locationState === 'ready' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : locationState === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/5 text-[hsl(var(--muted-foreground))]'}`}>
+            <MapPin size={16} className="mt-0.5 shrink-0" />
+            <span className="min-w-0 flex-1">{locationMessage || 'La localisation est nécessaire pour calculer le chauffeur le plus proche.'}</span>
+            <button type="button" onClick={locate} className="shrink-0 font-bold underline" disabled={locationState === 'locating'}>{locationState === 'locating' ? 'Recherche…' : 'Actualiser'}</button>
+          </div>
+          {error && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-3 text-xs text-rose-800">{error}</p>}
+          <button type="submit" disabled={submitting || locationState !== 'ready'} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{submitting ? 'Recherche du chauffeur…' : 'Demander une course'}</button>
+        </form>
+        {trip && <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-bold">{tripMessage}</p>
+          <p className="mt-2 text-xs">Référence : <span className="font-bold">{trip.reference}</span>{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? ` · ${trip.matchedDistanceKm.toFixed(2)} km` : ''}</p>
+          {trip.driverName && <p className="mt-1 text-xs">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}
+          {trip.driverPhone && <div className="mt-3 flex gap-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center gap-2 rounded-lg bg-[var(--shop-accent)] px-3 py-2 text-xs font-bold text-white"><Phone size={14} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-3 py-2 text-xs font-bold text-white"><MessageCircle size={14} /> WhatsApp</a></div>}
+        </div>}
       </div>
       <div className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><Phone size={21} /></div>

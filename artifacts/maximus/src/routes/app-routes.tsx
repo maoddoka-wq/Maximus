@@ -182,6 +182,7 @@ export function CompanyRouter({
   scopeNodeId,
   companyId,
   employee,
+  employees,
   presenceEmployees,
   presenceFeatureIds,
   ecommerceFeatureIds,
@@ -210,6 +211,7 @@ export function CompanyRouter({
   scopeNodeId?: string;
   companyId: string;
   employee: StoreData['employees'][number] | null;
+  employees: StoreData['employees'];
   presenceEmployees: Employee[];
   presenceFeatureIds?: string[];
   ecommerceFeatureIds?: string[];
@@ -397,6 +399,8 @@ export function CompanyRouter({
   if (routePath === '/entreprise/transport') {
     return renderScreen(screens.transport, {
       companyId,
+      employees: employees.filter(item => item.companyId === companyId),
+      currentEmployeeId: employee?.id ?? null,
       canCreate: hasPermission('transport', 'créer'),
       canModify: hasPermission('transport', 'modifier'),
       allowedFeatureIds: transportFeatureIds,

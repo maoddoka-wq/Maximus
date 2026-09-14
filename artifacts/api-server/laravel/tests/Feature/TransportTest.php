@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class TransportTest extends TestCase
@@ -76,6 +78,92 @@ class TransportTest extends TestCase
             'company_id' => 'another-company',
             'name' => 'Conducteur Kora',
         ]);
+    }
+
+    public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'transport')
+            ->update([
+                'feature_ids' => json_encode(['overview']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+            ]);
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-taxi',
+            'company_id' => 'kora',
+            'slug' => 'kora-taxi',
+            'name' => 'Kora Taxi',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $freshDriver = 'driver-fresh';
+        $staleDriver = 'driver-stale';
+        DB::table('transport_drivers')->insert([
+            [
+                'id' => $freshDriver,
+                'company_id' => 'kora',
+                'name' => 'Chauffeur GPS',
+                'phone' => '+221770000001',
+                'license_number' => 'GPS-001',
+                'status' => 'ACTIVE',
+                'latitude' => 14.7180,
+                'longitude' => -17.4677,
+                'location_updated_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $staleDriver,
+                'company_id' => 'kora',
+                'name' => 'Chauffeur obsolète',
+                'phone' => '+221770000002',
+                'license_number' => 'GPS-002',
+                'status' => 'ACTIVE',
+                'latitude' => 14.7168,
+                'longitude' => -17.4677,
+                'location_updated_at' => now()->subMinutes(6),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        DB::table('transport_vehicles')->insert([
+            'id' => 'vehicle-gps',
+            'company_id' => 'kora',
+            'registration' => 'DK-GPS-01',
+            'model' => 'Toyota GPS',
+            'vehicle_type' => 'TAXI',
+            'status' => 'AVAILABLE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/shop/kora-taxi/transport/trips', [
+            'pickup' => 'Plateau',
+            'destination' => 'Almadies',
+            'passengerName' => 'Moussa Fall',
+            'passengerPhone' => '+221771111111',
+            'pickupLatitude' => 14.7167,
+            'pickupLongitude' => -17.4677,
+        ])->assertCreated()
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('trip.driverId', $freshDriver)
+            ->assertJsonPath('trip.driverName', 'Chauffeur GPS');
+
+        $this->assertDatabaseHas('transport_trips', [
+            'company_id' => 'kora',
+            'driver_id' => $freshDriver,
+            'vehicle_id' => 'vehicle-gps',
+            'status' => 'ASSIGNED',
+        ]);
+        $this->assertDatabaseMissing('transport_trips', ['driver_id' => $staleDriver]);
     }
 
     private function asActor(string $role = 'company_admin', array $permissions = []): self

@@ -11,6 +11,10 @@ export interface Driver {
   phone: string;
   licenseNumber: string;
   status: DriverStatus;
+  employeeId: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: string | null;
 }
 
 export interface Vehicle {
@@ -35,6 +39,11 @@ export interface Trip {
   vehicleId: string | null;
   status: TripStatus;
   requestedAt: string;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+  matchedDistanceKm?: number | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
 }
 
 export interface TransportMetrics {
@@ -56,6 +65,7 @@ export interface CreateDriverInput {
   phone: string;
   licenseNumber: string;
   status: DriverStatus;
+  employeeId?: string;
 }
 
 export interface CreateVehicleInput {
@@ -73,6 +83,24 @@ export interface CreateTripInput {
   fare: number;
   driverId?: string;
   vehicleId?: string;
+}
+
+export interface PublicTransportTrip {
+  id: string;
+  companyId: string;
+  reference: string;
+  pickup: string;
+  destination: string;
+  passengerName: string;
+  passengerPhone: string;
+  fare: number;
+  driverId: string | null;
+  vehicleId: string | null;
+  status: TripStatus;
+  requestedAt: string;
+  matchedDistanceKm: number | null;
+  driverName: string | null;
+  driverPhone: string | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -93,6 +121,12 @@ export const createTransportApi = (companyId: string) => {
   return {
     bootstrap: () => request<TransportBootstrap>(withCompany('/transport/bootstrap')),
     createDriver: (body: CreateDriverInput) => request<Driver>(withCompany('/transport/drivers'), json(body)),
+    updateDriverLocation: (id: string, body: { latitude: number; longitude: number }) =>
+      request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/location`), {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      }),
     createVehicle: (body: CreateVehicleInput) => request<Vehicle>(withCompany('/transport/vehicles'), json(body)),
     createTrip: (body: CreateTripInput) => request<Trip>(withCompany('/transport/trips'), json(body)),
     updateTripStatus: (id: string, status: TripStatus) =>
@@ -103,3 +137,17 @@ export const createTransportApi = (companyId: string) => {
       }),
   };
 };
+
+export const createPublicTransportApi = (slug?: string, domain = false) => ({
+  createTrip: (body: {
+    pickup: string;
+    destination: string;
+    passengerName: string;
+    passengerPhone: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+  }) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
+    domain ? '/shop-domain/transport/trips' : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips`,
+    json(body),
+  ),
+});
