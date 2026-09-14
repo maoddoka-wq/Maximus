@@ -71,6 +71,7 @@ const transportTabByFeatureId: Record<string, TransportTab> = {
 };
 
 const tripStatuses: TripStatus[] = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const openTripStatuses: TripStatus[] = ['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'];
 
 const emptyData = (): TransportBootstrap => ({
   drivers: [],
@@ -434,10 +435,8 @@ export default function TransportModulePage({
       </nav>}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
-        {canOperateTrips && (offeredTrip || activeTrip) && <div className="space-y-4">
-          <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(offeredTrip && pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} />
-          <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />
-        </div>}
+        {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} />}
+        {canOperateTrips && tab === 'courses' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
         {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}</>}
         {tab === 'courses' && <TripsPanel data={data} canCreate={canOperateTrips} canModify={canOperateTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
         {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
@@ -464,8 +463,8 @@ export default function TransportModulePage({
 }
 
 function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: TransportTab) => void }) {
-  const activeTrips = data.trips.filter(trip => ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS'].includes(trip.status));
-  const recentTrips = data.trips.slice(0, 5);
+  const activeTrips = data.trips.filter(trip => openTripStatuses.includes(trip.status));
+  const recentTrips = activeTrips.slice(0, 5);
   return <div className="fade-up space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Chauffeurs actifs" value={data.metrics.activeDrivers} detail="Prêts à prendre une course" icon={UsersRound} accent="brand" />
@@ -476,7 +475,7 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,.6fr)]">
       <section className="card-surface overflow-hidden">
         <div className="section-heading border-b px-5 py-4"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Flux opérationnel</p><h2 className="mt-1 text-base font-bold">Dernières courses</h2></div><button type="button" onClick={() => onTab('courses')} className="text-xs font-bold text-[hsl(var(--primary))] hover:underline">Voir toutes les courses</button></div>
-        {recentTrips.length ? <TripTable trips={recentTrips} compact onStatusChange={() => undefined} /> : <EmptyState icon={Route} title="Aucune course aujourd’hui" text="Les nouvelles demandes apparaîtront ici dès leur création." />}
+         {recentTrips.length ? <TripTable trips={recentTrips} compact onStatusChange={() => undefined} /> : <EmptyState icon={Route} title="Aucune course ouverte" text="Les nouvelles demandes apparaîtront ici dès leur création." />}
       </section>
       <section className="card-surface overflow-hidden">
         <div className="border-b px-5 py-4"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Disponibilité</p><h2 className="mt-1 text-base font-bold">État de la flotte</h2></div>
@@ -600,7 +599,7 @@ function TripsPanel({ data, canCreate, canModify, onCreate, onStatusChange }: { 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<TripStatus | 'ALL'>('ALL');
   const trips = useMemo(() => data.trips.filter(trip => {
-    if (!['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].includes(trip.status)) return false;
+     if (!openTripStatuses.includes(trip.status)) return false;
     const matchesQuery = !query || `${trip.reference} ${trip.pickup} ${trip.destination} ${trip.passengerName}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
     return matchesQuery && (filter === 'ALL' || trip.status === filter);
   }), [data.trips, filter, query]);

@@ -71,6 +71,7 @@ export function TaxiRouteMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
+  const viewportKeyRef = useRef<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export function TaxiRouteMap({
       map.remove();
       mapRef.current = null;
       layersRef.current = null;
+      viewportKeyRef.current = null;
     };
   }, []);
 
@@ -109,8 +111,10 @@ export function TaxiRouteMap({
     if (clientStop) addMarker(layers, bounds, clientStop, clientStopIcon, 'Arrêt du client');
     if (destination) addMarker(layers, bounds, destination, destinationIcon, 'Destination');
 
-    if (bounds.isValid()) {
+    const viewportKey = JSON.stringify({ clientStop, destination, routeGeometry, pickupRouteGeometry });
+    if (bounds.isValid() && viewportKeyRef.current !== viewportKey) {
       map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
+      viewportKeyRef.current = viewportKey;
     }
   }, [clientStop, destination, driver, pickupRouteGeometry, routeGeometry]);
 
