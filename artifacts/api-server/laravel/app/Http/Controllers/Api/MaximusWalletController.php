@@ -25,7 +25,7 @@ final class MaximusWalletController extends Controller
             return $this->forbidden();
         }
 
-        $this->sellerWallet->reconcilePaidSales();
+        $this->sellerWallet->reconcilePaidSales(10);
 
         return response()->json($this->wallet->bootstrap());
     }

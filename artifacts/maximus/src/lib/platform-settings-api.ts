@@ -103,9 +103,12 @@ export class PlatformSettingsRequestError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, options: { timeoutMs?: number } = {}): Promise<T> {
   try {
-    return await requestJson<T>(path, init, { fallbackMessage: 'Les paramètres plateforme sont indisponibles.' });
+    return await requestJson<T>(path, init, {
+      fallbackMessage: 'Les paramètres plateforme sont indisponibles.',
+      timeoutMs: options.timeoutMs,
+    });
   } catch (cause) {
     if (cause instanceof ApiRequestError) {
       throw new PlatformSettingsRequestError(cause.message, cause.status);
@@ -142,7 +145,7 @@ export const platformSettingsApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
-  maximusWallet: () => request<MaximusWalletBootstrap>('/platform-settings/maximus-wallet'),
+  maximusWallet: () => request<MaximusWalletBootstrap>('/platform-settings/maximus-wallet', undefined, { timeoutMs: 7_000 }),
   updateMaximusPayoutAccount: (payload: { provider: 'WAVE'; mobile: string; beneficiaryName: string }) =>
     request<MaximusWallet>('/platform-settings/maximus-wallet/payout-account', {
       method: 'PATCH',

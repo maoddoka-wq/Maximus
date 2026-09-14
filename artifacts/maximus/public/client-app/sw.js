@@ -37,16 +37,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      caches.match(shellPath()).then((cached) => {
-        const network = fetch(request).then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            void caches.open(CACHE_NAME).then((cache) => cache.put(shellPath(), copy));
-          }
-          return response;
-        });
-        return cached || network.catch(() => Response.error());
-      }),
+      fetch(request).catch(() => caches.match(shellPath()).then((response) => response || Response.error())),
     );
     return;
   }

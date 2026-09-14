@@ -91,11 +91,31 @@ final class SellerWalletController extends Controller
         ]);
     }
 
-    public function reconcilePaidSales(): int
+    public function reconcilePaidSales(int $limit = 25): int
     {
         $orders = DB::table('ecommerce_orders')
+            ->from('ecommerce_orders as orders')
             ->where('payment_status', 'PAID')
+            ->where(function ($query): void {
+                $query
+                    ->whereNotExists(function ($subquery): void {
+                        $subquery
+                            ->select(DB::raw('1'))
+                            ->from('seller_wallet_ledger')
+                            ->whereColumn('seller_wallet_ledger.company_id', 'orders.company_id')
+                            ->whereColumn('seller_wallet_ledger.reference_id', 'orders.id')
+                            ->where('seller_wallet_ledger.type', 'SALE_CREDIT');
+                    })
+                    ->orWhereNotExists(function ($subquery): void {
+                        $subquery
+                            ->select(DB::raw('1'))
+                            ->from('maximus_wallet_ledger')
+                            ->whereColumn('maximus_wallet_ledger.reference_id', 'orders.id')
+                            ->where('maximus_wallet_ledger.type', 'SALE_COMMISSION');
+                    });
+            })
             ->orderBy('created_at')
+            ->limit(max(1, min($limit, 100)))
             ->get();
         $repaired = 0;
 

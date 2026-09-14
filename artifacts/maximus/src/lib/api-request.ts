@@ -15,9 +15,11 @@ type RequestOptions = {
   fallbackMessage?: string;
   timeoutMs?: number;
   dedupe?: boolean;
+  cacheTtlMs?: number;
 };
 
 const inflightGets = new Map<string, Promise<unknown>>();
+const completedGets = new Map<string, { expiresAt: number; value: unknown }>();
 
 function errorMessage(payload: unknown, fallbackMessage: string) {
   if (!payload || typeof payload !== 'object') return fallbackMessage;
@@ -87,10 +89,23 @@ export function requestJson<T>(
   const shouldDedupe = method === 'GET' && options.dedupe !== false;
   if (!shouldDedupe) return executeRequest<T>(path, init, options);
 
+  if (options.cacheTtlMs && options.cacheTtlMs > 0) {
+    const cached = completedGets.get(path);
+    if (cached) {
+      if (cached.expiresAt > Date.now()) return Promise.resolve(cached.value as T);
+      completedGets.delete(path);
+    }
+  }
+
   const existing = inflightGets.get(path);
   if (existing) return existing as Promise<T>;
 
-  const request = executeRequest<T>(path, init, options);
+  const request = executeRequest<T>(path, init, options).then((value) => {
+    if (options.cacheTtlMs && options.cacheTtlMs > 0) {
+      completedGets.set(path, { expiresAt: Date.now() + options.cacheTtlMs, value });
+    }
+    return value;
+  });
   inflightGets.set(path, request);
   void request.then(
     () => {
