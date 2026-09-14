@@ -16,9 +16,9 @@ class TransportTest extends TestCase
     public function test_taxi_cycle_is_persisted_and_vehicle_returns_to_available_after_completion(): void
     {
         $request = $this->asActor();
+        $employeeId = $this->createDriverEmployee();
         $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
-            'name' => 'Awa Ndiaye',
-            'phone' => '+221770000000',
+            'employeeId' => $employeeId,
             'licenseNumber' => 'SN-TAXI-001',
         ])->assertCreated();
         $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
@@ -59,24 +59,23 @@ class TransportTest extends TestCase
     public function test_transport_ignores_client_company_id_for_tenant_scope(): void
     {
         $request = $this->asActor();
+        $employeeId = $this->createDriverEmployee('tenant-driver');
         $request->postJson('/api/transport/drivers?companyId=another-company', [
-            'name' => 'Conducteur Kora',
-            'phone' => '+221772222222',
+            'employeeId' => $employeeId,
             'licenseNumber' => 'SN-TAXI-002',
         ])->assertForbidden();
 
         $request->postJson('/api/transport/drivers?companyId=kora', [
-            'name' => 'Conducteur Kora',
-            'phone' => '+221772222222',
+            'employeeId' => $employeeId,
             'licenseNumber' => 'SN-TAXI-002',
         ])->assertCreated();
         $this->assertDatabaseHas('transport_drivers', [
             'company_id' => 'kora',
-            'name' => 'Conducteur Kora',
+            'employee_id' => $employeeId,
         ]);
         $this->assertDatabaseMissing('transport_drivers', [
             'company_id' => 'another-company',
-            'name' => 'Conducteur Kora',
+            'employee_id' => $employeeId,
         ]);
     }
 
@@ -88,8 +87,7 @@ class TransportTest extends TestCase
 
         $request->getJson('/api/transport/bootstrap?companyId=kora')->assertOk();
         $request->postJson('/api/transport/drivers?companyId=kora', [
-            'name' => 'Chauffeur autorisé',
-            'phone' => '+221773333333',
+            'employeeId' => 'transport-employee',
             'licenseNumber' => 'SN-TAXI-003',
         ])->assertCreated();
 
@@ -134,6 +132,8 @@ class TransportTest extends TestCase
         ]);
         $freshDriver = 'driver-fresh';
         $staleDriver = 'driver-stale';
+        $this->createDriverEmployee($freshDriver, 'Chauffeur GPS', '+221770000001');
+        $this->createDriverEmployee($staleDriver, 'Chauffeur obsolète', '+221770000002');
         DB::table('transport_drivers')->insert([
             [
                 'id' => $freshDriver,
@@ -141,6 +141,7 @@ class TransportTest extends TestCase
                 'name' => 'Chauffeur GPS',
                 'phone' => '+221770000001',
                 'license_number' => 'GPS-001',
+                'employee_id' => $freshDriver,
                 'status' => 'ACTIVE',
                 'latitude' => 14.7180,
                 'longitude' => -17.4677,
@@ -154,6 +155,7 @@ class TransportTest extends TestCase
                 'name' => 'Chauffeur obsolète',
                 'phone' => '+221770000002',
                 'license_number' => 'GPS-002',
+                'employee_id' => $staleDriver,
                 'status' => 'ACTIVE',
                 'latitude' => 14.7168,
                 'longitude' => -17.4677,
@@ -194,6 +196,25 @@ class TransportTest extends TestCase
         $this->assertDatabaseMissing('transport_trips', ['driver_id' => $staleDriver]);
     }
 
+    private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string
+    {
+        AuthUser::query()->create([
+            'id' => $id,
+            'email' => $id.'@kora.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => $displayName,
+            'phone' => $phone,
+            'role' => 'employee',
+            'company_id' => 'kora',
+            'employee_id' => $id,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        return $id;
+    }
+
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
         $user = AuthUser::query()->create([
@@ -201,9 +222,10 @@ class TransportTest extends TestCase
             'email' => 'transport-'.strtolower($role).'@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Gestionnaire Transport',
+            'phone' => '',
             'role' => $role,
             'company_id' => 'kora',
-            'employee_id' => null,
+            'employee_id' => $role === 'employee' ? 'transport-employee' : null,
             'sector_ids' => [],
             'permissions' => $permissions,
             'status' => 'ACTIF',

@@ -255,7 +255,7 @@ class AppStateController extends Controller
                 'firstName' => $parts[0] ?? 'Employé',
                 'lastName' => $parts[1] ?? 'MAXIMUS',
                 'email' => (string) $user->email,
-                'phone' => '',
+                'phone' => (string) ($user->phone ?? ''),
                 'position' => (string) $user->role,
                 'department' => '',
                 'subDepartment' => '',

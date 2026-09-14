@@ -62,22 +62,21 @@ class TransportController extends Controller
         }
 
         $input = $this->validated($request, [
-            'name' => ['required', 'string', 'min:2', 'max:120'],
-            'phone' => ['required', 'string', 'max:40'],
             'licenseNumber' => ['required', 'string', 'max:80'],
-            'employeeId' => ['nullable', 'string', 'max:120'],
+            'employeeId' => ['required', 'string', 'max:120'],
             'status' => ['sometimes', Rule::in(self::DRIVER_STATUSES)],
         ]);
         $company = $this->company($request);
-        $employeeId = trim((string) ($input['employeeId'] ?? '')) ?: null;
-        if ($employeeId !== null && ! AuthUser::query()
+        $employeeId = trim($input['employeeId']);
+        $employee = AuthUser::query()
             ->where('employee_id', $employeeId)
             ->where('company_id', $company)
             ->where('status', 'ACTIF')
-            ->exists()) {
-            return response()->json(['error' => 'Le compte employé sélectionné est introuvable dans cette entreprise.'], 422);
+            ->first();
+        if (! $employee) {
+            return response()->json(['error' => 'Le chauffeur doit être un employé actif de cette entreprise, créé dans Organisation.'], 422);
         }
-        if ($employeeId !== null && DB::table('transport_drivers')
+        if (DB::table('transport_drivers')
             ->where('company_id', $company)
             ->where('employee_id', $employeeId)
             ->exists()) {
@@ -86,8 +85,8 @@ class TransportController extends Controller
         $row = [
             'id' => $this->id('driver'),
             'company_id' => $company,
-            'name' => trim($input['name']),
-            'phone' => trim($input['phone']),
+            'name' => trim((string) $employee->display_name),
+            'phone' => trim((string) ($employee->phone ?? '')),
             'license_number' => trim($input['licenseNumber']),
             'employee_id' => $employeeId,
             'status' => $input['status'] ?? 'ACTIVE',
@@ -357,6 +356,7 @@ class TransportController extends Controller
             $drivers = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('status', 'ACTIVE')
+                ->whereNotNull('employee_id')
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
                 ->where('location_updated_at', '>=', now()->subMinutes(5))

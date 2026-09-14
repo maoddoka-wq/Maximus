@@ -17,6 +17,7 @@ class AuthUser extends Model
         'email',
         'password_hash',
         'display_name',
+        'phone',
         'role',
         'company_id',
         'employee_id',

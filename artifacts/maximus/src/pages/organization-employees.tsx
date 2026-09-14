@@ -165,6 +165,7 @@ export function EmployeesTab({
                id: employeeId,
                email: employeeData.email.trim().toLowerCase(),
                displayName: `${employeeData.firstName.trim()} ${employeeData.lastName.trim()}`,
+               phone: employeeData.phone,
                companyId: company.id,
                employeeId,
                sectorIds,

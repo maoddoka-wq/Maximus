@@ -61,11 +61,9 @@ export interface TransportBootstrap {
 }
 
 export interface CreateDriverInput {
-  name: string;
-  phone: string;
+  employeeId: string;
   licenseNumber: string;
   status: DriverStatus;
-  employeeId?: string;
 }
 
 export interface CreateVehicleInput {

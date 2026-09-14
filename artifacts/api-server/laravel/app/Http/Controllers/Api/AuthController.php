@@ -69,6 +69,7 @@ class AuthController extends Controller
             'id' => ['required', 'string', 'min:1'],
             'email' => ['required', 'email', 'max:255'],
             'displayName' => ['required', 'string', 'min:1', 'max:180'],
+            'phone' => ['nullable', 'string', 'max:40'],
             'companyId' => ['required', 'string', 'min:1'],
             'employeeId' => ['required', 'string', 'min:1'],
             'sectorIds' => ['required', 'array', 'min:1'],
@@ -99,6 +100,7 @@ class AuthController extends Controller
         $values = [
             'email' => Str::lower(trim($data['email'])),
             'display_name' => trim($data['displayName']),
+            'phone' => trim((string) ($data['phone'] ?? '')),
             'role' => $data['role'],
             'company_id' => $data['companyId'],
             'employee_id' => $data['employeeId'],

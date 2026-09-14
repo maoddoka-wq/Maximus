@@ -25,6 +25,7 @@ export const authApi = {
     id: string;
     email: string;
     displayName: string;
+    phone?: string;
     companyId: string;
     employeeId: string;
     sectorIds: string[];

@@ -66,3 +66,4 @@
 - [Frontière Transport Taxi](transport-module-boundary.md) — le cycle Taxi reste séparé de la Location e-commerce, avec ses propres ressources, permissions et données tenant-scoped.
 - [Rapprochement GPS Taxi](transport-gps-matching.md) — sélectionner côté serveur un chauffeur actif, libre et géolocalisé récemment, sans API cartographique externe.
 - [Identifiants du menu Transport](transport-menu-identifiers.md) — générer le menu depuis `overview`, `trips`, `drivers`, `vehicles`, pas depuis les libellés français.
+- [Qualification des chauffeurs](transport-driver-organization.md) — créer l’employé dans Organisation, puis ajouter dans Transport uniquement les données Taxi.

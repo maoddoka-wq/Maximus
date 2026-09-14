@@ -120,7 +120,7 @@ export default function TransportModulePage({
   allowedFeatureIds?: string[];
   featurePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
   initialTab?: string;
-  employees?: Array<{ id: string; firstName: string; lastName: string }>;
+  employees?: Array<{ id: string; firstName: string; lastName: string; phone: string; status: string }>;
   currentEmployeeId?: string | null;
   singleModuleNavigation?: boolean;
   preview?: boolean;
@@ -252,7 +252,19 @@ export default function TransportModulePage({
 
   const addPreviewDriver = (input: CreateDriverInput) => {
     if (!data) return;
-    const driver: Driver = { ...input, id: `preview-driver-${Date.now()}`, companyId, employeeId: input.employeeId ?? null, latitude: null, longitude: null, locationUpdatedAt: null };
+    const employee = employees.find(item => item.id === input.employeeId);
+    const driver: Driver = {
+      id: `preview-driver-${Date.now()}`,
+      companyId,
+      name: employee ? `${employee.firstName} ${employee.lastName}` : 'Employé sélectionné',
+      phone: employee?.phone ?? '',
+      licenseNumber: input.licenseNumber,
+      status: input.status,
+      employeeId: input.employeeId,
+      latitude: null,
+      longitude: null,
+      locationUpdatedAt: null,
+    };
     setData(current => current ? { ...current, drivers: [driver, ...current.drivers], metrics: { ...current.metrics, activeDrivers: current.metrics.activeDrivers + (input.status === 'ACTIVE' ? 1 : 0) } } : current);
     showAppToast('Chauffeur ajouté à l’aperçu local.', 'success');
     setDialog(null);
@@ -422,10 +434,17 @@ function Field({ label, children, required = true }: { label: string; children: 
 
 const inputClass = 'w-full border px-3 py-2.5 text-sm';
 
-function DriverDialog({ busy, employees, onClose, onSubmit }: { busy: boolean; employees: Array<{ id: string; firstName: string; lastName: string }>; onClose: () => void; onSubmit: (input: CreateDriverInput) => void }) {
-  const [form, setForm] = useState<CreateDriverInput>({ name: '', phone: '', licenseNumber: '', status: 'ACTIVE', employeeId: '' });
-  const submit = (event: FormEvent) => { event.preventDefault(); if (form.name.trim() && form.phone.trim() && form.licenseNumber.trim()) onSubmit({ ...form, name: form.name.trim(), phone: form.phone.trim(), licenseNumber: form.licenseNumber.trim() }); };
-  return <DialogShell title="Ajouter un chauffeur" description="Créez un profil et liez le compte qui partagera sa position GPS." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><Field label="Nom complet"><input required autoFocus value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} className={inputClass} placeholder="Ex. Aïcha Diop" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Téléphone"><input required type="tel" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} className={inputClass} placeholder="+221 77 000 00 00" /></Field><Field label="Numéro de permis"><input required value={form.licenseNumber} onChange={event => setForm({ ...form, licenseNumber: event.target.value })} className={inputClass} placeholder="SN-TR-0000" /></Field></div><Field label="Compte employé pour le GPS" required={false}><select value={form.employeeId ?? ''} onChange={event => setForm({ ...form, employeeId: event.target.value })} className={inputClass}><option value="">Lier plus tard</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}</select></Field><Field label="Statut"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as DriverStatus })} className={inputClass}><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option></select></Field><DialogActions busy={busy} onClose={onClose} label="Enregistrer le chauffeur" /></form></DialogShell>;
+function DriverDialog({ busy, employees, onClose, onSubmit }: { busy: boolean; employees: Array<{ id: string; firstName: string; lastName: string; phone: string; status: string }>; onClose: () => void; onSubmit: (input: CreateDriverInput) => void }) {
+  const eligibleEmployees = employees.filter(employee => employee.status === 'ACTIF');
+  const [form, setForm] = useState<CreateDriverInput>({ employeeId: '', licenseNumber: '', status: 'ACTIVE' });
+  const selectedEmployee = eligibleEmployees.find(employee => employee.id === form.employeeId);
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (form.employeeId && form.licenseNumber.trim()) {
+      onSubmit({ ...form, licenseNumber: form.licenseNumber.trim() });
+    }
+  };
+  return <DialogShell title="Qualifier un chauffeur" description="Sélectionnez un employé créé dans Organisation, puis ajoutez ses informations de conduite." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><Field label="Employé de l’organisation"><select required autoFocus value={form.employeeId} onChange={event => setForm({ ...form, employeeId: event.target.value })} className={inputClass}><option value="">Sélectionner un employé…</option>{eligibleEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}</select></Field>{selectedEmployee && <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Identité et téléphone repris depuis Organisation : <strong className="text-[hsl(var(--foreground))]">{selectedEmployee.firstName} {selectedEmployee.lastName}</strong>{selectedEmployee.phone ? ` · ${selectedEmployee.phone}` : ' · aucun téléphone renseigné'}</p>}<Field label="Numéro de permis"><input required value={form.licenseNumber} onChange={event => setForm({ ...form, licenseNumber: event.target.value })} className={inputClass} placeholder="SN-TR-0000" /></Field><Field label="Statut"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as DriverStatus })} className={inputClass}><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option></select></Field>{eligibleEmployees.length === 0 && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-800">Créez d’abord un employé actif dans Organisation pour pouvoir le qualifier comme chauffeur.</p>}<DialogActions busy={busy} disabled={eligibleEmployees.length === 0 || !form.employeeId || !form.licenseNumber.trim()} onClose={onClose} label="Qualifier le chauffeur" /></form></DialogShell>;
 }
 
 function VehicleDialog({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (input: CreateVehicleInput) => void }) {
@@ -440,6 +459,6 @@ function TripDialog({ busy, drivers, vehicles, onClose, onSubmit }: { busy: bool
   return <DialogShell title="Créer une course" description="Saisissez la demande et affectez-la si un équipage est disponible." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Départ"><input required autoFocus value={form.pickup} onChange={event => setForm({ ...form, pickup: event.target.value })} className={inputClass} placeholder="Point de prise en charge" /></Field><Field label="Destination"><input required value={form.destination} onChange={event => setForm({ ...form, destination: event.target.value })} className={inputClass} placeholder="Destination" /></Field></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du passager"><input required value={form.passengerName} onChange={event => setForm({ ...form, passengerName: event.target.value })} className={inputClass} placeholder="Nom complet" /></Field><Field label="Téléphone du passager"><input required type="tel" value={form.passengerPhone} onChange={event => setForm({ ...form, passengerPhone: event.target.value })} className={inputClass} placeholder="+221 77 000 00 00" /></Field></div><Field label="Tarif estimé (XOF)"><input required min="1" type="number" value={form.fare || ''} onChange={event => setForm({ ...form, fare: Number(event.target.value) })} className={inputClass} placeholder="0" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Chauffeur" required={false}><select value={form.driverId} onChange={event => setForm({ ...form, driverId: event.target.value })} className={inputClass}><option value="">À affecter plus tard</option>{drivers.filter(driver => driver.status === 'ACTIVE').map(driver => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></Field><Field label="Véhicule" required={false}><select value={form.vehicleId} onChange={event => setForm({ ...form, vehicleId: event.target.value })} className={inputClass}><option value="">À affecter plus tard</option>{vehicles.filter(vehicle => vehicle.status === 'AVAILABLE').map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration} · {vehicle.model}</option>)}</select></Field></div><DialogActions busy={busy} onClose={onClose} label="Créer la course" /></form></DialogShell>;
 }
 
-function DialogActions({ busy, onClose, label }: { busy: boolean; onClose: () => void; label: string }) {
-  return <div className="modal-footer flex items-center justify-end gap-2"><button type="button" onClick={onClose} className="px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" disabled={busy}>Annuler</button><button type="submit" disabled={busy} className="btn inline-flex items-center gap-2 bg-slate-900 px-4 py-2.5 text-xs font-bold text-white disabled:cursor-wait disabled:opacity-60">{busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}{busy ? 'Enregistrement…' : label}</button></div>;
+function DialogActions({ busy, disabled = false, onClose, label }: { busy: boolean; disabled?: boolean; onClose: () => void; label: string }) {
+  return <div className="modal-footer flex items-center justify-end gap-2"><button type="button" onClick={onClose} className="px-3 py-2.5 text-xs font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" disabled={busy}>Annuler</button><button type="submit" disabled={busy || disabled} className="btn inline-flex items-center gap-2 bg-slate-900 px-4 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">{busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}{busy ? 'Enregistrement…' : label}</button></div>;
 }
