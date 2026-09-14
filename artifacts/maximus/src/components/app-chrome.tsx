@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import type { ModuleId, StoreData } from '@/lib/store';
+import { companyWorkspaceFeatureForPath, type CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 import {
   adminNav,
   companyNav,
@@ -40,6 +41,7 @@ type SidebarProps = {
   collapsed: boolean;
   onToggleCollapse: () => void;
   activeNavStyle?: CSSProperties;
+  hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
 };
 
 export function Sidebar({
@@ -59,15 +61,18 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
   activeNavStyle,
+  hiddenWorkspaceFeatures = [],
 }: SidebarProps) {
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
+  const hiddenWorkspaceFeatureSet = new Set(hiddenWorkspaceFeatures);
   const nav = isAdmin
     ? adminNav
     : companyNav.filter(
         item =>
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
-          (item.module === null || allowed.includes(item.module as ModuleId)),
+          (item.module === null || allowed.includes(item.module as ModuleId)) &&
+          !hiddenWorkspaceFeatureSet.has(companyWorkspaceFeatureForPath(item.href) as CompanyWorkspaceFeatureId),
       );
   const companyCoreItems = nav.filter(item => item.module === null);
   const companyModuleItems = nav.filter(item => item.module !== null);

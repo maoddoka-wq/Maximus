@@ -6,6 +6,7 @@ import {
   payrollFeatureDefinitions,
 } from './payroll-features';
 import type { ModuleId } from './module-ids';
+import type { CompanyWorkspaceFeatureId } from './company-workspace-features';
 import { buildSubscriptionForCompany, type CompanySubscription } from './subscription-model';
 import type { CatalogDraft } from './catalog-workflow';
 
@@ -44,6 +45,7 @@ export interface Company {
   requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
   allowedModules: ModuleId[];
   refusedModules: ModuleId[];
+  hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
   createdAt: string;
   profilePhoto?: string;
   primaryColor?: string;
@@ -463,6 +465,12 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
         allowedModules: normalizeStringArray(raw.allowedModules) as ModuleId[],
         refusedModules: normalizeStringArray(raw.refusedModules) as ModuleId[],
       };
+      if (raw.hiddenWorkspaceFeatures !== undefined) {
+        normalizedCompany.hiddenWorkspaceFeatures = normalizeStringArray(raw.hiddenWorkspaceFeatures)
+          .filter((featureId): featureId is CompanyWorkspaceFeatureId =>
+            ['controle', 'organisation', 'guide-configuration'].includes(featureId),
+          );
+      }
       if (raw.requestedModulePackIds !== undefined) {
         normalizedCompany.requestedModulePackIds = normalizeStringArrayMap(raw.requestedModulePackIds) as Partial<Record<ModuleId, string[]>>;
       }

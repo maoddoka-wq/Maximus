@@ -58,3 +58,6 @@
 - [Inscription publique](public-registration-policy.md) — le réglage global masque les parcours manuel et intelligent, sans bloquer la création manuelle depuis MAXIMUS.
 - [Routage Apache des PWA](apache-pwa-routing.md) — ne jamais rediriger les routes SPA profondes vers le port Apache interne de Render.
 - [Publication GitHub de secours](github-push-fallback.md) — si le push Git refuse l’authentification, publier via l’intégration GitHub puis resynchroniser la branche locale.
+- [Liaison PostgreSQL Render](render-database-binding.md) — la production doit utiliser la base Render gérée, pas une ancienne URL Neon fixe.
+- [Routage domaine boutique](custom-domain-routing.md) — un domaine personnalisé doit ouvrir directement la vitrine, avant tout rendu de la connexion MAXIMUS.
+- [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.

@@ -294,7 +294,7 @@ const storageKeyFor = (companyId: string) => `maximus:setup-guide:${companyId}`;
 export function CompanySetupGuide({
   companyId,
   companyName,
-  allowedModules,
+  allowedModules = [],
   onNavigate,
 }: GuideProps) {
   const [completed, setCompleted] = useState<string[]>([]);

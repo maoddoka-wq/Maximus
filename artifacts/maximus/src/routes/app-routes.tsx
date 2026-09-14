@@ -9,6 +9,7 @@ import type { AdminAssistantScope } from '@/lib/local-assistant';
 import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
 import { getAdminControlRoute } from '@/lib/control-routing';
+import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -191,6 +192,7 @@ export function CompanyRouter({
   moduleStatuses,
   serverModuleAccess,
   singleModuleNavigation,
+  hiddenWorkspaceFeatures,
   screens,
 }: {
   location: string;
@@ -218,9 +220,13 @@ export function CompanyRouter({
   serverModuleAccess?: import('@/lib/module-api').ServerModuleAccess[] | null;
   singleModuleNavigation?: boolean;
   screens: CompanyRouteScreens;
+  hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
 }) {
   const routePath = normalizeRoutePath(location);
   const query = new URLSearchParams(location.split('?')[1] ?? '');
+  const hiddenWorkspaceFeatureSet = new Set(hiddenWorkspaceFeatures ?? []);
+  const isWorkspaceFeatureHidden = (featureId: CompanyWorkspaceFeatureId) =>
+    hiddenWorkspaceFeatureSet.has(featureId);
   const requiredModule = moduleIdForPath(routePath);
   const maintenanceModule: ModuleId | 'controle' | undefined =
     routePath === '/entreprise/controle' ? 'controle' : requiredModule;
@@ -242,6 +248,13 @@ export function CompanyRouter({
     return renderScreen(screens.dashboard, { data, onNavigate, allowed });
   }
   if (routePath === '/entreprise/controle') {
+    if (isWorkspaceFeatureHidden('controle')) {
+      return renderScreen(screens.empty, {
+        title: 'Fonctionnalité masquée',
+        text: 'Le contrôle et la coordination ne sont pas activés pour cette entreprise.',
+        action: () => onBack('/entreprise/dashboard'),
+      });
+    }
     return renderScreen(screens.control, {
       data,
       companyId,
@@ -259,6 +272,13 @@ export function CompanyRouter({
     return renderScreen(screens.notifications, { data, mutate, context: { isAdmin: false, companyId } });
   }
   if (routePath === '/entreprise/guide-configuration') {
+    if (isWorkspaceFeatureHidden('guide-configuration')) {
+      return renderScreen(screens.empty, {
+        title: 'Fonctionnalité masquée',
+        text: 'Le guide de configuration n’est pas activé pour cette entreprise.',
+        action: () => onBack('/entreprise/dashboard'),
+      });
+    }
     const company = data.companies.find(item => item.id === companyId);
     return company && companyAdmin ? (
       renderScreen(screens.setupGuide, {
@@ -288,6 +308,13 @@ export function CompanyRouter({
     );
   }
   if (routePath === '/entreprise/organisation' || routePath === '/entreprise/acces' || routePath === '/entreprise/autorisations' || routePath === '/entreprise/employes' || routePath === '/entreprise/roles') {
+    if (isWorkspaceFeatureHidden('organisation')) {
+      return renderScreen(screens.empty, {
+        title: 'Fonctionnalité masquée',
+        text: 'L’organisation et les accès ne sont pas activés pour cette entreprise.',
+        action: () => onBack('/entreprise/dashboard'),
+      });
+    }
     const company = data.companies.find(item => item.id === companyId);
     const initialTab =
       routePath === '/entreprise/acces'

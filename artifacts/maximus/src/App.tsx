@@ -133,6 +133,11 @@ import {
 import { maximusAssistantApi, type MaximusAssistantAction, type MaximusAssistantMessage } from '@/lib/maximus-assistant-api';
 import { onboardingApi } from '@/lib/onboarding-api';
 import { mutationSuccessMessage } from '@/lib/mutation-feedback';
+import {
+  companyWorkspaceFeatureDefinitions,
+  normalizeCompanyWorkspaceFeatureIds,
+  type CompanyWorkspaceFeatureId,
+} from '@/lib/company-workspace-features';
 
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
@@ -1049,6 +1054,7 @@ function AppContent() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
+        hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Topbar
@@ -1178,6 +1184,7 @@ function AppContent() {
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
                   singleModuleNavigation={verticalModuleNavigation}
+                   hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,
@@ -7033,6 +7040,12 @@ function CompanyModulesDetail({
   const [savedFeatureSelections, setSavedFeatureSelections] = useState<Record<ModuleId, string[]>>({});
   const [packSelections, setPackSelections] = useState<Record<ModuleId, string[]>>({});
   const [savedPackSelections, setSavedPackSelections] = useState<Record<ModuleId, string[]>>({});
+  const [hiddenWorkspaceFeatures, setHiddenWorkspaceFeatures] = useState<CompanyWorkspaceFeatureId[]>(
+    () => normalizeCompanyWorkspaceFeatureIds(company.hiddenWorkspaceFeatures),
+  );
+  const [savedHiddenWorkspaceFeatures, setSavedHiddenWorkspaceFeatures] = useState<CompanyWorkspaceFeatureId[]>(
+    () => normalizeCompanyWorkspaceFeatureIds(company.hiddenWorkspaceFeatures),
+  );
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -7089,6 +7102,12 @@ function CompanyModulesDetail({
     JSON.stringify(company.requestedModulePackIds ?? {}),
   ]);
 
+  useEffect(() => {
+    const next = normalizeCompanyWorkspaceFeatureIds(company.hiddenWorkspaceFeatures);
+    setHiddenWorkspaceFeatures(next);
+    setSavedHiddenWorkspaceFeatures(next);
+  }, [company.id, JSON.stringify(company.hiddenWorkspaceFeatures ?? [])]);
+
   const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
   };
@@ -7115,6 +7134,22 @@ function CompanyModulesDetail({
     if (packIds.length > 0) {
       setFeatureSelections((previous) => ({ ...previous, [moduleId]: featureIds }));
     }
+  };
+
+  const toggleWorkspaceFeature = (featureId: CompanyWorkspaceFeatureId) => {
+    setHiddenWorkspaceFeatures((previous) =>
+      previous.includes(featureId)
+        ? previous.filter((item) => item !== featureId)
+        : [...previous, featureId],
+    );
+  };
+
+  const saveWorkspaceFeatures = () => {
+    mutate((draft) => {
+      const target = draft.companies.find((item) => item.id === company.id);
+      if (target) target.hiddenWorkspaceFeatures = [...hiddenWorkspaceFeatures];
+    }, 'Visibilité de l’espace entreprise enregistrée.');
+    setSavedHiddenWorkspaceFeatures(hiddenWorkspaceFeatures);
   };
 
   const save = async () => {
@@ -7210,6 +7245,63 @@ function CompanyModulesDetail({
           </div>
         </div>
       </div>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Fonctionnalités de l’espace entreprise</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Choisissez les fonctionnalités visibles dans le menu de cette entreprise. Le réglage est
+              enregistré pour tous ses utilisateurs et bloque aussi l’accès direct à la route.
+            </p>
+          </div>
+          <span className="mono shrink-0 text-xs text-[hsl(var(--muted-foreground))]">
+            {companyWorkspaceFeatureDefinitions.length - hiddenWorkspaceFeatures.length} / {companyWorkspaceFeatureDefinitions.length} visibles
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {companyWorkspaceFeatureDefinitions.map((feature) => {
+            const visible = !hiddenWorkspaceFeatures.includes(feature.id);
+            return (
+              <label
+                key={feature.id}
+                data-testid={`card-company-workspace-feature-${feature.id}`}
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                  visible
+                    ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'
+                    : 'bg-[hsl(var(--muted)/.4)] opacity-70'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  data-testid={`checkbox-company-workspace-feature-${feature.id}`}
+                  checked={visible}
+                  onChange={() => toggleWorkspaceFeature(feature.id)}
+                  className="mt-1"
+                />
+                <span className="min-w-0">
+                  <strong className="block text-sm">{feature.label}</strong>
+                  <span className="mt-1 block text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
+                    {feature.description}
+                  </span>
+                  <span className="mt-2 block text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--primary))]">
+                    {visible ? 'Visible' : 'Masquée'}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-workspace-features"
+            disabled={JSON.stringify(hiddenWorkspaceFeatures) === JSON.stringify(savedHiddenWorkspaceFeatures)}
+            onClick={saveWorkspaceFeatures}
+          >
+            Enregistrer la visibilité
+          </ActionButton>
+        </div>
+      </section>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex items-center justify-between">
           <div>

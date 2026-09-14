@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from './store';
 import { moduleRegistry } from './module-registry';
+import { companyWorkspaceFeatureForPath } from './company-workspace-features';
 
 export type Icon = LucideIcon;
 export type Session = 'admin' | `employee:${string}` | `company:${string}`;
@@ -75,3 +76,5 @@ export const companyNav: NavigationItem[] = [
     module: module.id,
   })),
 ];
+
+export { companyWorkspaceFeatureForPath };
