@@ -10,7 +10,6 @@ use App\Support\ModuleCatalog;
 use App\Services\EcommerceDomainVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -1136,7 +1135,7 @@ class EcommerceController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
-        return response()->json($this->cachedPublicStore($store))
+        return response()->json($this->publicStore($store))
             ->header('Cache-Control', 'private, no-store')
             ->header('Vary', 'Host');
     }
@@ -1148,7 +1147,7 @@ class EcommerceController extends Controller
             return response()->json(['available' => false]);
         }
 
-        return response()->json($this->cachedPublicStore($store))
+        return response()->json($this->publicStore($store))
             ->header('Cache-Control', 'private, no-store')
             ->header('Vary', 'Host');
     }
@@ -1322,21 +1321,6 @@ class EcommerceController extends Controller
                 : collect(),
             'deliveryZones' => $this->publicDeliveryZones($company, $features),
         ])->getData(true);
-    }
-
-    private function cachedPublicStore(object $store): array
-    {
-        if (app()->environment('testing')) {
-            return $this->publicStore($store);
-        }
-
-        $key = 'public-storefront:'.(string) $store->company_id.':'.(string) $store->id;
-
-        return Cache::remember(
-            $key,
-            now()->addSeconds(15),
-            fn (): array => $this->publicStore($store),
-        );
     }
 
     private function publicStorePayload(object $row, ?array $features = null): array
