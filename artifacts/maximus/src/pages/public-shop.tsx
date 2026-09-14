@@ -942,6 +942,23 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--shop-accent)]">
       <ArrowLeft size={16} /> Retour à la boutique
     </button>
+    <div className="relative overflow-hidden rounded-[2rem] bg-[#0b1b2b] p-6 text-white shadow-xl sm:p-10">
+      <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[var(--shop-primary)]/25 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-5rem] right-1/3 h-40 w-40 rounded-full border border-white/10" />
+      <div className="relative grid gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
+        <div>
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[.14em] text-white/80"><CarFront size={15} /> Taxi à la demande</span>
+          <h1 className="mt-5 max-w-xl text-4xl font-black tracking-[-.06em] sm:text-5xl">Votre chauffeur, en un seul geste.</h1>
+          <p className="mt-4 max-w-xl text-sm leading-7 text-white/70">Votre départ est détecté automatiquement. Entrez votre destination, confirmez votre téléphone et nous cherchons le chauffeur disponible le plus proche.</p>
+          <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-white/75"><span className="inline-flex items-center gap-2"><MapPin size={14} className="text-[var(--shop-primary)]" />Position GPS automatique</span><span className="inline-flex items-center gap-2"><Phone size={14} className="text-[var(--shop-primary)]" />Contact direct</span></div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[.08] p-4 backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3 text-xs font-semibold text-white/65"><span>État de la localisation</span><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${locationState === 'ready' ? 'bg-emerald-400/15 text-emerald-200' : locationState === 'error' ? 'bg-rose-400/15 text-rose-200' : 'bg-white/10 text-white/70'}`}><span className={`h-1.5 w-1.5 rounded-full ${locationState === 'ready' ? 'bg-emerald-300' : locationState === 'error' ? 'bg-rose-300' : 'bg-amber-300'}`} />{locationState === 'ready' ? 'Prête' : locationState === 'locating' ? 'Recherche…' : locationState === 'error' ? 'À autoriser' : 'En attente'}</span></div>
+          <p className="mt-3 text-sm leading-6 text-white/85">{locationState === 'ready' ? 'Votre position de départ est prête. Vous n’avez pas besoin de saisir une adresse.' : locationMessage || 'Nous préparons automatiquement votre position de départ.'}</p>
+          {locationState === 'error' && <button type="button" onClick={locate} className="mt-3 text-xs font-bold text-[var(--shop-primary)] underline">Autoriser ma position</button>}
+        </div>
+      </div>
+    </div>
     <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,.8fr)]">
       <div className="rounded-[1.75rem] border bg-white p-5 shadow-sm sm:p-7">
         {!formOpen && !trip && <div className="text-center sm:py-6">
