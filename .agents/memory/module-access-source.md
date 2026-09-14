@@ -26,3 +26,9 @@ Pour un rôle issu d’un pack, les fonctionnalités du pack sont aussi une limi
 **Why:** Les rôles chauffeur pouvaient hériter d’une liste de secteur contenant toutes les rubriques Transport, alors que le pack chauffeur n’en incluait que quatre.
 
 **How to apply:** Intersecter la sélection explicite de l’unité avec les `featureIds` du pack avant de calculer les fonctionnalités visibles.
+
+Pour un employé, le plafond de fonctionnalités de l’entreprise doit être appliqué même lorsque le rôle est manuel ou ne porte pas de `packId`; l’espace ne doit jamais retomber sur toutes les rubriques du module.
+
+**Why:** Un employé chauffeur pouvait recevoir un rôle global Transport et une sélection d’unité large, puis voir des fonctionnalités absentes du pack entreprise.
+
+**How to apply:** Calculer le plafond depuis l’accès serveur, les packs entreprise ou la sélection persistée, puis l’intersecter avec la sélection du rôle avant de transmettre les identifiants à l’espace Transport.
