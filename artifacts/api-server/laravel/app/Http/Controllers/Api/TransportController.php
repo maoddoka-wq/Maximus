@@ -287,6 +287,120 @@ class TransportController extends Controller
         return response()->json($this->vehicle((object) $row), 201);
     }
 
+    public function updateVehicle(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'vehicles')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->validated($request, [
+            'registration' => ['required', 'string', 'max:30'],
+            'model' => ['required', 'string', 'max:80'],
+            'vehicleType' => ['required', 'string', 'max:50'],
+            'driverId' => ['required', 'string', 'max:120'],
+            'status' => ['required', Rule::in(self::VEHICLE_STATUSES)],
+            'imageData' => ['sometimes', 'nullable', 'string', 'max:4194304'],
+        ]);
+        $company = $this->company($request);
+        $vehicle = DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $vehicle) {
+            return response()->json(['error' => 'Véhicule introuvable.'], 404);
+        }
+
+        $driverId = trim($input['driverId']);
+        if (! DB::table('transport_drivers')
+            ->where('id', $driverId)
+            ->where('company_id', $company)
+            ->where('status', 'ACTIVE')
+            ->exists()) {
+            return response()->json(['error' => 'Un chauffeur actif doit être sélectionné pour ce véhicule.'], 422);
+        }
+        if (DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('driver_id', $driverId)
+            ->where('id', '!=', $id)
+            ->exists()) {
+            return response()->json(['error' => 'Ce chauffeur possède déjà un autre véhicule.'], 422);
+        }
+
+        $registration = strtoupper(trim($input['registration']));
+        if (DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->whereRaw('upper(registration) = ?', [$registration])
+            ->where('id', '!=', $id)
+            ->exists()) {
+            return response()->json(['error' => 'Cette immatriculation existe déjà dans cette entreprise.'], 422);
+        }
+
+        $activeTrip = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('vehicle_id', $id)
+            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS'])
+            ->first();
+        if ($activeTrip && $input['status'] !== 'ON_TRIP') {
+            return response()->json(['error' => 'Ce véhicule est lié à une course en cours et doit rester marqué « En course ».'], 422);
+        }
+        if (! $activeTrip && $input['status'] === 'ON_TRIP') {
+            return response()->json(['error' => 'Un véhicule ne peut être marqué « En course » sans course active.'], 422);
+        }
+
+        $updates = [
+            'registration' => $registration,
+            'model' => trim($input['model']),
+            'vehicle_type' => trim($input['vehicleType']),
+            'driver_id' => $driverId,
+            'status' => $input['status'],
+            'updated_at' => now(),
+        ];
+        if (array_key_exists('imageData', $input)) {
+            if ($input['imageData'] === null) {
+                $updates['image_data'] = null;
+                $updates['image_mime'] = null;
+            } else {
+                $image = $this->decodeImageData($input['imageData']);
+                if ($image === null) {
+                    return response()->json(['error' => 'Ajoutez une image JPG, PNG ou WebP valide de 2 Mo maximum.'], 422);
+                }
+                $updates['image_data'] = base64_encode($image['contents']);
+                $updates['image_mime'] = $image['mime'];
+            }
+        }
+
+        DB::table('transport_vehicles')->where('id', $id)->where('company_id', $company)->update($updates);
+
+        return response()->json($this->vehicle(DB::table('transport_vehicles')->where('id', $id)->where('company_id', $company)->first()));
+    }
+
+    public function deleteVehicle(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'vehicles')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $vehicle = DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $vehicle) {
+            return response()->json(['error' => 'Véhicule introuvable.'], 404);
+        }
+        if (DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('vehicle_id', $id)
+            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS'])
+            ->exists()) {
+            return response()->json(['error' => 'Un véhicule engagé dans une course en cours ne peut pas être supprimé.'], 422);
+        }
+
+        DB::table('transport_vehicles')->where('id', $id)->where('company_id', $company)->delete();
+
+        return response()->json(['id' => $id]);
+    }
+
     public function createTrip(Request $request): JsonResponse
     {
         if (! $this->allowed($request, 'create', 'trips')) {

@@ -79,6 +79,54 @@ class TransportTest extends TestCase
             ->assertJsonPath('metrics.todayRevenue', 3500);
     }
 
+    public function test_vehicle_can_be_updated_and_deleted_but_not_while_on_an_active_trip(): void
+    {
+        $request = $this->asActor();
+        $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $this->createDriverEmployee('vehicle-management-driver'),
+            'licenseNumber' => 'SN-MANAGE-001',
+        ])->assertCreated();
+        $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-MANAGE-01',
+            'model' => 'Toyota Corolla',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
+
+        $request->patchJson('/api/transport/vehicles/'.$vehicle->json('id').'?companyId=kora', [
+            'registration' => 'DK-MANAGE-02',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'BERLINE',
+            'driverId' => $driver->json('id'),
+            'status' => 'AVAILABLE',
+        ])->assertOk()
+            ->assertJsonPath('registration', 'DK-MANAGE-02')
+            ->assertJsonPath('model', 'Toyota Yaris');
+
+        $trip = $request->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Plateau',
+            'destination' => 'Fann',
+            'passengerName' => 'Passager Gestion',
+            'passengerPhone' => '+221770000099',
+            'fare' => 2500,
+            'driverId' => $driver->json('id'),
+            'vehicleId' => $vehicle->json('id'),
+        ])->assertCreated();
+
+        $request->deleteJson('/api/transport/vehicles/'.$vehicle->json('id').'?companyId=kora')
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Un véhicule engagé dans une course en cours ne peut pas être supprimé.');
+
+        $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'COMPLETED',
+        ])->assertOk();
+        $request->deleteJson('/api/transport/vehicles/'.$vehicle->json('id').'?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('id', $vehicle->json('id'));
+        $this->assertDatabaseMissing('transport_vehicles', ['id' => $vehicle->json('id')]);
+    }
+
     public function test_transport_ignores_client_company_id_for_tenant_scope(): void
     {
         $request = $this->asActor();

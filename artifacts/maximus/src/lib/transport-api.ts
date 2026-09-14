@@ -97,6 +97,15 @@ export interface CreateVehicleInput {
   imageData: string;
 }
 
+export interface UpdateVehicleInput {
+  registration: string;
+  model: string;
+  vehicleType: string;
+  driverId: string;
+  status: VehicleStatus;
+  imageData?: string | null;
+}
+
 export interface CreateTripInput {
   pickup: string;
   destination: string;
@@ -182,6 +191,14 @@ export const createTransportApi = (companyId: string) => {
         headers: { 'Content-Type': 'application/json' },
       }),
     createVehicle: (body: CreateVehicleInput) => request<Vehicle>(withCompany('/transport/vehicles'), json(body)),
+    updateVehicle: (id: string, body: UpdateVehicleInput) => request<Vehicle>(withCompany(`/transport/vehicles/${encodeURIComponent(id)}`), {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+    }),
+    deleteVehicle: (id: string) => request<{ id: string }>(withCompany(`/transport/vehicles/${encodeURIComponent(id)}`), {
+      method: 'DELETE',
+    }),
     createTrip: (body: CreateTripInput) => request<Trip>(withCompany('/transport/trips'), json(body)),
     updateTripStatus: (id: string, status: TripStatus) =>
       request<Trip>(withCompany(`/transport/trips/${encodeURIComponent(id)}/status`), {

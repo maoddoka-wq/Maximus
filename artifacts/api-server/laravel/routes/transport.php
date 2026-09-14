@@ -10,6 +10,8 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::patch('/settings', [TransportController::class, 'updateSettings']);
     Route::get('/settings/hero-image', [TransportController::class, 'transportHeroImage']);
     Route::post('/vehicles', [TransportController::class, 'createVehicle']);
+    Route::patch('/vehicles/{id}', [TransportController::class, 'updateVehicle']);
+    Route::delete('/vehicles/{id}', [TransportController::class, 'deleteVehicle']);
     Route::get('/vehicles/{id}/image', [TransportController::class, 'vehicleImage']);
     Route::post('/trips', [TransportController::class, 'createTrip']);
     Route::patch('/trips/{id}/status', [TransportController::class, 'updateTripStatus']);

@@ -11,12 +11,14 @@ import {
   ImagePlus,
   MapPin,
   Navigation,
+  Pencil,
   Phone,
   Plus,
   RefreshCw,
   Route,
   ShieldCheck,
   Settings,
+  Trash2,
   UserRound,
   UsersRound,
   Wrench,
@@ -33,6 +35,7 @@ import {
   type TransportSettings,
   type Trip,
   type TripStatus,
+  type UpdateVehicleInput,
   type Vehicle,
   type VehicleStatus,
 } from '@/lib/transport-api';
@@ -42,6 +45,7 @@ import { TaxiRouteMap } from '@/components/taxi-route-map';
 
 type TransportTab = 'overview' | 'courses' | 'chauffeurs' | 'vehicules' | 'historique' | 'parametres';
 type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
+type VehicleFormInput = Omit<CreateVehicleInput, 'imageData'> & { imageData?: string };
 
 const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: string }[] = [
   { id: 'overview', label: 'Vue d’ensemble', icon: Gauge, featureId: 'overview' },
@@ -161,6 +165,7 @@ export default function TransportModulePage({
   const [error, setError] = useState('');
   const [pendingAction, setPendingAction] = useState('');
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [locationError, setLocationError] = useState('');
   const [locationActive, setLocationActive] = useState(false);
   const latestPosition = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -176,6 +181,7 @@ export default function TransportModulePage({
     ? Boolean(featurePermissions.drivers?.canModify || featurePermissions.trips?.canModify)
     : canModify;
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
+  const canModifyVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canModify) : canModify;
   const canModifySettings = featurePermissions ? Boolean(featurePermissions.parametres?.canModify) : canModify;
   const canOperateTrips = Boolean(currentEmployeeId) && canModifyTrips;
   const trackingIntervalSeconds = 10;
@@ -311,6 +317,32 @@ export default function TransportModulePage({
     setDialog(null);
   };
 
+  const updatePreviewVehicle = (vehicle: Vehicle, input: VehicleFormInput) => {
+    setData(current => current ? {
+      ...current,
+      vehicles: current.vehicles.map(item => item.id === vehicle.id
+        ? { ...item, ...input, imageUrl: input.imageData || item.imageUrl }
+        : item),
+    } : current);
+    showAppToast('Véhicule modifié dans l’aperçu local.', 'success');
+    setDialog(null);
+    setEditingVehicle(null);
+  };
+
+  const removePreviewVehicle = (vehicle: Vehicle) => {
+    setData(current => current ? {
+      ...current,
+      vehicles: current.vehicles.filter(item => item.id !== vehicle.id),
+      metrics: {
+        ...current.metrics,
+        availableVehicles: vehicle.status === 'AVAILABLE'
+          ? Math.max(0, current.metrics.availableVehicles - 1)
+          : current.metrics.availableVehicles,
+      },
+    } : current);
+    showAppToast('Véhicule supprimé de l’aperçu local.', 'success');
+  };
+
   const addPreviewTrip = (input: CreateTripInput) => {
     if (!data) return;
     const trip: Trip = { ...input, id: `preview-trip-${Date.now()}`, companyId, reference: `TX-${String(data.trips.length + 1).padStart(4, '0')}`, driverId: input.driverId ?? null, vehicleId: input.vehicleId ?? null, status: input.driverId && input.vehicleId ? 'ASSIGNED' : 'REQUESTED', requestedAt: new Date().toISOString() };
@@ -363,6 +395,16 @@ export default function TransportModulePage({
     });
   };
 
+  const removeVehicle = (vehicle: Vehicle) => {
+    if (!canModifyVehicles || pendingAction) return;
+    if (!window.confirm(`Supprimer le véhicule ${vehicle.registration} ? Cette action est définitive.`)) return;
+    if (preview) {
+      removePreviewVehicle(vehicle);
+      return;
+    }
+    void run(() => api.deleteVehicle(vehicle.id), 'Véhicule supprimé.');
+  };
+
   if (loading) return <TransportLoadingState />;
   if (!data) return <TransportErrorState message={error} onRetry={() => void load()} />;
 
@@ -399,13 +441,23 @@ export default function TransportModulePage({
         {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}</>}
         {tab === 'courses' && <TripsPanel data={data} canCreate={canOperateTrips} canModify={canOperateTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
         {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
-        {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} onCreate={() => setDialog('vehicle')} />}
+        {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
         {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
       </>}
 
       {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} employees={employees} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}
-      {dialog === 'vehicle' && <VehicleDialog busy={Boolean(pendingAction)} drivers={data.drivers} vehicles={data.vehicles} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewVehicle(input) : void run(() => api.createVehicle(input), 'Véhicule enregistré.')} />}
+      {dialog === 'vehicle' && <VehicleDialog busy={Boolean(pendingAction)} vehicle={editingVehicle} drivers={data.drivers} vehicles={data.vehicles} onClose={() => { setDialog(null); setEditingVehicle(null); }} onSubmit={input => {
+        if (editingVehicle) {
+          if (preview) {
+            updatePreviewVehicle(editingVehicle, input);
+          } else {
+            void run(() => api.updateVehicle(editingVehicle.id, input as UpdateVehicleInput), 'Véhicule modifié.');
+          }
+        } else if (input.imageData) {
+          void run(() => api.createVehicle({ ...input, imageData: input.imageData as string }), 'Véhicule enregistré.');
+        }
+      }} />}
       {dialog === 'trip' && <TripDialog busy={Boolean(pendingAction)} drivers={data.drivers} vehicles={data.vehicles} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewTrip(input) : void run(() => api.createTrip(input), 'Course créée.')} />}
     </div>
   );
@@ -477,7 +529,8 @@ function TrackingSurface({ pickupLatitude, pickupLongitude, driverLatitude, driv
 }
 
 function HistoryPanel({ trips }: { trips: Trip[] }) {
-  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Traçabilité Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Historique</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Retrouvez les courses et leurs statuts enregistrés.</p></div></div><section className="card-surface overflow-hidden">{trips.length ? <TripTable trips={trips} compact onStatusChange={() => undefined} /> : <EmptyState icon={History} title="Aucun historique" text="Les courses terminées ou en cours apparaîtront ici." />}</section></div>;
+  const historicalTrips = trips.filter(trip => ['COMPLETED', 'CANCELLED'].includes(trip.status));
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Traçabilité Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Historique</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les courses terminées ou annulées sont conservées ici.</p></div></div><section className="card-surface overflow-hidden">{historicalTrips.length ? <TripTable trips={historicalTrips} compact onStatusChange={() => undefined} /> : <EmptyState icon={History} title="Aucun historique" text="Les courses terminées ou annulées apparaîtront ici après leur clôture." />}</section></div>;
 }
 
 function SettingsPanel({ settings, canModify, onSave }: { settings: TransportSettings; canModify: boolean; onSave: (settings: TransportSettings) => void }) {
@@ -531,13 +584,14 @@ function TripsPanel({ data, canCreate, canModify, onCreate, onStatusChange }: { 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<TripStatus | 'ALL'>('ALL');
   const trips = useMemo(() => data.trips.filter(trip => {
+    if (!['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].includes(trip.status)) return false;
     const matchesQuery = !query || `${trip.reference} ${trip.pickup} ${trip.destination} ${trip.passengerName}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
     return matchesQuery && (filter === 'ALL' || trip.status === filter);
   }), [data.trips, filter, query]);
   return <div className="fade-up space-y-4">
-    <div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Dispatch</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Courses</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Chaque demande, de l’appel à l’arrivée.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Créer une course</button>}</div>
+     <div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Dispatch en cours</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Courses</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Seules les courses actuellement ouvertes sont affichées ici. Les courses terminées ou annulées sont dans Historique.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Créer une course</button>}</div>
     <section className="card-surface overflow-hidden">
-      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center"><div className="relative min-w-0 flex-1"><MapPin size={15} className="absolute left-3 top-3 text-[hsl(var(--muted-foreground))]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une référence, un passager ou une adresse" className="w-full border px-9 py-2.5 text-sm" /></div><select value={filter} onChange={event => setFilter(event.target.value as TripStatus | 'ALL')} className="border px-3 py-2.5 text-sm sm:w-48"><option value="ALL">Tous les statuts</option>{tripStatuses.map(status => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></div>
+       <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center"><div className="relative min-w-0 flex-1"><MapPin size={15} className="absolute left-3 top-3 text-[hsl(var(--muted-foreground))]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une course en cours" className="w-full border px-9 py-2.5 text-sm" /></div><select value={filter} onChange={event => setFilter(event.target.value as TripStatus | 'ALL')} className="border px-3 py-2.5 text-sm sm:w-48"><option value="ALL">Tous les statuts actifs</option>{['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].map(status => <option key={status} value={status}>{statusLabels[status as TripStatus]}</option>)}</select></div>
       {trips.length ? <TripTable trips={trips} canModify={canModify} onStatusChange={onStatusChange} /> : <EmptyState icon={Route} title={query || filter !== 'ALL' ? 'Aucun résultat' : 'Le carnet de courses est vide'} text={query || filter !== 'ALL' ? 'Essayez un autre filtre ou une autre recherche.' : 'Créez une course pour commencer à organiser le dispatch.'} />}
     </section>
   </div>;
@@ -556,8 +610,8 @@ function DriversPanel({ drivers, canCreate, onCreate }: { drivers: Driver[]; can
   return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Équipage</p><h2 className="mt-1 text-lg font-black tracking-[-.03em] sm:text-xl">Chauffeurs</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Les profils autorisés à prendre le volant.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un chauffeur</button>}</div><section className="card-surface overflow-hidden">{drivers.length ? <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Statut</th></tr></thead><tbody>{drivers.map(driver => <tr key={driver.id} className="border-t"><td className="px-3 sm:px-4"><div className="flex items-center gap-2 sm:gap-3"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(var(--primary)/.12)] text-[11px] font-black text-[hsl(var(--primary))] sm:h-8 sm:w-8 sm:text-xs">{driver.name.slice(0, 2).toUpperCase()}</div><span className="font-semibold">{driver.name}</span></div></td><td><a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"><Phone size={13} />{driver.phone}</a></td><td className="mono text-[11px] sm:text-xs">{driver.licenseNumber}</td><td><StatusBadge status={driver.status} label={driverStatusLabel[driver.status]} /></td></tr>)}</tbody></table></div> : <EmptyState icon={UserRound} title="Aucun chauffeur enregistré" text="Ajoutez les chauffeurs habilités à rejoindre votre flotte." />}</section></div>;
 }
 
-function VehiclesPanel({ vehicles, drivers, canCreate, onCreate }: { vehicles: Vehicle[]; drivers: Driver[]; canCreate: boolean; onCreate: () => void }) {
-  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Parc roulant</p><h2 className="mt-1 text-lg font-black tracking-[-.03em] sm:text-xl">Véhicules</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Une lecture rapide de l’état de chaque voiture.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un véhicule</button>}</div><section className="card-surface overflow-hidden">{vehicles.length ? <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Immatriculation</th><th>Modèle</th><th>Chauffeur</th><th>Type</th><th>État</th></tr></thead><tbody>{vehicles.map(vehicle => <tr key={vehicle.id} className="border-t"><td className="px-3 sm:px-4"><div className="flex items-center gap-2"><img src={vehicle.imageUrl || '/taxi-car.svg'} alt={`Photo de ${vehicle.model}`} className="h-9 w-12 rounded-md border bg-white object-cover" /><span className="mono rounded bg-[hsl(var(--muted))] px-2 py-1 text-[11px] font-bold sm:text-xs">{vehicle.registration}</span></div></td><td className="font-semibold">{vehicle.model}</td><td>{vehicle.driverId ? drivers.find(driver => driver.id === vehicle.driverId)?.name ?? 'Chauffeur introuvable' : <span className="text-[11px] text-amber-700 sm:text-xs">Non rattaché</span>}</td><td className="text-[hsl(var(--muted-foreground))]">{vehicle.vehicleType}</td><td><StatusBadge status={vehicle.status} label={vehicleStatusLabel[vehicle.status]} /></td></tr>)}</tbody></table></div> : <EmptyState icon={CarFront} title="Aucun véhicule enregistré" text="Votre parc roulant apparaîtra ici après son premier enregistrement." />}</section></div>;
+function VehiclesPanel({ vehicles, drivers, canCreate, canModify, onCreate, onEdit, onDelete }: { vehicles: Vehicle[]; drivers: Driver[]; canCreate: boolean; canModify: boolean; onCreate: () => void; onEdit: (vehicle: Vehicle) => void; onDelete: (vehicle: Vehicle) => void }) {
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Parc roulant</p><h2 className="mt-1 text-lg font-black tracking-[-.03em] sm:text-xl">Véhicules</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Une lecture rapide de l’état de chaque voiture.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un véhicule</button>}</div><section className="card-surface overflow-hidden">{vehicles.length ? <div className="table-scroll transport-table-scroll"><table className="data-table w-full text-left text-xs sm:text-sm"><thead><tr><th className="px-3 sm:px-4">Immatriculation</th><th>Modèle</th><th>Chauffeur</th><th>Type</th><th>État</th>{canModify && <th>Actions</th>}</tr></thead><tbody>{vehicles.map(vehicle => <tr key={vehicle.id} className="border-t"><td className="px-3 sm:px-4"><div className="flex items-center gap-2"><img src={vehicle.imageUrl || '/taxi-car.svg'} alt={`Photo de ${vehicle.model}`} className="h-9 w-12 rounded-md border bg-white object-cover" /><span className="mono rounded bg-[hsl(var(--muted))] px-2 py-1 text-[11px] font-bold sm:text-xs">{vehicle.registration}</span></div></td><td className="font-semibold">{vehicle.model}</td><td>{vehicle.driverId ? drivers.find(driver => driver.id === vehicle.driverId)?.name ?? 'Chauffeur introuvable' : <span className="text-[11px] text-amber-700 sm:text-xs">Non rattaché</span>}</td><td className="text-[hsl(var(--muted-foreground))]">{vehicle.vehicleType}</td><td><StatusBadge status={vehicle.status} label={vehicleStatusLabel[vehicle.status]} /></td>{canModify && <td><div className="flex flex-wrap gap-1.5"><button type="button" onClick={() => onEdit(vehicle)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[11px] font-bold hover:bg-[hsl(var(--muted))]" aria-label={`Modifier ${vehicle.registration}`}><Pencil size={13} />Modifier</button><button type="button" onClick={() => onDelete(vehicle)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-2.5 py-2 text-[11px] font-bold text-rose-700 hover:bg-rose-50" aria-label={`Supprimer ${vehicle.registration}`}><Trash2 size={13} />Supprimer</button></div></td>}</tr>)}</tbody></table></div> : <EmptyState icon={CarFront} title="Aucun véhicule enregistré" text="Votre parc roulant apparaîtra ici après son premier enregistrement." />}</section></div>;
 }
 
 function StatusBadge({ status, label }: { status: TripStatus | DriverStatus | VehicleStatus; label: string }) {
@@ -599,9 +653,17 @@ function DriverDialog({ busy, employees, onClose, onSubmit }: { busy: boolean; e
   return <DialogShell title="Qualifier un chauffeur" description="Sélectionnez un employé créé dans Organisation, puis ajoutez ses informations de conduite." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><Field label="Employé de l’organisation"><select required autoFocus value={form.employeeId} onChange={event => setForm({ ...form, employeeId: event.target.value })} className={inputClass}><option value="">Sélectionner un employé…</option>{eligibleEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}</select></Field>{selectedEmployee && <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Identité et téléphone repris depuis Organisation : <strong className="text-[hsl(var(--foreground))]">{selectedEmployee.firstName} {selectedEmployee.lastName}</strong>{selectedEmployee.phone ? ` · ${selectedEmployee.phone}` : ' · aucun téléphone renseigné'}</p>}<Field label="Numéro de permis"><input required value={form.licenseNumber} onChange={event => setForm({ ...form, licenseNumber: event.target.value })} className={inputClass} placeholder="SN-TR-0000" /></Field><Field label="Statut"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as DriverStatus })} className={inputClass}><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option></select></Field>{eligibleEmployees.length === 0 && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-800">Créez d’abord un employé actif dans Organisation pour pouvoir le qualifier comme chauffeur.</p>}<DialogActions busy={busy} disabled={eligibleEmployees.length === 0 || !form.employeeId || !form.licenseNumber.trim()} onClose={onClose} label="Qualifier le chauffeur" /></form></DialogShell>;
 }
 
-function VehicleDialog({ busy, drivers, vehicles, onClose, onSubmit }: { busy: boolean; drivers: Driver[]; vehicles: Vehicle[]; onClose: () => void; onSubmit: (input: CreateVehicleInput) => void }) {
-  const eligibleDrivers = drivers.filter(driver => driver.status === 'ACTIVE' && !vehicles.some(vehicle => vehicle.driverId === driver.id));
-  const [form, setForm] = useState<CreateVehicleInput>({ registration: '', model: '', vehicleType: 'Berline', driverId: '', status: 'AVAILABLE', imageData: '' });
+function VehicleDialog({ busy, vehicle, drivers, vehicles, onClose, onSubmit }: { busy: boolean; vehicle: Vehicle | null; drivers: Driver[]; vehicles: Vehicle[]; onClose: () => void; onSubmit: (input: VehicleFormInput) => void }) {
+  const editing = Boolean(vehicle);
+  const eligibleDrivers = drivers.filter(driver => driver.status === 'ACTIVE' && (!vehicles.some(item => item.driverId === driver.id && item.id !== vehicle?.id)));
+  const [form, setForm] = useState<VehicleFormInput>(() => ({
+    registration: vehicle?.registration ?? '',
+    model: vehicle?.model ?? '',
+    vehicleType: vehicle?.vehicleType ?? 'Berline',
+    driverId: vehicle?.driverId ?? '',
+    status: vehicle?.status ?? 'AVAILABLE',
+    imageData: '',
+  }));
   const [imageError, setImageError] = useState('');
   const handleImage = (file: File | undefined) => {
     if (!file) return;
@@ -622,8 +684,14 @@ function VehicleDialog({ busy, drivers, vehicles, onClose, onSubmit }: { busy: b
     };
     reader.readAsDataURL(file);
   };
-  const submit = (event: FormEvent) => { event.preventDefault(); if (form.registration.trim() && form.model.trim() && form.vehicleType.trim() && form.driverId && form.imageData) onSubmit({ ...form, registration: form.registration.trim().toUpperCase(), model: form.model.trim(), vehicleType: form.vehicleType.trim() }); };
-  return <DialogShell title="Ajouter un véhicule" description="Ajoutez une photo nette : elle sera affichée lors de la détection du véhicule par le client et le chauffeur." onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Immatriculation"><input required autoFocus value={form.registration} onChange={event => setForm({ ...form, registration: event.target.value })} className={`${inputClass} uppercase`} placeholder="DK-1234-AB" /></Field><Field label="Modèle"><input required value={form.model} onChange={event => setForm({ ...form, model: event.target.value })} className={inputClass} placeholder="Toyota Corolla" /></Field></div><Field label="Photo du véhicule"><div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed p-3">{form.imageData ? <img src={form.imageData} alt="Aperçu du véhicule" className="h-20 w-28 rounded-lg border bg-white object-cover" /> : <div className="flex h-20 w-28 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"><CarFront size={28} /></div>}<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><ImagePlus size={14} />Choisir une image<input required={!form.imageData} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={event => handleImage(event.target.files?.[0])} /></label></div>{imageError && <p className="mt-1 text-xs font-semibold text-rose-700">{imageError}</p>}<p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 2 Mo maximum.</p></Field><Field label="Chauffeur rattaché"><select required value={form.driverId} onChange={event => setForm({ ...form, driverId: event.target.value })} className={inputClass}><option value="">Sélectionner un chauffeur…</option>{eligibleDrivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></Field><Field label="Type de véhicule"><input required value={form.vehicleType} onChange={event => setForm({ ...form, vehicleType: event.target.value })} className={inputClass} placeholder="Berline, van, premium…" /></Field><Field label="État initial"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as VehicleStatus })} className={inputClass}><option value="AVAILABLE">Disponible</option><option value="MAINTENANCE">Maintenance</option><option value="ON_TRIP">En course</option></select></Field>{eligibleDrivers.length === 0 && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-800">Qualifiez d’abord un chauffeur actif dans Transport avant d’ajouter son véhicule.</p>}<DialogActions busy={busy} disabled={eligibleDrivers.length === 0 || !form.driverId || !form.registration.trim() || !form.model.trim() || !form.imageData} onClose={onClose} label="Enregistrer le véhicule" /></form></DialogShell>;
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (form.registration.trim() && form.model.trim() && form.vehicleType.trim() && form.driverId && (editing || form.imageData)) {
+      onSubmit({ ...form, registration: form.registration.trim().toUpperCase(), model: form.model.trim(), vehicleType: form.vehicleType.trim() });
+    }
+  };
+  const imagePreview = form.imageData || vehicle?.imageUrl;
+  return <DialogShell title={editing ? 'Modifier le véhicule' : 'Ajouter un véhicule'} description={editing ? 'Modifiez les informations de la voiture et de son chauffeur rattaché.' : 'Ajoutez une photo nette : elle sera affichée lors de la détection du véhicule par le client et le chauffeur.'} onClose={onClose}><form onSubmit={submit} className="mt-6 space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="Immatriculation"><input required autoFocus value={form.registration} onChange={event => setForm({ ...form, registration: event.target.value })} className={`${inputClass} uppercase`} placeholder="DK-1234-AB" /></Field><Field label="Modèle"><input required value={form.model} onChange={event => setForm({ ...form, model: event.target.value })} className={inputClass} placeholder="Toyota Corolla" /></Field></div><Field label="Photo du véhicule"><div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed p-3">{imagePreview ? <img src={imagePreview} alt="Aperçu du véhicule" className="h-20 w-28 rounded-lg border bg-white object-cover" /> : <div className="flex h-20 w-28 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"><CarFront size={28} /></div>}<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]"><ImagePlus size={14} />Choisir une image<input required={!editing && !form.imageData} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={event => handleImage(event.target.files?.[0])} /></label></div>{imageError && <p className="mt-1 text-xs font-semibold text-rose-700">{imageError}</p>}<p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 2 Mo maximum. Laissez l’image actuelle pour la conserver.</p></Field><Field label="Chauffeur rattaché"><select required value={form.driverId} onChange={event => setForm({ ...form, driverId: event.target.value })} className={inputClass}><option value="">Sélectionner un chauffeur…</option>{vehicle?.driverId && !eligibleDrivers.some(driver => driver.id === vehicle.driverId) && <option value={vehicle.driverId}>Chauffeur actuel</option>}{eligibleDrivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></Field><Field label="Type de véhicule"><input required value={form.vehicleType} onChange={event => setForm({ ...form, vehicleType: event.target.value })} className={inputClass} placeholder="Berline, van, premium…" /></Field><Field label={editing ? 'État' : 'État initial'}><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as VehicleStatus })} className={inputClass} disabled={vehicle?.status === 'ON_TRIP'}><option value="AVAILABLE">Disponible</option><option value="MAINTENANCE">Maintenance</option>{vehicle?.status === 'ON_TRIP' && <option value="ON_TRIP">En course</option>}</select></Field>{eligibleDrivers.length === 0 && !vehicle?.driverId && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-800">Qualifiez d’abord un chauffeur actif dans Transport avant d’ajouter son véhicule.</p>}<DialogActions busy={busy} disabled={eligibleDrivers.length === 0 && !vehicle?.driverId || !form.driverId || !form.registration.trim() || !form.model.trim() || !form.imageData && !editing} onClose={onClose} label={editing ? 'Enregistrer les modifications' : 'Enregistrer le véhicule'} /></form></DialogShell>;
 }
 
 function TripDialog({ busy, drivers, vehicles, onClose, onSubmit }: { busy: boolean; drivers: Driver[]; vehicles: Vehicle[]; onClose: () => void; onSubmit: (input: CreateTripInput) => void }) {
