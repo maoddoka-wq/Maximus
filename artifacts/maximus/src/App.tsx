@@ -108,7 +108,6 @@ import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
-import { publicEcommerceApi } from '@/lib/ecommerce-api';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
   loadCompanyModuleAccess,
@@ -138,6 +137,16 @@ import { mutationSuccessMessage } from '@/lib/mutation-feedback';
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
+
+function isPotentialCustomStoreHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+
+  return !['.replit.dev', '.replit.app', '.repl.co', '.onrender.com'].some((suffix) => hostname.endsWith(suffix));
+}
+
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
@@ -376,7 +385,6 @@ function AppContent() {
   const [appStateReady, setAppStateReady] = useState(
     () => !localStorage.getItem('maximus-session'),
   );
-  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>('none');
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
@@ -408,28 +416,6 @@ function AppContent() {
   }, [sidebarCollapsed]);
   const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
     showAppToast(message, kind);
-  useEffect(() => {
-    // A connected MAXIMUS workspace must not wait for the public-domain probe.
-    // The probe is only relevant on the public root route and runs in the
-    // background so the normal login screen remains immediately interactive.
-    if (session || pathname !== '/') {
-      setCustomDomainState('none');
-      return undefined;
-    }
-
-    let active = true;
-    setCustomDomainState('checking');
-    void publicEcommerceApi.bootstrapDomain()
-      .then((result) => {
-        if (active) setCustomDomainState('store' in result ? 'shop' : 'none');
-      })
-      .catch(() => {
-        if (active) setCustomDomainState('none');
-      });
-    return () => {
-      active = false;
-    };
-  }, [pathname, session]);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
@@ -941,12 +927,12 @@ function AppContent() {
     if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
     if (pwaEntry?.domain) return <PublicShopPage domain clientApp />;
   }
+  if (pathname === '/' && isPotentialCustomStoreHost()) {
+    return <PublicShopPage domain />;
+  }
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
   if (publicShopMatch) {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
-  }
-  if (!session && customDomainState === 'shop') {
-    return <PublicShopPage domain />;
   }
   if (session && !appStateReady) {
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
