@@ -1083,7 +1083,6 @@ class EcommerceTest extends TestCase
         $this->getJson('/api/shop/boutique-sans-livraison')
             ->assertOk()
             ->assertJsonPath('store.enabledFeatures.livraisons', false)
-            ->assertJsonPath('store.enabledFeatures.transport', false)
             ->assertJsonPath('store.enabledFeatures.location', true);
         $this->postJson('/api/shop/boutique-sans-livraison/delivery-requests', [
             'requesterName' => 'Client',
@@ -1091,200 +1090,6 @@ class EcommerceTest extends TestCase
             'address' => 'Dakar',
             'serviceType' => 'STANDARD',
         ])->assertForbidden();
-        $this->postJson('/api/shop/boutique-sans-livraison/taxi-requests', [
-            'requesterName' => 'Client Taxi',
-            'requesterEmail' => 'taxi@example.test',
-            'pickupAddress' => 'Dakar',
-            'pickupLatitude' => 14.7,
-            'pickupLongitude' => -17.4,
-            'destinationAddress' => 'Almadies',
-            'passengerCount' => 1,
-        ])->assertForbidden();
-    }
-
-    public function test_taxi_matches_the_nearest_verified_driver_and_keeps_the_driver_scope(): void
-    {
-        $this->enableTransportFeature();
-        $this->asActor('employee');
-        $admin = $this->asActor();
-        $admin->patchJson('/api/ecommerce/store?companyId=kora', [
-            'name' => 'Boutique Taxi',
-            'slug' => 'boutique-taxi',
-            'description' => 'Service Taxi',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primaryColor' => '#D69E2E',
-            'accentColor' => '#172033',
-        ])->assertOk();
-        $admin->postJson('/api/ecommerce/taxi/drivers?companyId=kora', [
-            'employeeId' => 'ecommerce-employee',
-            'vehicleMake' => 'Toyota',
-            'vehicleModel' => 'Corolla',
-            'licensePlate' => 'DK-1234-AA',
-        ])->assertCreated()
-            ->assertJsonPath('verificationStatus', 'PENDING');
-
-        $taxiDriverId = $admin->get('/api/ecommerce/taxi/drivers?companyId=kora')->json('drivers.0.id');
-        $admin->patchJson('/api/ecommerce/taxi/drivers/'.$taxiDriverId.'?companyId=kora', [
-            'verificationStatus' => 'VERIFIED',
-        ])->assertOk();
-
-        $driverSession = $this->asActor('employee');
-        $driverSession->patchJson('/api/ecommerce/taxi/driver-session?companyId=kora', [
-            'status' => 'AVAILABLE',
-            'latitude' => 14.7167,
-            'longitude' => -17.4677,
-        ])->assertOk()
-            ->assertJsonPath('status', 'AVAILABLE');
-
-        $request = $this->postJson('/api/shop/boutique-taxi/taxi-requests', [
-            'requesterName' => 'Client Taxi',
-            'requesterEmail' => 'taxi@example.test',
-            'pickupAddress' => 'Plateau, Dakar',
-            'pickupLatitude' => 14.7168,
-            'pickupLongitude' => -17.4678,
-            'destinationAddress' => 'Almadies, Dakar',
-            'passengerCount' => 2,
-        ])->assertCreated()
-            ->assertJsonPath('status', 'PROPOSEE')
-            ->assertJsonPath('assignedDriverId', $taxiDriverId)
-            ->json();
-
-        $driverSession->getJson('/api/ecommerce/taxi/driver-session?companyId=kora')
-            ->assertOk()
-            ->assertJsonPath('requests.0.id', $request['id'])
-            ->assertJsonPath('requests.0.status', 'PROPOSEE');
-
-        $driverSession->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=kora', [
-            'action' => 'ACCEPT',
-        ])->assertOk()->assertJsonPath('status', 'ACCEPTEE');
-
-        $this->assertDatabaseHas('ecommerce_taxi_requests', [
-            'id' => $request['id'],
-            'company_id' => 'kora',
-            'status' => 'ACCEPTEE',
-        ]);
-    }
-
-    public function test_transport_employee_management_does_not_depend_on_delivery_permission(): void
-    {
-        $this->enableTransportFeature();
-        $this->asActor('employee');
-        $admin = $this->asActor();
-        $driver = $admin->postJson('/api/ecommerce/taxi/drivers?companyId=kora', [
-            'employeeId' => 'ecommerce-employee',
-            'licensePlate' => 'DK-9090-ZZ',
-        ])->assertCreated()->json();
-
-        $this->asActor('employee', [
-            'ecommerce:menu:transport' => ['voir', 'modifier'],
-        ])->patchJson('/api/ecommerce/taxi/drivers/'.$driver['id'].'?companyId=kora', [
-            'verificationStatus' => 'VERIFIED',
-        ])->assertOk()
-            ->assertJsonPath('verificationStatus', 'VERIFIED');
-    }
-
-    public function test_delivery_can_remain_enabled_without_enabling_transport(): void
-    {
-        DB::table('maximus_company_modules')
-            ->where('company_id', 'kora')
-            ->where('module_id', 'ecommerce')
-            ->update([
-                'feature_ids' => json_encode(['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'livraisons', 'finances', 'parametres']),
-                'configuration' => json_encode(['featureScope' => 'explicit']),
-            ]);
-
-        $admin = $this->asActor();
-        $admin->patchJson('/api/ecommerce/store?companyId=kora', [
-            'name' => 'Boutique Livraison Sans Taxi',
-            'slug' => 'boutique-livraison-sans-taxi',
-            'description' => 'Livraison uniquement',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primaryColor' => '#D69E2E',
-            'accentColor' => '#172033',
-        ])->assertOk();
-
-        $this->getJson('/api/shop/boutique-livraison-sans-taxi')
-            ->assertOk()
-            ->assertJsonPath('store.enabledFeatures.livraisons', true)
-            ->assertJsonPath('store.enabledFeatures.transport', false);
-
-        $this->postJson('/api/shop/boutique-livraison-sans-taxi/taxi-requests', [
-            'requesterName' => 'Client Taxi',
-            'requesterEmail' => 'taxi@example.test',
-            'pickupAddress' => 'Dakar',
-            'pickupLatitude' => 14.7,
-            'pickupLongitude' => -17.4,
-            'destinationAddress' => 'Almadies',
-            'passengerCount' => 1,
-        ])->assertForbidden();
-    }
-
-    public function test_taxi_refusal_reassigns_and_driver_can_complete_the_full_course_cycle(): void
-    {
-        $this->enableTransportFeature();
-        $this->asEmployeeActor('taxi-driver-one');
-        $this->asEmployeeActor('taxi-driver-two');
-        $admin = $this->asActor();
-        $admin->patchJson('/api/ecommerce/store?companyId=kora', [
-            'name' => 'Boutique Taxi Cycle',
-            'slug' => 'boutique-taxi-cycle',
-            'description' => 'Service Taxi',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primaryColor' => '#D69E2E',
-            'accentColor' => '#172033',
-        ])->assertOk();
-
-        $driverOne = $admin->postJson('/api/ecommerce/taxi/drivers?companyId=kora', [
-            'employeeId' => 'taxi-driver-one',
-            'licensePlate' => 'DK-1111-AA',
-        ])->assertCreated()->json();
-        $driverTwo = $admin->postJson('/api/ecommerce/taxi/drivers?companyId=kora', [
-            'employeeId' => 'taxi-driver-two',
-            'licensePlate' => 'DK-2222-AA',
-        ])->assertCreated()->json();
-        $admin->patchJson('/api/ecommerce/taxi/drivers/'.$driverOne['id'].'?companyId=kora', ['verificationStatus' => 'VERIFIED'])->assertOk();
-        $admin->patchJson('/api/ecommerce/taxi/drivers/'.$driverTwo['id'].'?companyId=kora', ['verificationStatus' => 'VERIFIED'])->assertOk();
-
-        $this->asEmployeeActor('taxi-driver-one')->patchJson('/api/ecommerce/taxi/driver-session?companyId=kora', [
-            'status' => 'AVAILABLE',
-            'latitude' => 14.7167,
-            'longitude' => -17.4677,
-        ])->assertOk();
-        $this->asEmployeeActor('taxi-driver-two')->patchJson('/api/ecommerce/taxi/driver-session?companyId=kora', [
-            'status' => 'AVAILABLE',
-            'latitude' => 14.8000,
-            'longitude' => -17.5000,
-        ])->assertOk();
-
-        $request = $this->postJson('/api/shop/boutique-taxi-cycle/taxi-requests', [
-            'requesterName' => 'Client Cycle',
-            'requesterEmail' => 'cycle@example.test',
-            'pickupAddress' => 'Plateau, Dakar',
-            'pickupLatitude' => 14.7168,
-            'pickupLongitude' => -17.4678,
-            'destinationAddress' => 'Almadies, Dakar',
-            'passengerCount' => 1,
-        ])->assertCreated()
-            ->assertJsonPath('assignedDriverId', $driverOne['id'])
-            ->json();
-
-        $this->asEmployeeActor('taxi-driver-one')->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=kora', ['action' => 'REFUSE'])
-            ->assertOk()
-            ->assertJsonPath('status', 'PROPOSEE')
-            ->assertJsonPath('assignedDriverId', $driverTwo['id']);
-        $this->asEmployeeActor('taxi-driver-two')->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=other-company', ['action' => 'ACCEPT'])
-            ->assertForbidden();
-        $this->asEmployeeActor('taxi-driver-two')->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=kora', ['action' => 'ACCEPT'])
-            ->assertOk()->assertJsonPath('status', 'ACCEPTEE');
-        $this->asEmployeeActor('taxi-driver-two')->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=kora', ['action' => 'START_APPROACH'])
-            ->assertOk()->assertJsonPath('status', 'CHAUFFEUR_EN_APPROCHE');
-        $this->asEmployeeActor('taxi-driver-two')->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=kora', ['action' => 'BOARD'])
-            ->assertOk()->assertJsonPath('status', 'CLIENT_A_BORD');
-        $this->asEmployeeActor('taxi-driver-two')->patchJson('/api/ecommerce/taxi/requests/'.$request['id'].'?companyId=kora', ['action' => 'COMPLETE'])
-            ->assertOk()->assertJsonPath('status', 'TERMINEE');
     }
 
     public function test_rentals_are_autonomous_persistent_and_exposed_only_when_published(): void
@@ -1395,56 +1200,21 @@ class EcommerceTest extends TestCase
 
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
-        $user = AuthUser::query()->updateOrCreate(
-            ['id' => 'ecommerce-'.strtolower($role)],
-            [
-                'email' => 'ecommerce-'.strtolower($role).'@kora.demo',
-                'password_hash' => 'not-used-in-this-test',
-                'display_name' => 'Gestionnaire E-commerce',
-                'role' => $role,
-                'company_id' => 'kora',
-                'employee_id' => $role === 'employee' ? 'ecommerce-employee' : null,
-                'sector_ids' => [],
-                'permissions' => $permissions,
-                'status' => 'ACTIF',
-            ],
-        );
+        $user = AuthUser::query()->create([
+            'id' => 'ecommerce-'.strtolower($role),
+            'email' => 'ecommerce-'.strtolower($role).'@kora.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Gestionnaire E-commerce',
+            'role' => $role,
+            'company_id' => 'kora',
+            'employee_id' => $role === 'employee' ? 'ecommerce-employee' : null,
+            'sector_ids' => [],
+            'permissions' => $permissions,
+            'status' => 'ACTIF',
+        ]);
 
         return $this
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
-    }
-
-    private function asEmployeeActor(string $employeeId): self
-    {
-        $user = AuthUser::query()->updateOrCreate(
-            ['id' => 'auth-'.$employeeId],
-            [
-                'email' => $employeeId.'@kora.demo',
-                'password_hash' => 'not-used-in-this-test',
-                'display_name' => $employeeId,
-                'role' => 'employee',
-                'company_id' => 'kora',
-                'employee_id' => $employeeId,
-                'sector_ids' => [],
-                'permissions' => [],
-                'status' => 'ACTIF',
-            ],
-        );
-
-        return $this
-            ->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
-    }
-
-    private function enableTransportFeature(): void
-    {
-        DB::table('maximus_company_modules')
-            ->where('company_id', 'kora')
-            ->where('module_id', 'ecommerce')
-            ->update([
-                'feature_ids' => json_encode(['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'livraisons', 'transport', 'finances', 'parametres']),
-                'configuration' => json_encode(['featureScope' => 'explicit']),
-            ]);
     }
 }

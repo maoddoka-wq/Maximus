@@ -158,7 +158,6 @@ export type CompanyRouteScreens = {
   empty: Screen;
   stocks: Screen;
   ecommerce: Screen;
-  taxi: Screen;
   finance: Screen;
   commerce: Screen;
   operational: Screen;
@@ -192,7 +191,6 @@ export function CompanyRouter({
   commerceTabIds,
   moduleStatuses,
   serverModuleAccess,
-  serverModuleAccessReady,
   singleModuleNavigation,
   hiddenWorkspaceFeatures,
   screens,
@@ -220,7 +218,6 @@ export function CompanyRouter({
   commerceTabIds?: string[];
   moduleStatuses: Record<string, ModuleAvailability>;
   serverModuleAccess?: import('@/lib/module-api').ServerModuleAccess[] | null;
-  serverModuleAccessReady?: boolean;
   singleModuleNavigation?: boolean;
   screens: CompanyRouteScreens;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
@@ -365,20 +362,6 @@ export function CompanyRouter({
       allowedFeatureIds: ecommerceFeatureIds,
       singleModuleNavigation,
     });
-  }
-  if (routePath === '/entreprise/taxi') {
-    const ecommerceAccess = serverModuleAccess?.find((module) => module.id === 'ecommerce');
-    const transportEnabled = ecommerceAccess
-      ? ecommerceAccess.featureIds.includes('transport')
-      : ecommerceFeatureIds?.includes('transport') ?? false;
-    if (serverModuleAccessReady !== false && !transportEnabled) {
-      return renderScreen(screens.empty, {
-        title: 'Transport non activé',
-        text: 'Cette entreprise n’a pas autorisé la fonctionnalité Transport.',
-        action: () => onBack('/entreprise/ecommerce'),
-      });
-    }
-    return renderScreen(screens.taxi, { companyId });
   }
   if (routePath === '/entreprise/finance') {
     return renderScreen(screens.finance, { data, mutate });

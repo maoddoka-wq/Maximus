@@ -9,9 +9,6 @@ export type EcommerceRentalStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
 export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COURS' | 'LIVREE' | 'ANNULEE';
 export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
-export type EcommerceTaxiDriverStatus = 'OFFLINE' | 'AVAILABLE' | 'APPROACHING' | 'IN_TRIP';
-export type EcommerceTaxiVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
-export type EcommerceTaxiRequestStatus = 'DEMANDEE' | 'PROPOSEE' | 'ACCEPTEE' | 'CHAUFFEUR_EN_APPROCHE' | 'CLIENT_A_BORD' | 'TERMINEE' | 'ANNULEE';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY';
 
@@ -93,7 +90,6 @@ export interface EcommerceStore {
 export interface PublicShopFeatures {
   location: boolean;
   livraisons: boolean;
-  transport: boolean;
   ventePhysique: boolean;
   venteNumerique: boolean;
 }
@@ -227,61 +223,6 @@ export interface EcommerceDeliveryZone {
   sortOrder: number;
 }
 
-export interface EcommerceTaxiDriver {
-  id: string;
-  companyId: string;
-  employeeId: string;
-  displayName: string;
-  email: string;
-  verificationStatus: EcommerceTaxiVerificationStatus;
-  status: EcommerceTaxiDriverStatus;
-  vehicleMake: string;
-  vehicleModel: string;
-  vehicleColor: string;
-  licensePlate: string;
-  documents: Record<string, string>;
-  latitude: number | null;
-  longitude: number | null;
-  lastLocationAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EcommerceTaxiRequest {
-  id: string;
-  companyId?: string;
-  customerId?: string | null;
-  reference: string;
-  requesterName: string;
-  requesterEmail: string;
-  requesterPhone: string;
-  pickupAddress: string;
-  pickupLatitude: number;
-  pickupLongitude: number;
-  destinationAddress: string;
-  destinationLatitude: number | null;
-  destinationLongitude: number | null;
-  passengerCount: number;
-  status: EcommerceTaxiRequestStatus;
-  assignedDriverId: string | null;
-  assignedDriverName: string | null;
-  assignedDistanceKm: number | null;
-  note: string;
-  createdAt: string;
-  offeredAt?: string | null;
-  acceptedAt?: string | null;
-  approachingAt?: string | null;
-  boardedAt?: string | null;
-  completedAt?: string | null;
-  cancelledAt?: string | null;
-}
-
-export interface EcommerceTaxiEmployee {
-  employeeId: string;
-  displayName: string;
-  email: string;
-}
-
 export interface EcommerceOrder {
   id: string;
   companyId: string;
@@ -312,8 +253,6 @@ export interface EcommerceBootstrap {
   orders: EcommerceOrder[];
   deliveryZones: EcommerceDeliveryZone[];
   deliveryRequests: EcommerceDeliveryRequest[];
-  taxiDrivers: EcommerceTaxiDriver[];
-  taxiRequests: EcommerceTaxiRequest[];
 }
 
 export interface SellerWallet {
@@ -605,18 +544,6 @@ export const createEcommerceApi = (companyId: string) => {
     updateOrderStatus: (id: string, status: EcommerceOrderStatus) => request<EcommerceOrder>(withCompany(`/ecommerce/orders/${id}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
     deliveryRequests: () => request<{ deliveryRequests: EcommerceDeliveryRequest[] }>(withCompany('/ecommerce/delivery-requests')),
     updateDeliveryRequestStatus: (id: string, status: EcommerceDeliveryRequestStatus) => request<EcommerceDeliveryRequest>(withCompany(`/ecommerce/delivery-requests/${encodeURIComponent(id)}/status`), { method: 'PATCH', body: JSON.stringify({ status }) }),
-     taxiEligibleEmployees: () => request<{ employees: EcommerceTaxiEmployee[] }>(withCompany('/ecommerce/taxi/eligible-employees')),
-     taxiDrivers: () => request<{ drivers: EcommerceTaxiDriver[] }>(withCompany('/ecommerce/taxi/drivers')),
-     createTaxiDriver: (body: { employeeId: string; vehicleMake?: string; vehicleModel?: string; vehicleColor?: string; licensePlate: string; documents?: Record<string, string> }) =>
-       request<EcommerceTaxiDriver>(withCompany('/ecommerce/taxi/drivers'), json(body)),
-     updateTaxiDriver: (id: string, body: Partial<Pick<EcommerceTaxiDriver, 'verificationStatus' | 'status' | 'vehicleMake' | 'vehicleModel' | 'vehicleColor' | 'licensePlate' | 'documents'>>) =>
-       request<EcommerceTaxiDriver>(withCompany(`/ecommerce/taxi/drivers/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
-     taxiDriverSession: () => request<{ driver: EcommerceTaxiDriver; requests: EcommerceTaxiRequest[] }>(withCompany('/ecommerce/taxi/driver-session')),
-     updateTaxiDriverSession: (body: { status: 'OFFLINE' | 'AVAILABLE'; latitude?: number; longitude?: number }) =>
-       request<EcommerceTaxiDriver>(withCompany('/ecommerce/taxi/driver-session'), { method: 'PATCH', body: JSON.stringify(body) }),
-     taxiDriverRequests: () => request<{ requests: EcommerceTaxiRequest[] }>(withCompany('/ecommerce/taxi/requests')),
-     updateTaxiRequestByDriver: (id: string, action: 'ACCEPT' | 'REFUSE' | 'START_APPROACH' | 'BOARD' | 'COMPLETE' | 'CANCEL') =>
-       request<EcommerceTaxiRequest>(withCompany(`/ecommerce/taxi/requests/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify({ action }) }),
   };
 };
 
@@ -631,10 +558,6 @@ export const publicEcommerceApi = {
   createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; deliveryZoneId?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
-   createTaxiRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; pickupAddress: string; pickupLatitude: number; pickupLongitude: number; destinationAddress: string; destinationLatitude?: number; destinationLongitude?: number; passengerCount: number; note?: string }) =>
-     request<EcommerceTaxiRequest>(`/shop/${encodeURIComponent(slug)}/taxi-requests`, { method: 'POST', body: JSON.stringify(body) }),
-   createDomainTaxiRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; pickupAddress: string; pickupLatitude: number; pickupLongitude: number; destinationAddress: string; destinationLatitude?: number; destinationLongitude?: number; passengerCount: number; note?: string }) =>
-     request<EcommerceTaxiRequest>('/shop-domain/taxi-requests', { method: 'POST', body: JSON.stringify(body) }),
   createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>
     request<{ reference: string; total: number; checkoutUrl: string; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/payment`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   createDomainPayment: (orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>

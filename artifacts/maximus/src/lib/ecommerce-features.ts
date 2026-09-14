@@ -9,7 +9,6 @@ export const ecommerceFeatureDefinitions = [
   { id: 'promotions', label: 'Promotions' },
   { id: 'location', label: 'Location' },
   { id: 'livraisons', label: 'Livraisons' },
-  { id: 'transport', label: 'Transport' },
   { id: 'finances', label: 'Finances & retraits' },
   { id: 'parametres', label: 'Paramètres' },
 ] as const;
@@ -22,7 +21,6 @@ export const ecommerceFeatureDependencies: Partial<Record<string, string[]>> = {
   'vente-physique': ['catalogue'],
   'vente-numerique': ['catalogue'],
   livraisons: ['commandes'],
-  transport: ['livraisons'],
 };
 
 export const ecommerceFeaturePacks = [

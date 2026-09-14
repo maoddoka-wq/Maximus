@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Navigation, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -10,7 +10,6 @@ import {
   type EcommerceCustomerCartLine,
   type EcommerceDeliveryRequest,
   type EcommerceDeliveryServiceType,
-  type EcommerceTaxiRequest,
   type EcommerceCarReservation,
   type EcommerceCarReservationStatus,
   type EcommerceCarTripType,
@@ -120,7 +119,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [submittingDelivery, setSubmittingDelivery] = useState(false);
-  const [submittingTaxi, setSubmittingTaxi] = useState(false);
   const [customerActionPending, setCustomerActionPending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -131,8 +129,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('WAVE');
   const [deliveryForm, setDeliveryForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', address: '', deliveryZoneId: '', serviceType: 'STANDARD' as EcommerceDeliveryServiceType, desiredDate: '', note: '' });
   const [deliverySubmitted, setDeliverySubmitted] = useState<EcommerceDeliveryRequest | null>(null);
-  const [taxiForm, setTaxiForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', pickupAddress: '', destinationAddress: '', passengerCount: 1, note: '' });
-  const [taxiSubmitted, setTaxiSubmitted] = useState<EcommerceTaxiRequest | null>(null);
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [addressForm, setAddressForm] = useState<Omit<EcommerceCustomerAddress, 'id'>>({
@@ -519,43 +515,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     }
   };
 
-  const submitTaxiRequest = async () => {
-    if (!taxiForm.requesterName.trim() || !taxiForm.requesterEmail.trim() || !taxiForm.pickupAddress.trim() || !taxiForm.destinationAddress.trim()) return;
-    if (!navigator.geolocation) {
-      const message = 'La position GPS est nécessaire pour rechercher le chauffeur le plus proche.';
-      setError(message);
-      showAppToast(message, 'error');
-      return;
-    }
-    setError('');
-    setSubmittingTaxi(true);
-    showAppToast('Recherche de chauffeurs disponibles…', 'info');
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 });
-      });
-      const body = {
-        ...taxiForm,
-        pickupLatitude: position.coords.latitude,
-        pickupLongitude: position.coords.longitude,
-      };
-      const result = domain
-        ? await publicEcommerceApi.createDomainTaxiRequest(body)
-        : await publicEcommerceApi.createTaxiRequest(slug ?? '', body);
-      setTaxiSubmitted(result);
-      setTaxiForm(current => ({ ...current, pickupAddress: '', destinationAddress: '', note: '' }));
-      showAppToast(result.status === 'PROPOSEE' ? 'Un chauffeur a été proposé.' : 'Votre demande Taxi est enregistrée.', 'success');
-    } catch (cause) {
-      const message = cause instanceof GeolocationPositionError
-        ? 'Autorisez la position GPS pour envoyer une demande Taxi.'
-        : cause instanceof Error ? cause.message : 'La demande Taxi n’a pas pu être envoyée.';
-      setError(message);
-      showAppToast(message, 'error');
-    } finally {
-      setSubmittingTaxi(false);
-    }
-  };
-
   const toggleFavorite = async (product: PublicProduct) => {
     if (!customer) {
       go('/connexion');
@@ -660,7 +619,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const sellerCardImageUrl = store.logoUrl || seller.photoUrl;
   const canOpenSellerCard = Boolean(sellerCardImageUrl || seller.name || seller.email || seller.phone);
   const products = allProducts.filter(product => product.productType === 'SALE');
-  const enabledFeatures = store.enabledFeatures ?? { location: false, livraisons: false, transport: false, ventePhysique: true, venteNumerique: false };
+  const enabledFeatures = store.enabledFeatures ?? { location: false, livraisons: false, ventePhysique: true, venteNumerique: false };
   const requiresShipping = cart.some(line => Boolean(line.product.rentalId) || line.product.fulfillmentType !== 'DIGITAL');
   const selectedDeliveryZone = data.deliveryZones.find(zone => zone.id === checkoutDeliveryZoneId);
   const deliveryFee = requiresShipping ? selectedDeliveryZone?.fee ?? 0 : 0;
@@ -720,10 +679,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              {seller.email && <a href={`mailto:${seller.email}`} className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition hover:bg-[hsl(var(--muted)/.55)]"><Mail size={17} style={{ color: 'var(--shop-primary)' }} /><span className="min-w-0 break-all">{seller.email}</span></a>}
              {seller.phone && <a href={`tel:${seller.phone}`} className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition hover:bg-[hsl(var(--muted)/.55)]"><Phone size={17} style={{ color: 'var(--shop-primary)' }} /><span>{seller.phone}</span></a>}
              {!seller.email && !seller.phone && <p className="rounded-xl bg-[hsl(var(--muted)/.55)] px-4 py-3 text-center text-sm text-[hsl(var(--muted-foreground))]">Les coordonnées du vendeur ne sont pas renseignées.</p>}
-            </div>
-          </div>
-        </div>}
-       <main className="shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pb-24 pt-6 sm:px-6 sm:py-9 lg:px-8">
+           </div>
+         </div>
+       </div>}
+      <main className="shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pb-24 pt-6 sm:px-6 sm:py-9 lg:px-8">
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
        {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -733,9 +692,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
               {isIosDevice() ? 'Touchez Partager, puis « Sur l’écran d’accueil » pour retrouver rapidement votre espace client.' : 'Retrouvez la boutique et vos commandes plus rapidement depuis votre écran d’accueil.'}
             </p>
-           </div>
-         </div>
-         {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>
+          </div>
+        </div>
+        {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>
           <Download size={15} />Installer l’application
         </button>}
       </div>}
@@ -743,7 +702,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
               : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
-            : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} showTaxi={enabledFeatures.transport} taxiForm={taxiForm} setTaxiForm={setTaxiForm} taxiSubmitted={taxiSubmitted} onTaxiSubmit={() => void submitTaxiRequest()} taxiSubmitting={submittingTaxi} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
+            : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
           : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
@@ -1102,7 +1061,7 @@ function CatalogSections({
   </div>;
 }
 
-function DeliveryPage({ store, zones, customer, requests, form, setForm, submitted, onSubmit, submitting, showTaxi, taxiForm, setTaxiForm, taxiSubmitted, onTaxiSubmit, taxiSubmitting, onNavigate }: { store: PublicShopBootstrap['store']; zones: PublicShopBootstrap['deliveryZones']; customer: EcommerceCustomer | null; requests: EcommerceDeliveryRequest[]; form: { requesterName: string; requesterEmail: string; requesterPhone: string; address: string; deliveryZoneId: string; serviceType: EcommerceDeliveryServiceType; desiredDate: string; note: string }; setForm: (form: { requesterName: string; requesterEmail: string; requesterPhone: string; address: string; deliveryZoneId: string; serviceType: EcommerceDeliveryServiceType; desiredDate: string; note: string }) => void; submitted: EcommerceDeliveryRequest | null; onSubmit: () => void; submitting: boolean; showTaxi: boolean; taxiForm: { requesterName: string; requesterEmail: string; requesterPhone: string; pickupAddress: string; destinationAddress: string; passengerCount: number; note: string }; setTaxiForm: (form: { requesterName: string; requesterEmail: string; requesterPhone: string; pickupAddress: string; destinationAddress: string; passengerCount: number; note: string }) => void; taxiSubmitted: EcommerceTaxiRequest | null; onTaxiSubmit: () => void; taxiSubmitting: boolean; onNavigate: (path: string) => void }) {
+function DeliveryPage({ store, zones, customer, requests, form, setForm, submitted, onSubmit, submitting, onNavigate }: { store: PublicShopBootstrap['store']; zones: PublicShopBootstrap['deliveryZones']; customer: EcommerceCustomer | null; requests: EcommerceDeliveryRequest[]; form: { requesterName: string; requesterEmail: string; requesterPhone: string; address: string; deliveryZoneId: string; serviceType: EcommerceDeliveryServiceType; desiredDate: string; note: string }; setForm: (form: { requesterName: string; requesterEmail: string; requesterPhone: string; address: string; deliveryZoneId: string; serviceType: EcommerceDeliveryServiceType; desiredDate: string; note: string }) => void; submitted: EcommerceDeliveryRequest | null; onSubmit: () => void; submitting: boolean; onNavigate: (path: string) => void }) {
   const steps = [
     { icon: ShoppingBag, title: 'Choisissez vos articles', text: 'Ajoutez vos produits au panier et indiquez votre adresse.' },
     { icon: Truck, title: 'Nous préparons votre colis', text: 'La boutique confirme la commande et organise l’acheminement.' },
@@ -1120,10 +1079,6 @@ function DeliveryPage({ store, zones, customer, requests, form, setForm, submitt
       </div>
       <div className="flex items-start gap-3 rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[hsl(var(--primary)/.08)] p-4 text-sm"><Clock3 size={18} className="mt-0.5 shrink-0" style={{ color: store.accentColor }} /><span>Les délais et frais peuvent dépendre de votre zone. L’adresse enregistrée dans votre compte facilite chaque nouvelle demande.</span></div>
     </div>
-      {showTaxi && <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-5 shadow-sm sm:p-6">
-       <div className="flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${store.primaryColor}22`, color: store.accentColor }}><Navigation size={20} /></span><div><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Taxi</p><h2 className="mt-1 text-2xl font-bold">Demander un chauffeur</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Votre position GPS sert uniquement à rechercher le chauffeur disponible le plus proche de cette entreprise.</p></div></div>
-       {taxiSubmitted ? <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><Check className="text-emerald-700" size={22} /><p className="mt-3 font-bold text-emerald-900">Demande Taxi enregistrée</p><p className="mt-1 text-sm text-emerald-800">Référence : {taxiSubmitted.reference}. {taxiSubmitted.status === 'PROPOSEE' ? 'Un chauffeur a reçu la proposition.' : 'Nous recherchons un chauffeur disponible.'}</p><button type="button" onClick={() => onNavigate('/compte')} className="mt-4 text-sm font-bold text-emerald-900 underline">Suivre ma demande</button></div> : <div className="mt-5 grid gap-3 sm:grid-cols-2"><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Nom complet" value={taxiForm.requesterName} onChange={event => setTaxiForm({ ...taxiForm, requesterName: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Email" type="email" value={taxiForm.requesterEmail} onChange={event => setTaxiForm({ ...taxiForm, requesterEmail: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" placeholder="Téléphone" value={taxiForm.requesterPhone} onChange={event => setTaxiForm({ ...taxiForm, requesterPhone: event.target.value })} /><input className="rounded-xl border px-3 py-3 text-sm" type="number" min={1} max={8} aria-label="Nombre de passagers" placeholder="Passagers" value={taxiForm.passengerCount} onChange={event => setTaxiForm({ ...taxiForm, passengerCount: Math.min(8, Math.max(1, Number(event.target.value) || 1)) })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Adresse de départ" value={taxiForm.pickupAddress} onChange={event => setTaxiForm({ ...taxiForm, pickupAddress: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Destination" value={taxiForm.destinationAddress} onChange={event => setTaxiForm({ ...taxiForm, destinationAddress: event.target.value })} /><textarea className="rounded-xl border px-3 py-3 text-sm sm:col-span-2" rows={2} placeholder="Précisions pour le chauffeur (facultatif)" value={taxiForm.note} onChange={event => setTaxiForm({ ...taxiForm, note: event.target.value })} /><button type="button" onClick={onTaxiSubmit} disabled={taxiSubmitting || !taxiForm.requesterName.trim() || !taxiForm.requesterEmail.trim() || !taxiForm.pickupAddress.trim() || !taxiForm.destinationAddress.trim()} className="rounded-xl py-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2" style={{ backgroundColor: store.accentColor }}>{taxiSubmitting ? 'Recherche en cours…' : 'Demander un chauffeur'}</button></div>}
-      </div>}
      {customer && requests.length > 0 && <div className="mt-6 rounded-2xl border bg-[hsl(var(--card))] p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: store.primaryColor }}>Mon suivi</p><h2 className="mt-2 text-xl font-bold">Mes demandes récentes</h2><div className="mt-4 divide-y">{requests.slice(0, 5).map(request => <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-bold">{request.reference}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{request.deliveryZoneName ? `${request.deliveryZoneName} · ` : ''}{request.serviceType === 'URGENT' ? 'Urgente' : 'Standard'}{request.desiredDate ? ` · ${request.desiredDate}` : ''}</p></div><span className="rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">{request.status}</span></div>)}</div></div>}
   </section>;
 }
@@ -1139,8 +1094,8 @@ function RentalProductCard({ rental, store, onSelect }: { rental: PublicRental; 
       <p className="truncate text-[9px] font-bold uppercase tracking-[.14em] text-[#8c6c37]">{rental.category || 'Général'} · Location</p>
       <div className="mt-1.5 flex items-start justify-between gap-3">
         <h2 className="min-w-0 break-words text-sm font-bold leading-tight text-[#20252f] sm:text-base">{rental.name}</h2>
-         <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{money(rental.dailyRate ?? rental.price, store.currency)}<span className="block text-[10px] font-medium text-[#655e55]">/ jour</span></p>
-       </div>
+        <p className="shrink-0 text-right text-xs font-bold text-[#20252f] sm:text-sm">{money(rental.dailyRate ?? rental.price, store.currency)}<span className="block text-[10px] font-medium text-[#655e55]">/ jour</span></p>
+      </div>
       <div className="mt-3 flex items-center justify-between border-t border-[#eee7dc] pt-2 text-[11px] font-semibold text-[#655e55]">
         <div className="flex items-center gap-1.5"><Home size={14} className="shrink-0 text-[#8c6c37]" /><span>{rental.seats ? `${rental.seats} places` : 'Places N/A'}</span></div>
         <div className="flex items-center gap-1.5 truncate"><span>{rental.transmission === 'AUTOMATIC' ? 'Auto' : rental.transmission === 'MANUAL' ? 'Manuelle' : 'Transmission N/A'}</span></div>
@@ -1365,8 +1320,8 @@ function OrderSection({ orders, selectedOrder, onOrder, onDownload }: { orders: 
          <strong className="block">Paiement échoué</strong>
          <span className="mt-1 block">{selectedOrder.paymentFailureReason || 'Le paiement Wave n’a pas été confirmé. Votre commande n’a pas été débitée.'}</span>
          <span className="mt-2 block text-xs">Vous pouvez retourner au panier et réessayer le paiement.</span>
-         </div>}
-         {selectedOrderIsDigital && selectedOrder.paymentStatus === 'PAID' && <div role="status" className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+       </div>}
+       {selectedOrderIsDigital && selectedOrder.paymentStatus === 'PAID' && <div role="status" className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
          <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100"><Download size={18} /></span><div><strong className="block">Votre téléchargement est prêt</strong><p className="mt-1 text-sm leading-5">Cliquez sur le bouton pour télécharger votre produit numérique.</p></div></div>
          <div className="mt-4 flex flex-wrap gap-2">{selectedOrder.items.filter(item => item.fulfillmentType === 'DIGITAL').map(item => <button type="button" key={`download-${item.id}`} onClick={() => onDownload(selectedOrder.id, item.id)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800"><Download size={15} />Télécharger{selectedOrder.items.filter(candidate => candidate.fulfillmentType === 'DIGITAL').length > 1 ? ` · ${item.productName}` : ''}</button>)}</div>
        </div>}

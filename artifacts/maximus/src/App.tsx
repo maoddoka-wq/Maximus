@@ -106,7 +106,6 @@ import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/mod
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
-import { createEcommerceApi } from '@/lib/ecommerce-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
@@ -156,7 +155,6 @@ function isPotentialCustomStoreHost(): boolean {
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
-const TaxiDriverPage = lazy(() => import('@/pages/taxi-driver-page'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
@@ -703,25 +701,17 @@ function AppContent() {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
-  const openAuthenticatedWorkspace = (user: AuthUser, redirectTaxiDriver: boolean) => {
+  const applyAuthenticatedUser = (user: AuthUser) => {
     const nextSession = sessionFromAuthUser(user);
     loginTransitionRef.current = true;
     setAppStateReady(true);
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
-    const fallback = user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard';
-    setLocation(fallback);
-    if (!redirectTaxiDriver || user.role === 'maximus_admin' || !user.companyId || !user.employeeId) return;
-
-    void createEcommerceApi(user.companyId).taxiDriverSession()
-      .then(() => setLocation('/entreprise/taxi'))
-      .catch(() => {
-        // Un employé normal n'a pas de profil chauffeur : il conserve son dashboard habituel.
-      });
+    setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
   };
   const login = async (_space: 'admin' | 'company', email: string, password: string) => {
     const { user } = await authApi.login(email, password);
-    openAuthenticatedWorkspace(user, true);
+    applyAuthenticatedUser(user);
   };
   const startSectorTest = (preset: SectorPreset) => {
     const testCompanyId = `sector-test-${preset.id}`;
@@ -1193,7 +1183,6 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
-                   serverModuleAccessReady={serverModuleAccessReady}
                   singleModuleNavigation={verticalModuleNavigation}
                    hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
                   screens={{
@@ -1205,7 +1194,6 @@ function AppContent() {
                     empty: EmptyState,
                     stocks: StockModulePage,
                     ecommerce: EcommerceModulePage,
-                     taxi: TaxiDriverPage,
                     finance: FinancePage,
                     commerce: CommerceModulePage,
                     operational: OperationalModulePage,
