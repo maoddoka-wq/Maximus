@@ -145,9 +145,24 @@ class TransportController extends Controller
             'registration' => ['required', 'string', 'max:30'],
             'model' => ['required', 'string', 'max:80'],
             'vehicleType' => ['required', 'string', 'max:50'],
+            'driverId' => ['required', 'string', 'max:120'],
             'status' => ['sometimes', Rule::in(self::VEHICLE_STATUSES)],
         ]);
         $company = $this->company($request);
+        $driverId = trim($input['driverId']);
+        if (! DB::table('transport_drivers')
+            ->where('id', $driverId)
+            ->where('company_id', $company)
+            ->where('status', 'ACTIVE')
+            ->exists()) {
+            return response()->json(['error' => 'Un chauffeur actif doit être sélectionné pour ce véhicule.'], 422);
+        }
+        if (DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('driver_id', $driverId)
+            ->exists()) {
+            return response()->json(['error' => 'Ce chauffeur possède déjà un véhicule.'], 422);
+        }
         $registration = strtoupper(trim($input['registration']));
         if (DB::table('transport_vehicles')->where('company_id', $company)->whereRaw('upper(registration) = ?', [$registration])->exists()) {
             return response()->json(['error' => 'Cette immatriculation existe déjà dans cette entreprise.'], 422);
@@ -158,6 +173,7 @@ class TransportController extends Controller
             'registration' => $registration,
             'model' => trim($input['model']),
             'vehicle_type' => trim($input['vehicleType']),
+            'driver_id' => $driverId,
             'status' => $input['status'] ?? 'AVAILABLE',
             'created_at' => now(),
             'updated_at' => now(),
@@ -188,8 +204,19 @@ class TransportController extends Controller
         if ($driverId !== null && ! DB::table('transport_drivers')->where('id', $driverId)->where('company_id', $company)->where('status', 'ACTIVE')->exists()) {
             return response()->json(['error' => 'Chauffeur actif introuvable.'], 422);
         }
-        if ($vehicleId !== null && ! DB::table('transport_vehicles')->where('id', $vehicleId)->where('company_id', $company)->where('status', 'AVAILABLE')->exists()) {
+        if ($vehicleId !== null && $driverId === null) {
+            return response()->json(['error' => 'Un véhicule ne peut pas être affecté sans chauffeur.'], 422);
+        }
+        $vehicle = $vehicleId === null ? null : DB::table('transport_vehicles')
+            ->where('id', $vehicleId)
+            ->where('company_id', $company)
+            ->where('status', 'AVAILABLE')
+            ->first();
+        if ($vehicleId !== null && ! $vehicle) {
             return response()->json(['error' => 'Véhicule disponible introuvable.'], 422);
+        }
+        if ($vehicle && $vehicle->driver_id !== $driverId) {
+            return response()->json(['error' => 'Le véhicule sélectionné n’est pas rattaché à ce chauffeur.'], 422);
         }
         $status = $driverId !== null && $vehicleId !== null ? 'ASSIGNED' : 'REQUESTED';
         $row = [
@@ -299,6 +326,7 @@ class TransportController extends Controller
             'registration' => $row->registration,
             'model' => $row->model,
             'vehicleType' => $row->vehicle_type,
+            'driverId' => $row->driver_id ?? null,
             'status' => $row->status,
         ];
     }
@@ -372,19 +400,22 @@ class TransportController extends Controller
             $vehicles = DB::table('transport_vehicles')
                 ->where('company_id', $company)
                 ->where('status', 'AVAILABLE')
+                ->whereNotNull('driver_id')
                 ->orderBy('updated_at')
                 ->lockForUpdate()
-                ->get();
+                ->get()
+                ->keyBy('driver_id');
 
             $match = $drivers
                 ->map(fn (object $driver): array => [
                     'driver' => $driver,
                     'distance' => $this->distanceInKm($latitude, $longitude, (float) $driver->latitude, (float) $driver->longitude),
+                    'vehicle' => $vehicles->get($driver->id),
                 ])
                 ->sortBy('distance')
-                ->first(fn (array $candidate): bool => $vehicles->isNotEmpty());
+                ->first(fn (array $candidate): bool => $candidate['vehicle'] !== null);
             $driver = $match['driver'] ?? null;
-            $vehicle = $driver ? $vehicles->first() : null;
+            $vehicle = $match['vehicle'] ?? null;
             $status = $driver && $vehicle ? 'ASSIGNED' : 'REQUESTED';
             $row = [
                 'id' => $this->id('trip'),

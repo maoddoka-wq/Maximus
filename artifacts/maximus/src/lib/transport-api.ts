@@ -23,6 +23,7 @@ export interface Vehicle {
   registration: string;
   model: string;
   vehicleType: string;
+  driverId: string | null;
   status: VehicleStatus;
 }
 
@@ -70,6 +71,7 @@ export interface CreateVehicleInput {
   registration: string;
   model: string;
   vehicleType: string;
+  driverId: string;
   status: VehicleStatus;
 }
 

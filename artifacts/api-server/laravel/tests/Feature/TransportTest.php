@@ -25,7 +25,25 @@ class TransportTest extends TestCase
             'registration' => 'DK-1234-AA',
             'model' => 'Toyota Corolla',
             'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+        ])->assertCreated()->assertJsonPath('driverId', $driver->json('id'));
+        $this->assertDatabaseHas('transport_vehicles', [
+            'id' => $vehicle->json('id'),
+            'driver_id' => $driver->json('id'),
+        ]);
+        $otherDriver = $request->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $this->createDriverEmployee('other-driver'),
+            'licenseNumber' => 'SN-TAXI-OTHER',
         ])->assertCreated();
+        $request->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Plateau',
+            'destination' => 'Fann',
+            'passengerName' => 'Moussa Fall',
+            'passengerPhone' => '+221771111111',
+            'fare' => 2500,
+            'driverId' => $otherDriver->json('id'),
+            'vehicleId' => $vehicle->json('id'),
+        ])->assertStatus(422)->assertJsonPath('error', 'Le véhicule sélectionné n’est pas rattaché à ce chauffeur.');
         $trip = $request->postJson('/api/transport/trips?companyId=kora', [
             'pickup' => 'Plateau',
             'destination' => 'Almadies',
@@ -95,6 +113,7 @@ class TransportTest extends TestCase
             'registration' => 'DK-3333-CC',
             'model' => 'Toyota Yaris',
             'vehicleType' => 'TAXI',
+            'driverId' => 'missing-driver',
         ])->assertForbidden();
 
         $request->postJson('/api/transport/trips?companyId=kora', [
@@ -170,6 +189,7 @@ class TransportTest extends TestCase
             'registration' => 'DK-GPS-01',
             'model' => 'Toyota GPS',
             'vehicle_type' => 'TAXI',
+            'driver_id' => $freshDriver,
             'status' => 'AVAILABLE',
             'created_at' => now(),
             'updated_at' => now(),
