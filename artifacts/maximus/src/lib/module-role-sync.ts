@@ -1,5 +1,6 @@
 import { commerceTabDefinitions, commerceTabPermissionKeys } from './commerce-permissions';
-import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from './permission-keys';
+import { getModuleFeatureOptions } from './module-features';
+import { permissionFeatureKey, resolveFeatureDependencies } from './permission-keys';
 import {
   getConfiguredModules,
   stockSubmoduleDependencies,
@@ -33,7 +34,7 @@ function featureIdsForModule(module: Module) {
   if (module.id === 'stocks') {
     return ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'];
   }
-  return module.features.map(featureSlug);
+  return getModuleFeatureOptions(module).map(feature => feature.id);
 }
 
 function isFeaturePermissionKey(module: Module, key: string) {

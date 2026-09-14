@@ -52,6 +52,33 @@ test('crée un rôle automatique avec les permissions du pack et de l’unité',
   assert.equal(role.modulePermissions['stocks:settings'], undefined);
 });
 
+test('conserve les permissions du pack Transport dans un secteur', () => {
+  const { data, company } = createData();
+  company.requestedModules = ['transport'];
+  company.allowedModules = ['transport'];
+  const node: OrgNode = {
+    id: 'test-transport-unit',
+    companyId: company.id,
+    name: 'Exploitation Taxi',
+    type: 'service',
+    parentId: null,
+    moduleIds: ['transport'],
+    modulePackIds: { transport: ['transport-gestion'] },
+    moduleFeatures: { transport: ['overview', 'trips', 'drivers', 'vehicles'] },
+  };
+
+  synchronizeUnitPackRoles(data, company, node);
+
+  const role = data.roles.find(item => item.packId === 'transport-gestion' && item.sectorId === node.id);
+  assert.ok(role);
+  assert.equal(role.packModuleId, 'transport');
+  assert.deepEqual(role.modulePermissions['transport'], ['voir']);
+  assert.deepEqual(role.modulePermissions['transport:menu:overview'], ['voir']);
+  assert.deepEqual(role.modulePermissions['transport:menu:trips'], ['voir', 'créer', 'modifier']);
+  assert.deepEqual(role.modulePermissions['transport:menu:drivers'], ['voir', 'créer', 'modifier']);
+  assert.deepEqual(role.modulePermissions['transport:menu:vehicles'], ['voir', 'créer', 'modifier']);
+});
+
 test('supprime un rôle automatique retiré lorsqu’il n’est pas affecté', () => {
   const { data, company } = createData();
   const node = createStockUnit();
