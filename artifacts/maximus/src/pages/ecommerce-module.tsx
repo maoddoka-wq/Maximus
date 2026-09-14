@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   Archive,
   ArrowUpRight,
@@ -1142,8 +1142,11 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
   const [domainInput, setDomainInput] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [heroFiles, setHeroFiles] = useState<File[]>([]);
+  const initializedCompanyId = useRef<string | null>(null);
   const api = createEcommerceApi(store.companyId);
   useEffect(() => {
+    if (initializedCompanyId.current === store.companyId) return;
+    initializedCompanyId.current = store.companyId;
     setForm({
       name: store.name,
       slug: store.slug,
