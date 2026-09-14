@@ -616,8 +616,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     phone: store.seller?.phone ?? '',
     photoUrl: store.seller?.photoUrl ?? '',
   };
-  const sellerPhotoUrl = seller.photoUrl || store.logoUrl;
-  const canOpenSellerCard = Boolean(sellerPhotoUrl || seller.name || seller.email || seller.phone);
+  const sellerCardImageUrl = store.logoUrl || seller.photoUrl;
+  const canOpenSellerCard = Boolean(sellerCardImageUrl || seller.name || seller.email || seller.phone);
   const products = allProducts.filter(product => product.productType === 'SALE');
   const enabledFeatures = store.enabledFeatures ?? { location: false, livraisons: false, ventePhysique: true, venteNumerique: false };
   const requiresShipping = cart.some(line => Boolean(line.product.rentalId) || line.product.fulfillmentType !== 'DIGITAL');
@@ -668,7 +668,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
            <p className="pr-10 text-center text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>À propos de la boutique</p>
            <div className="mt-5 flex justify-center">
              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[var(--shop-primary)]/20 bg-[hsl(var(--muted)/.45)] p-2">
-               {sellerPhotoUrl ? <img src={sellerPhotoUrl} alt={`Photo de ${seller.name || store.name}`} className="h-full w-full rounded-full object-cover" /> : <UserRound size={48} className="text-[hsl(var(--muted-foreground))]" />}
+                {sellerCardImageUrl ? <img src={sellerCardImageUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-full object-cover" /> : <UserRound size={48} className="text-[hsl(var(--muted-foreground))]" />}
              </div>
            </div>
            <div className="mt-5 text-center">
