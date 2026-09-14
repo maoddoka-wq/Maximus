@@ -44,7 +44,7 @@ final class ModuleAuthorization
         // Store settings are the administrative control plane for the module:
         // an owner must still be able to publish or repair the store while
         // optional business features such as Location are disabled.
-        if ($feature !== null && $feature !== 'settings' && ! ModuleCatalog::allowsFeature($companyId, $module, $feature)) {
+        if ($feature !== null && ! in_array($feature, ['settings', 'parametres'], true) && ! ModuleCatalog::allowsFeature($companyId, $module, $feature)) {
             return false;
         }
         if (($actor['role'] ?? null) === 'company_admin') {

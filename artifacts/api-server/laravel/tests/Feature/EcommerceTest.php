@@ -59,6 +59,25 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_products', ['sku' => 'FORBIDDEN-01']);
     }
 
+    public function test_detailed_settings_permission_allows_store_logo_upload(): void
+    {
+        Storage::fake('public');
+        $request = $this->asActor('employee', [
+            'ecommerce:menu:parametres' => ['voir', 'modifier'],
+        ]);
+
+        $response = $request->post('/api/ecommerce/store/logo?companyId=kora', [
+            'image' => UploadedFile::fake()->image('logo-boutique.png'),
+        ])->assertOk();
+
+        $logoUrl = $response->json('logoUrl');
+        $this->assertStringStartsWith('/api/store-logos/kora/', $logoUrl);
+        $this->assertDatabaseHas('ecommerce_stores', [
+            'id' => 'ecommerce-store-kora',
+            'logo_url' => $logoUrl,
+        ]);
+    }
+
     public function test_categories_are_persistent_and_products_are_linked_to_them(): void
     {
         $request = $this->asActor();

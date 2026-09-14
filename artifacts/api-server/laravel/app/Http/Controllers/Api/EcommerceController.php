@@ -69,7 +69,7 @@ class EcommerceController extends Controller
 
     public function updateStore(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
@@ -117,7 +117,7 @@ class EcommerceController extends Controller
 
     public function uploadStoreLogo(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
@@ -164,7 +164,7 @@ class EcommerceController extends Controller
 
     public function uploadStoreHeroImages(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
@@ -177,7 +177,7 @@ class EcommerceController extends Controller
 
     public function deleteStoreHeroImage(Request $request, string $imageId): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
@@ -279,7 +279,7 @@ class EcommerceController extends Controller
 
     public function createDomain(Request $request): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
@@ -315,7 +315,7 @@ class EcommerceController extends Controller
 
     public function verifyDomain(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
@@ -352,7 +352,7 @@ class EcommerceController extends Controller
 
     public function deleteDomain(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'settings')) {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
             return $this->forbidden();
         }
 
