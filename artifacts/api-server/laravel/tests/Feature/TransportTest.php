@@ -26,7 +26,11 @@ class TransportTest extends TestCase
             'model' => 'Toyota Corolla',
             'vehicleType' => 'TAXI',
             'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
         ])->assertCreated()->assertJsonPath('driverId', $driver->json('id'));
+        $request->getJson('/api/transport/vehicles/'.$vehicle->json('id').'/image?companyId=kora')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
         $this->assertDatabaseHas('transport_vehicles', [
             'id' => $vehicle->json('id'),
             'driver_id' => $driver->json('id'),
@@ -143,6 +147,7 @@ class TransportTest extends TestCase
             'model' => 'Toyota Yaris',
             'vehicleType' => 'TAXI',
             'driverId' => 'missing-driver',
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
         ])->assertForbidden();
 
         $request->postJson('/api/transport/trips?companyId=kora', [

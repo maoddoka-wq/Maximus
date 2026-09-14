@@ -29,6 +29,7 @@ export interface Vehicle {
   vehicleType: string;
   driverId: string | null;
   status: VehicleStatus;
+  imageUrl: string | null;
 }
 
 export interface Trip {
@@ -78,6 +79,7 @@ export interface CreateVehicleInput {
   vehicleType: string;
   driverId: string;
   status: VehicleStatus;
+  imageData: string;
 }
 
 export interface CreateTripInput {

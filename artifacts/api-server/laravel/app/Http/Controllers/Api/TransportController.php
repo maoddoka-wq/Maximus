@@ -195,7 +195,12 @@ class TransportController extends Controller
             'vehicleType' => ['required', 'string', 'max:50'],
             'driverId' => ['required', 'string', 'max:120'],
             'status' => ['sometimes', Rule::in(self::VEHICLE_STATUSES)],
+            'imageData' => ['required', 'string', 'max:4096'],
         ]);
+        $image = $this->decodeVehicleImage($input['imageData']);
+        if ($image === null) {
+            return response()->json(['error' => 'Ajoutez une image JPG, PNG ou WebP valide de 2 Mo maximum.'], 422);
+        }
         $company = $this->company($request);
         $driverId = trim($input['driverId']);
         if (! DB::table('transport_drivers')
@@ -223,6 +228,8 @@ class TransportController extends Controller
             'vehicle_type' => trim($input['vehicleType']),
             'driver_id' => $driverId,
             'status' => $input['status'] ?? 'AVAILABLE',
+            'image_data' => base64_encode($image['contents']),
+            'image_mime' => $image['mime'],
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -323,7 +330,7 @@ class TransportController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
-        return $this->createPublicTripForStore($request, $store);
+        return $this->createPublicTripForStore($request, $store, true);
     }
 
     public function getPublicTrip(Request $request, string $slug, string $id): JsonResponse
@@ -356,7 +363,7 @@ class TransportController extends Controller
             return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
         }
 
-        return $this->publicTripForStore($store, $id);
+        return $this->publicTripForStore($store, $id, true);
     }
 
     public function updateTripStatus(Request $request, string $id): JsonResponse
@@ -410,6 +417,46 @@ class TransportController extends Controller
         return response()->json($this->trip(DB::table('transport_trips')->where('id', $id)->first()));
     }
 
+    public function publicVehicleImage(Request $request, string $slug, string $id)
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            abort(404);
+        }
+
+        return $this->serveVehicleImage((string) $store->company_id, $id);
+    }
+
+    public function vehicleImage(Request $request, string $id)
+    {
+        $company = $this->company($request);
+        return $this->serveVehicleImage($company, $id);
+    }
+
+    public function publicDomainVehicleImage(Request $request, string $id)
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->first();
+        if (! $domain) {
+            abort(404);
+        }
+
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            abort(404);
+        }
+
+        return $this->serveVehicleImage((string) $store->company_id, $id);
+    }
+
     private function driver(object $row): array
     {
         $latitude = $row->latitude ?? null;
@@ -438,6 +485,7 @@ class TransportController extends Controller
             'vehicleType' => $row->vehicle_type,
             'driverId' => $row->driver_id ?? null,
             'status' => $row->status,
+            'imageUrl' => empty($row->image_data) ? '/taxi-car.svg' : '/api/transport/vehicles/'.rawurlencode($row->id).'/image',
         ];
     }
 
@@ -468,10 +516,14 @@ class TransportController extends Controller
             'matchedDistanceKm' => $matchedDistance === null ? null : (float) $matchedDistance,
             'driverName' => $driver?->name,
             'driverPhone' => $driver?->phone,
+            'vehicleModel' => null,
+            'vehicleRegistration' => null,
+            'vehicleType' => null,
+            'vehicleImageUrl' => null,
         ];
     }
 
-    private function publicTripForStore(object $store, string $id): JsonResponse
+    private function publicTripForStore(object $store, string $id, bool $domain = false): JsonResponse
     {
         if (! ModuleCatalog::allowsFeature((string) $store->company_id, 'transport', 'overview')) {
             return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
@@ -492,7 +544,7 @@ class TransportController extends Controller
             : null;
 
         return response()->json([
-            'trip' => $this->publicTrip($trip, $driver, $vehicle),
+            'trip' => $this->publicTrip($trip, $driver, $vehicle, $this->vehicleImageUrl((string) $store->company_id, $trip->vehicle_id, $domain)),
             'matched' => in_array($trip->status, ['OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'], true),
             'message' => $trip->status === 'OFFERED'
                 ? 'Le chauffeur le plus proche doit encore valider la demande.'
@@ -502,7 +554,7 @@ class TransportController extends Controller
         ]);
     }
 
-    private function publicTrip(object $row, ?object $driver, ?object $vehicle): array
+    private function publicTrip(object $row, ?object $driver, ?object $vehicle, ?string $vehicleImageUrl = null): array
     {
         $trip = $this->trip($row, $driver);
         return [
@@ -512,11 +564,11 @@ class TransportController extends Controller
             'vehicleModel' => $vehicle?->model,
             'vehicleRegistration' => $vehicle?->registration,
             'vehicleType' => $vehicle?->vehicle_type,
-            'vehicleImageUrl' => '/taxi-car.svg',
+            'vehicleImageUrl' => $vehicleImageUrl ?? '/taxi-car.svg',
         ];
     }
 
-    private function createPublicTripForStore(Request $request, object $store): JsonResponse
+    private function createPublicTripForStore(Request $request, object $store, bool $domain = false): JsonResponse
     {
         $company = (string) $store->company_id;
         if (! ModuleCatalog::allowsFeature($company, 'transport', 'overview')) {
@@ -604,6 +656,7 @@ class TransportController extends Controller
             (object) $row,
             $row['driver_id'] ? DB::table('transport_drivers')->where('company_id', $company)->where('id', $row['driver_id'])->first() : null,
             $row['vehicle_id'] ? DB::table('transport_vehicles')->where('company_id', $company)->where('id', $row['vehicle_id'])->first() : null,
+            $row['vehicle_id'] ? $this->vehicleImageUrl($company, $row['vehicle_id'], $domain) : null,
         );
         return response()->json([
             'trip' => $response,
@@ -624,6 +677,66 @@ class TransportController extends Controller
         $a = sin($latDelta / 2) ** 2
             + cos(deg2rad($latitudeA)) * cos(deg2rad($latitudeB)) * sin($lonDelta / 2) ** 2;
         return $earthRadius * 2 * asin(min(1, sqrt($a)));
+    }
+
+    /**
+     * @return array{contents: string, mime: string}|null
+     */
+    private function decodeVehicleImage(string $imageData): ?array
+    {
+        if (! preg_match('/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+\/=\r\n]+)$/', trim($imageData), $matches)) {
+            return null;
+        }
+
+        $contents = base64_decode($matches[2], true);
+        if (! is_string($contents) || $contents === '' || strlen($contents) > 2 * 1024 * 1024) {
+            return null;
+        }
+
+        return [
+            'contents' => $contents,
+            'mime' => $matches[1] === 'image/jpg' ? 'image/jpeg' : $matches[1],
+        ];
+    }
+
+    private function vehicleImageUrl(string $companyId, ?string $vehicleId, bool $domain = false): ?string
+    {
+        if (! $vehicleId) {
+            return null;
+        }
+
+        $vehicle = DB::table('transport_vehicles')
+            ->where('company_id', $companyId)
+            ->where('id', $vehicleId)
+            ->first();
+        if (! $vehicle || empty($vehicle->image_data)) {
+            return '/taxi-car.svg';
+        }
+
+        return $domain
+            ? '/api/shop-domain/transport/vehicles/'.rawurlencode($vehicleId).'/image'
+            : '/api/shop/'.rawurlencode((string) DB::table('ecommerce_stores')->where('company_id', $companyId)->where('status', 'PUBLISHED')->value('slug')).'/transport/vehicles/'.rawurlencode($vehicleId).'/image';
+    }
+
+    private function serveVehicleImage(string $companyId, string $vehicleId)
+    {
+        $vehicle = DB::table('transport_vehicles')
+            ->where('company_id', $companyId)
+            ->where('id', $vehicleId)
+            ->first();
+        if (! $vehicle || empty($vehicle->image_data)) {
+            abort(404);
+        }
+
+        $contents = base64_decode($vehicle->image_data, true);
+        if (! is_string($contents)) {
+            abort(404);
+        }
+
+        return response($contents, 200, [
+            'Content-Type' => $vehicle->image_mime ?: 'application/octet-stream',
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
     }
 
     private function validated(Request $request, array $rules): array

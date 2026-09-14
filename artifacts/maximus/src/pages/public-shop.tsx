@@ -833,7 +833,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
   const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
-  const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? 'domain' : slug ?? 'shop'}`, [domain, slug]);
+  const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
   const [form, setForm] = useState({ pickup: 'Ma position GPS', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [locationState, setLocationState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
@@ -893,16 +893,25 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     try {
       const saved = window.localStorage.getItem(customerStorageKey);
       if (!saved) return;
-      const customer = JSON.parse(saved) as { passengerName?: string; passengerPhone?: string };
+      const customer = JSON.parse(saved) as { tripId?: string; passengerName?: string; passengerPhone?: string };
       setForm(current => ({
         ...current,
         passengerName: customer.passengerName?.trim() || current.passengerName,
         passengerPhone: customer.passengerPhone?.trim() || current.passengerPhone,
       }));
+      if (customer.tripId) {
+        void api.getTrip(customer.tripId).then(result => {
+          setTrip(result.trip);
+          setTripMessage(result.message);
+          setFormOpen(false);
+        }).catch(() => {
+          window.localStorage.removeItem(customerStorageKey);
+        });
+      }
     } catch {
       // Ignore an invalid local preference; the order flow remains usable.
     }
-  }, [customerStorageKey]);
+  }, [api, customerStorageKey]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -926,6 +935,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         pickupLongitude: position.longitude,
       });
       window.localStorage.setItem(customerStorageKey, JSON.stringify({
+        tripId: result.trip.id,
         passengerName: form.passengerName.trim(),
         passengerPhone: form.passengerPhone.trim(),
       }));
@@ -978,7 +988,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           <button type="submit" disabled={submitting || locationState !== 'ready'} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-5 py-4 text-sm font-black text-white shadow-lg shadow-black/10 transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={17} className="animate-spin" /> : <CarFront size={17} />}{submitting ? 'Recherche du chauffeur…' : 'Confirmer ma course'}<ArrowRight size={16} /></button>
           <p className="text-center text-[11px] text-[hsl(var(--muted-foreground))]">Vos coordonnées servent uniquement à vous mettre en relation avec le chauffeur affecté.</p>
         </form>}
-         {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-xl font-black tracking-[-.04em] sm:text-2xl">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
+         {trip && <div className="py-3 text-center sm:py-6"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Check size={30} /></div><p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Demande enregistrée</p><h2 className="mt-2 text-xl font-black tracking-[-.04em] sm:text-2xl">{trip.status === 'OFFERED' ? 'Un chauffeur a été détecté.' : trip.driverName ? 'Votre chauffeur est en route.' : 'Votre demande est en attente.'}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-5 flex items-center gap-3 rounded-xl bg-[hsl(var(--muted)/.35)] p-3 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-16 w-24 rounded-lg object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-5 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-4 py-3 text-sm font-bold text-white"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-bold text-white"><MessageCircle size={16} /> WhatsApp</a></div>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setTrip(null); setFormOpen(true); }} className="mt-5 text-xs font-bold text-[var(--shop-accent)] underline">Demander une autre course</button></div>}
       </div>
       <aside className="space-y-4">
         <div className="rounded-2xl border bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--shop-primary)]/10 text-[var(--shop-accent)]"><ShieldCheck size={20} /></div><div><h2 className="font-bold">Simple et direct</h2><p className="text-xs text-[hsl(var(--muted-foreground))]">Aucun intermédiaire</p></div></div><div className="mt-5 space-y-3 text-sm"><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">1</span><p><span className="font-bold">Localisez-vous</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Votre départ est détecté automatiquement.</span></p></div><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">2</span><p><span className="font-bold">Confirmez la destination</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Deux informations suffisent.</span></p></div><div className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/15 text-xs font-black text-[var(--shop-accent)]">3</span><p><span className="font-bold">Parlez au chauffeur</span><span className="block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Appelez-le directement après affectation.</span></p></div></div></div>
