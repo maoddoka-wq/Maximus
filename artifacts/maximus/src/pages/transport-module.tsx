@@ -132,6 +132,7 @@ export default function TransportModulePage({
     () => currentEmployeeId ? data?.drivers.find(driver => driver.employeeId === currentEmployeeId) ?? null : null,
     [currentEmployeeId, data?.drivers],
   );
+  const currentDriverId = currentDriver?.id ?? null;
 
   useEffect(() => {
     if (!visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0]?.id ?? 'overview');
@@ -167,13 +168,13 @@ export default function TransportModulePage({
   useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
 
   useEffect(() => {
-    if (preview || !currentDriver || !navigator.geolocation) {
+    if (preview || !currentDriverId || !navigator.geolocation) {
       setLocationActive(false);
       return undefined;
     }
     const sendLocation = (coords: { latitude: number; longitude: number }) => {
       latestPosition.current = coords;
-      void api.updateDriverLocation(currentDriver.id, coords).then(driver => {
+      void api.updateDriverLocation(currentDriverId, coords).then(driver => {
         setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
       }).catch(cause => {
         setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
@@ -203,7 +204,7 @@ export default function TransportModulePage({
       navigator.geolocation.clearWatch(watchId);
       window.clearInterval(refreshId);
     };
-  }, [api, currentDriver, preview]);
+  }, [api, currentDriverId, preview]);
 
   const run = async <T,>(action: () => Promise<T>, success: string) => {
     if (pendingAction) return;

@@ -30,12 +30,20 @@ class TransportController extends Controller
         $drivers = DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get();
         $vehicles = DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get();
         $trips = DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get();
+        $driverIds = $trips->pluck('driver_id')->filter()->unique()->values()->all();
+        $tripDrivers = empty($driverIds)
+            ? collect()
+            : DB::table('transport_drivers')
+                ->where('company_id', $company)
+                ->whereIn('id', $driverIds)
+                ->get()
+                ->keyBy('id');
         $today = now()->startOfDay()->toDateTimeString();
 
         return response()->json([
             'drivers' => $drivers->map(fn ($row) => $this->driver($row))->values(),
             'vehicles' => $vehicles->map(fn ($row) => $this->vehicle($row))->values(),
-            'trips' => $trips->map(fn ($row) => $this->trip($row))->values(),
+            'trips' => $trips->map(fn ($row) => $this->trip($row, $row->driver_id ? $tripDrivers->get($row->driver_id) : null))->values(),
             'metrics' => [
                 'activeDrivers' => $drivers->where('status', 'ACTIVE')->count(),
                 'availableVehicles' => $vehicles->where('status', 'AVAILABLE')->count(),
@@ -296,9 +304,15 @@ class TransportController extends Controller
         ];
     }
 
-    private function trip(object $row): array
+    private function trip(object $row, ?object $driver = null): array
     {
         $matchedDistance = $row->matched_distance_km ?? null;
+        $driver ??= $row->driver_id
+            ? DB::table('transport_drivers')
+                ->where('company_id', $row->company_id)
+                ->where('id', $row->driver_id)
+                ->first()
+            : null;
         return [
             'id' => $row->id,
             'companyId' => $row->company_id,
@@ -315,8 +329,8 @@ class TransportController extends Controller
             'pickupLatitude' => $row->pickup_latitude ?? null,
             'pickupLongitude' => $row->pickup_longitude ?? null,
             'matchedDistanceKm' => $matchedDistance === null ? null : (float) $matchedDistance,
-            'driverName' => $row->driver_id ? DB::table('transport_drivers')->where('id', $row->driver_id)->value('name') : null,
-            'driverPhone' => $row->driver_id ? DB::table('transport_drivers')->where('id', $row->driver_id)->value('phone') : null,
+            'driverName' => $driver?->name,
+            'driverPhone' => $driver?->phone,
         ];
     }
 
