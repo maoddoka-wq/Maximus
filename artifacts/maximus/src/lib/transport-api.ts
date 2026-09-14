@@ -3,6 +3,10 @@ import { requestJson } from '@/lib/api-request';
 export type DriverStatus = 'ACTIVE' | 'INACTIVE';
 export type VehicleStatus = 'AVAILABLE' | 'ON_TRIP' | 'MAINTENANCE';
 export type TripStatus = 'REQUESTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export interface TransportSettings {
+  gpsValidityMinutes: number;
+  trackingIntervalSeconds: number;
+}
 
 export interface Driver {
   id: string;
@@ -59,6 +63,7 @@ export interface TransportBootstrap {
   vehicles: Vehicle[];
   trips: Trip[];
   metrics: TransportMetrics;
+  settings: TransportSettings;
 }
 
 export interface CreateDriverInput {
@@ -120,6 +125,11 @@ export const createTransportApi = (companyId: string) => {
 
   return {
     bootstrap: () => request<TransportBootstrap>(withCompany('/transport/bootstrap')),
+    updateSettings: (body: TransportSettings) => request<TransportSettings>(withCompany('/transport/settings'), {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+    }),
     createDriver: (body: CreateDriverInput) => request<Driver>(withCompany('/transport/drivers'), json(body)),
     updateDriverLocation: (id: string, body: { latitude: number; longitude: number }) =>
       request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/location`), {

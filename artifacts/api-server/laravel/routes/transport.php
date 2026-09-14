@@ -7,6 +7,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::get('/bootstrap', [TransportController::class, 'bootstrap']);
     Route::post('/drivers', [TransportController::class, 'createDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
+    Route::patch('/settings', [TransportController::class, 'updateSettings']);
     Route::post('/vehicles', [TransportController::class, 'createVehicle']);
     Route::post('/trips', [TransportController::class, 'createTrip']);
     Route::patch('/trips/{id}/status', [TransportController::class, 'updateTripStatus']);

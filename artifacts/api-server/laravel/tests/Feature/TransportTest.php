@@ -97,6 +97,35 @@ class TransportTest extends TestCase
         ]);
     }
 
+    public function test_transport_chauffeur_pack_exposes_history_and_settings_and_settings_are_persisted(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        $transport = collect(ModuleCatalog::bootstrap('kora'))->firstWhere('id', 'transport');
+        $pack = collect($transport['featurePacks'])->firstWhere('id', 'transport-chauffeur');
+
+        $this->assertSame(['overview', 'trips', 'historique', 'parametres'], $pack['featureIds']);
+        $this->assertSame(['voir'], $pack['featurePermissions']['historique']);
+        $this->assertSame(['voir'], $pack['featurePermissions']['parametres']);
+
+        $request = $this->asActor();
+        $request->getJson('/api/transport/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('settings.gpsValidityMinutes', 5)
+            ->assertJsonPath('settings.trackingIntervalSeconds', 30);
+
+        $request->patchJson('/api/transport/settings?companyId=kora', [
+            'gpsValidityMinutes' => 8,
+            'trackingIntervalSeconds' => 45,
+        ])->assertOk()
+            ->assertJsonPath('gpsValidityMinutes', 8)
+            ->assertJsonPath('trackingIntervalSeconds', 45);
+
+        $request->getJson('/api/transport/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('settings.gpsValidityMinutes', 8)
+            ->assertJsonPath('settings.trackingIntervalSeconds', 45);
+    }
+
     public function test_transport_permissions_are_scoped_to_each_feature(): void
     {
         $request = $this->asActor('employee', [

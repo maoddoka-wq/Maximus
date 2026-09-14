@@ -19,6 +19,10 @@ class TransportController extends Controller
     private const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE'];
     private const VEHICLE_STATUSES = ['AVAILABLE', 'ON_TRIP', 'MAINTENANCE'];
     private const TRIP_STATUSES = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+    private const DEFAULT_SETTINGS = [
+        'gpsValidityMinutes' => 5,
+        'trackingIntervalSeconds' => 30,
+    ];
 
     public function bootstrap(Request $request): JsonResponse
     {
@@ -30,6 +34,17 @@ class TransportController extends Controller
         $drivers = DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get();
         $vehicles = DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get();
         $trips = DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get();
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) === 'employee') {
+            $driver = $drivers->firstWhere('employee_id', $actor['employeeId'] ?? null);
+            $drivers = $driver ? collect([$driver]) : collect();
+            $vehicles = $driver
+                ? $vehicles->where('driver_id', $driver->id)->values()
+                : collect();
+            $trips = $driver
+                ? $trips->where('driver_id', $driver->id)->values()
+                : collect();
+        }
         $driverIds = $trips->pluck('driver_id')->filter()->unique()->values()->all();
         $tripDrivers = empty($driverIds)
             ? collect()
@@ -52,7 +67,40 @@ class TransportController extends Controller
                     ->filter(fn ($row) => $row->status === 'COMPLETED' && $row->requested_at && $row->requested_at >= $today)
                     ->sum('fare'),
             ],
+            'settings' => $this->transportSettings($company),
         ]);
+    }
+
+    public function updateSettings(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->validated($request, [
+            'gpsValidityMinutes' => ['required', 'integer', 'min:1', 'max:60'],
+            'trackingIntervalSeconds' => ['required', 'integer', 'min:10', 'max:300'],
+        ]);
+        $company = $this->company($request);
+        $module = DB::table('maximus_company_modules')
+            ->where('company_id', $company)
+            ->where('module_id', 'transport')
+            ->first();
+        $configuration = json_decode($module->configuration ?? '{}', true);
+        $configuration = is_array($configuration) ? $configuration : [];
+        $configuration['transport'] = [
+            'gpsValidityMinutes' => (int) $input['gpsValidityMinutes'],
+            'trackingIntervalSeconds' => (int) $input['trackingIntervalSeconds'],
+        ];
+        DB::table('maximus_company_modules')
+            ->where('company_id', $company)
+            ->where('module_id', 'transport')
+            ->update([
+                'configuration' => json_encode($configuration, JSON_UNESCAPED_UNICODE),
+                'updated_at' => now(),
+            ]);
+
+        return response()->json($this->transportSettings($company));
     }
 
     public function createDriver(Request $request): JsonResponse
@@ -100,7 +148,7 @@ class TransportController extends Controller
 
     public function updateDriverLocation(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'drivers')) {
+        if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
             return $this->forbidden();
         }
 
@@ -290,6 +338,16 @@ class TransportController extends Controller
         if (! $trip) {
             return response()->json(['error' => 'Course introuvable.'], 404);
         }
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) === 'employee') {
+            $driverId = DB::table('transport_drivers')
+                ->where('company_id', $company)
+                ->where('employee_id', $actor['employeeId'] ?? null)
+                ->value('id');
+            if (! $driverId || $trip->driver_id !== $driverId) {
+                return response()->json(['error' => 'Vous ne pouvez modifier que vos propres courses.'], 403);
+            }
+        }
         DB::transaction(function () use ($trip, $input): void {
             DB::table('transport_trips')->where('id', $trip->id)->update(['status' => $input['status'], 'updated_at' => now()]);
             if ($trip->vehicle_id !== null && in_array($input['status'], ['COMPLETED', 'CANCELLED'], true)) {
@@ -387,7 +445,7 @@ class TransportController extends Controller
                 ->whereNotNull('employee_id')
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
-                ->where('location_updated_at', '>=', now()->subMinutes(5))
+                ->where('location_updated_at', '>=', now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes']))
                 ->whereNotExists(function ($query) use ($company): void {
                     $query->select(DB::raw(1))
                         ->from('transport_trips as active_trip')
@@ -473,6 +531,23 @@ class TransportController extends Controller
     private function company(Request $request): string
     {
         return (string) $request->attributes->get('companyId');
+    }
+
+    private function transportSettings(string $company): array
+    {
+        $configuration = DB::table('maximus_company_modules')
+            ->where('company_id', $company)
+            ->where('module_id', 'transport')
+            ->value('configuration');
+        $configuration = json_decode($configuration ?? '{}', true);
+        $settings = is_array($configuration) && is_array($configuration['transport'] ?? null)
+            ? $configuration['transport']
+            : [];
+
+        return [
+            'gpsValidityMinutes' => max(1, min(60, (int) ($settings['gpsValidityMinutes'] ?? self::DEFAULT_SETTINGS['gpsValidityMinutes']))),
+            'trackingIntervalSeconds' => max(10, min(300, (int) ($settings['trackingIntervalSeconds'] ?? self::DEFAULT_SETTINGS['trackingIntervalSeconds']))),
+        ];
     }
 
     private function id(string $prefix): string

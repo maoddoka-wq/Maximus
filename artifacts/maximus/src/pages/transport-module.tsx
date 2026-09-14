@@ -7,12 +7,14 @@ import {
   Clock3,
   FilePlus2,
   Gauge,
+  History,
   MapPin,
   Phone,
   Plus,
   RefreshCw,
   Route,
   ShieldCheck,
+  Settings,
   UserRound,
   UsersRound,
   Wrench,
@@ -26,6 +28,7 @@ import {
   type Driver,
   type DriverStatus,
   type TransportBootstrap,
+  type TransportSettings,
   type Trip,
   type TripStatus,
   type Vehicle,
@@ -34,7 +37,7 @@ import {
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-type TransportTab = 'overview' | 'courses' | 'chauffeurs' | 'vehicules';
+type TransportTab = 'overview' | 'courses' | 'chauffeurs' | 'vehicules' | 'historique' | 'parametres';
 type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
 
 const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: string }[] = [
@@ -42,6 +45,8 @@ const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: st
   { id: 'courses', label: 'Courses', icon: Route, featureId: 'trips' },
   { id: 'chauffeurs', label: 'Chauffeurs', icon: UserRound, featureId: 'drivers' },
   { id: 'vehicules', label: 'Véhicules', icon: CarFront, featureId: 'vehicles' },
+  { id: 'historique', label: 'Historique', icon: History, featureId: 'historique' },
+  { id: 'parametres', label: 'Paramètres', icon: Settings, featureId: 'parametres' },
 ];
 
 const transportTabByFeatureId: Record<string, TransportTab> = {
@@ -52,6 +57,10 @@ const transportTabByFeatureId: Record<string, TransportTab> = {
   chauffeurs: 'chauffeurs',
   vehicles: 'vehicules',
   vehicules: 'vehicules',
+  historique: 'historique',
+  history: 'historique',
+  parametres: 'parametres',
+  settings: 'parametres',
 };
 
 const tripStatuses: TripStatus[] = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
@@ -61,6 +70,7 @@ const emptyData = (): TransportBootstrap => ({
   vehicles: [],
   trips: [],
   metrics: { activeDrivers: 0, availableVehicles: 0, todayTrips: 0, todayRevenue: 0 },
+  settings: { gpsValidityMinutes: 5, trackingIntervalSeconds: 30 },
 });
 
 const dateLabel = (value: string) => {
@@ -155,8 +165,12 @@ export default function TransportModulePage({
   const canCreateTrips = featurePermissions ? Boolean(featurePermissions.trips?.canCreate) : canCreate;
   const canModifyTrips = featurePermissions ? Boolean(featurePermissions.trips?.canModify) : canModify;
   const canCreateDrivers = featurePermissions ? Boolean(featurePermissions.drivers?.canCreate) : canCreate;
-  const canModifyDrivers = featurePermissions ? Boolean(featurePermissions.drivers?.canModify) : canModify;
+  const canModifyDrivers = featurePermissions
+    ? Boolean(featurePermissions.drivers?.canModify || featurePermissions.trips?.canModify)
+    : canModify;
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
+  const canModifySettings = featurePermissions ? Boolean(featurePermissions.parametres?.canModify) : canModify;
+  const trackingIntervalSeconds = data?.settings.trackingIntervalSeconds ?? 30;
 
   useEffect(() => {
     const nextRequestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
@@ -183,6 +197,7 @@ export default function TransportModulePage({
         vehicles: Array.isArray(result?.vehicles) ? result.vehicles : [],
         trips: Array.isArray(result?.trips) ? result.trips : [],
         metrics: result?.metrics ?? emptyData().metrics,
+        settings: result?.settings ?? emptyData().settings,
       });
       setError('');
     } catch (cause) {
@@ -228,12 +243,12 @@ export default function TransportModulePage({
     );
     const refreshId = window.setInterval(() => {
       if (latestPosition.current) sendLocation(latestPosition.current);
-    }, 30_000);
+    }, trackingIntervalSeconds * 1000);
     return () => {
       navigator.geolocation.clearWatch(watchId);
       window.clearInterval(refreshId);
     };
-  }, [api, currentDriverId, canModifyDrivers, preview]);
+  }, [api, currentDriverId, canModifyDrivers, preview, trackingIntervalSeconds]);
 
   const run = async <T,>(action: () => Promise<T>, success: string) => {
     if (pendingAction) return;
@@ -325,10 +340,12 @@ export default function TransportModulePage({
       </nav>}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
-        {tab === 'overview' && <Overview data={data} onTab={setTab} />}
+        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{!visibleTabs.some(item => item.id === 'chauffeurs') && currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}</>}
         {tab === 'courses' && <TripsPanel data={data} canCreate={canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} />}
         {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} /></>}
         {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} onCreate={() => setDialog('vehicle')} />}
+        {tab === 'historique' && <HistoryPanel trips={data.trips} />}
+        {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
       </>}
 
       {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} employees={employees} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}
@@ -363,6 +380,23 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
       </section>
     </div>
   </div>;
+}
+
+function HistoryPanel({ trips }: { trips: Trip[] }) {
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Traçabilité Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Historique</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Retrouvez les courses et leurs statuts enregistrés.</p></div></div><section className="card-surface overflow-hidden">{trips.length ? <TripTable trips={trips} compact onStatusChange={() => undefined} /> : <EmptyState icon={History} title="Aucun historique" text="Les courses terminées ou en cours apparaîtront ici." />}</section></div>;
+}
+
+function SettingsPanel({ settings, canModify, onSave }: { settings: TransportSettings; canModify: boolean; onSave: (settings: TransportSettings) => void }) {
+  const [form, setForm] = useState<TransportSettings>(settings);
+  useEffect(() => setForm(settings), [settings]);
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    onSave({
+      gpsValidityMinutes: Math.max(1, Math.min(60, Number(form.gpsValidityMinutes))),
+      trackingIntervalSeconds: Math.max(10, Math.min(300, Number(form.trackingIntervalSeconds))),
+    });
+  };
+  return <div className="fade-up space-y-4"><div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Configuration Taxi</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Paramètres</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Définissez les règles de géolocalisation et de suivi des chauffeurs.</p></div></div><section className="card-surface p-5"><form onSubmit={submit} className="max-w-xl space-y-5"><Field label="Validité d’une position GPS (minutes)"><input required min="1" max="60" type="number" value={form.gpsValidityMinutes} onChange={event => setForm(current => ({ ...current, gpsValidityMinutes: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><Field label="Intervalle de suivi web (secondes)"><input required min="10" max="300" type="number" value={form.trackingIntervalSeconds} onChange={event => setForm(current => ({ ...current, trackingIntervalSeconds: Number(event.target.value) }))} className={inputClass} disabled={!canModify} /></Field><p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Une position plus ancienne que la durée choisie ne peut pas être utilisée pour affecter une course publique. Le suivi mobile en arrière-plan reste hors périmètre.</p>{canModify ? <DialogActions busy={false} onClose={() => setForm(settings)} label="Enregistrer les paramètres" /> : <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Ces paramètres sont consultables, mais votre rôle ne peut pas les modifier.</p>}</form></section></div>;
 }
 
 function Metric({ label, value, detail, icon: Icon, accent }: { label: string; value: string | number; detail: string; icon: typeof Gauge; accent: string }) {

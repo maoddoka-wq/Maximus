@@ -119,7 +119,7 @@ final class ModuleCatalog
                 'id' => 'transport',
                 'name' => 'Transport',
                 'description' => 'Organiser les chauffeurs, les véhicules et les courses Taxi.',
-                'features' => ['Vue d’ensemble', 'Courses', 'Chauffeurs', 'Véhicules'],
+                'features' => ['Vue d’ensemble', 'Courses', 'Chauffeurs', 'Véhicules', 'Historique', 'Paramètres'],
                 'feature_packs' => [
                     ['id' => 'transport-consultation', 'name' => 'Consultation Taxi', 'description' => 'Suivre l’activité Taxi, les courses et la flotte.', 'feature_ids' => ['overview', 'trips', 'drivers', 'vehicles']],
                     [
@@ -132,6 +132,18 @@ final class ModuleCatalog
                             'trips' => ['voir', 'créer', 'modifier'],
                             'drivers' => ['voir', 'créer', 'modifier'],
                             'vehicles' => ['voir', 'créer', 'modifier'],
+                        ],
+                    ],
+                    [
+                        'id' => 'transport-chauffeur',
+                        'name' => 'Espace chauffeur Taxi',
+                        'description' => 'Permettre au chauffeur de suivre ses courses, son historique et les paramètres opérationnels.',
+                        'feature_ids' => ['overview', 'trips', 'historique', 'parametres'],
+                        'feature_permissions' => [
+                            'overview' => ['voir'],
+                            'trips' => ['voir', 'modifier'],
+                            'historique' => ['voir'],
+                            'parametres' => ['voir'],
                         ],
                     ],
                 ],

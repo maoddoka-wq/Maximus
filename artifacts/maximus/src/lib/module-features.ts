@@ -24,6 +24,8 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
       { id: 'trips', label: 'Courses' },
       { id: 'drivers', label: 'Chauffeurs' },
       { id: 'vehicles', label: 'Véhicules' },
+      { id: 'historique', label: 'Historique' },
+      { id: 'parametres', label: 'Paramètres' },
     ];
   }
   return (Array.isArray(module.features) ? module.features : []).map(feature => ({ id: featureSlug(feature), label: feature }));
