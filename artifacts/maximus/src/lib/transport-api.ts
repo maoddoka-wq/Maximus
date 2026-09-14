@@ -6,6 +6,8 @@ export type TripStatus = 'REQUESTED' | 'OFFERED' | 'ASSIGNED' | 'IN_PROGRESS' | 
 export interface TransportSettings {
   gpsValidityMinutes: number;
   trackingIntervalSeconds: number;
+  baseFare: number;
+  pricePerKm: number;
   heroImageUrl: string;
   heroImageData?: string | null;
 }

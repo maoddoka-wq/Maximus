@@ -104,6 +104,19 @@ const whatsappNumber = (value: string) => {
   return digits;
 };
 
+const DAKAR_BOUNDS = {
+  minLatitude: 14.55,
+  maxLatitude: 14.95,
+  minLongitude: -17.65,
+  maxLongitude: -16.95,
+};
+
+const isWithinDakar = (latitude: number, longitude: number) =>
+  latitude >= DAKAR_BOUNDS.minLatitude
+  && latitude <= DAKAR_BOUNDS.maxLatitude
+  && longitude >= DAKAR_BOUNDS.minLongitude
+  && longitude <= DAKAR_BOUNDS.maxLongitude;
+
 export default function PublicShopPage({ slug, domain = false, clientApp = false }: { slug?: string; domain?: boolean; clientApp?: boolean }) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
@@ -922,6 +935,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     setLocationMessage('Localisation en cours…');
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        if (!isWithinDakar(coords.latitude, coords.longitude)) {
+          setPosition(null);
+          setLocationState('error');
+          setLocationMessage('Le service Taxi est actuellement limité à la zone de Dakar.');
+          return;
+        }
         setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy });
         setLocationState('ready');
         setLocationMessage(`Position partagée avec une précision d’environ ${Math.round(coords.accuracy)} m.`);
@@ -1035,7 +1054,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         {formOpen && !trip && <form onSubmit={submit} className="space-y-5">
            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Étape finale</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] sm:text-2xl">Où allez-vous ?</h2></div><button type="button" onClick={() => setFormOpen(false)} className="text-xs font-bold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">Retour</button></div>
           <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><MapPin size={18} className="shrink-0" /><div><p className="font-bold">Départ : votre position actuelle</p><p className="mt-0.5 text-xs text-emerald-800">Position précise partagée automatiquement</p></div></div>
-          <label className="block text-sm font-bold">Destination<input required autoFocus value={form.destination} onChange={event => setForm({ ...form, destination: event.target.value })} className="mt-2 w-full rounded-xl border px-4 py-3.5 text-sm outline-none transition focus:border-[var(--shop-accent)] focus:ring-2 focus:ring-[var(--shop-accent)]/15" placeholder="Ex. Aéroport Blaise Diagne" /></label>
+           <label className="block text-sm font-bold">Destination<input required autoFocus list="dakar-destinations" value={form.destination} onChange={event => setForm({ ...form, destination: event.target.value })} className="mt-2 w-full rounded-xl border px-4 py-3.5 text-sm outline-none transition focus:border-[var(--shop-accent)] focus:ring-2 focus:ring-[var(--shop-accent)]/15" placeholder="Ex. Plateau, Almadies ou Fann" /><datalist id="dakar-destinations"><option value="Plateau, Dakar" /><option value="Almadies, Dakar" /><option value="Fann, Dakar" /><option value="Ouakam, Dakar" /><option value="Parcelles Assainies, Dakar" /><option value="Aéroport Blaise Diagne" /></datalist><span className="mt-1.5 block text-xs font-normal text-[hsl(var(--muted-foreground))]">Recherche et arrivée limitées à la zone de Dakar.</span></label>
           {quoteLoading && <p className="inline-flex items-center gap-2 rounded-xl bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800"><RefreshCw size={14} className="animate-spin" />Calcul de la route et du tarif…</p>}
           {quoteError && !quoteLoading && <p role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-900">{quoteError}</p>}
           {quote && <div className="space-y-3 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/5 p-3"><div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Distance</p><p className="mt-1 text-sm font-black">{quote.distanceKm.toFixed(1)} km</p></div><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Durée</p><p className="mt-1 text-sm font-black">{quote.durationMinutes} min</p></div><div className="rounded-xl bg-white px-2 py-3"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Tarif</p><p className="mt-1 text-sm font-black text-[var(--shop-accent)]">{money(quote.fare, store.currency)}</p></div></div><TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="h-[clamp(20rem,70vw,28rem)]" /><p className="text-[11px] text-[hsl(var(--muted-foreground))]">Le tarif est calculé côté serveur à partir de la distance routière OpenStreetMap/OpenRouteService.</p></div>}

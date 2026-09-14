@@ -24,6 +24,14 @@ class TransportController extends Controller
     private const DEFAULT_SETTINGS = [
         'gpsValidityMinutes' => 5,
         'trackingIntervalSeconds' => 10,
+        'baseFare' => 500,
+        'pricePerKm' => 300,
+    ];
+    private const DAKAR_BOUNDS = [
+        'minLatitude' => 14.55,
+        'maxLatitude' => 14.95,
+        'minLongitude' => -17.65,
+        'maxLongitude' => -16.95,
     ];
 
     public function bootstrap(Request $request): JsonResponse
@@ -82,6 +90,8 @@ class TransportController extends Controller
         $input = $this->validated($request, [
             'gpsValidityMinutes' => ['required', 'integer', 'min:1', 'max:60'],
             'trackingIntervalSeconds' => ['sometimes', 'integer', 'in:10'],
+            'baseFare' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
+            'pricePerKm' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
             'heroImageData' => ['sometimes', 'nullable', 'string', 'max:4194304'],
         ]);
         $company = $this->company($request);
@@ -94,10 +104,18 @@ class TransportController extends Controller
         $transportConfiguration = is_array($configuration['transport'] ?? null)
             ? $configuration['transport']
             : [];
+        $baseFare = array_key_exists('baseFare', $input)
+            ? (int) $input['baseFare']
+            : (int) ($transportConfiguration['baseFare'] ?? self::DEFAULT_SETTINGS['baseFare']);
+        $pricePerKm = array_key_exists('pricePerKm', $input)
+            ? (int) $input['pricePerKm']
+            : (int) ($transportConfiguration['pricePerKm'] ?? self::DEFAULT_SETTINGS['pricePerKm']);
         $configuration['transport'] = [
             ...$transportConfiguration,
             'gpsValidityMinutes' => (int) $input['gpsValidityMinutes'],
             'trackingIntervalSeconds' => 10,
+            'baseFare' => $baseFare,
+            'pricePerKm' => $pricePerKm,
         ];
         if (array_key_exists('heroImageData', $input)) {
             if ($input['heroImageData'] === null || trim((string) $input['heroImageData']) === '') {
@@ -849,6 +867,9 @@ class TransportController extends Controller
             'pickupLatitude' => ['required', 'numeric', 'between:-90,90'],
             'pickupLongitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
+        if (! $this->isWithinDakar((float) $input['pickupLatitude'], (float) $input['pickupLongitude'])) {
+            return response()->json(['error' => 'Le service Taxi est limité à la zone de Dakar.'], 422);
+        }
         try {
             $route = $this->calculateRouteToAddress(
                 (float) $input['pickupLatitude'],
@@ -857,7 +878,7 @@ class TransportController extends Controller
             );
         } catch (\Throwable $exception) {
             report($exception);
-            return response()->json(['error' => 'La destination n’a pas pu être localisée ou l’itinéraire est indisponible.'], 422);
+            return response()->json(['error' => $this->routeErrorMessage($exception)], 422);
         }
         $payload = [
             'companyId' => $company,
@@ -875,7 +896,7 @@ class TransportController extends Controller
             'destinationLongitude' => $route['destinationLongitude'],
             'distanceKm' => $route['distanceKm'],
             'durationMinutes' => $route['durationMinutes'],
-            'fare' => $this->taxiFare($route['distanceKm']),
+            'fare' => $this->taxiFare($route['distanceKm'], $company),
             'geometry' => $route['geometry'],
         ]);
     }
@@ -899,6 +920,9 @@ class TransportController extends Controller
         $latitude = (float) $input['pickupLatitude'];
         $longitude = (float) $input['pickupLongitude'];
         $destination = trim($input['destination']);
+        if (! $this->isWithinDakar($latitude, $longitude)) {
+            return response()->json(['error' => 'Le service Taxi est limité à la zone de Dakar.'], 422);
+        }
         $route = $this->routeFromQuote($input['quoteToken'] ?? null, $company, $destination, $latitude, $longitude);
         if (($input['quoteToken'] ?? null) !== null && $route === null) {
             return response()->json(['error' => 'Le devis Taxi est invalide ou expiré.'], 422);
@@ -908,7 +932,7 @@ class TransportController extends Controller
                 $route = $this->calculateRouteToAddress($latitude, $longitude, $destination);
             } catch (\Throwable $exception) {
                 report($exception);
-                return response()->json(['error' => 'La destination n’a pas pu être localisée ou l’itinéraire est indisponible.'], 422);
+                return response()->json(['error' => $this->routeErrorMessage($exception)], 422);
             }
         }
         $row = null;
@@ -958,7 +982,7 @@ class TransportController extends Controller
                 'destination' => $destination,
                 'passenger_name' => trim($input['passengerName']),
                 'passenger_phone' => trim($input['passengerPhone']),
-                'fare' => $route ? $this->taxiFare($route['distanceKm']) : 0,
+                'fare' => $route ? $this->taxiFare($route['distanceKm'], $company) : 0,
                 'driver_id' => $driver?->id,
                 'vehicle_id' => $vehicle?->id,
                 'status' => $status,
@@ -1035,6 +1059,9 @@ class TransportController extends Controller
      */
     private function calculateRouteToAddress(float $originLatitude, float $originLongitude, string $destination): array
     {
+        if (! $this->isWithinDakar($originLatitude, $originLongitude)) {
+            throw new \InvalidArgumentException('ORIGIN_OUTSIDE_DAKAR');
+        }
         $key = trim((string) config('services.openrouteservice.api_key'));
         $destinationCoordinates = $key !== ''
             ? $this->geocode(
@@ -1043,6 +1070,9 @@ class TransportController extends Controller
                 $destination,
             )
             : $this->geocodeWithOpenStreetMap($destination);
+        if (! $this->isWithinDakar($destinationCoordinates[1], $destinationCoordinates[0])) {
+            throw new \InvalidArgumentException('DESTINATION_OUTSIDE_DAKAR');
+        }
         $route = $this->calculateRouteCoordinates(
             [$originLongitude, $originLatitude],
             $destinationCoordinates,
@@ -1118,21 +1148,53 @@ class TransportController extends Controller
             ->get('https://nominatim.openstreetmap.org/search', [
                 'format' => 'jsonv2',
                 'limit' => 1,
-                'q' => $address,
+            'q' => $address.', Dakar, Sénégal',
+            'countrycodes' => 'sn',
+            'viewbox' => '-17.65,14.95,-16.95,14.55',
+            'bounded' => 1,
             ]);
         $result = $response->json('0');
         if (! $response->successful() || ! is_array($result) || ! is_numeric($result['lon'] ?? null) || ! is_numeric($result['lat'] ?? null)) {
             throw new \RuntimeException('OpenStreetMap n’a pas pu localiser la destination.');
         }
 
-        return [(float) $result['lon'], (float) $result['lat']];
+        $coordinates = [(float) $result['lon'], (float) $result['lat']];
+        if (! $this->isWithinDakar($coordinates[1], $coordinates[0])) {
+            throw new \InvalidArgumentException('DESTINATION_OUTSIDE_DAKAR');
+        }
+
+        return $coordinates;
     }
 
-    private function taxiFare(float $distanceKm): int
+    /**
+     * @param  array<string, string>  $headers
+     * @return array{0: float, 1: float}
+     */
+    private function geocode(string $baseUrl, array $headers, string $address): array
     {
-        $baseFare = 500;
-        $perKilometre = 300;
-        return max(1000, $baseFare + ((int) ceil($distanceKm) * $perKilometre));
+        $response = Http::timeout(10)
+            ->withHeaders($headers)
+            ->get($baseUrl.'/geocode/search', [
+                'text' => $address.', Dakar, Sénégal',
+                'size' => 1,
+                'boundary.country' => 'SN',
+                'boundary.rect.min_lon' => self::DAKAR_BOUNDS['minLongitude'],
+                'boundary.rect.min_lat' => self::DAKAR_BOUNDS['minLatitude'],
+                'boundary.rect.max_lon' => self::DAKAR_BOUNDS['maxLongitude'],
+                'boundary.rect.max_lat' => self::DAKAR_BOUNDS['maxLatitude'],
+            ]);
+        $coordinates = $response->json('features.0.geometry.coordinates');
+        if (! $response->successful() || ! is_array($coordinates) || ! is_numeric($coordinates[0] ?? null) || ! is_numeric($coordinates[1] ?? null)) {
+            throw new \RuntimeException('Le fournisseur de géocodage n’a pas pu localiser la destination.');
+        }
+
+        return [(float) $coordinates[0], (float) $coordinates[1]];
+    }
+
+    private function taxiFare(float $distanceKm, string $company): int
+    {
+        $settings = $this->transportSettings($company);
+        return max(1000, $settings['baseFare'] + ((int) ceil($distanceKm) * $settings['pricePerKm']));
     }
 
     private function routeFromQuote(?string $token, string $company, string $destination, float $latitude, float $longitude): ?array
@@ -1151,6 +1213,12 @@ class TransportController extends Controller
                 || ($payload['expiresAt'] ?? 0) < now()->timestamp
                 || ! $validCoordinates
                 || ! is_array($payload['route'] ?? null)) {
+                return null;
+            }
+            if (! $this->isWithinDakar(
+                (float) ($payload['route']['destinationLatitude'] ?? 0),
+                (float) ($payload['route']['destinationLongitude'] ?? 0),
+            )) {
                 return null;
             }
 
@@ -1319,10 +1387,27 @@ class TransportController extends Controller
         return [
             'gpsValidityMinutes' => max(1, min(60, (int) ($settings['gpsValidityMinutes'] ?? self::DEFAULT_SETTINGS['gpsValidityMinutes']))),
             'trackingIntervalSeconds' => 10,
+            'baseFare' => max(0, min(1000000, (int) ($settings['baseFare'] ?? self::DEFAULT_SETTINGS['baseFare']))),
+            'pricePerKm' => max(1, min(1000000, (int) ($settings['pricePerKm'] ?? self::DEFAULT_SETTINGS['pricePerKm']))),
             'heroImageUrl' => empty($settings['heroImageData'])
                 ? '/taxi-transport-hero.jpg'
                 : '/api/transport/settings/hero-image',
         ];
+    }
+
+    private function isWithinDakar(float $latitude, float $longitude): bool
+    {
+        return $latitude >= self::DAKAR_BOUNDS['minLatitude']
+            && $latitude <= self::DAKAR_BOUNDS['maxLatitude']
+            && $longitude >= self::DAKAR_BOUNDS['minLongitude']
+            && $longitude <= self::DAKAR_BOUNDS['maxLongitude'];
+    }
+
+    private function routeErrorMessage(\Throwable $exception): string
+    {
+        return str_contains($exception->getMessage(), 'OUTSIDE_DAKAR')
+            ? 'Les destinations et départs Taxi sont limités à la zone de Dakar.'
+            : 'La destination n’a pas pu être localisée ou l’itinéraire est indisponible.';
     }
 
     private function id(string $prefix): string

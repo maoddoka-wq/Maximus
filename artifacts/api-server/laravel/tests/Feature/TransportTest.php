@@ -165,16 +165,22 @@ class TransportTest extends TestCase
             ->assertOk()
             ->assertJsonPath('settings.gpsValidityMinutes', 5)
             ->assertJsonPath('settings.trackingIntervalSeconds', 10)
+            ->assertJsonPath('settings.baseFare', 500)
+            ->assertJsonPath('settings.pricePerKm', 300)
             ->assertJsonPath('settings.heroImageUrl', '/taxi-transport-hero.jpg');
 
         $heroImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
         $request->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,
             'trackingIntervalSeconds' => 10,
+            'baseFare' => 750,
+            'pricePerKm' => 425,
             'heroImageData' => $heroImage,
         ])->assertOk()
             ->assertJsonPath('gpsValidityMinutes', 8)
             ->assertJsonPath('trackingIntervalSeconds', 10)
+            ->assertJsonPath('baseFare', 750)
+            ->assertJsonPath('pricePerKm', 425)
             ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image');
         $request->get('/api/transport/settings/hero-image?companyId=kora')
             ->assertOk()
@@ -184,6 +190,8 @@ class TransportTest extends TestCase
             ->assertOk()
             ->assertJsonPath('settings.gpsValidityMinutes', 8)
             ->assertJsonPath('settings.trackingIntervalSeconds', 10)
+            ->assertJsonPath('settings.baseFare', 750)
+            ->assertJsonPath('settings.pricePerKm', 425)
             ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image');
 
         $request->patchJson('/api/transport/settings?companyId=kora', [
@@ -373,6 +381,13 @@ class TransportTest extends TestCase
             ->assertJsonPath('distanceKm', 4.2)
             ->assertJsonPath('durationMinutes', 15)
             ->assertJsonPath('fare', 2000);
+
+        $this->postJson('/api/shop/kora-quote/transport/quote', [
+            'destination' => 'Paris',
+            'pickupLatitude' => 48.8566,
+            'pickupLongitude' => 2.3522,
+        ])->assertStatus(422)
+            ->assertJsonPath('error', 'Le service Taxi est limité à la zone de Dakar.');
 
         $trip = $this->postJson('/api/shop/kora-quote/transport/trips', [
             'pickup' => 'Plateau',
