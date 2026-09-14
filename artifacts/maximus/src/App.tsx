@@ -138,6 +138,62 @@ import { mutationSuccessMessage } from '@/lib/mutation-feedback';
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
+const appStateCachePrefix = 'maximus-app-state:';
+const authIdentityStorageKey = 'maximus-auth-identity';
+
+function appStateCacheKey(session: string | null) {
+  if (!session || session === 'admin' || typeof window === 'undefined') return null;
+  const identity = localStorage.getItem(authIdentityStorageKey);
+  return identity ? `${appStateCachePrefix}${session}:${identity}` : null;
+}
+
+function readCachedAppState(session: string | null): { data: StoreData; version: number } | null {
+  const cacheKey = appStateCacheKey(session);
+  if (!cacheKey) return null;
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { data?: Partial<StoreData>; version?: number };
+    if (!cached.data || typeof cached.data !== 'object') return null;
+    return {
+      data: sanitizeStoreData(cached.data),
+      version: typeof cached.version === 'number' ? cached.version : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function cacheAppState(session: string | null, data: StoreData, version: number) {
+  const cacheKey = appStateCacheKey(session);
+  if (!cacheKey) return;
+  try {
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify({ data, version, cachedAt: Date.now() }),
+    );
+  } catch {
+    // Le cache local est une accélération facultative. Le serveur reste la source de vérité.
+  }
+}
+
+function cacheAuthIdentity(user: AuthUser) {
+  if (typeof window === 'undefined') return;
+  const identity = [user.role, user.companyId ?? '', user.employeeId ?? ''].join('|');
+  localStorage.setItem(authIdentityStorageKey, identity);
+}
+
+function isPlatformHost() {
+  if (typeof window === 'undefined') return true;
+  const hostname = window.location.hostname.toLowerCase();
+  return hostname === 'localhost'
+    || hostname === '127.0.0.1'
+    || hostname === 'maximus-erp.onrender.com'
+    || hostname.endsWith('.replit.dev')
+    || hostname.endsWith('.replit.app')
+    || hostname.endsWith('.repl.co');
+}
+
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
@@ -368,17 +424,21 @@ const routesWithModuleHeaders = new Set([
 
 function AppContent() {
   const { alert, confirm } = useAppDialog();
-  const [data, setData] = useState<StoreData>(() => emptyStoreData());
+  const initialSession = typeof window === 'undefined' ? null : localStorage.getItem('maximus-session');
+  const initialCachedState = readCachedAppState(initialSession);
+  const [data, setData] = useState<StoreData>(() => initialCachedState?.data ?? emptyStoreData());
   const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
   const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
-  const [appStateVersion, setAppStateVersion] = useState(0);
+  const [appStateVersion, setAppStateVersion] = useState(initialCachedState?.version ?? 0);
   const [appStateError, setAppStateError] = useState('');
   const [appStateReady, setAppStateReady] = useState(
-    () => !localStorage.getItem('maximus-session'),
+    () => !initialSession || Boolean(initialCachedState),
   );
-  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>('checking');
+  const [customDomainState, setCustomDomainState] = useState<'checking' | 'none' | 'shop'>(
+    () => (isPlatformHost() ? 'none' : 'checking'),
+  );
   const [session, setSession] = useState<Session | null>(
-    () => localStorage.getItem('maximus-session') as Session | null,
+    () => initialSession as Session | null,
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
@@ -428,9 +488,11 @@ function AppContent() {
         if (!user) {
           setSession(null);
           localStorage.removeItem('maximus-session');
+          localStorage.removeItem(authIdentityStorageKey);
           return;
         }
         const nextSession = sessionFromAuthUser(user);
+        cacheAuthIdentity(user);
         const persistedTestCompanyId = localStorage.getItem('maximus-sector-test-company');
         if (nextSession === 'admin' && persistedTestCompanyId) {
           setData((previous) => {
@@ -449,6 +511,7 @@ function AppContent() {
       .catch(() => {
         setSession(null);
         localStorage.removeItem('maximus-session');
+          localStorage.removeItem(authIdentityStorageKey);
       });
   }, []);
   useEffect(() => {
@@ -494,6 +557,7 @@ function AppContent() {
         const nextData = sanitizeStoreData(remoteData);
         dataRef.current = nextData;
         setData(nextData);
+        cacheAppState(session, nextData, version);
         setAppStateError('');
         appStateVersionRef.current = version;
         setAppStateVersion(version);
@@ -503,6 +567,7 @@ function AppContent() {
         if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
           setSession(null);
           localStorage.removeItem('maximus-session');
+          localStorage.removeItem(authIdentityStorageKey);
           localStorage.removeItem('maximus-sector-test-company');
           notify('Votre session MAXIMUS n’est plus active.', 'warning');
           return false;
@@ -563,6 +628,7 @@ function AppContent() {
           const { version } = await appStateApi.save(dataRef.current, appStateVersionRef.current);
           appStateVersionRef.current = version;
           setAppStateVersion(version);
+           cacheAppState(session, dataRef.current, version);
           if (successMessage) notify(successMessage, 'success');
         })
         .catch((error) => {
@@ -694,6 +760,7 @@ function AppContent() {
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
   const applyAuthenticatedUser = (user: AuthUser) => {
     const nextSession = sessionFromAuthUser(user);
+    cacheAuthIdentity(user);
     loginTransitionRef.current = true;
     setAppStateReady(true);
     setSession(nextSession);
@@ -840,8 +907,11 @@ function AppContent() {
   const logout = () => {
     applyCompanyTheme(undefined);
     setAppStateReady(true);
+    const cacheKey = appStateCacheKey(session);
     setSession(null);
     localStorage.removeItem('maximus-session');
+    localStorage.removeItem(authIdentityStorageKey);
+    if (cacheKey) localStorage.removeItem(cacheKey);
     setLocation('/');
     void authApi.logout().catch(() => undefined);
   };
@@ -928,7 +998,7 @@ function AppContent() {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
   if (customDomainState === 'checking') {
-    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement de la boutique…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6 text-sm text-[hsl(var(--muted-foreground))]">Vérification de la boutique…</div>;
   }
   if (customDomainState === 'shop') {
     return <PublicShopPage domain />;

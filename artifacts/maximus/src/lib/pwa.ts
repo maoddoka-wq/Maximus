@@ -56,14 +56,53 @@ export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userA
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
-export async function mountClientManifest(manifestUrl: string): Promise<() => void> {
+type ClientManifest = { id: string; start_url: string; scope: string };
+const clientManifestCachePrefix = 'maximus-client-manifest:';
+
+const validClientManifest = (value: unknown): value is ClientManifest => {
+  if (!value || typeof value !== 'object') return false;
+  const manifest = value as Record<string, unknown>;
+  return typeof manifest.id === 'string'
+    && typeof manifest.start_url === 'string'
+    && typeof manifest.scope === 'string';
+};
+
+const readCachedClientManifest = (manifestUrl: string): ClientManifest | null => {
+  try {
+    const raw = localStorage.getItem(`${clientManifestCachePrefix}${manifestUrl}`);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { manifest?: unknown };
+    return validClientManifest(cached.manifest) ? cached.manifest : null;
+  } catch {
+    return null;
+  }
+};
+
+const fetchClientManifest = async (manifestUrl: string): Promise<ClientManifest> => {
   const response = await fetch(manifestUrl, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`Le manifest PWA est indisponible (${response.status}).`);
   }
-  const manifest = await response.json() as { id?: unknown; start_url?: unknown; scope?: unknown };
-  if (typeof manifest.id !== 'string' || typeof manifest.start_url !== 'string' || typeof manifest.scope !== 'string') {
+  const manifest = await response.json() as unknown;
+  if (!validClientManifest(manifest)) {
     throw new Error('Le manifest PWA ne contient pas d’identité de boutique.');
+  }
+  try {
+    localStorage.setItem(
+      `${clientManifestCachePrefix}${manifestUrl}`,
+      JSON.stringify({ manifest, cachedAt: Date.now() }),
+    );
+  } catch {
+    // Le cache du manifest est facultatif.
+  }
+  return manifest;
+};
+
+export async function mountClientManifest(manifestUrl: string): Promise<() => void> {
+  const cachedManifest = readCachedClientManifest(manifestUrl);
+  const manifest = cachedManifest ?? await fetchClientManifest(manifestUrl);
+  if (cachedManifest) {
+    void fetchClientManifest(manifestUrl).catch(() => undefined);
   }
 
   document.querySelectorAll('link[data-maximus-client-manifest="true"]').forEach((link) => link.remove());

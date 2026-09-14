@@ -20,3 +20,9 @@ Les nouveaux uploads publics (photos produits, logos boutique et photos de locat
 **Why:** Écrire d’abord sur le disque local Render crée une dépendance inutile à un volume éphémère et peut laisser une ressource non récupérable après redémarrage si l’écriture en base échoue.
 
 **How to apply:** Générer une URL stable avec un identifiant unique, persister `image_data`/`logo_data` et le MIME dans la même mutation que l’URL, puis tester la lecture après suppression de toute copie sur le disque public.
+
+En production Render, les dossiers privés montés sous `/var/data` doivent être réattribués à `www-data` au démarrage avant tout upload PHP ; le script d’entrée s’exécute en root, mais Apache/PHP écrit avec l’utilisateur `www-data`.
+
+**Why:** Un dossier créé par root peut sembler accessible au contrôle de démarrage tout en refusant l’écriture à Laravel, ce qui produit une erreur 500 pendant l’envoi d’un fichier numérique.
+
+**How to apply:** Après création ou montage du dossier, appliquer ownership et droits à `www-data`, puis tester l’écriture avec ce même utilisateur plutôt qu’avec root.

@@ -36,7 +36,7 @@ const money = (value: number, currency: PublicShopBootstrap['store']['currency']
 const readableDate = (value: string) =>
   new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value));
 
-async function retryRequest<T>(request: () => Promise<T>, attempts = 3): Promise<T> {
+async function retryRequest<T>(request: () => Promise<T>, attempts = 2): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -49,6 +49,39 @@ async function retryRequest<T>(request: () => Promise<T>, attempts = 3): Promise
     }
   }
   throw lastError instanceof Error ? lastError : new Error('La requête a échoué.');
+}
+
+const publicShopCachePrefix = 'maximus-public-shop:';
+
+function publicShopCacheKey(slug?: string, domain = false) {
+  const scope = domain && typeof window !== 'undefined'
+    ? `domain:${window.location.hostname.toLowerCase()}`
+    : clientPwaStorageKey(slug, domain);
+  return `${publicShopCachePrefix}${scope}`;
+}
+
+function readCachedPublicShop(slug?: string, domain = false): PublicShopBootstrap | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(publicShopCacheKey(slug, domain));
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { data?: PublicShopBootstrap };
+    return cached.data && typeof cached.data === 'object' ? cached.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function cachePublicShop(slug: string | undefined, domain: boolean, data: PublicShopBootstrap) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(
+      publicShopCacheKey(slug, domain),
+      JSON.stringify({ data, cachedAt: Date.now() }),
+    );
+  } catch {
+    // Le catalogue en cache est facultatif et ne doit jamais bloquer la boutique.
+  }
 }
 
 const customerCartToLines = (items: EcommerceCustomerCartLine[], products: PublicProduct[]): CartLine[] =>
@@ -101,11 +134,11 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const routePath = location.split('?')[0];
-  const [data, setData] = useState<PublicShopBootstrap | null>(null);
+  const [data, setData] = useState<PublicShopBootstrap | null>(() => readCachedPublicShop(slug, domain));
   const [customer, setCustomer] = useState<EcommerceCustomer | null>(null);
   const [customerData, setCustomerData] = useState<EcommerceCustomerBootstrap | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !readCachedPublicShop(slug, domain));
   const [customerLoading, setCustomerLoading] = useState(false);
   const [error, setError] = useState('');
   const [cartNotice, setCartNotice] = useState('');
@@ -255,7 +288,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setLoading(current => current && !data);
     const shopLoad = retryRequest(
       async () => {
         const result = domain
@@ -264,13 +297,14 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
         if (domain && !('store' in result)) throw new Error('Aucune boutique publiée ne correspond à ce domaine.');
         return result as PublicShopBootstrap;
       },
-      3,
+      2,
     );
     const sessionLoad = retryRequest(() => api.session(), 2);
     void shopLoad
       .then(result => {
         if (cancelled) return;
         setData(result);
+        cachePublicShop(slug, domain, result);
         setLoading(false);
 
         void sessionLoad
