@@ -325,7 +325,41 @@ export default function TransportModulePage({
       showAppToast('Statut de la course mis à jour.', 'success');
       return;
     }
-    void run(() => api.updateTripStatus(trip.id, status), 'Statut de la course mis à jour.');
+    if (pendingAction) return;
+    setPendingAction(`trip:${trip.id}`);
+    void api.updateTripStatus(trip.id, status).then(updatedTrip => {
+      setData(current => {
+        if (!current) return current;
+        const previousVehicleOnTrip = ['ASSIGNED', 'IN_PROGRESS'].includes(trip.status);
+        const nextVehicleOnTrip = ['ASSIGNED', 'IN_PROGRESS'].includes(status);
+        const vehicleStatus = status === 'ASSIGNED' || status === 'IN_PROGRESS'
+          ? 'ON_TRIP'
+          : status === 'COMPLETED' || status === 'CANCELLED'
+            ? 'AVAILABLE'
+            : null;
+        return {
+          ...current,
+          trips: current.trips.map(item => item.id === updatedTrip.id ? { ...item, ...updatedTrip } : item),
+          vehicles: vehicleStatus && updatedTrip.vehicleId
+            ? current.vehicles.map(vehicle => vehicle.id === updatedTrip.vehicleId ? { ...vehicle, status: vehicleStatus } : vehicle)
+            : current.vehicles,
+          metrics: !previousVehicleOnTrip && nextVehicleOnTrip
+            ? { ...current.metrics, availableVehicles: Math.max(0, current.metrics.availableVehicles - 1) }
+            : previousVehicleOnTrip && !nextVehicleOnTrip
+              ? { ...current.metrics, availableVehicles: current.metrics.availableVehicles + 1 }
+              : current.metrics,
+        };
+      });
+      showAppToast(status === 'ASSIGNED' ? 'Course validée. Vous pouvez rejoindre le client.' : 'Statut de la course mis à jour.', 'success');
+      // La réponse de l’action est affichée sans attendre le bootstrap complet.
+      // Le rafraîchissement complet réconcilie les autres indicateurs en arrière-plan.
+      void load(true);
+    }).catch(cause => {
+      showAppToast(cause instanceof Error ? cause.message : 'La validation de la course a échoué.', 'error');
+      void load(true);
+    }).finally(() => {
+      setPendingAction('');
+    });
   };
 
   if (loading) return <TransportLoadingState />;
@@ -358,7 +392,7 @@ export default function TransportModulePage({
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && (offeredTrip || activeTrip) && <div className="space-y-4">
-          <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} onAccept={trip => updateStatus(trip, 'ASSIGNED')} />
+          <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(offeredTrip && pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} />
           <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />
         </div>}
         {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} />}</>}
@@ -403,12 +437,12 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
   </div>;
 }
 
-function DriverRequestCard({ trip, vehicle, driver, onAccept }: { trip: Trip | null; vehicle: Vehicle | null; driver: Driver | null; onAccept: (trip: Trip) => void }) {
+function DriverRequestCard({ trip, vehicle, driver, pending, onAccept }: { trip: Trip | null; vehicle: Vehicle | null; driver: Driver | null; pending: boolean; onAccept: (trip: Trip) => void }) {
   if (!trip) return null;
   const routeUrl = trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined
     ? `https://www.google.com/maps/dir/?api=1${driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined ? `&origin=${driver.latitude},${driver.longitude}` : ''}&destination=${trip.pickupLatitude},${trip.pickupLongitude}&travelmode=driving`
     : null;
-  return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p></div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onAccept(trip)} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm"><CheckCircle2 size={17} />Valider la course</button></div></div></section>;
+  return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p></div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onAccept(trip)} disabled={pending} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm disabled:cursor-wait disabled:opacity-70">{pending ? <RefreshCw size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}{pending ? 'Validation…' : 'Valider la course'}</button></div></div></section>;
 }
 
 function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driver: Driver | null; vehicle: Vehicle | null }) {
