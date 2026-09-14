@@ -6,7 +6,7 @@ import type { GeoJsonLineString } from '@/lib/transport-api';
 type Point = { latitude: number; longitude: number };
 
 type TaxiRouteMapProps = {
-  pickup?: Point | null;
+  clientStop?: Point | null;
   destination?: Point | null;
   driver?: Point | null;
   routeGeometry?: GeoJsonLineString | null;
@@ -14,29 +14,53 @@ type TaxiRouteMapProps = {
   className?: string;
 };
 
-const addPoint = (group: L.LayerGroup, bounds: L.LatLngBounds, point: Point, color: string, label: string) => {
-  const marker = L.circleMarker([point.latitude, point.longitude], {
-    radius: 8,
-    color,
-    fillColor: color,
-    fillOpacity: 0.95,
-    weight: 3,
-  }).bindTooltip(label, { permanent: false, direction: 'top' });
-  marker.addTo(group);
+const driverIcon = L.divIcon({
+  className: 'taxi-driver-marker',
+  html: '<span class="taxi-driver-marker__body" aria-label="Position du taxi"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 28l3.5-10.5A4 4 0 0 1 17.3 15h13.4a4 4 0 0 1 3.8 2.5L38 28v8H10v-8Z" fill="#0f172a"/><path d="M15.7 25h16.6l-2.2-6.1a1.5 1.5 0 0 0-1.4-1H19.3a1.5 1.5 0 0 0-1.4 1L15.7 25Z" fill="#fbbf24"/><path d="M13 27h22v6H13z" fill="#f8fafc"/><path d="M10 27h28v4H10z" fill="#fbbf24"/><circle cx="16" cy="36" r="3" fill="#0f172a"/><circle cx="32" cy="36" r="3" fill="#0f172a"/><path d="M20 27h8" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/></svg></span>',
+  iconSize: [46, 46],
+  iconAnchor: [23, 23],
+});
+
+const clientStopIcon = L.divIcon({
+  className: 'taxi-client-stop-marker',
+  html: '<span class="taxi-client-stop-marker__body" aria-label="Arrêt du client"><span></span></span>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
+const destinationIcon = L.divIcon({
+  className: 'taxi-destination-marker',
+  html: '<span class="taxi-destination-marker__body" aria-label="Destination"><span>✓</span></span>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+});
+
+const addMarker = (group: L.LayerGroup, bounds: L.LatLngBounds, point: Point, icon: L.DivIcon, label: string) => {
+  L.marker([point.latitude, point.longitude], { icon })
+    .bindTooltip(label, { permanent: false, direction: 'top' })
+    .addTo(group);
   bounds.extend([point.latitude, point.longitude]);
 };
 
 const addRoute = (group: L.LayerGroup, bounds: L.LatLngBounds, geometry: GeoJsonLineString, color: string) => {
+  const coordinates = geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
+  L.polyline(coordinates, {
+    color: '#ffffff',
+    weight: 9,
+    opacity: 0.9,
+    lineCap: 'round',
+    lineJoin: 'round',
+  }).addTo(group);
   const layer = L.polyline(
-    geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]),
-    { color, weight: 5, opacity: 0.85 },
+    coordinates,
+    { color, weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round' },
   );
   layer.addTo(group);
   bounds.extend(layer.getBounds());
 };
 
 export function TaxiRouteMap({
-  pickup,
+  clientStop,
   destination,
   driver,
   routeGeometry,
@@ -57,8 +81,13 @@ export function TaxiRouteMap({
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     map.setView([14.7167, -17.4677], 12);
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    resizeObserver?.observe(containerRef.current);
 
     return () => {
+      resizeObserver?.disconnect();
       map.remove();
       mapRef.current = null;
       layersRef.current = null;
@@ -72,16 +101,23 @@ export function TaxiRouteMap({
     layers.clearLayers();
     const bounds = L.latLngBounds([]);
 
-    if (routeGeometry) addRoute(layers, bounds, routeGeometry, '#d69e2e');
-    if (pickupRouteGeometry) addRoute(layers, bounds, pickupRouteGeometry, '#0ea5e9');
-    if (pickup) addPoint(layers, bounds, pickup, '#16a34a', 'Prise en charge');
-    if (destination) addPoint(layers, bounds, destination, '#dc2626', 'Destination');
-    if (driver) addPoint(layers, bounds, driver, '#0284c7', 'Taxi');
+    if (pickupRouteGeometry) addRoute(layers, bounds, pickupRouteGeometry, '#0284c7');
+    if (routeGeometry) addRoute(layers, bounds, routeGeometry, '#f59e0b');
+    if (driver) addMarker(layers, bounds, driver, driverIcon, 'Position du taxi');
+    if (clientStop) addMarker(layers, bounds, clientStop, clientStopIcon, 'Arrêt du client');
+    if (destination) addMarker(layers, bounds, destination, destinationIcon, 'Destination');
 
     if (bounds.isValid()) {
       map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
     }
-  }, [destination, driver, pickup, pickupRouteGeometry, routeGeometry]);
+  }, [clientStop, destination, driver, pickupRouteGeometry, routeGeometry]);
 
-  return <div ref={containerRef} className={`overflow-hidden rounded-xl border bg-slate-100 ${className}`} aria-label="Carte du trajet Taxi" />;
+  return <div className="space-y-2">
+    <div ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${className}`} aria-label="Carte du trajet Taxi" />
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600">
+      <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-600 ring-2 ring-sky-100" />Taxi → arrêt client</span>
+      <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-amber-100" />Arrêt → destination</span>
+      <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-red-100" />Arrêt client</span>
+    </div>
+  </div>;
 }

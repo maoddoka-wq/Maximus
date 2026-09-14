@@ -128,6 +128,58 @@
   button, a, input, select, textarea { outline-color: hsl(var(--accent)); }
 }
 
+.taxi-driver-marker,
+.taxi-client-stop-marker,
+.taxi-destination-marker {
+  background: transparent;
+  border: 0;
+}
+
+.taxi-driver-marker__body {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 3px solid white;
+  border-radius: 999px;
+  background: #0f172a;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 28%);
+}
+
+.taxi-driver-marker__body svg {
+  width: 34px;
+  height: 34px;
+}
+
+.taxi-client-stop-marker__body,
+.taxi-destination-marker__body {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 3px solid white;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgb(15 23 42 / 24%);
+}
+
+.taxi-client-stop-marker__body {
+  background: #dc2626;
+}
+
+.taxi-client-stop-marker__body span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: white;
+}
+
+.taxi-destination-marker__body {
+  background: #f59e0b;
+  color: #422006;
+  font-size: 15px;
+  font-weight: 900;
+}
+
 * { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
 body { min-width: 320px; }
 .mono { font-family: var(--app-font-mono); }
