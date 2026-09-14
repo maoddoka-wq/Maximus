@@ -40,14 +40,17 @@ export function useAutoRefresh(
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') run();
     };
+    const onManualRefresh = () => run();
 
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('maximus:refresh', onManualRefresh);
     const interval = window.setInterval(run, intervalMs);
 
     return () => {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('maximus:refresh', onManualRefresh);
       window.clearInterval(interval);
     };
   }, [enabled, intervalMs]);

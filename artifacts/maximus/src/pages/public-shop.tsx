@@ -844,6 +844,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [trip, setTrip] = useState<PublicTransportTrip | null>(null);
+  const [tripEnded, setTripEnded] = useState<PublicTransportTrip | null>(null);
   const [tripMessage, setTripMessage] = useState('');
   const [quote, setQuote] = useState<PublicTransportQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
@@ -858,15 +859,30 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     });
   }, [api]);
 
-  useAutoRefresh(() => {
+  const applyTripResult = (result: { trip: PublicTransportTrip; message: string }) => {
+    setTripMessage(result.message);
+    if (['COMPLETED', 'CANCELLED'].includes(result.trip.status)) {
+      window.localStorage.removeItem(customerStorageKey);
+      setTrip(null);
+      setTripEnded(result.trip);
+      setFormOpen(false);
+      return;
+    }
+    setTripEnded(null);
+    setTrip(result.trip);
+    setFormOpen(false);
+  };
+
+  const refreshTrip = async () => {
     if (!trip) return;
-    return api.getTrip(trip.id).then(result => {
-      setTrip(result.trip);
-      setTripMessage(result.message);
-    }).catch(() => {
+    try {
+      applyTripResult(await api.getTrip(trip.id));
+    } catch {
       // Keep the last known position visible while the next refresh retries.
-    });
-  }, { enabled: Boolean(trip), intervalMs: 5_000 });
+    }
+  };
+
+  useAutoRefresh(refreshTrip, { enabled: Boolean(trip), intervalMs: 5_000 });
 
   useEffect(() => {
     if (!position || trip || form.destination.trim().length < 2) {
@@ -934,9 +950,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       }));
       if (customer.tripId) {
         void api.getTrip(customer.tripId).then(result => {
-          setTrip(result.trip);
-          setTripMessage(result.message);
-          setFormOpen(false);
+          applyTripResult(result);
         }).catch(() => {
           window.localStorage.removeItem(customerStorageKey);
         });
@@ -961,6 +975,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     setSubmitting(true);
     setError('');
     setTrip(null);
+    setTripEnded(null);
     try {
       const result = await api.createTrip({
         ...form,
@@ -977,8 +992,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         passengerName: form.passengerName.trim(),
         passengerPhone: form.passengerPhone.trim(),
       }));
-      setTrip(result.trip);
-      setTripMessage(result.message);
+       applyTripResult(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'La demande de course n’a pas pu être envoyée.');
     } finally {
@@ -1010,6 +1024,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     </div>
     <div className="mx-auto grid max-w-5xl gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,.8fr)]">
       <div className="rounded-[1.25rem] border bg-white p-4 shadow-sm sm:rounded-[1.75rem] sm:p-7">
+         {tripEnded && <div className={`mb-4 rounded-xl border px-4 py-3 text-left ${tripEnded.status === 'COMPLETED' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><p className="text-xs font-black uppercase tracking-[.14em]">{tripEnded.status === 'COMPLETED' ? 'Course terminée' : 'Course annulée'}</p><p className="mt-1 text-sm font-semibold">{tripEnded.status === 'COMPLETED' ? 'Le parcours est fini. Vous pouvez demander une nouvelle course.' : 'Cette demande n’est plus active. Vous pouvez recommencer.'}</p></div>}
         {!formOpen && !trip && <div className="text-center sm:py-6">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--shop-primary)]/12 text-[var(--shop-accent)]"><CarFront size={30} /></div>
           <p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Départ automatique</p>
@@ -1052,7 +1067,7 @@ function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
     : null;
 
   return <div className="mt-5 space-y-3 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left">
-    <div className="flex items-center justify-between gap-3 px-1"><p className="text-xs font-black">Suivi en direct</p><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span></div>
+    <div className="flex flex-wrap items-center justify-between gap-2 px-1"><p className="text-xs font-black">Suivi en direct</p><div className="flex items-center gap-3"><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span><button type="button" onClick={() => window.dispatchEvent(new Event('maximus:refresh'))} className="inline-flex items-center gap-1 rounded-lg border bg-white px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><RefreshCw size={12} />Actualiser</button></div></div>
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Taxi → arrêt client</p><p className="mt-1 text-sm font-black">{trip.pickupRouteDistanceKm !== null && trip.pickupRouteDistanceKm !== undefined ? `${trip.pickupRouteDistanceKm.toFixed(1)} km` : 'Calcul…'}</p></div>
       <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Arrivée estimée</p><p className="mt-1 text-sm font-black">{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined ? `${trip.pickupEtaMinutes} min` : 'GPS en attente'}</p></div>

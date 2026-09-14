@@ -46,9 +46,11 @@ export function SystemHealthPage() {
     };
 
     refresh();
+    window.addEventListener('maximus:refresh', refresh);
     const interval = window.setInterval(refresh, 60_000);
     return () => {
       active = false;
+      window.removeEventListener('maximus:refresh', refresh);
       window.clearInterval(interval);
     };
   }, []);

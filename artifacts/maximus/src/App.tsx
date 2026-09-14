@@ -1064,6 +1064,10 @@ function AppContent() {
           onToggleMenu={() => setMobileOpen(true)}
           notificationPath={isAdmin ? '/maximus/notifications' : '/entreprise/notifications'}
           unreadCount={unreadNotifications}
+          onRefresh={async () => {
+            window.dispatchEvent(new Event('maximus:refresh'));
+            await refreshAppState();
+          }}
           onHelp={() => {
             void alert({
               title: 'Aide MAXIMUS',
@@ -4212,12 +4216,14 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
   const [beneficiaryName, setBeneficiaryName] = useState('');
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const load = async () => {
+  const load = async (preserveForm = false) => {
     try {
       const response = await platformSettingsApi.maximusWallet();
       setBootstrap(response);
-      setMobile(response.wallet.payoutMobile);
-      setBeneficiaryName(response.wallet.payoutName);
+      if (!preserveForm) {
+        setMobile(response.wallet.payoutMobile);
+        setBeneficiaryName(response.wallet.payoutName);
+      }
     } catch (error) {
       setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Le solde MAXIMUS est indisponible.' });
     } finally {
@@ -4228,6 +4234,7 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
   useEffect(() => {
     void load();
   }, []);
+  useAutoRefresh(() => load(true), { enabled: Boolean(bootstrap), intervalMs: 30_000 });
 
   const savePayoutAccount = async () => {
     if (mobile.trim().length < 8 || beneficiaryName.trim().length < 2) {

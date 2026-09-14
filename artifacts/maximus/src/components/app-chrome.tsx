@@ -9,6 +9,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  RefreshCw,
   Search,
   X,
 } from 'lucide-react';
@@ -365,6 +366,7 @@ type TopbarProps = {
   notificationPath: string;
   unreadCount: number;
   onHelp: () => void;
+  onRefresh: () => void | Promise<void>;
 };
 
 export function Topbar({
@@ -375,8 +377,20 @@ export function Topbar({
   notificationPath,
   unreadCount,
   onHelp,
+  onRefresh,
 }: TopbarProps) {
   const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <header className="topbar flex min-h-[78px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
@@ -427,6 +441,18 @@ export function Topbar({
             />
           </div>
         )}
+        <button
+          type="button"
+          data-testid="button-global-refresh"
+          aria-label="Actualiser les données"
+          title="Actualiser les données"
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          className="topbar-icon inline-flex items-center gap-2 rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] disabled:cursor-wait disabled:opacity-60 sm:px-3"
+        >
+          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+          <span className="hidden text-xs font-bold sm:inline">Actualiser</span>
+        </button>
         <button
           data-testid="button-help"
           onClick={onHelp}
