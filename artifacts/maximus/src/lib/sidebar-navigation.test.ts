@@ -59,6 +59,26 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
 });
 
+test('le menu Transport utilise les identifiants canoniques des fonctionnalités', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['transport'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+    selectedFeatureIdsByModule: {
+      transport: ['overview', 'trips', 'drivers', 'vehicles'],
+    },
+  });
+
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
+    '/entreprise/transport?tab=overview',
+    '/entreprise/transport?tab=trips',
+    '/entreprise/transport?tab=drivers',
+    '/entreprise/transport?tab=vehicles',
+  ]);
+});
+
 test('le menu Paie utilise une icône distincte pour chaque fonctionnalité', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['paie'],

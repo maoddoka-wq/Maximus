@@ -407,6 +407,7 @@ export function CompanyRouter({
       canModify: hasPermission('transport', 'modifier'),
       allowedFeatureIds: transportFeatureIds,
       featurePermissions: transportFeaturePermissions,
+      initialTab: query.get('tab') ?? undefined,
       singleModuleNavigation,
     });
   }

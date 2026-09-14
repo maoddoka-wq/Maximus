@@ -1,6 +1,7 @@
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  CarFront,
   CalendarDays,
   ClipboardCheck,
   CreditCard,
@@ -152,7 +153,7 @@ export function buildSidebarFeatureGroups({
     const selectedFeatureIds = companyAdmin && !employeeRole
       ? new Set(
           selectedFeatureIdsByModule?.[module.id]
-            ?? module.features.map(feature => featureSlug(feature)),
+            ?? getModuleFeatureOptions(module).map(feature => feature.id),
         )
       : getSelectedFeatureIds(
           employeeRole,
@@ -196,6 +197,14 @@ export function buildSidebarFeatureGroups({
               label: feature,
               icon: CalendarDays,
             }))
+          : moduleId === 'transport'
+            ? getModuleFeatureOptions(module)
+              .filter(feature => selectedFeatureIds.has(feature.id))
+              .map(feature => ({
+                href: `/entreprise/transport?tab=${feature.id}`,
+                label: feature.label,
+                icon: CarFront,
+              }))
           : module.features
             .filter(feature => selectedFeatureIds.has(featureSlug(feature)))
             .map(feature => featureSlug(feature))

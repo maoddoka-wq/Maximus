@@ -44,6 +44,16 @@ const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: st
   { id: 'vehicules', label: 'Véhicules', icon: CarFront, featureId: 'vehicles' },
 ];
 
+const transportTabByFeatureId: Record<string, TransportTab> = {
+  overview: 'overview',
+  trips: 'courses',
+  courses: 'courses',
+  drivers: 'chauffeurs',
+  chauffeurs: 'chauffeurs',
+  vehicles: 'vehicules',
+  vehicules: 'vehicules',
+};
+
 const tripStatuses: TripStatus[] = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 const emptyData = (): TransportBootstrap => ({
@@ -98,6 +108,7 @@ export default function TransportModulePage({
   canModify = true,
   allowedFeatureIds,
   featurePermissions,
+  initialTab,
   employees = [],
   currentEmployeeId = null,
   singleModuleNavigation = false,
@@ -108,6 +119,7 @@ export default function TransportModulePage({
   canModify?: boolean;
   allowedFeatureIds?: string[];
   featurePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
+  initialTab?: string;
   employees?: Array<{ id: string; firstName: string; lastName: string }>;
   currentEmployeeId?: string | null;
   singleModuleNavigation?: boolean;
@@ -120,7 +132,12 @@ export default function TransportModulePage({
       : tabs,
     [allowedFeatureIds],
   );
-  const [tab, setTab] = useState<TransportTab>(visibleTabs[0]?.id ?? 'overview');
+  const requestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
+  const [tab, setTab] = useState<TransportTab>(
+    requestedTab && visibleTabs.some(item => item.id === requestedTab)
+      ? requestedTab
+      : visibleTabs[0]?.id ?? 'overview',
+  );
   const [data, setData] = useState<TransportBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -142,8 +159,13 @@ export default function TransportModulePage({
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
 
   useEffect(() => {
-    if (!visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0]?.id ?? 'overview');
-  }, [tab, visibleTabs]);
+    const nextRequestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
+    if (nextRequestedTab && visibleTabs.some(item => item.id === nextRequestedTab)) {
+      setTab(nextRequestedTab);
+    } else if (!visibleTabs.some(item => item.id === tab)) {
+      setTab(visibleTabs[0]?.id ?? 'overview');
+    }
+  }, [initialTab, tab, visibleTabs]);
 
   const load = async (silent = false) => {
     silent ? setRefreshing(true) : setLoading(true);
