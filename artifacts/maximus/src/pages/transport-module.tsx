@@ -82,6 +82,21 @@ const emptyData = (): TransportBootstrap => ({
   settings: { gpsValidityMinutes: 5, trackingIntervalSeconds: 10, baseFare: 500, pricePerKm: 300, heroImageUrl: '/taxi-transport-hero.jpg' },
 });
 
+const DAKAR_BOUNDS = {
+  minLatitude: 14.55,
+  maxLatitude: 14.95,
+  minLongitude: -17.65,
+  maxLongitude: -16.95,
+};
+
+const isWithinDakar = (latitude: number, longitude: number) =>
+  Number.isFinite(latitude)
+  && Number.isFinite(longitude)
+  && latitude >= DAKAR_BOUNDS.minLatitude
+  && latitude <= DAKAR_BOUNDS.maxLatitude
+  && longitude >= DAKAR_BOUNDS.minLongitude
+  && longitude <= DAKAR_BOUNDS.maxLongitude;
+
 const dateLabel = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime())
@@ -170,7 +185,6 @@ export default function TransportModulePage({
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [locationError, setLocationError] = useState('');
   const [locationActive, setLocationActive] = useState(false);
-  const latestPosition = useRef<{ latitude: number; longitude: number } | null>(null);
   const currentDriver = useMemo(
     () => currentEmployeeId ? data?.drivers.find(driver => driver.employeeId === currentEmployeeId) ?? null : null,
     [currentEmployeeId, data?.drivers],
@@ -242,11 +256,18 @@ export default function TransportModulePage({
       setLocationActive(false);
       return undefined;
     }
+    let disposed = false;
     const sendLocation = (coords: { latitude: number; longitude: number }) => {
-      latestPosition.current = coords;
+      if (disposed || !isWithinDakar(coords.latitude, coords.longitude)) {
+        setLocationActive(false);
+        setLocationError('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
+        return;
+      }
       void api.updateDriverLocation(currentDriverId, coords).then(driver => {
+        if (disposed) return;
         setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
       }).catch(cause => {
+        if (disposed) return;
         setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
       });
     };
@@ -265,12 +286,21 @@ export default function TransportModulePage({
           ? 'Autorisez la localisation pour être proposé aux clients proches.'
           : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
       },
-      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 15_000 },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
     );
     const refreshId = window.setInterval(() => {
-      if (latestPosition.current) sendLocation(latestPosition.current);
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          sendLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        },
+        () => {
+          if (!disposed) setLocationError('Aucune nouvelle position GPS fiable n’a été reçue.');
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
+      );
     }, trackingIntervalSeconds * 1000);
     return () => {
+      disposed = true;
       navigator.geolocation.clearWatch(watchId);
       window.clearInterval(refreshId);
     };

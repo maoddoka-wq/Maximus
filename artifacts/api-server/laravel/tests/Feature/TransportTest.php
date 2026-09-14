@@ -134,6 +134,11 @@ class TransportTest extends TestCase
             'employeeId' => $this->createDriverEmployee('dispatch-driver'),
             'licenseNumber' => 'SN-DISPATCH-001',
         ])->assertCreated();
+        $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
+            'latitude' => 0,
+            'longitude' => 0,
+        ])->assertStatus(422)
+            ->assertJsonPath('error', 'La position GPS doit se trouver dans la zone de Dakar.');
         $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
             'registration' => 'DK-DISPATCH-01',
             'model' => 'Toyota Yaris',

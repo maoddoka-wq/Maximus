@@ -197,6 +197,9 @@ class TransportController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
         $company = $this->company($request);
+        if (! $this->isWithinDakar((float) $input['latitude'], (float) $input['longitude'])) {
+            return response()->json(['error' => 'La position GPS doit se trouver dans la zone de Dakar.'], 422);
+        }
         $driver = DB::table('transport_drivers')
             ->where('id', $id)
             ->where('company_id', $company)
@@ -1022,6 +1025,10 @@ class TransportController extends Controller
         $routeDuration = $row->route_duration_minutes ?? null;
         $pickupRouteDistance = $row->pickup_route_distance_km ?? null;
         $pickupEta = $row->pickup_eta_minutes ?? null;
+        $pickupLatitude = $row->pickup_latitude ?? null;
+        $pickupLongitude = $row->pickup_longitude ?? null;
+        $destinationLatitude = $row->destination_latitude ?? null;
+        $destinationLongitude = $row->destination_longitude ?? null;
         $driver ??= $row->driver_id
             ? DB::table('transport_drivers')
                 ->where('company_id', $row->company_id)
@@ -1043,11 +1050,11 @@ class TransportController extends Controller
             'requestedAt' => $row->requested_at,
             'offerExpiresAt' => $row->offer_expires_at ?? null,
             'pickupCode' => $row->pickup_code ?? null,
-            'pickupLatitude' => $row->pickup_latitude ?? null,
-            'pickupLongitude' => $row->pickup_longitude ?? null,
+            'pickupLatitude' => $pickupLatitude === null ? null : (float) $pickupLatitude,
+            'pickupLongitude' => $pickupLongitude === null ? null : (float) $pickupLongitude,
             'matchedDistanceKm' => $matchedDistance === null ? null : (float) $matchedDistance,
-            'destinationLatitude' => $row->destination_latitude ?? null,
-            'destinationLongitude' => $row->destination_longitude ?? null,
+            'destinationLatitude' => $destinationLatitude === null ? null : (float) $destinationLatitude,
+            'destinationLongitude' => $destinationLongitude === null ? null : (float) $destinationLongitude,
             'routeDistanceKm' => $routeDistance === null ? null : (float) $routeDistance,
             'routeDurationMinutes' => $routeDuration === null ? null : (int) $routeDuration,
             'routeGeometry' => $this->decodeGeometry($row->route_geometry ?? null),
