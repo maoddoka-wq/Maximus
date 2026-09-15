@@ -222,6 +222,11 @@ export function buildAppAccessContext({
       ? companySelectedFeatureIds(presenceModule)
       : accessRole && presenceModule
         ? [...getSelectedFeatureIds(accessRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
+          .filter(featureId => {
+            const ceiling = companyFeatureCeiling(presenceModule);
+            return (!ceiling || ceiling.has(featureId))
+              && roleHasFeaturePermission(accessRole, employeeNode, presenceModule.id, featureId, 'voir');
+          })
       : undefined;
   const ecommerceModule = configuredModules.find(module => module.id === 'ecommerce');
   const selectedEcommerceFeatureIds =

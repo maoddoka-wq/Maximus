@@ -37,6 +37,7 @@ class PresenceController extends Controller
             ->orderByDesc('updated_at')
             ->orderBy('work_date');
         $items = $query->get()
+            ->filter(fn (PresenceItem $item): bool => $this->actorCanViewType($actor, $item->type))
             ->map(fn (PresenceItem $item) => $this->item($item))
             ->values();
 
@@ -393,17 +394,32 @@ class PresenceController extends Controller
             'absence' => 'absences',
             'schedule' => 'horaires',
             'leave' => 'congés',
+            'history' => 'historique',
             default => null,
         };
     }
 
+    private function actorCanViewType(mixed $actor, string $type): bool
+    {
+        if (! is_array($actor)) {
+            return false;
+        }
+
+        $feature = $this->featureForType($type);
+
+        return $feature !== null
+            && ModuleAuthorization::allows($actor, 'presences', 'view', $feature);
+    }
+
     private function actorCanAccessEmployee(array $actor, string $companyId, ?string $employeeId): bool
     {
+        if (($actor['role'] ?? null) === 'employee') {
+            return is_string($employeeId)
+                && $employeeId !== ''
+                && $employeeId === ($actor['employeeId'] ?? null);
+        }
         if ($employeeId === null || $employeeId === '') {
             return true;
-        }
-        if (($actor['role'] ?? null) === 'employee') {
-            return $employeeId === ($actor['employeeId'] ?? null);
         }
         if (($actor['role'] ?? null) !== 'sector_manager') {
             return true;
