@@ -557,28 +557,7 @@ class AppStateController extends Controller
             return [];
         }
 
-        foreach ([
-            'companies',
-            'employees',
-            'roles',
-            'orgNodes',
-            'subscriptions',
-            'controlTasks',
-            'domainEvents',
-            'auditEntries',
-            'notifications',
-            'products',
-            'movements',
-            'sales',
-            'activities',
-            'purchaseOrders',
-            'supplierRecords',
-            'deliveries',
-            'businessDocuments',
-            'accountingEntries',
-            'payrollSlips',
-            'crmOpportunities',
-        ] as $key) {
+        foreach (self::COMPANY_SCOPED_COLLECTIONS as $key) {
             if (!isset($state[$key]) || !is_array($state[$key])) {
                 continue;
             }
