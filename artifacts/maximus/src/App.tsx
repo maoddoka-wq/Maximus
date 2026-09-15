@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -6491,8 +6491,37 @@ function ModulePackTestWorkbench({
     'logistique',
     'documents',
   ];
-  const previewCompany = data.companies[0];
-  const previewCompanyId = previewCompany?.id ?? '';
+  const previewContext = useMemo(() => {
+    const previewCompany: Company = {
+      id: 'module-preview-company',
+      name: 'Entreprise de prévisualisation',
+      manager: 'Aperçu MAXIMUS',
+      email: 'preview@maximus.local',
+      phone: '',
+      country: '',
+      sector: '',
+      status: 'ACTIF',
+      requestedModules: [module.id],
+      allowedModules: [module.id],
+      refusedModules: [],
+      createdAt: '',
+    };
+    const previewData = emptyStoreData();
+    previewData.companies = [previewCompany];
+    previewData.orgNodes = [{
+      id: 'module-preview-root',
+      companyId: previewCompany.id,
+      name: 'Direction générale',
+      code: 'DG',
+      type: 'direction',
+      parentId: null,
+    }];
+    return { company: previewCompany, data: previewData };
+  }, [module.id]);
+  const previewCompany = previewContext.company;
+  const previewData = previewContext.data;
+  const previewCompanyId = previewCompany.id;
+  const previewMutate = () => {};
   const featureOptions = getModuleFeatureOptions(module);
   const fullFeatureIds = featureOptions.map((feature) => feature.id);
   const testFeatureIds = pack
@@ -6606,18 +6635,21 @@ function ModulePackTestWorkbench({
           {(module.id === 'commerce' || module.id === 'ventes') && (
             <CommerceModulePage
               companyId={previewCompanyId}
-              data={data}
-              mutate={mutate}
+              data={previewData}
+              mutate={previewMutate}
+              canCreate={false}
+              canModify={false}
               tabPermissions={commerceTabPermissions}
               allowedTabs={allowedCommerceTabs}
               initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')}
+              preview
             />
           )}
-           {module.id === 'finance' && <FinancePage data={data} />}
+           {module.id === 'finance' && <FinancePage data={previewData} />}
           {module.id === 'rh' && previewCompany && (
-            <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
+             <CompanyOrganizationAdmin company={previewCompany} data={previewData} mutate={previewMutate} />
           )}
-            {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
+             {module.id === 'presences' && <PresencesPage data={previewData} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
             {module.id === 'paie' && <PayrollModulePage companyId={previewCompanyId || 'module-preview'} employees={[]} canCreate={false} canModify={false} visibleFeatureIds={authorizedFeatures} preview />}
            {module.id === 'ecommerce' && (
              <EcommerceModulePage
@@ -6639,12 +6671,13 @@ function ModulePackTestWorkbench({
           {operationalModules.includes(module.id) && module.id !== 'paie' && (
             <OperationalModulePage
               moduleId={module.id}
-              data={data}
-              mutate={mutate}
+               data={previewData}
+               mutate={previewMutate}
+               preview
               featurePermissions={configuredPermissions}
             />
           )}
-          {module.id === 'rapports' && <OperationalReportsPage data={data} />}
+           {module.id === 'rapports' && <OperationalReportsPage data={previewData} />}
           {!['stocks', 'commerce', 'ventes', 'ecommerce', 'transport', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
             module.id,
           ) && (

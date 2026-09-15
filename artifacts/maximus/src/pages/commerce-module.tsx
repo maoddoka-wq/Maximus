@@ -123,6 +123,7 @@ export default function CommerceModulePage({
   allowedTabs,
   singleModuleNavigation = false,
   onNavigate,
+  preview = false,
 }: {
   companyId: string;
   data: StoreData;
@@ -134,6 +135,7 @@ export default function CommerceModulePage({
   allowedTabs?: readonly Tab[];
   singleModuleNavigation?: boolean;
   onNavigate?: (path: string) => void;
+  preview?: boolean;
 }) {
   const [state, setState] = useState<CommerceState>(() => readState(data, companyId));
   const availableTabIds = allowedTabs
@@ -151,6 +153,7 @@ export default function CommerceModulePage({
     setQuery('');
   };
   const updateState = (fn: (draft: CommerceState) => void, message?: string) => {
+    if (preview) return;
     setState(previous => {
       const next = structuredClone(previous) as CommerceState;
       fn(next);
