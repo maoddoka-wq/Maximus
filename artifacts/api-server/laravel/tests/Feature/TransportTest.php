@@ -490,6 +490,50 @@ class TransportTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_public_taxi_place_search_tries_broader_queries_and_returns_multiple_dakar_matches(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-places',
+            'company_id' => 'kora',
+            'slug' => 'kora-places',
+            'name' => 'Kora Places',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Http::fakeSequence()
+            ->push([])
+            ->push([
+                [
+                    'lat' => '14.7116',
+                    'lon' => '-17.4687',
+                    'display_name' => 'Grand-Dakar, Dakar, Sénégal',
+                    'type' => 'neighbourhood',
+                ],
+                [
+                    'lat' => '14.6920',
+                    'lon' => '-17.4470',
+                    'display_name' => 'Grand Dakar, Dakar, Sénégal',
+                    'type' => 'place',
+                ],
+            ]);
+
+        $this->getJson('/api/shop/kora-places/transport/places?q=Grand%20Dakar')
+            ->assertOk()
+            ->assertJsonCount(2, 'places')
+            ->assertJsonPath('places.0.latitude', 14.7116)
+            ->assertJsonPath('places.1.longitude', -17.447);
+
+        Http::assertSentCount(2);
+    }
+
     public function test_public_taxi_customer_can_cancel_only_with_the_signed_request_token(): void
     {
         ModuleCatalog::ensureCompanyAccess('kora');

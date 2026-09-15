@@ -937,6 +937,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       setQuoteLoading(false);
       return undefined;
     }
+    if (placesLoading) {
+      setQuote(null);
+      setQuoteError('');
+      setQuoteLoading(false);
+      return undefined;
+    }
 
     const timer = window.setTimeout(() => {
       setQuoteLoading(true);
@@ -960,7 +966,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [api, form.destination, position, selectedPlace, trip]);
+  }, [api, form.destination, placesLoading, position, selectedPlace, trip]);
 
   const stopLocationTracking = () => {
     if (locationWatchRef.current !== null && navigator.geolocation) {

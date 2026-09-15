@@ -1277,18 +1277,55 @@ class TransportController extends Controller
         ]);
         $query = trim($input['q']);
         try {
-            $response = Http::timeout(6)
-                ->withHeaders(['Accept' => 'application/json', 'User-Agent' => 'MAXIMUS Taxi'])
+            return response()->json(['places' => $this->searchDakarPlaces($query)]);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return response()->json(['places' => []]);
+        }
+    }
+
+    /**
+     * Search Dakar broadly enough for neighborhoods, streets, landmarks and
+     * approximate user input while keeping the server-side geographic fence.
+     *
+     * @return array<int, array{label: string, latitude: float, longitude: float, type: string}>
+     */
+    private function searchDakarPlaces(string $query, int $limit = 8): array
+    {
+        $query = trim((string) preg_replace('/\s+/u', ' ', $query));
+        if ($query === '') {
+            return [];
+        }
+
+        $queries = array_values(array_unique([
+            $query.', Dakar, Sénégal',
+            $query.', Région de Dakar, Sénégal',
+            $query.', Sénégal',
+            $query,
+        ]));
+
+        foreach ($queries as $searchQuery) {
+            $response = Http::timeout(8)
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'Accept-Language' => 'fr',
+                    'User-Agent' => 'MAXIMUS Taxi',
+                ])
                 ->get('https://nominatim.openstreetmap.org/search', [
                     'format' => 'jsonv2',
-                    'limit' => 8,
+                    'limit' => $limit,
                     'addressdetails' => 1,
                     'dedupe' => 1,
-                    'q' => $query.', Dakar, Sénégal',
+                    'q' => $searchQuery,
                     'countrycodes' => 'sn',
                     'viewbox' => '-17.65,14.95,-16.95,14.55',
                     'bounded' => 1,
                 ]);
+
+            if (! $response->successful() || ! is_array($response->json()) || $response->json() === []) {
+                continue;
+            }
+
             $places = collect($response->json())
                 ->filter(fn ($place): bool => is_array($place)
                     && is_numeric($place['lat'] ?? null)
@@ -1297,6 +1334,7 @@ class TransportController extends Controller
                 ->map(function (array $place): array {
                     $label = trim((string) ($place['display_name'] ?? ''));
                     $label = preg_replace('/,\s*(Sénégal|Senegal).*$/u', '', $label) ?: $label;
+
                     return [
                         'label' => Str::limit($label, 180, ''),
                         'latitude' => (float) $place['lat'],
@@ -1307,13 +1345,15 @@ class TransportController extends Controller
                 ->filter(fn (array $place): bool => $place['label'] !== '')
                 ->unique(fn (array $place): string => mb_strtolower($place['label']))
                 ->values()
+                ->take($limit)
                 ->all();
 
-            return response()->json(['places' => $places]);
-        } catch (\Throwable $exception) {
-            report($exception);
-            return response()->json(['places' => []]);
+            if ($places !== []) {
+                return $places;
+            }
         }
+
+        return [];
     }
 
     private function createPublicTripForStore(Request $request, object $store, bool $domain = false): JsonResponse
@@ -1566,22 +1606,12 @@ class TransportController extends Controller
      */
     private function geocodeWithOpenStreetMap(string $address): array
     {
-        $response = Http::timeout(10)
-            ->withHeaders(['Accept' => 'application/json', 'User-Agent' => 'MAXIMUS Taxi'])
-            ->get('https://nominatim.openstreetmap.org/search', [
-                'format' => 'jsonv2',
-                'limit' => 1,
-            'q' => $address.', Dakar, Sénégal',
-            'countrycodes' => 'sn',
-            'viewbox' => '-17.65,14.95,-16.95,14.55',
-            'bounded' => 1,
-            ]);
-        $result = $response->json('0');
-        if (! $response->successful() || ! is_array($result) || ! is_numeric($result['lon'] ?? null) || ! is_numeric($result['lat'] ?? null)) {
+        $place = $this->searchDakarPlaces($address, 1)[0] ?? null;
+        if (! is_array($place)) {
             throw new \RuntimeException('OpenStreetMap n’a pas pu localiser la destination.');
         }
 
-        $coordinates = [(float) $result['lon'], (float) $result['lat']];
+        $coordinates = [(float) $place['longitude'], (float) $place['latitude']];
         if (! $this->isWithinDakar($coordinates[1], $coordinates[0])) {
             throw new \InvalidArgumentException('DESTINATION_OUTSIDE_DAKAR');
         }
