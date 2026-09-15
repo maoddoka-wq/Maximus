@@ -14,3 +14,9 @@ Ne jamais republier périodiquement la dernière position GPS connue en la faisa
 **Why:** Republier une position mémorisée rafraîchit artificiellement `location_updated_at` et permettait de distribuer un point obsolète ; les colonnes décimales peuvent être sérialisées comme chaînes et perturber les composants cartographiques.
 
 **How to apply:** Demander une nouvelle lecture GPS lors des rafraîchissements, refuser côté serveur les positions hors Dakar, et caster latitude/longitude dans chaque payload Transport.
+
+Le bouton de guidage chauffeur doit ouvrir uniquement la première étape, depuis la position actuelle du téléphone vers les coordonnées GPS de l’arrêt client ; la destination finale ne devient une étape qu’après la prise en charge.
+
+**Why:** utiliser la destination finale comme cible initiale, avec l’arrêt client comme waypoint, envoyait le chauffeur vers le mauvais lieu malgré des coordonnées valides.
+
+**How to apply:** générer une URL de navigation avec `destination` égal au couple latitude/longitude du pickup, sans waypoint de destination finale, et refuser le guidage si le pickup n’a pas de coordonnées.

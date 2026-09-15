@@ -45,6 +45,7 @@ import {
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
+import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 
 type TransportTab = 'overview' | 'courses' | 'chauffeurs' | 'vehicules' | 'historique' | 'parametres';
 type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
@@ -599,7 +600,7 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
 
 function DriverRequestCard({ trip, vehicle, driver, pending, onAccept, onDecline }: { trip: Trip | null; vehicle: Vehicle | null; driver: Driver | null; pending: boolean; onAccept: (trip: Trip) => void; onDecline: (trip: Trip) => void }) {
   if (!trip) return null;
-  const routeUrl = buildGoogleTripRouteUrl(trip, driver);
+  const routeUrl = buildDriverNavigationUrl(trip, driver);
   const expiresAt = trip.offerExpiresAt ? new Date(trip.offerExpiresAt) : null;
   const remainingSeconds = expiresAt ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 1000)) : null;
   return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p>{remainingSeconds !== null && <p className={`mt-2 text-xs font-black ${remainingSeconds <= 20 ? 'text-rose-700' : 'text-amber-700'}`}>Réponse requise dans {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}</p>}</div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onDecline(trip)} disabled={pending} className="inline-flex items-center justify-center rounded-xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-70">Refuser</button><button type="button" onClick={() => onAccept(trip)} disabled={pending} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm disabled:cursor-wait disabled:opacity-70">{pending ? <RefreshCw size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}{pending ? 'Validation…' : 'Valider la course'}</button></div></div></section>;
@@ -611,7 +612,7 @@ function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driv
     ? distanceInKm(driver.latitude, driver.longitude, trip.pickupLatitude, trip.pickupLongitude)
     : null);
   const visibleDistance = remainingDistance ?? trip.matchedDistanceKm ?? null;
-  const routeUrl = buildGoogleTripRouteUrl(trip, driver);
+  const routeUrl = buildDriverNavigationUrl(trip, driver);
   return <section className="card-surface overflow-hidden p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Guidage chauffeur</p><h2 className="mt-1 text-lg font-black">Rejoindre l’arrêt client</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p>{visibleDistance !== null ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p> : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur est actif</p>}{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined && <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>}</div></div><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Lancer le guidage</a></div>{trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && <TaxiRouteMap clientStop={{ latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }} destination={trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude } : null} driver={driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined ? { latitude: driver.latitude, longitude: driver.longitude } : null} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]" />}<p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Itinéraire complet : la voiture rejoint l’arrêt client, puis le trajet continue jusqu’à la destination. GPS, distance et ETA actualisés automatiquement.</p></section>;
 }
 
@@ -621,26 +622,6 @@ function distanceInKm(latitudeA: number, longitudeA: number, latitudeB: number, 
   const longitudeDelta = (longitudeB - longitudeA) * Math.PI / 180;
   const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(latitudeA * Math.PI / 180) * Math.cos(latitudeB * Math.PI / 180) * Math.sin(longitudeDelta / 2) ** 2;
   return earthRadius * 2 * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
-function buildGoogleTripRouteUrl(trip: Trip, driver: Driver | null): string | null {
-  const pickup = trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined
-    ? `${trip.pickupLatitude},${trip.pickupLongitude}`
-    : trip.pickup;
-  const destination = trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined
-    ? `${trip.destinationLatitude},${trip.destinationLongitude}`
-    : trip.destination;
-  const hasDriverPosition = driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined;
-  if (!pickup || !destination) return null;
-
-  const params = new URLSearchParams({
-    api: '1',
-    origin: hasDriverPosition ? `${driver.latitude},${driver.longitude}` : pickup,
-    destination,
-    travelmode: 'driving',
-  });
-  if (hasDriverPosition) params.set('waypoints', pickup);
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 function formatDistance(value: number): string {
