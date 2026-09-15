@@ -27,11 +27,11 @@ Legacy packs without an explicit feature permission map are interpreted as view-
 
 **How to apply:** Treat a missing or empty feature permission as `voir` for included features, and persist the explicit permission map on the next save or signup request.
 
-Feature visibility must use the explicit feature selection, while dependencies remain an internal effective-permission concern.
+Feature visibility and permissions must use the explicit feature selection; dependencies are informational catalog metadata and must not activate another feature automatically.
 
-**Why:** A dependency granted so an operation can function is not necessarily a capability the company selected or should see in its navigation.
+**Why:** A dependency that is activated implicitly can expose a capability the company did not authorize, especially when roles are edited after a pack is selected.
 
-**How to apply:** Preserve dependencies when calculating effective permissions, but pass the pack or unit’s explicit feature ids to tests, navigation, and tab guards; never infer visible pack scope from dependency-expanded role permissions.
+**How to apply:** Persist and render only the selected feature ids and their explicit permissions. Dependencies may be shown as catalog information or validated separately, but never add feature ids or `voir` permissions during signup, pack synchronization, role editing, navigation, or access calculation.
 
 Pour Paie comme pour les autres modules, une entreprise dont le module est autorisé sans sélection détaillée voit les fonctionnalités du module ; une sélection détaillée reste restrictive.
 

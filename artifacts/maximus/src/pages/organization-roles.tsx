@@ -350,44 +350,6 @@ function RoleFormModal({
         ? [`presence.${featureSlug(feature)}`]
       : [permissionFeatureKey(moduleId, feature)];
 
-  const normalizeFeatureDependencies = (modulePermissions: Record<string, string[]>, moduleId: ModuleId) => {
-    const module = moduleDefinitions.find(item => item.id === moduleId);
-    if (!module) return modulePermissions;
-    const featureIds = moduleId === 'commerce'
-      ? commerceTabDefinitions.map(feature => feature.id)
-      : module.features.map(featureSlug);
-    const dependencies = moduleId === 'commerce' ? commerceTabDependencies : module.featureDependencies ?? {};
-    const normalized = { ...modulePermissions };
-
-    featureIds.forEach(featureId => {
-      const featureIsEnabled = featurePermissionKeys(moduleId, featureId)
-        .some(key => (normalized[key] ?? []).length > 0);
-      if (!featureIsEnabled) return;
-      resolveFeatureDependencies(dependencies, featureId).forEach(dependencyId => {
-        const dependencyKeys = featurePermissionKeys(moduleId, dependencyId);
-        const current = [...new Set(dependencyKeys.flatMap(key => normalized[key] ?? []))];
-        dependencyKeys.forEach(key => delete normalized[key]);
-        normalized[dependencyKeys[0]] = [...new Set([...current, 'voir'])];
-      });
-    });
-
-    return normalized;
-  };
-
-  const normalizeStockDependencies = (modulePermissions: Record<string, string[]>) => {
-    const normalized = { ...modulePermissions };
-    stockSubmodules.forEach(submodule => {
-      const key = `stocks:${submodule.id}`;
-      if (!(normalized[key] ?? []).length) return;
-      normalized[key] = [...new Set(['voir', ...normalized[key]])];
-      resolveFeatureDependencies(stockSubmoduleDependencies, submodule.id).forEach(dependencyId => {
-        const dependencyKey = `stocks:${dependencyId}`;
-        normalized[dependencyKey] = [...new Set([...(normalized[dependencyKey] || []), 'voir'])];
-      });
-    });
-    return normalized;
-  };
-
   const toggleFeaturePermission = (moduleId: ModuleId, feature: string, permission: 'voir' | 'créer' | 'modifier') => {
     setFormData(previous => {
       const permissionKeys = featurePermissionKeys(moduleId, feature);
@@ -401,7 +363,7 @@ function RoleFormModal({
       if (next.length && !modulePermissions[moduleId]?.includes('voir')) {
         modulePermissions[moduleId] = [...(modulePermissions[moduleId] || []), 'voir'];
       }
-      return { ...previous, modulePermissions: normalizeFeatureDependencies(modulePermissions, moduleId) };
+      return { ...previous, modulePermissions };
     });
   };
 
@@ -413,11 +375,10 @@ function RoleFormModal({
       const modulePermissions = { ...previous.modulePermissions };
       if (next.length) modulePermissions[key] = permission === 'voir' ? next : [...new Set(['voir', ...next])];
       else delete modulePermissions[key];
-      const normalized = normalizeStockDependencies(modulePermissions);
-      if (next.length && !normalized.stocks?.includes('voir')) {
-        normalized.stocks = [...(normalized.stocks || []), 'voir'];
+      if (next.length && !modulePermissions.stocks?.includes('voir')) {
+        modulePermissions.stocks = [...(modulePermissions.stocks || []), 'voir'];
       }
-      return { ...previous, modulePermissions: normalized };
+      return { ...previous, modulePermissions };
     });
   };
 
@@ -442,14 +403,8 @@ function RoleFormModal({
       return;
     }
     const moduleIds = new Set<string>(moduleDefinitions.map(module => module.id));
-    let normalizedPermissions = { ...formData.modulePermissions };
-    availableModules.forEach(module => {
-      normalizedPermissions = module.id === 'stocks'
-        ? normalizeStockDependencies(normalizedPermissions)
-        : normalizeFeatureDependencies(normalizedPermissions, module.id);
-    });
     const modulePermissions = Object.fromEntries(
-      Object.entries(normalizedPermissions)
+      Object.entries(formData.modulePermissions)
         .map(([key, permissions]) => [
           key,
           moduleIds.has(key) ? [...new Set(permissions)] : permissions,
@@ -546,14 +501,6 @@ function PermissionToggleGroup({
   );
 }
 
-function getFeatureDependencyIds(module: Module, feature: string) {
-  const dependencies = module.id === 'commerce' ? commerceTabDependencies : module.featureDependencies ?? {};
-  return resolveFeatureDependencies(
-    dependencies,
-    module.id === 'commerce' ? feature : featureSlug(feature),
-  );
-}
-
 function ModulePermissionCard({
   module,
   modulePermissions,
@@ -637,13 +584,10 @@ function FeaturePermissionList({
           const activePermissions = module.id === 'commerce'
             ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => modulePermissions[permissionKey] || []))]
             : modulePermissions[key] || [];
-          const dependencyLabels = getFeatureDependencyIds(module, feature.id)
-            .map(dependencyId => features.find(candidate => (module.id === 'commerce' ? candidate.id : featureSlug(candidate.id)) === dependencyId)?.label ?? dependencyId);
           return (
             <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                  <span className="text-sm font-semibold">{feature.label}</span>
-                 {dependencyLabels.length > 0 && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Prérequis activé automatiquement : {dependencyLabels.join(', ')}</p>}
               </div>
               <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={activePermissions} onToggle={permission => onToggle(module.id, feature.id, permission)} />
             </div>
@@ -670,13 +614,10 @@ function StockPermissionList({
       <div className="grid gap-2 sm:grid-cols-2">
         {stockSubmodules.map(submodule => {
           const key = `stocks:${submodule.id}`;
-          const dependencyLabels = resolveFeatureDependencies(stockSubmoduleDependencies, submodule.id)
-            .map(dependencyId => stockSubmodules.find(candidate => candidate.id === dependencyId)?.name ?? dependencyId);
           return (
             <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3">
               <div>
                  <span className="text-sm font-semibold">{submodule.name}</span>
-                 {dependencyLabels.length > 0 && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Prérequis activé automatiquement : {dependencyLabels.join(', ')}</p>}
               </div>
               <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={modulePermissions[key] || []} onToggle={permission => onToggle(submodule.id, permission)} />
             </div>

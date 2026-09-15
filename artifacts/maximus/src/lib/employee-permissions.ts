@@ -1,15 +1,14 @@
 import type { Company, Employee, ModuleId, OrgNode, Role } from './store';
 import {
-  commerceTabDependencies,
   commerceTabDefinitions,
   commerceTabPermissionKeys,
   hasCommerceTabPermission,
   hasDetailedCommercePermissions,
   type CommerceTabId,
 } from './commerce-permissions';
-import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from './permission-keys';
+import { featureSlug, permissionFeatureKey } from './permission-keys';
 import { getModuleFeatureOptions } from './module-features';
-import { stockSubmoduleDependencies, stockSubmodules, type Module } from './store';
+import { stockSubmodules, type Module } from './store';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
@@ -229,9 +228,6 @@ export function getStockPermissions(
   stockSubmodules.forEach(submodule => {
     if (!(permissions[submodule.id] ?? []).length) return;
     permissions[submodule.id] = [...new Set(['voir', ...permissions[submodule.id]])];
-    resolveFeatureDependencies(stockSubmoduleDependencies, submodule.id).forEach(dependencyId => {
-      permissions[dependencyId] = [...new Set([...(permissions[dependencyId] || []), 'voir'])];
-    });
   });
 
   return permissions;
@@ -282,27 +278,7 @@ export function getCommerceTabIds(
     }
   }
 
-  if (!selected) {
-    [...allowedTabIds].forEach(tabId => {
-      resolveFeatureDependencies(commerceTabDependencies, tabId)
-        .forEach(dependencyId => allowedTabIds.add(dependencyId as CommerceTabId));
-    });
-  }
-
   return [...allowedTabIds];
-}
-
-export function getFeatureIdsWithDependencies(
-  role: Role | null | undefined,
-  module: Module,
-) {
-  const enabledFeatureIds = getSelectedFeatureIds(role, module);
-  const effectiveFeatureIds = new Set(enabledFeatureIds);
-  enabledFeatureIds.forEach(featureId => {
-    resolveFeatureDependencies(module.featureDependencies ?? {}, featureId)
-      .forEach(dependencyId => effectiveFeatureIds.add(dependencyId));
-  });
-  return effectiveFeatureIds;
 }
 
 export function getSelectedFeatureIds(

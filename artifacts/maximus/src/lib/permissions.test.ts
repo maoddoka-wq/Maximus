@@ -264,15 +264,15 @@ test('résout les prérequis d’une fonctionnalité en cascade', () => {
   );
 });
 
-test('rend les prérequis visibles dans les permissions effectives', () => {
+test('ne rend pas les prérequis visibles sans permission explicite', () => {
   const commerceRole = role({
     commerce: ['voir'],
     [commerceTabPermissionKey('sales')]: ['voir'],
   });
   const commerceTabs = getCommerceTabIds(commerceRole, true, () => true) ?? [];
   assert.equal(commerceTabs.includes('sales'), true);
-  assert.equal(commerceTabs.includes('clients'), true);
-  assert.equal(commerceTabs.includes('products'), true);
+  assert.equal(commerceTabs.includes('clients'), false);
+  assert.equal(commerceTabs.includes('products'), false);
 
   const stockRole = role({
     stocks: ['voir'],
@@ -281,7 +281,7 @@ test('rend les prérequis visibles dans les permissions effectives', () => {
   const stockPermissions = getStockPermissions(stockRole, true) ?? {};
   assert.equal(stockPermissions.entries?.includes('créer'), true);
   assert.equal(stockPermissions.entries?.includes('voir'), true);
-  assert.equal(stockPermissions.products?.includes('voir'), true);
+  assert.equal(stockPermissions.products, undefined);
 });
 
 test('utilise une définition complète et partagée pour les fonctionnalités Présences', () => {
