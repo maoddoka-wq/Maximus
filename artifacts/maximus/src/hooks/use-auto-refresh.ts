@@ -7,13 +7,13 @@ type RefreshOptions = {
 
 /**
  * Keeps server-backed screens fresh without forcing a full-page reload.
- * Refreshes on focus/visibility changes and at a conservative interval while
+ * Refreshes on focus/visibility changes and every five seconds while
  * the page is visible. The callback is kept in a ref so callers can pass a
  * render-local function without restarting the listeners on every render.
  */
 export function useAutoRefresh(
   refresh: () => void | Promise<void>,
-  { enabled = true, intervalMs = 30_000 }: RefreshOptions = {},
+  { enabled = true, intervalMs = 5_000 }: RefreshOptions = {},
 ) {
   const refreshRef = useRef(refresh);
   const runningRef = useRef(false);

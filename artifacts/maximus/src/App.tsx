@@ -536,7 +536,7 @@ function AppContent() {
     void refreshAppState();
   }, {
     enabled: Boolean(session && !session.startsWith('company:sector-test-')),
-    intervalMs: 30_000,
+    intervalMs: 5_000,
   });
   useEffect(() => {
     if (session !== 'admin') return;
@@ -2502,7 +2502,7 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
   useEffect(() => {
     void refreshPendingRequests();
   }, []);
-  useAutoRefresh(refreshPendingRequests, { intervalMs: 30_000 });
+  useAutoRefresh(refreshPendingRequests, { intervalMs: 5_000 });
   const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
   return (
     <div className="space-y-6">
@@ -3227,7 +3227,7 @@ function RequestsPage({
   useEffect(() => {
     void refreshRequests();
   }, []);
-  useAutoRefresh(() => refreshRequests(true), { intervalMs: 30_000 });
+  useAutoRefresh(() => refreshRequests(true), { intervalMs: 5_000 });
   const approveRequest = async (company: Company) => {
     setPendingCompanyId(company.id);
     try {
@@ -4235,7 +4235,7 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
   useEffect(() => {
     void load();
   }, []);
-  useAutoRefresh(() => load(true), { enabled: Boolean(bootstrap), intervalMs: 30_000 });
+  useAutoRefresh(() => load(true), { enabled: Boolean(bootstrap), intervalMs: 5_000 });
 
   const savePayoutAccount = async () => {
     if (mobile.trim().length < 8 || beneficiaryName.trim().length < 2) {

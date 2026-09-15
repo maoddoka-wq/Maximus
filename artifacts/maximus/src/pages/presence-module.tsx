@@ -135,7 +135,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     }
     void refresh();
   }, [api, preview]);
-  useAutoRefresh(() => refresh(true), { enabled: !preview, intervalMs: 30_000 });
+  useAutoRefresh(() => refresh(true), { enabled: !preview, intervalMs: 5_000 });
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
   const nodeById = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);

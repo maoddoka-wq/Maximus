@@ -110,7 +110,7 @@ export function ControlCenterPage({
     }
   };
 
-  useAutoRefresh(refreshControl, { enabled: true, intervalMs: 30_000 });
+  useAutoRefresh(refreshControl, { enabled: true, intervalMs: 5_000 });
   useEffect(() => {
     void refreshControl();
     return undefined;

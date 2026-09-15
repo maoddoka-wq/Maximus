@@ -98,7 +98,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     const scope = scopeForTab(tab);
     if (!loadedScopes.current.has(scope)) void load(false, scope);
   }, [tab, preview, data]);
-  useAutoRefresh(() => load(true, scopeForTab(tab)), { enabled: !preview && Boolean(data), intervalMs: 30_000 });
+  useAutoRefresh(() => load(true, scopeForTab(tab)), { enabled: !preview && Boolean(data), intervalMs: 5_000 });
   const run = async (action: () => Promise<unknown>, success: string) => {
     if (pendingAction) return;
     setPendingAction(true);
