@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
 use App\Services\EcommerceDomainVerifier;
 use App\Support\CompanyRegistry;
+use App\Support\CompanyPaymentAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,13 @@ final class EcommercePaymentController extends Controller
 
     private function createForOrder(Request $request, object $store, string $orderId): JsonResponse
     {
+        if (! CompanyPaymentAccess::isEnabled((string) $store->company_id)) {
+            return response()->json([
+                'error' => 'Les systèmes de paiement de cette entreprise sont désactivés.',
+                'code' => 'COMPANY_PAYMENT_DISABLED',
+            ], 403);
+        }
+
         Validator::make($request->all(), [
             'redirectUrl' => ['nullable', 'url', 'max:500'],
             'provider' => ['sometimes', 'string', 'in:WAVE,ORANGE_MONEY'],

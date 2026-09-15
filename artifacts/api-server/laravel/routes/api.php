@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
@@ -60,6 +61,8 @@ Route::middleware('maximus.auth')->prefix('company-requests')->group(function ()
 
 Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
     Route::patch('/{companyId}', [CompanyController::class, 'update']);
+    Route::get('/{companyId}/payment-settings', [CompanyPaymentController::class, 'show']);
+    Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
     Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);
     Route::delete('/{companyId}/profile-photo', [CompanyController::class, 'deleteProfilePhoto']);
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);

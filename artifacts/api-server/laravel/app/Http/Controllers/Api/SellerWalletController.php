@@ -10,6 +10,7 @@ use App\Services\PayrollService;
 use App\Services\SellerWalletFeePolicy;
 use App\Services\SellerWalletMaturityPolicy;
 use App\Support\ModuleAuthorization;
+use App\Support\CompanyPaymentAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -175,6 +176,12 @@ final class SellerWalletController extends Controller
     {
         if (! $this->canModify($request)) {
             return response()->json(['error' => 'Cette action n’est pas autorisée pour votre rôle.'], 403);
+        }
+        if (! CompanyPaymentAccess::isEnabled($this->company($request))) {
+            return response()->json([
+                'error' => 'Les systèmes de paiement de cette entreprise sont désactivés.',
+                'code' => 'COMPANY_PAYMENT_DISABLED',
+            ], 403);
         }
         if (! $this->diamanoPay->isConfigured()) {
             return response()->json(['error' => 'Le retrait n’est pas encore activé par la configuration DiamanoPay.'], 503);

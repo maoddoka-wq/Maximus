@@ -107,6 +107,7 @@ import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-regist
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
+import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
@@ -7078,6 +7079,10 @@ function CompanyModulesDetail({
   );
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
+  const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
+  const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
+  const [paymentLoading, setPaymentLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -7137,6 +7142,30 @@ function CompanyModulesDetail({
     setHiddenWorkspaceFeatures(next);
     setSavedHiddenWorkspaceFeatures(next);
   }, [company.id, JSON.stringify(company.hiddenWorkspaceFeatures ?? [])]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPaymentLoading(true);
+    void loadCompanyPaymentAccess(company.id)
+      .then((access) => {
+        if (cancelled) return;
+        setPaymentEnabled(access.enabled);
+        setSavedPaymentEnabled(access.enabled);
+        setPaymentProviders(access.providers.length > 0 ? access.providers : ['DIAMANOPAY']);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPaymentEnabled(false);
+          setSavedPaymentEnabled(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
 
   const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
@@ -7198,14 +7227,22 @@ function CompanyModulesDetail({
             packIds: packSelections[module.id] ?? [],
           },
         }));
-      await Promise.all(changes);
+      const paymentChanged = paymentEnabled !== savedPaymentEnabled;
+      await Promise.all([
+        ...changes,
+        ...(paymentChanged
+          ? [setCompanyPaymentAccess(company.id, paymentEnabled, paymentProviders)]
+          : []),
+      ]);
       setSavedStatuses(moduleStatuses);
       setSavedFeatureSelections(featureSelections);
       setSavedPackSelections(packSelections);
+      setSavedPaymentEnabled(paymentEnabled);
     } catch (error) {
        setModuleStatuses(savedStatuses);
        setFeatureSelections(savedFeatureSelections);
        setPackSelections(savedPackSelections);
+       setPaymentEnabled(savedPaymentEnabled);
       window.alert(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.');
     } finally {
       setSaving(false);
@@ -7329,6 +7366,59 @@ function CompanyModulesDetail({
             onClick={saveWorkspaceFeatures}
           >
             Enregistrer la visibilité
+          </ActionButton>
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Systèmes de paiement</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Ce contrôle indépendant autorise ou bloque les encaissements DiamanoPay et les retraits de cette entreprise.
+              Les commandes déjà payées restent consultables.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${paymentEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {paymentLoading ? 'Chargement…' : paymentEnabled ? 'Activés' : 'Désactivés'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${paymentEnabled ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-payment-systems"
+            checked={paymentEnabled}
+            disabled={paymentLoading || saving}
+            onChange={(event) => setPaymentEnabled(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser les systèmes de paiement</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Fournisseur configuré : {paymentProviders.join(', ') || 'Aucun'}.
+              La décision est vérifiée côté serveur pour chaque opération sensible.
+            </span>
+          </span>
+        </label>
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-payment-systems"
+            disabled={paymentLoading || paymentEnabled === savedPaymentEnabled}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const access = await setCompanyPaymentAccess(company.id, paymentEnabled, paymentProviders);
+                setPaymentEnabled(access.enabled);
+                setSavedPaymentEnabled(access.enabled);
+              } catch (error) {
+                setPaymentEnabled(savedPaymentEnabled);
+                window.alert(error instanceof Error ? error.message : 'La configuration des paiements n’a pas pu être enregistrée.');
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            Enregistrer le paiement
           </ActionButton>
         </div>
       </section>
