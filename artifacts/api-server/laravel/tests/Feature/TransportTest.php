@@ -534,6 +534,36 @@ class TransportTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_public_taxi_place_search_keeps_plateau_available_when_geocoder_returns_no_result(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-plateau',
+            'company_id' => 'kora',
+            'slug' => 'kora-plateau',
+            'name' => 'Kora Plateau',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Http::fake([
+            'https://nominatim.openstreetmap.org/*' => Http::response([]),
+        ]);
+
+        $this->getJson('/api/shop/kora-plateau/transport/places?q=Dakar%20plateau')
+            ->assertOk()
+            ->assertJsonCount(2, 'places')
+            ->assertJsonPath('places.0.label', 'Dakar-Plateau, Dakar')
+            ->assertJsonPath('places.0.latitude', 14.667317)
+            ->assertJsonPath('places.0.longitude', -17.437966);
+    }
+
     public function test_public_taxi_customer_can_cancel_only_with_the_signed_request_token(): void
     {
         ModuleCatalog::ensureCompanyAccess('kora');

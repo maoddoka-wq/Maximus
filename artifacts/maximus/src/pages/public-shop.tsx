@@ -917,7 +917,10 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     const timer = window.setTimeout(() => {
       setPlacesLoading(true);
       void api.places(query).then(result => {
-        if (active) setDestinationPlaces(result.places);
+        if (active) {
+          setDestinationPlaces(result.places);
+          if (result.places.length === 1) setSelectedPlace(result.places[0]);
+        }
       }).catch(() => {
         if (active) setDestinationPlaces([]);
       }).finally(() => {

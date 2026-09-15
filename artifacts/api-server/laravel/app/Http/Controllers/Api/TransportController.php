@@ -33,6 +33,22 @@ class TransportController extends Controller
         'minLongitude' => -17.65,
         'maxLongitude' => -16.95,
     ];
+    private const COMMON_DAKAR_PLACES = [
+        'plateau' => [
+            [
+                'label' => 'Dakar-Plateau, Dakar',
+                'latitude' => 14.667317,
+                'longitude' => -17.437966,
+                'type' => 'neighbourhood',
+            ],
+            [
+                'label' => 'Arrondissement de Dakar-Plateau, Dakar',
+                'latitude' => 14.676818,
+                'longitude' => -17.439292,
+                'type' => 'administrative',
+            ],
+        ],
+    ];
 
     public function bootstrap(Request $request): JsonResponse
     {
@@ -1297,30 +1313,40 @@ class TransportController extends Controller
             return [];
         }
 
-        $queries = array_values(array_unique([
+        $withoutDakar = trim((string) preg_replace('/\bdakar\b/iu', ' ', $query));
+        $withoutDakar = trim((string) preg_replace('/\s+/u', ' ', $withoutDakar), " ,.-");
+        $dakarPlateau = preg_replace('/\bdakar\s+plateau\b/iu', 'Dakar-Plateau', $query);
+        $queries = array_values(array_unique(array_filter([
             $query.', Dakar, Sénégal',
+            $withoutDakar !== '' ? $withoutDakar.', Dakar, Sénégal' : null,
+            $dakarPlateau !== $query ? $dakarPlateau.', Sénégal' : null,
             $query.', Région de Dakar, Sénégal',
             $query.', Sénégal',
             $query,
-        ]));
+        ])));
 
         foreach ($queries as $searchQuery) {
-            $response = Http::timeout(8)
-                ->withHeaders([
-                    'Accept' => 'application/json',
-                    'Accept-Language' => 'fr',
-                    'User-Agent' => 'MAXIMUS Taxi',
-                ])
-                ->get('https://nominatim.openstreetmap.org/search', [
-                    'format' => 'jsonv2',
-                    'limit' => $limit,
-                    'addressdetails' => 1,
-                    'dedupe' => 1,
-                    'q' => $searchQuery,
-                    'countrycodes' => 'sn',
-                    'viewbox' => '-17.65,14.95,-16.95,14.55',
-                    'bounded' => 1,
-                ]);
+            try {
+                $response = Http::timeout(8)
+                    ->withHeaders([
+                        'Accept' => 'application/json',
+                        'Accept-Language' => 'fr',
+                        'User-Agent' => 'MAXIMUS Taxi',
+                    ])
+                    ->get('https://nominatim.openstreetmap.org/search', [
+                        'format' => 'jsonv2',
+                        'limit' => $limit,
+                        'addressdetails' => 1,
+                        'dedupe' => 1,
+                        'q' => $searchQuery,
+                        'countrycodes' => 'sn',
+                        'viewbox' => '-17.65,14.95,-16.95,14.55',
+                        'bounded' => 1,
+                    ]);
+            } catch (\Throwable $exception) {
+                report($exception);
+                continue;
+            }
 
             if (! $response->successful() || ! is_array($response->json()) || $response->json() === []) {
                 continue;
@@ -1351,6 +1377,16 @@ class TransportController extends Controller
             if ($places !== []) {
                 return $places;
             }
+        }
+
+        $normalizedQuery = mb_strtolower((string) Str::ascii($query));
+        $normalizedQuery = trim((string) preg_replace('/[^a-z0-9]+/u', ' ', $normalizedQuery));
+        foreach (self::COMMON_DAKAR_PLACES as $alias => $places) {
+            if (! str_contains(' '.$normalizedQuery.' ', ' '.$alias.' ')) {
+                continue;
+            }
+
+            return array_slice($places, 0, $limit);
         }
 
         return [];
