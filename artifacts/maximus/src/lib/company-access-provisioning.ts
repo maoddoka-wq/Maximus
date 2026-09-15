@@ -156,20 +156,26 @@ export function provisionCompanyAccess(
   }
 
   const rootSeed = options.root ?? {};
+  const defaultRootName = 'Direction générale';
+  const defaultRootCode = 'DG';
   let root = data.orgNodes.find(node => node.companyId === company.id && !node.parentId);
   if (!root) {
     root = {
       id: `company-root-${company.id}`,
       companyId: company.id,
-      name: rootSeed.name ?? company.name,
-      code: rootSeed.code ?? 'ROOT',
+      name: rootSeed.name ?? defaultRootName,
+      code: rootSeed.code ?? defaultRootCode,
       type: rootSeed.type ?? 'direction',
       parentId: null,
     };
     data.orgNodes.push(root);
   } else {
-    root.name = rootSeed.name ?? root.name;
-    root.code = rootSeed.code ?? root.code;
+    const isLegacyCompanyRoot =
+      !rootSeed.name
+      && root.type === 'direction'
+      && (root.code === 'ROOT' || root.name === company.name);
+    root.name = rootSeed.name ?? (isLegacyCompanyRoot ? defaultRootName : root.name);
+    root.code = rootSeed.code ?? (isLegacyCompanyRoot ? defaultRootCode : root.code);
     root.type = rootSeed.type ?? root.type;
   }
 

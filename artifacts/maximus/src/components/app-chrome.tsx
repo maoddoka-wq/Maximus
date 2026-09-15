@@ -5,6 +5,7 @@ import {
   CircleHelp,
   ChevronDown,
   ChevronRight,
+  FileBarChart,
   LogIn,
   Menu,
   PanelLeftClose,
@@ -20,6 +21,7 @@ import {
   adminNav,
   companyNav,
   type Icon,
+  type NavigationItem,
   type Session,
   type SidebarFeature,
   type SidebarFeatureGroup,
@@ -43,6 +45,7 @@ type SidebarProps = {
   onToggleCollapse: () => void;
   activeNavStyle?: CSSProperties;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
+  showDirectionReports?: boolean;
 };
 
 export function Sidebar({
@@ -63,18 +66,24 @@ export function Sidebar({
   onToggleCollapse,
   activeNavStyle,
   hiddenWorkspaceFeatures = [],
+  showDirectionReports = false,
 }: SidebarProps) {
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
   const hiddenWorkspaceFeatureSet = new Set(hiddenWorkspaceFeatures);
-  const nav = isAdmin
+  const nav: NavigationItem[] = isAdmin
     ? adminNav
-    : companyNav.filter(
+    : [
+        ...companyNav.filter(
         item =>
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
           (item.module === null || allowed.includes(item.module as ModuleId)) &&
           !hiddenWorkspaceFeatureSet.has(companyWorkspaceFeatureForPath(item.href) as CompanyWorkspaceFeatureId),
-      );
+        ),
+        ...(showDirectionReports
+          ? [{ href: '/entreprise/rapports', label: 'Rapports direction', icon: FileBarChart, module: null }]
+          : []),
+      ];
   const companyCoreItems = nav.filter(item => item.module === null);
   const companyModuleItems = nav.filter(item => item.module !== null);
   const verticalModuleMenu = Boolean(

@@ -49,6 +49,8 @@ export type AppAccessContext = {
   sidebarFeatureGroups: SidebarFeatureGroup[];
   verticalModuleNavigation: boolean;
   sectorManager: boolean;
+  isGeneralDirection: boolean;
+  canViewReports: boolean;
   canManagePeople: boolean;
 };
 
@@ -174,6 +176,15 @@ export function buildAppAccessContext({
     : sectorTestCompanyId && accessRole?.sectorId
       ? data.orgNodes.find(node => node.id === accessRole.sectorId && node.companyId === companyId) ?? null
       : null;
+  const isGeneralDirection = Boolean(
+    employee
+    && !companyAdmin
+    && !sectorTestCompanyId
+    && employeeNode
+    && !employeeNode.parentId
+    && (employeeNode.code === 'DG' || employeeNode.name === 'Direction générale')
+    && employeeNode.companyId === companyId,
+  );
   const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode);
   const accessRoleMatchesScope = sectorTestCompanyId
     ? Boolean(accessRole && employeeNode && accessRole.companyId === companyId && accessRole.sectorId === employeeNode.id)
@@ -243,6 +254,12 @@ export function buildAppAccessContext({
     )
     : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
+  const canViewReports = Boolean(
+    companyAdmin
+    || isGeneralDirection
+    || sectorManager
+    || allowed.includes('rapports'),
+  );
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
     .filter(item => {
@@ -329,6 +346,8 @@ export function buildAppAccessContext({
       && sidebarFeatureGroups.length,
     ),
     sectorManager,
+    isGeneralDirection,
+    canViewReports,
     canManagePeople: session.startsWith('company:') || sectorManager,
   };
 }

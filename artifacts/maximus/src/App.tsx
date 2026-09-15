@@ -987,6 +987,8 @@ function AppContent() {
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
+    isGeneralDirection,
+    canViewReports,
     verticalModuleNavigation,
   } = buildAppAccessContext({
     data,
@@ -1056,6 +1058,7 @@ function AppContent() {
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
         hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+        showDirectionReports={companyAdmin || isGeneralDirection}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Topbar
@@ -1175,6 +1178,8 @@ function AppContent() {
                   canManagePeople={canManagePeople}
                   companyAdmin={companyAdmin}
                   sectorManager={sectorManager}
+                  isGeneralDirection={isGeneralDirection}
+                  canViewReports={canViewReports}
                   scopeNodeId={employeeNode?.id}
                   companyId={companyId}
                   employee={employee}
@@ -2600,10 +2605,12 @@ function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
+  canViewReports,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
+  canViewReports: boolean;
 }) {
   const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
   const canStocks = allowed.includes('stocks');
@@ -6643,22 +6650,60 @@ function ModulePackTestWorkbench({
   );
 }
 
-function OperationalReportsPage({ data }: { data: StoreData }) {
+function OperationalReportsPage({
+  data,
+  companyId,
+  scopeNodeId,
+  globalScope = false,
+}: {
+  data: StoreData;
+  companyId?: string;
+  scopeNodeId?: string;
+  globalScope?: boolean;
+}) {
   type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
   const [report, setReport] = useState<ReportId>('sales');
   const [query, setQuery] = useState('');
+  const companyRecords = <T extends { companyId?: string }>(items: T[]) =>
+    companyId ? items.filter(item => !item.companyId || item.companyId === companyId) : items;
+  const scopeNodeIds = (() => {
+    if (globalScope || !scopeNodeId) return null;
+    const ids = new Set([scopeNodeId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      data.orgNodes.forEach(node => {
+        if (node.companyId === companyId && node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
+          ids.add(node.id);
+          changed = true;
+        }
+      });
+    }
+    return ids;
+  })();
+  const scopedEmployeeNames = scopeNodeIds
+    ? new Set(
+        data.employees
+          .filter(employee => employee.companyId === companyId && employee.sectorId && scopeNodeIds.has(employee.sectorId))
+          .map(employee => `${employee.firstName} ${employee.lastName}`),
+      )
+    : null;
+  const scopedActivities = companyRecords(data.activities).filter(activity =>
+    !scopedEmployeeNames || scopedEmployeeNames.has(activity.user),
+  );
+  const scopeLabel = globalScope ? 'Direction générale · lecture consolidée' : 'Périmètre du secteur';
   const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
     sales: {
       label: 'Ventes',
       description: 'Chiffre d’affaires et commandes clients.',
       headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'],
-      rows: data.sales.map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
+      rows: companyRecords(data.sales).map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
     },
     stock: {
       label: 'Gestion de stock',
       description: 'Valorisation et niveaux des produits.',
       headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'],
-      rows: data.products.map((item) => [
+      rows: companyRecords(data.products).map((item) => [
         item.name,
         item.sku,
         item.category,
@@ -6676,7 +6721,7 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
       label: 'Activité',
       description: 'Traçabilité des actions réalisées.',
       headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'],
-      rows: data.activities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
+      rows: scopedActivities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
     },
   };
   const active = definitions[report];
@@ -6706,12 +6751,18 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
           </button>
         ))}
       </div>
+      <section className="rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] px-4 py-3">
+        <p className="text-xs font-bold text-[hsl(var(--primary))]">{scopeLabel}</p>
+        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+          Les rapports sont consultables ici. Les modifications opérationnelles restent réalisées dans les unités autorisées.
+        </p>
+      </section>
       <section className="card-surface overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="font-bold">Rapport {active.label}</h2>
             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-              {rows.length} lignes calculées depuis les données de l’entreprise.
+              {rows.length} lignes calculées depuis {globalScope ? 'toutes les données de l’entreprise' : 'le périmètre accessible'}.
             </p>
           </div>
           <div className="flex gap-2">

@@ -179,6 +179,8 @@ export function CompanyRouter({
   canManagePeople,
   companyAdmin,
   sectorManager,
+  isGeneralDirection,
+  canViewReports,
   scopeNodeId,
   companyId,
   employee,
@@ -209,6 +211,8 @@ export function CompanyRouter({
   canManagePeople: boolean;
   companyAdmin: boolean;
   sectorManager: boolean;
+  isGeneralDirection: boolean;
+  canViewReports: boolean;
   scopeNodeId?: string;
   companyId: string;
   employee: StoreData['employees'][number] | null;
@@ -235,6 +239,7 @@ export function CompanyRouter({
   const isWorkspaceFeatureHidden = (featureId: CompanyWorkspaceFeatureId) =>
     hiddenWorkspaceFeatureSet.has(featureId);
   const requiredModule = moduleIdForPath(routePath);
+  const isReportsRoute = routePath === '/entreprise/rapports';
   const maintenanceModule: ModuleId | 'controle' | undefined =
     routePath === '/entreprise/controle' ? 'controle' : requiredModule;
   if (maintenanceModule && (serverModuleAccess?.find((item) => item.id === maintenanceModule)?.status ?? moduleStatuses[maintenanceModule]) === 'MAINTENANCE') {
@@ -244,7 +249,14 @@ export function CompanyRouter({
       action: () => onBack('/entreprise/dashboard'),
     });
   }
-  if (requiredModule && !allowed.includes(requiredModule)) {
+  if (isReportsRoute && !canViewReports) {
+    return renderScreen(screens.empty, {
+      title: 'Accès réservé',
+      text: 'Les rapports consolidés sont accessibles à la Direction générale et aux managers autorisés.',
+      action: () => onBack('/entreprise/dashboard'),
+    });
+  }
+  if (requiredModule && !allowed.includes(requiredModule) && !isReportsRoute) {
     return renderScreen(screens.empty, {
       title: 'Accès non autorisé',
       text: 'Votre rôle ne possède pas la permission Consulter pour ce module.',
@@ -252,7 +264,7 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/dashboard') {
-    return renderScreen(screens.dashboard, { data, onNavigate, allowed });
+    return renderScreen(screens.dashboard, { data, onNavigate, allowed, canViewReports });
   }
   if (routePath === '/entreprise/controle') {
     if (isWorkspaceFeatureHidden('controle')) {
@@ -448,7 +460,12 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/rapports') {
-    return renderScreen(screens.reports, { data });
+    return renderScreen(screens.reports, {
+      data,
+      companyId,
+      scopeNodeId: isGeneralDirection || companyAdmin ? undefined : scopeNodeId,
+      globalScope: companyAdmin || isGeneralDirection,
+    });
   }
   return renderScreen(screens.empty, {
     title: 'Module non autorisé',
