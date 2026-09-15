@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Settings, ShieldCheck, Trash2 } from 'lucide-react';
+import { Building2, Settings, Trash2 } from 'lucide-react';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   uid,
@@ -47,27 +47,12 @@ export function EmployeesTab({
   const companyEmployees = data.employees.filter(employee => employee.companyId === company.id);
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
-  const directionNode = companyNodes.find(node => !node.parentId && (node.code === 'DG' || node.name === 'Direction générale'));
   const directionEmployee = companyEmployees.find(employee => employee.isGeneralDirection === true);
-  const directionRoles = directionNode
-    ? companyRoles.filter(role => role.sectorId === directionNode.id)
-    : [];
-  const readOnlyDirectionRole = directionRoles.find(role =>
-    Object.values(role.modulePermissions).every(permissions => permissions.every(permission => permission === 'voir')),
-  ) ?? directionRoles[0];
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [creationDefaults, setCreationDefaults] = useState<{
-    sectorId?: string;
-    roleId?: string;
-    isGeneralDirection?: boolean;
-  }>({});
+  const [creationDefaults, setCreationDefaults] = useState<{ sectorId?: string; roleId?: string }>({});
 
-  const openCreate = (defaults: {
-    sectorId?: string;
-    roleId?: string;
-    isGeneralDirection?: boolean;
-  } = {}) => {
+  const openCreate = (defaults: { sectorId?: string; roleId?: string } = {}) => {
     setEditingEmployee(null);
     setCreationDefaults(defaults);
     setModalOpen(true);
@@ -105,41 +90,6 @@ export function EmployeesTab({
         </div>
         <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => openCreate()} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
-      {!sectorManager && directionNode && (
-        <div className="mx-4 mb-5 flex flex-col gap-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.05)] p-4 sm:mx-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
-              <ShieldCheck size={17} />
-            </span>
-            <div className="min-w-0">
-              <h3 className="font-bold">Compte propre de la Direction générale</h3>
-              <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                Le compte Direction générale est nominatif et séparé de l’administration technique du service informatique.
-              </p>
-              {directionEmployee && (
-                <p className="mt-2 text-xs font-semibold text-[hsl(var(--primary))]">
-                  Compte configuré : {directionEmployee.firstName} {directionEmployee.lastName} · {directionEmployee.email}
-                </p>
-              )}
-            </div>
-          </div>
-          {!directionEmployee && (
-            <ActionButton
-              className="shrink-0 self-start sm:self-center"
-              primary
-              disabled={!readOnlyDirectionRole}
-              onClick={() => openCreate({
-                sectorId: directionNode.id,
-                roleId: readOnlyDirectionRole?.id,
-                isGeneralDirection: true,
-              })}
-              testId="btn-create-direction-account"
-            >
-              Créer le compte Direction générale
-            </ActionButton>
-          )}
-        </div>
-      )}
       {(companyNodes.length === 0 || companyRoles.length === 0) && <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure, configurez les rôles et leurs autorisations, puis ajoutez les comptes employés.</p>}
       <div className="space-y-3 p-4 sm:hidden">
         {companyEmployees.map(employee => {
@@ -213,7 +163,8 @@ export function EmployeesTab({
           allEmployees={companyEmployees}
            defaultSectorId={creationDefaults.sectorId}
             defaultRoleId={creationDefaults.roleId}
-            defaultIsGeneralDirection={creationDefaults.isGeneralDirection}
+            allowGeneralDirection={!sectorManager && allowSectorAdmin}
+            generalDirectionAlreadyAssigned={Boolean(directionEmployee)}
           allowSectorAdmin={allowSectorAdmin}
           onClose={() => setModalOpen(false)}
            onSave={async employeeData => {
@@ -274,7 +225,8 @@ function EmployeeFormModal({
   allEmployees,
   defaultSectorId,
   defaultRoleId,
-  defaultIsGeneralDirection = false,
+  allowGeneralDirection = false,
+  generalDirectionAlreadyAssigned = false,
   allowSectorAdmin = true,
   onClose,
   onSave,
@@ -285,7 +237,8 @@ function EmployeeFormModal({
   allEmployees: Employee[];
   defaultSectorId?: string;
   defaultRoleId?: string;
-  defaultIsGeneralDirection?: boolean;
+  allowGeneralDirection?: boolean;
+  generalDirectionAlreadyAssigned?: boolean;
   allowSectorAdmin?: boolean;
   onClose: () => void;
   onSave: (data: EmployeeFormData) => Promise<void>;
@@ -301,7 +254,7 @@ function EmployeeFormModal({
     sectorId: initialData?.sectorId || defaultSectorId || (allNodes[0]?.id ?? ''),
     roleId: initialData?.roleId || defaultRoleId || '',
     isSectorAdmin: initialData?.isSectorAdmin ?? false,
-    isGeneralDirection: initialData?.isGeneralDirection ?? defaultIsGeneralDirection,
+    isGeneralDirection: initialData?.isGeneralDirection ?? false,
     password: '',
     passwordConfirm: '',
   });
@@ -383,7 +336,29 @@ function EmployeeFormModal({
           <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Rôles de l’unité sélectionnée et de ses unités parentes.</p>
         </label>
       </div>
-      {allowSectorAdmin && <label className="mt-4 flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold"><input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" /><span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span></label>}
+      {(allowSectorAdmin || (allowGeneralDirection && (!generalDirectionAlreadyAssigned || initialData?.isGeneralDirection))) && (
+        <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+          {allowSectorAdmin && (
+            <label className="flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold">
+              <input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" />
+              <span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span>
+            </label>
+          )}
+          {allowGeneralDirection && (!generalDirectionAlreadyAssigned || initialData?.isGeneralDirection) && (
+            <label className="flex items-start gap-2 rounded-lg border border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.05)] p-3 text-xs font-semibold">
+              <input
+                type="checkbox"
+                data-testid="checkbox-general-direction"
+                checked={Boolean(formData.isGeneralDirection)}
+                disabled={Boolean(initialData?.isGeneralDirection)}
+                onChange={event => setFormData(current => ({ ...current, isGeneralDirection: event.target.checked }))}
+                className="mt-0.5"
+              />
+              <span><strong className="block">Direction générale</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Compte nominatif unique de la Direction générale, séparé du service informatique. Ce choix ne peut être attribué qu’une seule fois.</small></span>
+            </label>
+          )}
+        </div>
+      )}
       <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
     </div>
   );
