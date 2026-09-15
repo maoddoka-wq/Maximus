@@ -69,3 +69,4 @@
 - [Identifiants du menu Transport](transport-menu-identifiers.md) — générer le menu depuis `overview`, `trips`, `drivers`, `vehicles`, pas depuis les libellés français.
 - [Qualification des chauffeurs](transport-driver-organization.md) — créer l’employé dans Organisation, puis ajouter dans Transport uniquement les données Taxi.
 - [Fonds de carte Taxi](map-tile-fallback.md) — les tuiles Leaflet peuvent échouer silencieusement ; conserver le trajet et prévoir un fournisseur de repli.
+- [Paiement récurrent Transport](transport-recurring-payment-boundary.md) — ne jamais simuler un renouvellement automatique avec le checkout DiamanoPay ponctuel ; il faut un mandat réutilisable documenté.
