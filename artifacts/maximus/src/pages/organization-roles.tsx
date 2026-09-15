@@ -22,12 +22,28 @@ import {
   type Role,
   type StoreData,
 } from '@/lib/store';
+import { authApi } from '@/lib/auth-api';
 import { restrictRoleToCompany } from '@/lib/employee-permissions';
 import { permissionLabel } from './organization-shared-utils';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 type Permission = 'voir' | 'créer' | 'modifier';
+
+function getSectorDescendantIds(nodes: OrgNode[], rootId: string) {
+  const ids = new Set<string>([rootId]);
+  const pending = [rootId];
+  while (pending.length > 0) {
+    const parentId = pending.pop();
+    if (!parentId) continue;
+    nodes.filter(node => node.parentId === parentId).forEach(node => {
+      if (ids.has(node.id)) return;
+      ids.add(node.id);
+      pending.push(node.id);
+    });
+  }
+  return [...ids];
+}
 
 const permissionLabels: Record<Permission, string> = {
   voir: 'Voir',
@@ -108,7 +124,28 @@ export function RolesTab({
           moduleDefinitions={getConfiguredModules(data)}
           sectorLocked={Boolean(editingRole && (data.employees.some(employee => employee.roleId === editingRole.id) || company.managerRoleId === editingRole.id))}
           onClose={() => setModalOpen(false)}
-          onSave={roleData => {
+          onSave={async roleData => {
+            if (editingRole) {
+              const assignedEmployees = data.employees.filter(employee => employee.roleId === editingRole.id);
+              await Promise.all(assignedEmployees.map(async employee => {
+                if (!employee.sectorId) {
+                  throw new Error(`L’unité de ${employee.firstName} ${employee.lastName} est introuvable.`);
+                }
+                await authApi.provisionAccount({
+                  id: employee.id,
+                  email: employee.email.trim().toLowerCase(),
+                  displayName: `${employee.firstName.trim()} ${employee.lastName.trim()}`,
+                  phone: employee.phone,
+                  companyId: company.id,
+                  employeeId: employee.id,
+                  sectorIds: employee.isSectorAdmin
+                    ? getSectorDescendantIds(companyNodes, employee.sectorId)
+                    : [employee.sectorId],
+                  role: employee.isSectorAdmin ? 'sector_manager' : 'employee',
+                  permissions: roleData.modulePermissions,
+                });
+              }));
+            }
             mutate(draft => {
               if (editingRole) {
                 const index = draft.roles.findIndex(role => role.id === editingRole.id);
@@ -258,7 +295,7 @@ function RoleFormModal({
   moduleDefinitions: Module[];
   sectorLocked: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; description: string; sectorId: string; modulePermissions: Record<string, string[]> }) => void;
+  onSave: (data: { name: string; description: string; sectorId: string; modulePermissions: Record<string, string[]> }) => void | Promise<void>;
 }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -396,7 +433,7 @@ function RoleFormModal({
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const name = formData.name.trim();
     if (!name || !formData.sectorId) {
       setError('Le nom et le secteur du rôle sont obligatoires.');
@@ -422,7 +459,11 @@ function RoleFormModal({
         .filter(([, permissions]) => permissions.length > 0),
     );
     const boundedRole = restrictRoleToCompany({ id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions }, company);
-    onSave({ ...formData, name, modulePermissions: boundedRole?.modulePermissions ?? {} });
+    try {
+      await onSave({ ...formData, name, modulePermissions: boundedRole?.modulePermissions ?? {} });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'La synchronisation des permissions a échoué.');
+    }
   };
 
   return (
