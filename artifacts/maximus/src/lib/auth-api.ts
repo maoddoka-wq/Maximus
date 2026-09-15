@@ -31,6 +31,7 @@ export const authApi = {
     sectorIds: string[];
     role: 'sector_manager' | 'employee';
     permissions?: Record<string, string[]>;
+    isGeneralDirection?: boolean;
     password?: string;
   }) => request<{ ok: true }>('/auth/accounts', {
     method: 'POST',

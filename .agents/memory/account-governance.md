@@ -7,4 +7,4 @@ L’administrateur de l’entreprise représente l’administration technique : 
 
 **Why:** Un compte partagé ou tout-puissant mélange la configuration informatique et les décisions métier, empêche une traçabilité correcte et expose la Direction générale à des actions opérationnelles inutiles.
 
-**How to apply:** Présenter clairement le compte `company_admin` comme administrateur technique, créer le compte Direction générale depuis Organisation & accès sur l’unité racine, et privilégier un rôle de lecture/reporting pour ce compte.
+**How to apply:** Présenter clairement le compte `company_admin` comme administrateur technique, créer le compte Direction générale depuis Organisation & accès sur l’unité racine, persister un marqueur explicite sur son compte authentifié, et privilégier un rôle de lecture/reporting.

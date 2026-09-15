@@ -23,6 +23,7 @@ class AuthUser extends Model
         'employee_id',
         'sector_ids',
         'permissions',
+        'is_general_direction',
         'status',
     ];
 
@@ -35,6 +36,7 @@ class AuthUser extends Model
         return [
             'sector_ids' => 'array',
             'permissions' => 'array',
+            'is_general_direction' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

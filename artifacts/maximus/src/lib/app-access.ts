@@ -180,9 +180,8 @@ export function buildAppAccessContext({
     employee
     && !companyAdmin
     && !sectorTestCompanyId
+    && employee.isGeneralDirection === true
     && employeeNode
-    && !employeeNode.parentId
-    && (employeeNode.code === 'DG' || employeeNode.name === 'Direction générale')
     && employeeNode.companyId === companyId,
   );
   const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode);

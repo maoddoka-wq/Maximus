@@ -103,6 +103,7 @@ class AppStateController extends Controller
         } else {
             $state = $this->mergeRegistryCompanies($state);
         }
+        $state = $this->hydrateEmployeeIdentityFlags($state);
         $state = $this->stripCredentials($state);
 
         return response()->json([
@@ -265,6 +266,7 @@ class AppStateController extends Controller
                 'sectorId' => $sectorId,
                 'roleId' => $roleId,
                 'isSectorAdmin' => $user->role === 'sector_manager',
+                'isGeneralDirection' => (bool) $user->is_general_direction,
             ];
         }
 
@@ -341,6 +343,36 @@ class AppStateController extends Controller
 
             return response()->json(['ok' => true, 'version' => $nextVersion]);
         });
+    }
+
+    private function hydrateEmployeeIdentityFlags(array $state): array
+    {
+        if (! isset($state['employees']) || ! is_array($state['employees'])) {
+            return $state;
+        }
+
+        $generalDirectionIds = array_fill_keys(
+            AuthUser::query()
+                ->whereNotNull('employee_id')
+                ->where('is_general_direction', true)
+                ->pluck('employee_id')
+                ->map(static fn (mixed $id): string => (string) $id)
+                ->all(),
+            true,
+        );
+
+        $state['employees'] = array_map(
+            static function (mixed $employee) use ($generalDirectionIds): mixed {
+                if (! is_array($employee) || ! isset($employee['id'])) {
+                    return $employee;
+                }
+                $employee['isGeneralDirection'] = isset($generalDirectionIds[(string) $employee['id']]);
+                return $employee;
+            },
+            $state['employees'],
+        );
+
+        return $state;
     }
 
     private function stripCredentials(array $state): array

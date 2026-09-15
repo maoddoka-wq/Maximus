@@ -48,9 +48,7 @@ export function EmployeesTab({
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
   const directionNode = companyNodes.find(node => !node.parentId && (node.code === 'DG' || node.name === 'Direction générale'));
-  const directionEmployee = directionNode
-    ? companyEmployees.find(employee => employee.sectorId === directionNode.id)
-    : undefined;
+  const directionEmployee = companyEmployees.find(employee => employee.isGeneralDirection === true);
   const directionRoles = directionNode
     ? companyRoles.filter(role => role.sectorId === directionNode.id)
     : [];
@@ -59,9 +57,17 @@ export function EmployeesTab({
   ) ?? directionRoles[0];
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [creationDefaults, setCreationDefaults] = useState<{ sectorId?: string; roleId?: string }>({});
+  const [creationDefaults, setCreationDefaults] = useState<{
+    sectorId?: string;
+    roleId?: string;
+    isGeneralDirection?: boolean;
+  }>({});
 
-  const openCreate = (defaults: { sectorId?: string; roleId?: string } = {}) => {
+  const openCreate = (defaults: {
+    sectorId?: string;
+    roleId?: string;
+    isGeneralDirection?: boolean;
+  } = {}) => {
     setEditingEmployee(null);
     setCreationDefaults(defaults);
     setModalOpen(true);
@@ -122,7 +128,11 @@ export function EmployeesTab({
               className="shrink-0 self-start sm:self-center"
               primary
               disabled={!readOnlyDirectionRole}
-              onClick={() => openCreate({ sectorId: directionNode.id, roleId: readOnlyDirectionRole?.id })}
+              onClick={() => openCreate({
+                sectorId: directionNode.id,
+                roleId: readOnlyDirectionRole?.id,
+                isGeneralDirection: true,
+              })}
               testId="btn-create-direction-account"
             >
               Créer le compte Direction générale
@@ -152,6 +162,7 @@ export function EmployeesTab({
                   <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-medium">
                     <Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />
                     {sector?.name || 'Non assigné'}
+                    {employee.isGeneralDirection && <span className="rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Direction générale</span>}
                     {employee.isSectorAdmin && <span className="rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}
                   </dd>
                 </div>
@@ -181,7 +192,7 @@ export function EmployeesTab({
               return (
                 <tr key={employee.id} className="transition hover:bg-[hsl(var(--muted)/.3)]">
                   <td className="px-6 py-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] text-xs font-black text-[hsl(var(--foreground))]">{employee.firstName[0]}{employee.lastName[0]}</span><div><p className="font-bold">{employee.firstName} {employee.lastName}</p><p className="text-xs text-[hsl(var(--muted-foreground))]">{employee.email}</p></div></div></td>
-                  <td className="px-6 py-4"><span className="inline-flex items-center gap-1.5 text-xs font-medium"><Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />{sector?.name || 'Non assigné'}{employee.isSectorAdmin && <span className="ml-1 rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}</span></td>
+                   <td className="px-6 py-4"><span className="inline-flex flex-wrap items-center gap-1.5 text-xs font-medium"><Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />{sector?.name || 'Non assigné'}{employee.isGeneralDirection && <span className="ml-1 rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Direction générale</span>}{employee.isSectorAdmin && <span className="ml-1 rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}</span></td>
                   <td className="px-6 py-4 text-xs font-medium">{role?.name || 'Non assigné'}</td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2">
                     <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
@@ -201,7 +212,8 @@ export function EmployeesTab({
           allRoles={companyRoles}
           allEmployees={companyEmployees}
            defaultSectorId={creationDefaults.sectorId}
-           defaultRoleId={creationDefaults.roleId}
+            defaultRoleId={creationDefaults.roleId}
+            defaultIsGeneralDirection={creationDefaults.isGeneralDirection}
           allowSectorAdmin={allowSectorAdmin}
           onClose={() => setModalOpen(false)}
            onSave={async employeeData => {
@@ -222,7 +234,8 @@ export function EmployeesTab({
                employeeId,
                sectorIds,
                role: employeeData.isSectorAdmin ? 'sector_manager' : 'employee',
-               permissions: assignedRole.modulePermissions,
+                permissions: assignedRole.modulePermissions,
+                ...(employeeData.isGeneralDirection ? { isGeneralDirection: true } : {}),
                ...(employeeData.loginPassword ? { password: employeeData.loginPassword } : {}),
              });
             mutate(draft => {
@@ -261,6 +274,7 @@ function EmployeeFormModal({
   allEmployees,
   defaultSectorId,
   defaultRoleId,
+  defaultIsGeneralDirection = false,
   allowSectorAdmin = true,
   onClose,
   onSave,
@@ -271,6 +285,7 @@ function EmployeeFormModal({
   allEmployees: Employee[];
   defaultSectorId?: string;
   defaultRoleId?: string;
+  defaultIsGeneralDirection?: boolean;
   allowSectorAdmin?: boolean;
   onClose: () => void;
   onSave: (data: EmployeeFormData) => Promise<void>;
@@ -286,6 +301,7 @@ function EmployeeFormModal({
     sectorId: initialData?.sectorId || defaultSectorId || (allNodes[0]?.id ?? ''),
     roleId: initialData?.roleId || defaultRoleId || '',
     isSectorAdmin: initialData?.isSectorAdmin ?? false,
+    isGeneralDirection: initialData?.isGeneralDirection ?? defaultIsGeneralDirection,
     password: '',
     passwordConfirm: '',
   });
@@ -341,6 +357,7 @@ function EmployeeFormModal({
       sectorId: formData.sectorId,
       roleId: formData.roleId,
       isSectorAdmin: formData.isSectorAdmin,
+      isGeneralDirection: formData.isGeneralDirection,
       role: role.name,
       ...(password ? { loginPassword: password } : {}),
     }).catch(nextError => {

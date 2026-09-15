@@ -79,6 +79,7 @@ class AuthController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['array'],
             'permissions.*.*' => ['string', 'min:1'],
+            'isGeneralDirection' => ['sometimes', 'boolean'],
         ]);
         $actor = $request->attributes->get('authActor');
         if (! CompanyAuthorization::canManageAccount($actor, $data['companyId'], $data['sectorIds'])) {
@@ -86,6 +87,16 @@ class AuthController extends Controller
         }
         if (! CompanyAuthorization::canAssignPermissions($actor, $data['permissions'] ?? [])) {
             return response()->json(['error' => 'Permissions du compte hors périmètre autorisé.'], 403);
+        }
+        if (($data['isGeneralDirection'] ?? false) === true) {
+            $existingGeneralDirection = AuthUser::query()
+                ->where('company_id', $data['companyId'])
+                ->where('is_general_direction', true)
+                ->where('employee_id', '!=', $data['employeeId'])
+                ->exists();
+            if ($existingGeneralDirection) {
+                return response()->json(['error' => 'Un compte Direction générale existe déjà pour cette entreprise.'], 409);
+            }
         }
 
         $existingQuery = AuthUser::query()->where('employee_id', $data['employeeId']);
@@ -106,6 +117,7 @@ class AuthController extends Controller
             'employee_id' => $data['employeeId'],
             'sector_ids' => $data['sectorIds'],
             'permissions' => $data['permissions'] ?? [],
+            'is_general_direction' => (bool) ($data['isGeneralDirection'] ?? false),
             'status' => 'ACTIF',
             'updated_at' => now(),
         ];
