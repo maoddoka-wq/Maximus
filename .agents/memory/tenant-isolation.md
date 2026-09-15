@@ -27,6 +27,19 @@ entreprise après actualisation.
 ventes, paiements, mouvements, activités, fournisseurs et commandes avant
 d’étendre un écran métier qui utilise `/api/app-state`.
 
+Les employés, managers et administrateurs d’une même entreprise doivent lire le
+même état métier partagé. Un employé peut enregistrer une donnée opérationnelle
+de son entreprise ; le serveur rattache les lignes sans `companyId` à la session
+de l’entreprise et ne fusionne jamais une ligne appartenant à un autre tenant.
+
+**Why:** Le partage vertical des données est nécessaire au suivi par le manager
+et la direction, tandis que le navigateur ne doit pas pouvoir choisir le tenant
+de destination.
+
+**How to apply:** Autoriser la sauvegarde métier des comptes employés sur
+`/api/app-state`, normaliser le rattachement serveur lors de la fusion et tester
+le parcours employé → manager dans la même entreprise.
+
 La résolution d’une session MAXIMUS doit vérifier l’existence et le statut actif
 de l’entreprise avant de retourner l’utilisateur ; le middleware seul ne suffit
 pas pour les endpoints de session, la connexion et les boutiques publiques.

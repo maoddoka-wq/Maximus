@@ -37,6 +37,20 @@ class AppStateController extends Controller
         'crmOpportunities',
     ];
 
+    private const EMPLOYEE_WRITABLE_COLLECTIONS = [
+        'products',
+        'movements',
+        'sales',
+        'activities',
+        'purchaseOrders',
+        'supplierRecords',
+        'deliveries',
+        'businessDocuments',
+        'accountingEntries',
+        'payrollSlips',
+        'crmOpportunities',
+    ];
+
     public function registrationCatalog(PublicRegistrationPolicy $registrationPolicy): JsonResponse
     {
         $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
@@ -336,7 +350,15 @@ class AppStateController extends Controller
                     return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
                 }
 
-                $currentPayload = $this->mergeCompanyState($currentPayload, $incomingState, $companyId);
+                $employeeCollections = ($actor['role'] ?? null) === 'employee'
+                    ? self::EMPLOYEE_WRITABLE_COLLECTIONS
+                    : null;
+                $currentPayload = $this->mergeCompanyState(
+                    $currentPayload,
+                    $incomingState,
+                    $companyId,
+                    $employeeCollections,
+                );
             } else {
                 $currentPayload = $incomingState;
             }
@@ -582,10 +604,20 @@ class AppStateController extends Controller
         return $state;
     }
 
-    private function mergeCompanyState(array $current, array $incoming, string $companyId): array
+    private function mergeCompanyState(
+        array $current,
+        array $incoming,
+        string $companyId,
+        ?array $writableCollections = null,
+    ): array
     {
         foreach ($incoming as $key => $value) {
             if (!is_array($value)) {
+                continue;
+            }
+            if ($writableCollections !== null
+                && !in_array($key, $writableCollections, true)
+                && $key !== 'commerceStates') {
                 continue;
             }
 
