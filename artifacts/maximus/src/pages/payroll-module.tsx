@@ -346,7 +346,7 @@ export default function PayrollModulePage({
   };
 
   useEffect(() => { void refresh(); }, [api, preview]);
-  useAutoRefresh(() => refresh(true), { enabled: !preview && Boolean(data), intervalMs: 5_000 });
+  useAutoRefresh(() => refresh(true), { enabled: !preview && Boolean(data) });
 
   const mutate = async (work: () => Promise<unknown>, message: string, action = 'action') => {
     if (pendingAction) return false;

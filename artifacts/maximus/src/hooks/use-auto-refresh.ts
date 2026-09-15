@@ -26,14 +26,19 @@ export function useAutoRefresh(
     const run = () => {
       if (document.visibilityState !== 'visible' || runningRef.current) return;
       runningRef.current = true;
-      void Promise.resolve(refreshRef.current()).then(
-        () => {
-          runningRef.current = false;
-        },
-        () => {
-          runningRef.current = false;
-        },
-      );
+      try {
+        void Promise.resolve(refreshRef.current()).then(
+          () => {
+            runningRef.current = false;
+          },
+          () => {
+            runningRef.current = false;
+          },
+        );
+      } catch {
+        // Un callback synchrone défaillant ne doit pas bloquer les prochains cycles.
+        runningRef.current = false;
+      }
     };
 
     const onFocus = () => run();

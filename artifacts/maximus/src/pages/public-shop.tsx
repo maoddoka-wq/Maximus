@@ -905,7 +905,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }
   };
 
-  useAutoRefresh(refreshTrip, { enabled: Boolean(trip), intervalMs: 5_000 });
+  useAutoRefresh(refreshTrip, { enabled: Boolean(trip) });
 
   useEffect(() => {
     const query = form.destination.trim();

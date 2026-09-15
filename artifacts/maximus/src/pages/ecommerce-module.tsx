@@ -322,7 +322,7 @@ export default function EcommerceModulePage({
   useEffect(() => {
     void load();
   }, [companyId, preview]);
-  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 5_000 });
+  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data) });
 
   const run = async <T,>(action: () => Promise<T>, success: string, actionKey = 'action'): Promise<T | undefined> => {
     if (pendingAction) return undefined;
