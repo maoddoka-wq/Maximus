@@ -71,6 +71,7 @@ export function TaxiRouteMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const viewportKeyRef = useRef<string | null>(null);
   const viewportBoundsRef = useRef<L.LatLngBounds | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -78,11 +79,26 @@ export function TaxiRouteMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
     const map = L.map(containerRef.current, { zoomControl: true, attributionControl: true });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    const openStreetMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      subdomains: 'abc',
+      maxZoom: 19,
+    });
+    const cartoFallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
-    }).addTo(map);
+    });
+    let fallbackActivated = false;
+    openStreetMapLayer.on('tileerror', () => {
+      if (fallbackActivated || !map.hasLayer(openStreetMapLayer)) return;
+      fallbackActivated = true;
+      map.removeLayer(openStreetMapLayer);
+      cartoFallbackLayer.addTo(map);
+      tileLayerRef.current = cartoFallbackLayer;
+    });
+    openStreetMapLayer.addTo(map);
+    tileLayerRef.current = openStreetMapLayer;
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     map.setView([14.7167, -17.4677], 12);
@@ -96,6 +112,7 @@ export function TaxiRouteMap({
       map.remove();
       mapRef.current = null;
       layersRef.current = null;
+      tileLayerRef.current = null;
       viewportKeyRef.current = null;
       viewportBoundsRef.current = null;
     };
