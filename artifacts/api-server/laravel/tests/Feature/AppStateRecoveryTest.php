@@ -516,6 +516,82 @@ class AppStateRecoveryTest extends TestCase
             ->assertHeader('Pragma', 'no-cache');
     }
 
+    public function test_employee_writes_are_shared_with_the_company_manager(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'shared-data-company',
+            'name' => 'Entreprise données partagées',
+            'manager' => 'Direction générale',
+            'email' => 'shared-data@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $employee = AuthUser::query()->create([
+            'id' => 'shared-data-employee',
+            'email' => 'shared-data.employee@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Employé partagé',
+            'role' => 'employee',
+            'company_id' => $company->id,
+            'employee_id' => 'shared-data-employee',
+            'sector_ids' => ['shared-data-sector'],
+            'permissions' => ['commerce' => ['voir', 'créer']],
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'shared-data-manager',
+            'email' => 'shared-data.manager@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Manager partagé',
+            'role' => 'sector_manager',
+            'company_id' => $company->id,
+            'sector_ids' => ['shared-data-sector'],
+            'permissions' => ['commerce' => ['voir', 'créer', 'modifier']],
+            'status' => 'ACTIF',
+        ]);
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'companies' => [['id' => $company->id, 'name' => $company->name]],
+                'products' => [],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $employeeRequest = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($employee));
+        $employeeState = $employeeRequest
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk();
+
+        $employeeRequest
+            ->putJson('/api/app-state', [
+                'version' => $employeeState->json('version'),
+                'data' => [
+                    'companies' => [['id' => $company->id, 'name' => $company->name]],
+                    'products' => [[
+                        'id' => 'shared-product',
+                        'sku' => 'SHARED-001',
+                        'name' => 'Produit saisi par l’employé',
+                        'category' => 'Commerce',
+                        'stock' => 12,
+                        'threshold' => 2,
+                        'price' => 1500,
+                    ]],
+                ],
+            ])
+            ->assertOk();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.products.0.id', 'shared-product')
+            ->assertJsonPath('data.products.0.companyId', $company->id)
+            ->assertJsonPath('data.products.0.name', 'Produit saisi par l’employé');
+    }
+
     public function test_app_state_rejects_a_stale_write_without_overwriting_the_latest_data(): void
     {
         $admin = AuthUser::query()->create([

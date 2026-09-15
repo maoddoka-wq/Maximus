@@ -14,6 +14,29 @@ use Illuminate\Support\Str;
 
 class AppStateController extends Controller
 {
+    private const COMPANY_SCOPED_COLLECTIONS = [
+        'companies',
+        'employees',
+        'roles',
+        'orgNodes',
+        'subscriptions',
+        'controlTasks',
+        'domainEvents',
+        'auditEntries',
+        'notifications',
+        'products',
+        'movements',
+        'sales',
+        'activities',
+        'purchaseOrders',
+        'supplierRecords',
+        'deliveries',
+        'businessDocuments',
+        'accountingEntries',
+        'payrollSlips',
+        'crmOpportunities',
+    ];
+
     public function registrationCatalog(PublicRegistrationPolicy $registrationPolicy): JsonResponse
     {
         $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
@@ -304,7 +327,7 @@ class AppStateController extends Controller
 
             $incomingState = $this->stripCredentials($data['data']);
             if (($actor['role'] ?? null) !== 'maximus_admin') {
-                if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager'], true)) {
+                if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager', 'employee'], true)) {
                     return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
                 }
 
@@ -373,27 +396,10 @@ class AppStateController extends Controller
                 && isset($activeCompanyIds[(string) $item['id']]),
         ));
 
-        foreach ([
-            'employees',
-            'roles',
-            'orgNodes',
-            'subscriptions',
-            'controlTasks',
-            'domainEvents',
-            'auditEntries',
-            'notifications',
-            'products',
-            'movements',
-            'sales',
-            'activities',
-            'purchaseOrders',
-            'supplierRecords',
-            'deliveries',
-            'businessDocuments',
-            'accountingEntries',
-            'payrollSlips',
-            'crmOpportunities',
-        ] as $key) {
+        foreach (self::COMPANY_SCOPED_COLLECTIONS as $key) {
+            if ($key === 'companies') {
+                continue;
+            }
             if (!isset($state[$key]) || !is_array($state[$key])) {
                 continue;
             }
@@ -579,15 +585,26 @@ class AppStateController extends Controller
     private function mergeCompanyState(array $current, array $incoming, string $companyId): array
     {
         foreach ($incoming as $key => $value) {
-            if (!is_array($value) || !isset($current[$key]) || !is_array($current[$key])) {
+            if (!is_array($value)) {
                 continue;
             }
 
             if ($key === 'commerceStates') {
+                if (!isset($current[$key]) || !is_array($current[$key])) {
+                    $current[$key] = [];
+                }
                 if (array_key_exists($companyId, $value)) {
                     $current[$key][$companyId] = $value[$companyId];
                 }
                 continue;
+            }
+
+            $isCompanyScopedCollection = in_array($key, self::COMPANY_SCOPED_COLLECTIONS, true);
+            if (!isset($current[$key]) || !is_array($current[$key])) {
+                if (!$isCompanyScopedCollection) {
+                    continue;
+                }
+                $current[$key] = [];
             }
 
             if (!array_is_list($value)) {
@@ -596,9 +613,10 @@ class AppStateController extends Controller
             }
 
             $existing = collect($current[$key]);
-            $incomingCompanyRecords = collect($value)->filter(
-                fn (mixed $item): bool => $this->belongsToCompany($item, $companyId, $key),
-            );
+            $incomingCompanyRecords = collect($value)
+                ->map(fn (mixed $item): ?array => $this->normalizeIncomingCompanyRecord($item, $companyId, $key))
+                ->filter()
+                ->values();
             if ($incomingCompanyRecords->isEmpty()) {
                 continue;
             }
@@ -612,6 +630,24 @@ class AppStateController extends Controller
         }
 
         return $current;
+    }
+
+    private function normalizeIncomingCompanyRecord(mixed $item, string $companyId, string $key): ?array
+    {
+        if (!is_array($item)) {
+            return null;
+        }
+
+        $recordCompanyId = $key === 'companies'
+            ? ($item['id'] ?? null)
+            : ($item['companyId'] ?? $item['company_id'] ?? null);
+
+        if ($recordCompanyId === null && $key !== 'companies') {
+            $item['companyId'] = $companyId;
+            return $item;
+        }
+
+        return (string) $recordCompanyId === $companyId ? $item : null;
     }
 
     private function belongsToCompany(mixed $item, string $companyId, string $key): bool
