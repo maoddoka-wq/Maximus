@@ -38,3 +38,9 @@ Les droits détaillés issus des packs doivent être persistés avec l’accès 
 **Why:** Après actualisation ou connexion d’un employé, un état local absent pouvait ramener les droits d’une fonctionnalité à `voir` et réactiver un contrôle global de création/modification.
 
 **How to apply:** Lors de l’enregistrement d’un accès module, synchroniser `featureIds`, `packIds` et `featurePermissions` vers la ligne d’accès serveur et le registre entreprise ; une entrée détaillée vide reste un refus explicite.
+
+L’éditeur de rôle doit exposer les trois actions aussi au niveau général du module ; la sauvegarde ne doit pas réduire ce niveau à `voir` avant l’application du plafond entreprise.
+
+**Why:** Un rôle pouvait afficher `Créer` et `Modifier` sur des sous-fonctionnalités, mais le niveau module restait limité à `Voir`, ce qui bloquait les écrans qui contrôlent l’action sur le module.
+
+**How to apply:** Afficher et enregistrer `voir`, `créer` et `modifier` pour le module, avec `Créer`/`Modifier` dépendant de `Voir`, puis plafonner ces actions selon les permissions détaillées autorisées par l’entreprise.

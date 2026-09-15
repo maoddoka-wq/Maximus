@@ -410,3 +410,35 @@ test('plafonne les droits des rôles au choix de l’entreprise', () => {
     'commerce:menu:clients': ['voir'],
   });
 });
+
+test('conserve les droits généraux créer et modifier quand le module les autorise', () => {
+  const company: Company = {
+    id: 'company-2',
+    name: 'Entreprise avec écriture',
+    manager: 'Admin',
+    email: 'admin@example.test',
+    phone: '',
+    country: 'Sénégal',
+    sector: 'Commerce',
+    status: 'ACTIF',
+    requestedModules: ['commerce'],
+    requestedModuleFeatures: { commerce: ['clients'] },
+    requestedModulePermissions: { commerce: { clients: ['voir', 'créer', 'modifier'] } },
+    allowedModules: ['commerce'],
+    refusedModules: [],
+    createdAt: '2026-01-01',
+  };
+  const role: Role = {
+    id: 'role-2',
+    name: 'Responsable commercial',
+    description: '',
+    companyId: company.id,
+    sectorId: 'unit-2',
+    modulePermissions: {
+      commerce: ['voir', 'créer', 'modifier'],
+      'commerce:menu:clients': ['voir', 'créer', 'modifier'],
+    },
+  };
+
+  assert.deepEqual(restrictRoleToCompany(role, company)?.modulePermissions, role.modulePermissions);
+});

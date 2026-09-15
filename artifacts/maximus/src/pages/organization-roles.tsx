@@ -276,8 +276,27 @@ function RoleFormModal({
 
   const togglePermission = (moduleId: string, permission: 'voir' | 'créer' | 'modifier') => {
     setFormData(previous => {
-      const permissions = previous.modulePermissions[moduleId] || [];
-      const nextPermissions = permissions.includes(permission) ? permissions.filter(value => value !== permission) : [...permissions, permission];
+      const current = new Set(previous.modulePermissions[moduleId] || []);
+      const enabled = current.has(permission);
+      if (permission === 'voir') {
+        if (enabled) current.clear();
+        else current.add('voir');
+      } else if (permission === 'créer') {
+        if (enabled) {
+          current.delete('créer');
+          current.delete('modifier');
+        } else {
+          current.add('voir');
+          current.add('créer');
+        }
+      } else if (enabled) {
+        current.delete('modifier');
+      } else {
+        current.add('voir');
+        current.add('créer');
+        current.add('modifier');
+      }
+      const nextPermissions = [...current];
       const modulePermissions = { ...previous.modulePermissions };
       if (nextPermissions.length === 0) delete modulePermissions[moduleId];
       else modulePermissions[moduleId] = nextPermissions;
@@ -398,7 +417,7 @@ function RoleFormModal({
       Object.entries(normalizedPermissions)
         .map(([key, permissions]) => [
           key,
-          moduleIds.has(key) ? permissions.filter(permission => permission === 'voir') : permissions,
+          moduleIds.has(key) ? [...new Set(permissions)] : permissions,
         ] as const)
         .filter(([, permissions]) => permissions.length > 0),
     );
@@ -421,7 +440,7 @@ function RoleFormModal({
       <div className="mt-4 border-t pt-4">
         <div className="mb-4">
           <h3 className="text-sm font-bold">Droits d’accès</h3>
-          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le module définit la visibilité. Les actions Créer et Modifier se configurent ensuite dans chaque sous-fonctionnalité. Les droits restent limités aux éléments choisis par l’entreprise.</p>
+          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les droits généraux du module et ceux de chaque sous-fonctionnalité sont configurables séparément. Les droits restent limités aux éléments choisis par l’entreprise.</p>
         </div>
         <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto pr-1">
           {availableModules.map(module => (
@@ -530,7 +549,7 @@ function ModulePermissionCard({
         </div>
         <div className="shrink-0">
            <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
-          <PermissionToggleGroup permissions={['voir']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
+          <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
         </div>
       </div>
       <div className="space-y-3 p-4">

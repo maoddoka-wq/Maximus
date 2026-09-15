@@ -55,7 +55,12 @@ export function restrictRoleToCompany(role: Role | null | undefined, company: Co
       return;
     }
     if (key === moduleId) {
-      if (permissions.includes('voir') && featureIds(moduleId).size > 0) boundedEntries.push([key, ['voir']]);
+      const hasPermissionLimit = Object.prototype.hasOwnProperty.call(requestedPermissions ?? {}, moduleId);
+      const allowedModulePermissions = hasPermissionLimit
+        ? new Set(Object.values(requestedPermissions?.[moduleId] ?? {}).flat())
+        : new Set(['voir']);
+      const filtered = permissions.filter(permission => allowedModulePermissions.has(permission));
+      if (filtered.length && featureIds(moduleId).size > 0) boundedEntries.push([key, filtered]);
       return;
     }
     const featureId = permissionFeatureId(moduleId, key);
