@@ -205,6 +205,62 @@ class PresenceTest extends TestCase
         ])->assertCreated();
     }
 
+    public function test_employee_can_create_absence_and_leave_only_for_self(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', [
+            'presence.absences' => ['voir', 'créer'],
+            'presence.congés' => ['voir', 'créer'],
+        ]);
+
+        foreach (['absence', 'leave'] as $type) {
+            $request->postJson('/api/presence/items', [
+                'companyId' => 'kora',
+                'type' => $type,
+                'employeeId' => 'another-employee',
+                'status' => 'EN ATTENTE',
+                'payload' => ['reason' => 'Tentative hors périmètre'],
+            ])->assertForbidden();
+
+            $request->postJson('/api/presence/items', [
+                'companyId' => 'kora',
+                'type' => $type,
+                'employeeId' => 'presence-employee',
+                'status' => 'EN ATTENTE',
+                'payload' => ['reason' => 'Demande personnelle'],
+            ])->assertCreated();
+        }
+
+        $request->postJson('/api/presence/items', [
+            'companyId' => 'kora',
+            'type' => 'leave',
+            'status' => 'EN ATTENTE',
+            'payload' => ['reason' => 'Sans employé'],
+        ])->assertForbidden();
+    }
+
+    public function test_presence_bootstrap_hides_types_without_detailed_view_permission(): void
+    {
+        PresenceItem::query()->create([
+            'id' => 'presence-absence-hidden',
+            'company_id' => 'kora',
+            'type' => 'absence',
+            'employee_id' => 'presence-employee',
+            'status' => 'EN ATTENTE',
+            'payload' => ['reason' => 'Absence privée'],
+            'created_by' => 'Admin',
+            'updated_by' => 'Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->asActor('employee', 'presence-employee', [
+            'presence.pointage' => ['voir', 'créer'],
+        ])
+            ->getJson('/api/presence/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonMissing(['id' => 'presence-absence-hidden']);
+    }
+
     public function test_presence_create_permission_is_limited_to_the_selected_feature(): void
     {
         $request = $this->asActor('employee', 'presence-employee', [
