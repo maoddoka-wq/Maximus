@@ -7,6 +7,7 @@ import {
   getEmployeeAncestry,
   getStockPermissions,
   getSelectedFeatureIds,
+  getFeaturePermissions,
   restrictRoleToCompany,
   roleHasPermission,
 } from './employee-permissions';
@@ -107,6 +108,29 @@ test('hérite des permissions détaillées du module', () => {
   const salesRole = role({ 'commerce:menu:clients': ['voir'] });
   assert.equal(roleHasPermission(salesRole, nodes[1], 'commerce', 'voir'), true);
   assert.equal(roleHasPermission(salesRole, nodes[1], 'commerce', 'créer'), false);
+});
+
+test('borne les actions à la fonctionnalité demandée', () => {
+  const salesRole = role({
+    commerce: ['voir', 'créer', 'modifier'],
+    'commerce:menu:clients': ['voir'],
+    'commerce:menu:sales': ['voir', 'créer'],
+  });
+
+  assert.deepEqual(getFeaturePermissions(salesRole, nodes[1], 'commerce', 'clients'), ['voir']);
+  assert.deepEqual(getFeaturePermissions(salesRole, nodes[1], 'commerce', 'sales'), ['voir', 'créer']);
+});
+
+test('respecte une permission détaillée explicitement vide', () => {
+  const restrictedRole = role({
+    ecommerce: ['voir', 'créer', 'modifier'],
+    'ecommerce:menu:catalogue': [],
+  });
+
+  assert.deepEqual(
+    getFeaturePermissions(restrictedRole, nodes[1], 'ecommerce', 'catalogue'),
+    [],
+  );
 });
 
 test('expose uniquement les sous-rubriques Stocks permises', () => {

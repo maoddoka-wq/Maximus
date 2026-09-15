@@ -279,6 +279,7 @@ export default function PayrollModulePage({
   canCreate,
   canModify,
   visibleFeatureIds,
+  featurePermissions,
   activeFeatureId = 'tableau-de-bord',
   onNavigate = () => {},
   preview = false,
@@ -288,6 +289,7 @@ export default function PayrollModulePage({
   canCreate: boolean;
   canModify: boolean;
   visibleFeatureIds?: string[];
+  featurePermissions?: Partial<Record<string, string[]>>;
   activeFeatureId?: string;
   onNavigate?: (path: string) => void;
   preview?: boolean;
@@ -321,12 +323,16 @@ export default function PayrollModulePage({
   const activeFeature = normalizePayrollFeatureId(activeFeatureId) ?? 'tableau-de-bord';
   const copy = featureCopy[activeFeature];
   const canSee = (featureId: PayrollFeatureId) => visibleFeatures.has(featureId);
-  const canManageBeneficiaries = canCreate && canSee('bénéficiaires');
-  const canModifyBeneficiaries = canModify && canSee('bénéficiaires');
-  const canPrepare = canCreate && canSee('préparer-une-paie');
-  const canValidate = canModify && canSee('validation');
-  const canPayout = canModify && canSee('virements');
-  const canManageBalance = canModify && canSee('solde-de-paie');
+  const canCreateFeature = (featureId: PayrollFeatureId) =>
+    Boolean(canCreate && canSee(featureId) && (!featurePermissions || featurePermissions[featureId]?.includes('créer')));
+  const canModifyFeature = (featureId: PayrollFeatureId) =>
+    Boolean(canModify && canSee(featureId) && (!featurePermissions || featurePermissions[featureId]?.includes('modifier')));
+  const canManageBeneficiaries = canCreateFeature('bénéficiaires');
+  const canModifyBeneficiaries = canModifyFeature('bénéficiaires');
+  const canPrepare = canCreateFeature('préparer-une-paie');
+  const canValidate = canModifyFeature('validation');
+  const canPayout = canModifyFeature('virements');
+  const canManageBalance = canModifyFeature('solde-de-paie');
 
   const refresh = async (silent = false) => {
     if (preview) {

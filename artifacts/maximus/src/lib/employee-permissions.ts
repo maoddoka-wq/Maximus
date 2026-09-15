@@ -137,6 +137,33 @@ export function roleHasFeaturePermission(
   return role.modulePermissions[permissionFeatureKey(moduleId, featureId)]?.includes(permission) ?? false;
 }
 
+/**
+ * Returns the complete action set for one feature. A detailed permission entry
+ * always wins over the module-level entry; the latter is only a legacy
+ * fallback for roles that predate feature permissions.
+ */
+export function getFeaturePermissions(
+  role: Role | null | undefined,
+  employeeNode: OrgNode | null | undefined,
+  moduleId: ModuleId,
+  featureId: string,
+) {
+  if (!role || !unitAllowsModule(employeeNode, moduleId)) return [];
+
+  const keys = moduleId === 'commerce'
+    ? commerceTabPermissionKeys(featureId as CommerceTabId)
+    : moduleId === 'stocks'
+      ? [`stocks:${featureId}`]
+      : moduleId === 'presences'
+        ? [`presence.${featureSlug(featureId)}`]
+        : [permissionFeatureKey(moduleId, featureId)];
+  const detailedKey = keys.find(key => Object.prototype.hasOwnProperty.call(role.modulePermissions, key));
+  if (detailedKey) {
+    return [...new Set(role.modulePermissions[detailedKey] ?? [])];
+  }
+  return [...(role.modulePermissions[moduleId] ?? [])];
+}
+
 export function employeeHasPresencePermission(
   role: Role | null | undefined,
   employeeNode: OrgNode | null | undefined,

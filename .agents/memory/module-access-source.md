@@ -32,3 +32,9 @@ Pour un employé, le plafond de fonctionnalités de l’entreprise doit être ap
 **Why:** Un employé chauffeur pouvait recevoir un rôle global Transport et une sélection d’unité large, puis voir des fonctionnalités absentes du pack entreprise.
 
 **How to apply:** Calculer le plafond depuis l’accès serveur, les packs entreprise ou la sélection persistée, puis l’intersecter avec la sélection du rôle avant de transmettre les identifiants à l’espace Transport.
+
+Les droits détaillés issus des packs doivent être persistés avec l’accès module et dans la fiche entreprise, pas uniquement dans l’état local du navigateur.
+
+**Why:** Après actualisation ou connexion d’un employé, un état local absent pouvait ramener les droits d’une fonctionnalité à `voir` et réactiver un contrôle global de création/modification.
+
+**How to apply:** Lors de l’enregistrement d’un accès module, synchroniser `featureIds`, `packIds` et `featurePermissions` vers la ligne d’accès serveur et le registre entreprise ; une entrée détaillée vide reste un refus explicite.

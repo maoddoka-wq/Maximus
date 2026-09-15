@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Support\ModuleCatalog;
 use App\Support\CompanyRegistry;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +39,11 @@ class ModuleController extends Controller
             'featureIds' => ['nullable', 'array'],
             'featureIds.*' => ['string', 'min:1'],
             'configuration' => ['nullable', 'array'],
+            'configuration.packIds' => ['nullable', 'array'],
+            'configuration.packIds.*' => ['string', 'min:1'],
+            'configuration.featurePermissions' => ['nullable', 'array'],
+            'configuration.featurePermissions.*' => ['array'],
+            'configuration.featurePermissions.*.*' => ['string', 'min:1'],
         ])->validate();
 
         $definition = collect(ModuleCatalog::definitionsWithCustom())->firstWhere('id', $moduleId);
@@ -72,6 +78,34 @@ class ModuleController extends Controller
             ['company_id' => $companyId, 'module_id' => $moduleId],
             $values,
         );
+
+        $company = Company::query()->whereKey($companyId)->first();
+        if ($company) {
+            $featureIds = array_key_exists('featureIds', $input)
+                ? array_values($input['featureIds'] ?? [])
+                : (json_decode($existing?->feature_ids ?? '[]', true) ?: []);
+            $configuration = array_key_exists('configuration', $input)
+                ? ($input['configuration'] ?? [])
+                : (json_decode($existing?->configuration ?? '{}', true) ?: []);
+            $featurePermissions = is_array($configuration['featurePermissions'] ?? null)
+                ? $configuration['featurePermissions']
+                : ($company->requested_module_permissions[$moduleId] ?? []);
+
+            $requestedFeatures = $company->requested_module_features ?? [];
+            $requestedFeatures[$moduleId] = $featureIds;
+            $requestedPacks = $company->requested_module_pack_ids ?? [];
+            if (array_key_exists('packIds', $configuration) && is_array($configuration['packIds'])) {
+                $requestedPacks[$moduleId] = array_values($configuration['packIds']);
+            }
+            $requestedPermissions = $company->requested_module_permissions ?? [];
+            $requestedPermissions[$moduleId] = $featurePermissions;
+
+            $company->update([
+                'requested_module_features' => $requestedFeatures,
+                'requested_module_pack_ids' => $requestedPacks,
+                'requested_module_permissions' => $requestedPermissions,
+            ]);
+        }
 
         return response()->json([
             'companyId' => $companyId,

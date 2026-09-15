@@ -242,6 +242,7 @@ export default function EcommerceModulePage({
   canCreate = true,
   canModify = true,
   allowedFeatureIds,
+  featurePermissions,
   singleModuleNavigation = false,
   preview = false,
 }: {
@@ -249,6 +250,7 @@ export default function EcommerceModulePage({
   canCreate?: boolean;
   canModify?: boolean;
   allowedFeatureIds?: string[];
+  featurePermissions?: Partial<Record<string, string[]>>;
   singleModuleNavigation?: boolean;
   preview?: boolean;
 }) {
@@ -350,6 +352,10 @@ export default function EcommerceModulePage({
   const store = data.store;
   const publicShopUrl = `/shop/${encodeURIComponent(store.slug || slugify(store.name) || 'boutique')}`;
   const navigate = (next: EcommerceTab) => setTab(next);
+  const permissionFeatureId = tab === 'accueil' ? 'parametres' : tab;
+  const currentFeaturePermissions = featurePermissions?.[permissionFeatureId];
+  const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
+  const currentCanModify = Boolean(canModify && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
 
   return (
     <div className="space-y-5" data-testid="ecommerce-module" aria-busy={Boolean(pendingAction)}>
@@ -396,16 +402,16 @@ export default function EcommerceModulePage({
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
-      {tab === 'accueil' && <HomePanel store={store} canModify={canModify} run={run} />}
-      {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={canCreate} canModify={canModify} run={run} />}
-      {tab === 'categories' && <CategoryManager data={data} canCreate={canCreate} canModify={canModify} run={run} />}
-      {tab === 'commandes' && <Orders data={data} canModify={canModify} run={run} />}
+      {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
+      {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
+      {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
+      {tab === 'commandes' && <Orders data={data} canModify={currentCanModify} run={run} />}
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
-       {tab === 'location' && <RentalPanel data={data} canCreate={canCreate} canModify={canModify} run={run} />}
-      {tab === 'livraisons' && <Deliveries data={data} canCreate={canCreate} canModify={canModify} run={run} />}
-      {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={canModify} run={run} pendingAction={pendingAction} />}
-      {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={canModify} run={run} />}
+       {tab === 'location' && <RentalPanel data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
+      {tab === 'livraisons' && <Deliveries data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
+      {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={currentCanModify} run={run} pendingAction={pendingAction} />}
+      {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={currentCanModify} run={run} />}
       </>}
     </div>
   );

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -175,6 +176,46 @@ class ModuleAccessTest extends TestCase
             ->assertJsonPath('module.status', 'MAINTENANCE')
             ->assertJsonPath('module.featureIds.0', 'dashboard')
             ->assertJsonPath('module.configuration.featureScope', 'explicit');
+    }
+
+    public function test_feature_permissions_are_persisted_with_company_module_access(): void
+    {
+        $maximusAdmin = AuthUser::query()->create([
+            'id' => 'feature-permission-admin',
+            'email' => 'feature-permission-admin@maximus.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'company_id' => null,
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        $this->withCredentials()->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($maximusAdmin))
+            ->patchJson('/api/modules/ecommerce/access?companyId=kora', [
+                'status' => 'ACTIF',
+                'featureIds' => ['dashboard', 'catalogue'],
+                'configuration' => [
+                    'featureScope' => 'explicit',
+                    'packIds' => ['ecommerce-gestion'],
+                    'featurePermissions' => [
+                        'dashboard' => ['voir'],
+                        'catalogue' => ['voir', 'créer'],
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('module.configuration.featurePermissions.catalogue.1', 'créer');
+
+        $company = Company::query()->findOrFail('kora');
+        $this->assertSame(
+            ['voir', 'créer'],
+            $company->requested_module_permissions['ecommerce']['catalogue'],
+        );
+        $this->assertSame(
+            ['ecommerce-gestion'],
+            $company->requested_module_pack_ids['ecommerce'],
+        );
     }
 
     public function test_feature_selection_isolated_and_blocks_location_api_for_one_company(): void

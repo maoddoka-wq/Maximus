@@ -610,6 +610,20 @@ function AppContent() {
           [moduleId]: configuredPackIds.filter((value): value is string => typeof value === 'string'),
         };
       }
+      const configuredFeaturePermissions = options.configuration?.featurePermissions;
+      if (configuredFeaturePermissions && typeof configuredFeaturePermissions === 'object' && !Array.isArray(configuredFeaturePermissions)) {
+        company.requestedModulePermissions = {
+          ...(company.requestedModulePermissions ?? {}),
+          [moduleId]: Object.fromEntries(
+            Object.entries(configuredFeaturePermissions as Record<string, unknown>)
+              .filter(([, permissions]) => Array.isArray(permissions))
+              .map(([featureId, permissions]) => [
+                featureId,
+                [...new Set((permissions as unknown[]).filter((permission): permission is string => typeof permission === 'string'))],
+              ]),
+          ),
+        };
+      }
     });
     notify(
       status === 'MAINTENANCE'
@@ -983,6 +997,10 @@ function AppContent() {
     selectedPayrollFeatureIds,
     selectedTransportFeatureIds,
     transportFeaturePermissions,
+    ecommerceFeaturePermissions,
+    payrollFeaturePermissions,
+    commerceTabPermissions,
+    moduleFeaturePermissions,
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
@@ -1183,7 +1201,11 @@ function AppContent() {
                   hasPresencePermission={hasPresencePermission}
                   presenceFeatureIds={selectedPresenceFeatureIds}
                   ecommerceFeatureIds={selectedEcommerceFeatureIds}
+                  ecommerceFeaturePermissions={ecommerceFeaturePermissions}
                   payrollFeatureIds={selectedPayrollFeatureIds}
+                  payrollFeaturePermissions={payrollFeaturePermissions}
+                  commerceTabPermissions={commerceTabPermissions}
+                  moduleFeaturePermissions={moduleFeaturePermissions}
                   transportFeatureIds={selectedTransportFeatureIds}
                   transportFeaturePermissions={transportFeaturePermissions}
                   stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
@@ -7220,13 +7242,34 @@ function CompanyModulesDetail({
           || JSON.stringify(featureSelections[module.id] ?? []) !== JSON.stringify(savedFeatureSelections[module.id] ?? [])
           || JSON.stringify(packSelections[module.id] ?? []) !== JSON.stringify(savedPackSelections[module.id] ?? []),
         )
-        .map((module) => onModuleAccess(company.id, module.id, moduleStatuses[module.id], {
-          featureIds: featureSelections[module.id] ?? [],
-          configuration: {
-            featureScope: 'explicit',
-            packIds: packSelections[module.id] ?? [],
-          },
-        }));
+        .map((module) => {
+          const featureIds = featureSelections[module.id] ?? [];
+          const selectedPacks = (module.featurePacks ?? []).filter((pack) =>
+            (packSelections[module.id] ?? []).includes(pack.id),
+          );
+          const packPermissions = selectedPacks.reduce<Record<string, string[]>>((all, pack) => {
+            Object.entries(pack.featurePermissions ?? {}).forEach(([featureId, permissions]) => {
+              all[featureId] = [...new Set([...(all[featureId] ?? []), ...(permissions ?? [])])];
+            });
+            return all;
+          }, {});
+          const featurePermissions = Object.fromEntries(
+            featureIds.map((featureId) => [
+              featureId,
+              packPermissions[featureId]
+                ?? company.requestedModulePermissions?.[module.id]?.[featureId]
+                ?? ['voir'],
+            ]),
+          );
+          return onModuleAccess(company.id, module.id, moduleStatuses[module.id], {
+            featureIds,
+            configuration: {
+              featureScope: 'explicit',
+              packIds: packSelections[module.id] ?? [],
+              featurePermissions,
+            },
+          });
+        });
       const paymentChanged = paymentEnabled !== savedPaymentEnabled;
       await Promise.all([
         ...changes,

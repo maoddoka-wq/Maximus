@@ -187,12 +187,16 @@ export function CompanyRouter({
   presenceFeatureIds,
   ecommerceFeatureIds,
   payrollFeatureIds,
+  payrollFeaturePermissions,
+  moduleFeaturePermissions,
   transportFeatureIds,
   transportFeaturePermissions,
+  ecommerceFeaturePermissions,
   hasPermission,
   hasPresencePermission,
   stockPermissions,
   commerceTabIds,
+  commerceTabPermissions,
   moduleStatuses,
   serverModuleAccess,
   singleModuleNavigation,
@@ -217,12 +221,16 @@ export function CompanyRouter({
   presenceFeatureIds?: string[];
   ecommerceFeatureIds?: string[];
   payrollFeatureIds?: string[];
+  payrollFeaturePermissions?: Partial<Record<string, string[]>>;
+  moduleFeaturePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
   transportFeatureIds?: string[];
   transportFeaturePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
+  ecommerceFeaturePermissions?: Partial<Record<string, string[]>>;
   hasPermission: (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') => boolean;
   hasPresencePermission: (permission: PresencePermission) => boolean;
   stockPermissions?: Record<string, string[]>;
   commerceTabIds?: string[];
+  commerceTabPermissions?: Partial<Record<string, string[]>>;
   moduleStatuses: Record<string, ModuleAvailability>;
   serverModuleAccess?: import('@/lib/module-api').ServerModuleAccess[] | null;
   singleModuleNavigation?: boolean;
@@ -367,6 +375,7 @@ export function CompanyRouter({
       canCreate: hasPermission('ecommerce', 'créer'),
       canModify: hasPermission('ecommerce', 'modifier'),
       allowedFeatureIds: ecommerceFeatureIds,
+      featurePermissions: ecommerceFeaturePermissions,
       singleModuleNavigation,
     });
   }
@@ -380,6 +389,7 @@ export function CompanyRouter({
       mutate,
       canCreate: hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer'),
       canModify: hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier'),
+      tabPermissions: commerceTabPermissions,
       allowedTabs: commerceTabIds,
       singleModuleNavigation,
       initialTab: routePath === '/entreprise/ventes' ? 'sales' : 'dashboard',
@@ -393,6 +403,7 @@ export function CompanyRouter({
       canCreate: hasPermission('paie', 'créer'),
       canModify: hasPermission('paie', 'modifier'),
       visibleFeatureIds: payrollFeatureIds,
+      featurePermissions: payrollFeaturePermissions,
       activeFeatureId: normalizePayrollFeatureId(query.get('feature') ?? '') ?? 'tableau-de-bord',
       onNavigate,
       singleModuleNavigation,
@@ -422,6 +433,7 @@ export function CompanyRouter({
       mutate,
       canCreate: hasPermission(operationalModule, 'créer'),
       canModify: hasPermission(operationalModule, 'modifier'),
+      featurePermissions: moduleFeaturePermissions?.[operationalModule],
     });
   }
   if (routePath === '/entreprise/rh') {

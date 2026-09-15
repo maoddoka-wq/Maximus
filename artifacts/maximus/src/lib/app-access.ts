@@ -6,6 +6,7 @@ import {
   getCommerceTabIds,
   getEmployeeAncestry,
   getSelectedFeatureIds,
+  getFeaturePermissions,
   getStockPermissions,
   restrictRoleToCompany,
   roleHasFeaturePermission,
@@ -13,6 +14,7 @@ import {
   type ModulePermission,
   type PresencePermission,
 } from './employee-permissions';
+import { commerceTabDefinitions } from './commerce-permissions';
 import { getConfiguredModules } from './store';
 import { getModuleFeatureOptions } from './module-features';
 import { buildSidebarFeatureGroups } from './sidebar-navigation';
@@ -44,6 +46,10 @@ export type AppAccessContext = {
   selectedPayrollFeatureIds?: string[];
   selectedTransportFeatureIds?: string[];
   transportFeaturePermissions?: Record<string, { canCreate: boolean; canModify: boolean }>;
+  ecommerceFeaturePermissions?: Partial<Record<string, string[]>>;
+  payrollFeaturePermissions?: Partial<Record<string, string[]>>;
+  commerceTabPermissions?: Partial<Record<string, string[]>>;
+  moduleFeaturePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
   stockPermissions?: Record<string, string[]>;
   commerceTabIds?: string[];
   sidebarFeatureGroups: SidebarFeatureGroup[];
@@ -198,6 +204,18 @@ export function buildAppAccessContext({
     return employeeHasPresencePermission(accessRole, employeeNode, permission, hasPermission);
   };
 
+  const permissionsForFeature = (
+    module: NonNullable<typeof configuredModules[number]> | undefined,
+    featureId: string,
+  ) => {
+    if (!module) return [];
+    if (companyAdmin) return ['voir', 'créer', 'modifier'];
+    if (!accessRoleMatchesScope || !accessRole) return [];
+    const ceiling = companyFeatureCeiling(module);
+    if (ceiling && !ceiling.has(featureId)) return [];
+    return getFeaturePermissions(accessRole, employeeNode, module.id, featureId);
+  };
+
   const presenceModule = configuredModules.find(module => module.id === 'presences');
   const selectedPresenceFeatureIds =
     presenceModule && companyAdmin
@@ -264,6 +282,33 @@ export function buildAppAccessContext({
     accessRole && stockModule
       ? getSelectedFeatureIds(accessRole, stockModule, employeeNode?.moduleFeatures?.[stockModule.id])
       : undefined;
+  const ecommerceFeaturePermissions = ecommerceModule
+    ? Object.fromEntries(
+      getModuleFeatureOptions(ecommerceModule).map(feature => [
+        feature.id,
+        permissionsForFeature(ecommerceModule, feature.id),
+      ]),
+    )
+    : undefined;
+  const payrollFeaturePermissions = payrollModule
+    ? Object.fromEntries(
+      getModuleFeatureOptions(payrollModule).map(feature => [
+        feature.id,
+        permissionsForFeature(payrollModule, feature.id),
+      ]),
+    )
+    : undefined;
+  const moduleFeaturePermissions = Object.fromEntries(
+    configuredModules.map(module => [
+      module.id,
+      Object.fromEntries(
+        getModuleFeatureOptions(module).map(feature => [
+          feature.id,
+          permissionsForFeature(module, feature.id),
+        ]),
+      ),
+    ]),
+  ) as Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
   const selectedCommerceFeatureIds =
     accessRole && commerceModule
       ? getSelectedFeatureIds(accessRole, commerceModule, employeeNode?.moduleFeatures?.[commerceModule.id])
@@ -292,6 +337,19 @@ export function buildAppAccessContext({
     canViewModule,
     selectedCommercialTabIds,
   );
+  const commerceTabPermissions = commerceTabDefinitions.reduce<Record<string, string[]>>((permissions, tab) => {
+    const values = new Set<string>(permissionsForFeature(commerceModule, tab.id));
+    if (tab.id === 'sales') {
+      ['devis', 'commandes'].forEach(featureId => {
+        permissionsForFeature(salesModule, featureId).forEach(permission => values.add(permission));
+      });
+    }
+    if (tab.id === 'invoices') {
+      permissionsForFeature(salesModule, 'facturation').forEach(permission => values.add(permission));
+    }
+    permissions[tab.id] = [...values];
+    return permissions;
+  }, {});
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
     (employee || sectorTestCompanyId || companyAdmin) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
@@ -320,6 +378,10 @@ export function buildAppAccessContext({
     selectedPayrollFeatureIds,
     selectedTransportFeatureIds,
     transportFeaturePermissions,
+    ecommerceFeaturePermissions,
+    payrollFeaturePermissions,
+    commerceTabPermissions,
+    moduleFeaturePermissions,
     stockPermissions,
     commerceTabIds,
     sidebarFeatureGroups,
