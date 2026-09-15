@@ -970,6 +970,14 @@ function AppContent() {
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
   const companyId = activeCompanyId ?? '';
   const currentCompany = activeCompany;
+  const currentCompanyWorkspaceFeatures = currentCompany?.employeeManagementEnabled === false
+    ? [
+        ...new Set<CompanyWorkspaceFeatureId>([
+          ...(currentCompany.hiddenWorkspaceFeatures ?? []),
+          'organisation',
+        ]),
+      ]
+    : currentCompany?.hiddenWorkspaceFeatures;
   const {
     accessRole,
     employeeNode,
@@ -1057,7 +1065,7 @@ function AppContent() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
-        hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+        hiddenWorkspaceFeatures={currentCompanyWorkspaceFeatures}
         showDirectionReports={companyAdmin || isGeneralDirection}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
@@ -1197,7 +1205,7 @@ function AppContent() {
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
                   singleModuleNavigation={verticalModuleNavigation}
-                   hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+                   hiddenWorkspaceFeatures={currentCompanyWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,
@@ -7135,6 +7143,13 @@ function CompanyModulesDetail({
   const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
   const [paymentLoading, setPaymentLoading] = useState(true);
+  const [employeeManagementEnabled, setEmployeeManagementEnabled] = useState(
+    company.employeeManagementEnabled !== false,
+  );
+  const [savedEmployeeManagementEnabled, setSavedEmployeeManagementEnabled] = useState(
+    company.employeeManagementEnabled !== false,
+  );
+  const companyEmployeeCount = data.employees.filter(employee => employee.companyId === company.id).length;
 
   useEffect(() => {
     let cancelled = false;
@@ -7194,6 +7209,12 @@ function CompanyModulesDetail({
     setHiddenWorkspaceFeatures(next);
     setSavedHiddenWorkspaceFeatures(next);
   }, [company.id, JSON.stringify(company.hiddenWorkspaceFeatures ?? [])]);
+
+  useEffect(() => {
+    const enabled = company.employeeManagementEnabled !== false;
+    setEmployeeManagementEnabled(enabled);
+    setSavedEmployeeManagementEnabled(enabled);
+  }, [company.id, company.employeeManagementEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7418,6 +7439,69 @@ function CompanyModulesDetail({
             onClick={saveWorkspaceFeatures}
           >
             Enregistrer la visibilité
+          </ActionButton>
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Gestion des employés</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Désactivez cette gestion pour une entreprise exploitée directement par son administrateur,
+              comme une boutique e-commerce sans équipe salariée.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
+            employeeManagementEnabled
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'
+          }`}>
+            {employeeManagementEnabled ? 'Avec employés' : 'Sans employés'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+          employeeManagementEnabled
+            ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'
+            : 'border-amber-300 bg-amber-50/70'
+        }`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-employee-management"
+            checked={employeeManagementEnabled}
+            disabled={saving}
+            onChange={(event) => setEmployeeManagementEnabled(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Activer la gestion des employés et de l’organisation</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              {employeeManagementEnabled
+                ? 'L’entreprise peut créer des unités, des rôles, des managers et des comptes employés.'
+                : 'Le menu Organisation est masqué dans l’espace entreprise. Les données existantes ne sont pas supprimées.'}
+            </span>
+            {companyEmployeeCount > 0 && !employeeManagementEnabled && (
+              <span className="mt-2 block text-xs font-semibold text-amber-700">
+                Cette entreprise possède actuellement {companyEmployeeCount} compte(s) employé(s). Ils restent conservés.
+              </span>
+            )}
+          </span>
+        </label>
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-employee-management"
+            disabled={employeeManagementEnabled === savedEmployeeManagementEnabled}
+            onClick={() => {
+              mutate((draft) => {
+                const target = draft.companies.find(item => item.id === company.id);
+                if (target) target.employeeManagementEnabled = employeeManagementEnabled;
+              }, employeeManagementEnabled
+                ? 'La gestion des employés est activée.'
+                : 'L’entreprise est configurée sans gestion des employés.');
+              setSavedEmployeeManagementEnabled(employeeManagementEnabled);
+            }}
+          >
+            Enregistrer le réglage
           </ActionButton>
         </div>
       </section>

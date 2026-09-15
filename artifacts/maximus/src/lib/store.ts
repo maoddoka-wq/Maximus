@@ -46,6 +46,8 @@ export interface Company {
   allowedModules: ModuleId[];
   refusedModules: ModuleId[];
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
+  /** When false, the workspace is operated directly by the company admin. */
+  employeeManagementEnabled?: boolean;
   createdAt: string;
   profilePhoto?: string;
   primaryColor?: string;
@@ -507,6 +509,9 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
           .filter((featureId): featureId is CompanyWorkspaceFeatureId =>
             ['controle', 'organisation', 'guide-configuration'].includes(featureId),
           );
+      }
+      if (raw.employeeManagementEnabled !== undefined) {
+        normalizedCompany.employeeManagementEnabled = raw.employeeManagementEnabled === true;
       }
       if (raw.requestedModulePackIds !== undefined) {
         normalizedCompany.requestedModulePackIds = normalizeStringArrayMap(raw.requestedModulePackIds) as Partial<Record<ModuleId, string[]>>;
