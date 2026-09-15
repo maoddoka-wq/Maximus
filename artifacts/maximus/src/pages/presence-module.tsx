@@ -111,7 +111,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     ? presenceFeatureDefinitions.filter(feature => visibleFeatureIds.includes(featureSlug(feature.label)))
     : presenceFeatureDefinitions;
   const tabs: [Tab, string, LucideIcon][] = visibleFeatures.map(feature => [feature.tab, feature.label, presenceTabIcons[feature.tab] ?? CalendarDays]);
-  const hasFeaturePermission = (label: string, permission: 'view' | 'create' | 'edit', fallback: boolean) => {
+  const hasFeaturePermission = (label: string, permission: Permission, fallback: boolean) => {
     const values = featurePermissions?.[featureSlug(label)];
     if (!values) return fallback;
     const required = permission === 'view' ? 'voir' : permission === 'create' ? 'créer' : 'modifier';
@@ -119,6 +119,9 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   };
   const canCreateFeature = (label: string) => hasFeaturePermission(label, 'create', canCreate);
   const canEditFeature = (label: string) => hasFeaturePermission(label, 'edit', canEdit);
+  const canValidateFeature = (label: string) => hasFeaturePermission(label, 'validate', canValidate);
+  const canDeleteFeature = (label: string) => hasFeaturePermission(label, 'delete', canDelete);
+  const canExportFeature = (label: string) => hasFeaturePermission(label, 'export', canExport);
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(([id]) => id),
     defaultTab: tabs[0]?.[0] ?? 'dashboard',
@@ -186,7 +189,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     const allowed = item.type === 'attendance'
       ? canCorrect
       : isValidation
-        ? canValidate
+        ? canValidateFeature(featureForType[item.type]!)
         : item.type === 'settings'
           ? canManage
           : Boolean(featureForType[item.type] && canEditFeature(featureForType[item.type]!));
@@ -196,21 +199,30 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     }
     try { await api.update(item.id, { payload, status, actor }); setSelected(null); showAppToast('Modification enregistrée.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Modification impossible.', 'error'); }
   };
-  const remove = async (item: PresenceItem) => { if (!canDelete || !await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return; try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); } };
+  const remove = async (item: PresenceItem) => {
+    const feature = featureForType[item.type];
+    const allowed = item.type === 'settings' ? canManage : Boolean(feature && canDeleteFeature(feature));
+    if (!allowed) {
+      showAppToast('Votre rôle ne possède pas le droit de supprimer dans cette fonctionnalité.', 'error');
+      return;
+    }
+    if (!await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return;
+    try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); }
+  };
   const scanClock = async (token: string, action: 'arrival' | 'exit') => { try { await api.clockScan({ token, action }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée après scan.' : 'Sortie enregistrée après scan.', 'success'); await refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Scan de pointage impossible.', 'error'); throw cause; } };
-  const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExport) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
+  const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExportFeature('Rapports')) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
   const kpis = { active: employees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
   const render = () => {
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
-     if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(employees.map(employee => meta(employee).unit))]} canExport={canExport} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
+     if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(employees.map(employee => meta(employee).unit))]} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
      if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canCreate={canCreateFeature('Pointage')} canGenerateQr={canGenerateQr && canCreateFeature('Pointage')} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
-     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} canExport={canExport} onExport={() => exportRows(rows, `presences-${date}.csv`)} canCorrect={canCorrect} onSelect={setSelected} />;
-     if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreateFeature('Absences')} canValidate={canValidate} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
-     if (tab === 'schedules') return <SchedulesPanel items={items} employees={employees} canCreate={canCreateFeature('Horaires')} canEdit={canEditFeature('Horaires')} canDelete={canDelete} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
-     if (tab === 'leave') return <LeavePanel items={items} employees={employees} date={date} canCreate={canCreateFeature('Congés')} canValidate={canValidate} onCreate={create} onUpdate={update} />;
+     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} canCorrect={canCorrect} onSelect={setSelected} />;
+     if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreateFeature('Absences')} canValidate={canValidateFeature('Absences')} onCreate={create} onUpdate={update} onRemove={remove} />;
+     if (tab === 'schedules') return <SchedulesPanel items={items} employees={employees} canCreate={canCreateFeature('Horaires')} canEdit={canEditFeature('Horaires')} canDelete={canDeleteFeature('Horaires')} onCreate={create} onUpdate={update} onRemove={remove} />;
+     if (tab === 'leave') return <LeavePanel items={items} employees={employees} date={date} canCreate={canCreateFeature('Congés')} canValidate={canValidateFeature('Congés')} onCreate={create} onUpdate={update} />;
     if (tab === 'history') return <HistoryPanel items={items} employees={employeeById} />;
-    if (tab === 'reports') return <ReportsPanel rows={rows} items={items} canExport={canExport} onExport={() => exportRows(rows, `rapport-presences-${date}.csv`)} />;
+     if (tab === 'reports') return <ReportsPanel rows={rows} items={items} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `rapport-presences-${date}.csv`)} />;
     return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManage} onCreate={create} onUpdate={update} />;
   };
   return <div className="space-y-5">
