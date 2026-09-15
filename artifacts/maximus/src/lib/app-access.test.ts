@@ -95,7 +95,8 @@ test('sépare les responsabilités transverses des permissions métier', () => {
   assert.equal(access.technicalAdmin, true);
   assert.equal(access.canManagePeople, true);
   assert.equal(access.canManageAccess, true);
-  assert.equal(access.canViewReports, false);
+  assert.equal(access.canViewReports, true);
+  assert.equal(access.canHandleApprovals, true);
   assert.equal(access.allowed.length, 1);
 
   role.responsibility = 'general_management';

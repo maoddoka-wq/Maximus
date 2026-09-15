@@ -1003,6 +1003,7 @@ function AppContent() {
     serverModuleAccessReady:
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
+  const workspaceAdmin = companyAdmin || technicalAdmin;
   const adminAssistantScope = buildAdminAssistantScope(data, 'Administration principale');
   const baseMeta =
     pageMeta[normalizeRoutePath(location)] ??
@@ -1177,7 +1178,7 @@ function AppContent() {
                   onBack={goBack}
                   allowed={allowed}
                   canManagePeople={canManagePeople}
-                  companyAdmin={companyAdmin}
+                  companyAdmin={workspaceAdmin}
                   sectorManager={sectorManager}
                   technicalAdmin={technicalAdmin}
                   generalManagement={generalManagement}
