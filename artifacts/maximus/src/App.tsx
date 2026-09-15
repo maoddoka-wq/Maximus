@@ -7065,6 +7065,41 @@ function AdminCreateCompanyPage({
   );
 }
 
+const permissionActions = [
+  { id: 'voir', label: 'Voir' },
+  { id: 'créer', label: 'Créer' },
+  { id: 'modifier', label: 'Modifier' },
+] as const;
+
+function normalizeFeaturePermissionMap(value: unknown): FeaturePermissionMap {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, permissions]) => Array.isArray(permissions))
+      .map(([featureId, permissions]) => [
+        featureId,
+        [...new Set((permissions as unknown[]).filter((permission): permission is string => typeof permission === 'string'))],
+      ]),
+  );
+}
+
+function selectedFeaturePermissions(
+  featureIds: string[],
+  preferred: FeaturePermissionMap,
+  fallback: FeaturePermissionMap = {},
+): FeaturePermissionMap {
+  return Object.fromEntries(
+    featureIds.map((featureId) => [
+      featureId,
+      preferred[featureId] !== undefined
+        ? [...preferred[featureId]!]
+        : fallback[featureId] !== undefined
+          ? [...fallback[featureId]!]
+          : ['voir'],
+    ]),
+  );
+}
+
 function CompanyModulesDetail({
   company,
   data,
@@ -7091,6 +7126,8 @@ function CompanyModulesDetail({
   const [savedStatuses, setSavedStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
   const [featureSelections, setFeatureSelections] = useState<Record<ModuleId, string[]>>({});
   const [savedFeatureSelections, setSavedFeatureSelections] = useState<Record<ModuleId, string[]>>({});
+  const [featurePermissions, setFeaturePermissions] = useState<Record<ModuleId, FeaturePermissionMap>>({});
+  const [savedFeaturePermissions, setSavedFeaturePermissions] = useState<Record<ModuleId, FeaturePermissionMap>>({});
   const [packSelections, setPackSelections] = useState<Record<ModuleId, string[]>>({});
   const [savedPackSelections, setSavedPackSelections] = useState<Record<ModuleId, string[]>>({});
   const [hiddenWorkspaceFeatures, setHiddenWorkspaceFeatures] = useState<CompanyWorkspaceFeatureId[]>(
@@ -7135,6 +7172,34 @@ function CompanyModulesDetail({
             return [module.id, [...new Set(featureIds)]];
           }),
         ) as Record<ModuleId, string[]>;
+        const nextPermissions = Object.fromEntries(
+          modules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const serverConfiguration = serverModule?.configuration;
+            const hasServerPermissions = Boolean(
+              serverConfiguration
+              && Object.prototype.hasOwnProperty.call(serverConfiguration, 'featurePermissions'),
+            );
+            const serverPermissions = normalizeFeaturePermissionMap(serverConfiguration?.featurePermissions);
+            const companyPermissions = normalizeFeaturePermissionMap(company.requestedModulePermissions?.[module.id]);
+            const selectedPackIds = company.requestedModulePackIds?.[module.id] ?? [];
+            const packPermissions = (module.featurePacks ?? [])
+              .filter((pack) => selectedPackIds.includes(pack.id))
+              .reduce<FeaturePermissionMap>(
+                (all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }),
+                {},
+              );
+            const preferred = hasServerPermissions
+              ? serverPermissions
+              : Object.keys(companyPermissions).length > 0
+                ? companyPermissions
+                : packPermissions;
+            return [
+              module.id,
+              selectedFeaturePermissions(nextFeatures[module.id] ?? [], preferred),
+            ];
+          }),
+        ) as Record<ModuleId, FeaturePermissionMap>;
         const nextPacks = Object.fromEntries(
           modules.map((module) => [
             module.id,
@@ -7143,6 +7208,8 @@ function CompanyModulesDetail({
         ) as Record<ModuleId, string[]>;
         setFeatureSelections(nextFeatures);
         setSavedFeatureSelections(nextFeatures);
+        setFeaturePermissions(nextPermissions);
+        setSavedFeaturePermissions(nextPermissions);
         setPackSelections(nextPacks);
         setSavedPackSelections(nextPacks);
       })
@@ -7157,6 +7224,7 @@ function CompanyModulesDetail({
     company.allowedModules.join('|'),
     JSON.stringify(company.requestedModuleFeatures ?? {}),
     JSON.stringify(company.requestedModulePackIds ?? {}),
+    JSON.stringify(company.requestedModulePermissions ?? {}),
   ]);
 
   useEffect(() => {
@@ -7198,6 +7266,13 @@ function CompanyModulesDetail({
       const selected = new Set(previous[moduleId] ?? []);
       if (selected.has(featureId)) selected.delete(featureId);
       else selected.add(featureId);
+      setFeaturePermissions((permissions) => ({
+        ...permissions,
+        [moduleId]: selectedFeaturePermissions(
+          [...selected],
+          permissions[moduleId] ?? {},
+        ),
+      }));
       return { ...previous, [moduleId]: [...selected] };
     });
   };
@@ -7211,10 +7286,62 @@ function CompanyModulesDetail({
             .flatMap((pack) => pack.featureIds),
         )]
       : [];
+    const selectedPacks = (module?.featurePacks ?? []).filter((pack) => packIds.includes(pack.id));
+    const packPermissions = selectedPacks.reduce<FeaturePermissionMap>(
+      (all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }),
+      {},
+    );
     setPackSelections((previous) => ({ ...previous, [moduleId]: packIds }));
     if (packIds.length > 0) {
       setFeatureSelections((previous) => ({ ...previous, [moduleId]: featureIds }));
     }
+    setFeaturePermissions((previous) => ({
+      ...previous,
+      [moduleId]: selectedFeaturePermissions(
+        featureIds,
+        packPermissions,
+        previous[moduleId] ?? {},
+      ),
+    }));
+  };
+
+  const setFeaturePermission = (
+    moduleId: ModuleId,
+    featureId: string,
+    permission: (typeof permissionActions)[number]['id'],
+    enabled: boolean,
+  ) => {
+    setFeaturePermissions((previous) => {
+      const nextPermissions = { ...(previous[moduleId] ?? {}) };
+      const current = new Set(nextPermissions[featureId] ?? []);
+      if (permission === 'voir') {
+        if (enabled) current.add('voir');
+        else current.clear();
+      } else if (permission === 'créer') {
+        if (enabled) {
+          current.add('voir');
+          current.add('créer');
+        } else {
+          current.delete('créer');
+          current.delete('modifier');
+        }
+      } else if (enabled) {
+        current.add('voir');
+        current.add('créer');
+        current.add('modifier');
+      } else {
+        current.delete('modifier');
+      }
+      if (current.size > 0) nextPermissions[featureId] = [...current];
+      else delete nextPermissions[featureId];
+      return { ...previous, [moduleId]: nextPermissions };
+    });
+    setFeatureSelections((previous) => {
+      const selected = new Set(previous[moduleId] ?? []);
+      if (permission === 'voir' && enabled) selected.add(featureId);
+      if (permission === 'voir' && !enabled) selected.delete(featureId);
+      return { ...previous, [moduleId]: [...selected] };
+    });
   };
 
   const toggleWorkspaceFeature = (featureId: CompanyWorkspaceFeatureId) => {
@@ -7240,33 +7367,21 @@ function CompanyModulesDetail({
         .filter((module) =>
           moduleStatuses[module.id] !== savedStatuses[module.id]
           || JSON.stringify(featureSelections[module.id] ?? []) !== JSON.stringify(savedFeatureSelections[module.id] ?? [])
-          || JSON.stringify(packSelections[module.id] ?? []) !== JSON.stringify(savedPackSelections[module.id] ?? []),
+          || JSON.stringify(packSelections[module.id] ?? []) !== JSON.stringify(savedPackSelections[module.id] ?? [])
+          || JSON.stringify(featurePermissions[module.id] ?? {}) !== JSON.stringify(savedFeaturePermissions[module.id] ?? {}),
         )
         .map((module) => {
           const featureIds = featureSelections[module.id] ?? [];
-          const selectedPacks = (module.featurePacks ?? []).filter((pack) =>
-            (packSelections[module.id] ?? []).includes(pack.id),
-          );
-          const packPermissions = selectedPacks.reduce<Record<string, string[]>>((all, pack) => {
-            Object.entries(pack.featurePermissions ?? {}).forEach(([featureId, permissions]) => {
-              all[featureId] = [...new Set([...(all[featureId] ?? []), ...(permissions ?? [])])];
-            });
-            return all;
-          }, {});
-          const featurePermissions = Object.fromEntries(
-            featureIds.map((featureId) => [
-              featureId,
-              packPermissions[featureId]
-                ?? company.requestedModulePermissions?.[module.id]?.[featureId]
-                ?? ['voir'],
-            ]),
+          const configuredPermissions = selectedFeaturePermissions(
+            featureIds,
+            featurePermissions[module.id] ?? {},
           );
           return onModuleAccess(company.id, module.id, moduleStatuses[module.id], {
             featureIds,
             configuration: {
               featureScope: 'explicit',
               packIds: packSelections[module.id] ?? [],
-              featurePermissions,
+              featurePermissions: configuredPermissions,
             },
           });
         });
@@ -7279,11 +7394,13 @@ function CompanyModulesDetail({
       ]);
       setSavedStatuses(moduleStatuses);
       setSavedFeatureSelections(featureSelections);
+      setSavedFeaturePermissions(featurePermissions);
       setSavedPackSelections(packSelections);
       setSavedPaymentEnabled(paymentEnabled);
     } catch (error) {
        setModuleStatuses(savedStatuses);
        setFeatureSelections(savedFeatureSelections);
+        setFeaturePermissions(savedFeaturePermissions);
        setPackSelections(savedPackSelections);
        setPaymentEnabled(savedPaymentEnabled);
       window.alert(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.');
@@ -7532,20 +7649,48 @@ function CompanyModulesDetail({
                        </div>
                      )}
                      <div>
-                        <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Fonctionnalités autorisées</p>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Fonctionnalités et droits</p>
+                          <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Voir · Créer · Modifier</span>
+                        </div>
                         {module.id === 'ecommerce' && <p className="mb-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour autoriser les produits, cochez <strong>Vente de produits physiques</strong>, <strong>Vente de produits numériques</strong>, ou les deux.</p>}
-                       <div className="grid gap-2 sm:grid-cols-2">
-                         {getModuleFeatureOptions(module).map((feature) => (
-                           <label key={feature.id} className="flex items-center gap-2 text-xs">
-                             <input
-                               type="checkbox"
-                               checked={(featureSelections[module.id] ?? []).includes(feature.id)}
-                               onChange={() => toggleFeature(module.id, feature.id)}
-                               className="rounded"
-                             />
-                             <span>{feature.label}</span>
-                           </label>
-                         ))}
+                        <div className="space-y-2">
+                          {getModuleFeatureOptions(module).map((feature) => {
+                            const selected = (featureSelections[module.id] ?? []).includes(feature.id);
+                            const permissions = featurePermissions[module.id]?.[feature.id] ?? [];
+                            return (
+                              <div key={feature.id} className={`rounded-lg border p-3 ${selected ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card)/.65)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] opacity-75'}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <label className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+                                    <input
+                                      type="checkbox"
+                                      data-testid={`checkbox-company-feature-${module.id}-${feature.id}`}
+                                      checked={selected}
+                                      onChange={() => toggleFeature(module.id, feature.id)}
+                                      className="rounded"
+                                    />
+                                    <span>{feature.label}</span>
+                                  </label>
+                                  <div className="flex flex-wrap gap-3">
+                                    {permissionActions.map((action) => (
+                                      <label key={action.id} className="flex items-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
+                                        <input
+                                          type="checkbox"
+                                          data-testid={`checkbox-company-permission-${module.id}-${feature.id}-${action.id}`}
+                                          checked={permissions.includes(action.id)}
+                                          disabled={action.id !== 'voir' && !permissions.includes('voir')}
+                                          onChange={(event) => setFeaturePermission(module.id, feature.id, action.id, event.target.checked)}
+                                          className="rounded"
+                                        />
+                                        {action.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
+                              </div>
+                            );
+                          })}
                        </div>
                      </div>
                    </div>
