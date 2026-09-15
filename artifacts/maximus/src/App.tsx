@@ -7508,10 +7508,10 @@ function CompanyModulesDetail({
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="font-bold">Gestion des employés</h2>
+            <h2 className="font-bold">Mode de fonctionnement de l’entreprise</h2>
             <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
-              Désactivez cette gestion pour une entreprise exploitée directement par son administrateur,
-              comme une boutique e-commerce sans équipe salariée.
+              Choisissez si cette entreprise est gérée directement par son administrateur ou avec une
+              organisation et une Direction technique.
             </p>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
@@ -7519,36 +7519,58 @@ function CompanyModulesDetail({
               ? 'bg-emerald-100 text-emerald-700'
               : 'bg-amber-100 text-amber-700'
           }`}>
-            {employeeManagementEnabled ? 'Avec employés' : 'Sans employés'}
+            {employeeManagementEnabled ? 'Avec équipe' : 'Mode seul'}
           </span>
         </div>
-        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-          employeeManagementEnabled
-            ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'
-            : 'border-amber-300 bg-amber-50/70'
-        }`}>
-          <input
-            type="checkbox"
-            data-testid="checkbox-company-employee-management"
-            checked={employeeManagementEnabled}
-            disabled={saving}
-            onChange={(event) => setEmployeeManagementEnabled(event.target.checked)}
-            className="mt-1"
-          />
-          <span>
-            <strong className="block text-sm">Activer la gestion des employés et de l’organisation</strong>
-            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              {employeeManagementEnabled
-                ? 'L’entreprise peut créer des unités, des rôles, des managers et des comptes employés.'
-                : 'Le menu Organisation est masqué dans l’espace entreprise. Les données existantes ne sont pas supprimées.'}
-            </span>
-            {companyEmployeeCount > 0 && !employeeManagementEnabled && (
-              <span className="mt-2 block text-xs font-semibold text-amber-700">
-                Cette entreprise possède actuellement {companyEmployeeCount} compte(s) employé(s). Ils restent conservés.
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+            !employeeManagementEnabled
+              ? 'border-amber-300 bg-amber-50/70'
+              : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/.35)]'
+          }`}>
+            <input
+              type="radio"
+              name={`company-operating-mode-${company.id}`}
+              data-testid="radio-company-mode-solo"
+              checked={!employeeManagementEnabled}
+              disabled={saving}
+              onChange={() => setEmployeeManagementEnabled(false)}
+              className="mt-1"
+            />
+            <span>
+              <strong className="block text-sm">Mode seul</strong>
+              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                L’administrateur travaille directement dans les modules activés, comme une boutique e-commerce sans équipe.
               </span>
-            )}
-          </span>
-        </label>
+              {companyEmployeeCount > 0 && !employeeManagementEnabled && (
+                <span className="mt-2 block text-xs font-semibold text-amber-700">
+                  Les {companyEmployeeCount} compte(s) employé(s) existants restent conservés.
+                </span>
+              )}
+            </span>
+          </label>
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+            employeeManagementEnabled
+              ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'
+              : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/.35)]'
+          }`}>
+            <input
+              type="radio"
+              name={`company-operating-mode-${company.id}`}
+              data-testid="radio-company-mode-team"
+              checked={employeeManagementEnabled}
+              disabled={saving}
+              onChange={() => setEmployeeManagementEnabled(true)}
+              className="mt-1"
+            />
+            <span>
+              <strong className="block text-sm">Mode avec équipe</strong>
+              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                L’entreprise peut créer ses unités, faire fonctionner ses modules depuis la Direction technique et créer le compte nominatif de la Direction générale.
+              </span>
+            </span>
+          </label>
+        </div>
         <div className="mt-5 flex justify-end">
           <ActionButton
             primary
