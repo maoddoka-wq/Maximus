@@ -13,8 +13,9 @@ export function getAdminControlRoute(location: string): AdminControlRoute {
 export function getCompanyControlScope(input: {
   companyAdmin: boolean;
   sectorManager: boolean;
+  generalManagement?: boolean;
 }): CompanyControlScope {
-  if (input.companyAdmin) return 'company';
+  if (input.companyAdmin || input.generalManagement) return 'company';
   if (input.sectorManager) return 'sector';
   return 'assigned';
 }

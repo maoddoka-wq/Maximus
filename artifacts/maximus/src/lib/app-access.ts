@@ -2,6 +2,9 @@ import type { Company, Employee, ModuleAvailability, ModuleId, OrgNode, Role, St
 import type { Session, SidebarFeatureGroup } from './navigation';
 import {
   employeeHasPresencePermission,
+  canHandleCompanyApprovals,
+  canManageTechnicalAdministration,
+  canViewCompanyReports,
   employeeRoleMatchesUnit,
   getCommerceTabIds,
   getEmployeeAncestry,
@@ -10,6 +13,7 @@ import {
   restrictRoleToCompany,
   roleHasFeaturePermission,
   roleHasPermission,
+  roleHasResponsibility,
   type ModulePermission,
   type PresencePermission,
 } from './employee-permissions';
@@ -50,6 +54,11 @@ export type AppAccessContext = {
   verticalModuleNavigation: boolean;
   sectorManager: boolean;
   canManagePeople: boolean;
+  technicalAdmin: boolean;
+  generalManagement: boolean;
+  canManageAccess: boolean;
+  canViewReports: boolean;
+  canHandleApprovals: boolean;
 };
 
 export function buildAppAccessContext({
@@ -242,7 +251,17 @@ export function buildAppAccessContext({
       ]),
     )
     : undefined;
-  const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
+  const sectorManager = Boolean(
+    employeeNode
+    && accessRole
+    && accessRoleMatchesScope
+    && roleHasResponsibility(accessRole, 'unit_manager'),
+  );
+  const technicalAdmin = canManageTechnicalAdministration(accessRole, companyAdmin, accessRoleMatchesScope);
+  const generalManagement = canViewCompanyReports(accessRole, companyAdmin, accessRoleMatchesScope);
+  const canManageAccess = technicalAdmin;
+  const canViewReports = generalManagement;
+  const canHandleApprovals = canHandleCompanyApprovals(accessRole, companyAdmin, accessRoleMatchesScope);
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
     .filter(item => {
@@ -329,6 +348,11 @@ export function buildAppAccessContext({
       && sidebarFeatureGroups.length,
     ),
     sectorManager,
-    canManagePeople: session.startsWith('company:') || sectorManager,
+    canManagePeople: session.startsWith('company:') || technicalAdmin || sectorManager,
+    technicalAdmin,
+    generalManagement,
+    canManageAccess,
+    canViewReports,
+    canHandleApprovals,
   };
 }

@@ -17,6 +17,7 @@ export function CompanyOrganizationAdmin({
   initialTab = 'structure',
   standalone = false,
   sectorManager = false,
+  technicalAdmin = false,
   scopeNodeId,
 }: {
   company: Company;
@@ -25,6 +26,7 @@ export function CompanyOrganizationAdmin({
   initialTab?: OrganizationTab;
   standalone?: boolean;
   sectorManager?: boolean;
+  technicalAdmin?: boolean;
   scopeNodeId?: string;
 }) {
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
@@ -76,7 +78,7 @@ export function CompanyOrganizationAdmin({
     { id: 'profile', label: 'Mon profil' },
   ] as { id: OrganizationTab; label: string }[]).filter(
     item =>
-      !sectorManager ||
+      (!sectorManager && (!technicalAdmin || item.id !== 'profile')) ||
       item.id === 'roles' ||
       item.id === 'employees',
   );
@@ -87,11 +89,15 @@ export function CompanyOrganizationAdmin({
         <h1 className="text-xl font-bold">
           {sectorManager
             ? 'Règles d’accès de mon unité'
+            : technicalAdmin
+              ? `Administration technique & accès : ${company.name}`
             : `Modèle d'Accès & Organisation : ${company.name}`}
         </h1>
         <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
           {sectorManager
             ? 'Gérez les rôles, sous-autorisations et comptes de votre unité et de ses descendants.'
+            : technicalAdmin
+              ? 'Gérez les comptes, les rôles, les accès aux modules et la configuration technique de cette entreprise.'
             : 'Construisez la hiérarchie, configurez les rôles et sous-autorisations, puis affectez les comptes et managers.'}
         </p>
         <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -110,7 +116,7 @@ export function CompanyOrganizationAdmin({
       {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
-      {tab === 'profile' && !sectorManager && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}
+      {tab === 'profile' && !sectorManager && !technicalAdmin && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}
     </div>
   );
 }

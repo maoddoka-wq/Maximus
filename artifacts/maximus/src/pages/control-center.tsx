@@ -60,6 +60,7 @@ export function ControlCenterPage({
   isAdmin,
   companyAdmin,
   sectorManager,
+  generalManagement,
   employeeId,
   scopeNodeId,
   actorName,
@@ -71,6 +72,7 @@ export function ControlCenterPage({
   isAdmin: boolean;
   companyAdmin?: boolean;
   sectorManager?: boolean;
+  generalManagement?: boolean;
   employeeId?: string;
   scopeNodeId?: string;
   actorName?: string;
@@ -91,6 +93,7 @@ export function ControlCenterPage({
   const companyControlScope = getCompanyControlScope({
     companyAdmin: Boolean(companyAdmin),
     sectorManager: Boolean(sectorManager),
+    generalManagement: Boolean(generalManagement),
   });
   const controlScope = isAdmin
     ? 'admin'
@@ -125,9 +128,9 @@ export function ControlCenterPage({
   const accessibleTasks = useMemo(() => controlTasks.filter(task => {
     if (isAdmin) return true;
     if (task.companyId !== companyId || !isWithinSectorScope(task.sectorId)) return false;
-    if (companyAdmin) return true;
+     if (companyAdmin || generalManagement) return true;
     return sectorManager ? Boolean(task.sectorId) : task.assigneeEmployeeId === employeeId;
-  }), [companyAdmin, companyId, controlTasks, employeeId, isAdmin, scopeNodeId, sectorManager, data.orgNodes]);
+  }), [companyAdmin, companyId, controlTasks, employeeId, generalManagement, isAdmin, scopeNodeId, sectorManager, data.orgNodes]);
 
   const visibleTaskIds = new Set(accessibleTasks.map(task => task.id));
   const controlEvents = useMemo(
@@ -152,14 +155,14 @@ export function ControlCenterPage({
   const targetCompany = data.companies.find(company => company.id === targetCompanyId);
   const assignableEmployees = data.employees.filter(employee => {
     if (employee.status !== 'ACTIF' || employee.companyId !== targetCompanyId) return false;
-    if (isAdmin || companyAdmin) return true;
+     if (isAdmin || companyAdmin || generalManagement) return true;
     return isDescendantOrSelf(data.orgNodes, employee.sectorId, scopeNodeId, companyId ?? '');
   });
   const sectorOptions = data.orgNodes.filter(node =>
     node.companyId === targetCompanyId
     && (!sectorManager || isDescendantOrSelf(data.orgNodes, node.id, scopeNodeId, companyId ?? '')),
   );
-  const canCreate = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
+  const canCreate = isAdmin || Boolean(companyAdmin) || Boolean(generalManagement) || Boolean(sectorManager);
 
   const updateTask = async (taskId: string, status: ControlTaskStatus) => {
     const task = accessibleTasks.find(candidate => candidate.id === taskId);

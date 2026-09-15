@@ -304,7 +304,7 @@ class AppStateController extends Controller
 
             $incomingState = $this->stripCredentials($data['data']);
             if (($actor['role'] ?? null) !== 'maximus_admin') {
-                if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager'], true)) {
+                if (!in_array($actor['role'] ?? null, ['company_admin', 'it_admin', 'sector_manager'], true)) {
                     return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
                 }
 

@@ -74,7 +74,7 @@ class AuthController extends Controller
             'employeeId' => ['required', 'string', 'min:1'],
             'sectorIds' => ['required', 'array', 'min:1'],
             'sectorIds.*' => ['string', 'min:1'],
-            'role' => ['required', 'in:sector_manager,employee'],
+            'role' => ['required', 'in:it_admin,general_management,sector_manager,employee'],
             'password' => ['nullable', 'string', 'min:8', 'max:200'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['array'],

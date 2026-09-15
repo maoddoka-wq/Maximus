@@ -72,7 +72,7 @@ class ControlController extends Controller
         $events = $eventsQuery->get();
         $auditEntries = $auditQuery->get();
 
-        if (! in_array($actor['role'], ['maximus_admin', 'company_admin'], true)) {
+        if (! in_array($actor['role'], ['maximus_admin', 'company_admin', 'general_management', 'it_admin'], true)) {
             $events = $events->filter(fn (ControlEvent $event) => $event->entity_id && in_array($event->entity_id, $taskIds, true))->values();
             $auditEntries = $auditEntries->filter(fn (ControlAuditEntry $audit) => $audit->entity_id && in_array($audit->entity_id, $taskIds, true))->values();
         }

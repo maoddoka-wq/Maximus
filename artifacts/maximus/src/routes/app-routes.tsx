@@ -179,6 +179,10 @@ export function CompanyRouter({
   canManagePeople,
   companyAdmin,
   sectorManager,
+  technicalAdmin,
+  generalManagement,
+  canViewReports,
+  canHandleApprovals,
   scopeNodeId,
   companyId,
   employee,
@@ -209,6 +213,10 @@ export function CompanyRouter({
   canManagePeople: boolean;
   companyAdmin: boolean;
   sectorManager: boolean;
+  technicalAdmin: boolean;
+  generalManagement: boolean;
+  canViewReports: boolean;
+  canHandleApprovals: boolean;
   scopeNodeId?: string;
   companyId: string;
   employee: StoreData['employees'][number] | null;
@@ -244,7 +252,7 @@ export function CompanyRouter({
       action: () => onBack('/entreprise/dashboard'),
     });
   }
-  if (requiredModule && !allowed.includes(requiredModule)) {
+  if (requiredModule && !allowed.includes(requiredModule) && !(requiredModule === 'rapports' && canViewReports)) {
     return renderScreen(screens.empty, {
       title: 'Accès non autorisé',
       text: 'Votre rôle ne possède pas la permission Consulter pour ce module.',
@@ -270,6 +278,8 @@ export function CompanyRouter({
       isAdmin: false,
       companyAdmin,
       sectorManager,
+        generalManagement,
+        canHandleApprovals,
       mutate,
       notify,
       actorName: employee ? `${employee.firstName} ${employee.lastName}` : data.companies.find(item => item.id === companyId)?.manager,
@@ -333,13 +343,14 @@ export function CompanyRouter({
           || (routePath === '/entreprise/organisation' && query.get('tab') === 'employees')
             ? 'employees'
             : 'structure';
-    return company && (companyAdmin || sectorManager) ? (
+    return company && (companyAdmin || technicalAdmin || sectorManager) ? (
       renderScreen(screens.organization, {
         company,
         data,
         mutate,
         initialTab,
         sectorManager: sectorManager && !companyAdmin,
+        technicalAdmin: technicalAdmin && !companyAdmin,
         scopeNodeId: sectorManager && !companyAdmin ? scopeNodeId : undefined,
       })
     ) : (
@@ -448,7 +459,13 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/rapports') {
-    return renderScreen(screens.reports, { data });
+    return canViewReports
+      ? renderScreen(screens.reports, { data, companyId })
+      : renderScreen(screens.empty, {
+          title: 'Accès réservé',
+          text: 'Les rapports globaux sont accessibles à la Direction générale et à l’administrateur de l’entreprise.',
+          action: () => onBack('/entreprise/dashboard'),
+        });
   }
   return renderScreen(screens.empty, {
     title: 'Module non autorisé',

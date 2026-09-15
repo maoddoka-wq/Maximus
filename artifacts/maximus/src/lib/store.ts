@@ -76,14 +76,20 @@ export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'nam
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
-export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
+export type RoleResponsibility =
+  | 'company_admin'
+  | 'it_admin'
+  | 'general_management'
+  | 'unit_manager'
+  | 'employee';
+export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; responsibility?: RoleResponsibility; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; companyId?: string; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; companyId?: string; }
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; companyId?: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; companyId?: string; }
 export interface OrgNode { id: string; companyId?: string; code?: string; name: string; type?: string; parentId: string | null; email?: string; phone?: string; location?: string; moduleIds?: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; managerEmployeeId?: string; }
 export interface PurchaseOrder { id: string; reference: string; supplier: string; subject: string; amount: number; date: string; status: Status; productId?: string; quantity?: number; companyId?: string; }
-export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; }
+export interface AccountingEntry { id: string; reference: string; journal: string; label: string; debit: number; credit: number; date: string; status: Status; companyId?: string; }
 export interface PayrollSlip { id: string; reference: string; employee: string; period: string; gross: number; net: number; status: Status; }
 export interface CrmOpportunity { id: string; client: string; contact: string; subject: string; amount: number; nextAction: string; status: Status; }
 export interface SupplierRecord { id: string; name: string; contact: string; phone: string; category: string; score: number; status: Status; companyId?: string; }
@@ -523,10 +529,25 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
     ...node,
     ...(node.moduleFeatures ? { moduleFeatures: normalizeModuleFeatureMap(node.moduleFeatures) } : {}),
   }));
-  normalized.roles = normalized.roles.map(role => ({
-    ...role,
-    modulePermissions: normalizeRolePermissions(role.modulePermissions),
-  }));
+  const roleResponsibilities: RoleResponsibility[] = [
+    'company_admin',
+    'it_admin',
+    'general_management',
+    'unit_manager',
+    'employee',
+  ];
+  normalized.roles = normalized.roles.map(role => {
+    const responsibility = roleResponsibilities.includes(role.responsibility as RoleResponsibility)
+      ? role.responsibility as RoleResponsibility
+      : normalized.employees.some(employee => employee.roleId === role.id && employee.isSectorAdmin)
+        ? 'unit_manager'
+        : 'employee';
+    return {
+      ...role,
+      responsibility,
+      modulePermissions: normalizeRolePermissions(role.modulePermissions),
+    };
+  });
   if (!source.commerceStates || Array.isArray(source.commerceStates) || typeof source.commerceStates !== 'object') {
     normalized.commerceStates = defaults.commerceStates;
   }

@@ -31,6 +31,7 @@ type SidebarProps = {
   allowed: ModuleId[];
   sidebarFeatureGroups?: SidebarFeatureGroup[];
   canManagePeople: boolean;
+  canViewReports: boolean;
   onNavigate: (path: string) => void;
   onLogout: () => void;
   employee: StoreData['employees'][number] | null;
@@ -63,6 +64,7 @@ export function Sidebar({
   onToggleCollapse,
   activeNavStyle,
   hiddenWorkspaceFeatures = [],
+  canViewReports,
 }: SidebarProps) {
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
@@ -72,7 +74,8 @@ export function Sidebar({
     : companyNav.filter(
         item =>
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
-          (item.module === null || allowed.includes(item.module as ModuleId)) &&
+           (!item.companyAdminOnly || companyAdmin) &&
+           (item.module === 'rapports' ? canViewReports : item.module === null || allowed.includes(item.module as ModuleId)) &&
           !hiddenWorkspaceFeatureSet.has(companyWorkspaceFeatureForPath(item.href) as CompanyWorkspaceFeatureId),
       );
   const companyCoreItems = nav.filter(item => item.module === null);
