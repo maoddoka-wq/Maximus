@@ -163,6 +163,24 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const create = async (input: Parameters<typeof api.create>[0]) => { try { await api.create(input); showAppToast('Enregistrement créé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Création impossible.', 'error'); } };
   const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => { try { await api.update(item.id, { payload, status, actor }); setSelected(null); showAppToast('Modification enregistrée.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Modification impossible.', 'error'); } };
   const remove = async (item: PresenceItem) => { if (!canDelete || !await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return; try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); } };
+  const selfClock = async (action: 'arrival' | 'exit') => {
+    if (!currentEmployee) return;
+    try {
+      await api.clock({
+        employeeId: currentEmployee.id,
+        workDate: date,
+        action,
+        actor,
+        expectedStart: settings.expectedStart,
+        tolerance: Number(settings.tolerance ?? 10),
+      });
+      showAppToast(action === 'arrival' ? 'Votre arrivée est enregistrée.' : 'Votre sortie est enregistrée.', 'success');
+      await refresh(true);
+    } catch (cause) {
+      showAppToast(cause instanceof Error ? cause.message : 'Pointage impossible.', 'error');
+      throw cause;
+    }
+  };
   const scanClock = async (token: string, action: 'arrival' | 'exit') => { try { await api.clockScan({ token, action }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée après scan.' : 'Sortie enregistrée après scan.', 'success'); await refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Scan de pointage impossible.', 'error'); throw cause; } };
   const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExport) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
   const kpis = { active: employees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
@@ -170,7 +188,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
     if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(employees.map(employee => meta(employee).unit))]} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
-    if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canGenerateQr={canGenerateQr} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
+     if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canGenerateQr={canGenerateQr} canSelfClock={Boolean(currentEmployee?.isSectorAdmin && canCreate)} onRequestQr={workDate => api.clockQr(workDate)} onSelfClock={selfClock} onScanClock={scanClock} />;
     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} onExport={() => exportRows(rows, `presences-${date}.csv`)} onSelect={setSelected} />;
     if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreate} canValidate={canValidate} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
     if (tab === 'schedules') return <SchedulesPanel items={items} employees={employees} canCreate={canCreate} canEdit={canEdit} onCreate={create} onUpdate={update} onRemove={canDelete ? remove : undefined} />;
@@ -202,25 +220,30 @@ type ClockPanelProps = {
   setDate: (value: string) => void;
   settings: PresenceSettings;
   canGenerateQr: boolean;
+  canSelfClock: boolean;
   selfOnly: boolean;
   onRequestQr: (workDate: string) => Promise<PresenceClockQr>;
+  onSelfClock: (action: 'arrival' | 'exit') => Promise<void>;
   onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void>;
 };
 
-function ClockPanel({ rows, selectedEmployee, date, setDate, settings, canGenerateQr, selfOnly, onRequestQr, onScanClock }: ClockPanelProps) {
+function ClockPanel({ rows, selectedEmployee, date, setDate, settings, canGenerateQr, canSelfClock, selfOnly, onRequestQr, onSelfClock, onScanClock }: ClockPanelProps) {
   if (canGenerateQr && !selfOnly) {
-    return <ManagerClockPanel date={date} setDate={setDate} settings={settings} onRequestQr={onRequestQr} />;
+    return <ManagerClockPanel row={rows.find(item => item.employee.id === selectedEmployee)} date={date} setDate={setDate} settings={settings} canSelfClock={canSelfClock} onRequestQr={onRequestQr} onSelfClock={onSelfClock} />;
   }
 
   return <EmployeeScannerPanel row={rows.find(item => item.employee.id === selectedEmployee)} date={date} onScanClock={onScanClock} />;
 }
 
-function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: string; setDate: (value: string) => void; settings: PresenceSettings; onRequestQr: (workDate: string) => Promise<PresenceClockQr> }) {
+function ManagerClockPanel({ row, date, setDate, settings, canSelfClock, onRequestQr, onSelfClock }: { row?: PresenceRow; date: string; setDate: (value: string) => void; settings: PresenceSettings; canSelfClock: boolean; onRequestQr: (workDate: string) => Promise<PresenceClockQr>; onSelfClock: (action: 'arrival' | 'exit') => Promise<void> }) {
   const [now, setNow] = useState(() => Date.now());
   const [qr, setQr] = useState<PresenceClockQr | null>(null);
   const [qrImage, setQrImage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selfClockBusy, setSelfClockBusy] = useState(false);
+  const [selfClockMessage, setSelfClockMessage] = useState('');
+  const selfClockAction: 'arrival' | 'exit' | null = row?.payload.exit ? null : row?.payload.arrival ? 'exit' : 'arrival';
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -257,7 +280,29 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
         <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-5">
           <p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Heure actuelle</p>
           <p className="mt-2 font-mono text-4xl font-bold tracking-tight">{currentTime(now)}</p>
-          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{displayDate(date)}</p>
+           <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{displayDate(date)}</p>
+           {canSelfClock && (
+             <div className="mt-5 border-t border-[hsl(var(--primary)/.2)] pt-4">
+               <Button
+                 primary
+                 disabled={!selfClockAction || selfClockBusy}
+                 onClick={() => {
+                   if (!selfClockAction) return;
+                   setSelfClockBusy(true);
+                   setSelfClockMessage('');
+                   void onSelfClock(selfClockAction)
+                     .then(() => setSelfClockMessage(selfClockAction === 'arrival' ? 'Arrivée enregistrée.' : 'Sortie enregistrée.'))
+                     .catch(cause => setSelfClockMessage(cause instanceof Error ? cause.message : 'Pointage impossible.'))
+                     .finally(() => setSelfClockBusy(false));
+                 }}
+               >
+                 <Clock3 size={15} />
+                 {selfClockBusy ? 'Enregistrement…' : selfClockAction === 'exit' ? 'Pointer ma sortie' : selfClockAction === 'arrival' ? 'Pointer mon arrivée' : 'Journée terminée'}
+               </Button>
+               <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Vous pouvez pointer votre propre arrivée ou sortie sans scanner le QR code.</p>
+               {selfClockMessage && <p className="mt-2 text-xs font-semibold text-[hsl(var(--primary))]">{selfClockMessage}</p>}
+             </div>
+           )}
         </div>
         <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Présentez ce QR code aux employés à leur arrivée et à leur sortie. Le serveur associe chaque scan au compte employé connecté.</p>
         <p className="text-xs text-[hsl(var(--muted-foreground))]">Horaire prévu : {settings.expectedStart ?? '08:00'} – {settings.expectedEnd ?? '17:00'} · Tolérance : {settings.tolerance ?? 10} min.</p>

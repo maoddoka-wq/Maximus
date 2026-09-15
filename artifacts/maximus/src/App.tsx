@@ -6661,17 +6661,31 @@ function ModulePackTestWorkbench({
 function OperationalReportsPage({
   data,
   companyId,
+  reportModuleIds,
   scopeNodeId,
   globalScope = false,
 }: {
   data: StoreData;
   companyId?: string;
+  reportModuleIds?: ModuleId[];
   scopeNodeId?: string;
   globalScope?: boolean;
 }) {
   type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
   const [report, setReport] = useState<ReportId>('sales');
   const [query, setQuery] = useState('');
+  const assignedReportModules = reportModuleIds ? new Set(reportModuleIds) : null;
+  const reportModules: Record<ReportId, ModuleId[]> = {
+    sales: ['commerce', 'ventes'],
+    stock: ['stocks'],
+    finance: ['finance', 'comptabilite'],
+    activity: [],
+  };
+  const isReportAssigned = (reportId: ReportId) =>
+    assignedReportModules === null
+      || (reportId === 'activity'
+        ? assignedReportModules.size > 0
+        : reportModules[reportId].some(moduleId => assignedReportModules.has(moduleId)));
   const companyRecords = <T extends { companyId?: string }>(items: T[]) =>
     companyId ? items.filter(item => !item.companyId || item.companyId === companyId) : items;
   const scopeNodeIds = (() => {
@@ -6732,7 +6746,23 @@ function OperationalReportsPage({
       rows: scopedActivities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
     },
   };
-  const active = definitions[report];
+  const availableReports = (Object.entries(definitions) as [ReportId, typeof definitions[ReportId]][])
+    .filter(([id]) => isReportAssigned(id));
+  const activeReportId = availableReports.some(([id]) => id === report)
+    ? report
+    : availableReports[0]?.[0];
+  if (!activeReportId) {
+    return (
+      <section className="card-surface rounded-2xl p-8 text-center">
+        <FileBarChart size={24} className="mx-auto text-[hsl(var(--muted-foreground))]" />
+        <h2 className="mt-4 font-bold">Aucun rapport attribué</h2>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          Aucun module autorisé pour votre périmètre ne possède encore de rapport consolidé.
+        </p>
+      </section>
+    );
+  }
+  const active = definitions[activeReportId];
   const rows = active.rows.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase()));
   const exportCsv = () => {
     const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -6740,14 +6770,14 @@ function OperationalReportsPage({
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `rapport-${report}.csv`;
+     link.download = `rapport-${activeReportId}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {(Object.entries(definitions) as [ReportId, typeof active][]).map(([id, item]) => (
+        {availableReports.map(([id, item]) => (
           <button
             key={id}
             onClick={() => setReport(id)}
@@ -6768,7 +6798,7 @@ function OperationalReportsPage({
       <section className="card-surface overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="font-bold">Rapport {active.label}</h2>
+              <h2 className="font-bold">Rapport {active.label}</h2>
             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
               {rows.length} lignes calculées depuis {globalScope ? 'toutes les données de l’entreprise' : 'le périmètre accessible'}.
             </p>

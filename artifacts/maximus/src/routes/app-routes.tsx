@@ -463,6 +463,7 @@ export function CompanyRouter({
     return renderScreen(screens.reports, {
       data,
       companyId,
+      reportModuleIds: allowed,
       scopeNodeId: isGeneralDirection || companyAdmin ? undefined : scopeNodeId,
       globalScope: companyAdmin || isGeneralDirection,
     });
