@@ -51,11 +51,11 @@ class PresenceController extends Controller
             return response()->json(['error' => 'Contexte entreprise requis.'], 400);
         }
         $actorData = $request->attributes->get('authActor');
-        if (! is_array($actorData) || ! ModuleAuthorization::allows($actorData, 'presences', 'create')) {
-            return $this->forbidden();
-        }
-        if (($actorData['role'] ?? null) === 'employee'
-            && ($input['employeeId'] ?? null) !== ($actorData['employeeId'] ?? null)) {
+        $feature = $this->featureForType($input['type']);
+        if (! is_array($actorData)
+            || $feature === null
+            || ! ModuleAuthorization::allows($actorData, 'presences', 'create', $feature)
+            || ! $this->actorCanAccessEmployee($actorData, $companyId, $input['employeeId'] ?? null)) {
             return $this->forbidden();
         }
         $actor = $this->actorName($request);
@@ -100,11 +100,26 @@ class PresenceController extends Controller
             return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
         }
         $actorData = $request->attributes->get('authActor');
+        $feature = $this->featureForType($item->type);
+        $statusChanged = array_key_exists('status', $input) && $input['status'] !== $item->status;
+        $payloadChanged = array_key_exists('payload', $input) && ($input['payload'] ?? []) !== ($item->payload ?? []);
+        $requiresValidation = $statusChanged && in_array($item->type, ['absence', 'leave'], true);
+        $requiresEdit = ($statusChanged && ! $requiresValidation)
+            || $payloadChanged
+            || array_key_exists('type', $input)
+            || array_key_exists('employeeId', $input)
+            || array_key_exists('workDate', $input)
+            || array_key_exists('startDate', $input)
+            || array_key_exists('endDate', $input);
+        $allowed = is_array($actorData)
+            && $feature !== null
+            && $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
+            && ($item->type === 'attendance'
+                ? ModuleAuthorization::allows($actorData, 'presences', 'correct', $feature)
+                : (! $requiresValidation || ModuleAuthorization::allows($actorData, 'presences', 'validate', $feature))
+                && (! $requiresEdit || ModuleAuthorization::allows($actorData, 'presences', 'edit', $feature)));
         if (! is_array($actorData)
-            || (($actorData['role'] ?? null) === 'employee' && $item->employee_id !== ($actorData['employeeId'] ?? null))
-            || (! ModuleAuthorization::allows($actorData, 'presences', 'correct')
-                && ! ModuleAuthorization::allows($actorData, 'presences', 'edit')
-                && ! ModuleAuthorization::allows($actorData, 'presences', 'modify'))) {
+            || ! $allowed) {
             return $this->forbidden();
         }
 
@@ -152,9 +167,8 @@ class PresenceController extends Controller
         }
         $actorData = $request->attributes->get('authActor');
         if (! is_array($actorData)
-            || (($actorData['role'] ?? null) === 'employee' && $item->employee_id !== ($actorData['employeeId'] ?? null))
-            || (! ModuleAuthorization::allows($actorData, 'presences', 'delete')
-                && ! ModuleAuthorization::allows($actorData, 'presences', 'manage'))) {
+            || ! $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
+            || ! ModuleAuthorization::allows($actorData, 'presences', 'delete', $this->featureForType($item->type))) {
             return $this->forbidden();
         }
 
@@ -364,6 +378,35 @@ class PresenceController extends Controller
             ->first();
 
         return is_array($user?->sector_ids) ? $user->sector_ids : [];
+    }
+
+    private function featureForType(string $type): ?string
+    {
+        return match ($type) {
+            'attendance' => 'pointage',
+            'absence' => 'absences',
+            'schedule' => 'horaires',
+            'leave' => 'congés',
+            default => null,
+        };
+    }
+
+    private function actorCanAccessEmployee(array $actor, string $companyId, ?string $employeeId): bool
+    {
+        if ($employeeId === null || $employeeId === '') {
+            return true;
+        }
+        if (($actor['role'] ?? null) === 'employee') {
+            return $employeeId === ($actor['employeeId'] ?? null);
+        }
+        if (($actor['role'] ?? null) !== 'sector_manager') {
+            return true;
+        }
+
+        $employeeSectorIds = $this->employeeSectorIds($companyId, $employeeId);
+
+        return $employeeSectorIds !== []
+            && array_diff($employeeSectorIds, $actor['sectorIds'] ?? []) === [];
     }
 
     private function encodeClockQrPayload(array $payload): string

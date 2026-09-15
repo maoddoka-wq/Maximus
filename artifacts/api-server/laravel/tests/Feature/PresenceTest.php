@@ -205,6 +205,69 @@ class PresenceTest extends TestCase
         ])->assertCreated();
     }
 
+    public function test_presence_create_permission_is_limited_to_the_selected_feature(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', [
+            'presence.pointage' => ['voir', 'créer'],
+        ]);
+
+        $request->postJson('/api/presence/items', [
+            'companyId' => 'kora',
+            'type' => 'schedule',
+            'employeeId' => 'presence-employee',
+            'status' => 'ACTIF',
+            'payload' => ['shift' => 'matin'],
+        ])->assertForbidden();
+    }
+
+    public function test_presence_update_does_not_treat_create_as_modify(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', [
+            'presence.horaires' => ['voir', 'créer'],
+        ]);
+        $item = PresenceItem::query()->create([
+            'id' => 'presence-schedule-protected',
+            'company_id' => 'kora',
+            'type' => 'schedule',
+            'employee_id' => 'presence-employee',
+            'status' => 'ACTIF',
+            'payload' => ['shift' => 'matin'],
+            'created_by' => 'Admin',
+            'updated_by' => 'Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->patchJson('/api/presence/items/'.$item->id, [
+            'companyId' => 'kora',
+            'payload' => ['shift' => 'soir'],
+        ])->assertForbidden();
+    }
+
+    public function test_presence_status_update_requires_modify_for_non_validation_items(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', [
+            'presence.horaires' => ['voir', 'créer'],
+        ]);
+        $item = PresenceItem::query()->create([
+            'id' => 'presence-schedule-status-protected',
+            'company_id' => 'kora',
+            'type' => 'schedule',
+            'employee_id' => 'presence-employee',
+            'status' => 'ACTIF',
+            'payload' => ['shift' => 'matin'],
+            'created_by' => 'Admin',
+            'updated_by' => 'Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->patchJson('/api/presence/items/'.$item->id, [
+            'companyId' => 'kora',
+            'status' => 'ARCHIVÉE',
+        ])->assertForbidden();
+    }
+
     public function test_manager_qr_is_scanned_by_the_authenticated_employee(): void
     {
         $workDate = now()->format('Y-m-d');

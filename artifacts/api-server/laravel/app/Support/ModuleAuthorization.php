@@ -129,6 +129,29 @@ final class ModuleAuthorization
         }
 
         $explicitKey = 'presence.'.$action;
+        $featureKeys = array_filter(
+            array_keys($permissions),
+            fn (string $key): bool => str_starts_with($key, 'presence.')
+                && ! in_array(substr($key, strlen('presence.')), [
+                    'view',
+                    'create',
+                    'edit',
+                    'delete',
+                    'correct',
+                    'validate',
+                    'manage',
+                    'export',
+                    'reports',
+                ], true),
+        );
+
+        // A feature-specific request must not fall back to another feature's
+        // action. For example, Pointage create cannot authorize Horaires.
+        if ($feature !== null && $featureKeys !== []) {
+            return array_key_exists($explicitKey, $permissions)
+                && self::contains($permissions[$explicitKey], 'allowed');
+        }
+
         $hasExplicitActions = array_key_exists($explicitKey, $permissions)
             || count(array_filter(
                 array_keys($permissions),

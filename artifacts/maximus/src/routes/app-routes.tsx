@@ -455,6 +455,7 @@ export function CompanyRouter({
       canExport: hasPresencePermission('export'),
       canDelete: hasPresencePermission('delete'),
       visibleFeatureIds: presenceFeatureIds,
+      featurePermissions: moduleFeaturePermissions?.presences,
       singleModuleNavigation,
       selfOnly: Boolean(employee && !companyAdmin && !sectorManager),
     });
