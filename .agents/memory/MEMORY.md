@@ -70,3 +70,4 @@
 - [Qualification des chauffeurs](transport-driver-organization.md) — créer l’employé dans Organisation, puis ajouter dans Transport uniquement les données Taxi.
 - [Fonds de carte Taxi](map-tile-fallback.md) — les tuiles Leaflet peuvent échouer silencieusement ; conserver le trajet et prévoir un fournisseur de repli.
 - [Paiement récurrent Transport](transport-recurring-payment-boundary.md) — ne jamais simuler un renouvellement automatique avec le checkout DiamanoPay ponctuel ; il faut un mandat réutilisable documenté.
+- [Contrôle paiement par entreprise](company-payment-control.md) — l’autorisation de paiement est indépendante des modules et de l’abonnement, avec blocage serveur des nouveaux encaissements et retraits.
