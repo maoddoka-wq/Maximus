@@ -10,6 +10,8 @@ import {
   History,
   ImagePlus,
   MapPin,
+  Maximize2,
+  Minimize2,
   Navigation,
   Pencil,
   Phone,
@@ -185,6 +187,9 @@ export default function TransportModulePage({
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [locationError, setLocationError] = useState('');
   const [locationActive, setLocationActive] = useState(false);
+  const [driverFullscreen, setDriverFullscreen] = useState(false);
+  const [driverFullscreenFallback, setDriverFullscreenFallback] = useState(false);
+  const driverSpaceRef = useRef<HTMLDivElement | null>(null);
   const currentDriver = useMemo(
     () => currentEmployeeId ? data?.drivers.find(driver => driver.employeeId === currentEmployeeId) ?? null : null,
     [currentEmployeeId, data?.drivers],
@@ -305,6 +310,35 @@ export default function TransportModulePage({
       window.clearInterval(refreshId);
     };
   }, [api, currentDriverId, canModifyDrivers, preview, trackingIntervalSeconds]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setDriverFullscreen(document.fullscreenElement === driverSpaceRef.current);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleDriverFullscreen = async () => {
+    if (driverFullscreenFallback) {
+      setDriverFullscreenFallback(false);
+      return;
+    }
+    if (document.fullscreenElement) {
+      await document.exitFullscreen?.();
+      return;
+    }
+    const target = driverSpaceRef.current;
+    if (!target?.requestFullscreen) {
+      setDriverFullscreenFallback(true);
+      return;
+    }
+    try {
+      await target.requestFullscreen({ navigationUI: 'hide' });
+    } catch {
+      setDriverFullscreenFallback(true);
+    }
+  };
 
   const run = async <T,>(action: () => Promise<T>, success: string) => {
     if (pendingAction) return;
@@ -479,7 +513,12 @@ export default function TransportModulePage({
   if (!data) return <TransportErrorState message={error} onRetry={() => void load()} />;
 
   return (
-    <div className="space-y-5" data-testid="transport-module" aria-busy={Boolean(pendingAction)}>
+    <div
+      ref={driverSpaceRef}
+      className={`${driverFullscreenFallback ? 'fixed inset-0 z-[80] overflow-y-auto bg-[hsl(var(--background))] p-3 sm:p-6' : 'space-y-5'} space-y-5`}
+      data-testid="transport-module"
+      aria-busy={Boolean(pendingAction)}
+    >
       {pendingAction && <div className="flex items-center gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm font-semibold text-sky-700"><RefreshCw size={15} className="animate-spin" />Enregistrement en cours…</div>}
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/25 bg-rose-500/5 px-4 py-3 text-sm text-rose-700"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer le message"><X size={16} /></button></div>}
 
@@ -506,9 +545,9 @@ export default function TransportModulePage({
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}
         {canOperateTrips && tab === 'courses' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
-        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} />}</>}
+        {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />}</>}
         {tab === 'courses' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canOperateTrips || canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
-        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} /></>}
+        {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
         {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
         {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
@@ -696,9 +735,9 @@ function TripAssignment({ trip, drivers, vehicles, onAssign }: { trip: Trip; dri
   return <div className="space-y-1.5"><select value={driverId} onChange={event => { setDriverId(event.target.value); setVehicleId(''); }} className="w-full border px-2 py-1.5 text-[11px]" aria-label={`Chauffeur de ${trip.reference}`}><option value="">Chauffeur à choisir</option>{availableDrivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name} · {driver.availability === 'PAUSED' ? 'pause' : 'disponible'}</option>)}</select><select value={vehicleId} onChange={event => setVehicleId(event.target.value)} disabled={!driverId} className="w-full border px-2 py-1.5 text-[11px]" aria-label={`Véhicule de ${trip.reference}`}><option value="">Véhicule à choisir</option>{availableVehicles.filter(vehicle => !driverId || vehicle.driverId === driverId).map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration} · {vehicle.model}</option>)}</select>{driverId && vehicleId && onAssign && <button type="button" onClick={() => onAssign(trip, driverId, vehicleId)} className="w-full rounded-md bg-[hsl(var(--primary))] px-2 py-1.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))]">Affecter</button>}</div>;
 }
 
-function DriverLocationPanel({ driver, active, error, onAvailabilityChange }: { driver: Driver | null; active: boolean; error: string; onAvailabilityChange?: (availability: DriverAvailability) => void }) {
+function DriverLocationPanel({ driver, active, error, onAvailabilityChange, fullscreen = false, onFullscreenToggle }: { driver: Driver | null; active: boolean; error: string; onAvailabilityChange?: (availability: DriverAvailability) => void; fullscreen?: boolean; onFullscreenToggle?: () => void }) {
   if (!driver) return <section className="card-surface border-dashed p-5"><div className="flex items-start gap-3"><MapPin className="mt-0.5 text-amber-600" size={19} /><div><h2 className="font-bold">Position chauffeur non configurée</h2><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Un administrateur doit lier votre compte employé à votre fiche chauffeur. La localisation GPS sera ensuite partagée automatiquement pendant que cette application est ouverte.</p></div></div></section>;
-  return <section className={`card-surface border p-5 ${active ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-start gap-3"><MapPin className={`mt-0.5 ${active ? 'text-emerald-600' : 'text-amber-600'}`} size={19} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Localisation du chauffeur</h2><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{active ? 'Active' : 'À activer'}</span></div><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{active ? 'Votre position GPS est partagée automatiquement. Les clients peuvent être orientés vers vous si votre véhicule est disponible.' : error || 'Autorisez la localisation dans votre navigateur pour recevoir les demandes proches.'}</p>{error && <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>}</div></div>{onAvailabilityChange && <div className="shrink-0 rounded-xl border bg-white/70 p-2"><p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Disponibilité</p><div className="flex gap-1"><button type="button" disabled={driver?.availability === 'ON_TRIP'} onClick={() => onAvailabilityChange('AVAILABLE')} className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${driver?.availability === 'AVAILABLE' ? 'bg-emerald-600 text-white' : 'border text-slate-600'} disabled:cursor-not-allowed disabled:opacity-50`}>Disponible</button><button type="button" disabled={driver?.availability === 'ON_TRIP'} onClick={() => onAvailabilityChange('PAUSED')} className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${driver?.availability === 'PAUSED' ? 'bg-amber-500 text-white' : 'border text-slate-600'} disabled:cursor-not-allowed disabled:opacity-50`}>Pause</button></div></div>}</div></section>;
+  return <section className={`card-surface border p-5 ${active ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/40'}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-start gap-3"><MapPin className={`mt-0.5 ${active ? 'text-emerald-600' : 'text-amber-600'}`} size={19} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">Localisation du chauffeur</h2><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${active ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{active ? 'Active' : 'À activer'}</span></div><p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{active ? 'Votre position GPS est partagée automatiquement. Les clients peuvent être orientés vers vous si votre véhicule est disponible.' : error || 'Autorisez la localisation dans votre navigateur pour recevoir les demandes proches.'}</p>{error && <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>}</div></div><div className="flex flex-wrap items-center gap-2 sm:justify-end">{onFullscreenToggle && <button type="button" onClick={onFullscreenToggle} className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white/80 px-3 py-2.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50" aria-label={fullscreen ? 'Quitter le GPS plein écran' : 'Ouvrir le GPS en plein écran'}>{fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{fullscreen ? 'Quitter le plein écran' : 'GPS plein écran'}</button>}{onAvailabilityChange && <div className="shrink-0 rounded-xl border bg-white/70 p-2"><p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Disponibilité</p><div className="flex gap-1"><button type="button" disabled={driver?.availability === 'ON_TRIP'} onClick={() => onAvailabilityChange('AVAILABLE')} className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${driver?.availability === 'AVAILABLE' ? 'bg-emerald-600 text-white' : 'border text-slate-600'} disabled:cursor-not-allowed disabled:opacity-50`}>Disponible</button><button type="button" disabled={driver?.availability === 'ON_TRIP'} onClick={() => onAvailabilityChange('PAUSED')} className={`rounded-lg px-2.5 py-2 text-[11px] font-bold ${driver?.availability === 'PAUSED' ? 'bg-amber-500 text-white' : 'border text-slate-600'} disabled:cursor-not-allowed disabled:opacity-50`}>Pause</button></div></div>}</div></div></section>;
 }
 
 function DriversPanel({ drivers, canCreate, onCreate }: { drivers: Driver[]; canCreate: boolean; onCreate: () => void }) {
