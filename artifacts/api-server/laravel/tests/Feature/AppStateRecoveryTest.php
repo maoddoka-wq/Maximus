@@ -574,4 +574,95 @@ class AppStateRecoveryTest extends TestCase
             (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
         );
     }
+
+    public function test_employee_business_records_are_shared_with_management_in_the_same_company(): void
+    {
+        Company::query()->create([
+            'id' => 'shared-business-company',
+            'name' => 'Entreprise métier partagé',
+            'manager' => 'Direction générale',
+            'email' => 'shared-business@example.test',
+            'status' => 'ACTIF',
+        ]);
+
+        $employee = AuthUser::query()->create([
+            'id' => 'shared-business-employee',
+            'email' => 'shared-business.employee@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Employé métier',
+            'role' => 'employee',
+            'company_id' => 'shared-business-company',
+            'employee_id' => 'shared-business-employee',
+            'sector_ids' => ['operations'],
+            'permissions' => ['achats' => ['voir', 'créer', 'modifier']],
+            'status' => 'ACTIF',
+        ]);
+        $management = AuthUser::query()->create([
+            'id' => 'shared-business-management',
+            'email' => 'shared-business.management@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Direction générale',
+            'role' => 'general_management',
+            'company_id' => 'shared-business-company',
+            'sector_ids' => [],
+            'permissions' => ['achats' => ['voir', 'créer', 'modifier']],
+            'status' => 'ACTIF',
+        ]);
+
+        $employeeRequest = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($employee));
+        $company = [[
+            'id' => 'shared-business-company',
+            'name' => 'Entreprise métier partagé',
+        ]];
+        $state = [
+            'companies' => $company,
+            'purchaseOrders' => [],
+        ];
+
+        $employeeRequest->putJson('/api/app-state', [
+            'version' => 0,
+            'data' => $state,
+        ])->assertOk()->assertJsonPath('version', 1);
+
+        $createdState = [
+            'companies' => $company,
+            'purchaseOrders' => [[
+                'id' => 'purchase-order-shared',
+                'companyId' => 'shared-business-company',
+                'reference' => 'BC-SHARED-01',
+                'supplier' => 'Fournisseur commun',
+                'subject' => 'Commande saisie par l’employé',
+                'amount' => 125000,
+                'date' => '2026-09-15',
+                'status' => 'BROUILLON',
+            ]],
+        ];
+
+        $employeeRequest->putJson('/api/app-state', [
+            'version' => 1,
+            'data' => $createdState,
+        ])->assertOk()->assertJsonPath('version', 2);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($management))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.purchaseOrders.0.id', 'purchase-order-shared')
+            ->assertJsonPath('data.purchaseOrders.0.subject', 'Commande saisie par l’employé');
+
+        $employeeRequest->putJson('/api/app-state', [
+            'version' => 2,
+            'data' => [
+                'companies' => $company,
+                'purchaseOrders' => [],
+            ],
+        ])->assertOk()->assertJsonPath('version', 3);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($management))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.purchaseOrders');
+    }
 }

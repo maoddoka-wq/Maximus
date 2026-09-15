@@ -304,7 +304,13 @@ class AppStateController extends Controller
 
             $incomingState = $this->stripCredentials($data['data']);
             if (($actor['role'] ?? null) !== 'maximus_admin') {
-                if (!in_array($actor['role'] ?? null, ['company_admin', 'it_admin', 'sector_manager'], true)) {
+                if (!in_array($actor['role'] ?? null, [
+                    'company_admin',
+                    'it_admin',
+                    'general_management',
+                    'sector_manager',
+                    'employee',
+                ], true)) {
                     return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
                 }
 
@@ -600,7 +606,7 @@ class AppStateController extends Controller
     private function mergeCompanyState(array $current, array $incoming, string $companyId): array
     {
         foreach ($incoming as $key => $value) {
-            if (!is_array($value) || !isset($current[$key]) || !is_array($current[$key])) {
+            if (!is_array($value)) {
                 continue;
             }
 
@@ -612,18 +618,25 @@ class AppStateController extends Controller
             }
 
             if (!array_is_list($value)) {
+                if (!isset($current[$key]) || !is_array($current[$key])) {
+                    continue;
+                }
                 $current[$key] = array_replace_recursive($current[$key], $value);
                 continue;
             }
 
-            $existing = collect($current[$key]);
             $incomingCompanyRecords = collect($value)->filter(
                 fn (mixed $item): bool => $this->belongsToCompany($item, $companyId, $key),
             );
-            if ($incomingCompanyRecords->isEmpty()) {
+            // An explicitly submitted empty list is a valid business update:
+            // it means that this company has no records left in this collection.
+            // An omitted key is still ignored above, so partial payloads cannot
+            // erase data accidentally.
+            if ($incomingCompanyRecords->isEmpty() && count($value) > 0) {
                 continue;
             }
 
+            $existing = collect($current[$key] ?? []);
             $ids = $incomingCompanyRecords->pluck('id')->filter()->all();
             $preserved = $existing->filter(
                 fn (mixed $item): bool => !$this->belongsToCompany($item, $companyId, $key)
