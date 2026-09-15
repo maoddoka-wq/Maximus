@@ -20,3 +20,9 @@ Le bouton de guidage chauffeur doit ouvrir uniquement la première étape, depui
 **Why:** utiliser la destination finale comme cible initiale, avec l’arrêt client comme waypoint, envoyait le chauffeur vers le mauvais lieu malgré des coordonnées valides.
 
 **How to apply:** générer une URL de navigation avec `destination` égal au couple latitude/longitude du pickup, sans waypoint de destination finale, et refuser le guidage si le pickup n’a pas de coordonnées.
+
+Les tuiles standard `tile.openstreetmap.org` peuvent être refusées par leur politique d’utilisation ; le fond Leaflet doit utiliser une source publique compatible et rester séparé des géométries GPS internes.
+
+**Why:** les lignes et marqueurs peuvent être correctement rendus alors que le fond cartographique reste vide si le fournisseur de tuiles bloque les requêtes.
+
+**How to apply:** conserver l’attribution du fournisseur de tuiles, tester le chargement du fond sur mobile et appeler `invalidateSize` après les transitions d’affichage plein écran.

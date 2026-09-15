@@ -78,8 +78,9 @@ export function TaxiRouteMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
     const map = L.map(containerRef.current, { zoomControl: true, attributionControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(map);
     layersRef.current = L.layerGroup().addTo(map);
@@ -138,6 +139,17 @@ export function TaxiRouteMap({
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previousOverflow;
+    };
+  }, [expanded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const frame = window.requestAnimationFrame(() => map.invalidateSize({ pan: false }));
+    const timer = window.setTimeout(() => map.invalidateSize({ pan: false }), 220);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
     };
   }, [expanded]);
 
