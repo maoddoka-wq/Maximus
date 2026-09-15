@@ -284,27 +284,27 @@ class StockController extends Controller
                     $this->updateBalance($input['companyId'], $input['productId'], $target, $input['locationId'] ?? null, $input['quantity']);
                 }
 
-                $row = array_merge([
+                $row = [
                     'id' => $this->id('movement'),
                     'company_id' => $input['companyId'],
                     'product_id' => $input['productId'],
-                    'supplier_id' => null,
+                    'supplier_id' => $input['supplierId'] ?? null,
                     'warehouse_id' => $input['warehouseId'],
-                    'destination_warehouse_id' => null,
-                    'location_id' => null,
-                    'requester_service' => null,
-                    'beneficiary' => null,
+                    'destination_warehouse_id' => $input['destinationWarehouseId'] ?? null,
+                    'location_id' => $input['locationId'] ?? null,
+                    'requester_service' => $input['requesterService'] ?? null,
+                    'beneficiary' => $input['beneficiary'] ?? null,
                     'type' => $input['type'],
                     'quantity' => $input['quantity'],
-                    'purchase_price' => 0,
-                    'reason' => '',
-                    'movement_date' => now(),
-                    'user_name' => $actorName,
-                    'reference' => '',
-                    'comment' => '',
+                    'purchase_price' => $input['purchasePrice'] ?? 0,
+                    'reason' => $input['reason'] ?? '',
+                    'movement_date' => $input['movementDate'] ?? now(),
+                    'user_name' => $input['userName'] ?? $actorName,
+                    'reference' => $input['reference'] ?? '',
+                    'comment' => $input['comment'] ?? '',
                     'status' => 'VALIDÉ',
                     'created_at' => now(),
-                ], $this->snake($input));
+                ];
                 DB::table('stock_movements')->insert($row);
                 DB::table('stock_audit_logs')->insert([
                     'id' => $this->id('audit'),

@@ -1,5 +1,6 @@
 - [GPS et annulation Taxi publics](public-taxi-gps-cancellation.md) — agréger plusieurs relevés GPS et annuler avec un jeton chiffré lié à la course, jamais avec le seul identifiant.
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
+- [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.
 - [Persistance des présences](presence-storage.md) — les workflows Présences sont stockés dans PostgreSQL via des éléments typés, payload extensible et historique.
 - [Pointage par QR code](presence-qr-clock.md) — le gérant affiche le QR du jour ; chaque employé scanne avec son propre compte pour enregistrer arrivée puis sortie.

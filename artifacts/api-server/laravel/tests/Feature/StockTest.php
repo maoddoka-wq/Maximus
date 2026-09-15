@@ -47,12 +47,16 @@ class StockTest extends TestCase
             'type' => 'ENTRÉE',
             'quantity' => 10,
             'userName' => 'Gestionnaire Stock',
+            'reference' => '',
+            'comment' => '',
         ];
 
         $request->postJson('/api/stock/movements', $movement)
             ->assertCreated()
             ->assertJsonPath('type', 'ENTRÉE')
-            ->assertJsonPath('quantity', 10);
+            ->assertJsonPath('quantity', 10)
+            ->assertJsonPath('reference', '')
+            ->assertJsonPath('comment', '');
 
         $request->postJson('/api/stock/movements', array_merge($movement, [
             'type' => 'SORTIE',
@@ -61,12 +65,22 @@ class StockTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('error', 'Stock insuffisant : le stock négatif est interdit.');
 
+        $request->postJson('/api/stock/movements', array_merge($movement, [
+            'type' => 'SORTIE',
+            'quantity' => 3,
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('type', 'SORTIE')
+            ->assertJsonPath('quantity', 3)
+            ->assertJsonPath('reference', '')
+            ->assertJsonPath('comment', '');
+
         $this->assertDatabaseHas('stock_balances', [
             'product_id' => $product->json('id'),
             'warehouse_id' => $warehouse->json('id'),
-            'quantity' => 10,
+            'quantity' => 7,
         ]);
-        $this->assertDatabaseCount('stock_audit_logs', 1);
+        $this->assertDatabaseCount('stock_audit_logs', 2);
         $this->assertDatabaseHas('stock_audit_logs', [
             'user_name' => 'Gestionnaire Stock',
         ]);
