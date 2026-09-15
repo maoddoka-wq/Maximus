@@ -116,6 +116,22 @@ test('détecte la Direction générale avec le marqueur du compte', () => {
   assert.equal(access.canViewReports, true);
 });
 
+test('ne donne pas les rapports direction à l’administrateur technique', () => {
+  const { data, company } = createAccessFixture();
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.equal(access.canViewReports, false);
+});
+
 test('calcule les permissions Transport séparément pour chaque rubrique', () => {
   const { data, company, employee } = createAccessFixture();
   const node = data.orgNodes[0]!;

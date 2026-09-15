@@ -1066,7 +1066,7 @@ function AppContent() {
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
         hiddenWorkspaceFeatures={currentCompanyWorkspaceFeatures}
-        showDirectionReports={companyAdmin || isGeneralDirection}
+        showDirectionReports={isGeneralDirection}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Topbar

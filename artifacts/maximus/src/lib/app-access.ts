@@ -254,8 +254,7 @@ export function buildAppAccessContext({
     : undefined;
   const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
   const canViewReports = Boolean(
-    companyAdmin
-    || isGeneralDirection
+    isGeneralDirection
     || sectorManager
     || allowed.includes('rapports'),
   );
