@@ -158,8 +158,7 @@ export function EmployeesTab({
              const assignedRole = data.roles.find(role => role.id === employeeData.roleId);
              if (!sectorId) throw new Error('Une unité doit être sélectionnée pour ce compte.');
              if (!assignedRole) throw new Error('Le rôle sélectionné est introuvable.');
-              const isUnitManager = assignedRole.responsibility === 'unit_manager';
-              const sectorIds = isUnitManager
+             const sectorIds = employeeData.isSectorAdmin
                ? getSectorDescendantIds(companyNodes, sectorId)
                : [sectorId];
              await authApi.provisionAccount({
@@ -170,7 +169,7 @@ export function EmployeesTab({
                companyId: company.id,
                employeeId,
                sectorIds,
-                role: isUnitManager ? 'sector_manager' : 'employee',
+               role: employeeData.isSectorAdmin ? 'sector_manager' : 'employee',
                permissions: assignedRole.modulePermissions,
                ...(employeeData.loginPassword ? { password: employeeData.loginPassword } : {}),
              });
@@ -178,13 +177,7 @@ export function EmployeesTab({
               const sector = draft.orgNodes.find(node => node.id === employeeData.sectorId);
               const parent = sector?.parentId ? draft.orgNodes.find(node => node.id === sector.parentId) : null;
                const { loginPassword: _loginPassword, ...employeeFields } = employeeData;
-                const normalized = {
-                  ...employeeFields,
-                  isSectorAdmin: isUnitManager,
-                  email: employeeData.email.trim().toLowerCase(),
-                  department: sector?.name ?? '',
-                  subDepartment: parent?.name ?? '',
-                };
+               const normalized = { ...employeeFields, email: employeeData.email.trim().toLowerCase(), department: sector?.name ?? '', subDepartment: parent?.name ?? '' };
               if (editingEmployee) {
                 const index = draft.employees.findIndex(employee => employee.id === editingEmployee.id);
                 if (index !== -1) draft.employees[index] = { ...draft.employees[index], ...normalized };
@@ -194,7 +187,7 @@ export function EmployeesTab({
               draft.orgNodes.forEach(node => {
                 if (node.managerEmployeeId === employeeId && node.id !== employeeData.sectorId) node.managerEmployeeId = undefined;
               });
-               if (isUnitManager && sector) {
+              if (employeeData.isSectorAdmin && sector) {
                 draft.orgNodes.forEach(node => { if (node.id !== sector.id && node.managerEmployeeId === employeeId) node.managerEmployeeId = undefined; });
                 sector.managerEmployeeId = employeeId;
               } else if (sector?.managerEmployeeId === employeeId) {
@@ -256,8 +249,7 @@ function EmployeeFormModal({
       setError('Prénom, nom, email, poste, appartenance et rôle compatible sont obligatoires.');
       return;
     }
-    const isUnitManager = role.responsibility === 'unit_manager';
-    if (isUnitManager && Object.keys(role.modulePermissions).length === 0) {
+    if (formData.isSectorAdmin && Object.keys(role.modulePermissions).length === 0) {
       setError('Un manager doit utiliser un rôle avec au moins une autorisation.');
       return;
     }
@@ -292,7 +284,7 @@ function EmployeeFormModal({
       position: formData.position.trim(),
       sectorId: formData.sectorId,
       roleId: formData.roleId,
-       isSectorAdmin: isUnitManager,
+      isSectorAdmin: formData.isSectorAdmin,
       role: role.name,
       ...(password ? { loginPassword: password } : {}),
     }).catch(nextError => {
@@ -318,11 +310,7 @@ function EmployeeFormModal({
           <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Rôles de l’unité sélectionnée et de ses unités parentes.</p>
         </label>
       </div>
-      {allowSectorAdmin && formData.roleId && <p className="mt-4 rounded-lg border p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-        {formData.isSectorAdmin
-          ? 'Ce compte est manager parce que son rôle porte la responsabilité « Manager d’unité ». Il pourra gérer son unité et ses unités descendantes.'
-          : 'Le périmètre de ce compte vient uniquement de son rôle, de son unité et des permissions métier configurées.'}
-      </p>}
+      {allowSectorAdmin && <label className="mt-4 flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold"><input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" /><span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span></label>}
       <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
     </div>
   );

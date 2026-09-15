@@ -1,4 +1,4 @@
-import type { Company, Employee, ModuleId, OrgNode, Role, RoleResponsibility } from './store';
+import type { Company, Employee, ModuleId, OrgNode, Role } from './store';
 import {
   commerceTabDependencies,
   commerceTabDefinitions,
@@ -13,37 +13,6 @@ import { stockSubmoduleDependencies, stockSubmodules, type Module } from './stor
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
-
-export function roleHasResponsibility(
-  role: Role | null | undefined,
-  responsibility: RoleResponsibility,
-) {
-  return role?.responsibility === responsibility;
-}
-
-export function canManageTechnicalAdministration(
-  role: Role | null | undefined,
-  companyAdmin: boolean,
-  roleMatchesScope: boolean,
-) {
-  return companyAdmin || (roleMatchesScope && roleHasResponsibility(role, 'it_admin'));
-}
-
-export function canViewCompanyReports(
-  role: Role | null | undefined,
-  companyAdmin: boolean,
-  roleMatchesScope: boolean,
-) {
-  return companyAdmin || (roleMatchesScope && roleHasResponsibility(role, 'general_management'));
-}
-
-export function canHandleCompanyApprovals(
-  role: Role | null | undefined,
-  companyAdmin: boolean,
-  roleMatchesScope: boolean,
-) {
-  return companyAdmin || (roleMatchesScope && roleHasResponsibility(role, 'general_management'));
-}
 
 function permissionModuleId(key: string): ModuleId | null {
   if (key.startsWith('presence.')) return 'presences';

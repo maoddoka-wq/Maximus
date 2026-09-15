@@ -1,7 +1,7 @@
 import { requestJson } from './api-request';
 
 export type AuthUser = {
-  role: 'maximus_admin' | 'company_admin' | 'it_admin' | 'general_management' | 'sector_manager' | 'employee';
+  role: 'maximus_admin' | 'company_admin' | 'sector_manager' | 'employee';
   displayName: string;
   companyId?: string;
   employeeId?: string;
@@ -29,7 +29,7 @@ export const authApi = {
     companyId: string;
     employeeId: string;
     sectorIds: string[];
-    role: 'it_admin' | 'general_management' | 'sector_manager' | 'employee';
+    role: 'sector_manager' | 'employee';
     permissions?: Record<string, string[]>;
     password?: string;
   }) => request<{ ok: true }>('/auth/accounts', {

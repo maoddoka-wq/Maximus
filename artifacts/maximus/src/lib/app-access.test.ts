@@ -78,57 +78,6 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
-test('sépare les responsabilités transverses des permissions métier', () => {
-  const { data, company, employee } = createAccessFixture();
-  const role = data.roles[0]!;
-
-  role.responsibility = 'it_admin';
-  let access = buildAppAccessContext({
-    data,
-    session: `employee:${employee.id}`,
-    employee,
-    activeCompanyId: company.id,
-    activeCompany: company,
-    sectorTestCompanyId: null,
-    serverModuleStatuses: null,
-  });
-  assert.equal(access.technicalAdmin, true);
-  assert.equal(access.canManagePeople, true);
-  assert.equal(access.canManageAccess, true);
-  assert.equal(access.canViewReports, true);
-  assert.equal(access.canHandleApprovals, true);
-  assert.equal(access.allowed.length, 1);
-
-  role.responsibility = 'general_management';
-  role.modulePermissions = {};
-  access = buildAppAccessContext({
-    data,
-    session: `employee:${employee.id}`,
-    employee,
-    activeCompanyId: company.id,
-    activeCompany: company,
-    sectorTestCompanyId: null,
-    serverModuleStatuses: null,
-  });
-  assert.equal(access.technicalAdmin, false);
-  assert.equal(access.canManagePeople, false);
-  assert.equal(access.canViewReports, true);
-  assert.equal(access.canHandleApprovals, true);
-  assert.deepEqual(access.allowed, []);
-
-  role.responsibility = 'unit_manager';
-  access = buildAppAccessContext({
-    data,
-    session: `employee:${employee.id}`,
-    employee,
-    activeCompanyId: company.id,
-    activeCompany: company,
-    sectorTestCompanyId: null,
-    serverModuleStatuses: null,
-  });
-  assert.equal(access.sectorManager, true);
-});
-
 test('calcule les permissions Transport séparément pour chaque rubrique', () => {
   const { data, company, employee } = createAccessFixture();
   const node = data.orgNodes[0]!;

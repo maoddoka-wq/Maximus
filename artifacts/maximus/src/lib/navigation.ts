@@ -28,7 +28,6 @@ export type NavigationItem = {
   icon: Icon;
   module?: ModuleId | null;
   peopleAdminOnly?: boolean;
-  companyAdminOnly?: boolean;
 };
 
 export function normalizeRoutePath(path: string): string {
@@ -65,7 +64,7 @@ const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/entreprise/organisation', label: 'Organisation & accès', icon: GitBranch, module: null, peopleAdminOnly: true },
-  { href: '/entreprise/guide-configuration', label: 'Guide de configuration', icon: BookOpen, module: null, companyAdminOnly: true },
+  { href: '/entreprise/guide-configuration', label: 'Guide de configuration', icon: BookOpen, module: null, peopleAdminOnly: true },
 ];
 
 export const companyNav: NavigationItem[] = [

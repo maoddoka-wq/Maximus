@@ -986,10 +986,6 @@ function AppContent() {
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
-    technicalAdmin,
-    generalManagement,
-    canViewReports,
-    canHandleApprovals,
     verticalModuleNavigation,
   } = buildAppAccessContext({
     data,
@@ -1003,7 +999,6 @@ function AppContent() {
     serverModuleAccessReady:
       serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
   });
-  const workspaceAdmin = companyAdmin || technicalAdmin;
   const adminAssistantScope = buildAdminAssistantScope(data, 'Administration principale');
   const baseMeta =
     pageMeta[normalizeRoutePath(location)] ??
@@ -1048,7 +1043,6 @@ function AppContent() {
         allowed={allowed}
         sidebarFeatureGroups={sidebarFeatureGroups}
         canManagePeople={canManagePeople}
-        canViewReports={canViewReports}
         onNavigate={navigate}
         onLogout={sectorTestCompanyId ? exitSectorTest : logout}
         employee={employee}
@@ -1178,12 +1172,8 @@ function AppContent() {
                   onBack={goBack}
                   allowed={allowed}
                   canManagePeople={canManagePeople}
-                  companyAdmin={workspaceAdmin}
+                  companyAdmin={companyAdmin}
                   sectorManager={sectorManager}
-                  technicalAdmin={technicalAdmin}
-                  generalManagement={generalManagement}
-                  canViewReports={canViewReports}
-                  canHandleApprovals={canHandleApprovals}
                   scopeNodeId={employeeNode?.id}
                   companyId={companyId}
                   employee={employee}
@@ -6652,24 +6642,22 @@ function ModulePackTestWorkbench({
   );
 }
 
-function OperationalReportsPage({ data, companyId }: { data: StoreData; companyId?: string }) {
+function OperationalReportsPage({ data }: { data: StoreData }) {
   type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
   const [report, setReport] = useState<ReportId>('sales');
   const [query, setQuery] = useState('');
-  const inCompany = <T extends { companyId?: string }>(items: T[]) =>
-    companyId ? items.filter(item => !item.companyId || item.companyId === companyId) : items;
   const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
     sales: {
       label: 'Ventes',
       description: 'Chiffre d’affaires et commandes clients.',
       headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'],
-       rows: inCompany(data.sales).map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
+      rows: data.sales.map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
     },
     stock: {
       label: 'Gestion de stock',
       description: 'Valorisation et niveaux des produits.',
       headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'],
-       rows: inCompany(data.products).map((item) => [
+      rows: data.products.map((item) => [
         item.name,
         item.sku,
         item.category,
@@ -6681,13 +6669,13 @@ function OperationalReportsPage({ data, companyId }: { data: StoreData; companyI
       label: 'Finance',
       description: 'Écritures comptables enregistrées.',
       headers: ['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date'],
-       rows: inCompany(data.accountingEntries).map((item) => [item.reference, item.journal, item.label, money(item.debit), money(item.credit), item.date]),
+      rows: data.accountingEntries.map((item) => [item.reference, item.journal, item.label, money(item.debit), money(item.credit), item.date]),
     },
     activity: {
       label: 'Activité',
       description: 'Traçabilité des actions réalisées.',
       headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'],
-       rows: inCompany(data.activities).map((item) => [item.user, item.action, item.module, item.object, item.date]),
+      rows: data.activities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
     },
   };
   const active = definitions[report];

@@ -18,10 +18,6 @@ final class CompanyAuthorization
             return true;
         }
 
-        if (($actor['role'] ?? null) === 'it_admin') {
-            return true;
-        }
-
         if (($actor['role'] ?? null) !== 'sector_manager' || $sectorIds === []) {
             return false;
         }
@@ -31,7 +27,7 @@ final class CompanyAuthorization
 
     public static function canAssignPermissions(array $actor, array $permissions): bool
     {
-        if (in_array($actor['role'] ?? null, ['maximus_admin', 'company_admin', 'it_admin'], true)) {
+        if (in_array($actor['role'] ?? null, ['maximus_admin', 'company_admin'], true)) {
             return true;
         }
 

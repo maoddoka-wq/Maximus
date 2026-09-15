@@ -2,9 +2,6 @@ import type { Company, Employee, ModuleAvailability, ModuleId, OrgNode, Role, St
 import type { Session, SidebarFeatureGroup } from './navigation';
 import {
   employeeHasPresencePermission,
-  canHandleCompanyApprovals,
-  canManageTechnicalAdministration,
-  canViewCompanyReports,
   employeeRoleMatchesUnit,
   getCommerceTabIds,
   getEmployeeAncestry,
@@ -13,7 +10,6 @@ import {
   restrictRoleToCompany,
   roleHasFeaturePermission,
   roleHasPermission,
-  roleHasResponsibility,
   type ModulePermission,
   type PresencePermission,
 } from './employee-permissions';
@@ -54,11 +50,6 @@ export type AppAccessContext = {
   verticalModuleNavigation: boolean;
   sectorManager: boolean;
   canManagePeople: boolean;
-  technicalAdmin: boolean;
-  generalManagement: boolean;
-  canManageAccess: boolean;
-  canViewReports: boolean;
-  canHandleApprovals: boolean;
 };
 
 export function buildAppAccessContext({
@@ -93,17 +84,16 @@ export function buildAppAccessContext({
   const companyAllowed = (sectorTestCompanyId || serverModuleAccessReady ? localCompanyAllowed : [])
     .filter(isModuleActive);
   const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
-  let workspaceAdmin = companyAdmin;
   const keepCompanySettings = (
     module: NonNullable<typeof configuredModules[number]>,
     featureIds: string[],
     preserveAdminSettings = true,
   ) =>
-    preserveAdminSettings && module.id === 'ecommerce' && workspaceAdmin
+    preserveAdminSettings && module.id === 'ecommerce' && companyAdmin
       ? [...new Set([...featureIds, 'parametres'])]
       : featureIds;
   const companySelectedFeatureIds = (module: NonNullable<typeof configuredModules[number]>) => {
-    if (!workspaceAdmin || !activeCompany) return undefined;
+    if (!companyAdmin || !activeCompany) return undefined;
 
     const serverAccess = serverModuleAccess?.find((item) => item.id === module.id);
     const serverConfiguration = serverAccess?.configuration;
@@ -174,6 +164,11 @@ export function buildAppAccessContext({
     }
     return new Set(requestedFeatures[module.id] ?? []);
   };
+  const selectedFeatureIdsByModule = Object.fromEntries(
+    configuredModules
+      .map(module => [module.id, companySelectedFeatureIds(module)] as const)
+      .filter(([, featureIds]) => featureIds !== undefined),
+  ) as Partial<Record<ModuleId, string[]>>;
   const employeeNode = employee?.sectorId
     ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) ?? null
     : sectorTestCompanyId && accessRole?.sectorId
@@ -183,19 +178,9 @@ export function buildAppAccessContext({
   const accessRoleMatchesScope = sectorTestCompanyId
     ? Boolean(accessRole && employeeNode && accessRole.companyId === companyId && accessRole.sectorId === employeeNode.id)
     : employeeRoleMatchesUnit(accessRole, employee, employeeAncestry);
-  const technicalAdmin = canManageTechnicalAdministration(accessRole, companyAdmin, accessRoleMatchesScope);
-  workspaceAdmin = companyAdmin || technicalAdmin;
-  const selectedFeatureIdsByModule = Object.fromEntries(
-    configuredModules
-      .map(module => [module.id, companySelectedFeatureIds(module)] as const)
-      .filter(([, featureIds]) => featureIds !== undefined),
-  ) as Partial<Record<ModuleId, string[]>>;
-  const canViewModule = (moduleId: ModuleId) =>
-    workspaceAdmin && !sectorTestCompanyId
-      ? true
-      : roleHasPermission(accessRole, employeeNode, moduleId, 'voir');
+  const canViewModule = (moduleId: ModuleId) => roleHasPermission(accessRole, employeeNode, moduleId, 'voir');
   const allowed =
-    workspaceAdmin && !sectorTestCompanyId
+    session.startsWith('company:') && !sectorTestCompanyId
       ? companyAllowed
       : sectorTestCompanyId && accessRole && accessRoleMatchesScope
         ? companyAllowed.filter(moduleId => canViewModule(moduleId))
@@ -203,40 +188,40 @@ export function buildAppAccessContext({
           ? companyAllowed.filter(moduleId => canViewModule(moduleId))
           : [];
   const hasPermission = (moduleId: ModuleId, permission: ModulePermission) => {
-    if (workspaceAdmin && !sectorTestCompanyId) return true;
+    if (session.startsWith('company:') && !sectorTestCompanyId) return true;
     if (!accessRoleMatchesScope || !accessRole) return false;
     return roleHasPermission(accessRole, employeeNode, moduleId, permission);
   };
   const hasPresencePermission = (permission: PresencePermission) => {
-    if (workspaceAdmin && !sectorTestCompanyId) return true;
+    if (session.startsWith('company:') && !sectorTestCompanyId) return true;
     if (!accessRoleMatchesScope || !accessRole) return false;
     return employeeHasPresencePermission(accessRole, employeeNode, permission, hasPermission);
   };
 
   const presenceModule = configuredModules.find(module => module.id === 'presences');
   const selectedPresenceFeatureIds =
-    presenceModule && workspaceAdmin
+    presenceModule && companyAdmin
       ? companySelectedFeatureIds(presenceModule)
       : accessRole && presenceModule
         ? [...getSelectedFeatureIds(accessRole, presenceModule, employeeNode?.moduleFeatures?.[presenceModule.id])]
       : undefined;
   const ecommerceModule = configuredModules.find(module => module.id === 'ecommerce');
   const selectedEcommerceFeatureIds =
-    ecommerceModule && workspaceAdmin
+    ecommerceModule && companyAdmin
       ? companySelectedFeatureIds(ecommerceModule)
       : accessRole && ecommerceModule
         ? [...getSelectedFeatureIds(accessRole, ecommerceModule, employeeNode?.moduleFeatures?.[ecommerceModule.id])]
         : undefined;
   const payrollModule = configuredModules.find(module => module.id === 'paie');
   const selectedPayrollFeatureIds =
-    payrollModule && workspaceAdmin
+    payrollModule && companyAdmin
       ? companySelectedFeatureIds(payrollModule)
       : accessRole && payrollModule
         ? [...getSelectedFeatureIds(accessRole, payrollModule, employeeNode?.moduleFeatures?.[payrollModule.id])]
         : undefined;
   const transportModule = configuredModules.find(module => module.id === 'transport');
   const selectedTransportFeatureIds =
-    transportModule && workspaceAdmin
+    transportModule && companyAdmin
       ? companySelectedFeatureIds(transportModule)
       : accessRole && transportModule
         ? [...getSelectedFeatureIds(accessRole, transportModule, employeeNode?.moduleFeatures?.[transportModule.id])]
@@ -251,22 +236,13 @@ export function buildAppAccessContext({
       getModuleFeatureOptions(transportModule).map(feature => [
         feature.id,
         {
-          canCreate: workspaceAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'créer'),
-          canModify: workspaceAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'modifier'),
+          canCreate: companyAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'créer'),
+          canModify: companyAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'modifier'),
         },
       ]),
     )
     : undefined;
-  const sectorManager = Boolean(
-    employeeNode
-    && accessRole
-    && accessRoleMatchesScope
-    && roleHasResponsibility(accessRole, 'unit_manager'),
-  );
-  const generalManagement = canViewCompanyReports(accessRole, companyAdmin, accessRoleMatchesScope) || technicalAdmin;
-  const canManageAccess = workspaceAdmin;
-  const canViewReports = generalManagement;
-  const canHandleApprovals = canHandleCompanyApprovals(accessRole, companyAdmin, accessRoleMatchesScope) || technicalAdmin;
+  const sectorManager = Boolean(employee?.isSectorAdmin && employeeNode && accessRole && accessRoleMatchesScope);
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
     .filter(item => {
@@ -285,21 +261,15 @@ export function buildAppAccessContext({
   const commerceModule = configuredModules.find(module => module.id === 'commerce');
   const salesModule = configuredModules.find(module => module.id === 'ventes');
   const selectedStockFeatureIds =
-    workspaceAdmin
-      ? undefined
-      : accessRole && stockModule
+    accessRole && stockModule
       ? getSelectedFeatureIds(accessRole, stockModule, employeeNode?.moduleFeatures?.[stockModule.id])
       : undefined;
   const selectedCommerceFeatureIds =
-    workspaceAdmin
-      ? undefined
-      : accessRole && commerceModule
+    accessRole && commerceModule
       ? getSelectedFeatureIds(accessRole, commerceModule, employeeNode?.moduleFeatures?.[commerceModule.id])
       : undefined;
   const selectedSalesFeatureIds =
-    workspaceAdmin
-      ? undefined
-      : accessRole && salesModule
+    accessRole && salesModule
       ? getSelectedFeatureIds(accessRole, salesModule, employeeNode?.moduleFeatures?.[salesModule.id])
       : undefined;
   const selectedCommercialTabIds =
@@ -323,13 +293,13 @@ export function buildAppAccessContext({
     selectedCommercialTabIds,
   );
   const sidebarFeatureGroups: SidebarFeatureGroup[] =
-    (employee || sectorTestCompanyId || workspaceAdmin) && allowed.length >= 1
+    (employee || sectorTestCompanyId || companyAdmin) && allowed.length >= 1
       ? buildSidebarFeatureGroups({
           allowed,
           configuredModules,
           employeeRole: accessRole,
           employeeNode,
-          companyAdmin: workspaceAdmin,
+          companyAdmin,
           selectedFeatureIdsByModule,
           commerceTabIds,
           stockPermissions,
@@ -359,11 +329,6 @@ export function buildAppAccessContext({
       && sidebarFeatureGroups.length,
     ),
     sectorManager,
-      canManagePeople: workspaceAdmin || sectorManager,
-    technicalAdmin,
-    generalManagement,
-    canManageAccess,
-    canViewReports,
-    canHandleApprovals,
+    canManagePeople: session.startsWith('company:') || sectorManager,
   };
 }

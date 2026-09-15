@@ -20,7 +20,6 @@ import {
   type ModuleId,
   type OrgNode,
   type Role,
-  type RoleResponsibility,
   type StoreData,
 } from '@/lib/store';
 import { restrictRoleToCompany } from '@/lib/employee-permissions';
@@ -34,14 +33,6 @@ const permissionLabels: Record<Permission, string> = {
   voir: 'Voir',
   créer: 'Créer',
   modifier: 'Modifier',
-};
-
-const responsibilityLabels: Record<RoleResponsibility, string> = {
-  company_admin: 'Administrateur entreprise',
-  it_admin: 'Responsable informatique',
-  general_management: 'Direction générale',
-  unit_manager: 'Manager d’unité',
-  employee: 'Employé',
 };
 
 export function RolesTab({
@@ -162,7 +153,6 @@ function RoleCard({
   const moduleLabels = new Map(moduleDefinitions.map(module => [module.id, module.name]));
   const moduleEntries = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key));
   const detailEntries = permissionEntries.filter(([key]) => !moduleDefinitions.some(module => module.id === key));
-  const responsibility = role.responsibility ?? 'employee';
 
   return (
     <article className="overflow-hidden rounded-xl border bg-[hsl(var(--card))] transition hover:border-[hsl(var(--primary)/.45)] hover:shadow-sm">
@@ -175,10 +165,7 @@ function RoleCard({
                 <h3 className="truncate font-bold">{role.name}</h3>
                 {sourcePackName && <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--primary))]">Pack · {sourcePackName}</span>}
               </div>
-               <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">
-                 <span className="inline-flex items-center gap-1.5"><Building2 size={11} /> {sectorName || 'Unité non affectée'}</span>
-                 <span className="rounded-full bg-[hsl(var(--accent)/.12)] px-2 py-1 text-[hsl(var(--accent))]">{responsibilityLabels[responsibility]}</span>
-               </div>
+              <span className="mt-1 inline-flex items-center gap-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]"><Building2 size={11} /> {sectorName || 'Unité non affectée'}</span>
             </div>
           </div>
           <p className="mt-3 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">{role.description || 'Aucune description renseignée pour ce rôle.'}</p>
@@ -271,14 +258,13 @@ function RoleFormModal({
   moduleDefinitions: Module[];
   sectorLocked: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; description: string; sectorId: string; responsibility: RoleResponsibility; modulePermissions: Record<string, string[]> }) => void;
+  onSave: (data: { name: string; description: string; sectorId: string; modulePermissions: Record<string, string[]> }) => void;
 }) {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     description: initialData?.description || '',
     sectorId: initialData?.sectorId || (allNodes[0]?.id ?? ''),
-    responsibility: initialData?.responsibility ?? 'employee',
     modulePermissions: restrictRoleToCompany(initialData, company)?.modulePermissions || {},
   });
   const selectedNode = allNodes.find(node => node.id === formData.sectorId);
@@ -416,14 +402,7 @@ function RoleFormModal({
         ] as const)
         .filter(([, permissions]) => permissions.length > 0),
     );
-    const boundedRole = restrictRoleToCompany({
-      id: initialData?.id ?? '',
-      name,
-      description: formData.description,
-      sectorId: formData.sectorId,
-      responsibility: formData.responsibility,
-      modulePermissions,
-    }, company);
+    const boundedRole = restrictRoleToCompany({ id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions }, company);
     onSave({ ...formData, name, modulePermissions: boundedRole?.modulePermissions ?? {} });
   };
 
@@ -432,20 +411,6 @@ function RoleFormModal({
       {error && <p role="alert" className="rounded-lg bg-[hsl(var(--destructive)/.1)] p-3 text-sm font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <Field label="Nom du rôle *" value={formData.name} onChange={(value: string) => setFormData(current => ({ ...current, name: value }))} help="Nom affiché lors de l’affectation d’un rôle à un employé." />
       <Field label="Description" value={formData.description} onChange={(value: string) => setFormData(current => ({ ...current, description: value }))} help="Expliquez les responsabilités principales associées à ce rôle." />
-      <label className="mt-4 block text-sm font-semibold">Responsabilité du rôle
-        <select
-          value={formData.responsibility}
-          onChange={event => setFormData(current => ({ ...current, responsibility: event.target.value as RoleResponsibility }))}
-          className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]"
-        >
-          {(Object.entries(responsibilityLabels) as [RoleResponsibility, string][]).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-          Cette responsabilité ouvre uniquement les espaces transverses correspondants. Les modules et actions métier restent réglés ci-dessous.
-        </span>
-      </label>
       <label className="mt-4 block text-sm font-semibold">Unité d’appartenance *
         <select disabled={sectorLocked} value={formData.sectorId} onChange={event => setFormData(current => ({ ...current, sectorId: event.target.value, modulePermissions: {} }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))] disabled:opacity-60">
           {allNodes.map(node => <option key={node.id} value={node.id}>{node.name}</option>)}

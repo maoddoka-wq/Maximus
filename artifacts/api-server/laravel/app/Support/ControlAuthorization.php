@@ -18,11 +18,11 @@ final class ControlAuthorization
             return ! empty($actor['employeeId']);
         }
 
-        if (in_array($actor['role'] ?? null, ['sector_manager'], true)) {
+        if (($actor['role'] ?? null) === 'sector_manager') {
             return count($actor['sectorIds'] ?? []) > 0;
         }
 
-        return in_array($actor['role'] ?? null, ['company_admin', 'general_management', 'it_admin'], true);
+        return ($actor['role'] ?? null) === 'company_admin';
     }
 
     public static function canRead(array $actor, ?string $companyId = null, ?array $task = null): bool
@@ -48,7 +48,7 @@ final class ControlAuthorization
         }
 
         return match ($actor['role'] ?? null) {
-            'company_admin', 'general_management', 'it_admin' => true,
+            'company_admin' => true,
             'sector_manager' => ! empty($task['sectorId']) && in_array($task['sectorId'], $actor['sectorIds'] ?? [], true),
             default => ($task['assigneeEmployeeId'] ?? null) === ($actor['employeeId'] ?? null),
         };
@@ -64,7 +64,7 @@ final class ControlAuthorization
             return false;
         }
 
-        if (in_array($actor['role'] ?? null, ['company_admin', 'general_management', 'it_admin'], true)) {
+        if (($actor['role'] ?? null) === 'company_admin') {
             return true;
         }
 
