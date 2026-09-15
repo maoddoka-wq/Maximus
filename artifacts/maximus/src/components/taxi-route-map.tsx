@@ -104,7 +104,13 @@ export function TaxiRouteMap({
     map.setView([14.7167, -17.4677], 12);
     const resizeObserver = typeof ResizeObserver === 'undefined'
       ? null
-      : new ResizeObserver(() => map.invalidateSize({ pan: false }));
+      : new ResizeObserver(() => {
+        window.requestAnimationFrame(() => {
+          if (mapRef.current !== map) return;
+          map.invalidateSize({ pan: false });
+          tileLayerRef.current?.redraw();
+        });
+      });
     resizeObserver?.observe(containerRef.current);
 
     return () => {
@@ -162,11 +168,21 @@ export function TaxiRouteMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return undefined;
-    const frame = window.requestAnimationFrame(() => map.invalidateSize({ pan: false }));
-    const timer = window.setTimeout(() => map.invalidateSize({ pan: false }), 220);
+    const refreshMapViewport = () => {
+      if (mapRef.current !== map) return;
+      map.invalidateSize({ pan: false });
+      tileLayerRef.current?.redraw();
+      if (expanded && viewportBoundsRef.current?.isValid()) {
+        map.fitBounds(viewportBoundsRef.current.pad(0.12), { maxZoom: 16, animate: false });
+      }
+    };
+    const frame = window.requestAnimationFrame(refreshMapViewport);
+    const timer = window.setTimeout(refreshMapViewport, 220);
+    const lateTimer = window.setTimeout(refreshMapViewport, 520);
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
+      window.clearTimeout(lateTimer);
     };
   }, [expanded]);
 
