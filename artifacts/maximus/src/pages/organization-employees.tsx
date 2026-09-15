@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Settings, Trash2 } from 'lucide-react';
+import { Building2, Settings, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   uid,
@@ -35,18 +35,37 @@ export function EmployeesTab({
   data,
   mutate,
   allowSectorAdmin = true,
+  sectorManager = false,
 }: {
   company: Company;
   data: StoreData;
   mutate: Mutate;
   allowSectorAdmin?: boolean;
+  sectorManager?: boolean;
 }) {
   const { alert, confirm } = useAppDialog();
   const companyEmployees = data.employees.filter(employee => employee.companyId === company.id);
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
+  const directionNode = companyNodes.find(node => !node.parentId && (node.code === 'DG' || node.name === 'Direction générale'));
+  const directionEmployee = directionNode
+    ? companyEmployees.find(employee => employee.sectorId === directionNode.id)
+    : undefined;
+  const directionRoles = directionNode
+    ? companyRoles.filter(role => role.sectorId === directionNode.id)
+    : [];
+  const readOnlyDirectionRole = directionRoles.find(role =>
+    Object.values(role.modulePermissions).every(permissions => permissions.every(permission => permission === 'voir')),
+  ) ?? directionRoles[0];
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [creationDefaults, setCreationDefaults] = useState<{ sectorId?: string; roleId?: string }>({});
+
+  const openCreate = (defaults: { sectorId?: string; roleId?: string } = {}) => {
+    setEditingEmployee(null);
+    setCreationDefaults(defaults);
+    setModalOpen(true);
+  };
 
   const deleteEmployee = async (employee: Employee) => {
     const ok = await confirm({
@@ -78,8 +97,39 @@ export function EmployeesTab({
           <h2 className="text-lg font-bold">Comptes Employés</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez le compte, choisissez son appartenance et son rôle. Les permissions viennent du rôle configuré à l’étape 2.</p>
         </div>
-        <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
+        <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => openCreate()} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
+      {!sectorManager && directionNode && (
+        <div className="mx-4 mb-5 flex flex-col gap-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.05)] p-4 sm:mx-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
+              <ShieldCheck size={17} />
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-bold">Compte propre de la Direction générale</h3>
+              <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                Le compte Direction générale est nominatif et séparé de l’administration technique du service informatique.
+              </p>
+              {directionEmployee && (
+                <p className="mt-2 text-xs font-semibold text-[hsl(var(--primary))]">
+                  Compte configuré : {directionEmployee.firstName} {directionEmployee.lastName} · {directionEmployee.email}
+                </p>
+              )}
+            </div>
+          </div>
+          {!directionEmployee && (
+            <ActionButton
+              className="shrink-0 self-start sm:self-center"
+              primary
+              disabled={!readOnlyDirectionRole}
+              onClick={() => openCreate({ sectorId: directionNode.id, roleId: readOnlyDirectionRole?.id })}
+              testId="btn-create-direction-account"
+            >
+              Créer le compte Direction générale
+            </ActionButton>
+          )}
+        </div>
+      )}
       {(companyNodes.length === 0 || companyRoles.length === 0) && <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure, configurez les rôles et leurs autorisations, puis ajoutez les comptes employés.</p>}
       <div className="space-y-3 p-4 sm:hidden">
         {companyEmployees.map(employee => {
@@ -150,6 +200,8 @@ export function EmployeesTab({
           allNodes={companyNodes}
           allRoles={companyRoles}
           allEmployees={companyEmployees}
+           defaultSectorId={creationDefaults.sectorId}
+           defaultRoleId={creationDefaults.roleId}
           allowSectorAdmin={allowSectorAdmin}
           onClose={() => setModalOpen(false)}
            onSave={async employeeData => {
@@ -207,6 +259,8 @@ function EmployeeFormModal({
   allNodes,
   allRoles,
   allEmployees,
+  defaultSectorId,
+  defaultRoleId,
   allowSectorAdmin = true,
   onClose,
   onSave,
@@ -215,6 +269,8 @@ function EmployeeFormModal({
   allNodes: OrgNode[];
   allRoles: Role[];
   allEmployees: Employee[];
+  defaultSectorId?: string;
+  defaultRoleId?: string;
   allowSectorAdmin?: boolean;
   onClose: () => void;
   onSave: (data: EmployeeFormData) => Promise<void>;
@@ -227,8 +283,8 @@ function EmployeeFormModal({
     email: initialData?.email || '',
     phone: initialData?.phone || '',
     position: initialData?.position || '',
-    sectorId: initialData?.sectorId || (allNodes[0]?.id ?? ''),
-    roleId: initialData?.roleId || '',
+    sectorId: initialData?.sectorId || defaultSectorId || (allNodes[0]?.id ?? ''),
+    roleId: initialData?.roleId || defaultRoleId || '',
     isSectorAdmin: initialData?.isSectorAdmin ?? false,
     password: '',
     passwordConfirm: '',

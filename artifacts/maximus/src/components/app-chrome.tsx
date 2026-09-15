@@ -212,7 +212,7 @@ export function Sidebar({
                     {companyName ?? 'Entreprise'}
                   </p>
                   <p className="mt-0.5 text-[10px] text-[hsl(var(--sidebar-foreground)/.55)]">
-                    {employee ? employee.role : 'Espace entreprise'}
+                    {employee ? employee.role : 'Administration technique'}
                   </p>
                 </div>
               )}

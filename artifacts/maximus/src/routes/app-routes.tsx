@@ -321,7 +321,7 @@ export function CompanyRouter({
     ) : (
       renderScreen(screens.empty, {
         title: 'Accès réservé à l’administrateur',
-        text: 'Le profil de l’entreprise est géré par son administrateur.',
+        text: 'Le profil de l’entreprise est géré par son administrateur technique.',
         action: () => onBack('/entreprise/dashboard'),
       })
     );
@@ -357,7 +357,7 @@ export function CompanyRouter({
     ) : (
       renderScreen(screens.empty, {
         title: 'Accès réservé',
-        text: 'L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur.',
+        text: 'L’Organisation est accessible à l’administrateur technique de l’entreprise et aux managers de secteur.',
         action: () => onBack('/entreprise/dashboard'),
       })
     );

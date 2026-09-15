@@ -7018,7 +7018,7 @@ function AdminCreateCompanyPage({
             testId="input-admin-company-manager"
           />
           <Field
-            label="Email administrateur"
+            label="Email administrateur technique"
             value={email}
             onChange={setEmail}
             type="email"
@@ -7056,7 +7056,7 @@ function AdminCreateCompanyPage({
             </select>
           </label>
           <Field
-            label="Mot de passe administrateur"
+            label="Mot de passe administrateur technique"
             value={password}
             onChange={setPassword}
             type="password"

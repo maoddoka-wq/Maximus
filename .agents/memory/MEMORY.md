@@ -4,6 +4,7 @@
 - [Persistance des présences](presence-storage.md) — les workflows Présences sont stockés dans PostgreSQL via des éléments typés, payload extensible et historique.
 - [Pointage par QR code](presence-qr-clock.md) — le gérant affiche le QR du jour ; chaque employé scanne avec son propre compte pour enregistrer arrivée puis sortie.
 - [Parcours Organisation](organization-workflow.md) — construire la hiérarchie, configurer les rôles, puis créer les employés et désigner les managers.
+- [Gouvernance des comptes entreprise](account-governance.md) — séparer l’administration technique du service informatique du compte métier nominatif de la Direction générale.
 - [Validation des vues authentifiées](authenticated-preview.md) — pour contrôler les écrans connectés, conserver une session locale via le navigateur CDP avant les captures.
 - [Frontière des données Commerce](commerce-data-boundary.md) — les workflows Commerce doivent synchroniser explicitement l’état local entreprise et le StoreData partagé lorsqu’ils touchent au stock.
 - [Routage avec paramètres](query-routing.md) — les routeurs d’espace doivent comparer le chemin sans query string, car les onglets internes modifient l’URL courante.
