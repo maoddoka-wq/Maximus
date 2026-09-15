@@ -2021,10 +2021,6 @@ function Signup({
                             </div>
                           </div>
                         )}
-                        <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">
-                          <Check size={12} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
-                          Les fonctionnalités nécessaires sont ajoutées automatiquement.
-                        </p>
                       </div>
                     )}
                   </div>

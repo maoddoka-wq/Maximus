@@ -45,9 +45,5 @@ export function getEffectiveModuleFeatureIds(module: Module, allowedFeatureIds?:
   const allFeatureIds = getModuleFeatureOptions(module).map(feature => feature.id);
   if (!Array.isArray(allowedFeatureIds)) return new Set(allFeatureIds);
 
-  const effectiveIds = new Set(allowedFeatureIds.filter(featureId => allFeatureIds.includes(featureId)));
-  [...effectiveIds].forEach(featureId => {
-    getModuleFeatureDependencies(module, featureId).forEach(dependencyId => effectiveIds.add(dependencyId));
-  });
-  return effectiveIds;
+  return new Set(allowedFeatureIds.filter(featureId => allFeatureIds.includes(featureId)));
 }

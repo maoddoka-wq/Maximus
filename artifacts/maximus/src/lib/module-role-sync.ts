@@ -1,9 +1,8 @@
 import { commerceTabDefinitions, commerceTabPermissionKeys } from './commerce-permissions';
 import { getModuleFeatureOptions } from './module-features';
-import { permissionFeatureKey, resolveFeatureDependencies } from './permission-keys';
+import { permissionFeatureKey } from './permission-keys';
 import {
   getConfiguredModules,
-  stockSubmoduleDependencies,
   type Company,
   type Module,
   type ModuleFeaturePack,
@@ -18,13 +17,6 @@ function featurePermissionKeys(module: Module, featureId: string) {
   if (module.id === 'stocks') return [`stocks:${featureId}`];
   if (module.id === 'presences') return [`presence.${featureId}`];
   return [permissionFeatureKey(module.id, featureId)];
-}
-
-function featureDependencies(module: Module, featureId: string) {
-  if (module.id === 'stocks') {
-    return resolveFeatureDependencies(stockSubmoduleDependencies, featureId);
-  }
-  return resolveFeatureDependencies(module.featureDependencies ?? {}, featureId);
 }
 
 function featureIdsForModule(module: Module) {
@@ -56,7 +48,6 @@ function buildPackRolePermissions(
   previousPermissions: Record<string, string[]> = {},
 ) {
   const selected = new Set(selectedFeatureIds);
-  selectedFeatureIds.forEach(featureId => featureDependencies(module, featureId).forEach(dependencyId => selected.add(dependencyId)));
   const permissions = Object.fromEntries(
     Object.entries(previousPermissions).filter(([key]) => !isFeaturePermissionKey(module, key) && key !== module.id),
   );

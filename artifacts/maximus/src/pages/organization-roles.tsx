@@ -3,17 +3,15 @@ import { Building2, Check, ChevronDown, KeyRound, Layers3, Settings, ShieldCheck
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   commerceTabDefinitions,
-  commerceTabDependencies,
   commerceTabPermissionKey,
   commerceTabPermissionKeys,
   type CommerceTabId,
 } from '@/lib/commerce-permissions';
-import { featureSlug, permissionFeatureKey, resolveFeatureDependencies } from '@/lib/permission-keys';
+import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import {
   getConfiguredModules,
   type Company,
-  stockSubmoduleDependencies,
   stockSubmodules,
   uid,
   type Module,
