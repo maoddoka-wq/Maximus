@@ -78,60 +78,6 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
-test('ne détecte pas la Direction générale avec le seul nom de l’unité', () => {
-  const { data, company, employee } = createAccessFixture();
-  const node = data.orgNodes[0]!;
-  node.name = 'Direction générale';
-  node.code = 'DG';
-
-  const access = buildAppAccessContext({
-    data,
-    session: `employee:${employee.id}`,
-    employee,
-    activeCompanyId: company.id,
-    activeCompany: company,
-    sectorTestCompanyId: null,
-    serverModuleStatuses: null,
-  });
-
-  assert.equal(access.isGeneralDirection, false);
-  assert.equal(access.canViewReports, false);
-});
-
-test('détecte la Direction générale avec le marqueur du compte', () => {
-  const { data, company, employee } = createAccessFixture();
-  employee.isGeneralDirection = true;
-
-  const access = buildAppAccessContext({
-    data,
-    session: `employee:${employee.id}`,
-    employee,
-    activeCompanyId: company.id,
-    activeCompany: company,
-    sectorTestCompanyId: null,
-    serverModuleStatuses: null,
-  });
-
-  assert.equal(access.isGeneralDirection, true);
-  assert.equal(access.canViewReports, true);
-});
-
-test('ne donne pas les rapports direction à l’administrateur technique', () => {
-  const { data, company } = createAccessFixture();
-
-  const access = buildAppAccessContext({
-    data,
-    session: `company:${company.id}`,
-    employee: null,
-    activeCompanyId: company.id,
-    activeCompany: company,
-    sectorTestCompanyId: null,
-    serverModuleStatuses: null,
-  });
-
-  assert.equal(access.canViewReports, false);
-});
-
 test('calcule les permissions Transport séparément pour chaque rubrique', () => {
   const { data, company, employee } = createAccessFixture();
   const node = data.orgNodes[0]!;

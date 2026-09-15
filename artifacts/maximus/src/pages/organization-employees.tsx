@@ -35,28 +35,18 @@ export function EmployeesTab({
   data,
   mutate,
   allowSectorAdmin = true,
-  sectorManager = false,
 }: {
   company: Company;
   data: StoreData;
   mutate: Mutate;
   allowSectorAdmin?: boolean;
-  sectorManager?: boolean;
 }) {
   const { alert, confirm } = useAppDialog();
   const companyEmployees = data.employees.filter(employee => employee.companyId === company.id);
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
-  const directionEmployee = companyEmployees.find(employee => employee.isGeneralDirection === true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [creationDefaults, setCreationDefaults] = useState<{ sectorId?: string; roleId?: string }>({});
-
-  const openCreate = (defaults: { sectorId?: string; roleId?: string } = {}) => {
-    setEditingEmployee(null);
-    setCreationDefaults(defaults);
-    setModalOpen(true);
-  };
 
   const deleteEmployee = async (employee: Employee) => {
     const ok = await confirm({
@@ -88,7 +78,7 @@ export function EmployeesTab({
           <h2 className="text-lg font-bold">Comptes Employés</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez le compte, choisissez son appartenance et son rôle. Les permissions viennent du rôle configuré à l’étape 2.</p>
         </div>
-        <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => openCreate()} testId="btn-create-employee">Ajouter un employé</ActionButton>
+        <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
       {(companyNodes.length === 0 || companyRoles.length === 0) && <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure, configurez les rôles et leurs autorisations, puis ajoutez les comptes employés.</p>}
       <div className="space-y-3 p-4 sm:hidden">
@@ -112,7 +102,6 @@ export function EmployeesTab({
                   <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-medium">
                     <Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />
                     {sector?.name || 'Non assigné'}
-                    {employee.isGeneralDirection && <span className="rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Direction générale</span>}
                     {employee.isSectorAdmin && <span className="rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}
                   </dd>
                 </div>
@@ -142,7 +131,7 @@ export function EmployeesTab({
               return (
                 <tr key={employee.id} className="transition hover:bg-[hsl(var(--muted)/.3)]">
                   <td className="px-6 py-4"><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] text-xs font-black text-[hsl(var(--foreground))]">{employee.firstName[0]}{employee.lastName[0]}</span><div><p className="font-bold">{employee.firstName} {employee.lastName}</p><p className="text-xs text-[hsl(var(--muted-foreground))]">{employee.email}</p></div></div></td>
-                   <td className="px-6 py-4"><span className="inline-flex flex-wrap items-center gap-1.5 text-xs font-medium"><Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />{sector?.name || 'Non assigné'}{employee.isGeneralDirection && <span className="ml-1 rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Direction générale</span>}{employee.isSectorAdmin && <span className="ml-1 rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}</span></td>
+                  <td className="px-6 py-4"><span className="inline-flex items-center gap-1.5 text-xs font-medium"><Building2 size={13} className="text-[hsl(var(--muted-foreground))]" />{sector?.name || 'Non assigné'}{employee.isSectorAdmin && <span className="ml-1 rounded-full bg-[hsl(var(--primary)/.12)] px-2 py-0.5 text-[9px] font-bold text-[hsl(var(--primary))]">Manager</span>}</span></td>
                   <td className="px-6 py-4 text-xs font-medium">{role?.name || 'Non assigné'}</td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2">
                     <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
@@ -161,10 +150,6 @@ export function EmployeesTab({
           allNodes={companyNodes}
           allRoles={companyRoles}
           allEmployees={companyEmployees}
-           defaultSectorId={creationDefaults.sectorId}
-            defaultRoleId={creationDefaults.roleId}
-            allowGeneralDirection={!sectorManager && allowSectorAdmin}
-            generalDirectionAlreadyAssigned={Boolean(directionEmployee)}
           allowSectorAdmin={allowSectorAdmin}
           onClose={() => setModalOpen(false)}
            onSave={async employeeData => {
@@ -185,8 +170,7 @@ export function EmployeesTab({
                employeeId,
                sectorIds,
                role: employeeData.isSectorAdmin ? 'sector_manager' : 'employee',
-                permissions: assignedRole.modulePermissions,
-                ...(employeeData.isGeneralDirection ? { isGeneralDirection: true } : {}),
+               permissions: assignedRole.modulePermissions,
                ...(employeeData.loginPassword ? { password: employeeData.loginPassword } : {}),
              });
             mutate(draft => {
@@ -223,10 +207,6 @@ function EmployeeFormModal({
   allNodes,
   allRoles,
   allEmployees,
-  defaultSectorId,
-  defaultRoleId,
-  allowGeneralDirection = false,
-  generalDirectionAlreadyAssigned = false,
   allowSectorAdmin = true,
   onClose,
   onSave,
@@ -235,10 +215,6 @@ function EmployeeFormModal({
   allNodes: OrgNode[];
   allRoles: Role[];
   allEmployees: Employee[];
-  defaultSectorId?: string;
-  defaultRoleId?: string;
-  allowGeneralDirection?: boolean;
-  generalDirectionAlreadyAssigned?: boolean;
   allowSectorAdmin?: boolean;
   onClose: () => void;
   onSave: (data: EmployeeFormData) => Promise<void>;
@@ -251,10 +227,9 @@ function EmployeeFormModal({
     email: initialData?.email || '',
     phone: initialData?.phone || '',
     position: initialData?.position || '',
-    sectorId: initialData?.sectorId || defaultSectorId || (allNodes[0]?.id ?? ''),
-    roleId: initialData?.roleId || defaultRoleId || '',
+    sectorId: initialData?.sectorId || (allNodes[0]?.id ?? ''),
+    roleId: initialData?.roleId || '',
     isSectorAdmin: initialData?.isSectorAdmin ?? false,
-    isGeneralDirection: initialData?.isGeneralDirection ?? false,
     password: '',
     passwordConfirm: '',
   });
@@ -310,7 +285,6 @@ function EmployeeFormModal({
       sectorId: formData.sectorId,
       roleId: formData.roleId,
       isSectorAdmin: formData.isSectorAdmin,
-      isGeneralDirection: formData.isGeneralDirection,
       role: role.name,
       ...(password ? { loginPassword: password } : {}),
     }).catch(nextError => {
@@ -336,29 +310,7 @@ function EmployeeFormModal({
           <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Rôles de l’unité sélectionnée et de ses unités parentes.</p>
         </label>
       </div>
-      {(allowSectorAdmin || (allowGeneralDirection && (!generalDirectionAlreadyAssigned || initialData?.isGeneralDirection))) && (
-        <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
-          {allowSectorAdmin && (
-            <label className="flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold">
-              <input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" />
-              <span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span>
-            </label>
-          )}
-          {allowGeneralDirection && (!generalDirectionAlreadyAssigned || initialData?.isGeneralDirection) && (
-            <label className="flex items-start gap-2 rounded-lg border border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.05)] p-3 text-xs font-semibold">
-              <input
-                type="checkbox"
-                data-testid="checkbox-general-direction"
-                checked={Boolean(formData.isGeneralDirection)}
-                disabled={Boolean(initialData?.isGeneralDirection)}
-                onChange={event => setFormData(current => ({ ...current, isGeneralDirection: event.target.checked }))}
-                className="mt-0.5"
-              />
-              <span><strong className="block">Direction générale</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Compte nominatif unique de la Direction générale, séparé du service informatique. Ce choix ne peut être attribué qu’une seule fois.</small></span>
-            </label>
-          )}
-        </div>
-      )}
+      {allowSectorAdmin && <label className="mt-4 flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold"><input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" /><span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span></label>}
       <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
     </div>
   );

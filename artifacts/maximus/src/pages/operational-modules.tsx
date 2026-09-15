@@ -347,7 +347,6 @@ export function OperationalModulePage({
   canCreate = true,
   canModify = true,
   featurePermissions,
-  preview = false,
 }: {
   moduleId: ModuleId;
   data: StoreData;
@@ -355,7 +354,6 @@ export function OperationalModulePage({
   canCreate?: boolean;
   canModify?: boolean;
   featurePermissions?: Partial<Record<string, string[]>>;
-  preview?: boolean;
 }) {
   const config = configs.find(item => item.id === moduleId);
   if (!config) return null;
@@ -372,8 +370,8 @@ export function OperationalModulePage({
       config={config}
       data={data}
       mutate={mutate}
-      canCreate={preview ? false : scopedCanCreate}
-      canModify={preview ? false : scopedCanModify}
+      canCreate={scopedCanCreate}
+      canModify={scopedCanModify}
     />
   );
 }

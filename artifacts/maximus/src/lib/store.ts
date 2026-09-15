@@ -46,8 +46,6 @@ export interface Company {
   allowedModules: ModuleId[];
   refusedModules: ModuleId[];
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
-  /** When false, the workspace is operated directly by the company admin. */
-  employeeManagementEnabled?: boolean;
   createdAt: string;
   profilePhoto?: string;
   primaryColor?: string;
@@ -77,7 +75,7 @@ export interface Module {
 export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
-export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; isGeneralDirection?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
+export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
 export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; companyId?: string; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; companyId?: string; }
@@ -509,9 +507,6 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
           .filter((featureId): featureId is CompanyWorkspaceFeatureId =>
             ['controle', 'organisation', 'guide-configuration'].includes(featureId),
           );
-      }
-      if (raw.employeeManagementEnabled !== undefined) {
-        normalizedCompany.employeeManagementEnabled = raw.employeeManagementEnabled === true;
       }
       if (raw.requestedModulePackIds !== undefined) {
         normalizedCompany.requestedModulePackIds = normalizeStringArrayMap(raw.requestedModulePackIds) as Partial<Record<ModuleId, string[]>>;

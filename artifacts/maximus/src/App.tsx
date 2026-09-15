@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -970,14 +970,6 @@ function AppContent() {
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
   const companyId = activeCompanyId ?? '';
   const currentCompany = activeCompany;
-  const currentCompanyWorkspaceFeatures = currentCompany?.employeeManagementEnabled === false
-    ? [
-        ...new Set<CompanyWorkspaceFeatureId>([
-          ...(currentCompany.hiddenWorkspaceFeatures ?? []),
-          'organisation',
-        ]),
-      ]
-    : currentCompany?.hiddenWorkspaceFeatures;
   const {
     accessRole,
     employeeNode,
@@ -995,8 +987,6 @@ function AppContent() {
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
-    isGeneralDirection,
-    canViewReports,
     verticalModuleNavigation,
   } = buildAppAccessContext({
     data,
@@ -1065,8 +1055,7 @@ function AppContent() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
-        hiddenWorkspaceFeatures={currentCompanyWorkspaceFeatures}
-        showDirectionReports={isGeneralDirection}
+        hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Topbar
@@ -1186,8 +1175,6 @@ function AppContent() {
                   canManagePeople={canManagePeople}
                   companyAdmin={companyAdmin}
                   sectorManager={sectorManager}
-                  isGeneralDirection={isGeneralDirection}
-                  canViewReports={canViewReports}
                   scopeNodeId={employeeNode?.id}
                   companyId={companyId}
                   employee={employee}
@@ -1205,7 +1192,7 @@ function AppContent() {
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
                   singleModuleNavigation={verticalModuleNavigation}
-                   hiddenWorkspaceFeatures={currentCompanyWorkspaceFeatures}
+                   hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,
@@ -2613,12 +2600,10 @@ function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
-  canViewReports,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
-  canViewReports: boolean;
 }) {
   const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
   const canStocks = allowed.includes('stocks');
@@ -6491,37 +6476,8 @@ function ModulePackTestWorkbench({
     'logistique',
     'documents',
   ];
-  const previewContext = useMemo(() => {
-    const previewCompany: Company = {
-      id: 'module-preview-company',
-      name: 'Entreprise de prévisualisation',
-      manager: 'Aperçu MAXIMUS',
-      email: 'preview@maximus.local',
-      phone: '',
-      country: '',
-      sector: '',
-      status: 'ACTIF',
-      requestedModules: [module.id],
-      allowedModules: [module.id],
-      refusedModules: [],
-      createdAt: '',
-    };
-    const previewData = emptyStoreData();
-    previewData.companies = [previewCompany];
-    previewData.orgNodes = [{
-      id: 'module-preview-root',
-      companyId: previewCompany.id,
-      name: 'Direction générale',
-      code: 'DG',
-      type: 'direction',
-      parentId: null,
-    }];
-    return { company: previewCompany, data: previewData };
-  }, [module.id]);
-  const previewCompany = previewContext.company;
-  const previewData = previewContext.data;
-  const previewCompanyId = previewCompany.id;
-  const previewMutate = () => {};
+  const previewCompany = data.companies[0];
+  const previewCompanyId = previewCompany?.id ?? '';
   const featureOptions = getModuleFeatureOptions(module);
   const fullFeatureIds = featureOptions.map((feature) => feature.id);
   const testFeatureIds = pack
@@ -6635,21 +6591,18 @@ function ModulePackTestWorkbench({
           {(module.id === 'commerce' || module.id === 'ventes') && (
             <CommerceModulePage
               companyId={previewCompanyId}
-              data={previewData}
-              mutate={previewMutate}
-              canCreate={false}
-              canModify={false}
+              data={data}
+              mutate={mutate}
               tabPermissions={commerceTabPermissions}
               allowedTabs={allowedCommerceTabs}
               initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')}
-              preview
             />
           )}
-           {module.id === 'finance' && <FinancePage data={previewData} />}
+           {module.id === 'finance' && <FinancePage data={data} />}
           {module.id === 'rh' && previewCompany && (
-             <CompanyOrganizationAdmin company={previewCompany} data={previewData} mutate={previewMutate} />
+            <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
           )}
-             {module.id === 'presences' && <PresencesPage data={previewData} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
+            {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
             {module.id === 'paie' && <PayrollModulePage companyId={previewCompanyId || 'module-preview'} employees={[]} canCreate={false} canModify={false} visibleFeatureIds={authorizedFeatures} preview />}
            {module.id === 'ecommerce' && (
              <EcommerceModulePage
@@ -6671,13 +6624,12 @@ function ModulePackTestWorkbench({
           {operationalModules.includes(module.id) && module.id !== 'paie' && (
             <OperationalModulePage
               moduleId={module.id}
-               data={previewData}
-               mutate={previewMutate}
-               preview
+              data={data}
+              mutate={mutate}
               featurePermissions={configuredPermissions}
             />
           )}
-           {module.id === 'rapports' && <OperationalReportsPage data={previewData} />}
+          {module.id === 'rapports' && <OperationalReportsPage data={data} />}
           {!['stocks', 'commerce', 'ventes', 'ecommerce', 'transport', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
             module.id,
           ) && (
@@ -6691,74 +6643,22 @@ function ModulePackTestWorkbench({
   );
 }
 
-function OperationalReportsPage({
-  data,
-  companyId,
-  reportModuleIds,
-  scopeNodeId,
-  globalScope = false,
-}: {
-  data: StoreData;
-  companyId?: string;
-  reportModuleIds?: ModuleId[];
-  scopeNodeId?: string;
-  globalScope?: boolean;
-}) {
+function OperationalReportsPage({ data }: { data: StoreData }) {
   type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
   const [report, setReport] = useState<ReportId>('sales');
   const [query, setQuery] = useState('');
-  const assignedReportModules = reportModuleIds ? new Set(reportModuleIds) : null;
-  const reportModules: Record<ReportId, ModuleId[]> = {
-    sales: ['commerce', 'ventes'],
-    stock: ['stocks'],
-    finance: ['finance', 'comptabilite'],
-    activity: [],
-  };
-  const isReportAssigned = (reportId: ReportId) =>
-    assignedReportModules === null
-      || (reportId === 'activity'
-        ? assignedReportModules.size > 0
-        : reportModules[reportId].some(moduleId => assignedReportModules.has(moduleId)));
-  const companyRecords = <T extends { companyId?: string }>(items: T[]) =>
-    companyId ? items.filter(item => !item.companyId || item.companyId === companyId) : items;
-  const scopeNodeIds = (() => {
-    if (globalScope || !scopeNodeId) return null;
-    const ids = new Set([scopeNodeId]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      data.orgNodes.forEach(node => {
-        if (node.companyId === companyId && node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
-          ids.add(node.id);
-          changed = true;
-        }
-      });
-    }
-    return ids;
-  })();
-  const scopedEmployeeNames = scopeNodeIds
-    ? new Set(
-        data.employees
-          .filter(employee => employee.companyId === companyId && employee.sectorId && scopeNodeIds.has(employee.sectorId))
-          .map(employee => `${employee.firstName} ${employee.lastName}`),
-      )
-    : null;
-  const scopedActivities = companyRecords(data.activities).filter(activity =>
-    !scopedEmployeeNames || scopedEmployeeNames.has(activity.user),
-  );
-  const scopeLabel = globalScope ? 'Direction générale · lecture consolidée' : 'Périmètre du secteur';
   const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
     sales: {
       label: 'Ventes',
       description: 'Chiffre d’affaires et commandes clients.',
       headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'],
-      rows: companyRecords(data.sales).map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
+      rows: data.sales.map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
     },
     stock: {
       label: 'Gestion de stock',
       description: 'Valorisation et niveaux des produits.',
       headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'],
-      rows: companyRecords(data.products).map((item) => [
+      rows: data.products.map((item) => [
         item.name,
         item.sku,
         item.category,
@@ -6776,26 +6676,10 @@ function OperationalReportsPage({
       label: 'Activité',
       description: 'Traçabilité des actions réalisées.',
       headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'],
-      rows: scopedActivities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
+      rows: data.activities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
     },
   };
-  const availableReports = (Object.entries(definitions) as [ReportId, typeof definitions[ReportId]][])
-    .filter(([id]) => isReportAssigned(id));
-  const activeReportId = availableReports.some(([id]) => id === report)
-    ? report
-    : availableReports[0]?.[0];
-  if (!activeReportId) {
-    return (
-      <section className="card-surface rounded-2xl p-8 text-center">
-        <FileBarChart size={24} className="mx-auto text-[hsl(var(--muted-foreground))]" />
-        <h2 className="mt-4 font-bold">Aucun rapport attribué</h2>
-        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-          Aucun module autorisé pour votre périmètre ne possède encore de rapport consolidé.
-        </p>
-      </section>
-    );
-  }
-  const active = definitions[activeReportId];
+  const active = definitions[report];
   const rows = active.rows.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase()));
   const exportCsv = () => {
     const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
@@ -6803,14 +6687,14 @@ function OperationalReportsPage({
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-     link.download = `rapport-${activeReportId}.csv`;
+    link.download = `rapport-${report}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {availableReports.map(([id, item]) => (
+        {(Object.entries(definitions) as [ReportId, typeof active][]).map(([id, item]) => (
           <button
             key={id}
             onClick={() => setReport(id)}
@@ -6822,18 +6706,12 @@ function OperationalReportsPage({
           </button>
         ))}
       </div>
-      <section className="rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] px-4 py-3">
-        <p className="text-xs font-bold text-[hsl(var(--primary))]">{scopeLabel}</p>
-        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-          Les rapports sont consultables ici. Les modifications opérationnelles restent réalisées dans les unités autorisées.
-        </p>
-      </section>
       <section className="card-surface overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-              <h2 className="font-bold">Rapport {active.label}</h2>
+            <h2 className="font-bold">Rapport {active.label}</h2>
             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-              {rows.length} lignes calculées depuis {globalScope ? 'toutes les données de l’entreprise' : 'le périmètre accessible'}.
+              {rows.length} lignes calculées depuis les données de l’entreprise.
             </p>
           </div>
           <div className="flex gap-2">
@@ -7051,7 +6929,7 @@ function AdminCreateCompanyPage({
             testId="input-admin-company-manager"
           />
           <Field
-            label="Email administrateur technique"
+            label="Email administrateur"
             value={email}
             onChange={setEmail}
             type="email"
@@ -7089,7 +6967,7 @@ function AdminCreateCompanyPage({
             </select>
           </label>
           <Field
-            label="Mot de passe administrateur technique"
+            label="Mot de passe administrateur"
             value={password}
             onChange={setPassword}
             type="password"
@@ -7206,13 +7084,6 @@ function CompanyModulesDetail({
   const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
   const [paymentLoading, setPaymentLoading] = useState(true);
-  const [employeeManagementEnabled, setEmployeeManagementEnabled] = useState(
-    company.employeeManagementEnabled !== false,
-  );
-  const [savedEmployeeManagementEnabled, setSavedEmployeeManagementEnabled] = useState(
-    company.employeeManagementEnabled !== false,
-  );
-  const companyEmployeeCount = data.employees.filter(employee => employee.companyId === company.id).length;
 
   useEffect(() => {
     let cancelled = false;
@@ -7272,12 +7143,6 @@ function CompanyModulesDetail({
     setHiddenWorkspaceFeatures(next);
     setSavedHiddenWorkspaceFeatures(next);
   }, [company.id, JSON.stringify(company.hiddenWorkspaceFeatures ?? [])]);
-
-  useEffect(() => {
-    const enabled = company.employeeManagementEnabled !== false;
-    setEmployeeManagementEnabled(enabled);
-    setSavedEmployeeManagementEnabled(enabled);
-  }, [company.id, company.employeeManagementEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7502,91 +7367,6 @@ function CompanyModulesDetail({
             onClick={saveWorkspaceFeatures}
           >
             Enregistrer la visibilité
-          </ActionButton>
-        </div>
-      </section>
-      <section className="card-surface rounded-2xl p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="font-bold">Mode de fonctionnement de l’entreprise</h2>
-            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
-              Choisissez si cette entreprise est gérée directement par son administrateur ou avec une
-              organisation et une Direction technique.
-            </p>
-          </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
-            employeeManagementEnabled
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-amber-100 text-amber-700'
-          }`}>
-            {employeeManagementEnabled ? 'Avec équipe' : 'Mode seul'}
-          </span>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-            !employeeManagementEnabled
-              ? 'border-amber-300 bg-amber-50/70'
-              : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/.35)]'
-          }`}>
-            <input
-              type="radio"
-              name={`company-operating-mode-${company.id}`}
-              data-testid="radio-company-mode-solo"
-              checked={!employeeManagementEnabled}
-              disabled={saving}
-              onChange={() => setEmployeeManagementEnabled(false)}
-              className="mt-1"
-            />
-            <span>
-              <strong className="block text-sm">Mode seul</strong>
-              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                L’administrateur travaille directement dans les modules activés, comme une boutique e-commerce sans équipe.
-              </span>
-              {companyEmployeeCount > 0 && !employeeManagementEnabled && (
-                <span className="mt-2 block text-xs font-semibold text-amber-700">
-                  Les {companyEmployeeCount} compte(s) employé(s) existants restent conservés.
-                </span>
-              )}
-            </span>
-          </label>
-          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-            employeeManagementEnabled
-              ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'
-              : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/.35)]'
-          }`}>
-            <input
-              type="radio"
-              name={`company-operating-mode-${company.id}`}
-              data-testid="radio-company-mode-team"
-              checked={employeeManagementEnabled}
-              disabled={saving}
-              onChange={() => setEmployeeManagementEnabled(true)}
-              className="mt-1"
-            />
-            <span>
-              <strong className="block text-sm">Mode avec équipe</strong>
-              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                L’entreprise peut créer ses unités, faire fonctionner ses modules depuis la Direction technique et créer le compte nominatif de la Direction générale.
-              </span>
-            </span>
-          </label>
-        </div>
-        <div className="mt-5 flex justify-end">
-          <ActionButton
-            primary
-            testId="button-save-company-employee-management"
-            disabled={employeeManagementEnabled === savedEmployeeManagementEnabled}
-            onClick={() => {
-              mutate((draft) => {
-                const target = draft.companies.find(item => item.id === company.id);
-                if (target) target.employeeManagementEnabled = employeeManagementEnabled;
-              }, employeeManagementEnabled
-                ? 'La gestion des employés est activée.'
-                : 'L’entreprise est configurée sans gestion des employés.');
-              setSavedEmployeeManagementEnabled(employeeManagementEnabled);
-            }}
-          >
-            Enregistrer le réglage
           </ActionButton>
         </div>
       </section>
