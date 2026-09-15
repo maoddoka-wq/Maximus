@@ -74,6 +74,7 @@ export function TaxiRouteMap({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const viewportKeyRef = useRef<string | null>(null);
   const viewportBoundsRef = useRef<L.LatLngBounds | null>(null);
+  const [mapReady, setMapReady] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -101,6 +102,7 @@ export function TaxiRouteMap({
     tileLayerRef.current = openStreetMapLayer;
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+    setMapReady((value) => value + 1);
     map.setView([14.7167, -17.4677], 12);
     const resizeObserver = typeof ResizeObserver === 'undefined'
       ? null
@@ -122,7 +124,7 @@ export function TaxiRouteMap({
       viewportKeyRef.current = null;
       viewportBoundsRef.current = null;
     };
-  }, []);
+  }, [expanded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -143,7 +145,7 @@ export function TaxiRouteMap({
       map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
       viewportKeyRef.current = viewportKey;
     }
-  }, [clientStop, destination, driver, pickupRouteGeometry, routeGeometry]);
+  }, [clientStop, destination, driver, mapReady, pickupRouteGeometry, routeGeometry]);
 
   const recenter = () => {
     const map = mapRef.current;
@@ -165,31 +167,10 @@ export function TaxiRouteMap({
     };
   }, [expanded]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return undefined;
-    const refreshMapViewport = () => {
-      if (mapRef.current !== map) return;
-      map.invalidateSize({ pan: false });
-      tileLayerRef.current?.redraw();
-      if (expanded && viewportBoundsRef.current?.isValid()) {
-        map.fitBounds(viewportBoundsRef.current.pad(0.12), { maxZoom: 16, animate: false });
-      }
-    };
-    const frame = window.requestAnimationFrame(refreshMapViewport);
-    const timer = window.setTimeout(refreshMapViewport, 220);
-    const lateTimer = window.setTimeout(refreshMapViewport, 520);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
-      window.clearTimeout(lateTimer);
-    };
-  }, [expanded]);
-
   return <div className={expanded ? 'fixed inset-0 z-[70] flex flex-col bg-slate-950/80 p-3 sm:p-6' : 'space-y-2'}>
      {expanded && <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-lg sm:px-4"><div><p className="text-sm font-black text-slate-900">GPS Taxi</p><p className="text-[11px] text-slate-500">Chauffeur → arrêt client → destination</p></div><div className="flex items-center gap-2"><button type="button" onClick={recenter} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100" aria-label="Recentrer la carte"><LocateFixed size={15} />Recentrer</button><button type="button" onClick={() => setExpanded(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-slate-700 hover:bg-slate-100" aria-label="Réduire la carte"><X size={18} /></button></div></div>}
      <div className={expanded ? 'relative z-0 min-h-0 flex-1' : 'relative z-0'}>
-      <div ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${expanded ? 'h-full min-h-[20rem]' : className}`} aria-label="Carte du trajet Taxi" />
+      <div key={expanded ? 'expanded-map' : 'inline-map'} ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${expanded ? 'h-full min-h-[20rem]' : className}`} aria-label="Carte du trajet Taxi" />
        {!expanded && <div className="absolute right-3 top-3 flex items-center gap-1.5"><button type="button" onClick={recenter} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/95 text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Recentrer la carte"><LocateFixed size={15} /></button><button type="button" onClick={() => setExpanded(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] font-black text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Agrandir la carte"><Maximize2 size={14} />Agrandir</button></div>}
     </div>
     <div className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600 ${expanded ? 'rounded-xl bg-white px-3 py-2.5 shadow-lg' : ''}`}>
