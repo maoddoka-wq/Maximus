@@ -315,6 +315,13 @@ export function CompanyRouter({
     );
   }
   if (routePath === '/entreprise/profil') {
+    if (isWorkspaceFeatureHidden('organisation')) {
+      return renderScreen(screens.empty, {
+        title: 'Fonctionnalité masquée',
+        text: 'L’organisation et les accès ne sont pas activés pour cette entreprise.',
+        action: () => onBack('/entreprise/dashboard'),
+      });
+    }
     const company = data.companies.find(item => item.id === companyId);
     return companyAdmin && company ? (
       renderScreen(screens.organization, { company, data, mutate, initialTab: 'profile' })
