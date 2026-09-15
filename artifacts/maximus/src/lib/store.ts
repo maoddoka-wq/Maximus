@@ -136,17 +136,27 @@ export const modules: Module[] = [
   { id: 'commerce', name: 'Gestion commerciale', description: 'Piloter les ventes, les clients, les achats et la performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
     { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
     { id: 'commerce-gestion', name: 'Gestion commerciale', description: 'Gérer les ventes, clients et indicateurs.', featureIds: ['clients', 'sales', 'products', 'reports'] },
+    { id: 'commerce-employe', name: 'Employé commercial', description: 'Gérer les clients et suivre les ventes confiées à l’employé.', featureIds: ['dashboard', 'clients', 'sales'], featurePermissions: { dashboard: ['voir'], clients: ['voir', 'créer', 'modifier'], sales: ['voir', 'créer', 'modifier'] } },
+    { id: 'commerce-manager', name: 'Manager commercial', description: 'Piloter les ventes, les clients, les produits et les résultats de l’équipe.', featureIds: ['dashboard', 'sales', 'products', 'clients', 'suppliers', 'purchases', 'expenses', 'cash', 'credit', 'invoices', 'returns', 'reports', 'activity'], featurePermissions: { dashboard: ['voir'], sales: ['voir', 'créer', 'modifier'], products: ['voir', 'créer', 'modifier'], clients: ['voir', 'créer', 'modifier'], suppliers: ['voir', 'créer', 'modifier'], purchases: ['voir', 'créer', 'modifier'], expenses: ['voir', 'créer', 'modifier'], cash: ['voir', 'modifier'], credit: ['voir', 'modifier'], invoices: ['voir', 'créer', 'modifier'], returns: ['voir', 'créer', 'modifier'], reports: ['voir'], activity: ['voir'] } },
   ], status: 'ACTIF' },
-  { id: 'ecommerce', name: 'E-commerce', description: 'Boutique en ligne, catalogue public et commandes clients.', features: ecommerceFeatureDefinitions.map(feature => feature.label), featureDependencies: ecommerceFeatureDependencies, featurePacks: ecommerceFeaturePacks.map(pack => ({ ...pack, featureIds: [...pack.featureIds], featurePermissions: Object.fromEntries(Object.entries(pack.featurePermissions).map(([featureId, permissions]) => [featureId, [...permissions]])) })), status: 'ACTIF' },
+  { id: 'ecommerce', name: 'E-commerce', description: 'Boutique en ligne, catalogue public et commandes clients.', features: ecommerceFeatureDefinitions.map(feature => feature.label), featureDependencies: ecommerceFeatureDependencies, featurePacks: [
+    ...ecommerceFeaturePacks.map(pack => ({ ...pack, featureIds: [...pack.featureIds], featurePermissions: Object.fromEntries(Object.entries(pack.featurePermissions).map(([featureId, permissions]) => [featureId, [...permissions]])) })),
+    { id: 'ecommerce-employe', name: 'Employé e-commerce', description: 'Traiter les commandes et accompagner les clients sans modifier la configuration de la boutique.', featureIds: ['dashboard', 'commandes', 'clients'], featurePermissions: { dashboard: ['voir'], commandes: ['voir', 'modifier'], clients: ['voir'] } },
+    { id: 'ecommerce-manager', name: 'Manager e-commerce', description: 'Piloter la boutique, le catalogue, les ventes, les livraisons et les résultats.', featureIds: ecommerceFeatureDefinitions.map(feature => feature.id), featurePermissions: Object.fromEntries(ecommerceFeatureDefinitions.map(feature => [feature.id, feature.id === 'dashboard' || feature.id === 'clients' ? ['voir'] : ['voir', 'créer', 'modifier']])) },
+  ], status: 'ACTIF' },
   { id: 'stocks', name: 'Gestion de stock', description: 'Suivre les articles, les entrées, les sorties et les niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
     { id: 'stock-consultation', name: 'Consultation du stock', description: 'Consulter les articles et les niveaux de stock.', featureIds: ['dashboard', 'products', 'reports'] },
     { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
+    { id: 'stocks-employe', name: 'Employé de stock', description: 'Consulter les articles et enregistrer les mouvements de stock autorisés.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests'], featurePermissions: { dashboard: ['voir'], products: ['voir'], entries: ['voir', 'créer'], exits: ['voir', 'créer'], requests: ['voir', 'créer'] } },
+    { id: 'stocks-manager', name: 'Manager de stock', description: 'Superviser les mouvements, les inventaires, les référentiels et les utilisateurs du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'], featurePermissions: { dashboard: ['voir'], products: ['voir', 'créer', 'modifier'], entries: ['voir', 'créer', 'modifier'], exits: ['voir', 'créer', 'modifier'], requests: ['voir', 'créer', 'modifier'], inventory: ['voir', 'créer', 'modifier'], reports: ['voir'], references: ['voir', 'créer', 'modifier'], users: ['voir', 'modifier'], settings: ['voir', 'modifier'] } },
   ], status: 'ACTIF' },
   { id: 'transport', name: 'Transport', description: 'Organiser les chauffeurs, les véhicules et les courses Taxi.', features: ['Vue d’ensemble', 'Courses', 'Chauffeurs', 'Véhicules', 'Historique', 'Paramètres'], featurePacks: [
     { id: 'transport-consultation', name: 'Consultation Taxi', description: 'Suivre l’activité Taxi, les courses et la flotte.', featureIds: ['overview', 'trips', 'drivers', 'vehicles'] },
     { id: 'transport-gestion', name: 'Gestionnaire Taxi', description: 'Gérer les courses, les chauffeurs et les véhicules.', featureIds: ['overview', 'trips', 'drivers', 'vehicles'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'] } },
     { id: 'transport-chauffeur', name: 'Espace chauffeur Taxi', description: 'Suivre ses courses, son historique et les paramètres opérationnels.', featureIds: ['overview', 'trips', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'modifier'], historique: ['voir'], parametres: ['voir'] } },
+    { id: 'transport-employe', name: 'Employé Transport', description: 'Suivre les courses et l’activité de la flotte sans administrer les chauffeurs.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique'], featurePermissions: { overview: ['voir'], trips: ['voir', 'modifier'], drivers: ['voir'], vehicles: ['voir'], historique: ['voir'] } },
+    { id: 'transport-manager', name: 'Manager Transport', description: 'Piloter les courses, les chauffeurs, les véhicules et l’historique Taxi.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'], historique: ['voir'], parametres: ['voir', 'modifier'] } },
   ], status: 'ACTIF' },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: payrollFeatureDefinitions.map(feature => feature.label), featurePacks: [
@@ -177,6 +187,28 @@ export const modules: Module[] = [
       id: 'paie-supervision',
       name: 'Responsable paie',
       description: 'Valider, financer et lancer les virements.',
+      featureIds: ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique'],
+      featurePermissions: {
+        'tableau-de-bord': ['voir'],
+        bénéficiaires: ['voir', 'créer', 'modifier'],
+        'préparer-une-paie': ['voir', 'créer', 'modifier'],
+        validation: ['voir', 'modifier'],
+        virements: ['voir', 'modifier'],
+        'solde-de-paie': ['voir', 'modifier'],
+        historique: ['voir'],
+      },
+    },
+    {
+      id: 'paie-employe',
+      name: 'Employé paie',
+      description: 'Consulter les informations et l’historique de paie autorisés.',
+      featureIds: ['tableau-de-bord', 'historique'],
+      featurePermissions: { 'tableau-de-bord': ['voir'], historique: ['voir'] },
+    },
+    {
+      id: 'paie-manager',
+      name: 'Manager paie',
+      description: 'Superviser la préparation, la validation, le solde et les virements de paie.',
       featureIds: ['tableau-de-bord', 'bénéficiaires', 'préparer-une-paie', 'validation', 'virements', 'solde-de-paie', 'historique'],
       featurePermissions: {
         'tableau-de-bord': ['voir'],

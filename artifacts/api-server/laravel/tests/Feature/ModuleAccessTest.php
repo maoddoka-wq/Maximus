@@ -134,9 +134,11 @@ class ModuleAccessTest extends TestCase
             ->assertJsonPath('modules.1.featurePacks.0.description', 'Publier une boutique et présenter vos produits.')
             ->assertJsonPath('modules.4.id', 'paie')
             ->assertJsonCount(7, 'modules.4.features')
-            ->assertJsonCount(3, 'modules.4.featurePacks')
+            ->assertJsonCount(5, 'modules.4.featurePacks')
             ->assertJsonPath('modules.4.featurePacks.1.featurePermissions.préparer-une-paie.1', 'créer')
-            ->assertJsonPath('modules.4.featurePacks.2.featurePermissions.virements.1', 'modifier');
+            ->assertJsonPath('modules.4.featurePacks.2.featurePermissions.virements.1', 'modifier')
+            ->assertJsonPath('modules.4.featurePacks.3.id', 'paie-employe')
+            ->assertJsonPath('modules.4.featurePacks.4.id', 'paie-manager');
 
         $this->assertSame(
             $updatedAtBefore,

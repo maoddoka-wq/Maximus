@@ -77,4 +77,31 @@ export const presenceFeaturePacks = [
       [featureId('Rapports')]: ['voir', 'créer', 'modifier'],
     },
   },
+  {
+    id: 'presence-employe',
+    name: 'Employé Présences',
+    description: 'Pointer, consulter son historique et suivre ses absences et congés.',
+    featureIds: [featureId('Tableau de bord'), featureId('Pointage'), featureId('Absences'), featureId('Congés'), featureId('Historique')],
+    featurePermissions: {
+      [featureId('Tableau de bord')]: ['voir'],
+      [featureId('Pointage')]: ['voir', 'créer'],
+      [featureId('Absences')]: ['voir', 'créer'],
+      [featureId('Congés')]: ['voir', 'créer'],
+      [featureId('Historique')]: ['voir'],
+    },
+  },
+  {
+    id: 'presence-manager',
+    name: 'Manager Présences',
+    description: 'Piloter les horaires, les absences, les congés et les rapports de l’équipe.',
+    featureIds: supervisionFeatures,
+    featurePermissions: {
+      ...permissionsFor([featureId('Tableau de bord'), featureId('Présences'), featureId('Historique')], ['voir', 'créer', 'modifier']),
+      [featureId('Pointage')]: ['voir', 'créer', 'modifier'],
+      [featureId('Absences')]: ['voir', 'créer', 'modifier'],
+      [featureId('Horaires')]: ['voir', 'créer', 'modifier'],
+      [featureId('Congés')]: ['voir', 'créer', 'modifier'],
+      [featureId('Rapports')]: ['voir', 'créer', 'modifier'],
+    },
+  },
 ];

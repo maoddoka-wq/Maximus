@@ -14,3 +14,9 @@ MAXI peut préparer un module, un pack, une fonctionnalité, un secteur ou une u
 **Why:** L’assistant doit accélérer les opérations d’administration sans transformer une interprétation de langage en publication ou en changement d’accès implicite.
 
 **How to apply:** Garder les actions dans une liste blanche serveur, produire un aperçu avant exécution, journaliser la confirmation et laisser la publication du catalogue à l’administration humaine.
+
+Les packs de rôle préconfigurés peuvent être ajoutés au catalogue standard, mais ils ne remplacent jamais les packs spécialisés ni les outils MAXIMUS de création, modification et suppression de packs.
+
+**Why:** Les rôles Employé et Manager couvrent les besoins courants, tandis que chaque entreprise peut avoir une organisation métier différente.
+
+**How to apply:** Fournir au minimum un pack Employé et un pack Manager par module, conserver les identifiants historiques utilisés par les secteurs, et laisser les packs personnalisés dans le brouillon jusqu’à publication.

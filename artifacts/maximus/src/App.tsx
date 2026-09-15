@@ -6041,8 +6041,9 @@ function InteractiveModulesPage({
                 </p>
                 <h2 className="mt-2 text-xl font-bold">Packs métiers du module</h2>
                 <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-                  Créez des packs réutilisables en regroupant les fonctionnalités de ce module. Les secteurs pourront
-                  ensuite les sélectionner.
+                  Des packs Employé et Manager sont préconfigurés avec les fonctionnalités utiles de ce module.
+                  Vous pouvez aussi créer, modifier ou supprimer vos propres packs selon votre organisation. Les
+                  secteurs pourront ensuite les sélectionner.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">

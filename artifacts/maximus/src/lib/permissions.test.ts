@@ -274,7 +274,7 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
   );
   assert.deepEqual(
     presenceModule.featurePacks?.map((pack) => pack.name),
-    ['Consultation des présences', 'Gestionnaire des présences', 'Responsable des présences'],
+    ['Consultation des présences', 'Gestionnaire des présences', 'Responsable des présences', 'Employé Présences', 'Manager Présences'],
   );
 });
 
@@ -294,7 +294,7 @@ test('expose tous les packs et fonctionnalités Paie dans le catalogue entrepris
   );
   assert.deepEqual(
     payroll.featurePacks?.map(pack => pack.id),
-    ['paie-consultation', 'paie-gestion', 'paie-supervision'],
+    ['paie-consultation', 'paie-gestion', 'paie-supervision', 'paie-employe', 'paie-manager'],
   );
   assert.ok(payroll.featurePacks?.every(pack => pack.featureIds.length > 0));
 
@@ -302,6 +302,15 @@ test('expose tous les packs et fonctionnalités Paie dans le catalogue entrepris
   assert.ok(availableSectors.length > 0);
   assert.ok(availableSectors.every(sector => sector.moduleIds.includes('paie')));
   assert.ok(availableSectors.every(sector => (sector.modulePackIds?.paie ?? []).length > 0));
+});
+
+test('prépare un pack employé et un pack manager pour chaque module', () => {
+  modules.forEach(module => {
+    const packIds = new Set((module.featurePacks ?? []).map(pack => pack.id));
+    const packPrefix = module.id === 'presences' ? 'presence' : module.id;
+    assert.equal(packIds.has(`${packPrefix}-employe`), true, `pack employé absent pour ${module.id}`);
+    assert.equal(packIds.has(`${packPrefix}-manager`), true, `pack manager absent pour ${module.id}`);
+  });
 });
 
 test('ignore un cycle de dépendances sans boucler', () => {
