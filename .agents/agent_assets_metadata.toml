@@ -168,3 +168,17 @@ mtime_ms = 1789410814336
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/8c0f3eff-9e53-42ed-8fbe-e6115a65b08e/244cb048-8284-497e-bc42-5f1096062a26"
 storage_version_token = "1789411411791731"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "s8rRyZARjQoP0dCbIJU-W"
+uri = "file://screenshots/maximus-mobile-final.jpg"
+type = "image"
+title = "MAXIMUS — validation mobile"
+description = "Capture du parcours de connexion à 402×874 px, utilisée pour vérifier le rendu responsive avant la présentation."
+logical_id = "638d2aab-7f01-47de-8803-af3c9f95a2d2"
+content_hash = "sha256:611d501a81d8446ccff100d4664dfe652b93d86ed5005db05e924a749e62fbc3"
+size = 28805
+mtime_ms = 1789475578746
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/638d2aab-7f01-47de-8803-af3c9f95a2d2/aa75bf07-4e0a-460c-8f0e-c1a3d41e5c14"
+storage_version_token = "1789475637455594"
+content_type = "image/jpeg"
