@@ -177,6 +177,98 @@ class MaximusAuthTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_sector_manager_cannot_update_an_existing_account_outside_its_scope(): void
+    {
+        $existing = AuthUser::query()->create([
+            'id' => 'existing-outside-sector',
+            'email' => 'existing-outside-sector@kora.demo',
+            'password_hash' => MaximusPassword::hash('Existing123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Employé hors secteur',
+            'role' => 'employee',
+            'company_id' => 'kora',
+            'employee_id' => 'employee-outside-sector',
+            'sector_ids' => ['secteur-b'],
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'sector-manager-existing-boundary',
+            'email' => 'sector-manager-existing-boundary@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => 'kora',
+            'sector_ids' => ['secteur-a'],
+            'status' => 'ACTIF',
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager))
+            ->postJson('/api/auth/accounts', [
+                'id' => 'attempted-outside-sector',
+                'email' => 'changed-outside-sector@kora.demo',
+                'displayName' => 'Modification interdite',
+                'companyId' => 'kora',
+                'employeeId' => $existing->employee_id,
+                'sectorIds' => ['secteur-a'],
+                'role' => 'employee',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('auth_users', [
+            'id' => $existing->id,
+            'email' => 'existing-outside-sector@kora.demo',
+            'display_name' => 'Employé hors secteur',
+        ]);
+    }
+
+    public function test_account_scope_change_revokes_existing_sessions(): void
+    {
+        $employee = AuthUser::query()->create([
+            'id' => 'account-scope-change',
+            'email' => 'account-scope-change@kora.demo',
+            'password_hash' => MaximusPassword::hash('Existing123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Employé à requalifier',
+            'role' => 'employee',
+            'company_id' => 'kora',
+            'employee_id' => 'employee-scope-change',
+            'sector_ids' => ['secteur-a'],
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'company-admin-scope-change',
+            'email' => 'company-admin-scope-change@kora.demo',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        AuthSession::query()->create([
+            'id' => 'scope-change-session',
+            'user_id' => $employee->id,
+            'token_hash' => hash('sha256', 'scope-change-token'),
+            'expires_at' => now()->addHour(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager))
+            ->postJson('/api/auth/accounts', [
+                'id' => $employee->id,
+                'email' => $employee->email,
+                'displayName' => $employee->display_name,
+                'companyId' => 'kora',
+                'employeeId' => $employee->employee_id,
+                'sectorIds' => ['secteur-b'],
+                'role' => 'sector_manager',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('auth_sessions', ['id' => 'scope-change-session']);
+    }
+
     public function test_sector_manager_cannot_grant_permissions_they_do_not_hold(): void
     {
         $manager = AuthUser::query()->create([

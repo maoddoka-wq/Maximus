@@ -6,6 +6,7 @@ import type {
   StoreData,
 } from './store';
 import { getConfiguredModules, modules } from './store';
+import { getModuleFeatureOptions } from './module-features';
 
 export interface CatalogDraft {
   moduleOverrides: ModuleOverrides;
@@ -75,12 +76,57 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   const snapshot = getCatalogSnapshot(data);
   const errors: string[] = [];
   const warnings: string[] = [];
-  const moduleIds = new Set(modules.map(module => module.id));
-  const availableModuleIds = new Set(modules.filter(module => !snapshot.removedModules.includes(module.id)).map(module => module.id));
   const configuredModules = getConfiguredModules({
     moduleOverrides: snapshot.moduleOverrides,
     removedModules: [],
     customModules: snapshot.customModules,
+  });
+  const moduleById = new Map(configuredModules.map(module => [module.id, module]));
+  const moduleIds = new Set(configuredModules.map(module => module.id));
+  const availableModuleIds = new Set(
+    configuredModules
+      .filter(module => !snapshot.removedModules.includes(module.id))
+      .filter(module => (snapshot.moduleStatuses[module.id] ?? module.status) !== 'INACTIF')
+      .map(module => module.id),
+  );
+  const validActions = new Set(['voir', 'créer', 'modifier']);
+
+  const validateModuleReferences = (moduleId: ModuleId, moduleName: string) => {
+    const module = moduleById.get(moduleId);
+    if (!module) return;
+    const featureIds = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
+    const packs = module.featurePacks ?? [];
+    const packIds = new Set<string>();
+    packs.forEach(pack => {
+      if (packIds.has(pack.id)) errors.push(`Le module « ${moduleName} » contient des packs portant le même identifiant.`);
+      packIds.add(pack.id);
+      const packFeatures = new Set(pack.featureIds);
+      pack.featureIds.forEach(featureId => {
+        if (!featureIds.has(featureId)) errors.push(`Le pack « ${pack.name || pack.id} » référence une fonctionnalité absente.`);
+      });
+      Object.entries(pack.featurePermissions ?? {}).forEach(([featureId, permissions]) => {
+        const normalizedPermissions = permissions ?? [];
+        if (!packFeatures.has(featureId)) errors.push(`Le pack « ${pack.name || pack.id} » autorise une fonctionnalité non incluse.`);
+        if (normalizedPermissions.some(permission => !validActions.has(permission))) {
+          errors.push(`Le pack « ${pack.name || pack.id} » contient une action de permission inconnue.`);
+        }
+      });
+    });
+    Object.entries(module.featureDependencies ?? {}).forEach(([featureId, dependencies]) => {
+      const normalizedDependencies = dependencies ?? [];
+      if (!featureIds.has(featureId) || normalizedDependencies.some(dependency => !featureIds.has(dependency))) {
+        errors.push(`Le module « ${moduleName} » contient une dépendance de fonctionnalité invalide.`);
+      }
+    });
+  };
+
+  const modulesToValidate = new Set<ModuleId>([
+    ...Object.keys(snapshot.moduleOverrides) as ModuleId[],
+    ...(snapshot.customModules ?? []).map(module => module.id),
+  ]);
+  modulesToValidate.forEach(moduleId => {
+    const module = moduleById.get(moduleId);
+    if (module) validateModuleReferences(module.id, module.name);
   });
 
   snapshot.sectorPresets.forEach(sector => {
@@ -89,18 +135,35 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
     sector.moduleIds.forEach(moduleId => {
       if (!moduleIds.has(moduleId)) errors.push(`Le secteur « ${sector.name} » référence un module inconnu.`);
       if (!availableModuleIds.has(moduleId)) errors.push(`Le secteur « ${sector.name} » utilise un module inactif.`);
-      const module = configuredModules.find(candidate => candidate.id === moduleId);
+      const module = moduleById.get(moduleId);
       if (!module) return;
       const availablePackIds = new Set((module.featurePacks ?? []).map(pack => pack.id));
       const selectedPackIds = sector.modulePackIds?.[moduleId] ?? [];
+      if (new Set(selectedPackIds).size !== selectedPackIds.length) {
+        errors.push(`Le secteur « ${sector.name} » sélectionne deux fois le même pack.`);
+      }
       selectedPackIds.forEach(packId => {
         if (!availablePackIds.has(packId)) errors.push(`Le secteur « ${sector.name} » référence un pack absent.`);
+      });
+      const validFeatureIds = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
+      const selectedPackFeatures = new Set(
+        selectedPackIds.flatMap(packId => module.featurePacks?.find(pack => pack.id === packId)?.featureIds ?? []),
+      );
+      (sector.moduleFeatures?.[moduleId] ?? []).forEach(featureId => {
+        if (!validFeatureIds.has(featureId)) errors.push(`Le secteur « ${sector.name} » référence une fonctionnalité absente.`);
+        if (selectedPackIds.length > 0 && !selectedPackFeatures.has(featureId)) {
+          errors.push(`Le secteur « ${sector.name} » utilise une fonctionnalité hors des packs choisis.`);
+        }
       });
       if (selectedPackIds.length === 0) warnings.push(`Le secteur « ${sector.name} » n’a pas de pack sélectionné pour ${module.name ?? moduleId}.`);
     });
   });
 
   Object.entries(snapshot.moduleOverrides).forEach(([moduleId, override]) => {
+    if (!moduleIds.has(moduleId as ModuleId)) {
+      errors.push(`Le brouillon référence un module inconnu « ${moduleId} ».`);
+      return;
+    }
     if (override?.description !== undefined && (typeof override.description !== 'string' || !override.description.trim())) {
       errors.push(`Le module « ${moduleId} » doit avoir une description compréhensible.`);
     }
@@ -180,21 +243,105 @@ export function publishCatalogDraft(data: StoreData) {
   data.removedModules = draft.removedModules;
   data.customModules = draft.customModules ?? [];
   data.sectorPresets = draft.sectorPresets;
+  const publishedModules = getConfiguredModules({
+    moduleOverrides: draft.moduleOverrides,
+    removedModules: [],
+    customModules: draft.customModules ?? [],
+  });
+  const activeModuleIds = new Set(
+    publishedModules
+      .filter(module => !draft.removedModules.includes(module.id))
+      .filter(module => (draft.moduleStatuses[module.id] ?? module.status) !== 'INACTIF')
+      .map(module => module.id),
+  );
+  const moduleById = new Map(publishedModules.map(module => [module.id, module]));
+  const selectedFeaturesFor = (moduleId: ModuleId, packIds: string[] = [], featureIds: string[] = []) => {
+    const module = moduleById.get(moduleId);
+    if (!module) return { packIds: [], featureIds: [] };
+    const validFeatures = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
+    const packs = (module.featurePacks ?? []).filter(pack => packIds.includes(pack.id));
+    const allowedByPack = new Set(packs.flatMap(pack => pack.featureIds));
+    const normalizedPackIds = packs.map(pack => pack.id);
+    const normalizedFeatureIds = [...new Set(featureIds.filter(featureId => validFeatures.has(featureId)))];
+    return {
+      packIds: normalizedPackIds,
+      featureIds: normalizedPackIds.length > 0
+        ? (normalizedFeatureIds.length > 0 ? normalizedFeatureIds.filter(featureId => allowedByPack.has(featureId)) : [...allowedByPack])
+        : normalizedFeatureIds,
+    };
+  };
+  const cleanModuleMaps = (
+    moduleIds: ModuleId[],
+    packMap: Partial<Record<ModuleId, string[]>> | undefined,
+    featureMap: Partial<Record<ModuleId, string[]>> | undefined,
+    permissionMap: Partial<Record<ModuleId, Partial<Record<string, string[]>>>> | undefined,
+  ) => {
+    const nextPacks: Partial<Record<ModuleId, string[]>> = {};
+    const nextFeatures: Partial<Record<ModuleId, string[]>> = {};
+    const nextPermissions: Partial<Record<ModuleId, Partial<Record<string, string[]>>>> = {};
+    moduleIds.forEach(moduleId => {
+      const selection = selectedFeaturesFor(moduleId, packMap?.[moduleId] ?? [], featureMap?.[moduleId] ?? []);
+      nextPacks[moduleId] = selection.packIds;
+      nextFeatures[moduleId] = selection.featureIds;
+      const allowedFeatures = new Set(selection.featureIds);
+      const permissions = permissionMap?.[moduleId] ?? {};
+      nextPermissions[moduleId] = Object.fromEntries(
+        Object.entries(permissions)
+          .filter(([featureId, values]) => allowedFeatures.has(featureId))
+          .map(([featureId, values]) => [
+            featureId,
+            [...new Set((values ?? []).filter(value => ['voir', 'créer', 'modifier'].includes(value)))],
+          ]),
+      );
+    });
+    return { nextPacks, nextFeatures, nextPermissions };
+  };
   const removedModules = new Set(draft.removedModules);
   data.companies.forEach(company => {
-    company.allowedModules = company.allowedModules.filter(moduleId => !removedModules.has(moduleId));
+    const requestedModules = company.requestedModules.filter(moduleId => activeModuleIds.has(moduleId));
+    const cleaned = cleanModuleMaps(
+      requestedModules,
+      company.requestedModulePackIds,
+      company.requestedModuleFeatures,
+      company.requestedModulePermissions,
+    );
+    company.requestedModules = requestedModules;
+    company.requestedModulePackIds = cleaned.nextPacks;
+    company.requestedModuleFeatures = cleaned.nextFeatures;
+    company.requestedModulePermissions = cleaned.nextPermissions;
+    company.allowedModules = company.allowedModules.filter(moduleId => activeModuleIds.has(moduleId));
     company.refusedModules = company.requestedModules.filter(moduleId => !company.allowedModules.includes(moduleId));
   });
   data.orgNodes = data.orgNodes.map(node => ({
     ...node,
-    moduleIds: node.moduleIds?.filter(moduleId => !removedModules.has(moduleId)),
+    moduleIds: node.moduleIds?.filter(moduleId => activeModuleIds.has(moduleId)),
     modulePackIds: Object.fromEntries(
-      Object.entries(node.modulePackIds ?? {}).filter(([moduleId]) => !removedModules.has(moduleId as ModuleId)),
+      Object.entries(node.modulePackIds ?? {})
+        .filter(([moduleId]) => activeModuleIds.has(moduleId as ModuleId))
+        .map(([moduleId, packIds]) => [moduleId, selectedFeaturesFor(moduleId as ModuleId, packIds, []).packIds]),
     ),
     moduleFeatures: Object.fromEntries(
-      Object.entries(node.moduleFeatures ?? {}).filter(([moduleId]) => !removedModules.has(moduleId as ModuleId)),
+      Object.entries(node.moduleFeatures ?? {})
+        .filter(([moduleId]) => activeModuleIds.has(moduleId as ModuleId))
+        .map(([moduleId, featureIds]) => [
+          moduleId,
+          selectedFeaturesFor(
+            moduleId as ModuleId,
+            node.modulePackIds?.[moduleId as ModuleId] ?? [],
+            featureIds,
+          ).featureIds,
+        ]),
     ),
   }));
+  data.roles.forEach(role => {
+    if (!role.packModuleId) return;
+    const module = moduleById.get(role.packModuleId);
+    const pack = module?.featurePacks?.find(candidate => candidate.id === role.packId);
+    if (!activeModuleIds.has(role.packModuleId) || !pack) {
+      delete role.packId;
+      delete role.packModuleId;
+    }
+  });
   data.catalogVersion = (data.catalogVersion ?? 0) + 1;
   delete data.catalogDraft;
 }

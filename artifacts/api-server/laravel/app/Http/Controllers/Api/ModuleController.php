@@ -62,15 +62,26 @@ class ModuleController extends Controller
             ->where('company_id', $companyId)
             ->where('module_id', $moduleId)
             ->first();
+        $featureIds = array_key_exists('featureIds', $input)
+            ? array_values($input['featureIds'] ?? [])
+            : json_decode($existing?->feature_ids ?? '[]', true);
+        $configuration = array_key_exists('configuration', $input)
+            ? ($input['configuration'] ?? [])
+            : (json_decode($existing?->configuration ?? '{}', true) ?: []);
+        if (array_key_exists('featureIds', $input) || array_key_exists('configuration', $input)) {
+            try {
+                $selection = ModuleCatalog::normalizeSelection($moduleId, is_array($featureIds) ? $featureIds : [], is_array($configuration) ? $configuration : []);
+            } catch (\InvalidArgumentException $exception) {
+                return response()->json(['error' => $exception->getMessage()], 422);
+            }
+            $featureIds = $selection['featureIds'];
+            $configuration = $selection['configuration'];
+        }
         $values = [
             'id' => 'company-module-'.Str::slug($companyId.'-'.$moduleId),
             'status' => $input['status'],
-            'feature_ids' => array_key_exists('featureIds', $input)
-                ? json_encode($input['featureIds'] ?? [], JSON_UNESCAPED_UNICODE)
-                : ($existing?->feature_ids ?? json_encode([], JSON_UNESCAPED_UNICODE)),
-            'configuration' => array_key_exists('configuration', $input)
-                ? json_encode($input['configuration'] ?? [], JSON_UNESCAPED_UNICODE)
-                : ($existing?->configuration ?? json_encode([], JSON_UNESCAPED_UNICODE)),
+            'feature_ids' => json_encode($featureIds ?: [], JSON_UNESCAPED_UNICODE),
+            'configuration' => json_encode($configuration ?: [], JSON_UNESCAPED_UNICODE),
             'updated_at' => now(),
             'created_at' => $existing?->created_at ?? now(),
         ];
@@ -81,12 +92,6 @@ class ModuleController extends Controller
 
         $company = Company::query()->whereKey($companyId)->first();
         if ($company) {
-            $featureIds = array_key_exists('featureIds', $input)
-                ? array_values($input['featureIds'] ?? [])
-                : (json_decode($existing?->feature_ids ?? '[]', true) ?: []);
-            $configuration = array_key_exists('configuration', $input)
-                ? ($input['configuration'] ?? [])
-                : (json_decode($existing?->configuration ?? '{}', true) ?: []);
             $featurePermissions = is_array($configuration['featurePermissions'] ?? null)
                 ? $configuration['featurePermissions']
                 : ($company->requested_module_permissions[$moduleId] ?? []);

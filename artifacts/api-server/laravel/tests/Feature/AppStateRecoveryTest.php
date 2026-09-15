@@ -592,6 +592,65 @@ class AppStateRecoveryTest extends TestCase
             ->assertJsonPath('data.products.0.name', 'Produit saisi par l’employé');
     }
 
+    public function test_sector_manager_cannot_modify_records_outside_managed_sector_descendants(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'scoped-state-company',
+            'name' => 'Entreprise périmètre',
+            'manager' => 'Direction',
+            'email' => 'scoped-state@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'scoped-state-manager',
+            'email' => 'scoped-state.manager@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => $company->id,
+            'sector_ids' => ['sector-owned'],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $state = [
+            'companies' => [['id' => $company->id, 'name' => $company->name]],
+            'employees' => [
+                ['id' => 'employee-owned', 'companyId' => $company->id, 'sectorId' => 'sector-owned', 'firstName' => 'Local'],
+                ['id' => 'employee-other', 'companyId' => $company->id, 'sectorId' => 'sector-other', 'firstName' => 'Autre'],
+            ],
+            'roles' => [],
+            'orgNodes' => [
+                ['id' => 'sector-owned', 'companyId' => $company->id, 'parentId' => null],
+                ['id' => 'sector-other', 'companyId' => $company->id, 'parentId' => null],
+            ],
+        ];
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager));
+        $request->putJson('/api/app-state', [
+            'version' => 1,
+            'data' => [
+                ...$state,
+                'employees' => [
+                    $state['employees'][0],
+                    [...$state['employees'][1], 'firstName' => 'Modification interdite'],
+                ],
+            ],
+        ])->assertForbidden();
+
+        $this->assertStringContainsString(
+            'Autre',
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+        );
+    }
+
     public function test_app_state_rejects_a_stale_write_without_overwriting_the_latest_data(): void
     {
         $admin = AuthUser::query()->create([

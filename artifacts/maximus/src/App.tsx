@@ -5299,28 +5299,33 @@ function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreD
 }
 function FinancePage({
   data,
+  companyId,
 }: {
   data: StoreData;
+  companyId?: string;
   mutate?: (fn: (d: StoreData) => void, msg?: string) => void;
 }) {
+  const accountingEntries = companyId
+    ? data.accountingEntries.filter((entry) => entry.companyId === companyId)
+    : data.accountingEntries;
   return (
     <div className="space-y-5">
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-2">
         <Metric
           label="Écritures comptables"
-          value={String(data.accountingEntries.length)}
+           value={String(accountingEntries.length)}
           detail="Journaux enregistrés"
           icon={FileText}
           accent
         />
         <Metric
           label="Débit total"
-          value={shortMoney(data.accountingEntries.reduce((sum, entry) => sum + entry.debit, 0))}
+           value={shortMoney(accountingEntries.reduce((sum, entry) => sum + entry.debit, 0))}
           suffix=" FCFA"
           detail="Écritures comptables"
           icon={TrendingUp}
         />
-        <Metric label="Crédit total" value={shortMoney(data.accountingEntries.reduce((sum, entry) => sum + entry.credit, 0))} suffix=" FCFA" detail="Écritures comptables" icon={CircleDollarSign} />
+        <Metric label="Crédit total" value={shortMoney(accountingEntries.reduce((sum, entry) => sum + entry.credit, 0))} suffix=" FCFA" detail="Écritures comptables" icon={CircleDollarSign} />
       </div>
       <section className="card-surface overflow-hidden rounded-2xl">
         <div className="border-b p-5">
@@ -5328,7 +5333,7 @@ function FinancePage({
         </div>
         <DataTable
           headers={['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date', 'Statut']}
-          rows={data.accountingEntries.map((entry) => [
+           rows={accountingEntries.map((entry) => [
             <strong key={entry.id}>{entry.reference}</strong>,
             entry.journal,
             entry.label,
@@ -6664,22 +6669,34 @@ function ModulePackTestWorkbench({
   );
 }
 
-function OperationalReportsPage({ data }: { data: StoreData }) {
+function OperationalReportsPage({
+  data,
+  companyId,
+  reportPermissions,
+  canExport,
+}: {
+  data: StoreData;
+  companyId?: string;
+  reportPermissions?: Partial<Record<'sales' | 'stock' | 'finance' | 'activity', boolean>>;
+  canExport?: boolean;
+}) {
   type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
   const [report, setReport] = useState<ReportId>('sales');
   const [query, setQuery] = useState('');
+  const scoped = <T extends { companyId?: string }>(items: T[]) =>
+    companyId ? items.filter((item) => item.companyId === companyId) : items;
   const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
     sales: {
       label: 'Ventes',
       description: 'Chiffre d’affaires et commandes clients.',
       headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'],
-      rows: data.sales.map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
+       rows: scoped(data.sales).map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
     },
     stock: {
       label: 'Gestion de stock',
       description: 'Valorisation et niveaux des produits.',
       headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'],
-      rows: data.products.map((item) => [
+       rows: scoped(data.products).map((item) => [
         item.name,
         item.sku,
         item.category,
@@ -6691,31 +6708,42 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
       label: 'Finance',
       description: 'Écritures comptables enregistrées.',
       headers: ['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date'],
-      rows: data.accountingEntries.map((item) => [item.reference, item.journal, item.label, money(item.debit), money(item.credit), item.date]),
+       rows: scoped(data.accountingEntries).map((item) => [item.reference, item.journal, item.label, money(item.debit), money(item.credit), item.date]),
     },
     activity: {
       label: 'Activité',
       description: 'Traçabilité des actions réalisées.',
       headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'],
-      rows: data.activities.map((item) => [item.user, item.action, item.module, item.object, item.date]),
+       rows: scoped(data.activities).map((item) => [item.user, item.action, item.module, item.object, item.date]),
     },
   };
-  const active = definitions[report];
+  const visibleDefinitions = (Object.entries(definitions) as [ReportId, typeof definitions[ReportId]][])
+    .filter(([id]) => reportPermissions?.[id] !== false);
+  const activeReport = visibleDefinitions.some(([id]) => id === report) ? report : visibleDefinitions[0]?.[0];
+  if (!activeReport) {
+    return (
+      <section className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+        Aucun rapport n’est autorisé pour votre rôle.
+      </section>
+    );
+  }
+  const active = definitions[activeReport];
   const rows = active.rows.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase()));
   const exportCsv = () => {
+    if (!canExport) return;
     const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
     const csv = [active.headers, ...rows].map((row) => row.map(escape).join(';')).join('\n');
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `rapport-${report}.csv`;
+     link.download = `rapport-${activeReport}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {(Object.entries(definitions) as [ReportId, typeof active][]).map(([id, item]) => (
+        {visibleDefinitions.map(([id, item]) => (
           <button
             key={id}
             onClick={() => setReport(id)}
@@ -6736,15 +6764,19 @@ function OperationalReportsPage({ data }: { data: StoreData }) {
             </p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => window.print()} className="rounded-lg border px-4 py-2.5 text-xs font-bold">
-              Imprimer
-            </button>
-            <button
-              onClick={exportCsv}
-              className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
-            >
-              Exporter CSV
-            </button>
+             {canExport && (
+               <>
+                 <button onClick={() => window.print()} className="rounded-lg border px-4 py-2.5 text-xs font-bold">
+                   Imprimer
+                 </button>
+                 <button
+                   onClick={exportCsv}
+                   className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+                 >
+                   Exporter CSV
+                 </button>
+               </>
+             )}
           </div>
         </div>
         <div className="p-5">

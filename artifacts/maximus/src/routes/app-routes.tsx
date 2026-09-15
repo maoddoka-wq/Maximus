@@ -242,7 +242,12 @@ export function CompanyRouter({
   const hiddenWorkspaceFeatureSet = new Set(hiddenWorkspaceFeatures ?? []);
   const isWorkspaceFeatureHidden = (featureId: CompanyWorkspaceFeatureId) =>
     hiddenWorkspaceFeatureSet.has(featureId);
-  const requiredModule = moduleIdForPath(routePath);
+  const routeModuleOverrides: Partial<Record<string, ModuleId>> = {
+    '/entreprise/finance': 'finance',
+    '/entreprise/rh': 'rh',
+    '/entreprise/rapports': 'rapports',
+  };
+  const requiredModule = moduleIdForPath(routePath) ?? routeModuleOverrides[routePath];
   const maintenanceModule: ModuleId | 'controle' | undefined =
     routePath === '/entreprise/controle' ? 'controle' : requiredModule;
   if (maintenanceModule && (serverModuleAccess?.find((item) => item.id === maintenanceModule)?.status ?? moduleStatuses[maintenanceModule]) === 'MAINTENANCE') {
@@ -380,7 +385,13 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/finance') {
-    return renderScreen(screens.finance, { data, mutate });
+    return renderScreen(screens.finance, {
+      data,
+      mutate,
+      companyId,
+      canCreate: hasPermission('finance', 'créer'),
+      canModify: hasPermission('finance', 'modifier'),
+    });
   }
   if (routePath === '/entreprise/commerce' || routePath === '/entreprise/ventes') {
     return renderScreen(screens.commerce, {
@@ -437,7 +448,15 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/rh') {
-    return renderScreen(screens.humanResources, { data, mutate, companyAdmin, employee, companyId });
+    return renderScreen(screens.humanResources, {
+      data,
+      mutate,
+      companyAdmin,
+      employee,
+      companyId,
+      canCreate: hasPermission('rh', 'créer'),
+      canModify: hasPermission('rh', 'modifier'),
+    });
   }
   if (routePath === '/entreprise/presences') {
     return renderScreen(screens.presence, {
@@ -461,7 +480,23 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/rapports') {
-    return renderScreen(screens.reports, { data });
+    const canViewFeature = (moduleId: ModuleId, featureId: string) => {
+      if (!hasPermission(moduleId, 'voir')) return false;
+      const permissions = moduleFeaturePermissions?.[moduleId];
+      if (!permissions || !Object.prototype.hasOwnProperty.call(permissions, featureId)) return true;
+      return permissions[featureId]?.includes('voir') ?? false;
+    };
+    return renderScreen(screens.reports, {
+      data,
+      companyId,
+      reportPermissions: {
+        sales: canViewFeature('commerce', 'reports') || canViewFeature('ventes', 'reports') || canViewFeature('ventes', 'sales'),
+        stock: canViewFeature('stocks', 'reports'),
+        finance: canViewFeature('finance', 'reports') || canViewFeature('comptabilite', 'reports'),
+        activity: canViewFeature('rapports', 'activity') || canViewFeature('rapports', 'reports'),
+      },
+      canExport: hasPermission('rapports', 'modifier'),
+    });
   }
   return renderScreen(screens.empty, {
     title: 'Module non autorisé',

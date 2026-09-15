@@ -24,22 +24,51 @@ final class CompanyRequestCreationService
             throw new RuntimeException('Une demande ou une entreprise utilise déjà cette adresse email.');
         }
 
-        $knownModules = collect(ModuleCatalog::definitionsWithCustom())
-            ->map(fn (array $module): string => (string) ($module['id'] ?? ''))
-            ->filter()
-            ->values()
-            ->all();
-        $requestedModules = array_values(array_unique(array_intersect(
-            is_array($input['requestedModules'] ?? null) ? $input['requestedModules'] : [],
-            $knownModules,
-        )));
+        $requestedModules = array_values(array_unique(array_map('strval', is_array($input['requestedModules'] ?? null) ? $input['requestedModules'] : [])));
 
         if ($requestedModules === []) {
             throw new RuntimeException('Sélectionnez au moins un module valide.');
         }
+        foreach ($requestedModules as $moduleId) {
+            if (! ModuleCatalog::isPublishedModule($moduleId)) {
+                throw new RuntimeException("Le module « {$moduleId} » n’est pas publié.");
+            }
+        }
+
+        $rawPacks = is_array($input['requestedModulePackIds'] ?? null) ? $input['requestedModulePackIds'] : [];
+        $rawFeatures = is_array($input['requestedModuleFeatures'] ?? null) ? $input['requestedModuleFeatures'] : [];
+        $rawPermissions = is_array($input['requestedModulePermissions'] ?? null) ? $input['requestedModulePermissions'] : [];
+        $requestedPacks = [];
+        $requestedFeatures = [];
+        $requestedPermissions = [];
+        foreach ($requestedModules as $moduleId) {
+            try {
+                $selection = ModuleCatalog::normalizeSelection(
+                    $moduleId,
+                    is_array($rawFeatures[$moduleId] ?? null) ? $rawFeatures[$moduleId] : [],
+                    [
+                        'packIds' => is_array($rawPacks[$moduleId] ?? null) ? $rawPacks[$moduleId] : [],
+                        'featurePermissions' => is_array($rawPermissions[$moduleId] ?? null) ? $rawPermissions[$moduleId] : [],
+                    ],
+                );
+            } catch (\InvalidArgumentException $exception) {
+                throw new RuntimeException($exception->getMessage());
+            }
+            $requestedPacks[$moduleId] = $selection['configuration']['packIds'];
+            $requestedFeatures[$moduleId] = $selection['featureIds'];
+            $requestedPermissions[$moduleId] = $selection['configuration']['featurePermissions'];
+        }
 
         $companyId = (string) Str::uuid();
-        $company = DB::transaction(function () use ($input, $email, $requestedModules, $companyId): Company {
+        $company = DB::transaction(function () use (
+            $input,
+            $email,
+            $requestedModules,
+            $requestedPacks,
+            $requestedFeatures,
+            $requestedPermissions,
+            $companyId,
+        ): Company {
             $company = Company::query()->create([
                 'id' => $companyId,
                 'name' => trim((string) $input['name']),
@@ -50,9 +79,9 @@ final class CompanyRequestCreationService
                 'sector' => trim((string) ($input['sector'] ?? '')),
                 'status' => 'EN ATTENTE',
                 'requested_modules' => $requestedModules,
-                'requested_module_pack_ids' => $input['requestedModulePackIds'] ?? [],
-                'requested_module_features' => $input['requestedModuleFeatures'] ?? [],
-                'requested_module_permissions' => $input['requestedModulePermissions'] ?? [],
+                'requested_module_pack_ids' => $requestedPacks,
+                'requested_module_features' => $requestedFeatures,
+                'requested_module_permissions' => $requestedPermissions,
             ]);
 
             CompanyRequest::query()->create([

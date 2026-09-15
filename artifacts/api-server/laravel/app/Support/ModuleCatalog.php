@@ -368,12 +368,119 @@ final class ModuleCatalog
                     'module_id' => $moduleId,
                     'status' => $status,
                     'feature_ids' => json_encode([], JSON_UNESCAPED_UNICODE),
+                    // An access row created by the legacy provisioning path
+                    // keeps the legacy "whole module" behavior. Modern
+                    // registration and explicit edits write featureScope
+                    // themselves.
                     'configuration' => json_encode([], JSON_UNESCAPED_UNICODE),
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]);
             }
         }
+    }
+
+    public static function isPublishedModule(string $moduleId): bool
+    {
+        $definition = collect(self::definitionsWithCustom())->firstWhere('id', $moduleId);
+        if (! $definition) {
+            return false;
+        }
+
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = is_string($row?->payload)
+            ? json_decode($row->payload, true)
+            : ($row?->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+        if (in_array($moduleId, is_array($state['removedModules'] ?? null) ? $state['removedModules'] : [], true)) {
+            return false;
+        }
+
+        $status = $state['moduleStatuses'][$moduleId] ?? ($definition['status'] ?? 'ACTIF');
+        return in_array($status, ['ACTIF', 'BETA'], true);
+    }
+
+    /**
+     * Normalize and bound company/module selections to the published catalog.
+     *
+     * @return array{featureIds: array<int, string>, configuration: array<string, mixed>}
+     */
+    public static function normalizeSelection(
+        string $moduleId,
+        array $featureIds = [],
+        array $configuration = [],
+    ): array {
+        $definition = collect(self::definitionsWithCustom())->firstWhere('id', $moduleId);
+        if (! $definition || ! self::isPublishedModule($moduleId)) {
+            throw new \InvalidArgumentException("Le module « {$moduleId} » n’est pas publié.");
+        }
+
+        $packs = is_array($definition['feature_packs'] ?? null) ? $definition['feature_packs'] : [];
+        $packById = collect($packs)->keyBy('id');
+        $packIds = $configuration['packIds'] ?? [];
+        if (! is_array($packIds)) {
+            throw new \InvalidArgumentException("Les packs du module « {$moduleId} » sont invalides.");
+        }
+        $packIds = array_values(array_unique(array_map('strval', $packIds)));
+        $unknownPacks = array_values(array_diff($packIds, $packById->keys()->all()));
+        if ($unknownPacks !== []) {
+            throw new \InvalidArgumentException("Le module « {$moduleId} » référence un pack absent.");
+        }
+
+        $validFeatureIds = collect($packs)
+            ->flatMap(fn (array $pack): array => is_array($pack['feature_ids'] ?? null) ? $pack['feature_ids'] : [])
+            ->merge(collect(is_array($definition['features'] ?? null) ? $definition['features'] : [])
+                ->map(fn (mixed $feature): string => Str::slug((string) $feature)))
+            ->map(fn (mixed $feature): string => (string) $feature)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $featureIds = array_values(array_unique(array_map('strval', $featureIds)));
+        $unknownFeatures = array_values(array_diff($featureIds, $validFeatureIds));
+        if ($unknownFeatures !== []) {
+            throw new \InvalidArgumentException("Le module « {$moduleId} » référence une fonctionnalité absente.");
+        }
+
+        $packFeatureIds = $packIds === []
+            ? []
+            : collect($packIds)
+                ->flatMap(fn (string $packId): array => $packById->get($packId)['feature_ids'] ?? [])
+                ->unique()
+                ->values()
+                ->all();
+        if ($packIds !== [] && array_diff($featureIds, $packFeatureIds) !== []) {
+            throw new \InvalidArgumentException('Une fonctionnalité sélectionnée ne appartient pas aux packs choisis.');
+        }
+        if ($packIds !== [] && $featureIds === []) {
+            $featureIds = $packFeatureIds;
+        }
+
+        $rawPermissions = $configuration['featurePermissions'] ?? [];
+        if (! is_array($rawPermissions)) {
+            throw new \InvalidArgumentException('Les permissions de fonctionnalités sont invalides.');
+        }
+        $actions = ['voir', 'créer', 'modifier'];
+        $featurePermissions = [];
+        foreach ($rawPermissions as $featureId => $permissions) {
+            if (! in_array((string) $featureId, $featureIds, true) || ! is_array($permissions)) {
+                throw new \InvalidArgumentException('Une permission référence une fonctionnalité non sélectionnée.');
+            }
+            $permissions = array_values(array_unique(array_map('strval', $permissions)));
+            if (array_diff($permissions, $actions) !== []) {
+                throw new \InvalidArgumentException('Une action de permission est inconnue.');
+            }
+            $featurePermissions[(string) $featureId] = $permissions;
+        }
+
+        return [
+            'featureIds' => $featureIds,
+            'configuration' => [
+                'featureScope' => 'explicit',
+                'packIds' => $packIds,
+                'featurePermissions' => $featurePermissions,
+            ],
+        ];
     }
 
     public static function isEnabled(string $companyId, string $moduleId): bool

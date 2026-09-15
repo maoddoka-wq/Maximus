@@ -93,6 +93,15 @@ class AuthController extends Controller
             $existingQuery->where('company_id', $data['companyId']);
         }
         $existing = $existingQuery->first();
+        if ($existing
+            && ($actor['role'] ?? null) === 'sector_manager'
+            && ! CompanyAuthorization::canManageAccount(
+                $actor,
+                (string) $existing->company_id,
+                is_array($existing->sector_ids) ? $existing->sector_ids : [],
+            )) {
+            return response()->json(['error' => 'Le compte existant est hors périmètre administrable.'], 403);
+        }
         if (! $existing && empty($data['password'])) {
             return response()->json(['error' => 'Un mot de passe initial est requis pour ce compte.'], 400);
         }
@@ -115,8 +124,12 @@ class AuthController extends Controller
 
         try {
             if ($existing) {
+                $scopeChanged = $existing->company_id !== $data['companyId']
+                    || $existing->role !== $data['role']
+                    || $existing->employee_id !== $data['employeeId']
+                    || (is_array($existing->sector_ids) ? $existing->sector_ids : []) !== $data['sectorIds'];
                 $existing->update($values);
-                if (! empty($data['password'])) {
+                if (! empty($data['password']) || $scopeChanged) {
                     AuthSession::query()->where('user_id', $existing->id)->delete();
                 }
             } else {

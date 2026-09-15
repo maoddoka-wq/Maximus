@@ -349,6 +349,17 @@ class AppStateController extends Controller
                 if ($companyId === '') {
                     return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
                 }
+                if (($actor['role'] ?? null) === 'sector_manager'
+                    && ! $this->managerStateWriteWithinScope(
+                        $currentPayload,
+                        $incomingState,
+                        $companyId,
+                        is_array($actor['sectorIds'] ?? null) ? $actor['sectorIds'] : [],
+                    )) {
+                    return response()->json([
+                        'error' => 'La modification demandée sort du périmètre des secteurs administrés.',
+                    ], 403);
+                }
 
                 $employeeCollections = ($actor['role'] ?? null) === 'employee'
                     ? self::EMPLOYEE_WRITABLE_COLLECTIONS
@@ -386,6 +397,100 @@ class AppStateController extends Controller
 
             return response()->json(['ok' => true, 'version' => $nextVersion]);
         });
+    }
+
+    private function managerStateWriteWithinScope(
+        array $current,
+        array $incoming,
+        string $companyId,
+        array $sectorIds,
+    ): bool {
+        $currentNodes = collect($current['orgNodes'] ?? [])
+            ->filter(fn (mixed $item): bool => is_array($item) && ($item['companyId'] ?? null) === $companyId)
+            ->values()
+            ->all();
+        $incomingNodes = collect($incoming['orgNodes'] ?? [])
+            ->filter(fn (mixed $item): bool => is_array($item) && ($item['companyId'] ?? null) === $companyId)
+            ->values()
+            ->all();
+        $nodes = [...$currentNodes, ...$incomingNodes];
+        $allowedNodes = [];
+        foreach ($sectorIds as $sectorId) {
+            $allowedNodes[(string) $sectorId] = true;
+        }
+        do {
+            $added = false;
+            foreach ($nodes as $node) {
+                if (!is_array($node) || isset($allowedNodes[(string) ($node['id'] ?? '')])) {
+                    continue;
+                }
+                if (isset($allowedNodes[(string) ($node['parentId'] ?? '')])) {
+                    $allowedNodes[(string) ($node['id'] ?? '')] = true;
+                    $added = true;
+                }
+            }
+        } while ($added);
+
+        $currentByCollection = [];
+        foreach (['companies', 'employees', 'roles', 'orgNodes'] as $collection) {
+            $currentByCollection[$collection] = collect($current[$collection] ?? [])
+                ->filter(fn (mixed $item): bool => is_array($item) && isset($item['id']))
+                ->keyBy(fn (array $item): string => (string) $item['id'])
+                ->all();
+        }
+
+        foreach (['companies', 'employees', 'roles', 'orgNodes'] as $collection) {
+            foreach (($incoming[$collection] ?? []) as $item) {
+                if (!is_array($item) || !isset($item['id'])) {
+                    return false;
+                }
+                $id = (string) $item['id'];
+                $existing = $currentByCollection[$collection][$id] ?? null;
+                $recordCompanyId = $collection === 'companies'
+                    ? $id
+                    : ($item['companyId'] ?? $item['company_id'] ?? null);
+                if ($collection !== 'companies' && $recordCompanyId !== null && (string) $recordCompanyId !== $companyId) {
+                    return false;
+                }
+
+                $sectorId = $collection === 'orgNodes'
+                    ? $id
+                    : ($item['sectorId'] ?? $item['sector_id'] ?? null);
+                $oldSectorId = is_array($existing)
+                    ? ($existing['sectorId'] ?? $existing['sector_id'] ?? null)
+                    : null;
+                $inside = $collection === 'companies'
+                    ? false
+                    : isset($allowedNodes[(string) $sectorId]) || isset($allowedNodes[(string) $oldSectorId]);
+                if (!$inside && !$this->sameStateRecord($existing, $item)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function sameStateRecord(mixed $left, mixed $right): bool
+    {
+        if (!is_array($left) || !is_array($right)) {
+            return false;
+        }
+        $normalize = function (mixed $value) use (&$normalize): mixed {
+            if (!is_array($value)) {
+                return $value;
+            }
+            if (array_is_list($value)) {
+                return array_map($normalize, $value);
+            }
+            ksort($value);
+            foreach ($value as $key => $child) {
+                $value[$key] = $normalize($child);
+            }
+            return $value;
+        };
+
+        return json_encode($normalize($left)) === json_encode($normalize($right));
     }
 
     private function stripCredentials(array $state): array

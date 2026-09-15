@@ -99,6 +99,14 @@ class PresenceController extends Controller
         if ($item->type === 'history') {
             return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
         }
+        // The type and employee identity define the authorization boundary of
+        // an item. They are immutable after creation; otherwise a caller could
+        // pass an authorized attendance record and turn it into another
+        // feature or another employee's record after the initial check.
+        if ((array_key_exists('type', $input) && $input['type'] !== $item->type)
+            || (array_key_exists('employeeId', $input) && $input['employeeId'] !== $item->employee_id)) {
+            return $this->forbidden();
+        }
         $actorData = $request->attributes->get('authActor');
         $feature = $this->featureForType($item->type);
         $statusChanged = array_key_exists('status', $input) && $input['status'] !== $item->status;
@@ -106,8 +114,6 @@ class PresenceController extends Controller
         $requiresValidation = $statusChanged && in_array($item->type, ['absence', 'leave'], true);
         $requiresEdit = ($statusChanged && ! $requiresValidation)
             || $payloadChanged
-            || array_key_exists('type', $input)
-            || array_key_exists('employeeId', $input)
             || array_key_exists('workDate', $input)
             || array_key_exists('startDate', $input)
             || array_key_exists('endDate', $input);

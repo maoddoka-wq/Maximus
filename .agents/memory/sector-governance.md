@@ -7,4 +7,4 @@ Une entreprise choisit librement son périmètre de modules, fonctionnalités et
 
 **Why:** L’entreprise doit pouvoir composer son espace selon son activité, tandis que les droits métier doivent être définis au plus près des équipes concernées sans permettre à un manager comptabilité de dépasser les choix de l’entreprise ou de contrôler les équipes stock, RH ou commerciales.
 
-**How to apply:** Conserver la séparation entre le périmètre choisi par l’entreprise, le périmètre organisationnel du manager et les permissions métier des rôles ; un employé sans rôle valide ne reçoit aucun module métier, et toute permission de rôle est plafonnée par les choix de l’entreprise.
+**How to apply:** Conserver la séparation entre le périmètre choisi par l’entreprise, le périmètre organisationnel du manager et les permissions métier des rôles ; un employé sans rôle valide ne reçoit aucun module métier, et toute permission de rôle est plafonnée par les choix de l’entreprise. Les écritures d’état et les comptes existants doivent refuser toute modification hors secteur, même si le client envoie une copie complète de l’espace.

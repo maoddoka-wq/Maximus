@@ -119,13 +119,28 @@ class CompanyController extends Controller
 
                 ModuleCatalog::ensureCatalog();
                 foreach ($company->requested_modules ?? [] as $moduleId) {
+                    if (! ModuleCatalog::isPublishedModule((string) $moduleId)) {
+                        throw new \DomainException("Le module « {$moduleId} » n’est plus publié ou actif.");
+                    }
+                    try {
+                        $selection = ModuleCatalog::normalizeSelection(
+                            (string) $moduleId,
+                            $company->requested_module_features[$moduleId] ?? [],
+                            [
+                                'packIds' => $company->requested_module_pack_ids[$moduleId] ?? [],
+                                'featurePermissions' => $company->requested_module_permissions[$moduleId] ?? [],
+                            ],
+                        );
+                    } catch (\InvalidArgumentException $exception) {
+                        throw new \DomainException($exception->getMessage());
+                    }
                     DB::table('maximus_company_modules')->updateOrInsert(
                         ['company_id' => $company->id, 'module_id' => $moduleId],
                         [
                             'id' => 'company-module-'.Str::slug($company->id.'-'.$moduleId),
                             'status' => 'ACTIF',
-                            'feature_ids' => json_encode($company->requested_module_features[$moduleId] ?? [], JSON_UNESCAPED_UNICODE),
-                            'configuration' => json_encode($company->requested_module_permissions[$moduleId] ?? [], JSON_UNESCAPED_UNICODE),
+                            'feature_ids' => json_encode($selection['featureIds'], JSON_UNESCAPED_UNICODE),
+                            'configuration' => json_encode($selection['configuration'], JSON_UNESCAPED_UNICODE),
                             'updated_at' => now(),
                             'created_at' => now(),
                         ],
