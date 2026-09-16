@@ -1349,7 +1349,6 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
-                    singleModuleNavigation
                    hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,

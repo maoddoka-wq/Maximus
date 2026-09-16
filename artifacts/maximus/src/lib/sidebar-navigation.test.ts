@@ -26,6 +26,47 @@ test('le menu latéral générique respecte les fonctionnalités sélectionnées
   ]);
 });
 
+test('un employé retrouve les fonctionnalités de plusieurs modules dans le menu unique', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['commerce', 'stocks'],
+    configuredModules,
+    employeeRole: {
+      id: 'multi-module-reader',
+      name: 'Lecteur multi-modules',
+      description: '',
+      modulePermissions: {
+        'commerce:menu:sales': ['voir'],
+        stocks: ['voir'],
+      },
+    },
+    employeeNode: {
+      id: 'unit-multi-module',
+      companyId: 'company-test',
+      name: 'Unité multi-modules',
+      type: 'service',
+      parentId: null,
+      moduleIds: ['commerce', 'stocks'],
+      moduleFeatures: {
+        commerce: ['sales'],
+        stocks: ['products'],
+      },
+    },
+    commerceTabIds: ['sales'],
+    stockPermissions: {
+      products: ['voir'],
+    },
+  });
+
+  assert.deepEqual(groups.map(group => group.label), [
+    'Gestion commerciale',
+    'Gestion de stock',
+  ]);
+  assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
+    '/entreprise/commerce?tab=sales',
+    '/entreprise/stocks?tab=products',
+  ]);
+});
+
 test('le menu Stock utilise les identifiants des sous-modules', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['stocks'],

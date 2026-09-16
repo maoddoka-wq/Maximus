@@ -25,6 +25,12 @@ function renderScreen<Props extends object>(screen: Screen, props: Props): React
   return <ScreenComponent {...props} />;
 }
 
+function renderCompanyModule<Props extends object>(screen: Screen, props: Props) {
+  // Les fonctionnalités de l’espace entreprise sont toujours naviguées depuis
+  // le menu latéral, pour les administrateurs comme pour les employés.
+  return renderScreen(screen, { ...props, singleModuleNavigation: true });
+}
+
 export type AdminRouteScreens = {
   dashboard: Screen;
   assistant: Screen;
@@ -199,7 +205,6 @@ export function CompanyRouter({
   commerceTabPermissions,
   moduleStatuses,
   serverModuleAccess,
-  singleModuleNavigation,
   hiddenWorkspaceFeatures,
   screens,
 }: {
@@ -233,7 +238,6 @@ export function CompanyRouter({
   commerceTabPermissions?: Partial<Record<string, string[]>>;
   moduleStatuses: Record<string, ModuleAvailability>;
   serverModuleAccess?: import('@/lib/module-api').ServerModuleAccess[] | null;
-  singleModuleNavigation?: boolean;
   screens: CompanyRouteScreens;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
 }) {
@@ -364,24 +368,22 @@ export function CompanyRouter({
     );
   }
   if (routePath === '/entreprise/stocks') {
-    return renderScreen(screens.stocks, {
+    return renderCompanyModule(screens.stocks, {
       companyId,
       companyUsers: data.employees.filter(item => item.companyId === companyId),
       companyServices: data.orgNodes.filter(node => node.companyId === companyId),
       canCreate: hasPermission('stocks', 'créer'),
       canModify: hasPermission('stocks', 'modifier'),
       stockPermissions,
-      singleModuleNavigation,
     });
   }
   if (routePath === '/entreprise/ecommerce') {
-    return renderScreen(screens.ecommerce, {
+    return renderCompanyModule(screens.ecommerce, {
       companyId,
       canCreate: hasPermission('ecommerce', 'créer'),
       canModify: hasPermission('ecommerce', 'modifier'),
       allowedFeatureIds: ecommerceFeatureIds,
       featurePermissions: ecommerceFeaturePermissions,
-      singleModuleNavigation,
     });
   }
   if (routePath === '/entreprise/finance') {
@@ -394,7 +396,7 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/commerce' || routePath === '/entreprise/ventes') {
-    return renderScreen(screens.commerce, {
+    return renderCompanyModule(screens.commerce, {
       companyId,
       data,
       mutate,
@@ -402,13 +404,12 @@ export function CompanyRouter({
       canModify: hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier'),
       tabPermissions: commerceTabPermissions,
       allowedTabs: commerceTabIds,
-      singleModuleNavigation,
       initialTab: routePath === '/entreprise/ventes' ? 'sales' : 'dashboard',
       onNavigate,
     });
   }
   if (routePath === '/entreprise/paie') {
-    return renderScreen(screens.payroll, {
+    return renderCompanyModule(screens.payroll, {
       companyId,
       employees: data.employees.filter(item => item.companyId === companyId),
       canCreate: hasPermission('paie', 'créer'),
@@ -417,11 +418,10 @@ export function CompanyRouter({
       featurePermissions: payrollFeaturePermissions,
       activeFeatureId: normalizePayrollFeatureId(query.get('feature') ?? '') ?? 'tableau-de-bord',
       onNavigate,
-      singleModuleNavigation,
     });
   }
   if (routePath === '/entreprise/transport') {
-    return renderScreen(screens.transport, {
+    return renderCompanyModule(screens.transport, {
       companyId,
       employees: employees.filter(item => item.companyId === companyId),
       currentEmployeeId: employee?.id ?? null,
@@ -430,7 +430,6 @@ export function CompanyRouter({
       allowedFeatureIds: transportFeatureIds,
       featurePermissions: transportFeaturePermissions,
       initialTab: query.get('tab') ?? undefined,
-      singleModuleNavigation,
     });
   }
   const operationalModule =
@@ -459,7 +458,7 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/presences') {
-    return renderScreen(screens.presence, {
+    return renderCompanyModule(screens.presence, {
       companyId,
       employees: presenceEmployees,
       nodes: data.orgNodes.filter(node => node.companyId === companyId),
@@ -475,7 +474,6 @@ export function CompanyRouter({
       canDelete: hasPresencePermission('delete'),
       visibleFeatureIds: presenceFeatureIds,
       featurePermissions: moduleFeaturePermissions?.presences,
-      singleModuleNavigation,
       selfOnly: Boolean(employee && !companyAdmin && !sectorManager),
     });
   }
