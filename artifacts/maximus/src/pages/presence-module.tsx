@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
 import QRCode from 'qrcode';
 import QrScanner from 'qr-scanner';
@@ -251,7 +251,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
      return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManageAsSupervisor} onCreate={create} onUpdate={update} />;
   };
   return <div className="space-y-5">
-      <div className="mobile-hero card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
+       <div className="mobile-hero card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p><p className="mt-3 text-xs font-semibold text-[hsl(var(--primary))]">Actualisation automatique active · données vérifiées toutes les 5 secondes.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
          {!singleModuleNavigation && <WorkspaceTabs
            items={tabs.map(([id, label, icon]) => ({ id, label, icon }))}
            activeId={tab}
@@ -299,34 +299,45 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
   const [qrImage, setQrImage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const onRequestQrRef = useRef(onRequestQr);
+
+  useEffect(() => {
+    onRequestQrRef.current = onRequestQr;
+  }, [onRequestQr]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    let active = true;
+  const loadQr = useCallback(async (workDate: string) => {
     setLoading(true);
     setError('');
-    void onRequestQr(date)
-      .then(async nextQr => {
-        const image = await QRCode.toDataURL(nextQr.token, { width: 300, margin: 2, errorCorrectionLevel: 'M' });
-        if (active) {
-          setQr(nextQr);
-          setQrImage(image);
-        }
-      })
-      .catch(cause => {
-        if (active) setError(cause instanceof Error ? cause.message : 'QR code indisponible.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [date]);
+    try {
+      const nextQr = await onRequestQrRef.current(workDate);
+      const image = await QRCode.toDataURL(nextQr.token, { width: 300, margin: 2, errorCorrectionLevel: 'M' });
+      setQr(nextQr);
+      setQrImage(image);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'QR code indisponible.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadQr(date);
+  }, [date, loadQr]);
+
+  useEffect(() => {
+    if (!qr) return undefined;
+    const expiresAt = new Date(qr.expiresAt).getTime();
+    const refreshIn = Math.max(1_000, expiresAt - Date.now() - 5_000);
+    const timeout = window.setTimeout(() => {
+      void loadQr(date);
+    }, refreshIn);
+    return () => window.clearTimeout(timeout);
+  }, [date, loadQr, qr]);
 
   return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
     <Panel title="Pointage par QR code">
@@ -344,7 +355,7 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
     <Panel title="QR code de pointage">
       <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 rounded-2xl border bg-white p-5 text-center">
         {loading ? <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]"><RefreshCw size={16} className="animate-spin" />Génération du QR code…</div> : qrImage ? <img src={qrImage} alt={`QR code de pointage du ${displayDate(date)}`} className="h-72 w-72 max-w-full rounded-xl" /> : <div className="text-sm text-red-700">{error || 'QR code indisponible.'}</div>}
-        {qr ? <p className="text-xs text-[hsl(var(--muted-foreground))]">Valide jusqu’à {new Date(qr.expiresAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.</p> : null}
+         {qr ? <p className="text-xs text-[hsl(var(--muted-foreground))]">Valide jusqu’à {new Date(qr.expiresAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Renouvellement automatique avant expiration.</p> : null}
         {error ? <p className="text-xs text-red-700">{error}</p> : null}
       </div>
     </Panel>
