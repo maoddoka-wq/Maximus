@@ -149,9 +149,7 @@ export function roleHasFeaturePermission(
         || !presenceOperationalPermissions.has(key.slice(featurePrefix.length) as PresencePermission)));
   if (!hasDetailedPermissions) {
     if (moduleId === 'presences') {
-      const action = permission === 'voir' ? 'view' : permission === 'créer' ? 'create' : 'edit';
-      const globalPresencePermission = role.modulePermissions[`presence.${action}`];
-      if (globalPresencePermission) return globalPresencePermission.length > 0;
+      return false;
     }
     return role.modulePermissions[moduleId]?.includes(permission) ?? false;
   }
@@ -186,18 +184,7 @@ export function getFeaturePermissions(
   if (detailedKey) {
     return [...new Set(role.modulePermissions[detailedKey] ?? [])];
   }
-  if (moduleId === 'presences') {
-    const globalActions: [string, string][] = [
-      ['view', 'voir'],
-      ['create', 'créer'],
-      ['edit', 'modifier'],
-    ];
-    for (const [action, permission] of globalActions) {
-      if (role.modulePermissions[`presence.${action}`]?.length) {
-        return [permission];
-      }
-    }
-  }
+  if (moduleId === 'presences') return [];
   return [...(role.modulePermissions[moduleId] ?? [])];
 }
 
@@ -340,9 +327,10 @@ export function getSelectedFeatureIds(
     module.id === 'presences' ? `presence.${featureId}` : permissionFeatureKey(module.id, featureId);
   const hasDetailedPermissions = featureIds.some(featureId => permissionKeyFor(featureId) in role.modulePermissions);
 
-  const hasGlobalPresenceView = module.id === 'presences'
-    && Boolean(role.modulePermissions['presence.view']?.length);
-  if (!hasDetailedPermissions && (role.modulePermissions[module.id]?.includes('voir') || hasGlobalPresenceView)) {
+  if (module.id === 'presences' && !hasDetailedPermissions) {
+    return new Set<string>();
+  }
+  if (!hasDetailedPermissions && role.modulePermissions[module.id]?.includes('voir')) {
     return new Set(featureIds);
   }
 

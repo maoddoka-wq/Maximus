@@ -232,6 +232,32 @@ test('n’affiche que les fonctionnalités explicitement incluses dans un pack P
   assert.equal(selected.has('rapports'), false);
 });
 
+test('ne transforme pas une permission opérationnelle globale en fonctionnalités visibles', () => {
+  const presenceModule = modules.find(module => module.id === 'presences');
+  assert.ok(presenceModule);
+
+  const selected = getSelectedFeatureIds(
+    role({
+      presences: ['voir'],
+      'presence.view': ['autorisé'],
+      'presence.absences': ['voir'],
+    }),
+    presenceModule,
+  );
+
+  assert.deepEqual([...selected], ['absences']);
+});
+
+test('ne transforme pas le droit racine Présences en accès à toutes les fonctionnalités', () => {
+  const presenceModule = modules.find(module => module.id === 'presences');
+  assert.ok(presenceModule);
+
+  assert.deepEqual(
+    [...getSelectedFeatureIds(role({ presences: ['voir'] }), presenceModule)],
+    [],
+  );
+});
+
 test('ne transforme pas une dépendance technique en fonctionnalité choisie du pack', () => {
   const presenceModule = modules.find(module => module.id === 'presences');
   assert.ok(presenceModule);

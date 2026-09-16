@@ -360,7 +360,12 @@ function RoleFormModal({
       permissionKeys.forEach(permissionKey => delete modulePermissions[permissionKey]);
       if (next.length) modulePermissions[key] = [...new Set(['voir', ...next])];
       else delete modulePermissions[key];
-      if (next.length && !modulePermissions[moduleId]?.includes('voir')) {
+      if (moduleId === 'presences') {
+        delete modulePermissions[moduleId];
+        Object.keys(modulePermissions)
+          .filter(permissionKey => /^presence\.(view|create|edit|delete|correct|validate|manage|export|reports)$/.test(permissionKey))
+          .forEach(permissionKey => delete modulePermissions[permissionKey]);
+      } else if (next.length && !modulePermissions[moduleId]?.includes('voir')) {
         modulePermissions[moduleId] = [...(modulePermissions[moduleId] || []), 'voir'];
       }
       return { ...previous, modulePermissions };
@@ -378,16 +383,6 @@ function RoleFormModal({
       if (next.length && !modulePermissions.stocks?.includes('voir')) {
         modulePermissions.stocks = [...(modulePermissions.stocks || []), 'voir'];
       }
-      return { ...previous, modulePermissions };
-    });
-  };
-
-  const togglePresencePermission = (permission: string) => {
-    setFormData(previous => {
-      const key = `presence.${permission}`;
-      const modulePermissions = { ...previous.modulePermissions };
-      if (modulePermissions[key]?.length) delete modulePermissions[key];
-      else modulePermissions[key] = ['autorisé'];
       return { ...previous, modulePermissions };
     });
   };
@@ -445,7 +440,6 @@ function RoleFormModal({
               onTogglePermission={togglePermission}
               onToggleFeature={toggleFeaturePermission}
               onToggleStock={toggleStockPermission}
-              onTogglePresence={togglePresencePermission}
             />
           ))}
           {availableModules.length === 0 && <div className="text-sm italic text-[hsl(var(--muted-foreground))]">Aucun module n’est autorisé pour cette unité. Revenez dans Structure & unités pour en sélectionner.</div>}
@@ -507,14 +501,12 @@ function ModulePermissionCard({
   onTogglePermission,
   onToggleFeature,
   onToggleStock,
-  onTogglePresence,
 }: {
   module: Module;
   modulePermissions: Record<string, string[]>;
   onTogglePermission: (key: string, permission: Permission) => void;
   onToggleFeature: (moduleId: ModuleId, feature: string, permission: Permission) => void;
   onToggleStock: (submoduleId: string, permission: Permission) => void;
-  onTogglePresence: (permission: string) => void;
 }) {
   const permissions = modulePermissions[module.id] || [];
   const features = module.id === 'commerce'
@@ -533,10 +525,10 @@ function ModulePermissionCard({
              <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
           </div>
         </div>
-        <div className="shrink-0">
+         {module.id !== 'presences' ? <div className="shrink-0">
            <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
           <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
-        </div>
+         </div> : <p className="max-w-xs text-xs leading-5 text-[hsl(var(--muted-foreground))]">Choisissez les fonctionnalités et les actions directement dans la liste ci-dessous.</p>}
       </div>
       <div className="space-y-3 p-4">
         {module.id !== 'stocks' && (
@@ -548,7 +540,6 @@ function ModulePermissionCard({
           />
         )}
         {module.id === 'stocks' && <StockPermissionList modulePermissions={modulePermissions} onToggle={onToggleStock} />}
-        {module.id === 'presences' && <PresencePermissionList modulePermissions={modulePermissions} onToggle={onTogglePresence} />}
       </div>
     </section>
   );
@@ -621,46 +612,6 @@ function StockPermissionList({
               </div>
               <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={modulePermissions[key] || []} onToggle={permission => onToggle(submodule.id, permission)} />
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PresencePermissionList({
-  modulePermissions,
-  onToggle,
-}: {
-  modulePermissions: Record<string, string[]>;
-  onToggle: (permission: string) => void;
-}) {
-  const permissions = [
-    ['view', 'Consulter'],
-    ['create', 'Créer'],
-    ['edit', 'Modifier'],
-    ['delete', 'Supprimer'],
-    ['correct', 'Corriger'],
-    ['validate', 'Valider'],
-    ['manage', 'Gérer'],
-    ['export', 'Exporter'],
-    ['reports', 'Rapports'],
-  ] as const;
-
-  return (
-    <div>
-      <div className="mb-2">
-         <h5 className="text-sm font-bold">Droits opérationnels des présences</h5>
-         <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Ces capacités complètent les fonctionnalités sélectionnées pour le rôle.</p>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {permissions.map(([key, label]) => {
-          const active = Boolean(modulePermissions[`presence.${key}`]?.length);
-           return (
-             <button key={key} type="button" aria-pressed={active} onClick={() => onToggle(key)} className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--muted)/.16)] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)]'}`}>
-              {label}
-              {active && <Check size={13} className="text-[hsl(var(--primary))]" />}
-            </button>
           );
         })}
       </div>

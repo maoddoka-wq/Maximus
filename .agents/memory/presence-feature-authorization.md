@@ -18,3 +18,9 @@ La validation d’une demande d’absence ou de congé est une opération de sup
 **Why:** La propriété du dossier limite le compte à ses propres données, mais ne suffit pas à empêcher l’auto-approbation d’une demande.
 
 **How to apply:** Réserver l’action `validate` à l’administrateur d’entreprise ou au manager de secteur dans l’interface, et refuser côté API toute transition de validation provenant d’un acteur de rôle `employee`.
+
+La configuration d’un rôle Présences doit être exclusivement portée par les clés détaillées `presence.<fonctionnalité>` et les actions Voir / Créer / Modifier de cette fonctionnalité. Les droits racine `presences` et les anciennes clés opérationnelles globales ne doivent pas rouvrir toutes les fonctionnalités.
+
+**Why:** Deux modes simultanés dans l’éditeur de rôles permettaient qu’un droit général ou une ancienne permission globale réapparaisse comme accès à des fonctionnalités non choisies.
+
+**How to apply:** Ne pas afficher d’accès général séparé pour Présences, supprimer le fallback racine dans la sélection des fonctionnalités et exiger une permission détaillée de lecture pour afficher un onglet.
