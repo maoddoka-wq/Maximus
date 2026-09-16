@@ -33,7 +33,17 @@ class PresenceController extends Controller
 
         $query = PresenceItem::query()
             ->where('company_id', $companyId)
-            ->when(($actor['role'] ?? null) === 'employee', fn ($query) => $query->where('employee_id', $actor['employeeId'] ?? '__no_employee__'))
+            ->when(($actor['role'] ?? null) === 'employee', function ($query) use ($actor): void {
+                $query->where(function ($scopedQuery) use ($actor): void {
+                    $scopedQuery
+                        ->where('employee_id', $actor['employeeId'] ?? '__no_employee__')
+                        ->orWhere(function ($globalQuery): void {
+                            $globalQuery
+                                ->whereNull('employee_id')
+                                ->where('type', 'schedule');
+                        });
+                });
+            })
             ->orderByDesc('updated_at')
             ->orderBy('work_date');
         $items = $query->get()

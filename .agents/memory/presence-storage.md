@@ -7,4 +7,4 @@ Les données de Gestion des Présences sont persistées dans PostgreSQL comme de
 
 **Why:** Le module doit couvrir plusieurs workflows métier et évoluer avec les congés/RH sans remplacer le store local existant qui porte encore l’organisation et les employés.
 
-**How to apply:** Toute nouvelle sous-fonction Présences doit utiliser l’API `/api/presence` et créer une entrée d’historique; ne pas réintroduire de données fictives ou une seconde persistance locale.
+**How to apply:** Toute nouvelle sous-fonction Présences doit utiliser l’API `/api/presence` et créer une entrée d’historique; ne pas réintroduire de données fictives ou une seconde persistance locale. Un horaire sans employé ciblé est global à l’entreprise et doit être inclus dans le bootstrap de chaque employé autorisé; un horaire ciblé reste isolé.

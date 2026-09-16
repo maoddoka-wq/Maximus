@@ -261,6 +261,42 @@ class PresenceTest extends TestCase
             ->assertJsonMissing(['id' => 'presence-absence-hidden']);
     }
 
+    public function test_employee_bootstrap_includes_global_schedules_but_not_another_employees_schedule(): void
+    {
+        PresenceItem::query()->create([
+            'id' => 'presence-schedule-global',
+            'company_id' => 'kora',
+            'type' => 'schedule',
+            'employee_id' => null,
+            'status' => 'ACTIF',
+            'payload' => ['name' => 'Horaire administratif'],
+            'created_by' => 'Administration',
+            'updated_by' => 'Administration',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        PresenceItem::query()->create([
+            'id' => 'presence-schedule-other-employee',
+            'company_id' => 'kora',
+            'type' => 'schedule',
+            'employee_id' => 'other-employee',
+            'status' => 'ACTIF',
+            'payload' => ['name' => 'Horaire autre employé'],
+            'created_by' => 'Administration',
+            'updated_by' => 'Administration',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->asActor('employee', 'presence-employee', [
+            'presence.horaires' => ['voir'],
+        ])
+            ->getJson('/api/presence/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonFragment(['id' => 'presence-schedule-global'])
+            ->assertJsonMissing(['id' => 'presence-schedule-other-employee']);
+    }
+
     public function test_presence_create_permission_is_limited_to_the_selected_feature(): void
     {
         $request = $this->asActor('employee', 'presence-employee', [
