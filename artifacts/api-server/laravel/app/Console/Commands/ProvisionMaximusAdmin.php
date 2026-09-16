@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AuthSession;
 use App\Models\AuthUser;
 use App\Support\MaximusPassword;
+use App\Support\InstallationContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,6 +20,12 @@ class ProvisionMaximusAdmin extends Command
 
     public function handle(): int
     {
+        if (!InstallationContext::isCentral()) {
+            $this->error('Un administrateur général MAXIMUS ne peut pas être créé sur une installation entreprise.');
+
+            return self::FAILURE;
+        }
+
         $email = Str::lower(trim((string) ($this->option('user') ?: env('ADMIN_USER', ''))));
         $password = (string) ($this->option('password') ?: env('ADMIN_PASSWORD', ''));
 

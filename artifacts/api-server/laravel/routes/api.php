@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Services\SystemHealthService;
+use App\Support\InstallationContext;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
@@ -38,9 +39,16 @@ Route::get('/healthz', function () {
     }
 });
 
-Route::get('/registration-catalog', [AppStateController::class, 'registrationCatalog']);
-Route::post('/company-requests', [CompanyController::class, 'createRequest'])->middleware('throttle:login');
-Route::prefix('onboarding/drafts')->middleware('throttle:onboarding')->group(function (): void {
+Route::get('/installation', function () {
+    return response()->json(InstallationContext::publicProfile());
+});
+
+Route::middleware('maximus.central')->group(function (): void {
+    Route::get('/registration-catalog', [AppStateController::class, 'registrationCatalog']);
+    Route::post('/company-requests', [CompanyController::class, 'createRequest'])->middleware('throttle:login');
+});
+
+Route::prefix('onboarding/drafts')->middleware(['maximus.central', 'throttle:onboarding'])->group(function (): void {
     Route::post('/', [OnboardingDraftController::class, 'store']);
     Route::get('/{draftId}', [OnboardingDraftController::class, 'show']);
     Route::put('/{draftId}', [OnboardingDraftController::class, 'update']);
@@ -58,13 +66,13 @@ Route::prefix('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 
-Route::middleware('maximus.auth')->prefix('company-requests')->group(function (): void {
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('company-requests')->group(function (): void {
     Route::get('/', [CompanyController::class, 'index']);
     Route::post('/{companyId}/approve', [CompanyController::class, 'approve']);
     Route::post('/{companyId}/reject', [CompanyController::class, 'reject']);
 });
 
-Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {
     Route::patch('/{companyId}', [CompanyController::class, 'update']);
     Route::get('/{companyId}/login-settings', [CompanyController::class, 'loginSettings']);
     Route::patch('/{companyId}/login-settings', [CompanyController::class, 'updateLoginSettings']);
@@ -99,7 +107,7 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
     Route::put('/', [AppStateController::class, 'save']);
 });
 
-Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (): void {
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {
     Route::get('/public-registration', [PlatformSettingsController::class, 'publicRegistration']);
     Route::put('/public-registration', [PlatformSettingsController::class, 'updatePublicRegistration']);
     Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);
@@ -116,8 +124,8 @@ Route::middleware('maximus.auth')->prefix('platform-settings')->group(function (
     Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);
 });
 
-Route::middleware('maximus.auth')->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
-Route::middleware('maximus.auth')->prefix('maximus-assistant/actions')->group(function (): void {
+Route::middleware(['maximus.central', 'maximus.auth'])->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('maximus-assistant/actions')->group(function (): void {
     Route::post('/preview', [MaximusAssistantController::class, 'previewAction']);
     Route::post('/execute', [MaximusAssistantController::class, 'executeAction']);
 });

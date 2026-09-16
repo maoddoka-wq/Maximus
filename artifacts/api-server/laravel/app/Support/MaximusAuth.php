@@ -55,8 +55,9 @@ final class MaximusAuth
             return false;
         }
 
-        return $user->company_id === null
-            || CompanyRegistry::isActive((string) $user->company_id);
+        return InstallationContext::allowsUser($user)
+            && ($user->company_id === null
+                || CompanyRegistry::isActive((string) $user->company_id));
     }
 
     public static function issueSession(AuthUser $user): string

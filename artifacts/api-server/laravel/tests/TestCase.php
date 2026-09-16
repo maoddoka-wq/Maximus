@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Support\ModuleCatalog;
+use App\Support\CompanyPaymentAccess;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Schema;
 
@@ -16,5 +17,6 @@ abstract class TestCase extends BaseTestCase
         }
         ModuleCatalog::ensureCatalog();
         ModuleCatalog::ensureCompanyAccess('kora');
+        CompanyPaymentAccess::ensure('kora', 'ACTIF');
     }
 }

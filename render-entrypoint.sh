@@ -2,7 +2,7 @@
 
 set -eu
 
-required_variables="APP_KEY ADMIN_USER ADMIN_PASSWORD DATABASE_URL APP_URL"
+required_variables="APP_KEY DATABASE_URL APP_URL"
 
 for variable in $required_variables; do
     eval "value=\${$variable:-}"
@@ -11,6 +11,39 @@ for variable in $required_variables; do
         exit 1
     fi
 done
+
+deployment_mode="${MAXIMUS_DEPLOYMENT_MODE:-central}"
+case "$deployment_mode" in
+    central)
+        for variable in ADMIN_USER ADMIN_PASSWORD; do
+            eval "value=\${$variable:-}"
+            if [ -z "$value" ]; then
+                echo "Render startup error: $variable is required for the central installation." >&2
+                exit 1
+            fi
+        done
+        ;;
+    dedicated|on_premise)
+        for variable in MAXIMUS_INSTALLATION_COMPANY_ID MAXIMUS_COMPANY_NAME MAXIMUS_COMPANY_EMAIL; do
+            eval "value=\${$variable:-}"
+            if [ -z "$value" ]; then
+                echo "Render startup error: $variable is required for an isolated installation." >&2
+                exit 1
+            fi
+        done
+
+        admin_user="${MAXIMUS_ADMIN_USER:-${ADMIN_USER:-}}"
+        admin_password="${MAXIMUS_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-}}"
+        if [ -z "$admin_user" ] || [ -z "$admin_password" ]; then
+            echo "Render startup error: MAXIMUS_ADMIN_USER/MAXIMUS_ADMIN_PASSWORD or ADMIN_USER/ADMIN_PASSWORD are required for an isolated installation." >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Render startup error: MAXIMUS_DEPLOYMENT_MODE must be central, dedicated or on_premise." >&2
+        exit 1
+        ;;
+esac
 
 for variable in DIAMANOPAY_CLIENT_ID DIAMANOPAY_CLIENT_SECRET DIAMANOPAY_WEBHOOK_SECRET; do
     eval "value=\${$variable:-}"
@@ -51,6 +84,10 @@ while ! php artisan migrate --force --no-interaction; do
     sleep 2
 done
 
-php artisan maximus:provision-admin --no-interaction
+if [ "$deployment_mode" = "central" ]; then
+    php artisan maximus:provision-admin --no-interaction
+else
+    php artisan maximus:install-company --no-interaction
+fi
 
 exec apache2-foreground

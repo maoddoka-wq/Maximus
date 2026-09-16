@@ -107,6 +107,7 @@ import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/mod
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
+import { installationApi, type InstallationProfile } from '@/lib/installation-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
@@ -393,6 +394,8 @@ function AppContent() {
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
   const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
+  const [installationProfile, setInstallationProfile] = useState<InstallationProfile | null>(null);
+  const [installationReady, setInstallationReady] = useState(false);
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [appStateError, setAppStateError] = useState('');
   const [appStateReady, setAppStateReady] = useState(
@@ -432,6 +435,35 @@ function AppContent() {
   const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
     showAppToast(message, kind);
   useEffect(() => {
+    let cancelled = false;
+    void installationApi
+      .profile()
+      .then((profile) => {
+        if (cancelled) return;
+        setInstallationProfile(profile);
+        setPublicRegistrationEnabled(profile.registrationEnabled);
+        if (profile.companyOnly && localStorage.getItem('maximus-session') === 'admin') {
+          localStorage.removeItem('maximus-session');
+          setSession(null);
+          setAppStateReady(true);
+          void authApi.logout().catch(() => undefined);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // The server remains authoritative. Keep the central UI fallback so
+          // a temporary configuration request failure does not blank the app.
+          setInstallationProfile(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInstallationReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
       .session()
@@ -463,7 +495,11 @@ function AppContent() {
       });
   }, []);
   useEffect(() => {
-    if (session || !['/', '/inscription', '/onboarding'].includes(pathname)) return undefined;
+    if (
+      session
+      || installationProfile?.companyOnly
+      || !['/', '/inscription', '/onboarding'].includes(pathname)
+    ) return undefined;
     let cancelled = false;
     void registrationCatalogApi.bootstrap()
       .then(({ catalog, version }) => {
@@ -491,7 +527,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [pathname, session]);
+  }, [installationProfile?.companyOnly, pathname, session]);
   const refreshAppState = async (waitForPendingSave = true) => {
     const requestSession = session;
     if (!requestSession || requestSession.startsWith('company:sector-test-')) return true;
@@ -962,6 +998,18 @@ function AppContent() {
     navigate(fallback);
   };
 
+  if (!installationReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
+        <h1 className="text-lg font-bold">Préparation de votre espace…</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          Vérification de la configuration de l’installation MAXIMUS.
+        </p>
+      </section>
+    </div>;
+  }
+  if (location === '/inscription' && installationProfile?.companyOnly)
+    return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
   if (location === '/inscription')
     return session === 'admin' ? (
       <AdminCreateCompanyPage
@@ -985,6 +1033,9 @@ function AppContent() {
         }}
       />
     );
+  if (location === '/onboarding' && installationProfile?.companyOnly) {
+    return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
+  }
   if (location === '/onboarding' && !session) {
     if (!publicRegistrationEnabled) {
       return <PublicRegistrationClosed onBack={() => setLocation('/')} />;
@@ -1059,11 +1110,12 @@ function AppContent() {
       <Login
         onLogin={login}
         employees={loginEmployees}
-        registrationEnabled={publicRegistrationEnabled}
+        registrationEnabled={installationProfile?.companyOnly ? false : publicRegistrationEnabled}
+        installationProfile={installationProfile}
       />
     );
   }
-  const isAdmin = session === 'admin';
+  const isAdmin = session === 'admin' && !installationProfile?.companyOnly;
   const companyAdmin = session.startsWith('company:');
   const employeeId = sessionEmployeeId;
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
@@ -1332,10 +1384,12 @@ function Login({
   onLogin,
   employees,
   registrationEnabled,
+  installationProfile,
 }: {
   onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
   employees: StoreData['employees'];
   registrationEnabled: boolean;
+  installationProfile: InstallationProfile | null;
 }) {
   const showDemoAccounts = false;
   const [email, setEmail] = useState('');
@@ -1406,10 +1460,14 @@ function Login({
             <Brand large />
           </div>
           <div className="mb-8">
-            <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
-              Accédez à votre espace
-            </p>
-            <h2 className="text-3xl font-bold tracking-[-.04em]">Gérez votre activité en toute simplicité</h2>
+             <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
+               {installationProfile?.companyOnly ? 'Espace entreprise dédié' : 'Accédez à votre espace'}
+             </p>
+             <h2 className="text-3xl font-bold tracking-[-.04em]">
+               {installationProfile?.companyOnly && installationProfile.company
+                 ? `Bienvenue chez ${installationProfile.company.name}`
+                 : 'Gérez votre activité en toute simplicité'}
+             </h2>
             <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
               Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.
             </p>
@@ -1471,17 +1529,19 @@ function Login({
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
-          <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-            Pas encore d’espace ?{' '}
-            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-              Créer une entreprise
-            </Link>
-            {!registrationEnabled && (
-              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
-              </p>
-            )}
-          </div>
+           {!installationProfile?.companyOnly && (
+             <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+               Pas encore d’espace ?{' '}
+               <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
+                 Créer une entreprise
+               </Link>
+               {!registrationEnabled && (
+                 <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                   L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
+                 </p>
+               )}
+             </div>
+           )}
           {showDemoAccounts && demoAccounts.length > 0 && (
             <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
               <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
@@ -1512,6 +1572,30 @@ function Login({
             </div>
           )}
         </div>
+      </section>
+    </div>
+  );
+}
+
+function InstallationCompanyOnlyNotice({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
+          <Building2 size={22} />
+        </div>
+        <h1 className="mt-6 text-2xl font-bold tracking-tight">Espace entreprise dédié</h1>
+        <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+          Cette installation est réservée à une seule entreprise. Les inscriptions et l’administration générale
+          MAXIMUS sont disponibles uniquement sur l’instance centrale.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-6 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+        >
+          Retour à la connexion
+        </button>
       </section>
     </div>
   );

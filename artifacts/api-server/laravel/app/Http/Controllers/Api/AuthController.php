@@ -7,6 +7,7 @@ use App\Models\AuthSession;
 use App\Models\AuthUser;
 use App\Models\Company;
 use App\Support\CompanyAuthorization;
+use App\Support\InstallationContext;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Database\QueryException;
@@ -25,10 +26,20 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'max:200'],
         ]);
 
-        $user = AuthUser::query()
+        $userQuery = AuthUser::query()
             ->where('email', Str::lower(trim($data['email'])))
-            ->where('status', 'ACTIF')
-            ->first();
+            ->where('status', 'ACTIF');
+        if (InstallationContext::isCompanyOnly()) {
+            $companyId = InstallationContext::companyId();
+            if ($companyId === null) {
+                return response()->json([
+                    'error' => 'L’installation entreprise n’est pas encore configurée.',
+                    'code' => 'INSTALLATION_NOT_CONFIGURED',
+                ], 503);
+            }
+            $userQuery->where('company_id', $companyId);
+        }
+        $user = $userQuery->first();
 
         if (
             ! $user
@@ -72,6 +83,10 @@ class AuthController extends Controller
             ->whereNull('deleted_at')
             ->first();
 
+        if (InstallationContext::isCompanyOnly() && (!$company || $company->id !== InstallationContext::companyId())) {
+            return response()->json(['error' => 'Cette entreprise ne correspond pas à cette installation.'], 404);
+        }
+
         if (! $company || ! $company->login_custom_allowed || ($company->login_mode ?: 'MAXIMUS') !== 'CUSTOM') {
             return response()->json(['error' => 'Cette connexion personnalisée est indisponible.'], 404);
         }
@@ -99,6 +114,10 @@ class AuthController extends Controller
             ->where('status', 'ACTIF')
             ->whereNull('deleted_at')
             ->first();
+
+        if (InstallationContext::isCompanyOnly() && (!$company || $company->id !== InstallationContext::companyId())) {
+            return response()->json(['error' => 'Cette entreprise ne correspond pas à cette installation.'], 404);
+        }
 
         if (! $company || ! $company->login_custom_allowed || ($company->login_mode ?: 'MAXIMUS') !== 'CUSTOM') {
             return response()->json(['error' => 'Cette connexion personnalisée est indisponible.'], 404);

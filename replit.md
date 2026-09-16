@@ -7,6 +7,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 - Production is already deployed on Render. Preserve the existing Render deployment and its current configuration when making changes; do not suggest the generic Replit deploy/publish action for this project.
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, legacy Express entrypoint)
 - `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php`; development provisions the demo idempotently, while production migrates the schema and provisions only the MAXIMUS admin from environment secrets.
+- `MAXIMUS_DEPLOYMENT_MODE=central` keeps the shared SaaS instance. `dedicated` and `on_premise` require `MAXIMUS_INSTALLATION_COMPANY_ID` plus company/admin variables, then `render-entrypoint.sh` runs `maximus:install-company` instead of creating a global MAXIMUS admin.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
