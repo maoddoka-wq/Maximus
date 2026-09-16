@@ -90,7 +90,7 @@
     <div class="card"><h3><code>dedicated</code></h3><p>À choisir pour un VPS ou un cloud réservé à l’entreprise. Le serveur peut être public, avec un domaine et un certificat TLS.</p><ul><li>Instance séparée.</li><li>Base PostgreSQL séparée.</li><li>Stockage séparé.</li><li>Accès administrateur entreprise seulement.</li></ul></div>
     <div class="card"><h3><code>on_premise</code></h3><p>À choisir pour un serveur dans l’infrastructure de l’entreprise, accessible sur réseau interne ou via VPN.</p><ul><li>Même isolation applicative.</li><li>Certificat géré par l’entreprise.</li><li>Sauvegardes sous responsabilité du client.</li><li>Pare-feu et accès réseau internes.</li></ul></div>
   </div>
-  <p>Le script d’installation interactif initialise le mode <code>dedicated</code>. Pour <code>on_premise</code>, modifier la valeur après la collecte ou fournir la configuration équivalente dans l’environnement avant l’exécution finale. Le serveur de production doit toujours utiliser une valeur explicite et contrôlée.</p>
+  <p>Le script d’installation propose le mode <code>dedicated</code> par défaut et accepte explicitement <code>on_premise</code>. Le serveur de production doit toujours utiliser une valeur explicite et contrôlée.</p>
   <div class="warning"><b>Stabilité de l’identifiant :</b> conserver le même <code>MAXIMUS_INSTALLATION_COMPANY_ID</code> lors des mises à jour et des relances. Le changer crée un nouveau périmètre logique et peut laisser l’ancien tenant dans la base.</div>
 
   <h2>3. Architecture de l’instance isolée</h2>

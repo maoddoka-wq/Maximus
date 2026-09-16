@@ -196,3 +196,17 @@ mtime_ms = 1789570093207
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/96a2546f-62e1-472c-91a3-1c18bd8e2ddb/5ee5150e-f94c-4b0e-b5ba-c02b4c3d2079"
 storage_version_token = "1789570158655456"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "qaMEIydqJo_4aPZz1yCSQ"
+uri = "file://docs/guides/maximus-dedicated-installation-guide.pdf"
+type = "pdf"
+title = "MAXIMUS — Guide d’installation dédiée"
+description = "Guide autonome consacré uniquement aux installations dedicated et on_premise : prérequis, PostgreSQL, installateur, HTTPS, isolation, sauvegardes, mises à jour et dépannage."
+logical_id = "bc327e84-9b93-444e-be32-7d7c364d1503"
+content_hash = "sha256:2d5961e23fc50b760c185fccc337a0444861a05574df9085a44f6375dd5ddb8b"
+size = 288882
+mtime_ms = 1789570846514
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bc327e84-9b93-444e-be32-7d7c364d1503/5bd82f78-b3ef-4608-989d-41139f9437f5"
+storage_version_token = "1789570853467914"
+content_type = "application/pdf"
