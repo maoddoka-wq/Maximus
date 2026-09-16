@@ -30,3 +30,9 @@ Le parcours Employé Présences est limité à la consultation des horaires, au 
 **Why:** L’interface gestionnaire était réutilisée telle quelle pour l’employé et l’API autorisait encore la création d’un horaire si une permission de rôle trop large était présente.
 
 **How to apply:** Appliquer la restriction dans les deux couches : masquer les actions côté écran selon `selfOnly`, puis refuser côté serveur les écritures d’horaires et les actions de supervision d’un acteur `employee`.
+
+Les rôles générés depuis un pack deviennent des rôles personnalisés dès qu’ils sont enregistrés depuis l’éditeur. Leur sélection effective doit alors venir uniquement des permissions détaillées enregistrées, jamais du `packId` conservé en arrière-plan.
+
+**Why:** Conserver la référence du pack faisait réapparaître toutes les fonctionnalités du pack après une modification manuelle, même lorsque l’utilisateur en avait désélectionné certaines.
+
+**How to apply:** Retirer les droits racine de module à la sauvegarde d’un rôle et détacher le pack lors d’un enregistrement depuis l’éditeur ; calculer Voir / Créer / Modifier par fonctionnalité.

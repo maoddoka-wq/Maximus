@@ -147,7 +147,14 @@ export function RolesTab({
             mutate(draft => {
               if (editingRole) {
                 const index = draft.roles.findIndex(role => role.id === editingRole.id);
-                if (index !== -1) draft.roles[index] = { ...draft.roles[index], ...roleData };
+                 if (index !== -1) {
+                   draft.roles[index] = {
+                     ...draft.roles[index],
+                     ...roleData,
+                     packId: undefined,
+                     packModuleId: undefined,
+                   };
+                 }
                 draft.employees.filter(employee => employee.roleId === editingRole.id).forEach(employee => { employee.role = roleData.name; });
               } else {
                 draft.roles.push({ id: uid('role'), companyId: company.id, ...roleData });
@@ -182,8 +189,18 @@ function RoleCard({
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const permissionEntries = Object.entries(role.modulePermissions);
-  const moduleCount = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key)).length;
-  const detailCount = permissionEntries.length - moduleCount;
+  const moduleForPermission = (key: string) => moduleDefinitions.find(module =>
+    key === module.id
+    || key.startsWith(`${module.id}:`)
+    || (module.id === 'presences' && key.startsWith('presence.')),
+  );
+  const coveredModuleIds = new Set(
+    permissionEntries
+      .map(([key]) => moduleForPermission(key)?.id)
+      .filter((moduleId): moduleId is ModuleId => Boolean(moduleId)),
+  );
+  const moduleCount = coveredModuleIds.size;
+  const detailCount = permissionEntries.filter(([key]) => !moduleDefinitions.some(module => module.id === key)).length;
   const assignedCount = assignedEmployees.length + (managerName ? 1 : 0);
   const moduleLabels = new Map(moduleDefinitions.map(module => [module.id, module.name]));
   const moduleEntries = permissionEntries.filter(([key]) => moduleDefinitions.some(module => module.id === key));
@@ -213,11 +230,11 @@ function RoleCard({
       <div className="grid gap-3 border-b p-4 sm:grid-cols-3">
         <div className="flex items-center gap-3 rounded-lg border bg-[hsl(var(--muted)/.18)] px-3 py-2.5">
           <span className="rounded-md bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><Layers3 size={14} /></span>
-          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Modules</p><p className="mt-0.5 text-sm font-bold">{moduleCount}</p></div>
+           <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Modules couverts</p><p className="mt-0.5 text-sm font-bold">{moduleCount}</p></div>
         </div>
         <div className="flex items-center gap-3 rounded-lg border bg-[hsl(var(--muted)/.18)] px-3 py-2.5">
           <span className="rounded-md bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><KeyRound size={14} /></span>
-          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Sous-autorisations</p><p className="mt-0.5 text-sm font-bold">{detailCount}</p></div>
+           <div><p className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités</p><p className="mt-0.5 text-sm font-bold">{detailCount}</p></div>
         </div>
         <div className="flex items-center gap-3 rounded-lg border bg-[hsl(var(--muted)/.18)] px-3 py-2.5">
           <span className="rounded-md bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]"><Users size={14} /></span>
@@ -235,7 +252,7 @@ function RoleCard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès configurés</p>
-            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{permissionEntries.length ? `${moduleCount} module${moduleCount > 1 ? 's' : ''} · ${detailCount} sous-autorisation${detailCount > 1 ? 's' : ''}` : 'Aucun droit configuré.'}</p>
+             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{permissionEntries.length ? `${moduleCount} module${moduleCount > 1 ? 's' : ''} couvert${moduleCount > 1 ? 's' : ''} · ${detailCount} fonctionnalité${detailCount > 1 ? 's' : ''}` : 'Aucun droit configuré.'}</p>
           </div>
           {permissionEntries.length > 0 && (
             <button
@@ -309,40 +326,6 @@ function RoleFormModal({
     .filter(module => !requestedModuleIds || requestedModuleIds.has(module.id))
     .filter(module => selectedNode?.moduleIds === undefined || selectedNode.moduleIds.includes(module.id));
 
-  const togglePermission = (moduleId: string, permission: 'voir' | 'créer' | 'modifier') => {
-    setFormData(previous => {
-      const current = new Set(previous.modulePermissions[moduleId] || []);
-      const enabled = current.has(permission);
-      if (permission === 'voir') {
-        if (enabled) current.clear();
-        else current.add('voir');
-      } else if (permission === 'créer') {
-        if (enabled) {
-          current.delete('créer');
-          current.delete('modifier');
-        } else {
-          current.add('voir');
-          current.add('créer');
-        }
-      } else if (enabled) {
-        current.delete('modifier');
-      } else {
-        current.add('voir');
-        current.add('créer');
-        current.add('modifier');
-      }
-      const nextPermissions = [...current];
-      const modulePermissions = { ...previous.modulePermissions };
-      if (nextPermissions.length === 0) delete modulePermissions[moduleId];
-      else modulePermissions[moduleId] = nextPermissions;
-      if (permission === 'voir' && nextPermissions.length === 0) {
-        const detailPrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:`;
-        Object.keys(modulePermissions).filter(key => key.startsWith(detailPrefix)).forEach(key => delete modulePermissions[key]);
-      }
-      return { ...previous, modulePermissions };
-    });
-  };
-
   const featurePermissionKeys = (moduleId: ModuleId, feature: string) =>
     moduleId === 'commerce'
       ? commerceTabPermissionKeys(feature as CommerceTabId)
@@ -365,8 +348,6 @@ function RoleFormModal({
         Object.keys(modulePermissions)
           .filter(permissionKey => /^presence\.(view|create|edit|delete|correct|validate|manage|export|reports)$/.test(permissionKey))
           .forEach(permissionKey => delete modulePermissions[permissionKey]);
-      } else if (next.length && !modulePermissions[moduleId]?.includes('voir')) {
-        modulePermissions[moduleId] = [...(modulePermissions[moduleId] || []), 'voir'];
       }
       return { ...previous, modulePermissions };
     });
@@ -380,9 +361,6 @@ function RoleFormModal({
       const modulePermissions = { ...previous.modulePermissions };
       if (next.length) modulePermissions[key] = permission === 'voir' ? next : [...new Set(['voir', ...next])];
       else delete modulePermissions[key];
-      if (next.length && !modulePermissions.stocks?.includes('voir')) {
-        modulePermissions.stocks = [...(modulePermissions.stocks || []), 'voir'];
-      }
       return { ...previous, modulePermissions };
     });
   };
@@ -404,6 +382,7 @@ function RoleFormModal({
           key,
           moduleIds.has(key) ? [...new Set(permissions)] : permissions,
         ] as const)
+        .filter(([key]) => !moduleIds.has(key))
         .filter(([, permissions]) => permissions.length > 0),
     );
     const boundedRole = restrictRoleToCompany({ id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions }, company);
@@ -437,7 +416,6 @@ function RoleFormModal({
               key={module.id}
               module={module}
               modulePermissions={formData.modulePermissions}
-              onTogglePermission={togglePermission}
               onToggleFeature={toggleFeaturePermission}
               onToggleStock={toggleStockPermission}
             />
@@ -498,17 +476,14 @@ function PermissionToggleGroup({
 function ModulePermissionCard({
   module,
   modulePermissions,
-  onTogglePermission,
   onToggleFeature,
   onToggleStock,
 }: {
   module: Module;
   modulePermissions: Record<string, string[]>;
-  onTogglePermission: (key: string, permission: Permission) => void;
   onToggleFeature: (moduleId: ModuleId, feature: string, permission: Permission) => void;
   onToggleStock: (submoduleId: string, permission: Permission) => void;
 }) {
-  const permissions = modulePermissions[module.id] || [];
   const features = module.id === 'commerce'
     ? commerceTabDefinitions
     : module.id === 'presences'
@@ -525,10 +500,7 @@ function ModulePermissionCard({
              <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{module.description}</p>
           </div>
         </div>
-         {module.id !== 'presences' ? <div className="shrink-0">
-           <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Accès général</p>
-          <PermissionToggleGroup permissions={['voir', 'créer', 'modifier']} activePermissions={permissions} onToggle={permission => onTogglePermission(module.id, permission)} />
-         </div> : <p className="max-w-xs text-xs leading-5 text-[hsl(var(--muted-foreground))]">Choisissez les fonctionnalités et les actions directement dans la liste ci-dessous.</p>}
+         <p className="max-w-xs text-xs leading-5 text-[hsl(var(--muted-foreground))]">Choisissez les fonctionnalités et les actions directement dans la liste ci-dessous.</p>
       </div>
       <div className="space-y-3 p-4">
         {module.id !== 'stocks' && (
