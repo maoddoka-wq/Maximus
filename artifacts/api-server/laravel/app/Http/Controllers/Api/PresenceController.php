@@ -121,6 +121,7 @@ class PresenceController extends Controller
         $allowed = is_array($actorData)
             && $feature !== null
             && $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
+            && ! ($requiresValidation && ($actorData['role'] ?? null) === 'employee')
             && ($item->type === 'attendance'
                 ? ModuleAuthorization::allows($actorData, 'presences', 'correct', $feature)
                 : (! $requiresValidation || ModuleAuthorization::allows($actorData, 'presences', 'validate', $feature))

@@ -78,6 +78,47 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
+test('borne Présences au dossier de l’employé et aux fonctionnalités de son rôle', () => {
+  const { data, company, employee } = createAccessFixture();
+  const node = data.orgNodes[0]!;
+  company.allowedModules = ['presences'];
+  company.requestedModules = ['presences'];
+  company.requestedModuleFeatures = {
+    presences: ['tableau-de-bord', 'pointage', 'absences', 'congés', 'historique'],
+  };
+  node.moduleIds = ['presences'];
+  const role = data.roles[0]!;
+  role.name = 'Employé Présences';
+  role.modulePermissions = {
+    presences: ['voir'],
+    'presence.tableau-de-bord': ['voir'],
+    'presence.absences': ['voir', 'créer'],
+    'presence.historique': ['voir'],
+  };
+  employee.role = role.name;
+  employee.roleId = role.id;
+  data.employees.push({
+    ...employee,
+    id: 'employee-other',
+    firstName: 'Autre',
+    email: 'other@company-test.example',
+  });
+
+  const access = buildAppAccessContext({
+    data,
+    session: `employee:${employee.id}`,
+    employee,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.presenceEmployees.map(item => item.id), [employee.id]);
+  assert.deepEqual(access.selectedPresenceFeatureIds, ['tableau-de-bord', 'absences', 'historique']);
+  assert.equal(access.hasPresencePermission('validate'), false);
+});
+
 test('calcule les permissions Transport séparément pour chaque rubrique', () => {
   const { data, company, employee } = createAccessFixture();
   const node = data.orgNodes[0]!;

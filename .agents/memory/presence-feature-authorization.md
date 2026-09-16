@@ -12,3 +12,9 @@ Une demande d’action Présences qui cible une fonctionnalité précise doit v�
 Pour un compte `employee`, toutes les données Présences doivent rester liées à son propre `employeeId`. L’interface doit lui transmettre uniquement son dossier ; l’API doit refuser les créations sans employé ou ciblant un autre employé.
 
 **Why:** Le formulaire Congés recevait encore la liste générale des employés alors que l’API devait déjà limiter les écritures. Les fonctionnalités sélectionnées pouvaient aussi rester visibles lorsqu’un rôle n’avait plus la permission de lecture détaillée.
+
+La validation d’une demande d’absence ou de congé est une opération de supervision : un compte employé ne peut pas changer le statut d’une demande, même si une permission de modification lui a été ajoutée par erreur.
+
+**Why:** La propriété du dossier limite le compte à ses propres données, mais ne suffit pas à empêcher l’auto-approbation d’une demande.
+
+**How to apply:** Réserver l’action `validate` à l’administrateur d’entreprise ou au manager de secteur dans l’interface, et refuser côté API toute transition de validation provenant d’un acteur de rôle `employee`.

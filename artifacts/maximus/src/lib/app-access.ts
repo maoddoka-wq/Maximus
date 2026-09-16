@@ -269,6 +269,7 @@ export function buildAppAccessContext({
   const presenceEmployees = data.employees
     .filter(item => item.companyId === companyId)
     .filter(item => {
+      if (employee && !companyAdmin && !sectorManager) return item.id === employee.id;
       if (!sectorManager || !employeeNode?.id) return true;
       let node = data.orgNodes.find(candidate => candidate.id === item.sectorId && candidate.companyId === companyId);
       while (node) {

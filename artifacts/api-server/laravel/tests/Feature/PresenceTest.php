@@ -363,6 +363,31 @@ class PresenceTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_employee_cannot_approve_even_their_own_presence_request(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', [
+            'presence.absences' => ['voir', 'créer', 'modifier'],
+        ]);
+        $item = PresenceItem::query()->create([
+            'id' => 'presence-absence-employee-request',
+            'company_id' => 'kora',
+            'type' => 'absence',
+            'employee_id' => 'presence-employee',
+            'work_date' => '2026-09-05',
+            'status' => 'EN ATTENTE',
+            'payload' => ['reason' => 'Demande personnelle'],
+            'created_by' => 'Employé',
+            'updated_by' => 'Employé',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->patchJson('/api/presence/items/'.$item->id, [
+            'companyId' => 'kora',
+            'status' => 'APPROUVÉE',
+        ])->assertForbidden();
+    }
+
     public function test_sector_manager_qr_is_limited_to_the_manager_sector(): void
     {
         $workDate = now()->format('Y-m-d');

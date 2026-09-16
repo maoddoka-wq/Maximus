@@ -468,7 +468,7 @@ export function CompanyRouter({
       canCreate: hasPresencePermission('create'),
       canEdit: hasPresencePermission('edit'),
       canCorrect: hasPresencePermission('correct'),
-      canValidate: hasPresencePermission('validate'),
+       canValidate: hasPresencePermission('validate') && (companyAdmin || sectorManager),
       canManage: hasPresencePermission('manage'),
       canGenerateQr: hasPresencePermission('create') && !Boolean(employee && !companyAdmin && !sectorManager),
       canExport: hasPresencePermission('export'),
