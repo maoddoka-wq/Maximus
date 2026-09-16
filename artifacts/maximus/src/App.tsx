@@ -108,6 +108,7 @@ import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
+import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
@@ -865,11 +866,20 @@ function AppContent() {
     notify('Test réel terminé. Retour à la configuration des secteurs.', 'success');
   };
   const logout = () => {
+    const isCompanySession = Boolean(session && session !== 'admin');
+    const companyLoginPath =
+      activeCompany?.loginCustomAllowed && (activeCompany.loginMode ?? 'MAXIMUS') === 'CUSTOM'
+        ? activeCompany.loginUrl
+          ?? (activeCompany.loginSlug
+            ? `/entreprise/${encodeURIComponent(activeCompany.loginSlug)}/connexion`
+            : null)
+        : null;
+    const destination = isCompanySession && companyLoginPath ? companyLoginPath : '/';
     applyCompanyTheme(undefined);
     setAppStateReady(true);
     setSession(null);
     localStorage.removeItem('maximus-session');
-    setLocation('/');
+    setLocation(destination);
     void authApi.logout().catch(() => undefined);
   };
   useEffect(() => {
@@ -955,7 +965,10 @@ function AppContent() {
     return (
       <CompanyLoginPage
         slug={decodeURIComponent(companyLoginMatch[1])}
-        onAuthenticated={applyAuthenticatedUser}
+        onAuthenticated={(user) => {
+          localStorage.setItem('maximus-last-company-login-path', pathname);
+          applyAuthenticatedUser(user);
+        }}
       />
     );
   }
@@ -3120,6 +3133,11 @@ function CompanyDetail({
     url: string;
   } | null>(null);
   const [loginSaving, setLoginSaving] = useState(false);
+  const [customDomains, setCustomDomains] = useState<EcommerceDomain[]>([]);
+  const [domainInput, setDomainInput] = useState('');
+  const [domainLoading, setDomainLoading] = useState(true);
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [domainError, setDomainError] = useState('');
   const toggle = (id: ModuleId) =>
     setActive((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   useEffect(() => {
@@ -3130,6 +3148,28 @@ function CompanyDetail({
       })
       .catch(() => {
         if (!cancelled) setLoginSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDomainLoading(true);
+    setDomainError('');
+    void createEcommerceApi(company.id).bootstrap()
+      .then(({ domains }) => {
+        if (!cancelled) setCustomDomains(Array.isArray(domains) ? domains : []);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCustomDomains([]);
+          setDomainError(error instanceof Error ? error.message : 'Les domaines personnalisés sont indisponibles.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDomainLoading(false);
       });
     return () => {
       cancelled = true;
@@ -3148,6 +3188,60 @@ function CompanyDetail({
       window.alert(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.');
     } finally {
       setLoginSaving(false);
+    }
+  };
+
+  const refreshCustomDomains = async () => {
+    const { domains } = await createEcommerceApi(company.id).bootstrap();
+    setCustomDomains(Array.isArray(domains) ? domains : []);
+  };
+
+  const createCustomDomain = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const domain = domainInput.trim();
+    if (!domain) return;
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).createDomain(domain);
+      await refreshCustomDomains();
+      setDomainInput('');
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être créé.');
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const verifyCustomDomain = async (domain: EcommerceDomain) => {
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).verifyDomain(domain.id);
+      await refreshCustomDomains();
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'La vérification DNS a échoué.');
+      try {
+        await refreshCustomDomains();
+      } catch {
+        // Keep the verification error visible when the refresh also fails.
+      }
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const deleteCustomDomain = async (domain: EcommerceDomain) => {
+    if (!window.confirm(`Retirer le domaine « ${domain.domain} » ?`)) return;
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).deleteDomain(domain.id);
+      await refreshCustomDomains();
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être retiré.');
+    } finally {
+      setDomainSaving(false);
     }
   };
   return (
@@ -3259,6 +3353,90 @@ function CompanyDetail({
                 <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
               </>
             ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
+          </div>
+        </div>
+        <div className="mt-6 border-t pt-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="font-bold">Domaine personnalisé</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Créez ici le domaine public de l’entreprise. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
+              {domainLoading ? 'Chargement…' : `${customDomains.length} domaine${customDomains.length > 1 ? 's' : ''}`}
+            </span>
+          </div>
+          <form onSubmit={createCustomDomain} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm font-semibold">
+              Nom de domaine
+              <input
+                data-testid="input-company-custom-domain"
+                value={domainInput}
+                onChange={(event) => setDomainInput(event.target.value)}
+                placeholder="connexion.exemple.sn"
+                disabled={domainSaving}
+                className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
+              />
+            </label>
+            <button
+              type="submit"
+              data-testid="button-create-company-custom-domain"
+              disabled={domainSaving || !domainInput.trim()}
+              className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {domainSaving ? 'Enregistrement…' : 'Créer le domaine'}
+            </button>
+          </form>
+          {domainError && (
+            <p data-testid="company-custom-domain-error" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+              {domainError}
+            </p>
+          )}
+          <div className="mt-4 space-y-3">
+            {customDomains.length === 0 && !domainLoading ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                Aucun domaine personnalisé n’est encore configuré pour cette entreprise.
+              </p>
+            ) : customDomains.map((domain) => (
+              <article key={domain.id} data-testid={`card-company-custom-domain-${domain.id}`} className="rounded-xl border p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="break-all">{domain.domain}</strong>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${domain.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {domain.status === 'ACTIVE' ? 'ACTIF' : 'EN ATTENTE DNS'}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:grid-cols-2">
+                      <p><span className="font-bold">TXT :</span> {domain.verificationName} → <code className="break-all">{domain.verificationValue}</code></p>
+                      <p><span className="font-bold">CNAME :</span> {domain.domain} → <code className="break-all">{domain.targetHost}</code></p>
+                    </div>
+                    {domain.lastError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]">{domain.lastError}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      data-testid={`button-verify-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void verifyCustomDomain(domain)}
+                      className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
+                    >
+                      Vérifier
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`button-delete-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void deleteCustomDomain(domain)}
+                      className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
