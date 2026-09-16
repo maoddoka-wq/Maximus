@@ -3484,24 +3484,6 @@ function CompanyDetail({
           </div>
           <div className="flex flex-wrap gap-2">
             <ActionButton
-              testId="button-prepare-dedicated-installation"
-              onClick={() => void prepareInstallation('dedicated')}
-            >
-              Préparer le VPS dédié
-            </ActionButton>
-            <ActionButton
-              testId="button-prepare-on-premise-installation"
-              onClick={() => void prepareInstallation('on_premise')}
-            >
-              Préparer l’installation locale
-            </ActionButton>
-            <ActionButton
-              testId="button-download-installation-manifest"
-              onClick={() => void downloadInstallationManifest()}
-            >
-              Télécharger le manifeste d’installation
-            </ActionButton>
-            <ActionButton
               testId="button-suspend-company"
               icon={company.status === 'SUSPENDU' ? RefreshCw : ShieldCheck}
               onClick={() =>
@@ -3553,46 +3535,14 @@ function CompanyDetail({
             Entreprise {company.status === 'ACTIF' ? 'active' : 'à activer'}
           </span>
         </div>
-        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
-          <div className="rounded-xl border p-4">
-            <p className="font-bold">1. Préparer</p>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Choisissez le type de serveur et téléchargez le bootstrap secret.
-            </p>
-          </div>
-          <div className="rounded-xl border p-4">
-            <p className="font-bold">2. Transférer</p>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Envoyez le JSON au VPS avec SSH/SCP, jamais dans le code ou une URL publique.
-            </p>
-          </div>
-          <div className="rounded-xl border p-4">
-            <p className="font-bold">3. Installer</p>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Le script du VPS récupère ensuite les modules, packs et permissions publiés.
-            </p>
-          </div>
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <ActionButton
-            primary
-            testId="button-prepare-dedicated-installation-card"
-            onClick={() => void prepareInstallation('dedicated')}
-          >
-            Préparer le VPS dédié
-          </ActionButton>
-          <ActionButton
-            testId="button-prepare-on-premise-installation-card"
-            onClick={() => void prepareInstallation('on_premise')}
-          >
-            Préparer le serveur local
-          </ActionButton>
-          <ActionButton
-            testId="button-download-installation-manifest-card"
-            onClick={() => void downloadInstallationManifest()}
-          >
-            Télécharger le manifeste
-          </ActionButton>
+         <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+           <p className="font-bold">Déploiement local suspendu pour protéger le code source</p>
+           <p className="mt-1 text-xs leading-5">
+             MAXIMUS ne génère plus de bootstrap pour une installation qui copierait Laravel sur un serveur
+             appartenant à l’entreprise. Le connecteur local sans exposition du code est encore en préparation.
+           </p>
+         </div>
+         <div className="mt-5 flex flex-wrap gap-2">
           <button
             type="button"
             data-testid="button-revoke-installation"
@@ -8255,59 +8205,33 @@ function CompanyModulesDetail({
           </div>
         </div>
       </div>
-      <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
+       <section className="card-surface rounded-2xl border border-amber-300 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2">
-              <KeyRound size={18} className="text-[hsl(var(--primary))]" />
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
-                Réservé à l’administration MAXIMUS
+               <KeyRound size={18} className="text-amber-700" />
+               <p className="mono text-[10px] uppercase tracking-[.16em] text-amber-700">
+                 Déploiement protégé
               </p>
             </div>
-            <h2 className="mt-2 text-xl font-bold">Installation dédiée ou locale</h2>
+             <h2 className="mt-2 text-xl font-bold">Installation locale désactivée</h2>
             <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              MAXIMUS crée ici le fichier bootstrap JSON secret. Vous le téléchargez, puis vous le transférez
-              au serveur de l’entreprise par SSH/SCP avant de lancer le script d’installation.
+               Pour empêcher toute exposition du code source, MAXIMUS ne copie pas Laravel sur un serveur
+               appartenant à l’entreprise. Le futur connecteur local sécurisé sera ajouté séparément.
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
-            {company.status === 'ACTIF' ? 'Entreprise active' : 'Entreprise à activer'}
+           <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800">
+             Code source protégé
           </span>
         </div>
-        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
-          <div className="rounded-xl border p-4">
-            <p className="font-bold">1. Préparer</p>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Générez le bootstrap depuis MAXIMUS principal.</p>
-          </div>
-          <div className="rounded-xl border p-4">
-            <p className="font-bold">2. Transférer</p>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Envoyez le JSON au VPS avec SSH/SCP.</p>
-          </div>
-          <div className="rounded-xl border p-4">
-            <p className="font-bold">3. Installer</p>
-            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le VPS récupère les modules et permissions publiés.</p>
-          </div>
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <ActionButton
-            primary
-            testId="button-prepare-dedicated-installation"
-            onClick={() => void prepareInstallation('dedicated')}
-          >
-            Préparer le VPS dédié
-          </ActionButton>
-          <ActionButton
-            testId="button-prepare-on-premise-installation"
-            onClick={() => void prepareInstallation('on_premise')}
-          >
-            Préparer le serveur local
-          </ActionButton>
-          <ActionButton
-            testId="button-download-installation-manifest"
-            onClick={() => void downloadInstallationManifest()}
-          >
-            Télécharger le manifeste
-          </ActionButton>
+         <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+           <p className="font-bold">Aucune installation source-based n’est disponible</p>
+           <p className="mt-1 text-xs leading-5">
+             Le code reste sur MAXIMUS central. Une installation sur le serveur de l’entreprise sera possible
+             uniquement avec un connecteur qui n’embarque pas le code source.
+           </p>
+         </div>
+         <div className="mt-5 flex flex-wrap gap-2">
           <button
             type="button"
             data-testid="button-revoke-installation"

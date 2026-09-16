@@ -15,4 +15,6 @@ return [
     'installation_login_slug' => env('MAXIMUS_INSTALLATION_LOGIN_SLUG'),
     'central_url' => env('MAXIMUS_CENTRAL_URL'),
     'installation_token' => env('MAXIMUS_INSTALLATION_TOKEN'),
+    // Disabled until the source-less local connector is implemented.
+    'source_installations_enabled' => env('MAXIMUS_SOURCE_INSTALLATIONS_ENABLED', false),
 ];
