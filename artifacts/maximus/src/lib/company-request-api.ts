@@ -103,6 +103,34 @@ export const companyRequestApi = {
         permissions: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
       };
     }>(`/companies/${encodeURIComponent(companyId)}/installation-manifest`),
+  issueInstallation: (companyId: string, input: { mode: 'dedicated' | 'on_premise'; endpointUrl?: string }) =>
+    request<{
+      ok: true;
+      installation: {
+        id: string;
+        companyId: string;
+        mode: 'dedicated' | 'on_premise';
+        status: string;
+        configurationVersion: number;
+        lastSeenAt: string | null;
+        lastSyncAt: string | null;
+        revokedAt: string | null;
+      };
+      bootstrap: {
+        centralUrl: string;
+        installationId: string;
+        companyId: string;
+        mode: 'dedicated' | 'on_premise';
+        token: string;
+      };
+    }>(`/companies/${encodeURIComponent(companyId)}/installation`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  revokeInstallation: (companyId: string) =>
+    request<{ ok: true }>(`/companies/${encodeURIComponent(companyId)}/installation`, {
+      method: 'DELETE',
+    }),
   uploadProfilePhoto: (companyId: string, photo: File) => {
     const body = new FormData();
     body.append('photo', photo);

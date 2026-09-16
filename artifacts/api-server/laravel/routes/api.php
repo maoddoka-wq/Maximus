@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
+use App\Http\Controllers\Api\InstallationController;
 use App\Services\SystemHealthService;
 use App\Support\InstallationContext;
 use Illuminate\Support\Facades\Route;
@@ -78,11 +79,18 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->gro
     Route::get('/{companyId}/login-settings', [CompanyController::class, 'loginSettings']);
     Route::patch('/{companyId}/login-settings', [CompanyController::class, 'updateLoginSettings']);
     Route::get('/{companyId}/installation-manifest', [CompanyController::class, 'installationManifest']);
+    Route::post('/{companyId}/installation', [InstallationController::class, 'issue']);
+    Route::delete('/{companyId}/installation', [InstallationController::class, 'revoke']);
     Route::get('/{companyId}/payment-settings', [CompanyPaymentController::class, 'show']);
     Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
     Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);
     Route::delete('/{companyId}/profile-photo', [CompanyController::class, 'deleteProfilePhoto']);
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
+});
+
+Route::middleware(['maximus.central', 'maximus.installation.token'])->prefix('installation-sync')->group(function (): void {
+    Route::get('/configuration', [InstallationController::class, 'configuration']);
+    Route::post('/heartbeat', [InstallationController::class, 'heartbeat']);
 });
 
 Route::get('/company-profile-images/{companyId}/{filename}', [CompanyController::class, 'serveProfilePhoto'])

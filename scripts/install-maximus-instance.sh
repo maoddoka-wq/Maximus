@@ -11,6 +11,7 @@ NON_INTERACTIVE=0
 SKIP_BUILD=0
 SKIP_COMPOSER=0
 SKIP_HEALTHCHECK=0
+BOOTSTRAP_FILE=""
 
 usage() {
     cat <<'EOF'
@@ -23,6 +24,7 @@ interactivement. Les secrets ne sont jamais affichés.
 Options:
   --workspace-dir PATH     Racine du workspace MAXIMUS
   --env-file PATH          Fichier Laravel .env à mettre à jour
+  --bootstrap-file PATH    Fichier JSON d’enrôlement généré par MAXIMUS principal
   --non-interactive        Refuse les valeurs manquantes au lieu de demander
   --skip-composer          Ne pas exécuter composer install
   --skip-build             Ne pas construire ni copier le frontend
@@ -31,9 +33,7 @@ Options:
 
 Variables utiles:
   DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
-  APP_URL, MAXIMUS_COMPANY_NAME, MAXIMUS_COMPANY_MANAGER
-  MAXIMUS_COMPANY_EMAIL, MAXIMUS_ADMIN_USER, MAXIMUS_ADMIN_PASSWORD
-  MAXIMUS_INSTALLATION_MODULES
+  APP_URL, MAXIMUS_ADMIN_USER, MAXIMUS_ADMIN_PASSWORD
 EOF
 }
 
@@ -177,6 +177,19 @@ validate_email() {
     php -r 'exit(filter_var($argv[1], FILTER_VALIDATE_EMAIL) ? 0 : 1);' "$value"
 }
 
+bootstrap_value() {
+    local file="$1"
+    local path="$2"
+    php -r '
+        $value = json_decode(file_get_contents($argv[1]), true);
+        foreach (explode(".", $argv[2]) as $part) {
+            if (!is_array($value) || !array_key_exists($part, $value)) exit(1);
+            $value = $value[$part];
+        }
+        if (is_scalar($value)) printf("%s", (string) $value);
+    ' "$file" "$path"
+}
+
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --workspace-dir)
@@ -190,6 +203,11 @@ while [[ "$#" -gt 0 ]]; do
         --env-file)
             [[ "$#" -ge 2 ]] || fail "--env-file attend un chemin."
             ENV_FILE="$2"
+            shift 2
+            ;;
+        --bootstrap-file)
+            [[ "$#" -ge 2 ]] || fail "--bootstrap-file attend un chemin."
+            BOOTSTRAP_FILE="$2"
             shift 2
             ;;
         --non-interactive) NON_INTERACTIVE=1; shift ;;
@@ -219,34 +237,26 @@ chmod 600 "$ENV_FILE"
 umask 077
 
 log "Collecte de la configuration de l’entreprise"
-ask_optional MAXIMUS_DEPLOYMENT_MODE "Mode d’installation" "dedicated"
-case "$REPLY" in
-    dedicated|on_premise) ;;
-    *) fail "MAXIMUS_DEPLOYMENT_MODE doit être dedicated ou on_premise." ;;
-esac
-set_env_value MAXIMUS_DEPLOYMENT_MODE "$REPLY"
-
-company_id="$(existing_or_exported MAXIMUS_INSTALLATION_COMPANY_ID)"
-if [[ -z "$company_id" && "$NON_INTERACTIVE" -eq 0 ]]; then
-    company_id="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || true)"
+if [[ -z "$BOOTSTRAP_FILE" ]]; then
+    BOOTSTRAP_FILE="$(existing_or_exported MAXIMUS_INSTALLATION_BOOTSTRAP)"
 fi
-ask_value MAXIMUS_INSTALLATION_COMPANY_ID "Identifiant stable de l’entreprise" "$company_id"
-[[ "$REPLY" =~ ^[A-Za-z0-9_-]+$ ]] || fail "MAXIMUS_INSTALLATION_COMPANY_ID contient des caractères invalides."
-set_env_value MAXIMUS_INSTALLATION_COMPANY_ID "$REPLY"
-
-ask_value MAXIMUS_COMPANY_NAME "Nom de l’entreprise"
-set_env_value MAXIMUS_COMPANY_NAME "$REPLY"
-ask_value MAXIMUS_COMPANY_MANAGER "Nom du responsable" "$REPLY"
-set_env_value MAXIMUS_COMPANY_MANAGER "$REPLY"
-ask_value MAXIMUS_COMPANY_EMAIL "Email de contact"
-validate_email "$REPLY" || fail "MAXIMUS_COMPANY_EMAIL doit être une adresse valide."
-set_env_value MAXIMUS_COMPANY_EMAIL "$REPLY"
-ask_optional MAXIMUS_COMPANY_COUNTRY "Pays" "Sénégal"
-set_env_value MAXIMUS_COMPANY_COUNTRY "$REPLY"
-ask_optional MAXIMUS_COMPANY_SECTOR "Secteur" ""
-set_env_value MAXIMUS_COMPANY_SECTOR "$REPLY"
-ask_optional MAXIMUS_INSTALLATION_MODULES "Modules" "commerce,ecommerce,stocks,presences"
-set_env_value MAXIMUS_INSTALLATION_MODULES "$REPLY"
+[[ -f "$BOOTSTRAP_FILE" ]] || fail "Le fichier JSON d’enrôlement MAXIMUS est requis (--bootstrap-file)."
+bootstrap_mode="$(bootstrap_value "$BOOTSTRAP_FILE" mode)" || fail "Le manifeste d’enrôlement est invalide."
+bootstrap_url="$(bootstrap_value "$BOOTSTRAP_FILE" centralUrl)" || fail "Le manifeste ne contient pas centralUrl."
+bootstrap_token="$(bootstrap_value "$BOOTSTRAP_FILE" token)" || fail "Le manifeste ne contient pas le jeton."
+bootstrap_company_id="$(bootstrap_value "$BOOTSTRAP_FILE" companyId)" || fail "Le manifeste ne contient pas companyId."
+bootstrap_installation_id="$(bootstrap_value "$BOOTSTRAP_FILE" installationId)" || fail "Le manifeste ne contient pas installationId."
+case "$bootstrap_mode" in
+    dedicated|on_premise) ;;
+    *) fail "Le mode du manifeste doit être dedicated ou on_premise." ;;
+esac
+[[ "$bootstrap_company_id" =~ ^[A-Za-z0-9_-]+$ ]] || fail "L’identifiant d’entreprise du manifeste est invalide."
+set_env_value MAXIMUS_DEPLOYMENT_MODE "$bootstrap_mode"
+set_env_value MAXIMUS_CENTRAL_URL "$bootstrap_url"
+set_env_value MAXIMUS_INSTALLATION_TOKEN "$bootstrap_token"
+set_env_value MAXIMUS_INSTALLATION_ID "$bootstrap_installation_id"
+set_env_value MAXIMUS_INSTALLATION_COMPANY_ID "$bootstrap_company_id"
+set_env_value MAXIMUS_INSTALLATION_BOOTSTRAP "$BOOTSTRAP_FILE"
 
 log "Collecte de la configuration de PostgreSQL"
 set_env_value DB_CONNECTION "pgsql"

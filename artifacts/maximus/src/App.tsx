@@ -3405,6 +3405,22 @@ function CompanyDetail({
     }
   };
 
+  const prepareInstallation = async (mode: 'dedicated' | 'on_premise') => {
+    try {
+      const result = await companyRequestApi.issueInstallation(company.id, { mode });
+      const blob = new Blob([JSON.stringify(result.bootstrap, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      window.alert('Le fichier d’enrôlement a été téléchargé. Conservez son jeton secret et transférez-le uniquement au VPS de cette entreprise.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'L’enrôlement de l’installation n’a pas pu être préparé.');
+    }
+  };
+
   return (
     <div className="space-y-5">
       <button
@@ -3431,6 +3447,18 @@ function CompanyDetail({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ActionButton
+              testId="button-prepare-dedicated-installation"
+              onClick={() => void prepareInstallation('dedicated')}
+            >
+              Préparer le VPS dédié
+            </ActionButton>
+            <ActionButton
+              testId="button-prepare-on-premise-installation"
+              onClick={() => void prepareInstallation('on_premise')}
+            >
+              Préparer l’installation locale
+            </ActionButton>
             <ActionButton
               testId="button-download-installation-manifest"
               onClick={() => void downloadInstallationManifest()}

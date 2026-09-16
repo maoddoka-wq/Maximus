@@ -24,7 +24,7 @@ case "$deployment_mode" in
         done
         ;;
     dedicated|on_premise)
-        for variable in MAXIMUS_INSTALLATION_COMPANY_ID MAXIMUS_COMPANY_NAME MAXIMUS_COMPANY_EMAIL; do
+        for variable in MAXIMUS_INSTALLATION_COMPANY_ID MAXIMUS_CENTRAL_URL MAXIMUS_INSTALLATION_TOKEN; do
             eval "value=\${$variable:-}"
             if [ -z "$value" ]; then
                 echo "Render startup error: $variable is required for an isolated installation." >&2

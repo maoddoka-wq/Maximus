@@ -108,11 +108,13 @@ DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php
 
 ### Installer une instance entreprise sur un VPS ou en local
 
-Le script suivant prépare une installation isolée pour une seule entreprise. Il
-demande les paramètres manquants, conserve les autres variables déjà présentes
-dans `artifacts/api-server/laravel/.env`, installe les dépendances Laravel,
-construit le frontend, applique les migrations PostgreSQL et initialise le
-premier compte `company_admin`.
+Le script suivant prépare une installation isolée pour une entreprise déjà
+créée et activée depuis MAXIMUS principal. Il reçoit un fichier JSON
+d’enrôlement généré par la fiche entreprise, récupère les modules et domaines
+autorisés depuis MAXIMUS principal, conserve les autres variables déjà
+présentes dans `artifacts/api-server/laravel/.env`, installe les dépendances
+Laravel, construit le frontend, applique les migrations PostgreSQL et
+initialise le premier compte `company_admin`.
 
 Les prérequis système sont PHP 8.2 avec l’extension PostgreSQL, Composer,
 Node.js avec Corepack/pnpm, curl et une base PostgreSQL accessible. Le script
@@ -120,14 +122,15 @@ ne crée jamais de compte `maximus_admin` et peut être relancé sans recréer
 l’entreprise.
 
 ```bash
-./scripts/install-maximus-instance.sh
+./scripts/install-maximus-instance.sh --bootstrap-file ./maximus-bootstrap.json
 ```
 
-Pour une exécution automatisée, fournir les variables documentées dans
-`artifacts/api-server/laravel/.env.example` puis utiliser :
+Pour une exécution automatisée, placer le bootstrap dans un chemin privé et
+fournir les variables documentées dans `artifacts/api-server/laravel/.env.example`
+puis utiliser :
 
 ```bash
-./scripts/install-maximus-instance.sh --non-interactive
+./scripts/install-maximus-instance.sh --bootstrap-file /opt/maximus/maximus-bootstrap.json --non-interactive
 ```
 
 Options utiles :

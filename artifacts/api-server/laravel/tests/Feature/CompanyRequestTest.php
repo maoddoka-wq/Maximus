@@ -64,6 +64,46 @@ class CompanyRequestTest extends TestCase
         ]);
     }
 
+    public function test_maximus_can_issue_a_vps_installation_token_and_the_vps_can_pull_approved_configuration(): void
+    {
+        $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
+        $companyId = Company::query()->where('email', 'owner@atelier.test')->value('id');
+        $maximusToken = $this->issueMaximusSession();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->postJson('/api/company-requests/'.$companyId.'/approve')
+            ->assertOk();
+
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->postJson('/api/companies/'.$companyId.'/installation', [
+                'mode' => 'dedicated',
+                'endpointUrl' => 'https://atelier.example.test',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('installation.companyId', $companyId)
+            ->assertJsonPath('installation.mode', 'dedicated');
+
+        $bootstrapToken = (string) $response->json('bootstrap.token');
+        $this->assertStringStartsWith('mxinstall_', $bootstrapToken);
+
+        $this->withHeader('Authorization', 'Bearer '.$bootstrapToken)
+            ->getJson('/api/installation-sync/configuration')
+            ->assertOk()
+            ->assertJsonPath('company.id', $companyId)
+            ->assertJsonPath('modules.ids.0', 'commerce');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->deleteJson('/api/companies/'.$companyId.'/installation')
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer '.$bootstrapToken)
+            ->getJson('/api/installation-sync/configuration')
+            ->assertUnauthorized();
+    }
+
     public function test_rejecting_a_request_is_persisted_and_cannot_be_approved_afterward(): void
     {
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
