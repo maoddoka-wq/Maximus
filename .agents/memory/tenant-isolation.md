@@ -60,3 +60,15 @@ choisir le domaine d’une autre entreprise et de franchir la frontière tenant.
 **How to apply:** Configurer la confiance proxy au niveau de l’infrastructure
 si nécessaire, puis garder les routes publiques par domaine séparées des
 routes de gestion authentifiées et tester un Host actif par entreprise.
+
+Un changement de compte dans le même navigateur doit invalider l’état métier local
+avant le rendu du nouveau tenant, et clôturer les réponses réseau et sauvegardes
+en attente avec l’identité de session qui les a déclenchées.
+
+**Why:** Une réponse de bootstrap ou une sauvegarde retardée de l’entreprise A
+peut sinon être réutilisée après la connexion à B, même si chaque réponse serveur
+est correctement filtrée.
+
+**How to apply:** Cléer les requêtes dédupliquées par session, vérifier la portée
+retournée avant de l’appliquer, vider les références d’état au login/logout et
+refuser toute mutation dont la session courante diffère de celle du déclenchement.

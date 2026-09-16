@@ -88,6 +88,7 @@ import {
   sanitizeStoreData,
 } from '@/lib/store';
 import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
+import { appStateScopeMatchesSession } from '@/lib/app-state-scope';
 import {
   discardCatalogDraft,
   getCatalogImpact,
@@ -189,6 +190,7 @@ function sessionFromAuthUser(user: AuthUser): Session {
       ? `company:${user.companyId}`
       : `employee:${user.employeeId}`;
 }
+
 const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
   '/maximus/dashboard': {
     kicker: 'Cockpit MAXIMUS',
@@ -414,7 +416,8 @@ function AppContent() {
   const dataRef = useRef(data);
   const appStateSaveQueue = useRef(Promise.resolve());
   const appStateVersionRef = useRef(appStateVersion);
-  const appStateRefreshRef = useRef<Promise<boolean> | null>(null);
+  const appStateRefreshRef = useRef<{ session: Session; promise: Promise<boolean> } | null>(null);
+  const sessionRef = useRef<Session | null>(session);
   const localMutationVersionRef = useRef(0);
   const loginTransitionRef = useRef(false);
   const moduleAccessCacheRef = useRef(
@@ -422,6 +425,7 @@ function AppContent() {
   );
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
+  sessionRef.current = session;
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
@@ -489,16 +493,25 @@ function AppContent() {
     };
   }, [pathname, session]);
   const refreshAppState = async (waitForPendingSave = true) => {
-    if (!session || session.startsWith('company:sector-test-')) return true;
-    if (appStateRefreshRef.current) return appStateRefreshRef.current;
+    const requestSession = session;
+    if (!requestSession || requestSession.startsWith('company:sector-test-')) return true;
+    if (appStateRefreshRef.current?.session === requestSession) {
+      return appStateRefreshRef.current.promise;
+    }
 
     const pendingSave = waitForPendingSave
       ? appStateSaveQueue.current.catch(() => undefined)
       : Promise.resolve();
-    const request = pendingSave
+    let request: Promise<boolean>;
+    request = pendingSave
       .then(async () => {
-        const { data: remoteData, version } = await appStateApi.bootstrap();
+        if (sessionRef.current !== requestSession) return false;
+        const { data: remoteData, scope, version } = await appStateApi.bootstrap();
+        if (sessionRef.current !== requestSession) return false;
         const nextData = sanitizeStoreData(remoteData);
+        if (!appStateScopeMatchesSession(requestSession, scope, nextData)) {
+          throw new AppStateRequestError('La réponse métier ne correspond pas à la session active.', 409);
+        }
         dataRef.current = nextData;
         setData(nextData);
         setAppStateError('');
@@ -507,6 +520,7 @@ function AppContent() {
         return true;
       })
       .catch((error) => {
+        if (sessionRef.current !== requestSession) return false;
         if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
           setSession(null);
           localStorage.removeItem('maximus-session');
@@ -519,10 +533,12 @@ function AppContent() {
         return false;
       })
       .finally(() => {
-        appStateRefreshRef.current = null;
+        if (appStateRefreshRef.current?.promise === request) {
+          appStateRefreshRef.current = null;
+        }
       });
 
-    appStateRefreshRef.current = request;
+    appStateRefreshRef.current = { session: requestSession, promise: request };
     return request;
   };
 
@@ -534,7 +550,10 @@ function AppContent() {
     const shouldBlockForInitialLoad = !loginTransitionRef.current && !appStateReady;
     loginTransitionRef.current = false;
     if (shouldBlockForInitialLoad) setAppStateReady(false);
-    void refreshAppState().then((ready) => setAppStateReady(ready));
+    const requestSession = session;
+    void refreshAppState().then((ready) => {
+      if (sessionRef.current === requestSession) setAppStateReady(ready);
+    });
   }, [session]);
   useAutoRefresh(() => {
     void refreshAppState();
@@ -559,6 +578,7 @@ function AppContent() {
     fn(next);
     const safeNext = sanitizeStoreData(next);
     const mutationVersion = ++localMutationVersionRef.current;
+    const mutationSession = session;
     const successMessage = mutationSuccessMessage(message, Boolean(session), persist);
     dataRef.current = safeNext;
     setData(safeNext);
@@ -566,7 +586,13 @@ function AppContent() {
       appStateSaveQueue.current = appStateSaveQueue.current
         .catch(() => undefined)
         .then(async () => {
+          if (sessionRef.current !== mutationSession) return null;
           const { version } = await appStateApi.save(dataRef.current, appStateVersionRef.current);
+          if (sessionRef.current !== mutationSession) return null;
+          return version;
+        })
+        .then((version) => {
+          if (version === null || sessionRef.current !== mutationSession) return;
           appStateVersionRef.current = version;
           setAppStateVersion(version);
           if (successMessage) notify(successMessage, 'success');
@@ -722,8 +748,15 @@ function AppContent() {
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
   const applyAuthenticatedUser = (user: AuthUser) => {
     const nextSession = sessionFromAuthUser(user);
+    const clearedData = emptyStoreData();
+    dataRef.current = clearedData;
+    setData(clearedData);
+    appStateVersionRef.current = 0;
+    setAppStateVersion(0);
+    setAppStateError('');
+    moduleAccessCacheRef.current.clear();
     loginTransitionRef.current = true;
-    setAppStateReady(true);
+    setAppStateReady(false);
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
     setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
@@ -876,6 +909,13 @@ function AppContent() {
         : null;
     const destination = isCompanySession && companyLoginPath ? companyLoginPath : '/';
     applyCompanyTheme(undefined);
+    const clearedData = emptyStoreData();
+    dataRef.current = clearedData;
+    setData(clearedData);
+    appStateVersionRef.current = 0;
+    setAppStateVersion(0);
+    setAppStateError('');
+    moduleAccessCacheRef.current.clear();
     setAppStateReady(true);
     setSession(null);
     localStorage.removeItem('maximus-session');
