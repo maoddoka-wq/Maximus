@@ -327,6 +327,7 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
 
 function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: PresenceRow; date: string; canCreate: boolean; onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void> }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onScanClockRef = useRef(onScanClock);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -336,29 +337,55 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
   const actionLabel = action === 'arrival' ? 'enregistrer votre arrivée' : action === 'exit' ? 'enregistrer votre sortie' : 'journée terminée';
 
   useEffect(() => {
+    onScanClockRef.current = onScanClock;
+  }, [onScanClock]);
+
+  useEffect(() => {
     if (!scannerOpen || !videoRef.current || !action) return;
     let handled = false;
+    let cancelled = false;
     const scanAction = action;
     const scanner = new QrScanner(videoRef.current, result => {
-      if (handled || !result.data) return;
+      if (cancelled || handled || !result.data) return;
       handled = true;
+      scanner.stop();
       setScannerOpen(false);
       setBusy(true);
       setError('');
-      void onScanClock(result.data, scanAction)
+      void onScanClockRef.current(result.data, scanAction)
         .then(() => setMessage(scanAction === 'arrival' ? 'Arrivée enregistrée.' : 'Sortie enregistrée.'))
         .catch(cause => setError(cause instanceof Error ? cause.message : 'Le QR code n’a pas pu être validé.'))
         .finally(() => setBusy(false));
-    }, { highlightScanRegion: true, highlightCodeOutline: true, returnDetailedScanResult: true });
+    }, {
+      highlightScanRegion: true,
+      highlightCodeOutline: true,
+      returnDetailedScanResult: true,
+      maxScansPerSecond: 30,
+      preferredCamera: 'environment',
+      calculateScanRegion: video => {
+        const size = Math.floor(Math.min(video.videoWidth, video.videoHeight) * 0.72);
+        return {
+          x: Math.floor((video.videoWidth - size) / 2),
+          y: Math.floor((video.videoHeight - size) / 2),
+          width: size,
+          height: size,
+          downScaledWidth: 720,
+          downScaledHeight: 720,
+        };
+      },
+    });
     void scanner.start().catch(cause => {
-      setScannerOpen(false);
-      setError(cause instanceof Error ? cause.message : 'Accès à la caméra impossible.');
+      if (!cancelled) {
+        setScannerOpen(false);
+        setError(cause instanceof Error ? cause.message : 'Accès à la caméra impossible.');
+      }
     });
     return () => {
+      cancelled = true;
       scanner.stop();
       scanner.destroy();
     };
-  }, [scannerOpen, action, onScanClock]);
+  }, [scannerOpen, action]);
 
   return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
     <Panel title="Pointage employé">
