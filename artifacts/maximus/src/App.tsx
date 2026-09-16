@@ -12,7 +12,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
-  Copy,
   CreditCard,
   Edit3,
   FileBarChart,
@@ -106,7 +105,7 @@ import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
-import { authApi, type AuthUser, type CompanyLoginBranding } from '@/lib/auth-api';
+import { authApi, type AuthUser } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
@@ -408,14 +407,6 @@ function AppContent() {
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const location = search ? `${pathname}?${search}` : pathname;
-  const companyLoginMatch = pathname.match(/^\/connexion(?:\/([^/]+))?$/);
-  const companyLoginId = companyLoginMatch?.[1] ? decodeURIComponent(companyLoginMatch[1]) : undefined;
-  const brandedLoginRoute = Boolean(
-    companyLoginMatch && (Boolean(companyLoginId) || (pathname === '/connexion' && isPotentialCustomStoreHost())),
-  );
-  const [loginBranding, setLoginBranding] = useState<CompanyLoginBranding | null>(null);
-  const [loginBrandingLoading, setLoginBrandingLoading] = useState(false);
-  const [loginBrandingError, setLoginBrandingError] = useState('');
   const dataRef = useRef(data);
   const appStateSaveQueue = useRef(Promise.resolve());
   const appStateVersionRef = useRef(appStateVersion);
@@ -430,34 +421,6 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-  useEffect(() => {
-    if (!brandedLoginRoute || session) {
-      setLoginBranding(null);
-      setLoginBrandingLoading(false);
-      setLoginBrandingError('');
-      return undefined;
-    }
-    let cancelled = false;
-    setLoginBranding(null);
-    setLoginBrandingError('');
-    setLoginBrandingLoading(true);
-    void authApi
-      .loginBranding(companyLoginId)
-      .then(({ branding }) => {
-        if (cancelled) return;
-        setLoginBranding(branding);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setLoginBrandingError(error instanceof Error ? error.message : 'L’identité de cette entreprise est indisponible.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoginBrandingLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [brandedLoginRoute, companyLoginId, session]);
   const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
     showAppToast(message, kind);
   useEffect(() => {
@@ -761,8 +724,8 @@ function AppContent() {
     localStorage.setItem('maximus-session', nextSession);
     setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
   };
-  const login = async (_space: 'admin' | 'company', email: string, password: string, companyId?: string) => {
-    const { user } = await authApi.login(email, password, companyId);
+  const login = async (_space: 'admin' | 'company', email: string, password: string) => {
+    const { user } = await authApi.login(email, password);
     applyAuthenticatedUser(user);
   };
   const startSectorTest = (preset: SectorPreset) => {
@@ -1011,10 +974,6 @@ function AppContent() {
         onLogin={login}
         employees={loginEmployees}
         registrationEnabled={publicRegistrationEnabled}
-        branding={brandedLoginRoute ? loginBranding : null}
-        brandingLoading={brandedLoginRoute && loginBrandingLoading}
-        brandingError={brandedLoginRoute ? loginBrandingError : ''}
-        companyLogin={brandedLoginRoute && (loginBrandingLoading || Boolean(loginBranding))}
       />
     );
   }
@@ -1288,18 +1247,10 @@ function Login({
   onLogin,
   employees,
   registrationEnabled,
-  branding,
-  brandingLoading,
-  brandingError,
-  companyLogin,
 }: {
-  onLogin: (space: 'admin' | 'company', email: string, password: string, companyId?: string) => Promise<void>;
+  onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
   employees: StoreData['employees'];
   registrationEnabled: boolean;
-  branding: CompanyLoginBranding | null;
-  brandingLoading: boolean;
-  brandingError: string;
-  companyLogin: boolean;
 }) {
   const showDemoAccounts = false;
   const [email, setEmail] = useState('');
@@ -1307,13 +1258,11 @@ function Login({
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
-  const brandingStyle = branding ? ({ ...companyThemeVariables(branding) } as CSSProperties) : undefined;
   const loginWithCredentials = (space: 'admin' | 'company', nextEmail: string, nextPassword: string) => {
     if (pendingEmail) return;
-    if (companyLogin && (!branding || brandingLoading || brandingError)) return;
     setError('');
     setPendingEmail(nextEmail);
-    void onLogin(space, nextEmail, nextPassword, branding?.companyId)
+    void onLogin(space, nextEmail, nextPassword)
       .catch((loginError) => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'))
       .finally(() => setPendingEmail(''));
   };
@@ -1343,22 +1292,11 @@ function Login({
     loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
   };
   return (
-    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]" style={brandingStyle}>
+    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
       <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
         <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
-        {branding ? (
-          <div className="relative flex items-center gap-4">
-            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--accent)/.18)] shadow-sm">
-              {branding.profilePhoto ? (
-                <img src={branding.profilePhoto} alt={`Logo de ${branding.name}`} className="h-full w-full object-contain" />
-              ) : (
-                <Building2 size={25} />
-              )}
-            </span>
-            <span className="max-w-[16rem] truncate text-xl font-black tracking-[-.04em]">{branding.name}</span>
-          </div>
-        ) : <Brand inverse large />}
+        <Brand inverse large />
         <div className="relative mt-32 max-w-xl pb-16">
           <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">
             La gestion d’entreprise, simplement
@@ -1380,46 +1318,21 @@ function Login({
       <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12">
         <div className="w-full max-w-md fade-up">
           <div className="mb-10 lg:hidden">
-            {branding ? (
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-[hsl(var(--primary)/.12)]">
-                  {branding.profilePhoto ? (
-                    <img src={branding.profilePhoto} alt={`Logo de ${branding.name}`} className="h-full w-full object-contain" />
-                  ) : (
-                    <Building2 size={20} className="text-[hsl(var(--primary))]" />
-                  )}
-                </span>
-                <span className="max-w-[16rem] truncate text-lg font-black tracking-[-.04em]">{branding.name}</span>
-              </div>
-            ) : <Brand large />}
+            <Brand large />
           </div>
           <div className="mb-8">
             <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
-              {branding ? `Espace sécurisé · ${branding.name}` : 'Accédez à votre espace'}
+              Accédez à votre espace
             </p>
-            <h2 className="text-3xl font-bold tracking-[-.04em]">
-              {branding ? `Bienvenue chez ${branding.name}` : 'Gérez votre activité en toute simplicité'}
-            </h2>
+            <h2 className="text-3xl font-bold tracking-[-.04em]">Gérez votre activité en toute simplicité</h2>
             <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              {branding
-                ? 'Connectez-vous pour retrouver les outils et les informations de votre entreprise.'
-                : 'Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.'}
+              Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.
             </p>
           </div>
-          {brandingLoading && (
-            <p className="mb-5 rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
-              Chargement de l’identité de votre entreprise…
-            </p>
-          )}
-          {brandingError && (
-            <p data-testid="login-branding-error" className="mb-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
-              {brandingError}
-            </p>
-          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-                submitLogin('company');
+              submitLogin('company');
             }}
             className="space-y-5"
           >
@@ -1465,7 +1378,7 @@ function Login({
             )}
             <button
               data-testid="button-login"
-              disabled={Boolean(pendingEmail) || brandingLoading || Boolean(brandingError) || (companyLogin && !branding)}
+              disabled={Boolean(pendingEmail)}
               className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)] disabled:cursor-wait disabled:opacity-70"
               type="submit"
             >
@@ -1474,22 +1387,14 @@ function Login({
             </button>
           </form>
           <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-            {companyLogin ? (
-              <Link data-testid="link-general-login" href="/" className="font-bold text-[hsl(var(--primary))]">
-                Connexion générale MAXIMUS
-              </Link>
-            ) : (
-              <>
-                Pas encore d’espace ?{' '}
-                <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-                  Créer une entreprise
-                </Link>
-                {!registrationEnabled && (
-                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                    L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
-                  </p>
-                )}
-              </>
+            Pas encore d’espace ?{' '}
+            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
+              Créer une entreprise
+            </Link>
+            {!registrationEnabled && (
+              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
+              </p>
             )}
           </div>
           {showDemoAccounts && demoAccounts.length > 0 && (
@@ -7265,11 +7170,6 @@ function CompanyModulesDetail({
   const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
   const [paymentLoading, setPaymentLoading] = useState(true);
-  const [customLoginEnabled, setCustomLoginEnabled] = useState(Boolean(company.customLoginEnabled));
-  const [savedCustomLoginEnabled, setSavedCustomLoginEnabled] = useState(Boolean(company.customLoginEnabled));
-  const [customLoginDomain, setCustomLoginDomain] = useState(company.customLoginDomain ?? '');
-  const [savedCustomLoginDomain, setSavedCustomLoginDomain] = useState(company.customLoginDomain ?? '');
-  const [copiedLoginLink, setCopiedLoginLink] = useState<'platform' | 'domain' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -7385,15 +7285,6 @@ function CompanyModulesDetail({
     };
   }, [company.id]);
 
-  useEffect(() => {
-    const enabled = Boolean(company.customLoginEnabled);
-    const domain = company.customLoginDomain ?? '';
-    setCustomLoginEnabled(enabled);
-    setSavedCustomLoginEnabled(enabled);
-    setCustomLoginDomain(domain);
-    setSavedCustomLoginDomain(domain);
-  }, [company.id, company.customLoginEnabled, company.customLoginDomain]);
-
   const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
   };
@@ -7495,63 +7386,6 @@ function CompanyModulesDetail({
       if (target) target.hiddenWorkspaceFeatures = [...hiddenWorkspaceFeatures];
     }, 'Visibilité de l’espace entreprise enregistrée.');
     setSavedHiddenWorkspaceFeatures(hiddenWorkspaceFeatures);
-  };
-
-  const saveCustomLogin = async () => {
-    setSaving(true);
-    try {
-      const domain = customLoginDomain.trim();
-      const savedCompany = (
-        await companyRequestApi.update(company.id, {
-          name: company.name,
-          manager: company.manager,
-          email: company.email,
-          phone: company.phone,
-          country: company.country,
-          sector: company.sector,
-          customLoginEnabled,
-          customLoginDomain: domain,
-        })
-      ).company;
-      const enabled = Boolean(savedCompany.customLoginEnabled);
-      const savedDomain = savedCompany.customLoginDomain ?? domain;
-      setCustomLoginEnabled(enabled);
-      setSavedCustomLoginEnabled(enabled);
-      setCustomLoginDomain(savedDomain);
-      setSavedCustomLoginDomain(savedDomain);
-      mutate((draft) => {
-        const target = draft.companies.find((item) => item.id === company.id);
-        if (target) {
-          target.customLoginEnabled = enabled;
-          target.customLoginDomain = savedDomain;
-        }
-      }, enabled ? 'Connexion personnalisée activée pour cette entreprise.' : 'Connexion générale MAXIMUS conservée pour cette entreprise.');
-    } catch (error) {
-      setCustomLoginEnabled(savedCustomLoginEnabled);
-      setCustomLoginDomain(savedCustomLoginDomain);
-      window.alert(error instanceof Error ? error.message : 'Le réglage de connexion n’a pas pu être enregistré.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const appBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const platformLoginLink = `${window.location.origin}${appBasePath}/connexion/${encodeURIComponent(company.id)}`;
-  const normalizedLoginDomain = customLoginDomain
-    .trim()
-    .replace(/^https?:\/\//i, '')
-    .replace(/\/.*$/, '')
-    .replace(/\.$/, '');
-  const domainLoginLink = normalizedLoginDomain ? `https://${normalizedLoginDomain}/connexion` : '';
-  const copyLoginLink = async (kind: 'platform' | 'domain', link: string) => {
-    if (!link) return;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopiedLoginLink(kind);
-      window.setTimeout(() => setCopiedLoginLink(null), 1800);
-    } catch {
-      setCopiedLoginLink(null);
-    }
   };
 
   const save = async () => {
@@ -7720,88 +7554,6 @@ function CompanyModulesDetail({
             onClick={saveWorkspaceFeatures}
           >
             Enregistrer la visibilité
-          </ActionButton>
-        </div>
-      </section>
-      <section className="card-surface rounded-2xl p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="font-bold">Page de connexion personnalisée</h2>
-            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
-              Activez ce réglage uniquement si cette entreprise doit utiliser son logo et son identité visuelle sur sa page de connexion.
-              Sinon, elle continue avec la connexion générale MAXIMUS.
-            </p>
-          </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${customLoginEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
-            {customLoginEnabled ? 'Activée' : 'Désactivée'}
-          </span>
-        </div>
-        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${customLoginEnabled ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
-          <input
-            type="checkbox"
-            data-testid="checkbox-company-custom-login"
-            checked={customLoginEnabled}
-            disabled={saving}
-            onChange={(event) => setCustomLoginEnabled(event.target.checked)}
-            className="mt-1"
-          />
-          <span>
-            <strong className="block text-sm">Autoriser la connexion avec l’identité de l’entreprise</strong>
-            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Quand cette option est active, les liens dédiés et le chemin /connexion d’un domaine personnalisé peuvent afficher la marque de cette entreprise.
-            </span>
-          </span>
-        </label>
-        <div className="mt-5 space-y-4 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4">
-          <div>
-            <p className="text-xs font-bold">Lien de connexion</p>
-            <p className="mt-1 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
-              Ce lien est disponible immédiatement après l’activation. Le domaine personnalisé doit aussi être configuré sur l’hébergement et pointer vers MAXIMUS.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <label className="min-w-0 flex-1 text-xs font-bold">
-              Lien MAXIMUS de cette entreprise
-              <input readOnly value={platformLoginLink} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-xs" />
-            </label>
-            <button type="button" onClick={() => void copyLoginLink('platform', platformLoginLink)} className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold">
-              <Copy size={14} />{copiedLoginLink === 'platform' ? 'Copié' : 'Copier'}
-            </button>
-          </div>
-          <label className="block text-xs font-bold">
-            Nom de domaine personnalisé
-            <input
-              data-testid="input-company-custom-login-domain"
-              value={customLoginDomain}
-              onChange={(event) => setCustomLoginDomain(event.target.value)}
-              disabled={!customLoginEnabled || saving}
-              placeholder="connexion.exemple.sn"
-              className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-            />
-            <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-              Saisissez uniquement le domaine, sans « https:// ». Il doit être ajouté à la configuration Custom Domains de Render.
-            </span>
-          </label>
-          {domainLoginLink && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <label className="min-w-0 flex-1 text-xs font-bold">
-                Lien de connexion sur ce domaine
-                <input readOnly value={domainLoginLink} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-xs" />
-              </label>
-              <button type="button" onClick={() => void copyLoginLink('domain', domainLoginLink)} className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold">
-                <Copy size={14} />{copiedLoginLink === 'domain' ? 'Copié' : 'Copier'}
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="mt-5 flex justify-end">
-          <ActionButton
-            primary
-            testId="button-save-company-custom-login"
-            disabled={saving || (customLoginEnabled === savedCustomLoginEnabled && customLoginDomain.trim() === savedCustomLoginDomain)}
-            onClick={() => void saveCustomLogin()}
-          >
-            Enregistrer la connexion
           </ActionButton>
         </div>
       </section>

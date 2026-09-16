@@ -31,8 +31,6 @@ class Company extends Model
         'primary_color',
         'accent_color',
         'sidebar_color',
-        'custom_login_enabled',
-        'custom_login_domain',
         'rejection_reason',
         'deleted_at',
     ];
@@ -45,7 +43,6 @@ class Company extends Model
             'requested_module_features' => 'array',
             'requested_module_permissions' => 'array',
             'deleted_at' => 'datetime',
-            'custom_login_enabled' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

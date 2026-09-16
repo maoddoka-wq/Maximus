@@ -49,7 +49,6 @@ Route::prefix('onboarding/drafts')->middleware('throttle:onboarding')->group(fun
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
-    Route::get('/branding', [AuthController::class, 'branding'])->middleware('throttle:login');
     Route::get('/session', [AuthController::class, 'session']);
     Route::post('/logout', [AuthController::class, 'logout']);
 });
