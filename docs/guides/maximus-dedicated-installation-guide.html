@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>MAXIMUS — Guide d’installation dédiée</title>
+  <style>
+    @page { size:A4; margin:18mm 16mm; }
+    :root { --navy:#151d2b; --gold:#f2b705; --ink:#202735; --muted:#637083; --line:#d9dee7; --soft:#f5f7fa; --red:#9c2f2f; }
+    * { box-sizing:border-box; }
+    body { color:var(--ink); font-family:Arial,Helvetica,sans-serif; font-size:10.5pt; line-height:1.48; }
+    h1,h2,h3,h4 { color:var(--navy); page-break-after:avoid; }
+    h1 { font-size:27pt; line-height:1.08; margin:0 0 10mm; }
+    h2 { border-bottom:2px solid var(--gold); padding-bottom:3mm; margin-top:12mm; font-size:18pt; }
+    h3 { margin-top:8mm; font-size:13pt; }
+    h4 { margin-top:6mm; font-size:11pt; }
+    p { margin:3mm 0; }
+    ul,ol { margin-top:2mm; padding-left:7mm; }
+    li { margin:1.4mm 0; }
+    code { font-family:"DejaVu Sans Mono",monospace; font-size:8.5pt; background:#eef1f5; padding:.5mm 1mm; border-radius:2px; }
+    pre { background:#111827; color:#f3f4f6; padding:4mm; border-radius:3mm; white-space:pre-wrap; overflow-wrap:anywhere; font-family:"DejaVu Sans Mono",monospace; font-size:7.6pt; line-height:1.42; page-break-inside:avoid; }
+    table { width:100%; border-collapse:collapse; margin:4mm 0 6mm; font-size:8.7pt; page-break-inside:avoid; }
+    th { background:var(--navy); color:#fff; text-align:left; }
+    th,td { border:1px solid var(--line); padding:2.2mm; vertical-align:top; }
+    tr:nth-child(even) td { background:#fafbfc; }
+    .cover { min-height:245mm; display:flex; flex-direction:column; justify-content:space-between; page-break-after:always; background:linear-gradient(135deg,#151d2b 0%,#151d2b 68%,#263247 68%,#263247 100%); color:#fff; padding:18mm; margin:-18mm -16mm; }
+    .cover h1 { color:#fff; }
+    .brand { color:var(--gold); font-size:14pt; letter-spacing:3px; font-weight:bold; }
+    .subtitle { font-size:15pt; max-width:145mm; color:#dfe5ed; }
+    .meta { color:#b9c2cf; font-size:9pt; }
+    .badge { display:inline-block; background:var(--gold); color:#171d29; padding:2mm 4mm; font-weight:bold; border-radius:3mm; }
+    .note,.warning,.success,.danger { padding:4mm; margin:4mm 0; border-left:4px solid; page-break-inside:avoid; }
+    .note { background:#eef5ff; border-color:#3d78c4; }
+    .warning { background:#fff6e5; border-color:#c37c00; }
+    .success { background:#edf9f1; border-color:#2d8a58; }
+    .danger { background:#fff0f0; border-color:var(--red); }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
+    .card { border:1px solid var(--line); padding:4mm; border-radius:2mm; page-break-inside:avoid; }
+    .checklist li { list-style:"☐  "; padding-left:1mm; }
+    .footer { color:var(--muted); font-size:8pt; border-top:1px solid var(--line); padding-top:2mm; margin-top:8mm; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="brand">MAXIMUS.</div>
+      <div style="height:35mm"></div>
+      <div class="badge">INSTALLATION DÉDIÉE</div>
+      <h1>Guide complet de l’instance entreprise isolée</h1>
+      <p class="subtitle">Installation, sécurisation, démarrage, vérification et exploitation des modes <code>dedicated</code> et <code>on_premise</code>.</p>
+    </div>
+    <div class="meta">
+      <p>Laravel + PostgreSQL + React/Vite</p>
+      <p>Version correspondant au dépôt vérifié le 16 septembre 2026</p>
+      <p>Ce document ne décrit pas l’installation centrale multi-entreprises.</p>
+    </div>
+  </section>
+
+  <h2>Sommaire</h2>
+  <ol>
+    <li>Objectif et garanties</li>
+    <li>Choisir <code>dedicated</code> ou <code>on_premise</code></li>
+    <li>Architecture de l’instance isolée</li>
+    <li>Prérequis serveur</li>
+    <li>Préparer PostgreSQL et le stockage</li>
+    <li>Installer avec <code>install-maximus-instance.sh</code></li>
+    <li>Configuration détaillée</li>
+    <li>Démarrer l’application en local ou derrière HTTPS</li>
+    <li>Créer et gérer l’accès administrateur</li>
+    <li>Validation complète de l’isolation</li>
+    <li>Sauvegardes, mises à jour et restauration</li>
+    <li>Dépannage et checklist</li>
+  </ol>
+  <div class="note"><b>Résumé :</b> une installation dédiée est bornée par <code>MAXIMUS_INSTALLATION_COMPANY_ID</code>. Le serveur ne doit jamais déduire l’entreprise depuis un <code>companyId</code> envoyé par le navigateur. Le compte créé est <code>company_admin</code> ; aucun <code>maximus_admin</code> global n’est provisionné.</div>
+
+  <h2>1. Objectif et garanties</h2>
+  <p>Cette procédure installe une copie MAXIMUS destinée à une seule entreprise. Elle convient à un VPS, un serveur local, une machine de recette isolée ou une installation dans le réseau interne du client.</p>
+  <table>
+    <tr><th>Garantie</th><th>Comportement attendu</th></tr>
+    <tr><td>Entreprise</td><td>L’identifiant <code>MAXIMUS_INSTALLATION_COMPANY_ID</code> fixe le périmètre côté serveur.</td></tr>
+    <tr><td>Connexion</td><td>Seuls les comptes rattachés à l’entreprise configurée peuvent ouvrir une session.</td></tr>
+    <tr><td>Administration</td><td>Le compte initial est <code>company_admin</code>. L’administration globale MAXIMUS est désactivée.</td></tr>
+    <tr><td>Routes centrales</td><td>Les routes réservées à MAXIMUS retournent <code>404 CENTRAL_INSTALLATION_ONLY</code>.</td></tr>
+    <tr><td>Vitrine publique</td><td>Les boutiques, domaines, images, profils et parcours Transport d’une autre entreprise retournent <code>404 INSTALLATION_COMPANY_ONLY</code>.</td></tr>
+    <tr><td>Relance</td><td>La commande <code>maximus:install-company</code> est idempotente : elle met à jour l’entreprise et le compte dédié sans créer de compte global.</td></tr>
+  </table>
+  <div class="danger"><b>Cette isolation n’est pas un simple masquage d’écran.</b> Elle est appliquée par Laravel, dans le contexte serveur et les middlewares. Ne pas supprimer ces contrôles pour “simplifier” l’interface.</div>
+
+  <h2>2. Choisir le mode d’installation</h2>
+  <div class="two-col">
+    <div class="card"><h3><code>dedicated</code></h3><p>À choisir pour un VPS ou un cloud réservé à l’entreprise. Le serveur peut être public, avec un domaine et un certificat TLS.</p><ul><li>Instance séparée.</li><li>Base PostgreSQL séparée.</li><li>Stockage séparé.</li><li>Accès administrateur entreprise seulement.</li></ul></div>
+    <div class="card"><h3><code>on_premise</code></h3><p>À choisir pour un serveur dans l’infrastructure de l’entreprise, accessible sur réseau interne ou via VPN.</p><ul><li>Même isolation applicative.</li><li>Certificat géré par l’entreprise.</li><li>Sauvegardes sous responsabilité du client.</li><li>Pare-feu et accès réseau internes.</li></ul></div>
+  </div>
+  <p>Le script d’installation interactif initialise le mode <code>dedicated</code>. Pour <code>on_premise</code>, modifier la valeur après la collecte ou fournir la configuration équivalente dans l’environnement avant l’exécution finale. Le serveur de production doit toujours utiliser une valeur explicite et contrôlée.</p>
+  <div class="warning"><b>Stabilité de l’identifiant :</b> conserver le même <code>MAXIMUS_INSTALLATION_COMPANY_ID</code> lors des mises à jour et des relances. Le changer crée un nouveau périmètre logique et peut laisser l’ancien tenant dans la base.</div>
+
+  <h2>3. Architecture de l’instance isolée</h2>
+  <p>Le workspace contient le frontend React/Vite et l’API Laravel. Le frontend est construit puis copié dans <code>artifacts/api-server/laravel/public</code>. Laravel utilise PostgreSQL pour les comptes, les entreprises, les modules, les sessions et les données métier.</p>
+  <pre>maximus/
+├── artifacts/api-server/laravel/   # API Laravel et runtime
+│   ├── .env                        # configuration locale, chmod 600
+│   ├── public/                     # frontend construit + point d’entrée
+│   ├── storage/app/digital-products/
+│   └── server.php                  # serveur PHP de test/local
+├── artifacts/maximus/              # frontend React/Vite
+└── scripts/install-maximus-instance.sh</pre>
+  <h3>Flux d’installation</h3>
+  <ol><li>Le script vérifie PHP, Composer et curl.</li><li>Il crée ou met à jour le fichier Laravel <code>.env</code> sans supprimer les autres variables.</li><li>Il protège le fichier par <code>chmod 600</code>.</li><li>Il installe Composer et construit le frontend.</li><li>Il prépare les répertoires de stockage et de cache.</li><li>Il migre PostgreSQL.</li><li>Il exécute <code>php artisan maximus:install-company</code>.</li><li>Il lance une sonde temporaire <code>/api/healthz</code>, sauf si elle est désactivée.</li></ol>
+
+  <h2>4. Prérequis serveur</h2>
+  <table>
+    <tr><th>Prérequis</th><th>Vérification</th><th>Utilisation</th></tr>
+    <tr><td>Linux</td><td>Utilisateur de service et permissions séparées</td><td>Exécution reproductible et réduction des privilèges.</td></tr>
+    <tr><td>PHP 8.2+</td><td><code>php -v</code></td><td>Laravel, migrations et serveur HTTP de test.</td></tr>
+    <tr><td>Extensions PHP</td><td>PDO PostgreSQL, mbstring, XML, curl, zip</td><td>Connexion DB, framework, HTTP et dépendances Composer.</td></tr>
+    <tr><td>Composer</td><td><code>composer --version</code></td><td>Dépendances Laravel.</td></tr>
+    <tr><td>Node.js 24 + Corepack</td><td><code>node --version</code>, <code>corepack --version</code></td><td>Construction React/Vite.</td></tr>
+    <tr><td>PostgreSQL</td><td><code>psql --version</code></td><td>Base dédiée à l’entreprise.</td></tr>
+    <tr><td>curl</td><td><code>curl --version</code></td><td>Healthcheck local ou distant.</td></tr>
+    <tr><td>Espace disque</td><td>Inclure code, dépendances, build, DB et fichiers</td><td>Éviter les échecs de build ou de téléversement.</td></tr>
+  </table>
+  <p>Le script ne tente pas d’installer les paquets système. Installer les prérequis avec le gestionnaire de paquets de la distribution et relancer les vérifications avant de continuer.</p>
+  <pre># Exemple de vérification groupée
+php -v
+composer --version
+node --version
+corepack --version
+psql --version
+curl --version</pre>
+
+  <h2>5. Préparer PostgreSQL et le stockage</h2>
+  <h3>5.1 Base locale PostgreSQL</h3>
+  <p>Exemple Debian/Ubuntu. Utiliser un mot de passe unique, transmis uniquement au prompt sécurisé :</p>
+  <pre>sudo -u postgres createuser --pwprompt maximus
+sudo -u postgres createdb --owner=maximus maximus
+sudo -u postgres psql -d maximus -c \
+  "ALTER ROLE maximus SET client_encoding TO 'UTF8';"</pre>
+  <p>Pour PostgreSQL distant, faire autoriser l’adresse du serveur applicatif dans le pare-feu et dans <code>pg_hba.conf</code>. Ne pas exposer le port 5432 à tout Internet.</p>
+  <h3>5.2 Répertoire applicatif</h3>
+  <pre>sudo useradd --system --home /opt/maximus --shell /usr/sbin/nologin maximus || true
+sudo mkdir -p /opt/maximus
+sudo chown -R maximus:maximus /opt/maximus
+cd /opt/maximus</pre>
+  <p>Le compte qui lance l’installateur doit pouvoir écrire dans le workspace. Après installation, le processus HTTP permanent doit utiliser un utilisateur non privilégié et les mêmes permissions sur <code>storage</code>, <code>bootstrap/cache</code> et le stockage numérique.</p>
+  <h3>5.3 Stockage persistant</h3>
+  <p>Le script utilise par défaut <code>artifacts/api-server/laravel/storage/app/digital-products</code>. Ce dossier doit être inclus dans les sauvegardes. Ne pas le remplacer par <code>/tmp</code> ou un disque éphémère.</p>
+
+  <h2>6. Installer avec le script</h2>
+  <h3>6.1 Récupérer le code</h3>
+  <pre>git clone &lt;depot-prive&gt; /opt/maximus
+cd /opt/maximus
+chmod +x scripts/install-maximus-instance.sh
+./scripts/install-maximus-instance.sh --help</pre>
+  <h3>6.2 Installation interactive recommandée</h3>
+  <pre>./scripts/install-maximus-instance.sh</pre>
+  <p>Les secrets sont demandés sans être affichés. Les valeurs déjà présentes dans l’environnement ou dans le <code>.env</code> sont réutilisées. Les variables non liées à l’installation sont conservées.</p>
+  <h3>6.3 Valeurs demandées</h3>
+  <ol><li><b>Identifiant stable :</b> lettres, chiffres, tiret ou underscore.</li><li><b>Entreprise :</b> nom, responsable, email, pays, secteur.</li><li><b>Modules :</b> liste séparée par virgules, par défaut <code>commerce,ecommerce,stocks,presences</code>.</li><li><b>PostgreSQL :</b> hôte, port, base, utilisateur, mot de passe.</li><li><b>Administrateur entreprise :</b> email et mot de passe d’au moins 8 caractères.</li><li><b>URL :</b> URL publique ou URL locale de l’installation.</li></ol>
+  <h3>6.4 Installation non interactive</h3>
+  <p>Ne pas mettre les mots de passe dans les arguments. Les fournir dans l’environnement du processus ou par le gestionnaire de secrets du serveur :</p>
+  <pre>export MAXIMUS_DEPLOYMENT_MODE=dedicated
+export MAXIMUS_INSTALLATION_COMPANY_ID=entreprise-exemple
+export MAXIMUS_COMPANY_NAME='Entreprise Exemple'
+export MAXIMUS_COMPANY_MANAGER='Responsable Exemple'
+export MAXIMUS_COMPANY_EMAIL='contact@example.test'
+export MAXIMUS_ADMIN_USER='admin@example.test'
+read -r -s MAXIMUS_ADMIN_PASSWORD
+export MAXIMUS_ADMIN_PASSWORD
+read -r -s DB_PASSWORD
+export DB_PASSWORD
+export DB_HOST=127.0.0.1 DB_PORT=5432
+export DB_DATABASE=maximus DB_USERNAME=maximus
+export APP_URL=https://erp.example.test
+export MAXIMUS_INSTALLATION_MODULES=commerce,ecommerce,stocks,presences
+
+./scripts/install-maximus-instance.sh --non-interactive</pre>
+  <p>Pour une installation on-premise, utiliser <code>MAXIMUS_DEPLOYMENT_MODE=on_premise</code>. Tester la valeur effective dans <code>/api/installation</code> après démarrage.</p>
+  <h3>6.5 Options de l’installateur</h3>
+  <table><tr><th>Option</th><th>Effet</th><th>Usage</th></tr>
+    <tr><td><code>--workspace-dir PATH</code></td><td>Change la racine du workspace.</td><td>Déploiement dans un chemin différent.</td></tr>
+    <tr><td><code>--env-file PATH</code></td><td>Change le fichier Laravel mis à jour.</td><td>Préparation contrôlée ou recette.</td></tr>
+    <tr><td><code>--non-interactive</code></td><td>Refuse les valeurs manquantes.</td><td>Automatisation et CI privée.</td></tr>
+    <tr><td><code>--skip-composer</code></td><td>N’installe pas Composer.</td><td>Seulement si les dépendances sont déjà validées.</td></tr>
+    <tr><td><code>--skip-build</code></td><td>Ne construit pas le frontend.</td><td>Seulement si le build a été produit par une étape contrôlée.</td></tr>
+    <tr><td><code>--skip-healthcheck</code></td><td>Désactive la sonde finale.</td><td>Uniquement si le serveur n’est pas démarrable pendant l’installation.</td></tr>
+  </table>
+
+  <h2>7. Configuration détaillée</h2>
+  <table>
+    <tr><th>Variable</th><th>Obligation</th><th>Description</th></tr>
+    <tr><td><code>MAXIMUS_DEPLOYMENT_MODE</code></td><td>Oui</td><td><code>dedicated</code> ou <code>on_premise</code>.</td></tr>
+    <tr><td><code>MAXIMUS_INSTALLATION_COMPANY_ID</code></td><td>Oui</td><td>Identifiant stable et serveur-scoped de l’entreprise.</td></tr>
+    <tr><td><code>MAXIMUS_COMPANY_NAME</code></td><td>Oui</td><td>Nom créé ou mis à jour par le bootstrap.</td></tr>
+    <tr><td><code>MAXIMUS_COMPANY_MANAGER</code></td><td>Oui</td><td>Nom affiché du responsable.</td></tr>
+    <tr><td><code>MAXIMUS_COMPANY_EMAIL</code></td><td>Oui</td><td>Email de l’entreprise.</td></tr>
+    <tr><td><code>MAXIMUS_ADMIN_USER</code></td><td>Oui</td><td>Email du <code>company_admin</code>.</td></tr>
+    <tr><td><code>MAXIMUS_ADMIN_PASSWORD</code></td><td>Oui</td><td>Mot de passe initial, minimum 8 caractères.</td></tr>
+    <tr><td><code>DB_HOST/PORT/DATABASE/USERNAME/PASSWORD</code></td><td>Oui</td><td>Connexion PostgreSQL.</td></tr>
+    <tr><td><code>APP_URL</code></td><td>Oui</td><td>URL réellement utilisée par les utilisateurs.</td></tr>
+    <tr><td><code>APP_KEY</code></td><td>Oui</td><td>Clé Laravel ; générée si absente, puis conservée.</td></tr>
+    <tr><td><code>MAXIMUS_INSTALLATION_MODULES</code></td><td>Optionnelle</td><td>Modules publiés autorisés, séparés par virgules.</td></tr>
+    <tr><td><code>DIGITAL_STORAGE_PATH</code></td><td>Défaut</td><td>Stockage persistant des ressources numériques.</td></tr>
+  </table>
+  <div class="warning"><b>APP_KEY :</b> ne pas la régénérer lors d’une mise à jour normale. Cela invaliderait les données chiffrées et les sessions selon leur usage.</div>
+  <h3>Fichier <code>.env</code></h3>
+  <pre>chmod 600 artifacts/api-server/laravel/.env
+grep -E '^(MAXIMUS_DEPLOYMENT_MODE|MAXIMUS_INSTALLATION_COMPANY_ID|APP_URL|DB_HOST|DB_DATABASE)=' \
+  artifacts/api-server/laravel/.env</pre>
+  <p>Afficher uniquement les clés non sensibles lors d’un diagnostic. Ne jamais utiliser <code>cat .env</code> dans un ticket ou un log partagé.</p>
+
+  <h2>8. Démarrer l’application</h2>
+  <h3>8.1 Test local temporaire</h3>
+  <pre>cd /opt/maximus/artifacts/api-server/laravel
+php -S 127.0.0.1:8080 server.php</pre>
+  <p>Dans un autre terminal :</p>
+  <pre>curl -fsS http://127.0.0.1:8080/api/healthz
+curl -fsS http://127.0.0.1:8080/api/installation</pre>
+  <p>Le serveur PHP intégré sert à valider l’installation. Il n’est pas recommandé comme exposition Internet permanente.</p>
+  <h3>8.2 Production derrière HTTPS</h3>
+  <p>Utiliser un service supervisé, un utilisateur non privilégié et un reverse proxy HTTPS (Nginx, Apache ou équivalent). Le proxy doit transmettre le host et le protocole d’origine, et ne doit pas rendre PostgreSQL ou le port interne public.</p>
+  <ul><li>Le proxy public écoute sur 443.</li><li>L’application écoute seulement sur loopback ou sur le réseau privé.</li><li>Le certificat couvre exactement <code>APP_URL</code>.</li><li><code>SESSION_SECURE_COOKIE=true</code> si l’URL commence par HTTPS.</li><li>Les logs du proxy ne contiennent pas les mots de passe ni les cookies.</li></ul>
+  <h3>8.3 Démarrage contrôlé</h3>
+  <p>Le dépôt ne fournit pas automatiquement un service systemd ou une configuration Nginx : ils dépendent de la distribution, du chemin d’installation et de la politique d’exploitation. Ils doivent être ajoutés par l’administrateur du serveur avant de considérer l’instance comme production.</p>
+
+  <h2>9. Accès administrateur entreprise</h2>
+  <ol><li>Ouvrir l’URL configurée dans <code>APP_URL</code>.</li><li>Utiliser l’email <code>MAXIMUS_ADMIN_USER</code>.</li><li>Se connecter avec le mot de passe fourni à l’installateur.</li><li>Vérifier que le compte affiche le rôle <code>company_admin</code> et la bonne entreprise.</li><li>Créer ensuite les employés et les rôles depuis Organisation.</li></ol>
+  <p>Une relance de <code>maximus:install-company</code> met à jour le compte dédié et invalide ses sessions existantes. L’opération est utile après une rotation de mot de passe, mais elle doit être planifiée.</p>
+  <pre>cd /opt/maximus/artifacts/api-server/laravel
+php artisan config:clear --no-interaction
+php artisan maximus:install-company --no-interaction</pre>
+  <div class="danger"><b>Ne pas exécuter</b> <code>php artisan maximus:provision-admin</code> sur cette instance. Cette commande est réservée à l’installation centrale et refuse normalement le mode isolé.</div>
+
+  <h2>10. Validation complète de l’isolation</h2>
+  <h3>10.1 Santé et identité</h3>
+  <pre>curl -fsS https://erp.example.test/api/healthz
+curl -fsS https://erp.example.test/api/installation</pre>
+  <p>Vérifier : <code>ready=true</code>, <code>companyOnly=true</code>, le mode <code>dedicated</code> ou <code>on_premise</code>, l’identifiant de l’entreprise attendu et <code>adminLoginEnabled=false</code>.</p>
+  <h3>10.2 Routes centrales</h3>
+  <p>Les routes d’inscription publique, catalogue plateforme, contrôle et administration MAXIMUS doivent retourner <code>404 CENTRAL_INSTALLATION_ONLY</code>. Un masquage dans le menu ne suffit pas comme test.</p>
+  <h3>10.3 Données d’une autre entreprise</h3>
+  <p>Avec deux entreprises de test en base, essayer le slug, les images, le domaine et Transport de l’autre entreprise :</p>
+  <pre>curl -i https://erp.example.test/api/shop/autre-entreprise
+curl -i https://erp.example.test/api/shop/autre-entreprise/transport/settings
+curl -i https://erp.example.test/api/product-images/autre-entreprise/image.png
+curl -i https://erp.example.test/api/company-profile-images/autre-entreprise/profile.png</pre>
+  <p>Les réponses doivent être <code>404</code> avec le code <code>INSTALLATION_COMPANY_ONLY</code>. La boutique et les ressources de l’entreprise configurée doivent, elles, rester accessibles.</p>
+  <h3>10.4 Connexion</h3>
+  <ul class="checklist"><li>Le <code>company_admin</code> dédié se connecte.</li><li>Un compte global MAXIMUS ne se connecte pas.</li><li>Une session d’une autre entreprise est refusée.</li><li>Après rafraîchissement, la session reste attachée au bon tenant.</li><li>Un accès direct à une route non autorisée est refusé côté API.</li></ul>
+
+  <h2>11. Sauvegardes, mises à jour et restauration</h2>
+  <h3>11.1 Sauvegarder la base</h3>
+  <pre>mkdir -p /var/backups/maximus
+pg_dump --format=custom \
+  --file=/var/backups/maximus/maximus-$(date +%F-%H%M).dump \
+  --host="$DB_HOST" --port="$DB_PORT" \
+  --username="$DB_USERNAME" "$DB_DATABASE"
+chmod 600 /var/backups/maximus/*.dump</pre>
+  <p>Copier les dumps vers un stockage hors serveur. Tester une restauration sur une base séparée ; une sauvegarde jamais restaurée n’est pas une procédure validée.</p>
+  <h3>11.2 Sauvegarder les fichiers</h3>
+  <pre>tar -C artifacts/api-server/laravel/storage/app \
+  -czf /var/backups/maximus/digital-products-$(date +%F-%H%M).tar.gz \
+  digital-products</pre>
+  <p>Conserver base et fichiers issus du même point de sauvegarde lorsque les commandes ou produits numériques se référencent.</p>
+  <h3>11.3 Mise à jour</h3>
+  <pre>cd /opt/maximus
+git fetch --all --tags
+git checkout &lt;version-validee&gt;
+./scripts/install-maximus-instance.sh --skip-healthcheck
+cd artifacts/api-server/laravel
+php artisan migrate --force --no-interaction</pre>
+  <p>Si l’installateur doit être relancé en non-interactif, fournir les secrets via l’environnement sécurisé. Vérifier ensuite le healthcheck, le mode d’installation, la connexion et les ressources publiques.</p>
+  <h3>11.4 Retour arrière</h3>
+  <ol><li>Arrêter le trafic applicatif.</li><li>Conserver les logs et l’état de la base.</li><li>Revenir au code validé précédent.</li><li>Restaurer la base seulement si nécessaire et si le dump est compatible.</li><li>Restaurer les fichiers numériques associés.</li><li>Relancer les validations d’identité, de connexion et d’isolation.</li></ol>
+
+  <h2>12. Dépannage</h2>
+  <table>
+    <tr><th>Symptôme</th><th>Diagnostic</th><th>Correction</th></tr>
+    <tr><td><code>MAXIMUS_INSTALLATION_COMPANY_ID</code> manquant</td><td>Mode isolé sans tenant fixé.</td><td>Définir l’identifiant stable puis relancer l’installation.</td></tr>
+    <tr><td>Erreur <code>MAXIMUS_COMPANY_NAME...</code></td><td>Configuration entreprise incomplète.</td><td>Fournir nom, responsable et email valide.</td></tr>
+    <tr><td>Connexion PostgreSQL refusée</td><td>Hôte, port, mot de passe ou pare-feu.</td><td>Tester avec <code>psql</code> et vérifier les règles réseau.</td></tr>
+    <tr><td>Frontend absent ou page blanche</td><td>Build sauté, échoué ou copié dans un mauvais dossier.</td><td>Relancer sans <code>--skip-build</code>, puis vérifier <code>public/index.html</code>.</td></tr>
+    <tr><td>Healthcheck inaccessible</td><td>Serveur non démarré, mauvais port ou route proxy.</td><td>Tester en loopback puis via le domaine HTTPS.</td></tr>
+    <tr><td>Autre boutique renvoie 404</td><td>Comportement attendu en mode isolé.</td><td>Utiliser le slug ou domaine de l’entreprise configurée.</td></tr>
+    <tr><td>Session perdue en HTTPS</td><td>Cookie sécurisé ou proxy mal transmis.</td><td>Vérifier <code>SESSION_SECURE_COOKIE=true</code>, TLS et les en-têtes forwarded.</td></tr>
+    <tr><td>Fichier téléchargé introuvable</td><td>Stockage non persistant ou permissions.</td><td>Vérifier <code>DIGITAL_STORAGE_PATH</code>, propriétaire et sauvegarde.</td></tr>
+    <tr><td>Échec après une relance</td><td>Variables différentes ou identifiant changé.</td><td>Comparer les clés non sensibles et conserver le même tenant ID.</td></tr>
+  </table>
+
+  <h2>13. Checklist de mise en service</h2>
+  <ul class="checklist">
+    <li>Le serveur est dédié à l’entreprise ou séparé par une frontière réseau claire.</li>
+    <li><code>MAXIMUS_DEPLOYMENT_MODE</code> vaut <code>dedicated</code> ou <code>on_premise</code>.</li>
+    <li><code>MAXIMUS_INSTALLATION_COMPANY_ID</code> est stable et documenté hors du code.</li>
+    <li>La base PostgreSQL est séparée et protégée par pare-feu.</li>
+    <li>Le fichier <code>.env</code> est en permission <code>600</code>.</li>
+    <li><code>APP_KEY</code> est défini et sauvegardé dans le gestionnaire de secrets.</li>
+    <li>Le frontend a été construit et copié dans Laravel.</li>
+    <li>Le stockage numérique est persistant et sauvegardé.</li>
+    <li>Le service permanent utilise un utilisateur non privilégié.</li>
+    <li>Le reverse proxy sert HTTPS et protège le port interne.</li>
+    <li><code>/api/healthz</code> répond correctement.</li>
+    <li><code>/api/installation</code> confirme le bon mode et le bon tenant.</li>
+    <li>Le compte <code>company_admin</code> se connecte.</li>
+    <li>Aucun compte <code>maximus_admin</code> global n’a été créé.</li>
+    <li>Les routes centrales sont refusées.</li>
+    <li>Les boutiques, images et parcours Transport d’autres entreprises sont refusés.</li>
+    <li>Une sauvegarde PostgreSQL et une restauration de test ont été réalisées.</li>
+    <li>La procédure de mise à jour et de retour arrière est connue de l’exploitant.</li>
+  </ul>
+  <div class="success"><b>Installation dédiée conforme :</b> l’entreprise configurée peut administrer ses modules et ses données ; les autres tenants, l’administration globale et les ressources publiques étrangères restent inaccessibles côté serveur.</div>
+  <div class="footer">MAXIMUS — Guide d’installation dédiée. Les valeurs entre chevrons sont des exemples. Aucun secret réel ne doit être copié dans ce document.</div>
+</body>
+</html>

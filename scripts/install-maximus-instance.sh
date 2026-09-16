@@ -219,7 +219,12 @@ chmod 600 "$ENV_FILE"
 umask 077
 
 log "Collecte de la configuration de l’entreprise"
-set_env_value MAXIMUS_DEPLOYMENT_MODE "dedicated"
+ask_optional MAXIMUS_DEPLOYMENT_MODE "Mode d’installation" "dedicated"
+case "$REPLY" in
+    dedicated|on_premise) ;;
+    *) fail "MAXIMUS_DEPLOYMENT_MODE doit être dedicated ou on_premise." ;;
+esac
+set_env_value MAXIMUS_DEPLOYMENT_MODE "$REPLY"
 
 company_id="$(existing_or_exported MAXIMUS_INSTALLATION_COMPANY_ID)"
 if [[ -z "$company_id" && "$NON_INTERACTIVE" -eq 0 ]]; then
