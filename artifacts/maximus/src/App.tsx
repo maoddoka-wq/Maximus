@@ -12,6 +12,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
+  Copy,
   CreditCard,
   Edit3,
   FileBarChart,
@@ -7266,6 +7267,9 @@ function CompanyModulesDetail({
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [customLoginEnabled, setCustomLoginEnabled] = useState(Boolean(company.customLoginEnabled));
   const [savedCustomLoginEnabled, setSavedCustomLoginEnabled] = useState(Boolean(company.customLoginEnabled));
+  const [customLoginDomain, setCustomLoginDomain] = useState(company.customLoginDomain ?? '');
+  const [savedCustomLoginDomain, setSavedCustomLoginDomain] = useState(company.customLoginDomain ?? '');
+  const [copiedLoginLink, setCopiedLoginLink] = useState<'platform' | 'domain' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -7383,9 +7387,12 @@ function CompanyModulesDetail({
 
   useEffect(() => {
     const enabled = Boolean(company.customLoginEnabled);
+    const domain = company.customLoginDomain ?? '';
     setCustomLoginEnabled(enabled);
     setSavedCustomLoginEnabled(enabled);
-  }, [company.id, company.customLoginEnabled]);
+    setCustomLoginDomain(domain);
+    setSavedCustomLoginDomain(domain);
+  }, [company.id, company.customLoginEnabled, company.customLoginDomain]);
 
   const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
@@ -7493,6 +7500,7 @@ function CompanyModulesDetail({
   const saveCustomLogin = async () => {
     setSaving(true);
     try {
+      const domain = customLoginDomain.trim();
       const savedCompany = (
         await companyRequestApi.update(company.id, {
           name: company.name,
@@ -7502,20 +7510,47 @@ function CompanyModulesDetail({
           country: company.country,
           sector: company.sector,
           customLoginEnabled,
+          customLoginDomain: domain,
         })
       ).company;
       const enabled = Boolean(savedCompany.customLoginEnabled);
+      const savedDomain = savedCompany.customLoginDomain ?? domain;
       setCustomLoginEnabled(enabled);
       setSavedCustomLoginEnabled(enabled);
+      setCustomLoginDomain(savedDomain);
+      setSavedCustomLoginDomain(savedDomain);
       mutate((draft) => {
         const target = draft.companies.find((item) => item.id === company.id);
-        if (target) target.customLoginEnabled = enabled;
+        if (target) {
+          target.customLoginEnabled = enabled;
+          target.customLoginDomain = savedDomain;
+        }
       }, enabled ? 'Connexion personnalisée activée pour cette entreprise.' : 'Connexion générale MAXIMUS conservée pour cette entreprise.');
     } catch (error) {
       setCustomLoginEnabled(savedCustomLoginEnabled);
+      setCustomLoginDomain(savedCustomLoginDomain);
       window.alert(error instanceof Error ? error.message : 'Le réglage de connexion n’a pas pu être enregistré.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const appBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const platformLoginLink = `${window.location.origin}${appBasePath}/connexion/${encodeURIComponent(company.id)}`;
+  const normalizedLoginDomain = customLoginDomain
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/\.$/, '');
+  const domainLoginLink = normalizedLoginDomain ? `https://${normalizedLoginDomain}/connexion` : '';
+  const copyLoginLink = async (kind: 'platform' | 'domain', link: string) => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLoginLink(kind);
+      window.setTimeout(() => setCopiedLoginLink(null), 1800);
+    } catch {
+      setCopiedLoginLink(null);
     }
   };
 
@@ -7717,11 +7752,53 @@ function CompanyModulesDetail({
             </span>
           </span>
         </label>
+        <div className="mt-5 space-y-4 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4">
+          <div>
+            <p className="text-xs font-bold">Lien de connexion</p>
+            <p className="mt-1 text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
+              Ce lien est disponible immédiatement après l’activation. Le domaine personnalisé doit aussi être configuré sur l’hébergement et pointer vers MAXIMUS.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="min-w-0 flex-1 text-xs font-bold">
+              Lien MAXIMUS de cette entreprise
+              <input readOnly value={platformLoginLink} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-xs" />
+            </label>
+            <button type="button" onClick={() => void copyLoginLink('platform', platformLoginLink)} className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold">
+              <Copy size={14} />{copiedLoginLink === 'platform' ? 'Copié' : 'Copier'}
+            </button>
+          </div>
+          <label className="block text-xs font-bold">
+            Nom de domaine personnalisé
+            <input
+              data-testid="input-company-custom-login-domain"
+              value={customLoginDomain}
+              onChange={(event) => setCustomLoginDomain(event.target.value)}
+              disabled={!customLoginEnabled || saving}
+              placeholder="connexion.exemple.sn"
+              className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
+              Saisissez uniquement le domaine, sans « https:// ». Il doit être ajouté à la configuration Custom Domains de Render.
+            </span>
+          </label>
+          {domainLoginLink && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="min-w-0 flex-1 text-xs font-bold">
+                Lien de connexion sur ce domaine
+                <input readOnly value={domainLoginLink} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-xs" />
+              </label>
+              <button type="button" onClick={() => void copyLoginLink('domain', domainLoginLink)} className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold">
+                <Copy size={14} />{copiedLoginLink === 'domain' ? 'Copié' : 'Copier'}
+              </button>
+            </div>
+          )}
+        </div>
         <div className="mt-5 flex justify-end">
           <ActionButton
             primary
             testId="button-save-company-custom-login"
-            disabled={saving || customLoginEnabled === savedCustomLoginEnabled}
+            disabled={saving || (customLoginEnabled === savedCustomLoginEnabled && customLoginDomain.trim() === savedCustomLoginDomain)}
             onClick={() => void saveCustomLogin()}
           >
             Enregistrer la connexion

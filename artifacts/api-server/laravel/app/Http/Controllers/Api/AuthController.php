@@ -29,7 +29,16 @@ class AuthController extends Controller
 
         $requestedCompanyId = trim((string) ($data['companyId'] ?? ''));
         $domain = $domainVerifier->activeForHost($request->getHost());
-        if ($domain && $requestedCompanyId !== '' && $requestedCompanyId !== (string) $domain->company_id) {
+        $customDomainCompany = Company::query()
+            ->where('custom_login_domain', strtolower($request->getHost()))
+            ->where('status', 'ACTIF')
+            ->where('custom_login_enabled', true)
+            ->whereNull('deleted_at')
+            ->first();
+        $hostCompanyId = $domain
+            ? (string) $domain->company_id
+            : ($customDomainCompany ? (string) $customDomainCompany->id : null);
+        if ($hostCompanyId !== null && $requestedCompanyId !== '' && $requestedCompanyId !== $hostCompanyId) {
             return response()->json(['error' => 'Cette page de connexion ne correspond pas à cette entreprise.'], 403);
         }
         $scopedCompanyId = null;
@@ -42,14 +51,14 @@ class AuthController extends Controller
             if ($requestedCompany?->custom_login_enabled) {
                 $scopedCompanyId = $requestedCompanyId;
             }
-        } elseif ($domain) {
+        } elseif ($hostCompanyId !== null) {
             $domainCompany = Company::query()
-                ->whereKey((string) $domain->company_id)
+                ->whereKey($hostCompanyId)
                 ->where('status', 'ACTIF')
                 ->whereNull('deleted_at')
                 ->first();
             if ($domainCompany?->custom_login_enabled) {
-                $scopedCompanyId = (string) $domain->company_id;
+                $scopedCompanyId = $hostCompanyId;
             }
         }
 
@@ -105,7 +114,15 @@ class AuthController extends Controller
     {
         $requestedCompanyId = trim((string) $request->query('companyId', ''));
         $domain = $domainVerifier->activeForHost($request->getHost());
-        $domainCompanyId = $domain ? (string) $domain->company_id : null;
+        $customDomainCompany = Company::query()
+            ->where('custom_login_domain', strtolower($request->getHost()))
+            ->where('status', 'ACTIF')
+            ->where('custom_login_enabled', true)
+            ->whereNull('deleted_at')
+            ->first();
+        $domainCompanyId = $domain
+            ? (string) $domain->company_id
+            : ($customDomainCompany ? (string) $customDomainCompany->id : null);
 
         if ($domainCompanyId !== null && $requestedCompanyId !== '' && $requestedCompanyId !== $domainCompanyId) {
             return response()->json(['error' => 'Cette adresse ne correspond pas à cette entreprise.'], 404);

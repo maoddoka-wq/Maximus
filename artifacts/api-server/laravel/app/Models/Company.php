@@ -32,6 +32,7 @@ class Company extends Model
         'accent_color',
         'sidebar_color',
         'custom_login_enabled',
+        'custom_login_domain',
         'rejection_reason',
         'deleted_at',
     ];

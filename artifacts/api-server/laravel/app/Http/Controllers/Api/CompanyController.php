@@ -212,6 +212,7 @@ class CompanyController extends Controller
             'accentColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'sidebarColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'customLoginEnabled' => ['sometimes', 'boolean'],
+            'customLoginDomain' => ['sometimes', 'nullable', 'string', 'max:253'],
         ])->validate();
 
         $email = Str::lower(trim($input['email']));
@@ -222,9 +223,22 @@ class CompanyController extends Controller
         if (Company::query()->where('email', $email)->where('id', '!=', $companyId)->whereNull('deleted_at')->exists()) {
             return response()->json(['error' => 'Une autre entreprise utilise déjà cette adresse email.'], 409);
         }
+        $customLoginDomain = array_key_exists('customLoginDomain', $input)
+            ? $this->normalizeLoginDomain($input['customLoginDomain'])
+            : null;
+        if (array_key_exists('customLoginDomain', $input) && trim((string) ($input['customLoginDomain'] ?? '')) !== '' && $customLoginDomain === null) {
+            return response()->json(['error' => 'Saisissez un nom de domaine valide, par exemple connexion.exemple.sn.'], 422);
+        }
+        if ($customLoginDomain !== null && Company::query()
+            ->where('custom_login_domain', $customLoginDomain)
+            ->where('id', '!=', $companyId)
+            ->whereNull('deleted_at')
+            ->exists()) {
+            return response()->json(['error' => 'Ce nom de domaine est déjà associé à une autre entreprise.'], 409);
+        }
 
         try {
-            $updated = DB::transaction(function () use ($company, $input, $email): Company {
+            $updated = DB::transaction(function () use ($company, $input, $email, $customLoginDomain): Company {
                 $changes = [
                     'name' => trim($input['name']),
                     'manager' => trim($input['manager']),
@@ -238,11 +252,14 @@ class CompanyController extends Controller
                     'accentColor' => 'accent_color',
                     'sidebarColor' => 'sidebar_color',
                     'customLoginEnabled' => 'custom_login_enabled',
+                    'customLoginDomain' => 'custom_login_domain',
                 ] as $inputKey => $column) {
                     if (array_key_exists($inputKey, $input)) {
-                        $changes[$column] = $inputKey === 'customLoginEnabled'
-                            ? (bool) $input[$inputKey]
-                            : strtoupper((string) $input[$inputKey]);
+                        $changes[$column] = match ($inputKey) {
+                            'customLoginEnabled' => (bool) $input[$inputKey],
+                            'customLoginDomain' => $customLoginDomain,
+                            default => strtoupper((string) $input[$inputKey]),
+                        };
                     }
                 }
                 $company->update($changes);
@@ -383,6 +400,21 @@ class CompanyController extends Controller
         }
     }
 
+    private function normalizeLoginDomain(mixed $value): ?string
+    {
+        $domain = strtolower(trim((string) ($value ?? '')));
+        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
+        $domain = preg_replace('#/.*$#', '', $domain) ?? '';
+        $domain = preg_replace('/:\d+$/', '', $domain) ?? '';
+        $domain = rtrim($domain, '.');
+
+        return $domain !== ''
+            && strlen($domain) <= 253
+            && filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)
+            ? $domain
+            : null;
+    }
+
     private function companyPayload(Company $company): array
     {
         return [
@@ -406,6 +438,7 @@ class CompanyController extends Controller
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
             'customLoginEnabled' => (bool) $company->custom_login_enabled,
+            'customLoginDomain' => $company->custom_login_domain,
         ];
     }
 
