@@ -7731,6 +7731,7 @@ function CompanyModulesDetail({
    ) => Promise<void>;
   onBack: () => void;
 }) {
+  const { confirm } = useAppDialog();
   const defaultStatuses = () =>
     Object.fromEntries(
       modules.map((module) => [module.id, company.allowedModules.includes(module.id) ? 'ACTIF' : 'INACTIF']),
@@ -7767,6 +7768,7 @@ function CompanyModulesDetail({
   const [domainLoading, setDomainLoading] = useState(true);
   const [domainSaving, setDomainSaving] = useState(false);
   const [domainError, setDomainError] = useState('');
+  const [installationBusy, setInstallationBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -7992,6 +7994,56 @@ function CompanyModulesDetail({
     }
   };
 
+  const downloadInstallationManifest = async () => {
+    try {
+      const manifest = await companyRequestApi.installationManifest(company.id);
+      const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-installation-${company.id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Le manifeste d’installation n’a pas pu être exporté.');
+    }
+  };
+
+  const prepareInstallation = async (mode: 'dedicated' | 'on_premise') => {
+    try {
+      const result = await companyRequestApi.issueInstallation(company.id, { mode });
+      const blob = new Blob([JSON.stringify(result.bootstrap, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      window.alert('Le fichier bootstrap a été téléchargé. Transférez-le uniquement au VPS de cette entreprise.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être préparée.');
+    }
+  };
+
+  const revokeInstallation = async () => {
+    const confirmed = await confirm({
+      title: 'Révoquer cette installation ?',
+      description: `Le jeton de « ${company.name} » ne fonctionnera plus pour les prochaines synchronisations. Cette action ne coupe pas automatiquement un serveur déjà démarré.`,
+      confirmLabel: 'Révoquer le jeton',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setInstallationBusy(true);
+    try {
+      await companyRequestApi.revokeInstallation(company.id);
+      window.alert('Installation révoquée. Arrêtez aussi le service du VPS si la coupure doit être immédiate.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.');
+    } finally {
+      setInstallationBusy(false);
+    }
+  };
+
   const toggleFeature = (moduleId: ModuleId, featureId: string) => {
     setFeatureSelections((previous) => {
       const selected = new Set(previous[moduleId] ?? []);
@@ -8203,6 +8255,74 @@ function CompanyModulesDetail({
           </div>
         </div>
       </div>
+      <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <KeyRound size={18} className="text-[hsl(var(--primary))]" />
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+                Réservé à l’administration MAXIMUS
+              </p>
+            </div>
+            <h2 className="mt-2 text-xl font-bold">Installation dédiée ou locale</h2>
+            <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              MAXIMUS crée ici le fichier bootstrap JSON secret. Vous le téléchargez, puis vous le transférez
+              au serveur de l’entreprise par SSH/SCP avant de lancer le script d’installation.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
+            {company.status === 'ACTIF' ? 'Entreprise active' : 'Entreprise à activer'}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">1. Préparer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Générez le bootstrap depuis MAXIMUS principal.</p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">2. Transférer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Envoyez le JSON au VPS avec SSH/SCP.</p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">3. Installer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le VPS récupère les modules et permissions publiés.</p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <ActionButton
+            primary
+            testId="button-prepare-dedicated-installation"
+            onClick={() => void prepareInstallation('dedicated')}
+          >
+            Préparer le VPS dédié
+          </ActionButton>
+          <ActionButton
+            testId="button-prepare-on-premise-installation"
+            onClick={() => void prepareInstallation('on_premise')}
+          >
+            Préparer le serveur local
+          </ActionButton>
+          <ActionButton
+            testId="button-download-installation-manifest"
+            onClick={() => void downloadInstallationManifest()}
+          >
+            Télécharger le manifeste
+          </ActionButton>
+          <button
+            type="button"
+            data-testid="button-revoke-installation"
+            disabled={installationBusy}
+            onClick={() => void revokeInstallation()}
+            className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {installationBusy ? 'Révocation…' : 'Révoquer le jeton'}
+          </button>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          L’entreprise doit être <strong>ACTIF</strong> avant la préparation. La révocation bloque les
+          synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
+        </p>
+      </section>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
