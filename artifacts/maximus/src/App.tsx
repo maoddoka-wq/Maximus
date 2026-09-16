@@ -1090,7 +1090,6 @@ function AppContent() {
     sidebarFeatureGroups,
     stockPermissions,
     sectorManager,
-    verticalModuleNavigation,
   } = buildAppAccessContext({
     data,
     session,
@@ -1298,7 +1297,7 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
-                  singleModuleNavigation={verticalModuleNavigation}
+                   singleModuleNavigation={false}
                    hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
