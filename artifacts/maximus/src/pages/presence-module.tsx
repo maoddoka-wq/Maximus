@@ -300,6 +300,8 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const onRequestQrRef = useRef(onRequestQr);
+  const qrRequestRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     onRequestQrRef.current = onRequestQr;
@@ -311,18 +313,35 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
   }, []);
 
   const loadQr = useCallback(async (workDate: string) => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    const requestId = qrRequestRef.current + 1;
+    qrRequestRef.current = requestId;
     setLoading(true);
     setError('');
     try {
       const nextQr = await onRequestQrRef.current(workDate);
       const image = await QRCode.toDataURL(nextQr.token, { width: 300, margin: 2, errorCorrectionLevel: 'M' });
+      if (requestId !== qrRequestRef.current) return;
       setQr(nextQr);
       setQrImage(image);
     } catch (cause) {
+      if (requestId !== qrRequestRef.current) return;
       setError(cause instanceof Error ? cause.message : 'QR code indisponible.');
+      retryTimerRef.current = window.setTimeout(() => {
+        retryTimerRef.current = null;
+        void loadQr(workDate);
+      }, 5_000);
     } finally {
-      setLoading(false);
+      if (requestId === qrRequestRef.current) setLoading(false);
     }
+  }, []);
+
+  useEffect(() => () => {
+    qrRequestRef.current += 1;
+    if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -330,7 +349,7 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
   }, [date, loadQr]);
 
   useEffect(() => {
-    if (!qr) return undefined;
+    if (!qr || qr.workDate !== date) return undefined;
     const expiresAt = new Date(qr.expiresAt).getTime();
     const refreshIn = Math.max(1_000, expiresAt - Date.now() - 5_000);
     const timeout = window.setTimeout(() => {
@@ -354,7 +373,7 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
     </Panel>
     <Panel title="QR code de pointage">
       <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 rounded-2xl border bg-white p-5 text-center">
-        {loading ? <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]"><RefreshCw size={16} className="animate-spin" />Génération du QR code…</div> : qrImage ? <img src={qrImage} alt={`QR code de pointage du ${displayDate(date)}`} className="h-72 w-72 max-w-full rounded-xl" /> : <div className="text-sm text-red-700">{error || 'QR code indisponible.'}</div>}
+         {qrImage && qr?.workDate === date ? <div className="relative"><img src={qrImage} alt={`QR code de pointage du ${displayDate(date)}`} className="h-72 w-72 max-w-full rounded-xl" />{loading ? <span className="absolute bottom-2 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold shadow"><RefreshCw size={12} className="animate-spin" />Actualisation…</span> : null}</div> : loading ? <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]"><RefreshCw size={16} className="animate-spin" />Génération du QR code…</div> : <div className="text-sm text-red-700">{error || 'QR code indisponible.'}</div>}
          {qr ? <p className="text-xs text-[hsl(var(--muted-foreground))]">Valide jusqu’à {new Date(qr.expiresAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Renouvellement automatique avant expiration.</p> : null}
         {error ? <p className="text-xs text-red-700">{error}</p> : null}
       </div>
