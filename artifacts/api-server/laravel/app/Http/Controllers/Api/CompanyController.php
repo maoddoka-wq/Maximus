@@ -272,9 +272,8 @@ class CompanyController extends Controller
         }
 
         $actor = $request->attributes->get('authActor');
-        $isMaximus = ($actor['role'] ?? null) === 'maximus_admin';
-        if (! $isMaximus && ($actor['companyId'] ?? null) !== $companyId) {
-            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        if (($actor['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'La connexion entreprise est administrée uniquement depuis MAXIMUS.'], 403);
         }
 
         $this->ensureLoginSlug($company);
@@ -292,9 +291,8 @@ class CompanyController extends Controller
         }
 
         $actor = $request->attributes->get('authActor');
-        $isMaximus = ($actor['role'] ?? null) === 'maximus_admin';
-        if (! $isMaximus && ($actor['companyId'] ?? null) !== $companyId) {
-            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        if (($actor['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'La connexion entreprise est administrée uniquement depuis MAXIMUS.'], 403);
         }
 
         $input = Validator::make($request->all(), [
@@ -302,16 +300,9 @@ class CompanyController extends Controller
             'mode' => ['sometimes', 'in:MAXIMUS,CUSTOM'],
         ])->validate();
 
-        if (! $isMaximus && array_key_exists('customAllowed', $input)) {
-            return response()->json(['error' => 'Seule l’administration MAXIMUS peut autoriser ce mode.'], 403);
-        }
-        if (($input['mode'] ?? null) === 'CUSTOM' && ! (bool) $company->login_custom_allowed && ! $isMaximus) {
-            return response()->json(['error' => 'La connexion personnalisée n’est pas autorisée par MAXIMUS.'], 403);
-        }
-
         $this->ensureLoginSlug($company);
         $changes = [];
-        if ($isMaximus && array_key_exists('customAllowed', $input)) {
+        if (array_key_exists('customAllowed', $input)) {
             $changes['login_custom_allowed'] = (bool) $input['customAllowed'];
             if (! $changes['login_custom_allowed']) {
                 $changes['login_mode'] = 'MAXIMUS';

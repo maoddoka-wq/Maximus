@@ -51,9 +51,6 @@ export function CompanyProfileSection({
   });
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [loginMode, setLoginMode] = useState<'MAXIMUS' | 'CUSTOM'>(company.loginMode ?? 'MAXIMUS');
-  const [loginSettings, setLoginSettings] = useState<{ customAllowed: boolean; slug: string; url: string } | null>(null);
-  const [loginSaving, setLoginSaving] = useState(false);
   const [error, setError] = useState('');
   const setField = (field: keyof ProfileForm) => (value: string) =>
     setForm(current => ({ ...current, [field]: value }));
@@ -73,11 +70,7 @@ export function CompanyProfileSection({
     });
     setNewPassword('');
     setPasswordConfirm('');
-    setLoginMode(company.loginMode ?? 'MAXIMUS');
     setError('');
-    void companyRequestApi.loginSettings(company.id)
-      .then(({ settings }) => setLoginSettings(settings))
-      .catch(() => setLoginSettings(null));
   }, [
     company.id,
     company.name,
@@ -90,7 +83,6 @@ export function CompanyProfileSection({
     company.primaryColor,
     company.accentColor,
     company.sidebarColor,
-    company.loginMode,
   ]);
 
   const handlePhoto = (file: File | undefined) => {
@@ -190,24 +182,6 @@ export function CompanyProfileSection({
     setPasswordConfirm('');
   };
 
-  const saveLoginMode = async (mode: 'MAXIMUS' | 'CUSTOM') => {
-    setLoginSaving(true);
-    try {
-      const result = await companyRequestApi.updateLoginSettings(company.id, { mode });
-      setLoginMode(result.settings.mode);
-      setLoginSettings(result.settings);
-      mutate((draft) => {
-        const target = draft.companies.find((item) => item.id === company.id);
-        if (target) Object.assign(target, result.company);
-      }, mode === 'CUSTOM' ? 'La connexion personnalisée est activée pour votre entreprise.' : 'La connexion MAXIMUS est rétablie.');
-    } catch (saveError) {
-      setLoginMode(company.loginMode ?? 'MAXIMUS');
-      setError(saveError instanceof Error ? saveError.message : 'Le mode de connexion n’a pas pu être enregistré.');
-    } finally {
-      setLoginSaving(false);
-    }
-  };
-
   return (
     <div className="space-y-5 fade-up">
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
@@ -242,32 +216,6 @@ export function CompanyProfileSection({
               <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" help="Pays dans lequel l’entreprise exerce principalement." />
               <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" help="Secteur d’activité utilisé pour contextualiser l’espace." />
             </div>
-          </section>
-          <section className="card-surface rounded-2xl p-6">
-            <p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Accès de connexion</p>
-            <h2 className="mt-2 text-xl font-bold">Choisissez votre porte d’entrée</h2>
-            <p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              MAXIMUS conserve le contrôle de l’autorisation. Vous pouvez choisir la connexion générale ou votre page personnalisée lorsqu’elle est autorisée.
-            </p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className={`cursor-pointer rounded-xl border p-4 ${loginMode === 'MAXIMUS' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}>
-                <input type="radio" name={`login-mode-${company.id}`} checked={loginMode === 'MAXIMUS'} onChange={() => void saveLoginMode('MAXIMUS')} disabled={loginSaving} className="mr-2" />
-                <strong className="text-sm">Connexion MAXIMUS</strong>
-                <span className="mt-1 block pl-6 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Utiliser la page actuelle de MAXIMUS.</span>
-              </label>
-              <label className={`cursor-pointer rounded-xl border p-4 ${loginMode === 'CUSTOM' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''} ${!loginSettings?.customAllowed ? 'cursor-not-allowed opacity-60' : ''}`}>
-                <input type="radio" name={`login-mode-${company.id}`} checked={loginMode === 'CUSTOM'} onChange={() => void saveLoginMode('CUSTOM')} disabled={loginSaving || !loginSettings?.customAllowed} className="mr-2" />
-                <strong className="text-sm">Page personnalisée</strong>
-                <span className="mt-1 block pl-6 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{loginSettings?.customAllowed ? 'Votre logo et vos couleurs sont affichés.' : 'Cette option doit d’abord être autorisée par MAXIMUS.'}</span>
-              </label>
-            </div>
-            {loginMode === 'CUSTOM' && loginSettings?.url && (
-              <div className="mt-4 rounded-xl bg-[hsl(var(--muted)/.55)] p-4">
-                <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Lien à partager</p>
-                <p className="mt-2 break-all font-mono text-xs">{window.location.origin}{loginSettings.url}</p>
-                <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
-              </div>
-            )}
           </section>
           <section className="card-surface rounded-2xl p-6">
             <h2 className="font-bold">Sécurité du compte</h2>

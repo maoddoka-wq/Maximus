@@ -3211,10 +3211,10 @@ function CompanyDetail({
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Accès entreprise</p>
-            <h2 className="mt-2 font-bold">Connexion personnalisée</h2>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Connexion et domaine</p>
+            <h2 className="mt-2 font-bold">Accès de connexion de l’entreprise</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              MAXIMUS décide si cette fonctionnalité est disponible. L’entreprise pourra ensuite choisir entre cette page et la connexion MAXIMUS actuelle.
+              Cette configuration appartient à MAXIMUS. Activez ou désactivez la page personnalisée, choisissez le mode utilisé et partagez le lien généré depuis cette section.
             </p>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
