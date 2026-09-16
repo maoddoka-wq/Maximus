@@ -80,12 +80,13 @@ export const presenceFeaturePacks = [
   {
     id: 'presence-employe',
     name: 'Employé Présences',
-    description: 'Pointer, consulter son historique et suivre ses absences et congés.',
-    featureIds: [featureId('Tableau de bord'), featureId('Pointage'), featureId('Absences'), featureId('Congés'), featureId('Historique')],
+    description: 'Pointer, consulter ses horaires et son historique, puis demander une absence ou un congé.',
+    featureIds: [featureId('Tableau de bord'), featureId('Pointage'), featureId('Absences'), featureId('Horaires'), featureId('Congés'), featureId('Historique')],
     featurePermissions: {
       [featureId('Tableau de bord')]: ['voir'],
       [featureId('Pointage')]: ['voir', 'créer'],
       [featureId('Absences')]: ['voir', 'créer'],
+      [featureId('Horaires')]: ['voir'],
       [featureId('Congés')]: ['voir', 'créer'],
       [featureId('Historique')]: ['voir'],
     },

@@ -24,3 +24,9 @@ La configuration d’un rôle Présences doit être exclusivement portée par le
 **Why:** Deux modes simultanés dans l’éditeur de rôles permettaient qu’un droit général ou une ancienne permission globale réapparaisse comme accès à des fonctionnalités non choisies.
 
 **How to apply:** Ne pas afficher d’accès général séparé pour Présences, supprimer le fallback racine dans la sélection des fonctionnalités et exiger une permission détaillée de lecture pour afficher un onglet.
+
+Le parcours Employé Présences est limité à la consultation des horaires, au pointage personnel et à la création de demandes d’absence ou de congé. La création, modification et suppression des horaires, les paramètres et les décisions de validation restent réservés à l’administration ou au manager.
+
+**Why:** L’interface gestionnaire était réutilisée telle quelle pour l’employé et l’API autorisait encore la création d’un horaire si une permission de rôle trop large était présente.
+
+**How to apply:** Appliquer la restriction dans les deux couches : masquer les actions côté écran selon `selfOnly`, puis refuser côté serveur les écritures d’horaires et les actions de supervision d’un acteur `employee`.

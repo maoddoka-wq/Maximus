@@ -118,11 +118,15 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     return values.includes(required);
   };
   const canCreateFeature = (label: string) => hasFeaturePermission(label, 'create', canCreate);
-  const canEditFeature = (label: string) => hasFeaturePermission(label, 'edit', canEdit);
+  const canCreatePresenceFeature = (label: string) =>
+    selfOnly && label === 'Horaires' ? false : canCreateFeature(label);
+  const canEditFeature = (label: string) =>
+    selfOnly && label === 'Horaires' ? false : hasFeaturePermission(label, 'edit', canEdit);
   const canValidateAsSupervisor = canValidate && !selfOnly;
   const canValidateFeature = (label: string) => hasFeaturePermission(label, 'validate', canValidateAsSupervisor);
   const canDeleteFeature = (label: string) => hasFeaturePermission(label, 'delete', canDelete);
   const canExportFeature = (label: string) => hasFeaturePermission(label, 'export', canExport);
+  const canManageAsSupervisor = canManage && !selfOnly;
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(([id]) => id),
     defaultTab: tabs[0]?.[0] ?? 'dashboard',
@@ -175,10 +179,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const featureForType: Partial<Record<PresenceItem['type'], string>> = { attendance: 'Pointage', absence: 'Absences', schedule: 'Horaires', leave: 'Congés' };
   const create = async (input: Parameters<typeof api.create>[0]) => {
     const allowed = input.type === 'settings'
-      ? canManage
+        ? canManageAsSupervisor
       : input.type === 'attendance'
-        ? canCreateFeature('Pointage')
-        : Boolean(featureForType[input.type] && canCreateFeature(featureForType[input.type]!));
+        ? canCreatePresenceFeature('Pointage')
+        : Boolean(featureForType[input.type] && canCreatePresenceFeature(featureForType[input.type]!));
     if (!allowed) {
       showAppToast('Votre rôle ne possède pas le droit de créer dans cette fonctionnalité.', 'error');
       return;
@@ -192,7 +196,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
       : isValidation
         ? canValidateFeature(featureForType[item.type]!)
         : item.type === 'settings'
-          ? canManage
+          ? canManageAsSupervisor
           : Boolean(featureForType[item.type] && canEditFeature(featureForType[item.type]!));
     if (!allowed) {
       showAppToast('Votre rôle ne possède pas le droit de modifier cet enregistrement.', 'error');
@@ -217,14 +221,14 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
      if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(visibleEmployees.map(employee => meta(employee).unit))]} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
-     if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canCreate={canCreateFeature('Pointage')} canGenerateQr={canGenerateQr && canCreateFeature('Pointage')} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
+      if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canCreate={canCreatePresenceFeature('Pointage')} canGenerateQr={canGenerateQr && canCreatePresenceFeature('Pointage')} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
      if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} canCorrect={canCorrect} onSelect={setSelected} />;
       if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreateFeature('Absences')} canValidate={canValidateFeature('Absences')} canDelete={canDeleteFeature('Absences')} onCreate={create} onUpdate={update} onRemove={remove} />;
-     if (tab === 'schedules') return <SchedulesPanel items={items} employees={visibleEmployees} canCreate={canCreateFeature('Horaires')} canEdit={canEditFeature('Horaires')} canDelete={canDeleteFeature('Horaires')} onCreate={create} onUpdate={update} onRemove={remove} />;
+      if (tab === 'schedules') return <SchedulesPanel items={items} employees={visibleEmployees} canCreate={canCreatePresenceFeature('Horaires')} canEdit={canEditFeature('Horaires')} canDelete={selfOnly ? false : canDeleteFeature('Horaires')} onCreate={create} onUpdate={update} onRemove={remove} />;
      if (tab === 'leave') return <LeavePanel items={items} employees={visibleEmployees} date={date} canCreate={canCreateFeature('Congés')} canValidate={canValidateFeature('Congés')} onCreate={create} onUpdate={update} />;
     if (tab === 'history') return <HistoryPanel items={items} employees={employeeById} />;
      if (tab === 'reports') return <ReportsPanel rows={rows} items={items} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `rapport-presences-${date}.csv`)} />;
-    return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManage} onCreate={create} onUpdate={update} />;
+     return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManageAsSupervisor} onCreate={create} onUpdate={update} />;
   };
   return <div className="space-y-5">
       <div className="mobile-hero card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>

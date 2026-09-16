@@ -61,6 +61,15 @@ final class ModuleAuthorization
         }
 
         if ($module === 'presences') {
+            if (($actor['role'] ?? null) === 'employee'
+                && $feature === 'horaires'
+                && $action !== 'view') {
+                return false;
+            }
+            if (($actor['role'] ?? null) === 'employee'
+                && in_array($action, ['validate', 'manage'], true)) {
+                return false;
+            }
             return self::allowsPresence($permissions, $action, $feature);
         }
 

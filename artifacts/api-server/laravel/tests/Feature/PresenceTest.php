@@ -202,7 +202,7 @@ class PresenceTest extends TestCase
             'employeeId' => 'presence-employee',
             'status' => 'ACTIF',
             'payload' => ['shift' => 'matin'],
-        ])->assertCreated();
+        ])->assertForbidden();
     }
 
     public function test_employee_can_create_absence_and_leave_only_for_self(): void
@@ -385,6 +385,32 @@ class PresenceTest extends TestCase
         $request->patchJson('/api/presence/items/'.$item->id, [
             'companyId' => 'kora',
             'status' => 'APPROUVÉE',
+        ])->assertForbidden();
+    }
+
+    public function test_employee_cannot_create_or_modify_a_schedule(): void
+    {
+        $employee = $this->asActor('employee', 'presence-employee', [
+            'presence.horaires' => ['voir', 'créer', 'modifier'],
+        ]);
+
+        $item = PresenceItem::query()->create([
+            'id' => 'presence-schedule-employee',
+            'company_id' => 'kora',
+            'type' => 'schedule',
+            'employee_id' => 'presence-employee',
+            'work_date' => '2026-09-05',
+            'status' => 'ACTIF',
+            'payload' => ['name' => 'Horaire existant'],
+            'created_by' => 'Manager',
+            'updated_by' => 'Manager',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $employee->patchJson('/api/presence/items/'.$item->id, [
+            'companyId' => 'kora',
+            'payload' => ['name' => 'Horaire modifié'],
         ])->assertForbidden();
     }
 

@@ -55,6 +55,7 @@ class PresenceController extends Controller
         $feature = $this->featureForType($input['type']);
         if (! is_array($actorData)
             || $feature === null
+            || (($actorData['role'] ?? null) === 'employee' && $input['type'] === 'schedule')
             || ! ModuleAuthorization::allows($actorData, 'presences', 'create', $feature)
             || ! $this->actorCanAccessEmployee($actorData, $companyId, $input['employeeId'] ?? null)) {
             return $this->forbidden();
@@ -121,6 +122,7 @@ class PresenceController extends Controller
         $allowed = is_array($actorData)
             && $feature !== null
             && $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
+            && ! (($actorData['role'] ?? null) === 'employee' && $item->type === 'schedule')
             && ! ($requiresValidation && ($actorData['role'] ?? null) === 'employee')
             && ($item->type === 'attendance'
                 ? ModuleAuthorization::allows($actorData, 'presences', 'correct', $feature)
@@ -175,6 +177,7 @@ class PresenceController extends Controller
         }
         $actorData = $request->attributes->get('authActor');
         if (! is_array($actorData)
+            || (($actorData['role'] ?? null) === 'employee' && $item->type === 'schedule')
             || ! $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
             || ! ModuleAuthorization::allows($actorData, 'presences', 'delete', $this->featureForType($item->type))) {
             return $this->forbidden();
