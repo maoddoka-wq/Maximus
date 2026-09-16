@@ -8377,91 +8377,93 @@ function CompanyModulesDetail({
           </div>
         </div>
       </section>
-      <section className="card-surface rounded-2xl p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Domaine entreprise</p>
-            <h2 className="mt-2 font-bold">Créer le domaine de connexion</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Créez ici le domaine public de l’entreprise. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
-            </p>
+      {loginSettings?.customAllowed && (
+        <section className="card-surface rounded-2xl p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Domaine personnalisé</p>
+              <h2 className="mt-2 font-bold">Connecter le domaine de l’entreprise</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Ajoutez le domaine utilisé par l’entreprise personnalisée. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
+              {domainLoading ? 'Chargement…' : `${customDomains.length} domaine${customDomains.length > 1 ? 's' : ''}`}
+            </span>
           </div>
-          <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
-            {domainLoading ? 'Chargement…' : `${customDomains.length} domaine${customDomains.length > 1 ? 's' : ''}`}
-          </span>
-        </div>
-        <form onSubmit={createCustomDomain} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block min-w-0 flex-1 text-sm font-semibold">
-            Nom de domaine
-            <input
-              data-testid="input-company-custom-domain"
-              value={domainInput}
-              onChange={(event) => setDomainInput(event.target.value)}
-              placeholder="connexion.exemple.sn"
-              disabled={domainSaving}
-              className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
-            />
-          </label>
-          <button
-            type="submit"
-            data-testid="button-create-company-custom-domain"
-            disabled={domainSaving || !domainInput.trim()}
-            className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {domainSaving ? 'Enregistrement…' : 'Créer le domaine'}
-          </button>
-        </form>
-        {domainError && (
-          <p data-testid="company-custom-domain-error" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
-            {domainError}
-          </p>
-        )}
-        <div className="mt-4 space-y-3">
-          {customDomains.length === 0 && !domainLoading ? (
-            <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
-              Aucun domaine personnalisé n’est encore configuré pour cette entreprise.
+          <form onSubmit={createCustomDomain} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm font-semibold">
+              Nom de domaine
+              <input
+                data-testid="input-company-custom-domain"
+                value={domainInput}
+                onChange={(event) => setDomainInput(event.target.value)}
+                placeholder="connexion.exemple.sn"
+                disabled={domainSaving}
+                className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
+              />
+            </label>
+            <button
+              type="submit"
+              data-testid="button-create-company-custom-domain"
+              disabled={domainSaving || !domainInput.trim()}
+              className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {domainSaving ? 'Enregistrement…' : 'Connecter le domaine'}
+            </button>
+          </form>
+          {domainError && (
+            <p data-testid="company-custom-domain-error" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+              {domainError}
             </p>
-          ) : customDomains.map((domain) => (
-            <article key={domain.id} data-testid={`card-company-custom-domain-${domain.id}`} className="rounded-xl border p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <strong className="break-all">{domain.domain}</strong>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${domain.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {domain.status === 'ACTIVE' ? 'ACTIF' : 'EN ATTENTE DNS'}
-                    </span>
+          )}
+          <div className="mt-4 space-y-3">
+            {customDomains.length === 0 && !domainLoading ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                Aucun domaine personnalisé n’est encore configuré pour cette entreprise.
+              </p>
+            ) : customDomains.map((domain) => (
+              <article key={domain.id} data-testid={`card-company-custom-domain-${domain.id}`} className="rounded-xl border p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="break-all">{domain.domain}</strong>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${domain.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {domain.status === 'ACTIVE' ? 'ACTIF' : 'EN ATTENTE DNS'}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:grid-cols-2">
+                      <p><span className="font-bold">TXT :</span> {domain.verificationName} → <code className="break-all">{domain.verificationValue}</code></p>
+                      <p><span className="font-bold">CNAME :</span> {domain.domain} → <code className="break-all">{domain.targetHost}</code></p>
+                    </div>
+                    {domain.lastError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]">{domain.lastError}</p>}
                   </div>
-                  <div className="mt-3 grid gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:grid-cols-2">
-                    <p><span className="font-bold">TXT :</span> {domain.verificationName} → <code className="break-all">{domain.verificationValue}</code></p>
-                    <p><span className="font-bold">CNAME :</span> {domain.domain} → <code className="break-all">{domain.targetHost}</code></p>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      data-testid={`button-verify-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void verifyCustomDomain(domain)}
+                      className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
+                    >
+                      Vérifier
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`button-delete-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void deleteCustomDomain(domain)}
+                      className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
+                    >
+                      Retirer
+                    </button>
                   </div>
-                  {domain.lastError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]">{domain.lastError}</p>}
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    data-testid={`button-verify-company-custom-domain-${domain.id}`}
-                    disabled={domainSaving}
-                    onClick={() => void verifyCustomDomain(domain)}
-                    className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
-                  >
-                    Vérifier
-                  </button>
-                  <button
-                    type="button"
-                    data-testid={`button-delete-company-custom-domain-${domain.id}`}
-                    disabled={domainSaving}
-                    onClick={() => void deleteCustomDomain(domain)}
-                    className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
-                  >
-                    Retirer
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
