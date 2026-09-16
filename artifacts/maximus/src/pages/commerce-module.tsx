@@ -37,6 +37,7 @@ import type { Sale, Status, StoreData } from '@/lib/store';
 import { addNotification, getVisibleNotifications, money, recordControlEvent, shortMoney, uid } from '@/lib/store';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@/hooks/use-toast';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 
@@ -188,13 +189,16 @@ export default function CommerceModulePage({
           <div className="rounded-lg px-3 py-2"><p className="mono text-[9px] uppercase text-[hsl(var(--muted-foreground))]">Alertes</p><strong className="mt-1 block text-sm">{lowStock.length + unread}</strong></div>
         </div>
       </div>
-      {!singleModuleNavigation && <nav aria-label="Menu Gestion commerciale" className="module-tabs mt-6 flex min-w-0 gap-1.5 overflow-x-auto border-t pt-4">
-        {visibleTabs.map(item => {
-          const ItemIcon = item.icon;
-          const isActive = tab === item.id;
-          return <button key={item.id} type="button" data-testid={`commerce-tab-${item.id}`} onClick={() => navigateTab(item.id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${isActive ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><ItemIcon size={16} />{item.label}</button>;
-        })}
-      </nav>}
+      {!singleModuleNavigation && (
+        <WorkspaceTabs
+          items={visibleTabs}
+          activeId={tab}
+          onChange={id => navigateTab(id as Tab)}
+          ariaLabel="Menu Gestion commerciale"
+          testIdPrefix="commerce-tab"
+          className="mt-6 border-t pt-4"
+        />
+      )}
     </section>
     {tab !== 'dashboard' && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative block max-w-xl flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input data-testid="input-commerce-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher dans cet espace..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label><button type="button" onClick={() => setState(readState(data, companyId))} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold hover:bg-[hsl(var(--muted))]"><RefreshCw size={14} />Actualiser</button></div>}
     {tab === 'dashboard' && <Dashboard data={data} state={state} lowStock={lowStock} revenue={revenue} onTab={navigateTab} />}

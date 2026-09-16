@@ -17,7 +17,8 @@ import {
 import { createPayrollApi, type PayrollBatch, type PayrollBeneficiary, type PayrollBootstrap } from '@/lib/payroll-api';
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
-import { normalizePayrollFeatureId, normalizePayrollFeatureIds, type PayrollFeatureId } from '@/lib/payroll-features';
+import { payrollFeatureDefinitions, normalizePayrollFeatureId, normalizePayrollFeatureIds, type PayrollFeatureId } from '@/lib/payroll-features';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 
 const payrollFeatureIds: PayrollFeatureId[] = [
   'tableau-de-bord',
@@ -28,6 +29,16 @@ const payrollFeatureIds: PayrollFeatureId[] = [
   'solde-de-paie',
   'historique',
 ];
+
+const payrollFeatureIcons: Record<PayrollFeatureId, typeof WalletCards> = {
+  'tableau-de-bord': WalletCards,
+  'bénéficiaires': UsersRound,
+  'préparer-une-paie': Pencil,
+  validation: ClipboardCheck,
+  virements: CreditCard,
+  'solde-de-paie': Banknote,
+  historique: History,
+};
 
 const featureCopy: Record<PayrollFeatureId, { eyebrow: string; title: string; description: string }> = {
   'tableau-de-bord': {
@@ -282,6 +293,7 @@ export default function PayrollModulePage({
   featurePermissions,
   activeFeatureId = 'tableau-de-bord',
   onNavigate = () => {},
+  singleModuleNavigation = false,
   preview = false,
 }: {
   companyId: string;
@@ -292,6 +304,7 @@ export default function PayrollModulePage({
   featurePermissions?: Partial<Record<string, string[]>>;
   activeFeatureId?: string;
   onNavigate?: (path: string) => void;
+  singleModuleNavigation?: boolean;
   preview?: boolean;
 }) {
   const api = useMemo(() => createPayrollApi(), []);
@@ -320,7 +333,10 @@ export default function PayrollModulePage({
     () => new Set(visibleFeatureIds ? normalizePayrollFeatureIds(visibleFeatureIds) : payrollFeatureIds),
     [visibleFeatureIds],
   );
-  const activeFeature = normalizePayrollFeatureId(activeFeatureId) ?? 'tableau-de-bord';
+  const requestedFeature = normalizePayrollFeatureId(activeFeatureId) ?? 'tableau-de-bord';
+  const activeFeature = visibleFeatures.has(requestedFeature)
+    ? requestedFeature
+    : [...visibleFeatures][0] ?? 'tableau-de-bord';
   const copy = featureCopy[activeFeature];
   const canSee = (featureId: PayrollFeatureId) => visibleFeatures.has(featureId);
   const canCreateFeature = (featureId: PayrollFeatureId) =>
@@ -496,6 +512,18 @@ export default function PayrollModulePage({
         </div>
         <Button onClick={() => void refresh()} loading={loading}><RefreshCw size={15} />Actualiser</Button>
       </div>
+      {!singleModuleNavigation && (
+        <WorkspaceTabs
+          items={payrollFeatureDefinitions
+            .filter(feature => visibleFeatures.has(feature.id))
+            .map(feature => ({ ...feature, icon: payrollFeatureIcons[feature.id] }))}
+          activeId={activeFeature}
+          onChange={feature => onNavigate(`/entreprise/paie?feature=${feature}`)}
+          ariaLabel="Fonctionnalités Paie"
+          testIdPrefix="payroll-tab"
+          className="rounded-xl border bg-[hsl(var(--card))] p-1.5"
+        />
+      )}
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}<button type="button" className="float-right font-bold" onClick={() => setError('')}>×</button></div>}
 
       {activeFeature === 'tableau-de-bord' && (

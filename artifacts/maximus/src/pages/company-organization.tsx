@@ -4,6 +4,7 @@ import { CompanyProfileSection } from './company-profile-section';
 import { EmployeesTab } from './organization-employees';
 import { RolesTab } from './organization-roles';
 import { StructureTab } from './organization-structure';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile';
@@ -94,18 +95,14 @@ export function CompanyOrganizationAdmin({
             ? 'Gérez les rôles, sous-autorisations et comptes de votre unité et de ses descendants.'
             : 'Construisez la hiérarchie, configurez les rôles et sous-autorisations, puis affectez les comptes et managers.'}
         </p>
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {tabs.map(item => (
-            <button
-              key={item.id}
-              data-testid={`tab-${item.id}`}
-              onClick={() => setTab(item.id)}
-              className={`min-w-0 rounded-lg px-2.5 py-2.5 text-left text-[11px] font-bold leading-4 transition sm:px-4 sm:text-xs ${tab === item.id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <WorkspaceTabs
+          items={tabs}
+          activeId={tab}
+          onChange={id => setTab(id as OrganizationTab)}
+          ariaLabel="Rubriques Organisation et accès"
+          testIdPrefix="tab"
+          className="mt-6 grid grid-cols-2 sm:flex sm:flex-wrap"
+        />
       </div>
       {tab === 'structure' && !sectorManager && <StructureTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}

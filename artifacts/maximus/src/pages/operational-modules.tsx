@@ -31,6 +31,7 @@ import {
   type SupplierRecord,
 } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import {
   transitionOptions,
   validateOperationalRecord,
@@ -390,6 +391,7 @@ function ModuleScreen({
   canModify: boolean;
 }) {
   const { confirm } = useAppDialog();
+  const [view, setView] = useState<'overview' | 'records'>('overview');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('Tous');
   const [editor, setEditor] = useState<RecordItem | 'new' | null>(null);
@@ -428,7 +430,19 @@ function ModuleScreen({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <WorkspaceTabs
+        items={[
+          { id: 'overview', label: 'Vue d’ensemble', icon: config.icon },
+          { id: 'records', label: 'Dossiers & opérations', icon: FileText },
+        ]}
+        activeId={view}
+        onChange={id => setView(id as 'overview' | 'records')}
+        ariaLabel={`Rubriques ${config.title}`}
+        testIdPrefix={`${config.id}-view`}
+        className="rounded-xl border bg-[hsl(var(--card))] p-1.5"
+      />
+
+      {view === 'overview' && <div className="grid gap-4 sm:grid-cols-3">
         <Metric
           icon={Icon}
           label={`${capitalize(config.noun)}s actives`}
@@ -449,9 +463,9 @@ function ModuleScreen({
           value={config.amount ? shortMoney(total) : String(total)}
           detail={config.amount ? 'FCFA hors archives' : 'statut ACTIF'}
         />
-      </div>
+      </div>}
 
-      <section className="card-surface overflow-hidden rounded-2xl">
+      {view === 'records' && <section className="card-surface overflow-hidden rounded-2xl">
         <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="font-bold">{config.title}</h2>
@@ -513,7 +527,7 @@ function ModuleScreen({
             });
           }}
         />
-      </section>
+      </section>}
 
       {editor && (
         <Editor

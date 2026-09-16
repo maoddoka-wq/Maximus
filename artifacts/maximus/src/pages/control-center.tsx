@@ -16,6 +16,7 @@ import { getCompanyControlScope } from '@/lib/control-routing';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { ControlTaskList } from '@/components/control-task-list';
 import { ControlCreateTaskDialog, type CreateTaskForm } from '@/components/control-create-task-dialog';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 
 function formatDate(value: string) {
   if (!value) return '—';
@@ -54,6 +55,14 @@ function initialForm(moduleId: ModuleId): CreateTaskForm {
   return { title: '', description: '', priority: 'NORMALE', moduleId, dueDate: '', sectorId: '' };
 }
 
+type ControlView = 'tasks' | 'events' | 'audit';
+
+const controlViews = [
+  { id: 'tasks', label: 'Tâches & décisions', icon: ListChecks },
+  { id: 'events', label: 'Flux d’événements', icon: Activity },
+  { id: 'audit', label: 'Journal de coordination', icon: FileCheck2 },
+] as const;
+
 export function ControlCenterPage({
   data,
   companyId,
@@ -82,6 +91,7 @@ export function ControlCenterPage({
   const [statusFilter, setStatusFilter] = useState<'TOUS' | ControlTaskStatus>('TOUS');
   const [moduleFilter, setModuleFilter] = useState<'TOUS' | ModuleId>('TOUS');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [controlView, setControlView] = useState<ControlView>('tasks');
   const [targetCompanyId, setTargetCompanyId] = useState(companyId ?? '');
   const [assigneeEmployeeId, setAssigneeEmployeeId] = useState('');
   const [updatingTaskId, setUpdatingTaskId] = useState('');
@@ -246,17 +256,28 @@ export function ControlCenterPage({
 
       {syncError && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{syncError}</div>}
 
-      <ControlTaskList
-        tasks={filteredTasks}
-        statusFilter={statusFilter}
-        moduleFilter={moduleFilter}
-        onStatusFilterChange={setStatusFilter}
-        onModuleFilterChange={setModuleFilter}
-        onUpdate={(taskId, status) => void updateTask(taskId, status)}
+      <WorkspaceTabs
+        items={controlViews}
+        activeId={controlView}
+        onChange={id => setControlView(id as ControlView)}
+        ariaLabel="Rubriques de contrôle et coordination"
+        testIdPrefix="control-view"
+        className="rounded-xl border bg-[hsl(var(--card))] p-1.5"
       />
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="card-surface rounded-2xl border">
+      {controlView === 'tasks' && (
+        <ControlTaskList
+          tasks={filteredTasks}
+          statusFilter={statusFilter}
+          moduleFilter={moduleFilter}
+          onStatusFilterChange={setStatusFilter}
+          onModuleFilterChange={setModuleFilter}
+          onUpdate={(taskId, status) => void updateTask(taskId, status)}
+        />
+      )}
+
+      {controlView === 'events' && (
+        <section className="card-surface rounded-2xl border">
           <div className="border-b p-5"><h3 className="text-base font-bold">Flux d’événements</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les décisions et changements liés à votre périmètre.</p></div>
           <div className="divide-y">
             {visibleEvents.slice(0, 8).map(event => (
@@ -271,8 +292,11 @@ export function ControlCenterPage({
             ))}
             {visibleEvents.length === 0 && <div className="p-6 text-sm text-[hsl(var(--muted-foreground))]">Aucun événement récent.</div>}
           </div>
-        </div>
-        <div className="card-surface rounded-2xl border">
+        </section>
+      )}
+
+      {controlView === 'audit' && (
+        <section className="card-surface rounded-2xl border">
           <div className="border-b p-5"><h3 className="text-base font-bold">Journal de coordination</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les changements restent attribués et consultables.</p></div>
           <div className="divide-y">
             {visibleAudit.slice(0, 8).map(entry => (
@@ -283,8 +307,8 @@ export function ControlCenterPage({
             ))}
             {visibleAudit.length === 0 && <div className="p-6 text-sm text-[hsl(var(--muted-foreground))]">Aucune trace disponible.</div>}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {showCreateDialog && (
         <ControlCreateTaskDialog

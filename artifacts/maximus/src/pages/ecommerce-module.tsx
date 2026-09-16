@@ -55,6 +55,7 @@ import {
 } from '@/lib/ecommerce-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
@@ -391,14 +392,18 @@ export default function EcommerceModulePage({
         </div>
       </section>
 
-      {!singleModuleNavigation && <section className="sticky top-0 z-20 rounded-2xl border bg-[hsl(var(--card)/.96)] p-2 shadow-sm backdrop-blur-md">
-        <nav aria-label="Fonctionnalités e-commerce" className="flex flex-wrap gap-1.5">
-          {visibleTabs.map(item => {
-            const Icon = item.icon;
-            return <button key={item.id} type="button" data-testid={`ecommerce-tab-${item.id}`} onClick={() => navigate(item.id)} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition ${tab === item.id ? 'border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--border))] hover:bg-[hsl(var(--muted)/.45)] hover:text-[hsl(var(--foreground))]'}`}><Icon size={15} />{item.label}</button>;
-          })}
-        </nav>
-      </section>}
+      {!singleModuleNavigation && (
+        <section className="sticky top-0 z-20 rounded-2xl border bg-[hsl(var(--card)/.96)] p-2 shadow-sm backdrop-blur-md">
+          <WorkspaceTabs
+            items={visibleTabs}
+            activeId={tab}
+            onChange={id => navigate(id as EcommerceTab)}
+            ariaLabel="Fonctionnalités e-commerce"
+            testIdPrefix="ecommerce-tab"
+            className="flex-wrap"
+          />
+        </section>
+      )}
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}

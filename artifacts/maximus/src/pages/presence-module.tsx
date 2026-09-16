@@ -6,6 +6,7 @@ import { createPresenceApi, type PresenceClockQr, type PresenceItem, type Presen
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { featureSlug } from '@/lib/permission-keys';
 import { useQueryTab } from '@/lib/query-tab';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
@@ -251,7 +252,13 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   };
   return <div className="space-y-5">
       <div className="mobile-hero card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
-        {!singleModuleNavigation && <nav aria-label="Menu Gestion des Présences" className="module-tabs mt-7 flex gap-1.5 overflow-x-auto border-t pt-5">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-3.5 text-sm font-bold ${tab === id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={16} />{label}</button>)}</nav>}</div>
+         {!singleModuleNavigation && <WorkspaceTabs
+           items={tabs.map(([id, label, icon]) => ({ id, label, icon }))}
+           activeId={tab}
+           onChange={id => setTab(id as Tab)}
+           ariaLabel="Menu Gestion des Présences"
+           className="mt-7 border-t pt-5"
+         />}</div>
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">{error}<button onClick={() => setError('')}><X size={16} /></button></div>}
     {loading ? <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-48 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-48 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div> : render()}
     {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrect} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}

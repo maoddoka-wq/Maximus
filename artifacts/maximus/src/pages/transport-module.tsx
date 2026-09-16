@@ -45,7 +45,9 @@ import {
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
+import { useQueryTab } from '@/lib/query-tab';
 
 type TransportTab = 'overview' | 'courses' | 'chauffeurs' | 'vehicules' | 'historique' | 'parametres';
 type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
@@ -174,11 +176,14 @@ export default function TransportModulePage({
     [allowedFeatureIds, currentEmployeeId],
   );
   const requestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
-  const [tab, setTab] = useState<TransportTab>(
-    requestedTab && visibleTabs.some(item => item.id === requestedTab)
+  const [tab, setTab] = useQueryTab({
+    tabs: tabs.map(item => item.id),
+    defaultTab: requestedTab && visibleTabs.some(item => item.id === requestedTab)
       ? requestedTab
       : visibleTabs[0]?.id ?? 'overview',
-  );
+    aliases: transportTabByFeatureId,
+    isAllowed: value => visibleTabs.some(item => item.id === value),
+  });
   const [data, setData] = useState<TransportBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -215,15 +220,6 @@ export default function TransportModulePage({
   const tripVehicle = (trip: Trip | null) => trip?.vehicleId
     ? data?.vehicles.find(vehicle => vehicle.id === trip.vehicleId) ?? null
     : null;
-
-  useEffect(() => {
-    const nextRequestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
-    if (nextRequestedTab && visibleTabs.some(item => item.id === nextRequestedTab)) {
-      setTab(nextRequestedTab);
-    } else if (!visibleTabs.some(item => item.id === tab)) {
-      setTab(visibleTabs[0]?.id ?? 'overview');
-    }
-  }, [initialTab, tab, visibleTabs]);
 
   const load = async (silent = false) => {
     silent ? setRefreshing(true) : setLoading(true);
@@ -539,9 +535,13 @@ export default function TransportModulePage({
         </div>
       </header>
 
-       {!singleModuleNavigation && <nav aria-label="Navigation transport" className="module-tabs flex gap-1 overflow-x-auto rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.9)] p-1 shadow-sm sm:gap-1.5 sm:p-1.5">
-         {visibleTabs.map(item => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-bold transition sm:gap-2 sm:px-3 sm:py-2.5 sm:text-xs ${tab === item.id ? 'active bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.6)] hover:text-[hsl(var(--foreground))]'}`}><Icon size={14} />{item.label}</button>; })}
-      </nav>}
+       {!singleModuleNavigation && <WorkspaceTabs
+         items={visibleTabs}
+         activeId={tab}
+         onChange={id => setTab(id as TransportTab)}
+         ariaLabel="Navigation transport"
+         className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.9)] p-1 shadow-sm sm:p-1.5"
+       />}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}

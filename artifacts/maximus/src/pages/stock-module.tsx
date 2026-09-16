@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ComponentT
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
 import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrapScope, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 import { useQueryTab } from '@/lib/query-tab';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { showAppToast } from '@/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
@@ -130,9 +131,18 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   return <StockApiContext.Provider value={api}><StockAccessContext.Provider value={{ canCreate: Boolean(currentCanCreate), canModify: Boolean(currentCanModify) }}><div className="space-y-5" aria-busy={pendingAction}>
     {pendingAction && <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.07)] px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))]" role="status"><RefreshCw size={15} className="animate-spin" aria-hidden="true" />Enregistrement en cours…</div>}
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
-    <div className="space-y-5">
-       <div className={`flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 ${singleModuleNavigation ? 'justify-end' : ''}`}>
-         {!singleModuleNavigation && <nav aria-label="Menu gestion de stock" className="module-tabs flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1">{tabs.filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id)).map(([id, label, Icon]) => <button key={id} data-testid={`stock-tab-${id}`} onClick={() => setTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold transition ${tab === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><Icon size={17} />{label}</button>)}</nav>}
+       <div className="space-y-5">
+        <div className={`flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 ${singleModuleNavigation ? 'justify-end' : ''}`}>
+          {!singleModuleNavigation && <WorkspaceTabs
+            items={tabs
+              .filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id))
+              .map(([id, label, icon]) => ({ id, label, icon }))}
+            activeId={tab}
+            onChange={id => setTab(id as Tab)}
+            ariaLabel="Menu gestion de stock"
+            testIdPrefix="stock-tab"
+            className="flex-1 pb-1"
+          />}
         <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
       </div>
       <div data-stock-can-create={currentCanCreate} data-stock-can-modify={currentCanModify}>
