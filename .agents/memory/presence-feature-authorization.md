@@ -42,3 +42,9 @@ Les identifiants d’onglet Présences (`schedules`, `leave`, etc.) ne sont pas 
 **Why:** Utiliser l’identifiant d’onglet faisait filtrer les droits comme non autorisés lors de la sauvegarde, puis toutes les sélections revenaient désactivées à la réouverture.
 
 **How to apply:** Garder les identifiants de navigation pour le routage et les slugs de libellés pour les clés de permissions persistées.
+
+Le menu latéral Présences doit recouper les fonctionnalités choisies par l’unité avec `roleHasFeaturePermission(..., 'voir')`; la sélection de l’unité seule ne suffit pas pour un employé.
+
+**Why:** Une fonctionnalité autorisée par l’entreprise mais refusée au rôle apparaissait encore dans le menu employé, alors que le routage Présences appliquait déjà un filtrage plus strict.
+
+**How to apply:** Pour les employés et managers, filtrer chaque entrée Présences par la permission Voir du rôle ; conserver le comportement complet uniquement pour l’administrateur d’entreprise.

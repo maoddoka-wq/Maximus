@@ -112,6 +112,38 @@ test('le menu Transport retire les fonctionnalités sans permission de lecture',
   ]);
 });
 
+test('le menu Présences retire les fonctionnalités sans permission de lecture du rôle', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['presences'],
+    configuredModules,
+    employeeRole: {
+      id: 'presence-reader',
+      name: 'Lecteur Présences',
+      description: '',
+      modulePermissions: {
+        'presence.tableau-de-bord': ['voir'],
+        'presence.horaires': ['voir'],
+      },
+    },
+    employeeNode: {
+      id: 'unit-presence',
+      companyId: 'company-test',
+      name: 'Présences',
+      type: 'service',
+      parentId: null,
+      moduleIds: ['presences'],
+      moduleFeatures: {
+        presences: ['tableau-de-bord', 'pointage', 'absences', 'horaires', 'congés', 'historique'],
+      },
+    },
+  });
+
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
+    '/entreprise/presences?tab=dashboard',
+    '/entreprise/presences?tab=schedules',
+  ]);
+});
+
 test('le menu Paie utilise une icône distincte pour chaque fonctionnalité', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['paie'],

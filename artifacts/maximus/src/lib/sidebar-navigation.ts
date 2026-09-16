@@ -191,7 +191,12 @@ export function buildSidebarFeatureGroups({
               feature,
               definition: presenceFeatureDefinitions.find(item => item.label === feature),
             }))
-            .filter(({ feature, definition }) => Boolean(definition && selectedFeatureIds.has(featureSlug(feature))))
+            .filter(({ feature, definition }) => Boolean(
+              definition
+              && selectedFeatureIds.has(featureSlug(feature))
+              && (companyAdmin
+                || roleHasFeaturePermission(employeeRole, employeeNode, module.id, featureSlug(feature), 'voir')),
+            ))
             .map(({ feature, definition }) => ({
               href: `/entreprise/presences?tab=${definition?.tab ?? 'dashboard'}`,
               label: feature,
