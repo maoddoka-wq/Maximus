@@ -106,6 +106,37 @@ DB_CONNECTION=pgsql php artisan maximus:provision-admin --no-interaction
 DB_CONNECTION=pgsql php -S 0.0.0.0:${PORT} server.php
 ```
 
+### Installer une instance entreprise sur un VPS ou en local
+
+Le script suivant prépare une installation isolée pour une seule entreprise. Il
+demande les paramètres manquants, conserve les autres variables déjà présentes
+dans `artifacts/api-server/laravel/.env`, installe les dépendances Laravel,
+construit le frontend, applique les migrations PostgreSQL et initialise le
+premier compte `company_admin`.
+
+Les prérequis système sont PHP 8.2 avec l’extension PostgreSQL, Composer,
+Node.js avec Corepack/pnpm, curl et une base PostgreSQL accessible. Le script
+ne crée jamais de compte `maximus_admin` et peut être relancé sans recréer
+l’entreprise.
+
+```bash
+./scripts/install-maximus-instance.sh
+```
+
+Pour une exécution automatisée, fournir les variables documentées dans
+`artifacts/api-server/laravel/.env.example` puis utiliser :
+
+```bash
+./scripts/install-maximus-instance.sh --non-interactive
+```
+
+Options utiles :
+
+```bash
+./scripts/install-maximus-instance.sh --skip-build
+./scripts/install-maximus-instance.sh --skip-composer --skip-healthcheck
+```
+
 ### Workflows du projet
 
 Les trois workflows habituels sont :
