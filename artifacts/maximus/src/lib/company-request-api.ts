@@ -15,6 +15,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const companyRequestApi = {
+  createAdministrative: (input: {
+    name: string;
+    manager: string;
+    email: string;
+    password: string;
+    phone?: string;
+    country?: string;
+    sector?: string;
+    requestedModules: ModuleId[];
+    requestedModulePackIds?: Partial<Record<ModuleId, string[]>>;
+    requestedModuleFeatures?: Partial<Record<ModuleId, string[]>>;
+    requestedModulePermissions?: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
+  }) =>
+    request<{ ok: true; company: Company }>(
+      '/companies',
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
   create: (input: {
     name: string;
     manager: string;
@@ -64,6 +81,28 @@ export const companyRequestApi = {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
+  installationManifest: (companyId: string) =>
+    request<{
+      manifestVersion: 1;
+      source: 'maximus-central';
+      exportedAt: string;
+      company: {
+        id: string;
+        name: string;
+        manager: string;
+        email: string;
+        phone: string;
+        country: string;
+        sector: string;
+        loginSlug: string;
+      };
+      modules: {
+        ids: ModuleId[];
+        packIds: Partial<Record<ModuleId, string[]>>;
+        featureIds: Partial<Record<ModuleId, string[]>>;
+        permissions: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
+      };
+    }>(`/companies/${encodeURIComponent(companyId)}/installation-manifest`),
   uploadProfilePhoto: (companyId: string, photo: File) => {
     const body = new FormData();
     body.append('photo', photo);

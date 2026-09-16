@@ -20,6 +20,38 @@ use Illuminate\Support\Str;
 
 class CompanyController extends Controller
 {
+    public function createAdministrative(
+        Request $request,
+        CompanyRequestCreationService $companyRequests,
+    ): JsonResponse {
+        if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
+        }
+
+        $input = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'min:2', 'max:160'],
+            'manager' => ['required', 'string', 'min:2', 'max:180'],
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'max:200'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'sector' => ['nullable', 'string', 'max:120'],
+            'requestedModules' => ['required', 'array', 'min:1'],
+            'requestedModules.*' => ['string', 'min:1'],
+            'requestedModulePackIds' => ['nullable', 'array'],
+            'requestedModuleFeatures' => ['nullable', 'array'],
+            'requestedModulePermissions' => ['nullable', 'array'],
+        ])->validate();
+
+        try {
+            $created = $companyRequests->create($input);
+            return $this->approve($request, $created['company']->id);
+        } catch (\RuntimeException $exception) {
+            $status = str_contains($exception->getMessage(), 'email') ? 409 : 422;
+            return response()->json(['error' => $exception->getMessage()], $status);
+        }
+    }
+
     public function createRequest(
         Request $request,
         CompanyRequestCreationService $companyRequests,
@@ -322,6 +354,52 @@ class CompanyController extends Controller
             'ok' => true,
             'company' => $this->companyPayload($company->fresh()),
             'settings' => $this->loginSettingsPayload($company->fresh()),
+        ]);
+    }
+
+    public function installationManifest(Request $request, string $companyId): JsonResponse
+    {
+        if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
+        }
+
+        $company = Company::query()
+            ->whereKey($companyId)
+            ->where('status', 'ACTIF')
+            ->whereNull('deleted_at')
+            ->first();
+        if (! $company) {
+            return response()->json(['error' => 'L’entreprise doit être active avant de préparer son installation.'], 409);
+        }
+
+        $this->ensureLoginSlug($company);
+        $moduleIds = array_values(array_unique(array_map('strval', $company->requested_modules ?? [])));
+        foreach ($moduleIds as $moduleId) {
+            if (! ModuleCatalog::isPublishedModule($moduleId)) {
+                return response()->json(['error' => "Le module « {$moduleId} » n’est plus publié ou actif."], 409);
+            }
+        }
+
+        return response()->json([
+            'manifestVersion' => 1,
+            'source' => 'maximus-central',
+            'exportedAt' => now()->toISOString(),
+            'company' => [
+                'id' => (string) $company->id,
+                'name' => (string) $company->name,
+                'manager' => (string) $company->manager,
+                'email' => (string) $company->email,
+                'phone' => (string) ($company->phone ?? ''),
+                'country' => (string) ($company->country ?? ''),
+                'sector' => (string) ($company->sector ?? ''),
+                'loginSlug' => (string) ($company->login_slug ?? ''),
+            ],
+            'modules' => [
+                'ids' => $moduleIds,
+                'packIds' => $company->requested_module_pack_ids ?? [],
+                'featureIds' => $company->requested_module_features ?? [],
+                'permissions' => $company->requested_module_permissions ?? [],
+            ],
         ]);
     }
 

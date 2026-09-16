@@ -1016,8 +1016,8 @@ function AppContent() {
         data={data}
         mutate={mutate}
         onComplete={() => {
-          notify('Demande d’entreprise enregistrée. Validez-la pour activer le compte.', 'success');
-          setLocation('/maximus/demandes');
+          notify('Entreprise créée et activée depuis l’administration MAXIMUS.', 'success');
+          setLocation('/maximus/entreprises');
         }}
         onCancel={() => setLocation('/maximus/entreprises')}
       />
@@ -3390,6 +3390,21 @@ function CompanyDetail({
     }
   };
 
+  const downloadInstallationManifest = async () => {
+    try {
+      const manifest = await companyRequestApi.installationManifest(company.id);
+      const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-installation-${company.id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Le manifeste d’installation n’a pas pu être exporté.');
+    }
+  };
+
   return (
     <div className="space-y-5">
       <button
@@ -3415,7 +3430,13 @@ function CompanyDetail({
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ActionButton
+              testId="button-download-installation-manifest"
+              onClick={() => void downloadInstallationManifest()}
+            >
+              Télécharger le manifeste d’installation
+            </ActionButton>
             <ActionButton
               testId="button-suspend-company"
               icon={company.status === 'SUSPENDU' ? RefreshCw : ShieldCheck}
@@ -7352,7 +7373,7 @@ function AdminCreateCompanyPage({
     setSaving(true);
     try {
       const preset = availableSectorPresets.find((item) => item.name === sector);
-      await companyRequestApi.create({
+       await companyRequestApi.createAdministrative({
         name: name.trim(),
         manager: manager.trim(),
         email: normalizedEmail,
@@ -7384,7 +7405,7 @@ function AdminCreateCompanyPage({
           </p>
           <h2 className="mt-3 text-2xl font-bold">Nouvelle entreprise</h2>
           <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-            Cette entreprise sera active immédiatement et ne passera pas par les demandes en attente.
+             Cette entreprise sera créée et activée immédiatement par l’administration MAXIMUS.
           </p>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
