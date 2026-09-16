@@ -3211,6 +3211,21 @@ function CompaniesPage({
           `${c.allowedModules.length} / ${c.requestedModules.length}`,
           <StatusBadge status={c.status} />,
           <div className="flex flex-wrap items-center gap-2">
+             <button
+               type="button"
+               data-testid={`button-open-company-installation-${c.id}`}
+               aria-label={`Ouvrir l’installation de ${c.name}`}
+               title={`Installation de ${c.name}`}
+               onClick={(event) => {
+                 event.stopPropagation();
+                 setSelected(c);
+                 onNavigate(`/maximus/entreprises/${encodeURIComponent(c.id)}`);
+               }}
+               className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] px-2.5 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
+             >
+               <KeyRound size={14} />
+               <span>Installation</span>
+             </button>
             <button
               type="button"
               data-testid={`button-edit-company-${c.id}`}
@@ -3269,7 +3284,9 @@ function CompanyDetail({
   mutate: (fn: (d: StoreData) => void, msg?: string) => void;
   onBack: () => void;
 }) {
+  const { confirm } = useAppDialog();
   const [active, setActive] = useState(company.allowedModules);
+  const [installationBusy, setInstallationBusy] = useState(false);
   const [loginSettings, setLoginSettings] = useState<{
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
@@ -3421,6 +3438,25 @@ function CompanyDetail({
     }
   };
 
+  const revokeInstallation = async () => {
+    const confirmed = await confirm({
+      title: 'Révoquer cette installation ?',
+      description: `Le jeton de « ${company.name} » ne pourra plus être utilisé pour les prochaines synchronisations. Cette action ne coupe pas automatiquement un serveur déjà démarré.`,
+      confirmLabel: 'Révoquer le jeton',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setInstallationBusy(true);
+    try {
+      await companyRequestApi.revokeInstallation(company.id);
+      window.alert('Installation révoquée. Arrêtez également le service du VPS si la coupure doit être immédiate.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.');
+    } finally {
+      setInstallationBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <button
@@ -3497,6 +3533,81 @@ function CompanyDetail({
           </div>
         </div>
       </div>
+      <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <KeyRound size={18} className="text-[hsl(var(--primary))]" />
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+                Réservé à l’administration MAXIMUS
+              </p>
+            </div>
+            <h2 className="mt-2 text-xl font-bold">Installation dédiée ou locale</h2>
+            <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              Préparez ici l’enrôlement du serveur de cette entreprise. MAXIMUS crée le lien sécurisé,
+              télécharge le fichier bootstrap JSON et conserve la configuration centrale. Le fichier doit
+              ensuite être transféré manuellement au VPS par SSH/SCP.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
+            Entreprise {company.status === 'ACTIF' ? 'active' : 'à activer'}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">1. Préparer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Choisissez le type de serveur et téléchargez le bootstrap secret.
+            </p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">2. Transférer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Envoyez le JSON au VPS avec SSH/SCP, jamais dans le code ou une URL publique.
+            </p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">3. Installer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le script du VPS récupère ensuite les modules, packs et permissions publiés.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <ActionButton
+            primary
+            testId="button-prepare-dedicated-installation-card"
+            onClick={() => void prepareInstallation('dedicated')}
+          >
+            Préparer le VPS dédié
+          </ActionButton>
+          <ActionButton
+            testId="button-prepare-on-premise-installation-card"
+            onClick={() => void prepareInstallation('on_premise')}
+          >
+            Préparer le serveur local
+          </ActionButton>
+          <ActionButton
+            testId="button-download-installation-manifest-card"
+            onClick={() => void downloadInstallationManifest()}
+          >
+            Télécharger le manifeste
+          </ActionButton>
+          <button
+            type="button"
+            data-testid="button-revoke-installation"
+            disabled={installationBusy}
+            onClick={() => void revokeInstallation()}
+            className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {installationBusy ? 'Révocation…' : 'Révoquer le jeton'}
+          </button>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          Une entreprise doit être <strong>ACTIF</strong> avant la préparation. La révocation bloque les
+          synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
+        </p>
+      </section>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
