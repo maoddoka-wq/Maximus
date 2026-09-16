@@ -898,7 +898,9 @@ function AppContent() {
     setLocation('/maximus/secteurs');
     notify('Test réel terminé. Retour à la configuration des secteurs.', 'success');
   };
-  const logout = () => {
+  const companyLoginMatch = pathname.match(/^\/entreprise\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
+  const companyLoginSlug = companyLoginMatch ? decodeURIComponent(companyLoginMatch[1]) : null;
+  const logout = (destinationOverride?: string) => {
     const isCompanySession = Boolean(session && session !== 'admin');
     const companyLoginPath =
       activeCompany?.loginCustomAllowed && (activeCompany.loginMode ?? 'MAXIMUS') === 'CUSTOM'
@@ -907,7 +909,7 @@ function AppContent() {
             ? `/entreprise/${encodeURIComponent(activeCompany.loginSlug)}/connexion`
             : null)
         : null;
-    const destination = isCompanySession && companyLoginPath ? companyLoginPath : '/';
+    const destination = destinationOverride ?? (isCompanySession && companyLoginPath ? companyLoginPath : '/');
     applyCompanyTheme(undefined);
     const clearedData = emptyStoreData();
     dataRef.current = clearedData;
@@ -922,6 +924,16 @@ function AppContent() {
     setLocation(destination);
     void authApi.logout().catch(() => undefined);
   };
+  useEffect(() => {
+    if (
+      !companyLoginSlug
+      || !session
+      || !appStateReady
+    ) {
+      return;
+    }
+    logout(location);
+  }, [appStateReady, companyLoginSlug, location, session]);
   useEffect(() => {
     const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
     if (!state?.maximus) {
@@ -1000,11 +1012,20 @@ function AppContent() {
   if (pathname === '/' && isPotentialCustomStoreHost()) {
     return <PublicShopPage domain />;
   }
-  const companyLoginMatch = pathname.match(/^\/entreprise\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
-  if (companyLoginMatch && !session) {
+  if (companyLoginSlug && session && appStateReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
+        <h1 className="text-lg font-bold">Changement d’espace en cours…</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          La session de l’autre entreprise est en cours de fermeture.
+        </p>
+      </section>
+    </div>;
+  }
+  if (companyLoginSlug && !session) {
     return (
       <CompanyLoginPage
-        slug={decodeURIComponent(companyLoginMatch[1])}
+        slug={companyLoginSlug}
         onAuthenticated={(user) => {
           localStorage.setItem('maximus-last-company-login-path', pathname);
           applyAuthenticatedUser(user);
