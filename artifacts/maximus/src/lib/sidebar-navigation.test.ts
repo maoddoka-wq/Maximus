@@ -144,6 +144,35 @@ test('le menu Présences retire les fonctionnalités sans permission de lecture 
   ]);
 });
 
+test('le menu Présences conserve les libellés quand la configuration contient des identifiants', () => {
+  const modulesWithIds = configuredModules.map(module => (
+    module.id === 'presences'
+      ? { ...module, features: ['tableau-de-bord', 'pointage', 'présences', 'horaires'] }
+      : module
+  ));
+
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['presences'],
+    configuredModules: modulesWithIds,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+    selectedFeatureIdsByModule: {
+      presences: ['tableau-de-bord', 'pointage', 'présences', 'horaires'],
+    },
+  });
+
+  assert.deepEqual(groups[0]?.items.map(item => ({
+    href: item.href,
+    label: item.label,
+  })), [
+    { href: '/entreprise/presences?tab=dashboard', label: 'Tableau de bord' },
+    { href: '/entreprise/presences?tab=clock', label: 'Pointage' },
+    { href: '/entreprise/presences?tab=presence', label: 'Présences' },
+    { href: '/entreprise/presences?tab=schedules', label: 'Horaires' },
+  ]);
+});
+
 test('le menu Paie utilise une icône distincte pour chaque fonctionnalité', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['paie'],

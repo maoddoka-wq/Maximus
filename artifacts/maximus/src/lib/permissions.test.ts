@@ -19,7 +19,7 @@ import {
 } from './commerce-permissions';
 import { parseQueryTab } from './query-tab';
 import { featureSlug, resolveFeatureDependencies } from './permission-keys';
-import { getModuleFeatureOptions } from './module-features';
+import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from './module-features';
 import { presenceFeatureDefinitions, presenceFeaturePacks } from './presence-features';
 import { emptyStoreData, recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
@@ -325,6 +325,39 @@ test('utilise une définition complète et partagée pour les fonctionnalités P
   assert.deepEqual(
     presenceModule.featurePacks?.map((pack) => pack.name),
     ['Consultation des présences', 'Gestionnaire des présences', 'Responsable des présences', 'Employé Présences', 'Manager Présences'],
+  );
+});
+
+test('normalise les libellés et identifiants historiques des fonctionnalités avant affichage', () => {
+  const presenceModule = {
+    ...modules.find(module => module.id === 'presences')!,
+    features: ['tableau-de-bord', 'Pointage', 'présences', 'horaires'],
+  };
+  const payrollModule = {
+    ...modules.find(module => module.id === 'paie')!,
+    features: ['dashboard', 'Bénéficiaires', 'historique'],
+  };
+
+  assert.deepEqual(
+    getModuleFeatureOptions(presenceModule),
+    [
+      { id: 'tableau-de-bord', label: 'Tableau de bord' },
+      { id: 'pointage', label: 'Pointage' },
+      { id: 'présences', label: 'Présences' },
+      { id: 'horaires', label: 'Horaires' },
+    ],
+  );
+  assert.deepEqual(
+    [...getSelectedFeatureIds(
+      role({ presences: ['voir'] }),
+      presenceModule,
+      ['Tableau de bord', 'Pointage', 'horaires'],
+    )],
+    ['tableau-de-bord', 'pointage', 'horaires'],
+  );
+  assert.deepEqual(
+    [...getEffectiveModuleFeatureIds(payrollModule, payrollModule.features)],
+    ['tableau-de-bord', 'bénéficiaires', 'historique'],
   );
 });
 

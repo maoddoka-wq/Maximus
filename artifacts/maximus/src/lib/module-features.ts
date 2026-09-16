@@ -38,6 +38,20 @@ function normalizeDefinedFeatureIds(
   )];
 }
 
+function normalizeValuesAgainstOptions(
+  values: Iterable<string>,
+  options: readonly ModuleFeatureOption[],
+) {
+  const byId = new Map(options.map(option => [option.id, option.id]));
+  const byLabel = new Map(options.map(option => [featureSlug(option.label), option.id]));
+
+  return [...new Set(
+    [...values]
+      .map(value => byId.get(value) ?? byLabel.get(featureSlug(value)))
+      .filter((featureId): featureId is string => Boolean(featureId)),
+  )];
+}
+
 function optionsFromDefinitions(
   values: readonly string[],
   definitions: readonly FeatureDefinition[],
@@ -80,26 +94,28 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
     );
   }
   if (module.id === 'paie') {
-    return optionsFromDefinitions(module.features, payrollFeatureDefinitions);
+    const normalizedPayrollIds = new Set(normalizePayrollFeatureIds(module.features));
+    return payrollFeatureDefinitions
+      .filter(feature => normalizedPayrollIds.has(feature.id) || module.features.some(value => featureSlug(value) === feature.id))
+      .map(feature => ({ id: feature.id, label: feature.label }));
   }
   return (Array.isArray(module.features) ? module.features : []).map(feature => ({ id: featureSlug(feature), label: feature }));
+}
+
+export function normalizeModuleFeatureIds(module: Module, values: Iterable<string>) {
+  const rawValues = [...values].map(value => {
+    if (module.id !== 'paie') return value;
+    return normalizePayrollFeatureIds([value])[0] ?? value;
+  });
+  return normalizeValuesAgainstOptions(
+    rawValues,
+    getModuleFeatureOptions(module),
+  );
 }
 
 export function getEffectiveModuleFeatureIds(module: Module, allowedFeatureIds?: string[]) {
   const allFeatureIds = getModuleFeatureOptions(module).map(feature => feature.id);
   if (!Array.isArray(allowedFeatureIds)) return new Set(allFeatureIds);
 
-  const normalized = module.id === 'paie'
-    ? normalizePayrollFeatureIds(allowedFeatureIds)
-    : module.id === 'presences'
-      ? normalizeDefinedFeatureIds(
-        allowedFeatureIds,
-        presenceFeatureDefinitions.map(feature => ({
-          id: featureSlug(feature.label),
-          label: feature.label,
-        })),
-      )
-      : allowedFeatureIds;
-
-  return new Set(normalized.filter(featureId => allFeatureIds.includes(featureId)));
+  return new Set(normalizeModuleFeatureIds(module, allowedFeatureIds).filter(featureId => allFeatureIds.includes(featureId)));
 }

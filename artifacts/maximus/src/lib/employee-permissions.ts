@@ -7,7 +7,7 @@ import {
   type CommerceTabId,
 } from './commerce-permissions';
 import { featureSlug, permissionFeatureKey } from './permission-keys';
-import { getModuleFeatureOptions } from './module-features';
+import { getModuleFeatureOptions, normalizeModuleFeatureIds } from './module-features';
 import { stockSubmodules, type Module } from './store';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
@@ -315,7 +315,8 @@ export function getSelectedFeatureIds(
     )
     : null;
   if (explicitFeatureIds) {
-    const selected = [...explicitFeatureIds].filter(featureId => validFeatureIds.has(featureId));
+    const selected = normalizeModuleFeatureIds(module, explicitFeatureIds)
+      .filter(featureId => validFeatureIds.has(featureId));
     return packFeatureIds
       ? new Set(selected.filter(featureId => packFeatureIds.has(featureId)))
       : new Set(selected);
