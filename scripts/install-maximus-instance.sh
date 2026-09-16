@@ -309,6 +309,7 @@ fi
 
 mkdir -p "$LARAVEL_DIR/storage/app/digital-products" "$LARAVEL_DIR/storage/framework/cache"
 mkdir -p "$LARAVEL_DIR/storage/framework/sessions" "$LARAVEL_DIR/storage/framework/views"
+mkdir -p "$LARAVEL_DIR/bootstrap/cache"
 chmod -R ug+rwX "$LARAVEL_DIR/storage" "$LARAVEL_DIR/bootstrap/cache"
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
@@ -341,7 +342,7 @@ if [[ "$SKIP_HEALTHCHECK" -eq 0 ]]; then
         health_pid=$!
         health_ok=0
         for _ in {1..15}; do
-            if curl --fail --silent --show-error --max-time 2 \
+            if curl --fail --silent --max-time 2 \
                 "http://127.0.0.1:${health_port}/api/healthz" >/dev/null; then
                 health_ok=1
                 break

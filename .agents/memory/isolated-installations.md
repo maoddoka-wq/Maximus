@@ -7,4 +7,4 @@ Le mode `central` reste la valeur par défaut. Les modes `dedicated` et `on_prem
 
 **Why:** Une installation client ne doit pas pouvoir exposer l’administration de la plateforme ni permettre au navigateur de choisir une autre entreprise.
 
-**How to apply:** Utiliser le contexte d’installation côté serveur pour filtrer l’authentification, les routes globales et le périmètre entreprise ; conserver un bootstrap idempotent après les migrations et ne jamais appeler le provisionnement de l’administrateur MAXIMUS global dans ces modes.
+**How to apply:** Utiliser le contexte d’installation côté serveur pour filtrer l’authentification, les routes globales et le périmètre entreprise ; conserver un bootstrap idempotent et non destructif après les migrations, y compris lors de la préparation de `.env`, et ne jamais appeler le provisionnement de l’administrateur MAXIMUS global dans ces modes.
