@@ -84,6 +84,7 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->gro
 });
 
 Route::get('/company-profile-images/{companyId}/{filename}', [CompanyController::class, 'serveProfilePhoto'])
+    ->middleware('maximus.installation.public')
     ->where(['companyId' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
 Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {

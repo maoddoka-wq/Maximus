@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class InstallationContextTest extends TestCase
@@ -81,6 +82,53 @@ class InstallationContextTest extends TestCase
         $this->getJson('/api/registration-catalog')
             ->assertNotFound()
             ->assertJsonPath('code', 'CENTRAL_INSTALLATION_ONLY');
+    }
+
+    public function test_dedicated_public_routes_refuse_other_company_stores_and_assets(): void
+    {
+        DB::table('ecommerce_stores')->insert([
+            [
+                'id' => 'store-dedicated',
+                'company_id' => 'dedicated-company',
+                'slug' => 'dedicated-store',
+                'name' => 'Boutique dédiée',
+                'description' => '',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primary_color' => '#D69E2E',
+                'accent_color' => '#172033',
+                'logo_url' => '',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 'store-other',
+                'company_id' => 'other-company',
+                'slug' => 'other-store',
+                'name' => 'Boutique autre entreprise',
+                'description' => '',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primary_color' => '#D69E2E',
+                'accent_color' => '#172033',
+                'logo_url' => '',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $this->getJson('/api/shop/other-store')
+            ->assertNotFound()
+            ->assertJsonPath('code', 'INSTALLATION_COMPANY_ONLY');
+        $this->getJson('/api/shop/other-store/transport/settings')
+            ->assertNotFound()
+            ->assertJsonPath('code', 'INSTALLATION_COMPANY_ONLY');
+        $this->getJson('/api/product-images/other-company/private.png')
+            ->assertNotFound()
+            ->assertJsonPath('code', 'INSTALLATION_COMPANY_ONLY');
+        $this->getJson('/api/company-profile-images/other-company/profile.png')
+            ->assertNotFound()
+            ->assertJsonPath('code', 'INSTALLATION_COMPANY_ONLY');
     }
 
     private function createCompany(): void

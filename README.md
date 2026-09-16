@@ -223,6 +223,9 @@ entreprise → unité → rôle → sous-fonctionnalité → action
 
 Le périmètre le plus restrictif gagne toujours. Un `companyId` fourni par le
 navigateur ne peut jamais élargir l’entreprise déduite de la session serveur.
+En mode `dedicated` ou `on_premise`, la même règle s’applique aux vitrines
+publiques : boutique, domaine, images et parcours Transport d’une autre
+entreprise renvoient `404`.
 
 ## Vérifications avant livraison
 

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Guide d’installation MAXIMUS — central et isolé</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm 18mm; }
+    :root { --navy:#151d2b; --gold:#f2b705; --ink:#202735; --muted:#637083; --line:#d9dee7; --soft:#f5f7fa; --red:#9c2f2f; --green:#146c43; }
+    * { box-sizing:border-box; }
+    body { color:var(--ink); font-family:Arial, Helvetica, sans-serif; font-size:10.5pt; line-height:1.48; }
+    h1,h2,h3,h4 { color:var(--navy); page-break-after:avoid; }
+    h1 { font-size:27pt; line-height:1.08; margin:0 0 10mm; }
+    h2 { border-bottom:2px solid var(--gold); padding-bottom:3mm; margin-top:12mm; font-size:18pt; }
+    h3 { margin-top:8mm; font-size:13pt; }
+    h4 { margin-top:6mm; font-size:11pt; }
+    p { margin:3mm 0; }
+    ul,ol { margin-top:2mm; padding-left:7mm; }
+    li { margin:1.4mm 0; }
+    code { font-family:"DejaVu Sans Mono", monospace; font-size:8.5pt; background:#eef1f5; padding:.5mm 1mm; border-radius:2px; }
+    pre { background:#111827; color:#f3f4f6; padding:4mm; border-radius:3mm; white-space:pre-wrap; overflow-wrap:anywhere; font-family:"DejaVu Sans Mono", monospace; font-size:7.6pt; line-height:1.42; page-break-inside:avoid; }
+    .cover { min-height:245mm; display:flex; flex-direction:column; justify-content:space-between; page-break-after:always; background:linear-gradient(135deg,#151d2b 0%,#151d2b 68%,#263247 68%,#263247 100%); color:#fff; padding:18mm; margin:-18mm -16mm; }
+    .cover h1,.cover h2,.cover h3 { color:#fff; border:0; }
+    .brand { color:var(--gold); font-size:14pt; letter-spacing:3px; font-weight:bold; }
+    .cover .subtitle { font-size:15pt; max-width:145mm; color:#dfe5ed; }
+    .cover .meta { color:#b9c2cf; font-size:9pt; }
+    .badge { display:inline-block; background:var(--gold); color:#171d29; padding:2mm 4mm; font-weight:bold; border-radius:3mm; }
+    .page-break { page-break-before:always; }
+    .note,.warning,.success { padding:4mm; margin:4mm 0; border-left:4px solid; page-break-inside:avoid; }
+    .note { background:#eef5ff; border-color:#3d78c4; }
+    .warning { background:#fff6e5; border-color:#c37c00; }
+    .success { background:#edf9f1; border-color:#2d8a58; }
+    .danger { background:#fff0f0; border-color:var(--red); }
+    table { width:100%; border-collapse:collapse; margin:4mm 0 6mm; font-size:8.7pt; page-break-inside:avoid; }
+    th { background:var(--navy); color:#fff; text-align:left; }
+    th,td { border:1px solid var(--line); padding:2.2mm; vertical-align:top; }
+    tr:nth-child(even) td { background:#fafbfc; }
+    .toc a { color:var(--navy); text-decoration:none; }
+    .small { color:var(--muted); font-size:8.8pt; }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
+    .card { border:1px solid var(--line); padding:4mm; border-radius:2mm; page-break-inside:avoid; }
+    .checklist li { list-style:"☐  "; padding-left:1mm; }
+    .footer { color:var(--muted); font-size:8pt; border-top:1px solid var(--line); padding-top:2mm; margin-top:8mm; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="brand">MAXIMUS.</div>
+      <div style="height:35mm"></div>
+      <div class="badge">GUIDE D’INSTALLATION</div>
+      <h1>Deux modes de déploiement,<br>une même exigence d’isolation.</h1>
+      <p class="subtitle">Procédure complète pour l’instance centrale multi-entreprises et l’instance dédiée/on-premise limitée à une seule entreprise.</p>
+    </div>
+    <div class="meta">
+      <p>Document opérationnel — Laravel + PostgreSQL + React/Vite</p>
+      <p>Version correspondant au dépôt vérifié le 16 septembre 2026</p>
+      <p>Les secrets sont toujours fournis par l’opérateur ; aucun secret réel n’est inclus dans ce document.</p>
+    </div>
+  </section>
+
+  <section class="toc">
+    <h2>Sommaire</h2>
+    <ol>
+      <li><a href="#decision">Choisir le bon mode</a></li>
+      <li><a href="#architecture">Architecture et principes de sécurité</a></li>
+      <li><a href="#prerequis">Prérequis communs</a></li>
+      <li><a href="#central">Installation A — instance centrale sur Render</a></li>
+      <li><a href="#dedicated">Installation B — instance dédiée ou on-premise</a></li>
+      <li><a href="#variables">Variables d’environnement</a></li>
+      <li><a href="#exploitation">Exploitation quotidienne</a></li>
+      <li><a href="#upgrade">Mises à jour, sauvegardes et restauration</a></li>
+      <li><a href="#validation">Validation de sécurité et recette</a></li>
+      <li><a href="#depannage">Dépannage</a></li>
+      <li><a href="#checklist">Checklist de mise en service</a></li>
+    </ol>
+    <div class="note"><b>Lecture rapide :</b> le mode central est l’instance SaaS partagée qui conserve l’administration MAXIMUS. Le mode dédié/on-premise est une installation séparée qui n’accepte qu’un compte <code>company_admin</code> de l’entreprise configurée et refuse l’administration globale.</div>
+  </section>
+
+  <h2 id="decision">1. Choisir le bon mode</h2>
+  <table>
+    <tr><th>Besoin</th><th>Mode</th><th>Choix recommandé</th></tr>
+    <tr><td>MAXIMUS héberge plusieurs entreprises et l’équipe MAXIMUS administre le catalogue, les demandes et les paramètres plateforme.</td><td><code>central</code></td><td>Render avec PostgreSQL géré, disque persistant et domaine public.</td></tr>
+    <tr><td>Une entreprise veut une URL et une base séparées, sans administration globale MAXIMUS.</td><td><code>dedicated</code></td><td>VPS ou Render configuré avec une entreprise stable.</td></tr>
+    <tr><td>Installation dans le réseau interne ou sur un serveur contrôlé par le client.</td><td><code>on_premise</code></td><td>Même procédure que <code>dedicated</code>, avec accès réseau et certificats gérés localement.</td></tr>
+  </table>
+  <div class="warning"><b>Ne pas confondre abonnement et installation :</b> l’abonnement détermine la facturation et les modules autorisés dans l’instance centrale. Une installation dédiée détermine une frontière serveur et doit être configurée par environnement ; le navigateur ne peut pas choisir son entreprise.</div>
+  <h3>Règle de décision</h3>
+  <ul>
+    <li>Utiliser <code>central</code> si plusieurs entreprises doivent cohabiter dans la même base.</li>
+    <li>Utiliser <code>dedicated</code> si l’instance doit être réservée à une entreprise mais reste hébergée sur un VPS ou un cloud.</li>
+    <li>Utiliser <code>on_premise</code> si le serveur est installé dans l’infrastructure de l’entreprise.</li>
+    <li>Ne jamais mettre un même identifiant de base ou un même fichier <code>.env</code> en partage entre deux instances isolées.</li>
+  </ul>
+
+  <h2 id="architecture">2. Architecture et principes de sécurité</h2>
+  <p>Le runtime actif est Laravel + Eloquent + PostgreSQL. Le frontend React/Vite est construit puis servi par le dossier public Laravel. Express/Drizzle restent présents pour la migration progressive et la comparaison de parité ; ils ne doivent pas devenir le serveur de production par accident.</p>
+  <div class="two-col">
+    <div class="card"><h3>Central</h3><ul><li><code>MAXIMUS_DEPLOYMENT_MODE=central</code></li><li>Connexion possible pour <code>maximus_admin</code>, <code>company_admin</code> et employés autorisés.</li><li>Routes plateforme accessibles selon permissions.</li><li>Inscription publique et onboarding disponibles selon le réglage global.</li></ul></div>
+    <div class="card"><h3>Isolé</h3><ul><li><code>MAXIMUS_DEPLOYMENT_MODE=dedicated</code> ou <code>on_premise</code>.</li><li>Entreprise fixée par <code>MAXIMUS_INSTALLATION_COMPANY_ID</code>.</li><li>Un seul compte initial <code>company_admin</code>.</li><li>Routes centrales et données publiques d’autres entreprises refusées.</li></ul></div>
+  </div>
+  <h3>Contrôles serveur appliqués</h3>
+  <ol>
+    <li><b>Authentification :</b> une connexion isolée ne recherche que les utilisateurs de l’entreprise configurée.</li>
+    <li><b>Session :</b> une session d’un autre tenant est refusée par <code>AuthenticateMaximus</code>.</li>
+    <li><b>Routes centrales :</b> elles renvoient <code>404 CENTRAL_INSTALLATION_ONLY</code> en mode isolé.</li>
+    <li><b>Vitrines publiques :</b> boutiques, domaines, images, profils publics et Transport sont filtrés avant le contrôleur.</li>
+    <li><b>Bootstrap :</b> <code>maximus:install-company</code> est idempotent et ne crée jamais <code>maximus-admin</code>.</li>
+    <li><b>Navigation :</b> l’interface masque l’inscription et l’accès central, mais la sécurité ne dépend pas du frontend.</li>
+  </ol>
+
+  <h2 id="prerequis">3. Prérequis communs</h2>
+  <table>
+    <tr><th>Composant</th><th>Central Render</th><th>VPS/local isolé</th></tr>
+    <tr><td>Code</td><td>Dépôt GitHub relié à Render.</td><td>Workspace cloné ou archive complète du monorepo.</td></tr>
+    <tr><td>PHP</td><td>Fourni par l’image <code>php:8.2-apache</code>.</td><td>PHP 8.2+, extensions PDO PostgreSQL, mbstring, XML, curl et zip.</td></tr>
+    <tr><td>Node</td><td>Fourni par l’étape Docker Node 24.</td><td>Node.js 24, Corepack et pnpm.</td></tr>
+    <tr><td>Base</td><td>PostgreSQL Render lié par <code>DATABASE_URL</code>.</td><td>PostgreSQL accessible, base et utilisateur créés.</td></tr>
+    <tr><td>Fichiers</td><td>Disque Render monté sur <code>/var/data</code>.</td><td>Répertoire persistant pour <code>DIGITAL_STORAGE_PATH</code> et sauvegardes.</td></tr>
+    <tr><td>HTTPS</td><td>Domaine Render ou domaine personnalisé.</td><td>Reverse proxy HTTPS recommandé ; HTTP seulement pour un test local.</td></tr>
+  </table>
+  <div class="danger"><b>Avant toute production :</b> ne pas copier un fichier <code>.env</code> de démonstration, ne pas publier les mots de passe dans Git, ne pas utiliser le disque éphémère pour les fichiers numériques et ne pas réutiliser une base entre central et dédié.</div>
+
+  <h2 id="central">4. Installation A — instance centrale sur Render</h2>
+  <h3>4.1 Créer le service</h3>
+  <ol>
+    <li>Relier le dépôt GitHub contenant le monorepo à Render.</li>
+    <li>Utiliser le fichier <code>render.yaml</code> ou créer un Web Service Docker.</li>
+    <li>Vérifier que le Dockerfile utilisé est <code>Dockerfile.render</code> et que le contexte est la racine du dépôt.</li>
+    <li>Vérifier le chemin de santé : <code>/api/healthz</code>.</li>
+    <li>Conserver une base PostgreSQL Render distincte pour la production.</li>
+  </ol>
+  <h3>4.2 Variables obligatoires</h3>
+  <pre>APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://votre-domaine
+APP_KEY=&lt;secret Laravel généré, jamais affiché dans Git&gt;
+MAXIMUS_DEPLOYMENT_MODE=central
+DATABASE_URL=&lt;connexion PostgreSQL Render&gt;
+DB_CONNECTION=pgsql
+ADMIN_USER=&lt;email administrateur MAXIMUS&gt;
+ADMIN_PASSWORD=&lt;mot de passe d’au moins 8 caractères&gt;
+DIGITAL_STORAGE_PATH=/var/data/digital-products
+SESSION_DRIVER=database
+SESSION_SECURE_COOKIE=true
+CACHE_STORE=database
+LOG_CHANNEL=stderr</pre>
+  <h3>4.3 Variables paiement</h3>
+  <p>Les variables DiamanoPay sont optionnelles au démarrage mais nécessaires pour encaisser ou retirer des fonds. Les renseigner uniquement dans les secrets Render :</p>
+  <pre>DIAMANOPAY_BASE_URL=https://api.diamanopay.com
+DIAMANOPAY_ACCESS_TOKEN=&lt;secret&gt;
+DIAMANOPAY_CLIENT_ID=&lt;secret&gt;
+DIAMANOPAY_CLIENT_SECRET=&lt;secret&gt;
+DIAMANOPAY_WEBHOOK_SECRET=&lt;secret&gt;</pre>
+  <h3>4.4 Séquence de démarrage</h3>
+  <ol>
+    <li>Docker construit le frontend avec <code>PORT=10000</code> et <code>BASE_PATH=/</code>.</li>
+    <li>Composer installe Laravel sans les dépendances de développement.</li>
+    <li>Render monte le disque persistant et le script vérifie les permissions.</li>
+    <li>Le script attend PostgreSQL puis applique <code>php artisan migrate --force</code>.</li>
+    <li>Le mode central exécute <code>php artisan maximus:provision-admin</code>.</li>
+    <li>Apache sert <code>/app/laravel/public</code> sur le port 10000.</li>
+    <li>Render appelle <code>GET /api/healthz</code>.</li>
+  </ol>
+  <h3>4.5 Première validation</h3>
+  <pre>curl -fsS https://votre-domaine/api/healthz
+curl -fsS https://votre-domaine/api/installation</pre>
+  <p>La réponse d’installation centrale doit contenir <code>"mode":"central"</code>, <code>"companyOnly":false</code>, <code>"ready":true</code> et <code>"adminLoginEnabled":true</code>.</p>
+  <h3>4.6 Domaine et cookies</h3>
+  <ul>
+    <li>Déclarer le domaine personnalisé dans Render et attendre son certificat.</li>
+    <li>Mettre exactement cette URL dans <code>APP_URL</code>.</li>
+    <li>Conserver <code>SESSION_SECURE_COOKIE=true</code> en HTTPS.</li>
+    <li>Tester une connexion, un rafraîchissement de page et une déconnexion.</li>
+  </ul>
+
+  <h2 id="dedicated">5. Installation B — instance dédiée ou on-premise</h2>
+  <h3>5.1 Préparer le serveur</h3>
+  <pre>git clone &lt;depot-prive&gt; maximus
+cd maximus
+php -v
+composer --version
+node --version
+corepack --version
+psql --version
+curl --version</pre>
+  <p>Le script ne remplace pas le gestionnaire de paquets du système : installer PHP, les extensions, Composer, Node et PostgreSQL selon la distribution du serveur, puis relancer les vérifications ci-dessus.</p>
+  <h3>5.2 Créer PostgreSQL</h3>
+  <p>Exemple Debian/Ubuntu pour une base locale. Choisir un mot de passe unique et le conserver dans un gestionnaire de secrets :</p>
+  <pre>sudo -u postgres createuser --pwprompt maximus
+sudo -u postgres createdb --owner=maximus maximus
+sudo -u postgres psql -d maximus -c \
+  "ALTER ROLE maximus SET client_encoding TO 'UTF8';"</pre>
+  <p>Pour une base distante, demander au DBA l’hôte, le port, le nom de base, l’utilisateur et les règles réseau ; ne pas ouvrir PostgreSQL à Internet sans filtrage.</p>
+  <h3>5.3 Lancer l’installateur interactif</h3>
+  <pre>./scripts/install-maximus-instance.sh</pre>
+  <p>Le script demande notamment :</p>
+  <ul>
+    <li>l’identifiant stable de l’entreprise ; le garder inchangé lors des relances ;</li>
+    <li>le nom, le responsable, l’email, le pays et le secteur ;</li>
+    <li>la connexion PostgreSQL ;</li>
+    <li>l’email et le mot de passe initial du <code>company_admin</code> ;</li>
+    <li>l’URL publique et les modules à activer.</li>
+  </ul>
+  <h3>5.4 Exécution automatisée</h3>
+  <p>Éviter de passer des mots de passe dans les arguments de commande. Fournir les variables dans l’environnement du processus ou un mécanisme de secrets du système, avec un fichier protégé en <code>600</code> :</p>
+  <pre>export MAXIMUS_DEPLOYMENT_MODE=dedicated
+export MAXIMUS_INSTALLATION_COMPANY_ID=&lt;identifiant-stable&gt;
+export MAXIMUS_COMPANY_NAME='Entreprise Exemple'
+export MAXIMUS_COMPANY_MANAGER='Responsable Exemple'
+export MAXIMUS_COMPANY_EMAIL='contact@example.test'
+export MAXIMUS_ADMIN_USER='admin@example.test'
+read -r -s MAXIMUS_ADMIN_PASSWORD
+export MAXIMUS_ADMIN_PASSWORD
+read -r -s DB_PASSWORD
+export DB_PASSWORD
+export DB_HOST=127.0.0.1 DB_PORT=5432
+export DB_DATABASE=maximus DB_USERNAME=maximus
+export APP_URL=https://erp.example.test
+export MAXIMUS_INSTALLATION_MODULES=commerce,ecommerce,stocks,presences
+
+./scripts/install-maximus-instance.sh --non-interactive</pre>
+  <h3>5.5 Mode on-premise</h3>
+  <p>Utiliser la même commande en remplaçant le mode :</p>
+  <pre>export MAXIMUS_DEPLOYMENT_MODE=on_premise
+./scripts/install-maximus-instance.sh --non-interactive</pre>
+  <p>Le mode on-premise reste serveur-isolé. Prévoir une URL interne stable, un certificat TLS de l’entreprise, des sauvegardes hors serveur et une règle de pare-feu autorisant uniquement les postes nécessaires.</p>
+  <h3>5.6 Démarrer l’API</h3>
+  <p>Pour une vérification locale uniquement :</p>
+  <pre>cd artifacts/api-server/laravel
+php -S 0.0.0.0:8080 server.php</pre>
+  <p>Pour la production, utiliser un service supervisé et un reverse proxy HTTPS (Apache ou Nginx avec PHP-FPM). Le serveur PHP intégré est utile pour le test, mais ne doit pas être exposé directement à Internet comme stratégie de production durable.</p>
+  <h3>5.7 Validation de l’instance isolée</h3>
+  <pre>curl -fsS https://erp.example.test/api/healthz
+curl -fsS https://erp.example.test/api/installation</pre>
+  <p>La réponse doit indiquer <code>"mode":"dedicated"</code> ou <code>"mode":"on_premise"</code>, <code>"companyOnly":true</code>, <code>"ready":true</code>, <code>"adminLoginEnabled":false</code> et l’entreprise configurée.</p>
+  <p>Une connexion avec l’email du compte <code>company_admin</code> doit réussir. Une connexion avec un ancien compte <code>maximus_admin</code> doit être refusée.</p>
+
+  <h2 id="variables">6. Variables d’environnement</h2>
+  <table>
+    <tr><th>Variable</th><th>Central</th><th>Dédié / on-premise</th><th>Rôle</th></tr>
+    <tr><td><code>MAXIMUS_DEPLOYMENT_MODE</code></td><td><code>central</code></td><td><code>dedicated</code> ou <code>on_premise</code></td><td>Choisit la frontière serveur.</td></tr>
+    <tr><td><code>MAXIMUS_INSTALLATION_COMPANY_ID</code></td><td>Vide</td><td>Obligatoire et stable</td><td>Tenant fixé côté serveur.</td></tr>
+    <tr><td><code>MAXIMUS_COMPANY_NAME</code></td><td>Non requis</td><td>Obligatoire à l’amorçage</td><td>Nom de l’entreprise créée/mise à jour.</td></tr>
+    <tr><td><code>MAXIMUS_COMPANY_EMAIL</code></td><td>Non requis</td><td>Obligatoire à l’amorçage</td><td>Email de contact de l’entreprise.</td></tr>
+    <tr><td><code>MAXIMUS_INSTALLATION_MODULES</code></td><td>Non utilisé</td><td>Liste séparée par virgules</td><td>Modules publiés autorisés au provisionnement.</td></tr>
+    <tr><td><code>ADMIN_USER/PASSWORD</code></td><td>Obligatoires</td><td>Fallback possible</td><td>Compte global central uniquement.</td></tr>
+    <tr><td><code>MAXIMUS_ADMIN_USER/PASSWORD</code></td><td>Non requis</td><td>Recommandées</td><td>Compte <code>company_admin</code> isolé.</td></tr>
+    <tr><td><code>DATABASE_URL</code></td><td>Render</td><td>Optionnel si DB_HOST est utilisé</td><td>URL PostgreSQL complète.</td></tr>
+    <tr><td><code>DB_HOST/PORT/DATABASE/USERNAME/PASSWORD</code></td><td>Alternative</td><td>Recommandées</td><td>Paramètres PostgreSQL séparés.</td></tr>
+    <tr><td><code>APP_KEY</code></td><td>Obligatoire</td><td>Générée par le script si absente</td><td>Chiffrement Laravel ; ne jamais renouveler sans plan de migration.</td></tr>
+    <tr><td><code>APP_URL</code></td><td>Obligatoire</td><td>Obligatoire</td><td>URL canonique et construction de liens/webhooks.</td></tr>
+    <tr><td><code>DIGITAL_STORAGE_PATH</code></td><td><code>/var/data/digital-products</code></td><td>Disque persistant</td><td>Fichiers numériques et ressources publiques.</td></tr>
+  </table>
+  <div class="warning"><b>Règle secrets :</b> ne jamais mettre <code>APP_KEY</code>, mots de passe PostgreSQL, mots de passe admin ou identifiants DiamanoPay dans Git, un ticket, une capture ou une ligne de commande visible par d’autres utilisateurs.</div>
+
+  <h2 id="exploitation">7. Exploitation quotidienne</h2>
+  <h3>Contrôles de santé</h3>
+  <pre>curl -fsS https://votre-domaine/api/healthz
+curl -fsS https://votre-domaine/api/installation</pre>
+  <p>Surveiller au minimum le code HTTP, <code>ok</code>, la disponibilité PostgreSQL et le champ <code>mode</code>. En installation isolée, toute réponse affichant <code>central</code> est une anomalie de configuration.</p>
+  <h3>Journaux</h3>
+  <ul><li>Render : logs du Web Service et de l’instance PostgreSQL.</li><li>VPS : logs du service systemd, du reverse proxy et <code>storage/logs/laravel.log</code> selon la configuration.</li><li>Ne pas journaliser les corps de requêtes contenant des mots de passe, cookies ou tokens.</li></ul>
+  <h3>Accès administrateur</h3>
+  <ul><li>Central : utiliser uniquement le compte global géré par <code>maximus:provision-admin</code> pour l’administration plateforme.</li><li>Isolé : utiliser le compte <code>company_admin</code> créé par <code>maximus:install-company</code>.</li><li>Après changement de mot de passe ou de périmètre, les sessions existantes sont invalidées.</li></ul>
+
+  <h2 id="upgrade">8. Mises à jour, sauvegardes et restauration</h2>
+  <h3>Avant mise à jour</h3>
+  <ol><li>Confirmer le mode et l’entreprise avec <code>/api/installation</code>.</li><li>Faire un dump PostgreSQL.</li><li>Sauvegarder le répertoire de fichiers numériques.</li><li>Noter le commit déployé et vérifier que les migrations sont présentes.</li><li>Prévoir une fenêtre de maintenance pour les changements de schéma.</li></ol>
+  <h3>Sauvegarde PostgreSQL</h3>
+  <pre>pg_dump --format=custom --file=maximus-$(date +%F-%H%M).dump \
+  --host="$DB_HOST" --port="$DB_PORT" \
+  --username="$DB_USERNAME" "$DB_DATABASE"</pre>
+  <p>Protéger le dump, le stocker hors du serveur et tester périodiquement une restauration sur une base séparée.</p>
+  <h3>Mise à jour VPS</h3>
+  <pre>git fetch --all --tags
+git checkout &lt;version-validée&gt;
+cd artifacts/api-server/laravel
+composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+php artisan down --render="errors::503" || true
+php artisan migrate --force --no-interaction
+cd ../../..
+PORT=10000 BASE_PATH=/ NODE_ENV=production \
+  corepack pnpm --filter @workspace/maximus run build
+cp -R artifacts/maximus/dist/public/. artifacts/api-server/laravel/public/
+cd artifacts/api-server/laravel
+php artisan up
+php artisan maximus:install-company --no-interaction</pre>
+  <p>Ne pas exécuter le bootstrap central sur une instance isolée. Après la migration, relancer les tests et la sonde de santé avant de rouvrir le trafic.</p>
+  <h3>Restauration</h3>
+  <ol><li>Arrêter le trafic.</li><li>Restaurer le code précédent.</li><li>Restaurer la base uniquement si la migration a rendu le schéma incompatible et si le dump est validé.</li><li>Restaurer les fichiers numériques correspondant au même point de sauvegarde.</li><li>Vérifier mode, entreprise, santé, connexion et données avant réouverture.</li></ol>
+
+  <h2 id="validation">9. Validation de sécurité et recette</h2>
+  <h3>Central</h3>
+  <ul class="checklist"><li><b>/api/installation</b> retourne <code>central</code> et autorise l’inscription selon le réglage.</li><li>L’administrateur global peut se connecter.</li><li>Une entreprise active peut se connecter selon ses droits.</li><li>Les routes plateforme protégées sont accessibles seulement à l’acteur prévu.</li><li>Les paiements et webhooks utilisent les secrets de production.</li><li>Une restauration PostgreSQL a été testée.</li></ul>
+  <h3>Dédié / on-premise</h3>
+  <ul class="checklist"><li><b>/api/installation</b> retourne le mode isolé et le bon identifiant d’entreprise.</li><li>Le compte <code>company_admin</code> se connecte.</li><li>Un ancien <code>maximus_admin</code> est refusé.</li><li><code>/api/registration-catalog</code> et <code>/api/platform-settings/public-registration</code> retournent <code>404 CENTRAL_INSTALLATION_ONLY</code>.</li><li>Une session d’un autre tenant retourne <code>403 INSTALLATION_COMPANY_ONLY</code>.</li><li><code>/api/shop/&lt;slug-autre-entreprise&gt;</code>, les images et Transport public retournent <code>404 INSTALLATION_COMPANY_ONLY</code>.</li><li>La boutique de l’entreprise dédiée fonctionne avec son slug ou son domaine autorisé.</li><li>La base et les fichiers sont séparés de l’instance centrale.</li></ul>
+  <h3>Commandes de vérification du dépôt</h3>
+  <pre>cd artifacts/api-server/laravel
+php artisan test --compact
+cd ../../..
+pnpm --filter @workspace/maximus run typecheck
+pnpm --filter @workspace/maximus test
+PORT=4173 BASE_PATH=/maximus pnpm --filter @workspace/maximus run build
+sh -n render-entrypoint.sh
+bash -n scripts/install-maximus-instance.sh
+git diff --check</pre>
+
+  <h2 id="depannage">10. Dépannage</h2>
+  <table>
+    <tr><th>Symptôme</th><th>Cause probable</th><th>Action</th></tr>
+    <tr><td>Le service refuse de démarrer avec <code>APP_KEY</code>.</td><td>Secret absent ou mal configuré.</td><td>Définir <code>APP_KEY</code>, sans l’afficher dans les logs, puis redémarrer.</td></tr>
+    <tr><td>Migration PostgreSQL en boucle sur Render.</td><td>Base non prête, URL incorrecte ou règle réseau.</td><td>Vérifier le binding <code>DATABASE_URL</code>, l’état DB et les logs, puis laisser le mécanisme de retry terminer.</td></tr>
+    <tr><td>Installation dédiée : <code>INSTALLATION_NOT_CONFIGURED</code>.</td><td>Identifiant d’entreprise absent.</td><td>Définir <code>MAXIMUS_INSTALLATION_COMPANY_ID</code>, migrer puis relancer le bootstrap.</td></tr>
+    <tr><td>Installation dédiée : <code>COMPANY_ONLY</code>.</td><td>Session d’un autre tenant ou mauvaise base.</td><td>Supprimer le cookie, se reconnecter avec le compte entreprise et vérifier l’environnement de base.</td></tr>
+    <tr><td>Vitrine d’un autre slug en 404.</td><td>Comportement attendu en mode isolé.</td><td>Utiliser le slug de l’entreprise configurée ou enregistrer son domaine actif.</td></tr>
+    <tr><td>Frontend blanc après déploiement.</td><td>Frontend non construit ou mauvais <code>BASE_PATH</code>.</td><td>Rejouer le build avec <code>BASE_PATH=/</code> pour Laravel et vérifier <code>public/index.html</code>.</td></tr>
+    <tr><td>Fichiers numériques perdus après redémarrage.</td><td>Stockage éphémère.</td><td>Configurer un disque persistant et sauvegarder <code>DIGITAL_STORAGE_PATH</code>.</td></tr>
+    <tr><td>Cookie non conservé en HTTPS.</td><td><code>SESSION_SECURE_COOKIE</code> incohérent ou proxy mal configuré.</td><td>Mettre la valeur à <code>true</code>, vérifier TLS et les en-têtes proxy.</td></tr>
+    <tr><td>DiamanoPay indisponible.</td><td>Secrets manquants, paiement entreprise désactivé ou webhook inaccessible.</td><td>Vérifier les secrets, le statut de paiement, l’URL webhook publique et les logs sans exposer les tokens.</td></tr>
+  </table>
+
+  <h2 id="checklist">11. Checklist de mise en service</h2>
+  <ul class="checklist">
+    <li>Le mode serveur est explicite et correspond à l’architecture choisie.</li>
+    <li><code>APP_KEY</code>, bases et mots de passe sont dans un gestionnaire de secrets.</li>
+    <li>La base PostgreSQL est dédiée à l’environnement et sauvegardée.</li>
+    <li>Les fichiers publics et numériques sont sur un stockage persistant.</li>
+    <li>HTTPS, domaine, cookies sécurisés et URL canonique sont vérifiés.</li>
+    <li>Les migrations passent sans erreur.</li>
+    <li><code>/api/healthz</code> et <code>/api/installation</code> renvoient les valeurs attendues.</li>
+    <li>Le parcours de connexion correspondant au mode fonctionne.</li>
+    <li>Les routes centrales sont refusées sur une instance isolée.</li>
+    <li>Les boutiques, domaines, images et Transport des autres entreprises sont refusés en mode isolé.</li>
+    <li>Un dump et une restauration de test ont été réalisés.</li>
+    <li>Les logs ne contiennent aucun secret.</li>
+    <li>La procédure de mise à jour et de retour arrière est écrite et testée.</li>
+  </ul>
+  <div class="success"><b>État attendu en fin de procédure :</b> l’instance centrale reste multi-entreprises et administrable par MAXIMUS ; l’instance dédiée/on-premise ne voit et ne sert que l’entreprise configurée, y compris pour ses parcours publics.</div>
+  <div class="footer">MAXIMUS — Guide d’installation central et dédié/on-premise. Les valeurs entre chevrons sont des exemples à remplacer. Ne jamais copier de secret réel dans ce document.</div>
+</body>
+</html>

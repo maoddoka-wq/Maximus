@@ -54,6 +54,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
          Route::delete('/delivery-zones/{id}', [EcommerceController::class, 'deleteDeliveryZone']);
     });
 
+Route::middleware('maximus.installation.public')->group(function (): void {
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
 Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
 Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
@@ -124,3 +125,4 @@ Route::get('/shop-domain/customer/delivery-requests', [EcommerceCustomerControll
 Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
 Route::post('/shop-domain/customer/logout', [EcommerceCustomerController::class, 'logout']);
 Route::post('/shop/{slug}/customer/logout', [EcommerceCustomerController::class, 'logout']);
+});

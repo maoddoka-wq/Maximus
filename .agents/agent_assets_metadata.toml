@@ -182,3 +182,17 @@ mtime_ms = 1789475578746
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/638d2aab-7f01-47de-8803-af3c9f95a2d2/aa75bf07-4e0a-460c-8f0e-c1a3d41e5c14"
 storage_version_token = "1789475637455594"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "cGl1aQgK_HXvXrob3s_lz"
+uri = "file://docs/guides/maximus-installations-guide.pdf"
+type = "pdf"
+title = "Guide d’installation MAXIMUS — central et isolé"
+description = "Guide PDF complet pour l’installation centrale Render et l’installation dédiée/on-premise sur VPS ou serveur local."
+logical_id = "96a2546f-62e1-472c-91a3-1c18bd8e2ddb"
+content_hash = "sha256:3eb3c0dae2cefda2aed87421a769555ab336750235f68755fe821d6cd06be158"
+size = 293350
+mtime_ms = 1789570093207
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/96a2546f-62e1-472c-91a3-1c18bd8e2ddb/5ee5150e-f94c-4b0e-b5ba-c02b4c3d2079"
+storage_version_token = "1789570158655456"
+content_type = "application/pdf"
