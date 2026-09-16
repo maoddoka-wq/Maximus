@@ -23,6 +23,7 @@ import {
   type Session,
   type SidebarFeature,
   type SidebarFeatureGroup,
+  adminNavGroups,
 } from '@/lib/navigation';
 
 type SidebarProps = {
@@ -81,10 +82,11 @@ export function Sidebar({
     !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
   );
   const compact = collapsed && !mobileOpen;
+  const navigationGroups = isAdmin ? adminNavGroups : (sidebarFeatureGroups ?? []);
   const active = (href: string) =>
     location === href || location.startsWith(`${href}?`);
   const activeFeatureGroupLabel =
-    sidebarFeatureGroups?.find(group => group.items.some(item => active(item.href)))?.label ?? '';
+    navigationGroups.find(group => group.items.some(item => active(item.href)))?.label ?? '';
   const [expandedMobileGroups, setExpandedMobileGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -230,7 +232,7 @@ export function Sidebar({
         <nav
           className={`${isAdmin ? 'flex-none' : 'min-h-0 flex-1'} space-y-1 overflow-hidden px-3 pb-4`}
         >
-          {verticalModuleMenu ? (
+          {verticalModuleMenu || isAdmin ? (
             <>
               {employeeAdministrationItems.length > 0 && (
                 <>
@@ -246,7 +248,7 @@ export function Sidebar({
                   </div>
                 </>
               )}
-              {sidebarFeatureGroups?.map((group, groupIndex) => (
+              {navigationGroups.map((group, groupIndex) => (
                 (() => {
                   const groupIsActive = group.label === activeFeatureGroupLabel;
                   const hasManualMobileState = Object.prototype.hasOwnProperty.call(
@@ -300,8 +302,6 @@ export function Sidebar({
                 })()
               ))}
             </>
-          ) : isAdmin ? (
-            <div className="space-y-1">{standardNav}</div>
           ) : (
             <>
               {!compact && (

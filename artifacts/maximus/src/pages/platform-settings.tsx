@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { AlertTriangle, Banknote, Check, Clock3, Copy, KeyRound, LockKeyhole, RefreshCw, Settings2, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Banknote, Check, Clock3, Copy, KeyRound, LockKeyhole, RefreshCw, Settings2, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import {
   platformSettingsApi,
   type DiagnosticTokenSummary,
@@ -51,6 +51,9 @@ export default function PlatformSettingsPage() {
   const [issuedDiagnosticToken, setIssuedDiagnosticToken] = useState<IssuedDiagnosticToken | null>(null);
   const [issuingDiagnosticToken, setIssuingDiagnosticToken] = useState(false);
   const [revokingDiagnosticTokenId, setRevokingDiagnosticTokenId] = useState<string | null>(null);
+  const jumpTo = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const load = async () => {
     setLoading(true);

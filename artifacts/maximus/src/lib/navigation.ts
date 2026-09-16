@@ -60,6 +60,35 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/parametres/portefeuille', label: 'Paramètres plateforme', icon: Settings },
 ];
 
+export const adminNavGroups: SidebarFeatureGroup[] = [
+  {
+    label: 'Accueil',
+    items: adminNav.filter(item => item.href === '/maximus/dashboard' || item.href === '/maximus/assistant'),
+  },
+  {
+    label: 'Pilotage',
+    items: adminNav.filter(item => item.href === '/maximus/controle' || item.href === '/maximus/surveillance'),
+  },
+  {
+    label: 'Entreprises',
+    items: adminNav.filter(item =>
+      ['/maximus/entreprises', '/maximus/entreprises/organisation', '/maximus/demandes'].includes(item.href),
+    ),
+  },
+  {
+    label: 'Catalogue',
+    items: adminNav.filter(item => item.href === '/maximus/modules' || item.href === '/maximus/secteurs'),
+  },
+  {
+    label: 'Suivi',
+    items: adminNav.filter(item => item.href === '/maximus/abonnements' || item.href === '/maximus/journal'),
+  },
+  {
+    label: 'Configuration',
+    items: adminNav.filter(item => item.href === '/maximus/parametres/portefeuille'),
+  },
+];
+
 const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
