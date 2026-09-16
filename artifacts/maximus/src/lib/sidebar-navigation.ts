@@ -27,7 +27,6 @@ import {
 import { getSelectedFeatureIds, roleHasFeaturePermission } from './employee-permissions';
 import { getModuleFeatureOptions } from './module-features';
 import { featureSlug } from './permission-keys';
-import { presenceFeatureDefinitions } from './presence-features';
 import {
   stockSubmodules,
   type Module,
@@ -186,20 +185,24 @@ export function buildSidebarFeatureGroups({
         : moduleId === 'ecommerce'
           ? buildEcommerceNavigationItems(module, selectedFeatureIds)
         : moduleId === 'presences'
-          ? module.features
-            .map(feature => ({
-              feature,
-              definition: presenceFeatureDefinitions.find(item => item.label === feature),
-            }))
-            .filter(({ feature, definition }) => Boolean(
-              definition
-              && selectedFeatureIds.has(featureSlug(feature))
+          ? getModuleFeatureOptions(module)
+            .filter(feature => Boolean(
+              selectedFeatureIds.has(feature.id)
               && (companyAdmin
-                || roleHasFeaturePermission(employeeRole, employeeNode, module.id, featureSlug(feature), 'voir')),
+                || roleHasFeaturePermission(employeeRole, employeeNode, module.id, feature.id, 'voir')),
             ))
-            .map(({ feature, definition }) => ({
-              href: `/entreprise/presences?tab=${definition?.tab ?? 'dashboard'}`,
-              label: feature,
+            .map(feature => ({
+              href: `/entreprise/presences?tab=${({
+                'tableau-de-bord': 'dashboard',
+                pointage: 'clock',
+                présences: 'presence',
+                absences: 'absence',
+                horaires: 'schedules',
+                congés: 'leave',
+                historique: 'history',
+                rapports: 'reports',
+              } as Record<string, string>)[feature.id] ?? 'dashboard'}`,
+              label: feature.label,
               icon: CalendarDays,
             }))
           : moduleId === 'transport'

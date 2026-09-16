@@ -16,7 +16,7 @@ import {
 } from './employee-permissions';
 import { commerceTabDefinitions } from './commerce-permissions';
 import { getConfiguredModules } from './store';
-import { getModuleFeatureOptions } from './module-features';
+import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from './module-features';
 import { buildSidebarFeatureGroups } from './sidebar-navigation';
 import type { ServerModuleAccess } from './module-api';
 
@@ -119,14 +119,14 @@ export function buildAppAccessContext({
       return keepCompanySettings(
         module,
         hasExplicitServerSelection
-          ? serverFeatureIds ?? []
-          : packFeatures,
+          ? [...getEffectiveModuleFeatureIds(module, serverFeatureIds ?? [])]
+          : [...getEffectiveModuleFeatureIds(module, packFeatures)],
         !hasExplicitServerSelection,
       );
     }
 
     if (hasExplicitServerSelection) {
-      return keepCompanySettings(module, serverFeatureIds ?? [], false);
+      return keepCompanySettings(module, [...getEffectiveModuleFeatureIds(module, serverFeatureIds ?? [])], false);
     }
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;
@@ -137,9 +137,8 @@ export function buildAppAccessContext({
       return undefined;
     }
 
-    const validFeatureIds = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
     return keepCompanySettings(module, [
-      ...new Set((requestedFeatures[module.id] ?? []).filter(featureId => validFeatureIds.has(featureId))),
+      ...getEffectiveModuleFeatureIds(module, requestedFeatures[module.id] ?? []),
     ]);
   };
   const companyFeatureCeiling = (module: NonNullable<typeof configuredModules[number]>) => {
@@ -152,15 +151,15 @@ export function buildAppAccessContext({
       Array.isArray(serverFeatureIds)
       && (serverFeatureIds.length > 0 || serverConfiguration?.featureScope === 'explicit');
     if (hasExplicitServerSelection) {
-      return new Set(serverFeatureIds ?? []);
+      return new Set(getEffectiveModuleFeatureIds(module, serverFeatureIds ?? []));
     }
 
     const selectedPackIds = activeCompany.requestedModulePackIds?.[module.id] ?? [];
     if (selectedPackIds.length > 0) {
       return new Set(
-        (module.featurePacks ?? [])
+        getEffectiveModuleFeatureIds(module, (module.featurePacks ?? [])
           .filter(pack => selectedPackIds.includes(pack.id))
-          .flatMap(pack => pack.featureIds),
+          .flatMap(pack => pack.featureIds)),
       );
     }
 
@@ -168,7 +167,7 @@ export function buildAppAccessContext({
     if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
       return undefined;
     }
-    return new Set(requestedFeatures[module.id] ?? []);
+    return new Set(getEffectiveModuleFeatureIds(module, requestedFeatures[module.id] ?? []));
   };
   const selectedFeatureIdsByModule = Object.fromEntries(
     configuredModules
