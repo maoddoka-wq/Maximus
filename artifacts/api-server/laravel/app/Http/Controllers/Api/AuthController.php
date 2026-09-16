@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthSession;
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Support\CompanyAuthorization;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
@@ -48,6 +49,74 @@ class AuthController extends Controller
 
         $token = MaximusAuth::issueSession($user);
 
+        return response()
+            ->json(['user' => MaximusAuth::actor($user)])
+            ->withCookie(cookie(
+                MaximusAuth::COOKIE,
+                $token,
+                480,
+                '/',
+                null,
+                app()->environment('production'),
+                true,
+                false,
+                'lax',
+            ));
+    }
+
+    public function companyLoginInfo(string $slug): JsonResponse
+    {
+        $company = Company::query()
+            ->where('login_slug', $slug)
+            ->where('status', 'ACTIF')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (! $company || ! $company->login_custom_allowed || ($company->login_mode ?: 'MAXIMUS') !== 'CUSTOM') {
+            return response()->json(['error' => 'Cette connexion personnalisée est indisponible.'], 404);
+        }
+
+        return response()->json([
+            'company' => [
+                'name' => (string) $company->name,
+                'slug' => (string) $company->login_slug,
+                'profilePhoto' => $company->profile_photo,
+                'primaryColor' => $company->primary_color ?: '#F2B705',
+                'accentColor' => $company->accent_color ?: ($company->primary_color ?: '#F2B705'),
+                'sidebarColor' => $company->sidebar_color ?: '#161D27',
+            ],
+        ]);
+    }
+
+    public function companyLogin(Request $request, string $slug): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['required', 'string', 'max:200'],
+        ]);
+        $company = Company::query()
+            ->where('login_slug', $slug)
+            ->where('status', 'ACTIF')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (! $company || ! $company->login_custom_allowed || ($company->login_mode ?: 'MAXIMUS') !== 'CUSTOM') {
+            return response()->json(['error' => 'Cette connexion personnalisée est indisponible.'], 404);
+        }
+
+        $user = AuthUser::query()
+            ->where('company_id', $company->id)
+            ->where('email', Str::lower(trim($data['email'])))
+            ->where('status', 'ACTIF')
+            ->first();
+        if (! $user || ! MaximusPassword::check($data['password'], $user->password_hash) || ! MaximusAuth::canAuthenticate($user)) {
+            return response()->json(['error' => 'Email ou mot de passe incorrect.'], 401);
+        }
+        if (MaximusPassword::needsRehash($user->password_hash)) {
+            $user->update(['password_hash' => MaximusPassword::hash($data['password']), 'updated_at' => now()]);
+        }
+
+        $token = MaximusAuth::issueSession($user);
         return response()
             ->json(['user' => MaximusAuth::actor($user)])
             ->withCookie(cookie(

@@ -157,6 +157,9 @@ const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
+const CompanyLoginPage = lazy(() =>
+  import('@/pages/company-login').then((module) => ({ default: module.CompanyLoginPage })),
+);
 const OperationalModulePage = lazy(() =>
   import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
 );
@@ -946,6 +949,15 @@ function AppContent() {
   }
   if (pathname === '/' && isPotentialCustomStoreHost()) {
     return <PublicShopPage domain />;
+  }
+  const companyLoginMatch = pathname.match(/^\/entreprise\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
+  if (companyLoginMatch && !session) {
+    return (
+      <CompanyLoginPage
+        slug={decodeURIComponent(companyLoginMatch[1])}
+        onAuthenticated={applyAuthenticatedUser}
+      />
+    );
   }
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
   if (publicShopMatch) {
@@ -3101,8 +3113,43 @@ function CompanyDetail({
   onBack: () => void;
 }) {
   const [active, setActive] = useState(company.allowedModules);
+  const [loginSettings, setLoginSettings] = useState<{
+    customAllowed: boolean;
+    mode: 'MAXIMUS' | 'CUSTOM';
+    slug: string;
+    url: string;
+  } | null>(null);
+  const [loginSaving, setLoginSaving] = useState(false);
   const toggle = (id: ModuleId) =>
     setActive((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  useEffect(() => {
+    let cancelled = false;
+    void companyRequestApi.loginSettings(company.id)
+      .then(({ settings }) => {
+        if (!cancelled) setLoginSettings(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setLoginSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }) => {
+    setLoginSaving(true);
+    try {
+      const result = await companyRequestApi.updateLoginSettings(company.id, input);
+      setLoginSettings(result.settings);
+      mutate((draft) => {
+        const target = draft.companies.find((item) => item.id === company.id);
+        if (target) Object.assign(target, result.company);
+      }, input.customAllowed === false ? 'La connexion personnalisée a été désactivée.' : 'Paramètres de connexion enregistrés.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.');
+    } finally {
+      setLoginSaving(false);
+    }
+  };
   return (
     <div className="space-y-5">
       <button
@@ -3161,6 +3208,60 @@ function CompanyDetail({
           </div>
         </div>
       </div>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Accès entreprise</p>
+            <h2 className="mt-2 font-bold">Connexion personnalisée</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              MAXIMUS décide si cette fonctionnalité est disponible. L’entreprise pourra ensuite choisir entre cette page et la connexion MAXIMUS actuelle.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-custom-login"
+            checked={Boolean(loginSettings?.customAllowed)}
+            disabled={!loginSettings || loginSaving}
+            onChange={(event) => void saveLoginSettings({ customAllowed: event.target.checked })}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser la page de connexion personnalisée</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le lien est généré à partir du nom de l’entreprise et reste stable même si son nom est modifié plus tard.
+            </span>
+          </span>
+        </label>
+        <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <label className="block text-sm font-semibold">
+            Mode actuellement utilisé
+            <select
+              data-testid="select-company-login-mode"
+              value={loginSettings?.mode ?? 'MAXIMUS'}
+              disabled={!loginSettings?.customAllowed || loginSaving}
+              onChange={(event) => void saveLoginSettings({ mode: event.target.value as 'MAXIMUS' | 'CUSTOM' })}
+              className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"
+            >
+              <option value="MAXIMUS">Connexion MAXIMUS actuelle</option>
+              <option value="CUSTOM">Page personnalisée</option>
+            </select>
+          </label>
+          <div className="rounded-xl bg-[hsl(var(--muted)/.55)] p-4">
+            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Lien généré</p>
+            {loginSettings?.url ? (
+              <>
+                <p className="mt-2 break-all font-mono text-xs">{window.location.origin}{loginSettings.url}</p>
+                <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
+              </>
+            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
+          </div>
+        </div>
+      </section>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex items-center justify-between">
           <div>

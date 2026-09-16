@@ -48,6 +48,22 @@ export const companyRequestApi = {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
+  loginSettings: (companyId: string) =>
+    request<{ settings: { companyId: string; customAllowed: boolean; mode: 'MAXIMUS' | 'CUSTOM'; slug: string; url: string } }>(
+      `/companies/${encodeURIComponent(companyId)}/login-settings`,
+    ),
+  updateLoginSettings: (
+    companyId: string,
+    input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' },
+  ) =>
+    request<{
+      ok: true;
+      company: Company;
+      settings: { companyId: string; customAllowed: boolean; mode: 'MAXIMUS' | 'CUSTOM'; slug: string; url: string };
+    }>(`/companies/${encodeURIComponent(companyId)}/login-settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
   uploadProfilePhoto: (companyId: string, photo: File) => {
     const body = new FormData();
     body.append('photo', photo);

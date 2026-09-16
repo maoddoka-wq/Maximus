@@ -51,6 +51,10 @@ export interface Company {
   primaryColor?: string;
   accentColor?: string;
   sidebarColor?: string;
+  loginCustomAllowed?: boolean;
+  loginMode?: 'MAXIMUS' | 'CUSTOM';
+  loginSlug?: string;
+  loginUrl?: string;
   managerRoleId?: string;
 }
 

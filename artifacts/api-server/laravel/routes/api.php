@@ -49,6 +49,11 @@ Route::prefix('onboarding/drafts')->middleware('throttle:onboarding')->group(fun
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::get('/company-login/{slug}', [AuthController::class, 'companyLoginInfo'])
+        ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+    Route::post('/company-login/{slug}', [AuthController::class, 'companyLogin'])
+        ->middleware('throttle:login')
+        ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::get('/session', [AuthController::class, 'session']);
     Route::post('/logout', [AuthController::class, 'logout']);
 });
@@ -61,6 +66,8 @@ Route::middleware('maximus.auth')->prefix('company-requests')->group(function ()
 
 Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
     Route::patch('/{companyId}', [CompanyController::class, 'update']);
+    Route::get('/{companyId}/login-settings', [CompanyController::class, 'loginSettings']);
+    Route::patch('/{companyId}/login-settings', [CompanyController::class, 'updateLoginSettings']);
     Route::get('/{companyId}/payment-settings', [CompanyPaymentController::class, 'show']);
     Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
     Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);

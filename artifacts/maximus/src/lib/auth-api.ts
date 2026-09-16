@@ -9,6 +9,15 @@ export type AuthUser = {
   permissions?: Record<string, string[]>;
 };
 
+export type PublicCompanyLogin = {
+  name: string;
+  slug: string;
+  profilePhoto?: string | null;
+  primaryColor: string;
+  accentColor: string;
+  sidebarColor: string;
+};
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return requestJson<T>(path, options, { fallbackMessage: 'La connexion MAXIMUS a échoué.' });
 }
@@ -19,6 +28,14 @@ export const authApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   }),
+  companyLoginInfo: (slug: string) =>
+    request<{ company: PublicCompanyLogin }>(`/auth/company-login/${encodeURIComponent(slug)}`),
+  companyLogin: (slug: string, email: string, password: string) =>
+    request<{ user: AuthUser }>(`/auth/company-login/${encodeURIComponent(slug)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    }),
   session: () => request<{ user: AuthUser | null }>('/auth/session'),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
   provisionAccount: (input: {

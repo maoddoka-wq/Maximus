@@ -264,6 +264,76 @@ class CompanyController extends Controller
         return response()->json(['ok' => true, 'company' => $this->companyPayload($updated)]);
     }
 
+    public function loginSettings(Request $request, string $companyId): JsonResponse
+    {
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if (! $company) {
+            return response()->json(['error' => 'Entreprise introuvable ou inactive.'], 404);
+        }
+
+        $actor = $request->attributes->get('authActor');
+        $isMaximus = ($actor['role'] ?? null) === 'maximus_admin';
+        if (! $isMaximus && ($actor['companyId'] ?? null) !== $companyId) {
+            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        }
+
+        $this->ensureLoginSlug($company);
+
+        return response()->json([
+            'settings' => $this->loginSettingsPayload($company->fresh()),
+        ]);
+    }
+
+    public function updateLoginSettings(Request $request, string $companyId): JsonResponse
+    {
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if (! $company) {
+            return response()->json(['error' => 'Entreprise introuvable ou inactive.'], 404);
+        }
+
+        $actor = $request->attributes->get('authActor');
+        $isMaximus = ($actor['role'] ?? null) === 'maximus_admin';
+        if (! $isMaximus && ($actor['companyId'] ?? null) !== $companyId) {
+            return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
+        }
+
+        $input = Validator::make($request->all(), [
+            'customAllowed' => ['sometimes', 'boolean'],
+            'mode' => ['sometimes', 'in:MAXIMUS,CUSTOM'],
+        ])->validate();
+
+        if (! $isMaximus && array_key_exists('customAllowed', $input)) {
+            return response()->json(['error' => 'Seule l’administration MAXIMUS peut autoriser ce mode.'], 403);
+        }
+        if (($input['mode'] ?? null) === 'CUSTOM' && ! (bool) $company->login_custom_allowed && ! $isMaximus) {
+            return response()->json(['error' => 'La connexion personnalisée n’est pas autorisée par MAXIMUS.'], 403);
+        }
+
+        $this->ensureLoginSlug($company);
+        $changes = [];
+        if ($isMaximus && array_key_exists('customAllowed', $input)) {
+            $changes['login_custom_allowed'] = (bool) $input['customAllowed'];
+            if (! $changes['login_custom_allowed']) {
+                $changes['login_mode'] = 'MAXIMUS';
+            }
+        }
+        if (array_key_exists('mode', $input)) {
+            if ($input['mode'] === 'CUSTOM' && ! ((bool) $company->login_custom_allowed || ($changes['login_custom_allowed'] ?? false))) {
+                return response()->json(['error' => 'Autorisez d’abord la connexion personnalisée depuis MAXIMUS.'], 409);
+            }
+            $changes['login_mode'] = $input['mode'];
+        }
+        if ($changes !== []) {
+            $company->update($changes);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'company' => $this->companyPayload($company->fresh()),
+            'settings' => $this->loginSettingsPayload($company->fresh()),
+        ]);
+    }
+
     public function destroy(Request $request, string $companyId): JsonResponse
     {
         if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
@@ -401,7 +471,39 @@ class CompanyController extends Controller
             'primaryColor' => $company->primary_color,
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
+            'loginCustomAllowed' => (bool) $company->login_custom_allowed,
+            'loginMode' => $company->login_mode ?: 'MAXIMUS',
+            'loginSlug' => $company->login_slug,
+            'loginUrl' => $company->login_slug
+                ? '/entreprise/'.rawurlencode($company->login_slug).'/connexion'
+                : null,
         ];
+    }
+
+    private function loginSettingsPayload(Company $company): array
+    {
+        return [
+            'companyId' => (string) $company->id,
+            'customAllowed' => (bool) $company->login_custom_allowed,
+            'mode' => $company->login_mode ?: 'MAXIMUS',
+            'slug' => (string) $company->login_slug,
+            'url' => '/entreprise/'.rawurlencode((string) $company->login_slug).'/connexion',
+        ];
+    }
+
+    private function ensureLoginSlug(Company $company): void
+    {
+        if (is_string($company->login_slug) && $company->login_slug !== '') {
+            return;
+        }
+
+        $base = Str::slug((string) $company->name) ?: 'entreprise';
+        $slug = $base;
+        $suffix = 2;
+        while (Company::query()->where('login_slug', $slug)->where('id', '!=', $company->id)->exists()) {
+            $slug = $base.'-'.$suffix++;
+        }
+        $company->update(['login_slug' => $slug]);
     }
 
     private function synchronizeCompanyModules(Company $company): void

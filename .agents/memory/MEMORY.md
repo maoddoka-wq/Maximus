@@ -74,3 +74,4 @@
 - [Contrôle paiement par entreprise](company-payment-control.md) — l’autorisation de paiement est indépendante des modules et de l’abonnement, avec blocage serveur des nouveaux encaissements et retraits.
 - [Synchronisation rôles et comptes](role-auth-permissions-sync.md) — toute modification de rôle doit mettre à jour les permissions du compte authentifié des employés affectés avant confirmation.
 - [Autorisation par fonctionnalité Présences](presence-feature-authorization.md) — une permission détaillée ne doit jamais retomber sur l’action d’une autre fonctionnalité.
+- [Connexion entreprise personnalisée](company-branded-login.md) — MAXIMUS autorise le mode marqué, l’entreprise choisit son entrée, et le serveur résout toujours le tenant par slug.
