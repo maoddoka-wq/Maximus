@@ -36,3 +36,9 @@ Les rôles générés depuis un pack deviennent des rôles personnalisés dès q
 **Why:** Conserver la référence du pack faisait réapparaître toutes les fonctionnalités du pack après une modification manuelle, même lorsque l’utilisateur en avait désélectionné certaines.
 
 **How to apply:** Retirer les droits racine de module à la sauvegarde d’un rôle et détacher le pack lors d’un enregistrement depuis l’éditeur ; calculer Voir / Créer / Modifier par fonctionnalité.
+
+Les identifiants d’onglet Présences (`schedules`, `leave`, etc.) ne sont pas les identifiants de permission (`horaires`, `congés`, etc.) ; l’éditeur de rôles doit convertir les libellés en `featureSlug` avant de construire `presence.<feature>`.
+
+**Why:** Utiliser l’identifiant d’onglet faisait filtrer les droits comme non autorisés lors de la sauvegarde, puis toutes les sélections revenaient désactivées à la réouverture.
+
+**How to apply:** Garder les identifiants de navigation pour le routage et les slugs de libellés pour les clés de permissions persistées.

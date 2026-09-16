@@ -487,7 +487,7 @@ function ModulePermissionCard({
   const features = module.id === 'commerce'
     ? commerceTabDefinitions
     : module.id === 'presences'
-      ? presenceFeatureDefinitions.map(feature => ({ id: feature.tab, label: feature.label }))
+      ? presenceFeatureDefinitions.map(feature => ({ id: featureSlug(feature.label), label: feature.label }))
     : module.features.map(feature => ({ id: feature, label: feature }));
 
   return (
