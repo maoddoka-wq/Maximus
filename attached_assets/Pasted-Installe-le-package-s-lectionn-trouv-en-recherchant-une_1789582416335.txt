@@ -1,0 +1,64 @@
+Installe le package sélectionné, trouvé en recherchant une source configurée ou directement à partir d’un manifeste. Par défaut, la requête doit correspondre à l’id, name ou moniker du package sans respecter la casse. D’autres champs peuvent être utilisés en passant leur option appropriée. Par défaut, la commande install vérifie l’état d’installation du package et tente d’effectuer une mise à niveau, le cas échéant. Remplacez par --force pour effectuer une installation directe.
+
+Utilisation : winget install [[-q] <query>...] [<options>]
+
+Les alias de commande suivants sont disponibles :
+  add
+
+Les arguments suivants sont disponibles :
+  -q,--query                           Requête utilisée pour rechercher un package
+
+Les options suivantes sont disponibles :
+  -m,--manifest                        Chemin d’accès au manifeste du package
+  --id                                 Filtrer les résultats par identifiant
+  --name                               Filtrer les résultats par nom
+  --moniker                            Filtrer les résultats par nom
+  -v,--version                         Utiliser la version indiquée; la version par défaut est la dernière version
+  -s,--source                          Rechercher un package à l’aide de la source indiquée
+  --scope                              Sélectionner l’étendue d’installation (user ou machine)
+  -a,--architecture                    Sélectionner l’architecture
+  --installer-type                     Sélectionner le type de programme d’installation
+  -e,--exact                           Rechercher un package en utilisant une correspondance exacte
+  -i,--interactive                     Demander une installation interactive; l’intervention de l’utilisateur peut être nécessaire
+  -h,--silent                          Demander une installation sans assistance
+  --locale                             Paramètres régionaux à utiliser (format BCP47)
+  -o,--log                             Emplacement du journal (si pris en charge)
+  --custom                             Arguments à passer au programme d’installation en plus des valeurs par défaut
+  --override                           Remplacer les arguments à transmettre au programme d’installation
+  -l,--location                        Emplacement d’installation (si pris en charge)
+  --ignore-security-hash               Ignorer l’échec de la vérification de hachage du programme d’installation
+  --allow-reboot                       Autorise un redémarrage le cas échéant
+  --skip-dependencies                  Ignore le traitement des dépendances de package et des fonctionnalités Windows
+  --dependencies-only                  Installe uniquement les dépendances du package
+  --ignore-local-archive-malware-scan  Ignorer l’analyse des programmes malveillants effectuée dans le cadre de l’installation d’un package de type archive à partir du manifeste local
+  --dependency-source                  Rechercher les dépendances de package à l’aide de la source spécifiée
+  --accept-package-agreements          Accepter tous les contrats de licence pour les packages
+  --no-upgrade                         Ignore la mise à niveau si une version installée existe déjà
+  --header                             Optional Windows-Package-Manager REST source HTTP header
+  --authentication-mode                Spécifier la préférence de fenêtre d’authentification (silent, silentPreferred ou interactive)
+  --authentication-account             Spécifier le compte à utiliser pour l’authentification
+  --accept-source-agreements           Accepter tous les contrats sources pendant les opérations sources
+  -r,--rename                          Valeur pour renommer le fichier exécutable (portable)
+  --uninstall-previous                 Désinstaller la version précédente du package pendant la mise à niveau
+  --force                              Exécuter directement la commande et continuer avec des problèmes non liés à la sécurité
+  -?,--help                            Affiche l’aide sur la commande sélectionnée
+  --wait                               Invite l’utilisateur à appuyer sur une touche avant de quitter
+  --logs,--open-logs                   Ouvrir l’emplacement des journaux par défaut
+  --verbose,--verbose-logs             Active la journalisation détaillée pour WinGet
+  --nowarn,--ignore-warnings           Supprime les sorties d'avertissement
+  --disable-interactivity              Désactiver les invites interactives
+  --proxy                              Définir un proxy à utiliser pour cette exécution
+  --no-proxy                           Désactiver l’utilisation du proxy pour cette exécution
+
+Vous trouverez de l’aide supplémentaire sur : 'https://aka.ms/winget-command-install'
+PS C:\Users\FIS-TS> php -v
+php : Le terme «php» n'est pas reconnu comme nom d'applet de commande, fonction, fichier de script ou programme
+exécutable. Vérifiez l'orthographe du nom, ou si un chemin d'accès existe, vérifiez que le chemin d'accès est correct
+et réessayez.
+Au caractère Ligne:1 : 1
++ php -v
++ ~~~
+    + CategoryInfo          : ObjectNotFound: (php:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\FIS-TS>
