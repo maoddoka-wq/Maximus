@@ -57,7 +57,7 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
-  { href: '/maximus/parametres/portefeuille', label: 'Paramètres plateforme', icon: Settings },
+  { href: '/maximus/parametres/portefeuille', label: 'Réglages MAXIMUS', icon: Settings },
 ];
 
 export const adminNavGroups: SidebarFeatureGroup[] = [

@@ -213,11 +213,11 @@ export default function PlatformSettingsPage() {
       <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.14),hsl(var(--card))_58%)] p-5 sm:p-7">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Paramètres plateforme</span>
-            <h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Maturation des fonds vendeurs</h1>
+            <span className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Centre de configuration</span>
+            <h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Réglages MAXIMUS</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Définissez la règle commune appliquée aux ventes e-commerce confirmées par DiamanoPay.
-              Une livraison libère toujours les fonds immédiatement.
+              Retrouvez ici les règles globales de la plateforme. Chaque rubrique correspond à une décision précise,
+              avec son impact expliqué avant l’enregistrement.
             </p>
           </div>
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
@@ -226,6 +226,53 @@ export default function PlatformSettingsPage() {
         </div>
       </section>
 
+      <nav aria-label="Rubriques de réglages" className="grid gap-3 sm:grid-cols-3">
+        {[
+          {
+            id: 'registration-settings',
+            icon: UserPlus,
+            title: 'Accès & inscriptions',
+            description: 'Contrôler l’ouverture des nouveaux espaces.',
+          },
+          {
+            id: 'payment-settings',
+            icon: Banknote,
+            title: 'Paiements & portefeuille',
+            description: 'Règles de maturation et frais de retrait.',
+          },
+          {
+            id: 'diagnostic-settings',
+            icon: KeyRound,
+            title: 'Sécurité & diagnostic',
+            description: 'Gérer les accès temporaires de support.',
+          },
+        ].map(item => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => jumpTo(item.id)}
+            className="card-surface flex items-start gap-3 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-[hsl(var(--primary)/.4)] hover:shadow-sm"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+              <item.icon size={17} />
+            </span>
+            <span className="min-w-0">
+              <strong className="flex items-center gap-1.5 text-sm">
+                {item.title}
+                <ArrowRight size={14} className="text-[hsl(var(--muted-foreground))]" />
+              </strong>
+              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">{item.description}</span>
+            </span>
+          </button>
+        ))}
+      </nav>
+
+      <section id="registration-settings" className="scroll-mt-6 space-y-3">
+        <div className="px-1">
+          <p className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Accès & inscriptions</p>
+          <h2 className="mt-1 text-lg font-bold">Ouverture des nouveaux espaces</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Décidez comment une nouvelle entreprise peut commencer son inscription.</p>
+        </div>
       <section className="card-surface rounded-2xl border p-5 sm:p-7">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -261,7 +308,14 @@ export default function PlatformSettingsPage() {
           </div>
         )}
       </section>
+      </section>
 
+      <section id="payment-settings" className="scroll-mt-6 space-y-3">
+        <div className="px-1">
+          <p className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Paiements & portefeuille</p>
+          <h2 className="mt-1 text-lg font-bold">Règles financières de la plateforme</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Définissez quand les fonds vendeurs deviennent disponibles et combien coûte un retrait.</p>
+        </div>
       <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
         <form onSubmit={save} className="card-surface rounded-2xl border p-5 sm:p-7">
           <div className="flex items-center gap-3">
@@ -372,7 +426,14 @@ export default function PlatformSettingsPage() {
           </button>
         </form>
       </section>
+      </section>
 
+      <section id="diagnostic-settings" className="scroll-mt-6 space-y-3">
+        <div className="px-1">
+          <p className="mono text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--primary))]">Sécurité & diagnostic</p>
+          <h2 className="mt-1 text-lg font-bold">Accès temporaire au support</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez et révoquez les accès en lecture seule utilisés pour diagnostiquer la production.</p>
+        </div>
       <section className="card-surface rounded-2xl border p-5 sm:p-7" data-testid="diagnostic-access-settings">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -468,6 +529,7 @@ export default function PlatformSettingsPage() {
             ))}
           </div>
         </div>
+      </section>
       </section>
     </div>
   );

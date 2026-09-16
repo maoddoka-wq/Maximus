@@ -136,7 +136,6 @@ export function Sidebar({
         .map(word => word[0])
         .join('')
         .toUpperCase() || 'KD';
-  const standardNav = nav.map(item => link(item));
   const singleModuleItems = nav.filter(
     item => 'module' in item && item.module === null,
   );

@@ -254,7 +254,7 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   },
   '/maximus/parametres/portefeuille': {
     kicker: 'Configuration',
-    title: 'Paramètres plateforme',
+    title: 'Réglages MAXIMUS',
     description: 'Définissez les règles globales appliquées aux espaces clients.',
   },
   '/entreprise/dashboard': {
