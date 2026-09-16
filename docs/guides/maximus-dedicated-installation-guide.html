@@ -35,6 +35,12 @@
     .danger { background:#fff0f0; border-color:var(--red); }
     .two-col { display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
     .card { border:1px solid var(--line); padding:4mm; border-radius:2mm; page-break-inside:avoid; }
+    .step { border:2px solid var(--line); padding:4mm; margin:5mm 0; page-break-inside:avoid; }
+    .step h3 { margin-top:0; }
+    .central { border-left:4px solid #3d78c4; background:#f4f8ff; padding:3mm 4mm; }
+    .server { border-left:4px solid #2d8a58; background:#f2faf5; padding:3mm 4mm; }
+    .when { border-left:4px solid #c37c00; background:#fff8ea; padding:3mm 4mm; }
+    .small { color:var(--muted); font-size:8.7pt; }
     .checklist li { list-style:"☐  "; padding-left:1mm; }
     .footer { color:var(--muted); font-size:8pt; border-top:1px solid var(--line); padding-top:2mm; margin-top:8mm; }
   </style>
@@ -57,22 +63,55 @@
 
   <h2>Sommaire</h2>
   <ol>
+    <li>Règle de lecture : qui fait quoi et quand</li>
     <li>Objectif et garanties</li>
     <li>Choisir <code>dedicated</code> ou <code>on_premise</code></li>
     <li>Architecture de l’instance isolée</li>
     <li>Prérequis serveur</li>
     <li>Préparer PostgreSQL et le stockage</li>
+    <li>Préparer l’entreprise dans MAXIMUS principal</li>
     <li>Installer avec <code>install-maximus-instance.sh</code></li>
     <li>Configuration détaillée</li>
     <li>Démarrer l’application en local ou derrière HTTPS</li>
     <li>Créer et gérer l’accès administrateur</li>
+    <li>Synchronisation et changements après installation</li>
     <li>Validation complète de l’isolation</li>
     <li>Sauvegardes, mises à jour et restauration</li>
-    <li>Dépannage et checklist</li>
+    <li>Dépannage</li>
+    <li>Checklist de mise en service</li>
   </ol>
-  <div class="note"><b>Résumé :</b> l’entreprise est créée, validée et équipée depuis MAXIMUS principal. Le VPS dédié s’enrôle avec un fichier JSON à usage unique, récupère la configuration autorisée et se resynchronise ensuite par HTTPS. Le compte local créé est <code>company_admin</code> ; aucun <code>maximus_admin</code> global n’est provisionné.</div>
+  <div class="note"><b>Résumé :</b> l’entreprise est créée, validée et équipée depuis MAXIMUS principal. Le VPS dédié s’enrôle avec un fichier JSON contenant un secret conservé jusqu’à révocation, récupère la configuration autorisée et se resynchronise ensuite par HTTPS. Le compte local créé est <code>company_admin</code> ; aucun <code>maximus_admin</code> global n’est provisionné.</div>
 
-  <h2>1. Objectif et garanties</h2>
+  <h2>1. Règle de lecture : qui fait quoi et quand</h2>
+  <div class="danger"><b>Ne pas mélanger les deux serveurs.</b> Les actions marquées <b>MAXIMUS PRINCIPAL</b> se font dans l’interface et la base du MAXIMUS central. Les actions marquées <b>SERVEUR DÉDIÉ</b> se font dans le terminal du VPS de l’entreprise. Une commande destinée au serveur dédié ne doit jamais être exécutée dans le terminal du serveur central, et inversement.</div>
+  <table>
+    <tr><th>Moment</th><th>MAXIMUS principal</th><th>Serveur dédié de l’entreprise</th></tr>
+    <tr><td>Avant l’installation</td><td>Créer l’entreprise, choisir les modules/packs/fonctionnalités/permissions, valider l’entreprise et préparer l’enrôlement.</td><td>Créer le VPS, la base PostgreSQL, l’utilisateur système et préparer le dossier applicatif.</td></tr>
+    <tr><td>Pendant l’installation</td><td>Rester accessible en HTTPS. Il répond à la demande de configuration du serveur dédié.</td><td>Recevoir le JSON secret, installer le code, appeler MAXIMUS principal, appliquer la configuration locale et créer le <code>company_admin</code>.</td></tr>
+    <tr><td>Après l’installation</td><td>Reste l’autorité des modules, packs, fonctionnalités, permissions et domaines. Il reçoit les heartbeats.</td><td>Conserve les employés et les données métier localement. Il exécute la synchronisation planifiée.</td></tr>
+    <tr><td>Modification centrale</td><td>Modifier puis publier la configuration voulue.</td><td>Exécuter immédiatement la synchronisation ou attendre le prochain passage planifié.</td></tr>
+    <tr><td>Révocation</td><td>Un administrateur central révoque l’installation avec l’action d’administration ou le point central <code>DELETE /api/companies/&lt;companyId&gt;/installation</code>.</td><td>Arrêter l’accès public du serveur si l’arrêt doit être immédiat, puis retirer le secret local et le service.</td></tr>
+  </table>
+  <h3>1.1 Les trois identifiants à ne pas confondre</h3>
+  <table>
+    <tr><th>Identifiant</th><th>Signification</th><th>Où le trouver</th><th>Ne jamais faire</th></tr>
+    <tr><td><code>companyId</code></td><td>Identifie l’entreprise dans la base centrale et locale.</td><td>Dans le fichier bootstrap et la réponse de configuration.</td><td>Ne pas le remplacer par le nom de l’entreprise ou un identifiant inventé.</td></tr>
+    <tr><td><code>installationId</code></td><td>Identifie le VPS lié à l’entreprise.</td><td>Dans le fichier bootstrap et la table centrale des installations.</td><td>Ne pas le modifier lors d’une mise à jour.</td></tr>
+    <tr><td><code>token</code></td><td>Secret permettant au VPS d’appeler les deux endpoints centraux.</td><td>Uniquement dans le fichier bootstrap et le <code>.env</code> privé.</td><td>Ne pas l’afficher, le copier dans Git, l’envoyer par email non chiffré ou le mettre dans une URL.</td></tr>
+  </table>
+  <h3>1.2 Chronologie obligatoire</h3>
+  <ol>
+    <li><b>J−1 ou avant :</b> l’exploitant prépare le DNS du futur VPS et la base PostgreSQL.</li>
+    <li><b>Étape A :</b> l’administrateur MAXIMUS crée et active l’entreprise centrale.</li>
+    <li><b>Étape B :</b> l’administrateur MAXIMUS prépare l’installation et télécharge le bootstrap.</li>
+    <li><b>Étape C :</b> l’exploitant transfère le bootstrap au seul VPS concerné.</li>
+    <li><b>Étape D :</b> l’exploitant lance l’installation automatisée.</li>
+    <li><b>Étape E :</b> l’exploitant démarre le service web et valide les URL de santé et d’identité.</li>
+    <li><b>Étape F :</b> l’exploitant installe la synchronisation planifiée.</li>
+    <li><b>Après chaque changement central :</b> l’administrateur publie le changement, puis l’exploitant déclenche une synchronisation immédiate si le changement ne peut pas attendre le prochain créneau.</li>
+  </ol>
+
+  <h2>2. Objectif et garanties</h2>
   <p>Cette procédure installe une copie MAXIMUS destinée à une seule entreprise. Elle convient à un VPS, un serveur local, une machine de recette isolée ou une installation dans le réseau interne du client.</p>
   <table>
     <tr><th>Garantie</th><th>Comportement attendu</th></tr>
@@ -86,15 +125,15 @@
   </table>
   <div class="danger"><b>Cette isolation n’est pas un simple masquage d’écran.</b> Elle est appliquée par Laravel, dans le contexte serveur et les middlewares. Ne pas supprimer ces contrôles pour “simplifier” l’interface.</div>
 
-  <h2>2. Choisir le mode d’installation</h2>
+  <h2>3. Choisir le mode d’installation</h2>
   <div class="two-col">
     <div class="card"><h3><code>dedicated</code></h3><p>À choisir pour un VPS ou un cloud réservé à l’entreprise. Le serveur peut être public, avec un domaine et un certificat TLS.</p><ul><li>Instance séparée.</li><li>Base PostgreSQL séparée.</li><li>Stockage séparé.</li><li>Accès administrateur entreprise seulement.</li></ul></div>
     <div class="card"><h3><code>on_premise</code></h3><p>À choisir pour un serveur dans l’infrastructure de l’entreprise, accessible sur réseau interne ou via VPN.</p><ul><li>Même isolation applicative.</li><li>Certificat géré par l’entreprise.</li><li>Sauvegardes sous responsabilité du client.</li><li>Pare-feu et accès réseau internes.</li></ul></div>
   </div>
   <p>Le script utilise le mode inscrit dans le fichier d’enrôlement. MAXIMUS principal choisit explicitement <code>dedicated</code> ou <code>on_premise</code>.</p>
-  <div class="warning"><b>Jeton secret :</b> le fichier d’enrôlement contient un jeton à usage d’installation. Le transférer uniquement au VPS concerné, le supprimer après installation et le régénérer depuis MAXIMUS en cas de fuite.</div>
+  <div class="warning"><b>Jeton secret :</b> le fichier d’enrôlement contient un jeton réutilisable jusqu’à sa révocation. Le transférer uniquement au VPS concerné, le supprimer après avoir copié sa valeur dans le gestionnaire de secrets du serveur, et le régénérer depuis MAXIMUS en cas de fuite.</div>
 
-  <h2>3. Architecture de l’instance isolée</h2>
+  <h2>4. Architecture de l’instance isolée</h2>
   <p>Le workspace contient le frontend React/Vite et l’API Laravel. Le frontend est construit puis copié dans <code>artifacts/api-server/laravel/public</code>. Laravel utilise PostgreSQL pour les comptes, les entreprises, les modules, les sessions et les données métier.</p>
   <pre>maximus/
 ├── artifacts/api-server/laravel/   # API Laravel et runtime
@@ -106,8 +145,23 @@
 └── scripts/install-maximus-instance.sh</pre>
   <h3>Flux d’installation</h3>
   <ol><li>L’administrateur crée et active l’entreprise dans MAXIMUS principal.</li><li>Il ouvre sa fiche, choisit « Préparer le VPS dédié » ou « Préparer l’installation locale » et télécharge le JSON.</li><li>Le script vérifie PHP, Composer, curl et le JSON d’enrôlement.</li><li>Il crée ou met à jour le fichier Laravel <code>.env</code>, y conserve le lien central et protège le fichier par <code>chmod 600</code>.</li><li>Il installe Composer, construit le frontend et migre PostgreSQL.</li><li><code>maximus:install-company</code> appelle MAXIMUS principal, valide le jeton, copie l’entreprise, les modules et les domaines, puis crée le <code>company_admin</code>.</li><li>Une tâche planifiée lance ensuite <code>maximus:sync-central-installation</code>.</li><li>Il lance une sonde temporaire <code>/api/healthz</code>, sauf si elle est désactivée.</li></ol>
+  <h3>Ce qui est copié et ce qui ne l’est pas</h3>
+  <table>
+    <tr><th>Copié vers le serveur dédié</th><th>Non copié vers le serveur dédié</th></tr>
+    <tr><td>Identité de l’entreprise, statut actif, pays, secteur, slug de connexion, modules actifs, packs, fonctionnalités, permissions détaillées et domaines enregistrés.</td><td>Les autres entreprises, les comptes <code>maximus_admin</code>, les employés des autres entreprises, leurs commandes et leurs données métier.</td></tr>
+  </table>
+  <div class="central"><b>MAXIMUS PRINCIPAL — résultat attendu :</b> l’installation apparaît comme <code>READY</code> avant le premier appel, puis <code>CONNECTED</code> après la récupération de configuration et le heartbeat.</div>
+  <div class="server"><b>SERVEUR DÉDIÉ — résultat attendu :</b> la base locale contient uniquement la configuration reçue pour l’entreprise indiquée par <code>companyId</code>, et le compte initial est rattaché à cette entreprise.</div>
+  <h3>4.1 Communications exactes entre les deux serveurs</h3>
+  <table>
+    <tr><th>Origine</th><th>Destination</th><th>Requête</th><th>Moment</th></tr>
+    <tr><td>Serveur dédié</td><td>MAXIMUS principal</td><td><code>GET /api/installation-sync/configuration</code> avec <code>Authorization: Bearer &lt;token&gt;</code></td><td>Installation initiale et chaque synchronisation.</td></tr>
+    <tr><td>Serveur dédié</td><td>MAXIMUS principal</td><td><code>POST /api/installation-sync/heartbeat</code> avec le même jeton.</td><td>Après une synchronisation réussie.</td></tr>
+    <tr><td>MAXIMUS principal</td><td>Serveur dédié</td><td>Aucune connexion entrante nécessaire. Le central ne pousse pas de données vers le VPS.</td><td>En permanence.</td></tr>
+  </table>
+  <p>Le pare-feu du VPS doit donc autoriser les connexions HTTPS sortantes vers le domaine central. Le pare-feu central doit autoriser les connexions HTTPS entrantes des administrateurs et des utilisateurs, mais il n’a pas besoin d’ouvrir un port PostgreSQL au VPS.</p>
 
-  <h2>4. Prérequis serveur</h2>
+  <h2>5. Prérequis serveur</h2>
   <table>
     <tr><th>Prérequis</th><th>Vérification</th><th>Utilisation</th></tr>
     <tr><td>Linux</td><td>Utilisateur de service et permissions séparées</td><td>Exécution reproductible et réduction des privilèges.</td></tr>
@@ -128,35 +182,93 @@ corepack --version
 psql --version
 curl --version</pre>
 
-  <h2>5. Préparer PostgreSQL et le stockage</h2>
-  <h3>5.1 Base locale PostgreSQL</h3>
+  <h2>6. Préparer PostgreSQL et le stockage</h2>
+  <h3>6.1 Base locale PostgreSQL</h3>
   <p>Exemple Debian/Ubuntu. Utiliser un mot de passe unique, transmis uniquement au prompt sécurisé :</p>
   <pre>sudo -u postgres createuser --pwprompt maximus
 sudo -u postgres createdb --owner=maximus maximus
 sudo -u postgres psql -d maximus -c \
   "ALTER ROLE maximus SET client_encoding TO 'UTF8';"</pre>
   <p>Pour PostgreSQL distant, faire autoriser l’adresse du serveur applicatif dans le pare-feu et dans <code>pg_hba.conf</code>. Ne pas exposer le port 5432 à tout Internet.</p>
-  <h3>5.2 Répertoire applicatif</h3>
+  <h3>6.2 Répertoire applicatif</h3>
   <pre>sudo useradd --system --home /opt/maximus --shell /usr/sbin/nologin maximus || true
 sudo mkdir -p /opt/maximus
 sudo chown -R maximus:maximus /opt/maximus
 cd /opt/maximus</pre>
   <p>Le compte qui lance l’installateur doit pouvoir écrire dans le workspace. Après installation, le processus HTTP permanent doit utiliser un utilisateur non privilégié et les mêmes permissions sur <code>storage</code>, <code>bootstrap/cache</code> et le stockage numérique.</p>
-  <h3>5.3 Stockage persistant</h3>
+  <h3>6.3 Stockage persistant</h3>
   <p>Le script utilise par défaut <code>artifacts/api-server/laravel/storage/app/digital-products</code>. Ce dossier doit être inclus dans les sauvegardes. Ne pas le remplacer par <code>/tmp</code> ou un disque éphémère.</p>
 
-  <h2>6. Installer avec le script</h2>
-  <h3>6.1 Récupérer le code</h3>
+  <h2>7. Préparer l’entreprise dans MAXIMUS principal</h2>
+  <div class="central"><b>Cette section est exécutée uniquement par l’administrateur MAXIMUS principal.</b> Le responsable du VPS ne doit pas inventer le nom de l’entreprise, les modules ou les permissions dans le fichier <code>.env</code>.</div>
+  <div class="step">
+    <h3>7.1 Créer ou ouvrir l’entreprise</h3>
+    <ol>
+      <li>Ouvrir l’URL du MAXIMUS principal.</li>
+      <li>Se connecter avec un compte ayant le rôle <code>maximus_admin</code>.</li>
+      <li>Ouvrir l’espace <b>Entreprises</b>.</li>
+      <li>Créer l’entreprise ou ouvrir l’entreprise déjà créée.</li>
+      <li>Vérifier le nom, le responsable, l’email, le pays et le secteur.</li>
+      <li>Vérifier que son statut est <code>ACTIF</code>. Une entreprise <code>PENDING</code>, <code>REJETÉE</code>, <code>SUSPENDU</code> ou supprimée ne doit pas être enrôlée.</li>
+    </ol>
+  </div>
+  <div class="step">
+    <h3>7.2 Configurer exactement le périmètre</h3>
+    <ol>
+      <li>Choisir uniquement les modules publiés qui doivent être disponibles sur l’installation.</li>
+      <li>Pour chaque module, choisir les packs publiés nécessaires.</li>
+      <li>Choisir les fonctionnalités nécessaires.</li>
+      <li>Pour chaque fonctionnalité, attribuer les permissions voulues.</li>
+      <li>Enregistrer et publier la configuration avant de préparer le VPS.</li>
+      <li>Vérifier le manifeste d’installation avec le bouton <b>Télécharger le manifeste d’installation</b>. Ce manifeste sert à contrôler les choix, mais il ne remplace pas le bootstrap secret.</li>
+    </ol>
+    <p class="small">Le manifeste de contrôle peut être conservé dans le dossier de livraison. Le bootstrap, lui, contient le jeton secret et doit rester strictement confidentiel.</p>
+  </div>
+  <div class="step">
+    <h3>7.3 Générer le bootstrap du serveur</h3>
+    <ol>
+      <li>Dans la fiche de l’entreprise, cliquer sur <b>Préparer le VPS dédié</b> pour un serveur public dédié, ou sur <b>Préparer l’installation locale</b> pour un serveur interne/on-premise.</li>
+      <li>Le serveur central crée ou renouvelle l’enregistrement <code>maximus_installations</code>.</li>
+      <li>Le navigateur télécharge un fichier nommé suivant le modèle <code>maximus-bootstrap-&lt;companyId&gt;-&lt;mode&gt;.json</code>.</li>
+      <li>Ouvrir le fichier uniquement pour vérifier sa structure, jamais pour copier son jeton dans un document ou une conversation.</li>
+      <li>Transférer le fichier au responsable du VPS par un canal privé.</li>
+    </ol>
+    <pre>{
+  "centralUrl": "https://central.example.test",
+  "installationId": "installation-...",
+  "companyId": "company-...",
+  "mode": "dedicated",
+  "token": "&lt;SECRET-A-CONSERVER&gt;"
+}</pre>
+  </div>
+  <div class="when"><b>Quand régénérer :</b> si le fichier a été envoyé à la mauvaise personne, copié dans Git, affiché dans un log, perdu, ou si le serveur doit être réinstallé avec un nouveau lien. La régénération remplace le hash du jeton central : l’ancien jeton cesse alors de fonctionner.</div>
+
+  <h2>8. Installer avec le script</h2>
+  <div class="server"><b>Cette section est exécutée uniquement sur le serveur dédié.</b> Le serveur dédié doit pouvoir ouvrir une connexion HTTPS sortante vers <code>MAXIMUS_CENTRAL_URL</code>. Il n’a pas besoin d’ouvrir PostgreSQL sur Internet et MAXIMUS principal n’a pas besoin d’ouvrir une connexion entrante vers PostgreSQL.</div>
+  <h3>8.0 Transférer le bootstrap sans exposer le secret</h3>
+  <p>Depuis le poste où le fichier a été téléchargé, le transférer directement vers le VPS par un canal SSH privé. Remplacer les valeurs entre chevrons ; ne jamais remplacer <code>&lt;SECRET&gt;</code> dans une commande car le secret est déjà dans le fichier.</p>
+  <pre>scp ./maximus-bootstrap-&lt;companyId&gt;-dedicated.json \
+  &lt;utilisateur-vps&gt;@&lt;ip-ou-nom-du-vps&gt;:/tmp/maximus-bootstrap.json
+
+ssh &lt;utilisateur-vps&gt;@&lt;ip-ou-nom-du-vps&gt;
+sudo install -d -m 750 -o maximus -g maximus /opt/maximus-secrets
+sudo install -m 600 -o maximus -g maximus /tmp/maximus-bootstrap.json \
+  /opt/maximus-secrets/bootstrap.json
+rm -f /tmp/maximus-bootstrap.json</pre>
+  <p>Si le compte <code>maximus</code> n’existe pas encore, exécuter d’abord les commandes de la section 6.2. Le fichier final doit être lisible par l’utilisateur qui exécute l’installateur, puis supprimé dès que la valeur a été conservée dans le gestionnaire de secrets.</p>
+  <h3>8.1 Récupérer le code</h3>
   <pre>git clone &lt;depot-prive&gt; /opt/maximus
 cd /opt/maximus
 chmod +x scripts/install-maximus-instance.sh
 ./scripts/install-maximus-instance.sh --help</pre>
-  <h3>6.2 Installer le JSON d’enrôlement</h3>
+  <h3>8.2 Installer le JSON d’enrôlement</h3>
   <p>Copier le fichier téléchargé depuis MAXIMUS principal sur le VPS, avec des permissions privées :</p>
-  <pre>chmod 600 maximus-bootstrap.json
-./scripts/install-maximus-instance.sh --bootstrap-file ./maximus-bootstrap.json</pre>
+  <pre>chmod 600 /opt/maximus-secrets/bootstrap.json
+cd /opt/maximus
+./scripts/install-maximus-instance.sh \
+  --bootstrap-file /opt/maximus-secrets/bootstrap.json</pre>
   <p>Le script ne demande plus le nom, l’email, les modules ou les permissions de l’entreprise : ces valeurs sont récupérées depuis MAXIMUS principal.</p>
-  <h3>6.3 Installation non interactive</h3>
+  <h3>8.3 Installation non interactive</h3>
   <p>Ne pas mettre les jetons ni les mots de passe dans les arguments. Les fournir dans l’environnement du processus ou par le gestionnaire de secrets du serveur :</p>
   <pre>export MAXIMUS_INSTALLATION_BOOTSTRAP=/opt/maximus/maximus-bootstrap.json
 export MAXIMUS_ADMIN_USER='admin@example.test'
@@ -165,12 +277,26 @@ export MAXIMUS_ADMIN_PASSWORD
 read -r -s DB_PASSWORD
 export DB_PASSWORD
 export DB_HOST=127.0.0.1 DB_PORT=5432
-export DB_DATABASE=maximus DB_USERNAME=maximus
+ export DB_DATABASE=maximus DB_USERNAME=maximus
  export APP_URL=https://erp.example.test
 
-./scripts/install-maximus-instance.sh --non-interactive</pre>
+ ./scripts/install-maximus-instance.sh \
+   --bootstrap-file /opt/maximus-secrets/bootstrap.json \
+   --non-interactive</pre>
   <p>Pour une installation on-premise, générer le bootstrap avec le bouton « Préparer l’installation locale ». Tester la valeur effective dans <code>/api/installation</code> après démarrage.</p>
-  <h3>6.5 Options de l’installateur</h3>
+  <h3>8.4 Ce que fait exactement l’installateur</h3>
+  <table>
+    <tr><th>Ordre</th><th>Action du script</th><th>Échec bloquant</th></tr>
+    <tr><td>1</td><td>Lit le JSON et contrôle <code>mode</code>, <code>centralUrl</code>, <code>token</code>, <code>companyId</code> et <code>installationId</code>.</td><td>Fichier absent, JSON invalide ou mode différent de <code>dedicated</code>/<code>on_premise</code>.</td></tr>
+    <tr><td>2</td><td>Écrit les cinq variables d’installation dans <code>.env</code> et force <code>DB_CONNECTION=pgsql</code>.</td><td>Répertoire Laravel absent ou fichier non accessible en écriture.</td></tr>
+    <tr><td>3</td><td>Demande ou lit PostgreSQL, l’URL publique, l’email et le mot de passe du <code>company_admin</code>.</td><td>Mot de passe inférieur à 8 caractères, email invalide ou variable manquante en mode non interactif.</td></tr>
+    <tr><td>4</td><td>Installe Composer, génère <code>APP_KEY</code> uniquement si elle est absente, puis prépare le stockage.</td><td>Composer absent, dépendance impossible à installer ou droits insuffisants.</td></tr>
+    <tr><td>5</td><td>Construit le frontend avec <code>PORT=10000 BASE_PATH=/</code> et copie le résultat dans <code>laravel/public</code>.</td><td>Node/Corepack absent ou erreur Vite.</td></tr>
+    <tr><td>6</td><td>Exécute les migrations puis <code>maximus:install-company</code>.</td><td>PostgreSQL indisponible ou MAXIMUS principal refuse le jeton.</td></tr>
+    <tr><td>7</td><td>Appelle <code>/api/healthz</code> sur une instance temporaire locale, sauf avec <code>--skip-healthcheck</code>.</td><td>L’application ne démarre pas ou la base ne répond pas.</td></tr>
+  </table>
+  <div class="success"><b>Installation réussie :</b> la dernière ligne indique que l’installation est terminée. Vérifier ensuite manuellement les URL et le compte selon la section 13. Ne pas considérer la simple fin du script comme une preuve de bon fonctionnement public.</div>
+  <h3>8.5 Options de l’installateur</h3>
   <table><tr><th>Option</th><th>Effet</th><th>Usage</th></tr>
     <tr><td><code>--workspace-dir PATH</code></td><td>Change la racine du workspace.</td><td>Déploiement dans un chemin différent.</td></tr>
     <tr><td><code>--env-file PATH</code></td><td>Change le fichier Laravel mis à jour.</td><td>Préparation contrôlée ou recette.</td></tr>
@@ -180,7 +306,7 @@ export DB_DATABASE=maximus DB_USERNAME=maximus
     <tr><td><code>--skip-healthcheck</code></td><td>Désactive la sonde finale.</td><td>Uniquement si le serveur n’est pas démarrable pendant l’installation.</td></tr>
   </table>
 
-  <h2>7. Configuration détaillée</h2>
+  <h2>9. Configuration détaillée</h2>
   <table>
     <tr><th>Variable</th><th>Obligation</th><th>Description</th></tr>
     <tr><td><code>MAXIMUS_INSTALLATION_BOOTSTRAP</code></td><td>Oui</td><td>Chemin privé du JSON généré par MAXIMUS principal.</td></tr>
@@ -202,47 +328,120 @@ export DB_DATABASE=maximus DB_USERNAME=maximus
   artifacts/api-server/laravel/.env</pre>
   <p>Afficher uniquement les clés non sensibles lors d’un diagnostic. Ne jamais utiliser <code>cat .env</code> dans un ticket ou un log partagé.</p>
 
-  <h2>8. Démarrer l’application</h2>
-  <h3>8.1 Test local temporaire</h3>
+  <h2>10. Démarrer l’application</h2>
+  <h3>10.1 Test local temporaire avant ouverture publique</h3>
   <pre>cd /opt/maximus/artifacts/api-server/laravel
 php -S 127.0.0.1:8080 server.php</pre>
   <p>Dans un autre terminal :</p>
   <pre>curl -fsS http://127.0.0.1:8080/api/healthz
 curl -fsS http://127.0.0.1:8080/api/installation</pre>
   <p>Le serveur PHP intégré sert à valider l’installation. Il n’est pas recommandé comme exposition Internet permanente.</p>
-  <h3>8.2 Production derrière HTTPS</h3>
+  <h3>10.2 Production derrière HTTPS</h3>
   <p>Utiliser un service supervisé, un utilisateur non privilégié et un reverse proxy HTTPS (Nginx, Apache ou équivalent). Le proxy doit transmettre le host et le protocole d’origine, et ne doit pas rendre PostgreSQL ou le port interne public.</p>
   <ul><li>Le proxy public écoute sur 443.</li><li>L’application écoute seulement sur loopback ou sur le réseau privé.</li><li>Le certificat couvre exactement <code>APP_URL</code>.</li><li><code>SESSION_SECURE_COOKIE=true</code> si l’URL commence par HTTPS.</li><li>Les logs du proxy ne contiennent pas les mots de passe ni les cookies.</li></ul>
-  <h3>8.3 Démarrage contrôlé</h3>
-  <p>Le dépôt ne fournit pas automatiquement un service systemd ou une configuration Nginx : ils dépendent de la distribution, du chemin d’installation et de la politique d’exploitation. Ils doivent être ajoutés par l’administrateur du serveur avant de considérer l’instance comme production.</p>
+  <h3>10.3 Service permanent minimal</h3>
+  <p>Pour un premier déploiement VPS, créer un service supervisé qui écoute uniquement en local. Le reverse proxy HTTPS sera le seul composant exposé à Internet.</p>
+  <pre>sudo tee /etc/systemd/system/maximus.service &gt;/dev/null &lt;&lt;'EOF'
+[Unit]
+Description=MAXIMUS instance entreprise
+After=network-online.target
 
-  <h2>9. Accès administrateur entreprise</h2>
+[Service]
+Type=simple
+User=maximus
+Group=maximus
+WorkingDirectory=/opt/maximus/artifacts/api-server/laravel
+ExecStart=/usr/bin/php -S 127.0.0.1:8080 server.php
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now maximus
+sudo systemctl status maximus --no-pager
+curl -fsS http://127.0.0.1:8080/api/healthz</pre>
+  <p>Si <code>php</code> n’est pas installé dans <code>/usr/bin/php</code>, exécuter <code>command -v php</code> et remplacer uniquement ce chemin. En production, ne pas lancer le service avec <code>root</code> et ne pas exposer directement le port 8080.</p>
+  <h3>10.4 Exemple de reverse proxy Nginx</h3>
+  <p>Remplacer <code>erp.example.test</code> par le domaine réellement configuré dans <code>APP_URL</code>. Installer et configurer le certificat TLS selon la politique du serveur avant d’ouvrir le port 443.</p>
+  <pre>server {
+    listen 443 ssl http2;
+    server_name erp.example.test;
+
+    ssl_certificate     /etc/letsencrypt/live/erp.example.test/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/erp.example.test/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}</pre>
+  <pre>sudo nginx -t
+sudo systemctl reload nginx
+curl -fsS https://erp.example.test/api/healthz</pre>
+  <h3>10.5 Programmer la synchronisation</h3>
+  <p>La synchronisation ne doit pas être lancée à chaque ouverture de page. Elle est déclenchée par une tâche du serveur dédié. L’exemple ci-dessous l’exécute toutes les 15 minutes ; un déclenchement manuel reste possible après une modification urgente.</p>
+  <pre>sudo -u maximus crontab -e</pre>
+  <pre>*/15 * * * * cd /opt/maximus/artifacts/api-server/laravel &amp;&amp; /usr/bin/php artisan maximus:sync-central-installation &gt;&gt; /opt/maximus/artifacts/api-server/laravel/storage/logs/installation-sync.log 2&gt;&amp;1</pre>
+  <p>Après l’enregistrement, vérifier la configuration et lancer un premier passage :</p>
+  <pre>sudo -u maximus crontab -l
+cd /opt/maximus/artifacts/api-server/laravel
+sudo -u maximus php artisan maximus:sync-central-installation
+tail -50 storage/logs/installation-sync.log</pre>
+  <div class="when"><b>Quand synchroniser :</b> immédiatement après une publication de module, de pack, de fonctionnalité, de permission ou de domaine dans MAXIMUS principal ; sinon au prochain passage automatique, au maximum 15 minutes après l’exemple ci-dessus.</div>
+
+  <h2>11. Accès administrateur entreprise</h2>
   <ol><li>Ouvrir l’URL configurée dans <code>APP_URL</code>.</li><li>Utiliser l’email <code>MAXIMUS_ADMIN_USER</code>.</li><li>Se connecter avec le mot de passe fourni à l’installateur.</li><li>Vérifier que le compte affiche le rôle <code>company_admin</code> et la bonne entreprise.</li><li>Créer ensuite les employés et les rôles depuis Organisation.</li></ol>
+  <p>Les employés, secteurs, rôles et données métier sont ensuite créés localement par le <code>company_admin</code>. Ils ne sont pas envoyés à MAXIMUS principal par la synchronisation de configuration.</p>
   <p>Une relance de <code>maximus:install-company</code> met à jour le compte dédié et invalide ses sessions existantes. L’opération est utile après une rotation de mot de passe, mais elle doit être planifiée.</p>
   <pre>cd /opt/maximus/artifacts/api-server/laravel
 php artisan config:clear --no-interaction
 php artisan maximus:install-company --no-interaction</pre>
   <div class="danger"><b>Ne pas exécuter</b> <code>php artisan maximus:provision-admin</code> sur cette instance. Cette commande est réservée à l’installation centrale et refuse normalement le mode isolé.</div>
 
-  <h2>10. Validation complète de l’isolation</h2>
-  <h3>10.1 Santé et identité</h3>
+  <h2>12. Que se passe-t-il après l’installation</h2>
+  <table>
+    <tr><th>Événement dans MAXIMUS principal</th><th>Action à faire</th><th>Résultat sur le serveur dédié</th></tr>
+    <tr><td>Ajout ou retrait d’un module, pack, fonctionnalité ou permission</td><td>Enregistrer/publier dans MAXIMUS principal, puis exécuter immédiatement la commande de synchronisation si nécessaire.</td><td>La configuration locale est remplacée par la configuration centrale validée. Les employés locaux restent dans la base.</td></tr>
+    <tr><td>Ajout, vérification ou retrait d’un domaine</td><td>Terminer l’action du domaine dans MAXIMUS principal, puis synchroniser.</td><td>La liste locale des domaines est reconstruite depuis la réponse centrale.</td></tr>
+    <tr><td>MAXIMUS principal temporairement inaccessible</td><td>Ne rien modifier dans le <code>.env</code>. Corriger le réseau ou le service central.</td><td>La commande échoue et l’installation conserve sa dernière configuration locale connue. Le script ne remplace pas une configuration valide par une configuration vide.</td></tr>
+    <tr><td>Jeton révoqué ou invalide</td><td>Révoquer l’ancien enrôlement, générer un nouveau bootstrap si le serveur doit continuer, ou arrêter le serveur si l’installation doit être coupée.</td><td>Les appels centraux renvoient <code>401</code>. La révocation du jeton bloque la prochaine synchronisation ; elle ne coupe pas à elle seule un processus web déjà démarré.</td></tr>
+    <tr><td>Entreprise rendue inactive dans MAXIMUS principal</td><td>Arrêter le serveur dédié si l’accès doit cesser immédiatement, puis traiter la remise en service depuis MAXIMUS principal.</td><td>La récupération de configuration renvoie <code>409</code>. L’ancienne copie locale n’est pas automatiquement effacée.</td></tr>
+  </table>
+  <div class="danger"><b>Arrêt immédiat :</b> pour couper réellement l’accès utilisateur, le responsable central doit demander l’arrêt du service dédié et l’exploitant doit exécuter <code>sudo systemctl stop maximus</code> et bloquer le reverse proxy. La révocation centrale seule empêche la synchronisation future, mais ne tue pas un serveur déjà en ligne.</div>
+  <h3>12.1 Procédure de synchronisation manuelle</h3>
+  <pre>cd /opt/maximus/artifacts/api-server/laravel
+sudo -u maximus php artisan config:clear --no-interaction
+sudo -u maximus php artisan maximus:sync-central-installation
+sudo systemctl restart maximus
+curl -fsS https://erp.example.test/api/installation</pre>
+  <p>La commande doit afficher une ligne de succès indiquant que la configuration centrale a été synchronisée. Si elle échoue, conserver le message d’erreur, ne pas supprimer la base locale et suivre la section 15.</p>
+
+  <h2>13. Validation complète de l’isolation</h2>
+  <h3>13.1 Santé et identité</h3>
   <pre>curl -fsS https://erp.example.test/api/healthz
 curl -fsS https://erp.example.test/api/installation</pre>
   <p>Vérifier : <code>ready=true</code>, <code>companyOnly=true</code>, le mode <code>dedicated</code> ou <code>on_premise</code>, l’identifiant de l’entreprise attendu et <code>adminLoginEnabled=false</code>.</p>
-  <h3>10.2 Routes centrales</h3>
+  <h3>13.2 Routes centrales</h3>
   <p>Les routes d’inscription publique, catalogue plateforme, contrôle et administration MAXIMUS doivent retourner <code>404 CENTRAL_INSTALLATION_ONLY</code>. Un masquage dans le menu ne suffit pas comme test.</p>
-  <h3>10.3 Données d’une autre entreprise</h3>
+  <h3>13.3 Données d’une autre entreprise</h3>
   <p>Avec deux entreprises de test en base, essayer le slug, les images, le domaine et Transport de l’autre entreprise :</p>
   <pre>curl -i https://erp.example.test/api/shop/autre-entreprise
 curl -i https://erp.example.test/api/shop/autre-entreprise/transport/settings
 curl -i https://erp.example.test/api/product-images/autre-entreprise/image.png
 curl -i https://erp.example.test/api/company-profile-images/autre-entreprise/profile.png</pre>
   <p>Les réponses doivent être <code>404</code> avec le code <code>INSTALLATION_COMPANY_ONLY</code>. La boutique et les ressources de l’entreprise configurée doivent, elles, rester accessibles.</p>
-  <h3>10.4 Connexion</h3>
+  <h3>13.4 Connexion</h3>
   <ul class="checklist"><li>Le <code>company_admin</code> dédié se connecte.</li><li>Un compte global MAXIMUS ne se connecte pas.</li><li>Une session d’une autre entreprise est refusée.</li><li>Après rafraîchissement, la session reste attachée au bon tenant.</li><li>Un accès direct à une route non autorisée est refusé côté API.</li></ul>
 
-  <h2>11. Sauvegardes, mises à jour et restauration</h2>
-  <h3>11.1 Sauvegarder la base</h3>
+  <h2>14. Sauvegardes, mises à jour et restauration</h2>
+  <h3>14.1 Sauvegarder la base</h3>
   <pre>mkdir -p /var/backups/maximus
 pg_dump --format=custom \
   --file=/var/backups/maximus/maximus-$(date +%F-%H%M).dump \
@@ -250,12 +449,12 @@ pg_dump --format=custom \
   --username="$DB_USERNAME" "$DB_DATABASE"
 chmod 600 /var/backups/maximus/*.dump</pre>
   <p>Copier les dumps vers un stockage hors serveur. Tester une restauration sur une base séparée ; une sauvegarde jamais restaurée n’est pas une procédure validée.</p>
-  <h3>11.2 Sauvegarder les fichiers</h3>
+  <h3>14.2 Sauvegarder les fichiers</h3>
   <pre>tar -C artifacts/api-server/laravel/storage/app \
   -czf /var/backups/maximus/digital-products-$(date +%F-%H%M).tar.gz \
   digital-products</pre>
   <p>Conserver base et fichiers issus du même point de sauvegarde lorsque les commandes ou produits numériques se référencent.</p>
-  <h3>11.3 Mise à jour</h3>
+  <h3>14.3 Mise à jour</h3>
   <pre>cd /opt/maximus
 git fetch --all --tags
 git checkout &lt;version-validee&gt;
@@ -263,14 +462,14 @@ git checkout &lt;version-validee&gt;
 cd artifacts/api-server/laravel
 php artisan migrate --force --no-interaction</pre>
   <p>Si l’installateur doit être relancé en non-interactif, fournir les secrets via l’environnement sécurisé. Vérifier ensuite le healthcheck, le mode d’installation, la connexion et les ressources publiques.</p>
-  <h3>11.4 Retour arrière</h3>
+  <h3>14.4 Retour arrière</h3>
   <ol><li>Arrêter le trafic applicatif.</li><li>Conserver les logs et l’état de la base.</li><li>Revenir au code validé précédent.</li><li>Restaurer la base seulement si nécessaire et si le dump est compatible.</li><li>Restaurer les fichiers numériques associés.</li><li>Relancer les validations d’identité, de connexion et d’isolation.</li></ol>
 
-  <h2>12. Dépannage</h2>
+  <h2>15. Dépannage</h2>
   <table>
     <tr><th>Symptôme</th><th>Diagnostic</th><th>Correction</th></tr>
     <tr><td>Bootstrap absent ou invalide</td><td>Le VPS ne possède pas le JSON généré par MAXIMUS.</td><td>Régénérer l’enrôlement depuis la fiche entreprise et relancer avec <code>--bootstrap-file</code>.</td></tr>
-    <tr><td>Jeton refusé</td><td>Jeton expiré, révoqué ou transféré vers une autre installation.</td><td>Révoquer l’installation dans MAXIMUS, générer un nouveau bootstrap et supprimer l’ancien fichier.</td></tr>
+    <tr><td>Jeton refusé</td><td>Jeton révoqué, remplacé par une nouvelle génération ou copié dans une autre installation.</td><td>Révoquer l’installation dans MAXIMUS, générer un nouveau bootstrap et supprimer l’ancien fichier.</td></tr>
     <tr><td>Synchronisation centrale échouée</td><td>URL centrale, pare-feu ou jeton indisponible.</td><td>Tester <code>curl</code> vers l’URL centrale, vérifier <code>MAXIMUS_CENTRAL_URL</code> et relancer <code>php artisan maximus:sync-central-installation</code>.</td></tr>
     <tr><td>Connexion PostgreSQL refusée</td><td>Hôte, port, mot de passe ou pare-feu.</td><td>Tester avec <code>psql</code> et vérifier les règles réseau.</td></tr>
     <tr><td>Frontend absent ou page blanche</td><td>Build sauté, échoué ou copié dans un mauvais dossier.</td><td>Relancer sans <code>--skip-build</code>, puis vérifier <code>public/index.html</code>.</td></tr>
@@ -281,7 +480,7 @@ php artisan migrate --force --no-interaction</pre>
     <tr><td>Échec après une relance</td><td>Variables différentes ou identifiant changé.</td><td>Comparer les clés non sensibles et conserver le même tenant ID.</td></tr>
   </table>
 
-  <h2>13. Checklist de mise en service</h2>
+  <h2>16. Checklist de mise en service</h2>
   <ul class="checklist">
     <li>Le serveur est dédié à l’entreprise ou séparé par une frontière réseau claire.</li>
     <li><code>MAXIMUS_DEPLOYMENT_MODE</code> vaut <code>dedicated</code> ou <code>on_premise</code>.</li>
