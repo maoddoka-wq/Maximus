@@ -219,8 +219,6 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-fail "Ce programme d’installation qui copie le code source est désactivé. Utilisez MAXIMUS central jusqu’à la disponibilité du connecteur local sans exposition du code."
-
 [[ -d "$LARAVEL_DIR" ]] || fail "Dossier Laravel introuvable : $LARAVEL_DIR"
 [[ -d "$FRONTEND_DIR" ]] || fail "Dossier frontend introuvable : $FRONTEND_DIR"
 command_required php

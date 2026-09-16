@@ -76,4 +76,3 @@
 - [Autorisation par fonctionnalité Présences](presence-feature-authorization.md) — une permission détaillée ne doit jamais retomber sur l’action d’une autre fonctionnalité.
 - [Connexion entreprise personnalisée](company-branded-login.md) — MAXIMUS autorise le mode marqué, l’entreprise choisit son entrée, et le serveur résout toujours le tenant par slug.
 - [Installations isolées](isolated-installations.md) — le mode central reste le défaut ; une installation dédiée est bornée par une entreprise configurée côté serveur et ne crée jamais d’admin global.
-- [Protection du code source](source-code-protection.md) — bloquer les installations client source-based ; le connecteur local doit fonctionner sans livrer Laravel ni le frontend.

@@ -84,7 +84,6 @@
 
   <h2>1. Règle de lecture : qui fait quoi et quand</h2>
   <div class="danger"><b>Ne pas mélanger les deux serveurs.</b> Les actions marquées <b>MAXIMUS PRINCIPAL</b> se font dans l’interface et la base du MAXIMUS central. Les actions marquées <b>SERVEUR DÉDIÉ</b> se font dans le terminal du VPS de l’entreprise. Une commande destinée au serveur dédié ne doit jamais être exécutée dans le terminal du serveur central, et inversement.</div>
-  <div class="danger"><b>Protection actuelle :</b> le déploiement qui copie le code source MAXIMUS sur un serveur appartenant à une entreprise est désactivé. Ne pas exécuter <code>scripts/install-maximus-instance.sh</code> ni utiliser un ancien bootstrap. Le connecteur local sans exposition du code est encore à construire ; cette documentation décrit le fonctionnement historique et ne constitue pas une autorisation de déploiement.</div>
   <table>
     <tr><th>Moment</th><th>MAXIMUS principal</th><th>Serveur dédié de l’entreprise</th></tr>
     <tr><td>Avant l’installation</td><td>Créer l’entreprise, choisir les modules/packs/fonctionnalités/permissions, valider l’entreprise et préparer l’enrôlement.</td><td>Créer le VPS, la base PostgreSQL, l’utilisateur système et préparer le dossier applicatif.</td></tr>
@@ -145,7 +144,7 @@
 ├── artifacts/maximus/              # frontend React/Vite
 └── scripts/install-maximus-instance.sh</pre>
   <h3>Flux d’installation</h3>
-  <ol><li>L’administrateur crée et active l’entreprise dans MAXIMUS principal.</li><li>Le domaine personnalisé est configuré et vérifié depuis MAXIMUS central.</li><li>L’entreprise utilise l’instance centrale via son domaine personnalisé.</li><li>Une installation sur un serveur appartenant à l’entreprise reste bloquée jusqu’à la disponibilité du connecteur local sans exposition du code source.</li></ol>
+  <ol><li>L’administrateur crée et active l’entreprise dans MAXIMUS principal.</li><li>Il ouvre sa fiche, choisit « Préparer le VPS dédié » ou « Préparer l’installation locale » et télécharge le JSON.</li><li>Le script vérifie PHP, Composer, curl et le JSON d’enrôlement.</li><li>Il crée ou met à jour le fichier Laravel <code>.env</code>, y conserve le lien central et protège le fichier par <code>chmod 600</code>.</li><li>Il installe Composer, construit le frontend et migre PostgreSQL.</li><li><code>maximus:install-company</code> appelle MAXIMUS principal, valide le jeton, copie l’entreprise, les modules et les domaines, puis crée le <code>company_admin</code>.</li><li>Une tâche planifiée lance ensuite <code>maximus:sync-central-installation</code>.</li><li>Il lance une sonde temporaire <code>/api/healthz</code>, sauf si elle est désactivée.</li></ol>
   <h3>Ce qui est copié et ce qui ne l’est pas</h3>
   <table>
     <tr><th>Copié vers le serveur dédié</th><th>Non copié vers le serveur dédié</th></tr>

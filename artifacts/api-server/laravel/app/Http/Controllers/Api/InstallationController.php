@@ -17,12 +17,6 @@ final class InstallationController extends Controller
         if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
             return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
         }
-        if (! config('maximus.source_installations_enabled')) {
-            return response()->json([
-                'error' => 'Les installations qui copient le code source sont désactivées. Le connecteur local sécurisé n’est pas encore disponible.',
-                'code' => 'SOURCE_INSTALLATION_DISABLED',
-            ], 410);
-        }
         $company = Company::query()->whereKey($companyId)->where('status', 'ACTIF')->whereNull('deleted_at')->first();
         if (! $company) {
             return response()->json(['error' => 'L’entreprise doit être active avant son installation.'], 409);
@@ -80,12 +74,6 @@ final class InstallationController extends Controller
 
     public function configuration(Request $request): JsonResponse
     {
-        if (! config('maximus.source_installations_enabled')) {
-            return response()->json([
-                'error' => 'La synchronisation d’une installation source-based est désactivée.',
-                'code' => 'SOURCE_INSTALLATION_DISABLED',
-            ], 410);
-        }
         $installation = $request->attributes->get('installation');
         $company = Company::query()->whereKey((string) $installation->company_id)
             ->where('status', 'ACTIF')->whereNull('deleted_at')->first();
