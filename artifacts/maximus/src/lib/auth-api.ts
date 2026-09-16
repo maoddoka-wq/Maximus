@@ -29,7 +29,7 @@ export const authApi = {
     body: JSON.stringify({ email, password, ...(companyId ? { companyId } : {}) }),
   }),
   loginBranding: (companyId?: string) =>
-    request<{ branding: CompanyLoginBranding }>(
+    request<{ branding: CompanyLoginBranding | null }>(
       `/auth/branding${companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''}`,
       undefined,
     ),

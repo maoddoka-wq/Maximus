@@ -1013,7 +1013,7 @@ function AppContent() {
         branding={brandedLoginRoute ? loginBranding : null}
         brandingLoading={brandedLoginRoute && loginBrandingLoading}
         brandingError={brandedLoginRoute ? loginBrandingError : ''}
-        companyLogin={brandedLoginRoute}
+        companyLogin={brandedLoginRoute && (loginBrandingLoading || Boolean(loginBranding))}
       />
     );
   }
@@ -7264,6 +7264,8 @@ function CompanyModulesDetail({
   const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
   const [paymentLoading, setPaymentLoading] = useState(true);
+  const [customLoginEnabled, setCustomLoginEnabled] = useState(Boolean(company.customLoginEnabled));
+  const [savedCustomLoginEnabled, setSavedCustomLoginEnabled] = useState(Boolean(company.customLoginEnabled));
 
   useEffect(() => {
     let cancelled = false;
@@ -7379,6 +7381,12 @@ function CompanyModulesDetail({
     };
   }, [company.id]);
 
+  useEffect(() => {
+    const enabled = Boolean(company.customLoginEnabled);
+    setCustomLoginEnabled(enabled);
+    setSavedCustomLoginEnabled(enabled);
+  }, [company.id, company.customLoginEnabled]);
+
   const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
   };
@@ -7480,6 +7488,35 @@ function CompanyModulesDetail({
       if (target) target.hiddenWorkspaceFeatures = [...hiddenWorkspaceFeatures];
     }, 'Visibilité de l’espace entreprise enregistrée.');
     setSavedHiddenWorkspaceFeatures(hiddenWorkspaceFeatures);
+  };
+
+  const saveCustomLogin = async () => {
+    setSaving(true);
+    try {
+      const savedCompany = (
+        await companyRequestApi.update(company.id, {
+          name: company.name,
+          manager: company.manager,
+          email: company.email,
+          phone: company.phone,
+          country: company.country,
+          sector: company.sector,
+          customLoginEnabled,
+        })
+      ).company;
+      const enabled = Boolean(savedCompany.customLoginEnabled);
+      setCustomLoginEnabled(enabled);
+      setSavedCustomLoginEnabled(enabled);
+      mutate((draft) => {
+        const target = draft.companies.find((item) => item.id === company.id);
+        if (target) target.customLoginEnabled = enabled;
+      }, enabled ? 'Connexion personnalisée activée pour cette entreprise.' : 'Connexion générale MAXIMUS conservée pour cette entreprise.');
+    } catch (error) {
+      setCustomLoginEnabled(savedCustomLoginEnabled);
+      window.alert(error instanceof Error ? error.message : 'Le réglage de connexion n’a pas pu être enregistré.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const save = async () => {
@@ -7648,6 +7685,46 @@ function CompanyModulesDetail({
             onClick={saveWorkspaceFeatures}
           >
             Enregistrer la visibilité
+          </ActionButton>
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Page de connexion personnalisée</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Activez ce réglage uniquement si cette entreprise doit utiliser son logo et son identité visuelle sur sa page de connexion.
+              Sinon, elle continue avec la connexion générale MAXIMUS.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${customLoginEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {customLoginEnabled ? 'Activée' : 'Désactivée'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${customLoginEnabled ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-custom-login"
+            checked={customLoginEnabled}
+            disabled={saving}
+            onChange={(event) => setCustomLoginEnabled(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser la connexion avec l’identité de l’entreprise</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Quand cette option est active, les liens dédiés et le chemin /connexion d’un domaine personnalisé peuvent afficher la marque de cette entreprise.
+            </span>
+          </span>
+        </label>
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-custom-login"
+            disabled={saving || customLoginEnabled === savedCustomLoginEnabled}
+            onClick={() => void saveCustomLogin()}
+          >
+            Enregistrer la connexion
           </ActionButton>
         </div>
       </section>

@@ -186,6 +186,7 @@ class AppStateController extends Controller
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
+                    'customLoginEnabled' => (bool) $company->custom_login_enabled,
                 ];
             },
         );
@@ -244,6 +245,7 @@ class AppStateController extends Controller
                 'primaryColor' => $company?->primary_color,
                 'accentColor' => $company?->accent_color,
                 'sidebarColor' => $company?->sidebar_color,
+                'customLoginEnabled' => (bool) ($company?->custom_login_enabled ?? false),
             ];
         })->values()->all();
 
@@ -589,6 +591,7 @@ class AppStateController extends Controller
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
+                    'customLoginEnabled' => (bool) $company->custom_login_enabled,
                 ]);
             },
             $state['companies'],
@@ -637,6 +640,7 @@ class AppStateController extends Controller
             'primaryColor' => $company->primary_color,
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
+            'customLoginEnabled' => (bool) $company->custom_login_enabled,
         ];
 
         $companies = collect($state['companies'] ?? []);

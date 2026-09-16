@@ -211,6 +211,7 @@ class CompanyController extends Controller
             'primaryColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'accentColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'sidebarColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'customLoginEnabled' => ['sometimes', 'boolean'],
         ])->validate();
 
         $email = Str::lower(trim($input['email']));
@@ -236,9 +237,12 @@ class CompanyController extends Controller
                     'primaryColor' => 'primary_color',
                     'accentColor' => 'accent_color',
                     'sidebarColor' => 'sidebar_color',
+                    'customLoginEnabled' => 'custom_login_enabled',
                 ] as $inputKey => $column) {
                     if (array_key_exists($inputKey, $input)) {
-                        $changes[$column] = strtoupper((string) $input[$inputKey]);
+                        $changes[$column] = $inputKey === 'customLoginEnabled'
+                            ? (bool) $input[$inputKey]
+                            : strtoupper((string) $input[$inputKey]);
                     }
                 }
                 $company->update($changes);
@@ -401,6 +405,7 @@ class CompanyController extends Controller
             'primaryColor' => $company->primary_color,
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
+            'customLoginEnabled' => (bool) $company->custom_login_enabled,
         ];
     }
 

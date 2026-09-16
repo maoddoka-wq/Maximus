@@ -32,9 +32,26 @@ class AuthController extends Controller
         if ($domain && $requestedCompanyId !== '' && $requestedCompanyId !== (string) $domain->company_id) {
             return response()->json(['error' => 'Cette page de connexion ne correspond pas à cette entreprise.'], 403);
         }
-        $scopedCompanyId = $requestedCompanyId !== ''
-            ? $requestedCompanyId
-            : ($domain ? (string) $domain->company_id : null);
+        $scopedCompanyId = null;
+        if ($requestedCompanyId !== '') {
+            $requestedCompany = Company::query()
+                ->whereKey($requestedCompanyId)
+                ->where('status', 'ACTIF')
+                ->whereNull('deleted_at')
+                ->first();
+            if ($requestedCompany?->custom_login_enabled) {
+                $scopedCompanyId = $requestedCompanyId;
+            }
+        } elseif ($domain) {
+            $domainCompany = Company::query()
+                ->whereKey((string) $domain->company_id)
+                ->where('status', 'ACTIF')
+                ->whereNull('deleted_at')
+                ->first();
+            if ($domainCompany?->custom_login_enabled) {
+                $scopedCompanyId = (string) $domain->company_id;
+            }
+        }
 
         $user = AuthUser::query()
             ->where('email', Str::lower(trim($data['email'])))
@@ -102,11 +119,16 @@ class AuthController extends Controller
         $company = Company::query()
             ->whereKey($companyId)
             ->where('status', 'ACTIF')
+            ->where('custom_login_enabled', true)
             ->whereNull('deleted_at')
             ->first();
 
         if (! $company) {
             return response()->json(['error' => 'Entreprise de connexion introuvable.'], 404);
+        }
+
+        if (! $company->custom_login_enabled) {
+            return response()->json(['branding' => null]);
         }
 
         return response()->json([

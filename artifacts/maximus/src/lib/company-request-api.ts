@@ -43,7 +43,7 @@ export const companyRequestApi = {
       `/company-requests/${encodeURIComponent(companyId)}/reject`,
       { method: 'POST', body: JSON.stringify({ reason: reason ?? '' }) },
     ),
-  update: (companyId: string, input: Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & Partial<Pick<Company, 'primaryColor' | 'accentColor' | 'sidebarColor'>>) =>
+  update: (companyId: string, input: Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'> & Partial<Pick<Company, 'primaryColor' | 'accentColor' | 'sidebarColor' | 'customLoginEnabled'>>) =>
     request<{ ok: true; company: Company }>(`/companies/${encodeURIComponent(companyId)}`, {
       method: 'PATCH',
       body: JSON.stringify(input),

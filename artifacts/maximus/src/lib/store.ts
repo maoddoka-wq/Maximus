@@ -51,6 +51,7 @@ export interface Company {
   primaryColor?: string;
   accentColor?: string;
   sidebarColor?: string;
+  customLoginEnabled?: boolean;
   managerRoleId?: string;
 }
 
