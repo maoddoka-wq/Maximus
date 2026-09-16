@@ -105,7 +105,7 @@ import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
-import { authApi, type AuthUser } from '@/lib/auth-api';
+import { authApi, type AuthUser, type CompanyLoginBranding } from '@/lib/auth-api';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
@@ -407,6 +407,14 @@ function AppContent() {
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const location = search ? `${pathname}?${search}` : pathname;
+  const companyLoginMatch = pathname.match(/^\/connexion(?:\/([^/]+))?$/);
+  const companyLoginId = companyLoginMatch?.[1] ? decodeURIComponent(companyLoginMatch[1]) : undefined;
+  const brandedLoginRoute = Boolean(
+    companyLoginMatch && (Boolean(companyLoginId) || (pathname === '/connexion' && isPotentialCustomStoreHost())),
+  );
+  const [loginBranding, setLoginBranding] = useState<CompanyLoginBranding | null>(null);
+  const [loginBrandingLoading, setLoginBrandingLoading] = useState(false);
+  const [loginBrandingError, setLoginBrandingError] = useState('');
   const dataRef = useRef(data);
   const appStateSaveQueue = useRef(Promise.resolve());
   const appStateVersionRef = useRef(appStateVersion);
@@ -421,6 +429,34 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    if (!brandedLoginRoute || session) {
+      setLoginBranding(null);
+      setLoginBrandingLoading(false);
+      setLoginBrandingError('');
+      return undefined;
+    }
+    let cancelled = false;
+    setLoginBranding(null);
+    setLoginBrandingError('');
+    setLoginBrandingLoading(true);
+    void authApi
+      .loginBranding(companyLoginId)
+      .then(({ branding }) => {
+        if (cancelled) return;
+        setLoginBranding(branding);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLoginBrandingError(error instanceof Error ? error.message : 'L’identité de cette entreprise est indisponible.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoginBrandingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [brandedLoginRoute, companyLoginId, session]);
   const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
     showAppToast(message, kind);
   useEffect(() => {
@@ -724,8 +760,8 @@ function AppContent() {
     localStorage.setItem('maximus-session', nextSession);
     setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
   };
-  const login = async (_space: 'admin' | 'company', email: string, password: string) => {
-    const { user } = await authApi.login(email, password);
+  const login = async (_space: 'admin' | 'company', email: string, password: string, companyId?: string) => {
+    const { user } = await authApi.login(email, password, companyId);
     applyAuthenticatedUser(user);
   };
   const startSectorTest = (preset: SectorPreset) => {
@@ -974,6 +1010,10 @@ function AppContent() {
         onLogin={login}
         employees={loginEmployees}
         registrationEnabled={publicRegistrationEnabled}
+        branding={brandedLoginRoute ? loginBranding : null}
+        brandingLoading={brandedLoginRoute && loginBrandingLoading}
+        brandingError={brandedLoginRoute ? loginBrandingError : ''}
+        companyLogin={brandedLoginRoute}
       />
     );
   }
@@ -1247,10 +1287,18 @@ function Login({
   onLogin,
   employees,
   registrationEnabled,
+  branding,
+  brandingLoading,
+  brandingError,
+  companyLogin,
 }: {
-  onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
+  onLogin: (space: 'admin' | 'company', email: string, password: string, companyId?: string) => Promise<void>;
   employees: StoreData['employees'];
   registrationEnabled: boolean;
+  branding: CompanyLoginBranding | null;
+  brandingLoading: boolean;
+  brandingError: string;
+  companyLogin: boolean;
 }) {
   const showDemoAccounts = false;
   const [email, setEmail] = useState('');
@@ -1258,11 +1306,13 @@ function Login({
   const [error, setError] = useState('');
   const [loginHelp, setLoginHelp] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
+  const brandingStyle = branding ? ({ ...companyThemeVariables(branding) } as CSSProperties) : undefined;
   const loginWithCredentials = (space: 'admin' | 'company', nextEmail: string, nextPassword: string) => {
     if (pendingEmail) return;
+    if (companyLogin && (!branding || brandingLoading || brandingError)) return;
     setError('');
     setPendingEmail(nextEmail);
-    void onLogin(space, nextEmail, nextPassword)
+    void onLogin(space, nextEmail, nextPassword, branding?.companyId)
       .catch((loginError) => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'))
       .finally(() => setPendingEmail(''));
   };
@@ -1292,11 +1342,22 @@ function Login({
     loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
   };
   return (
-    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
+    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]" style={brandingStyle}>
       <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
         <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
-        <Brand inverse large />
+        {branding ? (
+          <div className="relative flex items-center gap-4">
+            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[hsl(var(--accent)/.18)] shadow-sm">
+              {branding.profilePhoto ? (
+                <img src={branding.profilePhoto} alt={`Logo de ${branding.name}`} className="h-full w-full object-contain" />
+              ) : (
+                <Building2 size={25} />
+              )}
+            </span>
+            <span className="max-w-[16rem] truncate text-xl font-black tracking-[-.04em]">{branding.name}</span>
+          </div>
+        ) : <Brand inverse large />}
         <div className="relative mt-32 max-w-xl pb-16">
           <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">
             La gestion d’entreprise, simplement
@@ -1318,21 +1379,46 @@ function Login({
       <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12">
         <div className="w-full max-w-md fade-up">
           <div className="mb-10 lg:hidden">
-            <Brand large />
+            {branding ? (
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-[hsl(var(--primary)/.12)]">
+                  {branding.profilePhoto ? (
+                    <img src={branding.profilePhoto} alt={`Logo de ${branding.name}`} className="h-full w-full object-contain" />
+                  ) : (
+                    <Building2 size={20} className="text-[hsl(var(--primary))]" />
+                  )}
+                </span>
+                <span className="max-w-[16rem] truncate text-lg font-black tracking-[-.04em]">{branding.name}</span>
+              </div>
+            ) : <Brand large />}
           </div>
           <div className="mb-8">
             <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
-              Accédez à votre espace
+              {branding ? `Espace sécurisé · ${branding.name}` : 'Accédez à votre espace'}
             </p>
-            <h2 className="text-3xl font-bold tracking-[-.04em]">Gérez votre activité en toute simplicité</h2>
+            <h2 className="text-3xl font-bold tracking-[-.04em]">
+              {branding ? `Bienvenue chez ${branding.name}` : 'Gérez votre activité en toute simplicité'}
+            </h2>
             <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.
+              {branding
+                ? 'Connectez-vous pour retrouver les outils et les informations de votre entreprise.'
+                : 'Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.'}
             </p>
           </div>
+          {brandingLoading && (
+            <p className="mb-5 rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--muted-foreground))]">
+              Chargement de l’identité de votre entreprise…
+            </p>
+          )}
+          {brandingError && (
+            <p data-testid="login-branding-error" className="mb-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+              {brandingError}
+            </p>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              submitLogin('company');
+                submitLogin('company');
             }}
             className="space-y-5"
           >
@@ -1378,7 +1464,7 @@ function Login({
             )}
             <button
               data-testid="button-login"
-              disabled={Boolean(pendingEmail)}
+              disabled={Boolean(pendingEmail) || brandingLoading || Boolean(brandingError) || (companyLogin && !branding)}
               className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)] disabled:cursor-wait disabled:opacity-70"
               type="submit"
             >
@@ -1387,14 +1473,22 @@ function Login({
             </button>
           </form>
           <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-            Pas encore d’espace ?{' '}
-            <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-              Créer une entreprise
-            </Link>
-            {!registrationEnabled && (
-              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
-              </p>
+            {companyLogin ? (
+              <Link data-testid="link-general-login" href="/" className="font-bold text-[hsl(var(--primary))]">
+                Connexion générale MAXIMUS
+              </Link>
+            ) : (
+              <>
+                Pas encore d’espace ?{' '}
+                <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
+                  Créer une entreprise
+                </Link>
+                {!registrationEnabled && (
+                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
+                  </p>
+                )}
+              </>
             )}
           </div>
           {showDemoAccounts && demoAccounts.length > 0 && (

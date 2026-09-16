@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthSession;
 use App\Models\AuthUser;
+use App\Models\Company;
+use App\Services\EcommerceDomainVerifier;
 use App\Support\CompanyAuthorization;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
@@ -17,12 +19,22 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function login(Request $request): JsonResponse
+    public function login(Request $request, EcommerceDomainVerifier $domainVerifier): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'string', 'max:200'],
+            'companyId' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
+
+        $requestedCompanyId = trim((string) ($data['companyId'] ?? ''));
+        $domain = $domainVerifier->activeForHost($request->getHost());
+        if ($domain && $requestedCompanyId !== '' && $requestedCompanyId !== (string) $domain->company_id) {
+            return response()->json(['error' => 'Cette page de connexion ne correspond pas à cette entreprise.'], 403);
+        }
+        $scopedCompanyId = $requestedCompanyId !== ''
+            ? $requestedCompanyId
+            : ($domain ? (string) $domain->company_id : null);
 
         $user = AuthUser::query()
             ->where('email', Str::lower(trim($data['email'])))
@@ -37,6 +49,15 @@ class AuthController extends Controller
             return response()->json([
                 'error' => 'Email ou mot de passe incorrect.',
             ], 401);
+        }
+
+        if ($scopedCompanyId !== null && (
+            $user->role === 'maximus_admin'
+            || (string) $user->company_id !== $scopedCompanyId
+        )) {
+            return response()->json([
+                'error' => 'Ce compte n’est pas autorisé dans cet espace entreprise.',
+            ], 403);
         }
 
         if (MaximusPassword::needsRehash($user->password_hash)) {
@@ -61,6 +82,43 @@ class AuthController extends Controller
                 false,
                 'lax',
             ));
+    }
+
+    public function branding(Request $request, EcommerceDomainVerifier $domainVerifier): JsonResponse
+    {
+        $requestedCompanyId = trim((string) $request->query('companyId', ''));
+        $domain = $domainVerifier->activeForHost($request->getHost());
+        $domainCompanyId = $domain ? (string) $domain->company_id : null;
+
+        if ($domainCompanyId !== null && $requestedCompanyId !== '' && $requestedCompanyId !== $domainCompanyId) {
+            return response()->json(['error' => 'Cette adresse ne correspond pas à cette entreprise.'], 404);
+        }
+
+        $companyId = $domainCompanyId ?? ($requestedCompanyId !== '' ? $requestedCompanyId : null);
+        if ($companyId === null) {
+            return response()->json(['error' => 'Entreprise de connexion introuvable.'], 404);
+        }
+
+        $company = Company::query()
+            ->whereKey($companyId)
+            ->where('status', 'ACTIF')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (! $company) {
+            return response()->json(['error' => 'Entreprise de connexion introuvable.'], 404);
+        }
+
+        return response()->json([
+            'branding' => [
+                'companyId' => (string) $company->id,
+                'name' => (string) ($company->name ?: 'Espace entreprise'),
+                'profilePhoto' => $company->profile_photo,
+                'primaryColor' => $company->primary_color,
+                'accentColor' => $company->accent_color,
+                'sidebarColor' => $company->sidebar_color,
+            ],
+        ]);
     }
 
     public function createAccount(Request $request): JsonResponse

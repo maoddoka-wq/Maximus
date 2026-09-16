@@ -1,6 +1,7 @@
 import type { Company } from './store';
 
 export type CompanyThemeVariables = Record<string, string>;
+export type CompanyThemeSource = Pick<Company, 'primaryColor' | 'accentColor' | 'sidebarColor'>;
 
 const hexColorPattern = /^#[0-9a-f]{6}$/i;
 const themeVariableNames = [
@@ -65,7 +66,7 @@ function shiftHslLightness(hsl: string, amount: number) {
   return `${match[1]} ${match[2]}% ${Math.max(5, Math.min(95, Number(match[3]) + amount))}%`;
 }
 
-export function companyThemeVariables(company: Company | undefined): CompanyThemeVariables {
+export function companyThemeVariables(company: CompanyThemeSource | undefined): CompanyThemeVariables {
   if (!company) return {};
 
   const primary = hexColorPattern.test(company.primaryColor ?? '') ? company.primaryColor! : null;
