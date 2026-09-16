@@ -1,0 +1,29 @@
+
+config [-g|--global] [-e|--editor] [-a|--auth] [--unset] [-l|--list] [-f|--file FILE] [--absolute] [-j|--json] [-m|--merge] [--append] [--source] [--] [<setting-key> [<setting-value>...]]
+
+PS C:\Users\FIS-TS> composer config --global cafile "C:\Users\FIS-TS\php\cacert.pem"
+PS C:\Users\FIS-TS> composer config --global cafile
+C:\Program Files\Git\mingw64\etc\ssl\certs\ca-bundle.crt
+PS C:\Users\FIS-TS> composer diagnose
+Checking pubkeys: FAIL
+Missing pubkey for tags verification
+Missing pubkey for dev verification
+Run composer self-update --update-keys to set them up
+Checking Composer version: FAIL
+[Composer\Downloader\TransportException] curl error 60 while downloading https://getcomposer.org/versions: SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+Composer version: 2.10.3
+Checking Composer and its dependencies for vulnerabilities: Failed performing audit: curl error 60 while downloading https://repo.packagist.org/packages.json: SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+PHP version: 8.3.33
+PHP binary path: C:\Users\FIS-TS\php\php.exe
+OpenSSL version: OpenSSL 3.0.21 9 Jun 2026
+curl version: 8.21.0 libz 1.3.2 brotli brotli/1.2.0 zstd supported ssl OpenSSL/3.0.21 HTTP 1.0, 1.1, 2
+zip: extension present, unzip not available, 7-Zip not available
+Checking platform settings: OK
+Checking git settings: OK git version 2.53.0
+Checking http connectivity to packagist: OK
+Checking https connectivity to packagist: FAIL
+[Composer\Downloader\TransportException] curl error 60 while downloading https://repo.packagist.org/packages.json: SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+Checking github.com rate limit: FAIL
+[Composer\Downloader\TransportException] curl error 60 while downloading https://api.github.com/rate_limit: SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+Checking disk free space: OK
+PS C:\Users\FIS-TS>
