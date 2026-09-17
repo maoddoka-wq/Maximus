@@ -15,6 +15,12 @@ Les écrans d’administration qui modifient une entreprise doivent aussi charge
 
 **How to apply:** construire la liste affichée depuis les overrides et modules personnalisés publiés, préférer la configuration d’accès serveur au cache ancien de l’entreprise, et supprimer les IDs de packs/fonctionnalités qui ne sont plus présents avant toute mutation.
 
+Une installation dédiée doit recevoir les définitions du catalogue publié avec les identifiants de packs transmis dans sa configuration ; les seuls `packIds` ne suffisent pas pour synchroniser un override e-commerce ou un module personnalisé.
+
+**Why:** l’installation isolée ne partage pas l’état catalogue de MAXIMUS principal. Sans transfert des définitions, elle rejette correctement un pack pourtant publié et autorisé au central comme « pack absent ».
+
+**How to apply:** exporter les définitions publiées des modules autorisés dans la configuration centrale, les importer pendant le provisioning avant `normalizeSelection`, puis valider les packs avec ce catalogue local.
+
 Les dépendances du module Stock doivent utiliser les IDs opérationnels (`products`, `entries`, `exits`, etc.), jamais les anciens slugs de libellés.
 
 **Why:** les libellés affichés (« Articles », « Entrées et sorties ») ne correspondent pas aux IDs réellement utilisés par les packs et le moteur de permissions ; la validation du catalogue bloquait toute publication même sans modification Stock.

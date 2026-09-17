@@ -569,6 +569,95 @@ final class ModuleCatalog
     }
 
     /**
+     * Export the published definitions needed by an isolated installation.
+     *
+     * Company access and catalog definitions are separate concerns. A
+     * dedicated installation must receive both because a published custom pack
+     * may not exist in its built-in catalog.
+     *
+     * @param array<int, string> $moduleIds
+     * @return array<int, array<string, mixed>>
+     */
+    public static function publishedCatalog(array $moduleIds): array
+    {
+        $wanted = array_fill_keys(array_values(array_unique(array_map('strval', $moduleIds))), true);
+
+        return collect(self::definitionsWithCustom())
+            ->filter(static fn (array $definition): bool => isset($wanted[(string) ($definition['id'] ?? '')]))
+            ->map(fn (array $definition): array => self::publishedDefinitionPayload($definition))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Import published definitions into the local workspace catalog.
+     *
+     * This is used only during installation/provisioning, not during a normal
+     * authenticated app bootstrap.
+     *
+     * @param array<int, mixed> $catalog
+     */
+    public static function importPublishedCatalog(array $catalog): void
+    {
+        $incoming = collect($catalog)
+            ->filter(static fn (mixed $module): bool => is_array($module))
+            ->map(fn (array $module): ?array => self::normalizePublishedDefinition($module))
+            ->filter(static fn (?array $module): bool => is_array($module))
+            ->keyBy('id');
+
+        if ($incoming->isEmpty()) {
+            return;
+        }
+
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = is_string($row?->payload)
+            ? json_decode($row->payload, true)
+            : ($row?->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+        $moduleOverrides = is_array($state['moduleOverrides'] ?? null) ? $state['moduleOverrides'] : [];
+        $customModules = collect(is_array($state['customModules'] ?? null) ? $state['customModules'] : [])
+            ->filter(static fn (mixed $module): bool => is_array($module) && is_string($module['id'] ?? null))
+            ->keyBy('id');
+        $moduleStatuses = is_array($state['moduleStatuses'] ?? null) ? $state['moduleStatuses'] : [];
+        $builtInIds = array_fill_keys(array_map('strval', array_column(self::definitions(), 'id')), true);
+
+        foreach ($incoming as $moduleId => $module) {
+            if (isset($builtInIds[$moduleId])) {
+                $moduleOverrides[$moduleId] = [
+                    'name' => $module['name'],
+                    'description' => $module['description'],
+                    'features' => $module['features'],
+                    'featurePacks' => $module['featurePacks'],
+                    'featureDependencies' => $module['featureDependencies'],
+                ];
+            } else {
+                $customModules->put($moduleId, $module);
+            }
+            $moduleStatuses[$moduleId] = $module['status'];
+        }
+
+        $incomingIds = $incoming->keys()->map('strval')->all();
+        $state['moduleOverrides'] = $moduleOverrides;
+        $state['customModules'] = $customModules->values()->all();
+        $state['moduleStatuses'] = $moduleStatuses;
+        $state['removedModules'] = array_values(array_diff(
+            is_array($state['removedModules'] ?? null) ? array_map('strval', $state['removedModules']) : [],
+            $incomingIds,
+        ));
+
+        DB::table('maximus_app_states')->updateOrInsert(
+            ['scope' => 'workspace'],
+            [
+                'company_id' => null,
+                'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'version' => ((int) ($row?->version ?? 0)) + 1,
+                'updated_at' => now(),
+                'created_at' => $row?->created_at ?? now(),
+            ],
+        );
+    }
+
+    /**
      * Convert the frontend catalog shape into the internal catalog shape used
      * by server-side selection validation.
      *
@@ -604,6 +693,78 @@ final class ModuleCatalog
             ->filter(static fn (?array $pack): bool => is_array($pack) && $pack['id'] !== '')
             ->values()
             ->all();
+    }
+
+    /** @return array<string, mixed> */
+    private static function publishedDefinitionPayload(array $definition): array
+    {
+        return [
+            'id' => (string) $definition['id'],
+            'name' => (string) ($definition['name'] ?? $definition['id']),
+            'description' => (string) ($definition['description'] ?? ''),
+            'features' => is_array($definition['features'] ?? null)
+                ? array_values(array_map('strval', $definition['features']))
+                : [],
+            'featurePacks' => collect(is_array($definition['feature_packs'] ?? null) ? $definition['feature_packs'] : [])
+                ->map(static fn (array $pack): array => [
+                    'id' => (string) ($pack['id'] ?? ''),
+                    'name' => (string) ($pack['name'] ?? ''),
+                    'description' => (string) ($pack['description'] ?? ''),
+                    'featureIds' => is_array($pack['feature_ids'] ?? null)
+                        ? array_values(array_map('strval', $pack['feature_ids']))
+                        : [],
+                    'featurePermissions' => is_array($pack['feature_permissions'] ?? null)
+                        ? $pack['feature_permissions']
+                        : [],
+                ])
+                ->filter(static fn (array $pack): bool => $pack['id'] !== '')
+                ->values()
+                ->all(),
+            'featureDependencies' => is_array($definition['feature_dependencies'] ?? null)
+                ? $definition['feature_dependencies']
+                : [],
+            'status' => in_array(($definition['status'] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)
+                ? ($definition['status'] ?? 'ACTIF')
+                : 'ACTIF',
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function normalizePublishedDefinition(array $module): ?array
+    {
+        $id = trim((string) ($module['id'] ?? ''));
+        if ($id === '') {
+            return null;
+        }
+
+        $featurePacks = self::normalizeFeaturePacks(
+            $module['featurePacks'] ?? $module['feature_packs'] ?? [],
+        );
+
+        return [
+            'id' => $id,
+            'name' => trim((string) ($module['name'] ?? $id)),
+            'description' => trim((string) ($module['description'] ?? '')),
+            'features' => is_array($module['features'] ?? null)
+                ? array_values(array_map('strval', $module['features']))
+                : [],
+            'featurePacks' => array_map(
+                static fn (array $pack): array => [
+                    'id' => $pack['id'],
+                    'name' => $pack['name'],
+                    'description' => $pack['description'],
+                    'featureIds' => $pack['feature_ids'],
+                    'featurePermissions' => $pack['feature_permissions'],
+                ],
+                $featurePacks,
+            ),
+            'featureDependencies' => is_array($module['featureDependencies'] ?? null)
+                ? $module['featureDependencies']
+                : (is_array($module['feature_dependencies'] ?? null) ? $module['feature_dependencies'] : []),
+            'status' => in_array(($module['status'] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)
+                ? ($module['status'] ?? 'ACTIF')
+                : 'ACTIF',
+        ];
     }
 
     /**

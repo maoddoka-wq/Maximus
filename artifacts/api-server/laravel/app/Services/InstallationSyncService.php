@@ -45,47 +45,51 @@ final class InstallationSyncService
         $companyId = trim((string) ($companyData['id'] ?? ''));
         $moduleData = is_array($payload['modules'] ?? null) ? $payload['modules'] : [];
         $moduleIds = array_values(array_unique(array_map('strval', is_array($moduleData['ids'] ?? null) ? $moduleData['ids'] : [])));
+        $catalog = is_array($payload['catalog'] ?? null) ? $payload['catalog'] : [];
         if ($companyId === '' || $moduleIds === []) {
             throw new RuntimeException('La configuration centrale ne contient pas d’entreprise ou de module.');
         }
 
-        ModuleCatalog::ensureCatalog();
         $packIds = is_array($moduleData['packIds'] ?? null) ? $moduleData['packIds'] : [];
         $featureIds = is_array($moduleData['featureIds'] ?? null) ? $moduleData['featureIds'] : [];
         $permissions = is_array($moduleData['permissions'] ?? null) ? $moduleData['permissions'] : [];
-        $normalizedPacks = [];
-        $normalizedFeatures = [];
-        $normalizedPermissions = [];
-        foreach ($moduleIds as $moduleId) {
-            if (! ModuleCatalog::isPublishedModule($moduleId)) {
-                throw new RuntimeException("Le module « {$moduleId} » n’est pas publié localement.");
-            }
-            try {
-                $selection = ModuleCatalog::normalizeSelection(
-                    $moduleId,
-                    is_array($featureIds[$moduleId] ?? null) ? $featureIds[$moduleId] : [],
-                    [
-                        'packIds' => is_array($packIds[$moduleId] ?? null) ? $packIds[$moduleId] : [],
-                        'featurePermissions' => is_array($permissions[$moduleId] ?? null) ? $permissions[$moduleId] : [],
-                    ],
-                );
-            } catch (\InvalidArgumentException $exception) {
-                throw new RuntimeException($exception->getMessage(), previous: $exception);
-            }
-            $normalizedPacks[$moduleId] = $selection['configuration']['packIds'];
-            $normalizedFeatures[$moduleId] = $selection['featureIds'];
-            $normalizedPermissions[$moduleId] = $selection['configuration']['featurePermissions'];
-        }
 
         $company = DB::transaction(function () use (
             $companyData,
             $companyId,
             $moduleIds,
-            $normalizedPacks,
-            $normalizedFeatures,
-            $normalizedPermissions,
+            $catalog,
+            $packIds,
+            $featureIds,
+            $permissions,
             $payload,
         ): Company {
+            ModuleCatalog::importPublishedCatalog($catalog);
+            ModuleCatalog::ensureCatalog();
+            $normalizedPacks = [];
+            $normalizedFeatures = [];
+            $normalizedPermissions = [];
+            foreach ($moduleIds as $moduleId) {
+                if (! ModuleCatalog::isPublishedModule($moduleId)) {
+                    throw new RuntimeException("Le module « {$moduleId} » n’est pas publié localement.");
+                }
+                try {
+                    $selection = ModuleCatalog::normalizeSelection(
+                        $moduleId,
+                        is_array($featureIds[$moduleId] ?? null) ? $featureIds[$moduleId] : [],
+                        [
+                            'packIds' => is_array($packIds[$moduleId] ?? null) ? $packIds[$moduleId] : [],
+                            'featurePermissions' => is_array($permissions[$moduleId] ?? null) ? $permissions[$moduleId] : [],
+                        ],
+                    );
+                } catch (\InvalidArgumentException $exception) {
+                    throw new RuntimeException($exception->getMessage(), previous: $exception);
+                }
+                $normalizedPacks[$moduleId] = $selection['configuration']['packIds'];
+                $normalizedFeatures[$moduleId] = $selection['featureIds'];
+                $normalizedPermissions[$moduleId] = $selection['configuration']['featurePermissions'];
+            }
+
             $company = Company::query()->updateOrCreate(
                 ['id' => $companyId],
                 [

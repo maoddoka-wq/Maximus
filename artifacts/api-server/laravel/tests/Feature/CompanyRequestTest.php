@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\CompanyRequest;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -142,7 +143,8 @@ class CompanyRequestTest extends TestCase
             ->getJson('/api/installation-sync/configuration')
             ->assertOk()
             ->assertJsonPath('company.id', $companyId)
-            ->assertJsonPath('modules.ids.0', 'commerce');
+            ->assertJsonPath('modules.ids.0', 'commerce')
+            ->assertJsonPath('catalog.0.id', 'commerce');
 
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
@@ -152,6 +154,54 @@ class CompanyRequestTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$bootstrapToken)
             ->getJson('/api/installation-sync/configuration')
             ->assertUnauthorized();
+    }
+
+    public function test_published_custom_pack_can_be_imported_by_an_isolated_installation(): void
+    {
+        $pack = [
+            'id' => 'ecommerce-atelier-sur-mesure',
+            'name' => 'Pack Atelier',
+            'description' => 'Fonctionnalités publiées pour une boutique personnalisée.',
+            'featureIds' => ['dashboard', 'catalogue'],
+            'featurePermissions' => [
+                'dashboard' => ['voir'],
+                'catalogue' => ['voir', 'modifier'],
+            ],
+        ];
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'moduleOverrides' => [
+                    'ecommerce' => [
+                        'featurePacks' => [$pack],
+                    ],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $catalog = ModuleCatalog::publishedCatalog(['ecommerce']);
+        $this->assertSame($pack['id'], $catalog[0]['featurePacks'][0]['id']);
+
+        DB::table('maximus_app_states')->where('scope', 'workspace')->delete();
+        ModuleCatalog::importPublishedCatalog($catalog);
+
+        $selection = ModuleCatalog::normalizeSelection(
+            'ecommerce',
+            ['dashboard', 'catalogue'],
+            [
+                'packIds' => [$pack['id']],
+                'featurePermissions' => $pack['featurePermissions'],
+            ],
+        );
+
+        $this->assertSame([$pack['id']], $selection['configuration']['packIds']);
+        $this->assertSame(['dashboard', 'catalogue'], $selection['featureIds']);
+        $this->assertSame($pack['featurePermissions'], $selection['configuration']['featurePermissions']);
     }
 
     public function test_rejecting_a_request_is_persisted_and_cannot_be_approved_afterward(): void

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Support\ModuleCatalog;
 
 final class InstallationController extends Controller
 {
@@ -122,6 +123,7 @@ final class InstallationController extends Controller
                 'featureIds' => $company->requested_module_features ?? [],
                 'permissions' => $company->requested_module_permissions ?? [],
             ],
+            'catalog' => ModuleCatalog::publishedCatalog($company->requested_modules ?? []),
             'domains' => $domains,
         ]);
     }
