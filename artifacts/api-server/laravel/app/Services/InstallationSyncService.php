@@ -49,6 +49,9 @@ final class InstallationSyncService
             throw new RuntimeException('La configuration centrale ne contient pas d’entreprise ou de module.');
         }
 
+        $this->applyPublishedCatalog(
+            is_array($payload['catalog'] ?? null) ? $payload['catalog'] : [],
+        );
         ModuleCatalog::ensureCatalog();
         $packIds = is_array($moduleData['packIds'] ?? null) ? $moduleData['packIds'] : [];
         $featureIds = is_array($moduleData['featureIds'] ?? null) ? $moduleData['featureIds'] : [];
@@ -147,6 +150,41 @@ final class InstallationSyncService
         });
 
         return $company;
+    }
+
+    /** @param array<string, mixed> $catalog */
+    private function applyPublishedCatalog(array $catalog): void
+    {
+        DB::transaction(function () use ($catalog): void {
+            $current = DB::table('maximus_app_states')
+                ->where('scope', 'workspace')
+                ->lockForUpdate()
+                ->first();
+            $payload = is_string($current?->payload)
+                ? json_decode($current->payload, true)
+                : ($current?->payload ?? []);
+            $state = is_array($payload) ? $payload : [];
+
+            foreach (['moduleOverrides', 'moduleStatuses', 'customModules', 'removedModules'] as $key) {
+                if (array_key_exists($key, $catalog) && is_array($catalog[$key])) {
+                    $state[$key] = $catalog[$key];
+                }
+            }
+            if (array_key_exists('catalogVersion', $catalog)) {
+                $state['catalogVersion'] = (int) $catalog['catalogVersion'];
+            }
+
+            DB::table('maximus_app_states')->updateOrInsert(
+                ['scope' => 'workspace'],
+                [
+                    'company_id' => null,
+                    'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'version' => ((int) ($current?->version ?? 0)) + 1,
+                    'updated_at' => now(),
+                    'created_at' => $current?->created_at ?? now(),
+                ],
+            );
+        });
     }
 
     public function heartbeat(): void

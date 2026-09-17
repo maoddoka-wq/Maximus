@@ -78,3 +78,4 @@
 - [Connexion entreprise personnalisée](company-branded-login.md) — MAXIMUS autorise le mode marqué, l’entreprise choisit son entrée, et le serveur résout toujours le tenant par slug.
 - [Installations isolées](isolated-installations.md) — le mode central reste le défaut ; une installation dédiée est bornée par une entreprise configurée côté serveur et ne crée jamais d’admin global.
 - [URL canonique des bootstraps](installation-bootstrap-canonical-url.md) — générer les bootstraps depuis l’URL publique HTTPS configurée, jamais depuis l’hôte de requête reconstruit par Render.
+- [Synchronisation du catalogue dédié](dedicated-catalog-sync.md) — une installation dédiée reçoit le catalogue publié central et remplace seulement ses clés de catalogue, jamais son état métier.

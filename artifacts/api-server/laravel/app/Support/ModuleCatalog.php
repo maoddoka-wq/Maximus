@@ -589,6 +589,7 @@ final class ModuleCatalog
             : ($row?->payload ?? []);
         $state = is_array($payload) ? $payload : [];
         $custom = is_array($state['customModules'] ?? null) ? $state['customModules'] : [];
+        $overrides = is_array($state['moduleOverrides'] ?? null) ? $state['moduleOverrides'] : [];
 
         $normalizedCustom = collect($custom)
             ->filter(static fn (mixed $module): bool => is_array($module) && is_string($module['id'] ?? null))
@@ -616,9 +617,56 @@ final class ModuleCatalog
             ->values()
             ->all();
 
-        return [
+        $definitions = [
             ...self::definitions(),
             ...$normalizedCustom,
         ];
+
+        return collect($definitions)
+            ->map(static function (array $definition) use ($overrides): array {
+                $override = is_array($overrides[$definition['id']] ?? null)
+                    ? $overrides[$definition['id']]
+                    : [];
+                if ($override === []) {
+                    return $definition;
+                }
+
+                $featurePacks = $definition['feature_packs'] ?? [];
+                if (array_key_exists('featurePacks', $override) && is_array($override['featurePacks'])) {
+                    $featurePacks = collect($override['featurePacks'])
+                        ->filter(static fn (mixed $pack): bool => is_array($pack))
+                        ->map(static fn (array $pack): array => [
+                            'id' => (string) ($pack['id'] ?? ''),
+                            'name' => (string) ($pack['name'] ?? ''),
+                            'description' => (string) ($pack['description'] ?? ''),
+                            'feature_ids' => is_array($pack['featureIds'] ?? null) ? $pack['featureIds'] : [],
+                            'feature_permissions' => is_array($pack['featurePermissions'] ?? null)
+                                ? $pack['featurePermissions']
+                                : [],
+                        ])
+                        ->filter(static fn (array $pack): bool => $pack['id'] !== '')
+                        ->values()
+                        ->all();
+                }
+
+                return [
+                    ...$definition,
+                    'name' => is_string($override['name'] ?? null)
+                        ? $override['name']
+                        : $definition['name'],
+                    'description' => is_string($override['description'] ?? null)
+                        ? $override['description']
+                        : $definition['description'],
+                    'features' => is_array($override['features'] ?? null)
+                        ? array_values(array_filter($override['features'], 'is_string'))
+                        : $definition['features'],
+                    'feature_packs' => $featurePacks,
+                    'feature_dependencies' => is_array($override['featureDependencies'] ?? null)
+                        ? $override['featureDependencies']
+                        : ($definition['feature_dependencies'] ?? []),
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

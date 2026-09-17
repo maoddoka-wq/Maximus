@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Models\Company;
 use App\Models\CompanyRequest;
+use App\Services\InstallationSyncService;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,6 +172,99 @@ class CompanyRequestTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$bootstrapToken)
             ->getJson('/api/installation-sync/configuration')
             ->assertUnauthorized();
+    }
+
+    public function test_installation_sync_persists_a_newly_published_custom_module_before_validating_access(): void
+    {
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode([
+                'catalogVersion' => 12,
+                'moduleOverrides' => [
+                    'ecommerce' => [
+                        'featurePacks' => [[
+                            'id' => 'ecommerce-local-pack',
+                            'name' => 'Pack e-commerce local',
+                            'description' => 'Pack synchronisé depuis le catalogue central.',
+                            'featureIds' => ['dashboard', 'catalogue'],
+                            'featurePermissions' => [
+                                'dashboard' => ['voir'],
+                                'catalogue' => ['voir', 'modifier'],
+                            ],
+                        ]],
+                    ],
+                ],
+                'customModules' => [[
+                    'id' => 'projets',
+                    'name' => 'Gestion de projets',
+                    'description' => 'Suivre les projets.',
+                    'features' => ['Vue projets', 'Tâches'],
+                    'featurePacks' => [[
+                        'id' => 'projets-gestion',
+                        'name' => 'Gestion projets',
+                        'description' => 'Gérer les projets et les tâches.',
+                        'featureIds' => ['vue-projets', 'taches'],
+                        'featurePermissions' => [
+                            'vue-projets' => ['voir'],
+                            'taches' => ['voir', 'créer', 'modifier'],
+                        ],
+                    ]],
+                    'featureDependencies' => ['taches' => ['vue-projets']],
+                    'status' => 'ACTIF',
+                ]],
+                'companies' => [['id' => 'local-business-data']],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 4,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $payload = $this->requestPayload();
+        $payload['requestedModules'] = ['projets'];
+        $payload['requestedModuleFeatures'] = ['projets' => ['vue-projets', 'taches']];
+        $payload['requestedModulePackIds'] = ['projets' => ['projets-gestion']];
+        $payload['requestedModulePermissions'] = ['projets' => [
+            'vue-projets' => ['voir'],
+            'taches' => ['voir', 'créer', 'modifier'],
+        ]];
+
+        $this->postJson('/api/company-requests', $payload)->assertCreated();
+        $companyId = Company::query()->where('email', 'owner@atelier.test')->value('id');
+        $maximusToken = $this->issueMaximusSession();
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->postJson('/api/company-requests/'.$companyId.'/approve')
+            ->assertOk();
+
+        config(['app.url' => 'https://maximus-erp.onrender.com']);
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
+            ->postJson('/api/companies/'.$companyId.'/installation', ['mode' => 'dedicated'])
+            ->assertCreated();
+        $bootstrapToken = (string) $response->json('bootstrap.token');
+        $configuration = $this->withHeader('Authorization', 'Bearer '.$bootstrapToken)
+            ->getJson('/api/installation-sync/configuration')
+            ->assertOk()
+            ->assertJsonPath('catalogVersion', 12)
+            ->assertJsonPath('catalog.customModules.0.id', 'projets');
+
+        app(InstallationSyncService::class)->apply($configuration->json());
+
+        $state = json_decode((string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'), true);
+        $this->assertSame('local-business-data', $state['companies'][0]['id']);
+        $this->assertSame('projets', $state['customModules'][0]['id']);
+        $this->assertTrue(\App\Support\ModuleCatalog::isPublishedModule('projets'));
+        $this->assertSame(
+            ['ecommerce-local-pack'],
+            \App\Support\ModuleCatalog::normalizeSelection(
+                'ecommerce',
+                ['dashboard', 'catalogue'],
+                ['packIds' => ['ecommerce-local-pack']],
+            )['configuration']['packIds'],
+        );
+        $this->assertSame(
+            ['projets-gestion'],
+            Company::query()->whereKey($companyId)->value('requested_module_pack_ids')['projets'],
+        );
     }
 
     public function test_rejecting_a_request_is_persisted_and_cannot_be_approved_afterward(): void

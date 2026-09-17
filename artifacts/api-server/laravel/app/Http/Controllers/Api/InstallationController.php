@@ -95,6 +95,7 @@ final class InstallationController extends Controller
                 'lastError' => $domain->last_error,
                 'verifiedAt' => $domain->verified_at,
             ])->values()->all();
+        $catalog = $this->publishedCatalog();
 
         DB::table('maximus_installations')->where('id', $installation->id)->update([
             'status' => 'CONNECTED',
@@ -127,8 +128,36 @@ final class InstallationController extends Controller
                 'featureIds' => $company->requested_module_features ?? [],
                 'permissions' => $company->requested_module_permissions ?? [],
             ],
+            'catalogVersion' => $catalog['catalogVersion'],
+            'catalog' => $catalog,
             'domains' => $domains,
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function publishedCatalog(): array
+    {
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = is_string($row?->payload)
+            ? json_decode($row->payload, true)
+            : ($row?->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+
+        return [
+            'catalogVersion' => (int) ($state['catalogVersion'] ?? 0),
+            'moduleOverrides' => is_array($state['moduleOverrides'] ?? null)
+                ? $state['moduleOverrides']
+                : [],
+            'moduleStatuses' => is_array($state['moduleStatuses'] ?? null)
+                ? $state['moduleStatuses']
+                : [],
+            'customModules' => is_array($state['customModules'] ?? null)
+                ? $state['customModules']
+                : [],
+            'removedModules' => is_array($state['removedModules'] ?? null)
+                ? $state['removedModules']
+                : [],
+        ];
     }
 
     public function heartbeat(Request $request): JsonResponse
