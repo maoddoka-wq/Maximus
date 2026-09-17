@@ -36,6 +36,54 @@ class CompanyRequestTest extends TestCase
         ]);
     }
 
+    public function test_public_ecommerce_request_accepts_a_published_pack_override(): void
+    {
+        $pack = [
+            'id' => 'ecommerce-custom-catalogue',
+            'name' => 'Catalogue personnalisé',
+            'description' => 'Pack publié pour la boutique.',
+            'featureIds' => ['dashboard', 'catalogue'],
+            'featurePermissions' => [
+                'dashboard' => ['voir'],
+                'catalogue' => ['voir', 'créer', 'modifier'],
+            ],
+        ];
+
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'moduleOverrides' => [
+                    'ecommerce' => ['featurePacks' => [$pack]],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/company-requests', [
+            ...$this->requestPayload(),
+            'email' => 'ecommerce-owner@atelier.test',
+            'requestedModules' => ['ecommerce'],
+            'requestedModulePackIds' => ['ecommerce' => [$pack['id']]],
+            'requestedModuleFeatures' => ['ecommerce' => ['dashboard', 'catalogue']],
+            'requestedModulePermissions' => [
+                'ecommerce' => [
+                    'dashboard' => ['voir'],
+                    'catalogue' => ['voir', 'créer', 'modifier'],
+                ],
+            ],
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('status', 'PENDING');
+
+        $company = Company::query()->where('email', 'ecommerce-owner@atelier.test')->firstOrFail();
+        $this->assertSame([$pack['id']], $company->requested_module_pack_ids['ecommerce']);
+    }
+
     public function test_maximus_can_approve_a_request_and_provision_the_admin_and_modules(): void
     {
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();

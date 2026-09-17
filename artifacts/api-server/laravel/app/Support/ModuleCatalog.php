@@ -569,6 +569,79 @@ final class ModuleCatalog
     }
 
     /**
+     * Convert the frontend catalog shape into the internal catalog shape used
+     * by server-side selection validation.
+     *
+     * Published overrides are intentionally stored in camelCase because they
+     * are shared with the React workspace state. Registration must validate
+     * against those same published packs, not only against built-in defaults.
+     *
+     * @param mixed $packs
+     * @param array<int, array<string, mixed>> $fallback
+     * @return array<int, array<string, mixed>>
+     */
+    private static function normalizeFeaturePacks(mixed $packs, array $fallback = []): array
+    {
+        $source = is_array($packs) ? $packs : $fallback;
+
+        return collect($source)
+            ->map(static function (mixed $pack): ?array {
+                if (! is_array($pack)) {
+                    return null;
+                }
+
+                $featureIds = $pack['feature_ids'] ?? $pack['featureIds'] ?? [];
+                $permissions = $pack['feature_permissions'] ?? $pack['featurePermissions'] ?? [];
+
+                return [
+                    'id' => (string) ($pack['id'] ?? ''),
+                    'name' => (string) ($pack['name'] ?? ''),
+                    'description' => (string) ($pack['description'] ?? ''),
+                    'feature_ids' => is_array($featureIds) ? array_values(array_map('strval', $featureIds)) : [],
+                    'feature_permissions' => is_array($permissions) ? $permissions : [],
+                ];
+            })
+            ->filter(static fn (?array $pack): bool => is_array($pack) && $pack['id'] !== '')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Apply a published frontend module override to a server definition.
+     *
+     * @param mixed $rawOverride
+     * @return array<string, mixed>
+     */
+    private static function applyPublishedOverride(array $definition, mixed $rawOverride): array
+    {
+        if (! is_array($rawOverride)) {
+            return $definition;
+        }
+
+        if (is_string($rawOverride['name'] ?? null)) {
+            $definition['name'] = $rawOverride['name'];
+        }
+        if (is_string($rawOverride['description'] ?? null)) {
+            $definition['description'] = $rawOverride['description'];
+        }
+        if (is_array($rawOverride['features'] ?? null)) {
+            $definition['features'] = array_values(array_map('strval', $rawOverride['features']));
+        }
+        if (is_array($rawOverride['featurePacks'] ?? null) || is_array($rawOverride['feature_packs'] ?? null)) {
+            $definition['feature_packs'] = self::normalizeFeaturePacks(
+                $rawOverride['featurePacks'] ?? $rawOverride['feature_packs'],
+            );
+        }
+        if (is_array($rawOverride['featureDependencies'] ?? null)) {
+            $definition['feature_dependencies'] = $rawOverride['featureDependencies'];
+        } elseif (is_array($rawOverride['feature_dependencies'] ?? null)) {
+            $definition['feature_dependencies'] = $rawOverride['feature_dependencies'];
+        }
+
+        return $definition;
+    }
+
+    /**
      * Published custom modules live in the workspace catalog because they are
      * created through the MAXI draft workflow. Built-in definitions remain the
      * source of truth for the standard modules.
@@ -583,6 +656,15 @@ final class ModuleCatalog
             : ($row?->payload ?? []);
         $state = is_array($payload) ? $payload : [];
         $custom = is_array($state['customModules'] ?? null) ? $state['customModules'] : [];
+        $overrides = is_array($state['moduleOverrides'] ?? null) ? $state['moduleOverrides'] : [];
+
+        $normalizedDefinitions = collect(self::definitions())
+            ->map(fn (array $definition): array => self::applyPublishedOverride(
+                $definition,
+                $overrides[$definition['id']] ?? null,
+            ))
+            ->values()
+            ->all();
 
         $normalizedCustom = collect($custom)
             ->filter(static fn (mixed $module): bool => is_array($module) && is_string($module['id'] ?? null))
@@ -607,11 +689,15 @@ final class ModuleCatalog
                     ? ($module['status'] ?? 'ACTIF')
                     : 'ACTIF',
             ])
+            ->map(fn (array $definition): array => self::applyPublishedOverride(
+                $definition,
+                $overrides[$definition['id']] ?? null,
+            ))
             ->values()
             ->all();
 
         return [
-            ...self::definitions(),
+            ...$normalizedDefinitions,
             ...$normalizedCustom,
         ];
     }
