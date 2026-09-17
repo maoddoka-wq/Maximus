@@ -1,0 +1,41 @@
+$ vite build --config vite.config.ts
+C:\MAXIMUS\node_modules\.pnpm\rollup@4.62.3\node_modules\rollup\dist\native.js:121
+                throw new Error(
+                      ^
+
+Error: Cannot find module @rollup/rollup-win32-x64-msvc. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+    at requireWithFriendlyError (C:\MAXIMUS\node_modules\.pnpm\rollup@4.62.3\node_modules\rollup\dist\native.js:121:9)
+    at Object.<anonymous> (C:\MAXIMUS\node_modules\.pnpm\rollup@4.62.3\node_modules\rollup\dist\native.js:130:76)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:339:3)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:242:7) {
+  [cause]: Error: Cannot find module '@rollup/rollup-win32-x64-msvc'
+  Require stack:
+  - C:\MAXIMUS\node_modules\.pnpm\rollup@4.62.3\node_modules\rollup\dist\native.js
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+      at Module._load (node:internal/modules/cjs/loader:1227:37)
+      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+      at Module.require (node:internal/modules/cjs/loader:1504:12)
+      at require (node:internal/modules/helpers:152:16)
+      at requireWithFriendlyError (C:\MAXIMUS\node_modules\.pnpm\rollup@4.62.3\node_modules\rollup\dist\native.js:103:10)
+      at Object.<anonymous> (C:\MAXIMUS\node_modules\.pnpm\rollup@4.62.3\node_modules\rollup\dist\native.js:130:76) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      'C:\\MAXIMUS\\node_modules\\.pnpm\\rollup@4.62.3\\node_modules\\rollup\\dist\\native.js'
+    ]
+  }
+}
+
+Node.js v24.13.0
+[ELIFECYCLE] Command failed with exit code 1.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  x "pnpm recursive run" failed in C:\MAXIMUS\artifacts\maximus
