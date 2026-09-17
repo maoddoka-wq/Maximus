@@ -14,3 +14,9 @@ Les écrans d’administration qui modifient une entreprise doivent aussi charge
 **Why:** une entreprise existante pouvait conserver un pack E-commerce personnalisé ou historique que l’écran affichait et renvoyait malgré son absence de la définition intégrée, provoquant le refus serveur lors de la sauvegarde d’un autre réglage.
 
 **How to apply:** construire la liste affichée depuis les overrides et modules personnalisés publiés, préférer la configuration d’accès serveur au cache ancien de l’entreprise, et supprimer les IDs de packs/fonctionnalités qui ne sont plus présents avant toute mutation.
+
+Les dépendances du module Stock doivent utiliser les IDs opérationnels (`products`, `entries`, `exits`, etc.), jamais les anciens slugs de libellés.
+
+**Why:** les libellés affichés (« Articles », « Entrées et sorties ») ne correspondent pas aux IDs réellement utilisés par les packs et le moteur de permissions ; la validation du catalogue bloquait toute publication même sans modification Stock.
+
+**How to apply:** conserver une table canonique des dépendances Stock, la réutiliser dans la définition du module et remplacer cette forme dans les overrides historiques au moment de la lecture et de la publication.

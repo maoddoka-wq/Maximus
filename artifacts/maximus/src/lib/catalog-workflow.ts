@@ -5,7 +5,7 @@ import type {
   SectorPreset,
   StoreData,
 } from './store';
-import { getConfiguredModules, modules } from './store';
+import { getConfiguredModules, modules, stockSubmoduleDependencies } from './store';
 import { getModuleFeatureOptions } from './module-features';
 
 export interface CatalogDraft {
@@ -238,7 +238,17 @@ export function publishCatalogDraft(data: StoreData) {
   if (!data.catalogDraft) return;
   if (validateCatalogDraft(data).errors.length > 0) return;
   const draft = getCatalogSnapshot(data);
-  data.moduleOverrides = draft.moduleOverrides;
+  data.moduleOverrides = {
+    ...draft.moduleOverrides,
+    ...(draft.moduleOverrides.stocks
+      ? {
+          stocks: {
+            ...draft.moduleOverrides.stocks,
+            featureDependencies: clone(stockSubmoduleDependencies),
+          },
+        }
+      : {}),
+  };
   data.moduleStatuses = draft.moduleStatuses;
   data.removedModules = draft.removedModules;
   data.customModules = draft.customModules ?? [];

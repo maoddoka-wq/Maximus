@@ -7,7 +7,7 @@ import {
   updateCatalogDraft,
   validateCatalogDraft,
 } from './catalog-workflow';
-import { modules, type StoreData } from './store';
+import { modules, stockSubmoduleDependencies, type StoreData } from './store';
 
 function fixture(): StoreData {
   return {
@@ -80,6 +80,48 @@ test('enregistre les modifications du catalogue en brouillon sans toucher au pub
   assert.equal(data.moduleStatuses?.commerce, undefined);
   assert.equal(data.catalogDraft?.moduleStatuses.commerce, 'MAINTENANCE');
   assert.equal(getCatalogSnapshot(data).moduleStatuses.commerce, 'MAINTENANCE');
+});
+
+test('conserve des dépendances Stock alignées sur les identifiants de fonctionnalités', () => {
+  const stocks = modules.find(module => module.id === 'stocks');
+
+  assert.ok(stocks);
+  assert.deepEqual(stocks.featureDependencies, stockSubmoduleDependencies);
+  assert.deepEqual(stocks.featureDependencies?.entries, ['products']);
+  assert.deepEqual(stocks.featureDependencies?.exits, ['products']);
+  assert.equal(stocks.featureDependencies?.['entrees-et-sorties'], undefined);
+});
+
+test('répare les anciennes dépendances Stock présentes dans un override persistant', () => {
+  const data = fixture();
+  updateCatalogDraft(data, draft => {
+    draft.moduleOverrides.stocks = {
+      featureDependencies: {
+        'entrees-et-sorties': ['articles'],
+        'alertes-de-seuil': ['articles'],
+      },
+    };
+  });
+
+  const validation = validateCatalogDraft(data);
+
+  assert.equal(validation.errors.some(error => error.includes('dépendance de fonctionnalité invalide')), false);
+});
+
+test('publie la forme canonique des dépendances Stock', () => {
+  const data = fixture();
+  updateCatalogDraft(data, draft => {
+    draft.moduleOverrides.stocks = {
+      featureDependencies: {
+        'entrees-et-sorties': ['articles'],
+        'alertes-de-seuil': ['articles'],
+      },
+    };
+  });
+
+  publishCatalogDraft(data);
+
+  assert.deepEqual(data.moduleOverrides?.stocks?.featureDependencies, stockSubmoduleDependencies);
 });
 
 test('rend un secteur ajouté disponible aux écrans administratifs avant publication', () => {

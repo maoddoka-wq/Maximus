@@ -136,6 +136,30 @@ export interface StoreData {
   organizationVersion?: number;
 }
 
+export const stockSubmodules = [
+  { id: 'dashboard', name: 'Tableau de bord' },
+  { id: 'products', name: 'Articles' },
+  { id: 'entries', name: 'Entrées de stock' },
+  { id: 'exits', name: 'Sorties de stock' },
+  { id: 'requests', name: 'Demandes' },
+  { id: 'inventory', name: 'Inventaire' },
+  { id: 'reports', name: 'Rapports' },
+  { id: 'references', name: 'Référentiels' },
+  { id: 'users', name: 'Utilisateurs' },
+  { id: 'settings', name: 'Paramètres' },
+] as const;
+
+export const stockSubmoduleDependencies: Partial<Record<string, string[]>> = {
+  entries: ['products'],
+  exits: ['products'],
+  requests: ['products'],
+  inventory: ['products'],
+  reports: ['products'],
+  references: ['products'],
+  users: ['products'],
+  settings: ['products'],
+};
+
 export const modules: Module[] = [
   { id: 'commerce', name: 'Gestion commerciale', description: 'Piloter les ventes, les clients, les achats et la performance commerciale.', features: ['Clients', 'Devis et commandes', 'Chiffre d’affaires'], featurePacks: [
     { id: 'commerce-consultation', name: 'Consultation commerciale', description: 'Consulter les clients et le suivi commercial.', featureIds: ['clients', 'dashboard'] },
@@ -148,7 +172,7 @@ export const modules: Module[] = [
     { id: 'ecommerce-employe', name: 'Employé e-commerce', description: 'Traiter les commandes et accompagner les clients sans modifier la configuration de la boutique.', featureIds: ['dashboard', 'commandes', 'clients'], featurePermissions: { dashboard: ['voir'], commandes: ['voir', 'modifier'], clients: ['voir'] } },
     { id: 'ecommerce-manager', name: 'Manager e-commerce', description: 'Piloter la boutique, le catalogue, les ventes, les livraisons et les résultats.', featureIds: ecommerceFeatureDefinitions.map(feature => feature.id), featurePermissions: Object.fromEntries(ecommerceFeatureDefinitions.map(feature => [feature.id, feature.id === 'dashboard' || feature.id === 'clients' ? ['voir'] : ['voir', 'créer', 'modifier']])) },
   ], status: 'ACTIF' },
-  { id: 'stocks', name: 'Gestion de stock', description: 'Suivre les articles, les entrées, les sorties et les niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: { 'entrees-et-sorties': ['articles'], 'alertes-de-seuil': ['articles'] }, featurePacks: [
+  { id: 'stocks', name: 'Gestion de stock', description: 'Suivre les articles, les entrées, les sorties et les niveaux de stock.', features: ['Articles', 'Entrées et sorties', 'Alertes de seuil'], featureDependencies: stockSubmoduleDependencies, featurePacks: [
     { id: 'stock-consultation', name: 'Consultation du stock', description: 'Consulter les articles et les niveaux de stock.', featureIds: ['dashboard', 'products', 'reports'] },
     { id: 'stock-gestion', name: 'Gestionnaire de stock', description: 'Gérer les entrées, sorties et inventaires.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'inventory', 'reports'] },
     { id: 'stock-responsable', name: 'Responsable de stock', description: 'Piloter les opérations et les paramètres du stock.', featureIds: ['dashboard', 'products', 'entries', 'exits', 'requests', 'inventory', 'reports', 'references', 'users', 'settings'] },
@@ -226,23 +250,6 @@ export const modules: Module[] = [
     },
   ], status: 'ACTIF' },
 ];
-
-export const stockSubmodules = [
-  { id: 'dashboard', name: 'Tableau de bord' },
-  { id: 'products', name: 'Articles' },
-  { id: 'entries', name: 'Entrées de stock' },
-  { id: 'exits', name: 'Sorties de stock' },
-  { id: 'requests', name: 'Demandes' },
-  { id: 'inventory', name: 'Inventaire' },
-  { id: 'reports', name: 'Rapports' },
-  { id: 'references', name: 'Référentiels' },
-  { id: 'users', name: 'Utilisateurs' },
-  { id: 'settings', name: 'Paramètres' },
-] as const;
-export const stockSubmoduleDependencies: Partial<Record<string, string[]>> = {
-  entries: ['products'], exits: ['products'], requests: ['products'], inventory: ['products'],
-  reports: ['products'], references: ['products'], users: ['products'], settings: ['products'],
-};
 
 export const sectorPresets: SectorPreset[] = [
   { id: 'distribution', name: 'Distribution', moduleIds: ['commerce', 'stocks'], modulePackIds: { stocks: ['stock-gestion'], commerce: ['commerce-gestion'] } },
@@ -360,11 +367,13 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
           ? override.features.filter((feature): feature is string => typeof feature === 'string')
           : module.features,
         featureDependencies:
-          override.featureDependencies &&
-          typeof override.featureDependencies === 'object' &&
-          !Array.isArray(override.featureDependencies)
-            ? override.featureDependencies
-            : module.featureDependencies,
+          module.id === 'stocks'
+            ? stockSubmoduleDependencies
+            : override.featureDependencies &&
+                typeof override.featureDependencies === 'object' &&
+                !Array.isArray(override.featureDependencies)
+              ? override.featureDependencies
+              : module.featureDependencies,
         featurePacks,
       };
     });
