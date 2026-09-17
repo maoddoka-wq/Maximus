@@ -224,3 +224,17 @@ mtime_ms = 1789664811533
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/38247283-2533-446b-981e-f19c746b34bc/68bff7c8-516a-416b-bdef-36104bfa9caa"
 storage_version_token = "1789664819651408"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "oirtqZblrorAcMGg3FdhW"
+uri = "file://artifacts/maximus-instance-8c53db19fc993a43667b1f02cac4250e336c99a5.zip"
+type = "unspecified"
+title = "MAXIMUS — archive exacte du commit Render"
+description = "Archive générée depuis le commit 8c53db19fc993a43667b1f02cac4250e336c99a5, vérifié contre /api/healthz de maximus-erp.onrender.com. Elle contient MAXIMUS_BUILD_VERSION et exclut vendor, .env et les anciennes archives."
+logical_id = "931220d4-eb54-4ab8-8bbc-5aa40a071c0e"
+content_hash = "sha256:efc60978b2ceedcce11871796dcf06925a17ac5e78d493db31971ccc41e641f0"
+size = 8932870
+mtime_ms = 1789665869197
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/931220d4-eb54-4ab8-8bbc-5aa40a071c0e/a82578a4-03a8-4994-97b4-db59a3166903"
+storage_version_token = "1789665876313676"
+content_type = "application/octet-stream"
