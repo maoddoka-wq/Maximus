@@ -20,3 +20,9 @@ Les dépendances du module Stock doivent utiliser les IDs opérationnels (`produ
 **Why:** les libellés affichés (« Articles », « Entrées et sorties ») ne correspondent pas aux IDs réellement utilisés par les packs et le moteur de permissions ; la validation du catalogue bloquait toute publication même sans modification Stock.
 
 **How to apply:** conserver une table canonique des dépendances Stock, la réutiliser dans la définition du module et remplacer cette forme dans les overrides historiques au moment de la lecture et de la publication.
+
+Les secteurs doivent recalculer leurs fonctionnalités à partir des packs sélectionnés avant validation ; les sélections historiques peuvent contenir des fonctionnalités retirées d’un pack.
+
+**Why:** un changement de packs laisse parfois `moduleFeatures` dans l’ancien état et bloque alors la publication avec une fonctionnalité « hors des packs choisis ».
+
+**How to apply:** lors de la création du snapshot catalogue, intersecter `moduleFeatures` avec l’union des fonctionnalités des packs sélectionnés, puis publier ce snapshot nettoyé.

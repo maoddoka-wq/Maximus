@@ -141,6 +141,29 @@ test('rend un secteur ajouté disponible aux écrans administratifs avant public
   assert.equal(getCatalogSnapshot(data).sectorPresets.some(sector => sector.id === 'construction'), true);
 });
 
+test('nettoie les fonctionnalités de secteur absentes des packs sélectionnés', () => {
+  const data = fixture();
+  updateCatalogDraft(data, draft => {
+    draft.sectorPresets = [
+      {
+        id: 'boutique-en-ligne',
+        name: 'Boutique en ligne',
+        moduleIds: ['ecommerce'],
+        modulePackIds: { ecommerce: ['ecommerce-catalogue'] },
+        moduleFeatures: {
+          ecommerce: ['dashboard', 'catalogue', 'commandes'],
+        },
+      },
+    ];
+  });
+
+  const snapshot = getCatalogSnapshot(data);
+  const validation = validateCatalogDraft(data);
+
+  assert.deepEqual(snapshot.sectorPresets[0].moduleFeatures?.ecommerce, ['dashboard', 'catalogue']);
+  assert.equal(validation.errors.some(error => error.includes('hors des packs choisis')), false);
+});
+
 test('bloque la publication d’un catalogue incohérent', () => {
   const data = fixture();
   updateCatalogDraft(data, draft => {

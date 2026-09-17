@@ -39,14 +39,51 @@ export interface CatalogValidation {
 
 const clone = <T>(value: T): T => structuredClone(value);
 
+function normalizeSectorFeaturesForSelectedPacks(
+  sectors: SectorPreset[],
+  configuredModules: ReturnType<typeof getConfiguredModules>,
+): SectorPreset[] {
+  const moduleById = new Map(configuredModules.map(module => [module.id, module]));
+
+  return sectors.map(sector => {
+    if (!sector.moduleFeatures) return sector;
+
+    const moduleFeatures = Object.fromEntries(
+      Object.entries(sector.moduleFeatures).map(([moduleId, featureIds]) => {
+        const selectedPackIds = sector.modulePackIds?.[moduleId as ModuleId] ?? [];
+        if (selectedPackIds.length === 0) return [moduleId, featureIds];
+
+        const module = moduleById.get(moduleId as ModuleId);
+        const selectedPackFeatures = new Set(
+          (module?.featurePacks ?? [])
+            .filter(pack => selectedPackIds.includes(pack.id))
+            .flatMap(pack => pack.featureIds),
+        );
+        return [moduleId, (featureIds ?? []).filter(featureId => selectedPackFeatures.has(featureId))];
+      }),
+    ) as Partial<Record<ModuleId, string[]>>;
+
+    return { ...sector, moduleFeatures };
+  });
+}
+
 export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
   const draft = data.catalogDraft;
-  return {
+  const snapshot = {
     moduleOverrides: clone(draft?.moduleOverrides ?? data.moduleOverrides ?? {}),
     moduleStatuses: clone(draft?.moduleStatuses ?? data.moduleStatuses ?? {}),
     removedModules: clone(draft?.removedModules ?? data.removedModules ?? []),
     customModules: clone(draft?.customModules ?? data.customModules ?? []),
     sectorPresets: clone(draft?.sectorPresets ?? data.sectorPresets ?? []),
+  };
+  const configuredModules = getConfiguredModules({
+    moduleOverrides: snapshot.moduleOverrides,
+    removedModules: [],
+    customModules: snapshot.customModules,
+  });
+  return {
+    ...snapshot,
+    sectorPresets: normalizeSectorFeaturesForSelectedPacks(snapshot.sectorPresets, configuredModules),
   };
 }
 
