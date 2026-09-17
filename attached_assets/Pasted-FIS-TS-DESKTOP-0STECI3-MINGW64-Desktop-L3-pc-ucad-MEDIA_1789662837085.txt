@@ -1,0 +1,28 @@
+FIS-TS@DESKTOP-0STECI3 MINGW64 ~/Desktop/L3 pc ucad/MEDIA PLUS/spark 7/AUTRUIS/INTERNET/Music/Downloads/MAXIMUS/Maximus-main
+$ cd "/c/Users/FIS-TS/Desktop/L3 pc ucad/MEDIA PLUS/spark 7/AUTRUIS/INTERNET/Music/Downloads/MAXIMUS/Maximus-main"
+bash ./scripts/install-maximus-instance.sh --bootstrap-file ./maximus-bootstrap-bab818df-731b-455f-b399-2a312c13f2b2-on_premise.json --skip-composer --skip-build --skip-healthcheck
+
+==> Collecte de la configuration de l’entreprise
+
+==> Collecte de la configuration de PostgreSQL
+
+==> Configuration de l’administrateur entreprise
+
+==> Installation des dépendances Laravel
+Composer ignoré (--skip-composer).
+PHP Fatal error:  Uncaught Error: Class "Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance" not found in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php:166
+Stack trace:
+#0 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\bootstrap\app.php(8): Illuminate\Foundation\Configuration\ApplicationBuilder->withRouting(Object(Closure), 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', NULL, NULL, '/up')
+#1 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan(14): require_once('C:\\Users\\FIS-TS...')
+#2 {main}
+  thrown in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php on line 166
+
+Fatal error: Uncaught Error: Class "Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance" not found in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php:166
+Stack trace:
+#0 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\bootstrap\app.php(8): Illuminate\Foundation\Configuration\ApplicationBuilder->withRouting(Object(Closure), 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', NULL, NULL, '/up')
+#1 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan(14): require_once('C:\\Users\\FIS-TS...')
+#2 {main}
+  thrown in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php on line 166
+
+FIS-TS@DESKTOP-0STECI3 MINGW64 ~/Desktop/L3 pc ucad/MEDIA PLUS/spark 7/AUTRUIS/INTERNET/Music/Downloads/MAXIMUS/Maximus-main
+$
