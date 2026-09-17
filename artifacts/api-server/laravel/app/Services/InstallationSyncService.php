@@ -21,7 +21,9 @@ final class InstallationSyncService
             throw new RuntimeException('MAXIMUS_CENTRAL_URL et MAXIMUS_INSTALLATION_TOKEN sont requis.');
         }
 
-        $response = Http::timeout(20)
+        $response = Http::retry(3, 1500)
+            ->connectTimeout(10)
+            ->timeout(30)
             ->acceptJson()
             ->withToken($token)
             ->get($baseUrl.'/api/installation-sync/configuration');
