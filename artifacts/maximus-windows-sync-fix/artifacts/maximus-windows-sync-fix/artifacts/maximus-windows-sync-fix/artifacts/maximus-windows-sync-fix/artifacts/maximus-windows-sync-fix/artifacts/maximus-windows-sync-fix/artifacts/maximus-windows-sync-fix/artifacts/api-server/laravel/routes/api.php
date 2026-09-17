@@ -1,0 +1,151 @@
+<?php
+
+use App\Http\Controllers\Api\AppStateController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CompanyPaymentController;
+use App\Http\Controllers\Api\DiagnosticTokenController;
+use App\Http\Controllers\Api\MaximusWalletController;
+use App\Http\Controllers\Api\MaximusAssistantController;
+use App\Http\Controllers\Api\OnboardingDraftController;
+use App\Http\Controllers\Api\ModuleController;
+use App\Http\Controllers\Api\PlatformSettingsController;
+use App\Http\Controllers\Api\SystemHealthController;
+use App\Http\Controllers\Api\InstallationController;
+use App\Services\SystemHealthService;
+use App\Support\InstallationContext;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+
+Route::get('/', function () {
+    return response()->json([
+        'ok' => true,
+        'service' => 'MAXIMUS API',
+        'health' => '/api/healthz',
+    ]);
+});
+
+Route::get('/healthz', function () {
+    try {
+        return response()->json([
+            'ok' => DB::select('select 1') !== [],
+            'database' => true,
+            'status' => 'OPERATIONAL',
+            'checkedAt' => now()->toISOString(),
+        ]);
+    } catch (Throwable $exception) {
+        report($exception);
+
+        return response()->json(['ok' => false, 'database' => false, 'status' => 'DOWN'], 503);
+    }
+});
+
+Route::get('/installation', function () {
+    return response()->json(InstallationContext::publicProfile());
+});
+
+Route::middleware('maximus.central')->group(function (): void {
+    Route::get('/registration-catalog', [AppStateController::class, 'registrationCatalog']);
+    Route::post('/company-requests', [CompanyController::class, 'createRequest'])->middleware('throttle:login');
+});
+
+Route::prefix('onboarding/drafts')->middleware(['maximus.central', 'throttle:onboarding'])->group(function (): void {
+    Route::post('/', [OnboardingDraftController::class, 'store']);
+    Route::get('/{draftId}', [OnboardingDraftController::class, 'show']);
+    Route::put('/{draftId}', [OnboardingDraftController::class, 'update']);
+    Route::post('/{draftId}/confirm', [OnboardingDraftController::class, 'confirm']);
+});
+
+Route::prefix('auth')->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::get('/company-login/{slug}', [AuthController::class, 'companyLoginInfo'])
+        ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+    Route::post('/company-login/{slug}', [AuthController::class, 'companyLogin'])
+        ->middleware('throttle:login')
+        ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+    Route::get('/session', [AuthController::class, 'session']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
+
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('company-requests')->group(function (): void {
+    Route::get('/', [CompanyController::class, 'index']);
+    Route::post('/{companyId}/approve', [CompanyController::class, 'approve']);
+    Route::post('/{companyId}/reject', [CompanyController::class, 'reject']);
+});
+
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {
+    Route::post('/', [CompanyController::class, 'createAdministrative']);
+    Route::patch('/{companyId}', [CompanyController::class, 'update']);
+    Route::get('/{companyId}/login-settings', [CompanyController::class, 'loginSettings']);
+    Route::patch('/{companyId}/login-settings', [CompanyController::class, 'updateLoginSettings']);
+    Route::get('/{companyId}/installation-manifest', [CompanyController::class, 'installationManifest']);
+    Route::post('/{companyId}/installation', [InstallationController::class, 'issue']);
+    Route::delete('/{companyId}/installation', [InstallationController::class, 'revoke']);
+    Route::get('/{companyId}/payment-settings', [CompanyPaymentController::class, 'show']);
+    Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
+    Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);
+    Route::delete('/{companyId}/profile-photo', [CompanyController::class, 'deleteProfilePhoto']);
+    Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
+});
+
+Route::middleware(['maximus.central', 'maximus.installation.token'])->prefix('installation-sync')->group(function (): void {
+    Route::get('/configuration', [InstallationController::class, 'configuration']);
+    Route::post('/heartbeat', [InstallationController::class, 'heartbeat']);
+});
+
+Route::get('/company-profile-images/{companyId}/{filename}', [CompanyController::class, 'serveProfilePhoto'])
+    ->middleware('maximus.installation.public')
+    ->where(['companyId' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+
+Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {
+    Route::post('/', [AuthController::class, 'createAccount']);
+    Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
+});
+
+Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {
+    Route::post('/', [AuthController::class, 'provisionCompanyAdmin']);
+});
+
+Route::middleware('maximus.auth')->patch('/auth/company-password', [AuthController::class, 'updateCompanyPassword']);
+
+Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
+    Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
+    Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
+});
+
+Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
+    Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);
+    Route::put('/', [AppStateController::class, 'save']);
+});
+
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {
+    Route::get('/public-registration', [PlatformSettingsController::class, 'publicRegistration']);
+    Route::put('/public-registration', [PlatformSettingsController::class, 'updatePublicRegistration']);
+    Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);
+    Route::put('/seller-wallet-maturity', [PlatformSettingsController::class, 'updateSellerWalletMaturity']);
+    Route::get('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'sellerWalletWithdrawalFee']);
+    Route::put('/seller-wallet-withdrawal-fee', [PlatformSettingsController::class, 'updateSellerWalletWithdrawalFee']);
+    Route::get('/ecommerce-commission', [PlatformSettingsController::class, 'ecommerceCommission']);
+    Route::put('/ecommerce-commission', [PlatformSettingsController::class, 'updateEcommerceCommission']);
+    Route::get('/maximus-wallet', [MaximusWalletController::class, 'bootstrap']);
+    Route::patch('/maximus-wallet/payout-account', [MaximusWalletController::class, 'updatePayoutAccount']);
+    Route::post('/maximus-wallet/withdrawals', [MaximusWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
+    Route::get('/diagnostic-tokens', [DiagnosticTokenController::class, 'index']);
+    Route::post('/diagnostic-tokens', [DiagnosticTokenController::class, 'store']);
+    Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);
+});
+
+Route::middleware(['maximus.central', 'maximus.auth'])->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('maximus-assistant/actions')->group(function (): void {
+    Route::post('/preview', [MaximusAssistantController::class, 'previewAction']);
+    Route::post('/execute', [MaximusAssistantController::class, 'executeAction']);
+});
+
+Route::middleware('maximus.diagnostic')->get('/diagnostics/health', [SystemHealthController::class, 'show']);
+
+require __DIR__.'/control.php';
+require __DIR__.'/presence.php';
+require __DIR__.'/stock.php';
+require __DIR__.'/ecommerce.php';
+require __DIR__.'/payroll.php';
+require __DIR__.'/transport.php';

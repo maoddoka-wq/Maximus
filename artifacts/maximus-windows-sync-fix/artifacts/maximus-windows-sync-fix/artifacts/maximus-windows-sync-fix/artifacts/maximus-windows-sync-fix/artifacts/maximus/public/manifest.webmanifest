@@ -1,0 +1,20 @@
+{
+  "name": "Boutique MAXIMUS",
+  "short_name": "Boutique",
+  "description": "La vitrine et l’espace client de votre boutique MAXIMUS.",
+  "start_url": "/client-app/",
+  "scope": "/client-app/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8f5ed",
+  "theme_color": "#0b1b2b",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/admin-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

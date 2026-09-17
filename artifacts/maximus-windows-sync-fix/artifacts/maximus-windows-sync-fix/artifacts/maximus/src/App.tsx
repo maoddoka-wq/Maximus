@@ -1,0 +1,8746 @@
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Bell,
+  Boxes,
+  Building2,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleDollarSign,
+  ClipboardCheck,
+  CreditCard,
+  Edit3,
+  FileBarChart,
+  FileClock,
+  FileText,
+  FolderKanban,
+  Gauge,
+  GitBranch,
+  History,
+  KeyRound,
+  LockKeyhole,
+  LayoutGrid,
+  LogIn,
+  Package,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  SlidersHorizontal,
+  Sparkles,
+  Store,
+  Trash2,
+  TrendingUp,
+  UserPlus,
+  Users,
+  WalletCards,
+  Warehouse,
+  X,
+  UserRoundCog,
+} from 'lucide-react';
+import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
+import { Toaster } from '@/components/ui/toaster';
+import { showAppToast } from '@/hooks/use-toast';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { parseClientPwaPath } from '@/lib/pwa';
+import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
+import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
+import {
+  ActionButton,
+  ActivityRow,
+  Brand,
+  DataTable,
+  Field,
+  Metric,
+  StatusBadge,
+  Step,
+  Toolbar,
+} from '@/components/app-ui';
+import {
+  getConfiguredModules,
+  getCompanyDirectoryCompanies,
+  getVisibleNotifications,
+  emptyStoreData,
+  modules,
+  money,
+  shortMoney,
+  stockSubmodules,
+  uid,
+  type Company,
+  type Employee,
+  type ModuleAvailability,
+  type ModuleFeaturePack,
+  type ModuleId,
+  type OrgNode,
+  type Role,
+  type Sale,
+  type SectorPreset,
+  type StoreData,
+  subscriptionPlans,
+  sanitizeStoreData,
+} from '@/lib/store';
+import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
+import { appStateScopeMatchesSession } from '@/lib/app-state-scope';
+import {
+  discardCatalogDraft,
+  getCatalogImpact,
+  getCatalogSnapshot,
+  publishCatalogDraft,
+  updateCatalogDraft,
+  validateCatalogDraft,
+} from '@/lib/catalog-workflow';
+import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
+import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
+import { canonicalAppPath, normalizeRoutePath, type Session } from '@/lib/navigation';
+import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
+import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
+import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
+import {
+  getEffectiveModuleFeatureIds,
+  getModuleFeatureOptions,
+  normalizeFeatureIdsForSelectedPacks,
+} from '@/lib/module-features';
+import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
+import { presenceFeatureDefinitions } from '@/lib/presence-features';
+import { authApi, type AuthUser } from '@/lib/auth-api';
+import { installationApi, type InstallationProfile } from '@/lib/installation-api';
+import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
+import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
+import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
+import { registrationCatalogApi } from '@/lib/registration-catalog-api';
+import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
+import {
+  loadCompanyModuleAccess,
+  setCompanyModuleAccess,
+  synchronizeCompanyModuleAccess,
+  type ServerModuleAccess,
+} from '@/lib/module-api';
+import {
+  buildModulePack,
+  defaultFeaturePermissions,
+  emptyModulePackDraft,
+  permissionLevelFor,
+  type FeaturePermissionMap,
+  type ModulePackDraft,
+  updatePackPermission,
+} from '@/lib/module-pack';
+import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
+import { provisionCompanyAccess } from '@/lib/company-access-provisioning';
+import { buildAppAccessContext } from '@/lib/app-access';
+import {
+  buildAdminAssistantScope,
+} from '@/lib/local-assistant';
+import { maximusAssistantApi, type MaximusAssistantAction, type MaximusAssistantMessage } from '@/lib/maximus-assistant-api';
+import { onboardingApi } from '@/lib/onboarding-api';
+import { mutationSuccessMessage } from '@/lib/mutation-feedback';
+import {
+  companyWorkspaceFeatureDefinitions,
+  normalizeCompanyWorkspaceFeatureIds,
+  type CompanyWorkspaceFeatureId,
+} from '@/lib/company-workspace-features';
+
+const queryClient = new QueryClient();
+type DemoAccount = { id: string; label: string; email: string; password: string };
+const defaultDemoAccounts: DemoAccount[] = [];
+
+function isPotentialCustomStoreHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+
+  return !['.replit.dev', '.replit.app', '.repl.co', '.onrender.com'].some((suffix) => hostname.endsWith(suffix));
+}
+
+const StockModulePage = lazy(() => import('@/pages/stock-module'));
+const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
+const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
+const PublicShopPage = lazy(() => import('@/pages/public-shop'));
+const CompanyLoginPage = lazy(() =>
+  import('@/pages/company-login').then((module) => ({ default: module.CompanyLoginPage })),
+);
+const OperationalModulePage = lazy(() =>
+  import('@/pages/operational-modules').then((module) => ({ default: module.OperationalModulePage })),
+);
+const TransportModulePage = lazy(() => import('@/pages/transport-module'));
+const CompanyOrganizationAdmin = lazy(() =>
+  import('@/pages/company-organization').then((module) => ({ default: module.CompanyOrganizationAdmin })),
+);
+const CompanySetupGuide = lazy(() => import('@/pages/company-setup-guide'));
+const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
+const PayrollModulePage = lazy(() => import('@/pages/payroll-module'));
+const MaximusAssistantPage = lazy(() => import('@/pages/maximus-assistant'));
+const IntelligentOnboardingPage = lazy(() =>
+  import('@/pages/intelligent-onboarding').then((module) => ({ default: module.IntelligentOnboardingPage })),
+);
+const ControlCenterPage = lazy(() =>
+  import('@/pages/control-center').then((module) => ({ default: module.ControlCenterPage })),
+);
+const SystemHealthPage = lazy(() =>
+  import('@/pages/system-health').then((module) => ({ default: module.SystemHealthPage })),
+);
+const PlatformSettingsPage = lazy(() => import('@/pages/platform-settings'));
+function sessionFromAuthUser(user: AuthUser): Session {
+  return user.role === 'maximus_admin'
+    ? 'admin'
+    : user.role === 'company_admin'
+      ? `company:${user.companyId}`
+      : `employee:${user.employeeId}`;
+}
+
+const pageMeta: Record<string, { kicker: string; title: string; description: string }> = {
+  '/maximus/dashboard': {
+    kicker: 'Cockpit MAXIMUS',
+    title: 'Bonjour, équipe MAXIMUS.',
+    description: 'Voici ce qui mérite votre attention aujourd’hui.',
+  },
+  '/maximus/assistant': {
+    kicker: 'Administration principale',
+    title: 'MAXI',
+    description: 'Comprenez les modules, les packs, les organisations et les règles d’accès avant de décider.',
+  },
+  '/maximus/controle': {
+    kicker: 'Pilotage MAXIMUS',
+    title: 'Contrôle & coordination',
+    description: 'Les décisions, tâches et événements qui structurent les opérations.',
+  },
+  '/maximus/surveillance': {
+    kicker: 'Surveillance MAXIMUS',
+    title: 'Détecteur de problèmes',
+    description: 'Vérifiez la disponibilité de l’application, de PostgreSQL et de son schéma.',
+  },
+  '/maximus/entreprises': {
+    kicker: 'Administration',
+    title: 'Entreprises',
+    description: 'Pilotez les espaces clients et leurs accès modules.',
+  },
+  '/maximus/entreprises/organisation': {
+    kicker: 'Administration des entreprises',
+    title: 'Organisation & accès',
+    description: 'Structurez les secteurs, leurs modules, les rôles et les comptes employés.',
+  },
+  '/maximus/demandes': {
+    kicker: 'Administration',
+    title: 'Demandes en attente',
+    description: 'Traitez les demandes d’ouverture reçues récemment.',
+  },
+  '/maximus/modules': {
+    kicker: 'Configuration',
+    title: 'Catalogue des modules',
+    description: 'Les briques métier disponibles dans MAXIMUS.',
+  },
+  '/maximus/secteurs': {
+    kicker: 'Configuration',
+    title: 'Secteurs d’activité',
+    description: 'Préparez les modules proposés lors de l’inscription d’une entreprise.',
+  },
+  '/maximus/abonnements': {
+    kicker: 'Compte',
+    title: 'Abonnements',
+    description: 'Une lecture claire de vos espaces et de leur statut.',
+  },
+  '/maximus/notifications': {
+    kicker: 'Centre de contrôle',
+    title: 'Notifications',
+    description: 'Les signaux utiles, sans bruit.',
+  },
+  '/maximus/journal': {
+    kicker: 'Traçabilité',
+    title: 'Journal d’activité',
+    description: 'Chaque action importante, horodatée et attribuée.',
+  },
+  '/maximus/parametres/portefeuille': {
+    kicker: 'Configuration',
+    title: 'Réglages MAXIMUS',
+    description: 'Définissez les règles globales appliquées aux espaces clients.',
+  },
+  '/entreprise/dashboard': {
+    kicker: 'Espace entreprise',
+    title: 'Votre activité, en un regard.',
+    description: 'Pilotez vos opérations depuis un espace unifié.',
+  },
+  '/entreprise/controle': {
+    kicker: 'Espace entreprise',
+    title: 'Contrôle & coordination',
+    description: 'Les décisions, tâches et événements de votre périmètre.',
+  },
+  '/entreprise/organisation': {
+    kicker: 'Espace entreprise',
+    title: 'Organisation & accès',
+    description: 'Structure, rôles, sous-autorisations, comptes et managers au même endroit.',
+  },
+  '/entreprise/acces': {
+    kicker: 'Espace entreprise',
+    title: 'Accès',
+    description: 'Gérez les rôles, permissions et comptes autorisés de votre entreprise.',
+  },
+  '/entreprise/profil': {
+    kicker: 'Espace entreprise',
+    title: 'Mon profil',
+    description: 'Mettez à jour les informations et les accès de votre entreprise.',
+  },
+  '/entreprise/guide-configuration': {
+    kicker: 'Espace entreprise',
+    title: 'Guide de configuration',
+    description: 'Configurez votre entreprise de A à Z avec une méthode vérifiable et sans angle mort.',
+  },
+  '/entreprise/roles': {
+    kicker: 'Espace entreprise',
+    title: 'Rôles',
+    description: 'Des accès précis, pour travailler sereinement.',
+  },
+  '/entreprise/stocks': {
+    kicker: 'Espace entreprise',
+    title: 'Gestion de stock',
+    description: 'Pilotez vos articles, entrées, sorties et inventaires.',
+  },
+  '/entreprise/finance': {
+    kicker: 'Espace entreprise',
+    title: 'Finance',
+    description: 'Une lecture simple des encaissements et de la trésorerie.',
+  },
+  '/entreprise/commerce': {
+    kicker: 'Espace entreprise',
+    title: 'Gestion commerciale',
+    description: 'Clients, commandes et activité commerciale en temps réel.',
+  },
+  '/entreprise/ventes': {
+    kicker: 'Espace entreprise',
+    title: 'Ventes',
+    description: 'Devis, ventes et validation des opérations clients.',
+  },
+  '/entreprise/achats': {
+    kicker: 'Espace entreprise',
+    title: 'Achats',
+    description: 'Demandes, commandes fournisseurs et réceptions.',
+  },
+  '/entreprise/comptabilite': {
+    kicker: 'Espace entreprise',
+    title: 'Comptabilité',
+    description: 'Écritures, journaux et rapprochements comptables.',
+  },
+  '/entreprise/rh': {
+    kicker: 'Espace entreprise',
+    title: 'Ressources humaines',
+    description: 'Organisation, employés, rôles et permissions.',
+  },
+  '/entreprise/presences': { kicker: 'Espace entreprise', title: 'Présences', description: 'Le suivi quotidien de vos équipes.' },
+  '/entreprise/paie': {
+    kicker: 'Espace entreprise',
+    title: 'Paie',
+    description: 'Périodes, bulletins et validation des salaires.',
+  },
+  '/entreprise/crm': {
+    kicker: 'Espace entreprise',
+    title: 'CRM / Clients',
+    description: 'Fiches clients, opportunités et relances.',
+  },
+  '/entreprise/fournisseurs': {
+    kicker: 'Espace entreprise',
+    title: 'Fournisseurs',
+    description: 'Référentiel, évaluation et suivi des partenaires.',
+  },
+  '/entreprise/logistique': {
+    kicker: 'Espace entreprise',
+    title: 'Logistique',
+    description: 'Entrepôts, livraisons et acheminement.',
+  },
+  '/entreprise/documents': {
+    kicker: 'Espace entreprise',
+    title: 'Documents',
+    description: 'Classement, partage et suivi des versions.',
+  },
+  '/entreprise/rapports': {
+    kicker: 'Espace entreprise',
+    title: 'Rapports',
+    description: 'Des synthèses actionnables pour décider plus vite.',
+  },
+};
+
+const routesWithModuleHeaders = new Set([
+  '/maximus/controle',
+  '/maximus/surveillance',
+  '/entreprise/controle',
+  '/entreprise/dashboard',
+  '/entreprise/stocks',
+  '/entreprise/commerce',
+  '/entreprise/ventes',
+  '/entreprise/finance',
+  '/entreprise/rh',
+  '/entreprise/achats',
+  '/entreprise/comptabilite',
+  '/entreprise/paie',
+  '/entreprise/crm',
+  '/entreprise/fournisseurs',
+  '/entreprise/logistique',
+  '/entreprise/documents',
+  '/entreprise/presences',
+  '/entreprise/rapports',
+  '/entreprise/organisation',
+  '/entreprise/guide-configuration',
+  '/entreprise/acces',
+  '/entreprise/autorisations',
+  '/entreprise/employes',
+  '/entreprise/roles',
+  ...modulePaths,
+]);
+
+function AppContent() {
+  const { alert, confirm } = useAppDialog();
+  const [data, setData] = useState<StoreData>(() => emptyStoreData());
+  const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
+  const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
+  const [installationProfile, setInstallationProfile] = useState<InstallationProfile | null>(null);
+  const [installationReady, setInstallationReady] = useState(false);
+  const [appStateVersion, setAppStateVersion] = useState(0);
+  const [appStateError, setAppStateError] = useState('');
+  const [appStateReady, setAppStateReady] = useState(
+    () => !localStorage.getItem('maximus-session'),
+  );
+  const [session, setSession] = useState<Session | null>(
+    () => localStorage.getItem('maximus-session') as Session | null,
+  );
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
+  const [serverModuleAccess, setServerModuleAccess] = useState<ServerModuleAccess[] | null>(null);
+  const [serverModuleAccessReady, setServerModuleAccessReady] = useState(false);
+  const [serverModuleAccessCompanyId, setServerModuleAccessCompanyId] = useState<string | null>(null);
+  const [serverModuleAccessError, setServerModuleAccessError] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('maximus-sidebar-collapsed') === 'true',
+  );
+  const [pathname, setLocation] = useLocation();
+  const search = useSearch();
+  const location = search ? `${pathname}?${search}` : pathname;
+  const dataRef = useRef(data);
+  const appStateSaveQueue = useRef(Promise.resolve());
+  const appStateVersionRef = useRef(appStateVersion);
+  const appStateRefreshRef = useRef<{ session: Session; promise: Promise<boolean> } | null>(null);
+  const sessionRef = useRef<Session | null>(session);
+  const localMutationVersionRef = useRef(0);
+  const loginTransitionRef = useRef(false);
+  const moduleAccessCacheRef = useRef(
+    new Map<string, { access: ServerModuleAccess[]; updatedAt: number }>(),
+  );
+  dataRef.current = data;
+  appStateVersionRef.current = appStateVersion;
+  sessionRef.current = session;
+  useEffect(() => {
+    localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+  const notify = (message: string, kind: 'success' | 'error' | 'info' | 'warning' = 'info') =>
+    showAppToast(message, kind);
+  useEffect(() => {
+    let cancelled = false;
+    void installationApi
+      .profile()
+      .then((profile) => {
+        if (cancelled) return;
+        setInstallationProfile(profile);
+        setPublicRegistrationEnabled(profile.registrationEnabled);
+        if (profile.companyOnly && localStorage.getItem('maximus-session') === 'admin') {
+          localStorage.removeItem('maximus-session');
+          setSession(null);
+          setAppStateReady(true);
+          void authApi.logout().catch(() => undefined);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // The server remains authoritative. Keep the central UI fallback so
+          // a temporary configuration request failure does not blank the app.
+          setInstallationProfile(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInstallationReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (!localStorage.getItem('maximus-session')) return undefined;
+    void authApi
+      .session()
+      .then(({ user }) => {
+        if (!user) {
+          setSession(null);
+          localStorage.removeItem('maximus-session');
+          return;
+        }
+        const nextSession = sessionFromAuthUser(user);
+        const persistedTestCompanyId = localStorage.getItem('maximus-sector-test-company');
+        if (nextSession === 'admin' && persistedTestCompanyId) {
+          setData((previous) => {
+            const next = structuredClone(previous) as StoreData;
+            next.companies = next.companies.filter((company) => company.id !== persistedTestCompanyId);
+            next.orgNodes = next.orgNodes.filter((node) => node.companyId !== persistedTestCompanyId);
+            next.employees = next.employees.filter((employee) => employee.companyId !== persistedTestCompanyId);
+            next.roles = next.roles.filter((role) => role.companyId !== persistedTestCompanyId);
+            return next;
+          });
+          localStorage.removeItem('maximus-sector-test-company');
+        }
+        setSession(nextSession);
+        localStorage.setItem('maximus-session', nextSession);
+      })
+      .catch(() => {
+        setSession(null);
+        localStorage.removeItem('maximus-session');
+      });
+  }, []);
+  useEffect(() => {
+    if (
+      session
+      || installationProfile?.companyOnly
+      || !['/', '/inscription', '/onboarding'].includes(pathname)
+    ) return undefined;
+    let cancelled = false;
+    void registrationCatalogApi.bootstrap()
+      .then(({ catalog, version }) => {
+        if (cancelled) return;
+        setData((previous) =>
+          sanitizeStoreData({
+            ...previous,
+            ...(catalog.sectorPresets !== null && catalog.sectorPresets !== undefined
+              ? { sectorPresets: catalog.sectorPresets }
+              : {}),
+            moduleOverrides: catalog.moduleOverrides ?? previous.moduleOverrides,
+            moduleStatuses: catalog.moduleStatuses ?? previous.moduleStatuses,
+            customModules: catalog.customModules ?? previous.customModules,
+            removedModules: catalog.removedModules ?? previous.removedModules,
+            catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
+          }),
+        );
+        setPublicRegistrationEnabled(catalog.registrationEnabled !== false);
+        setRegistrationCatalogVersion(version);
+      })
+      .catch(() => {
+        // Les secteurs intégrés restent disponibles si le catalogue distant est indisponible.
+        setPublicRegistrationEnabled(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [installationProfile?.companyOnly, pathname, session]);
+  const refreshAppState = async (waitForPendingSave = true) => {
+    const requestSession = session;
+    if (!requestSession || requestSession.startsWith('company:sector-test-')) return true;
+    if (appStateRefreshRef.current?.session === requestSession) {
+      return appStateRefreshRef.current.promise;
+    }
+
+    const pendingSave = waitForPendingSave
+      ? appStateSaveQueue.current.catch(() => undefined)
+      : Promise.resolve();
+    let request: Promise<boolean>;
+    request = pendingSave
+      .then(async () => {
+        if (sessionRef.current !== requestSession) return false;
+        const { data: remoteData, scope, version } = await appStateApi.bootstrap();
+        if (sessionRef.current !== requestSession) return false;
+        const nextData = sanitizeStoreData(remoteData);
+        if (!appStateScopeMatchesSession(requestSession, scope, nextData)) {
+          throw new AppStateRequestError('La réponse métier ne correspond pas à la session active.', 409);
+        }
+        dataRef.current = nextData;
+        setData(nextData);
+        setAppStateError('');
+        appStateVersionRef.current = version;
+        setAppStateVersion(version);
+        return true;
+      })
+      .catch((error) => {
+        if (sessionRef.current !== requestSession) return false;
+        if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
+          setSession(null);
+          localStorage.removeItem('maximus-session');
+          localStorage.removeItem('maximus-sector-test-company');
+          notify('Votre session MAXIMUS n’est plus active.', 'warning');
+          return false;
+        }
+        const message = error instanceof Error ? error.message : 'Les données métier sont indisponibles.';
+        setAppStateError(message);
+        return false;
+      })
+      .finally(() => {
+        if (appStateRefreshRef.current?.promise === request) {
+          appStateRefreshRef.current = null;
+        }
+      });
+
+    appStateRefreshRef.current = { session: requestSession, promise: request };
+    return request;
+  };
+
+  useEffect(() => {
+    if (!session || session.startsWith('company:sector-test-')) {
+      setAppStateReady(true);
+      return;
+    }
+    const shouldBlockForInitialLoad = !loginTransitionRef.current && !appStateReady;
+    loginTransitionRef.current = false;
+    if (shouldBlockForInitialLoad) setAppStateReady(false);
+    const requestSession = session;
+    void refreshAppState().then((ready) => {
+      if (sessionRef.current === requestSession) setAppStateReady(ready);
+    });
+  }, [session]);
+  useAutoRefresh(() => {
+    void refreshAppState();
+  }, {
+    enabled: Boolean(session && !session.startsWith('company:sector-test-')),
+  });
+  useEffect(() => {
+    if (session !== 'admin') return;
+    const activeCompanies = data.companies.filter((company) => company.status === 'ACTIF');
+    void Promise.all(
+      activeCompanies.flatMap((company) => [
+        synchronizeCompanyModuleAccess(company.id, company.allowedModules),
+      ]),
+    ).catch((error) => {
+      notify(error instanceof Error ? `Synchronisation incomplète : ${error.message}` : 'Synchronisation des entreprises incomplète.', 'warning');
+    });
+  }, [session]);
+
+  const mutate = (fn: (draft: StoreData) => void, message?: string, persist = true) => {
+    const previous = dataRef.current;
+    const next = structuredClone(previous) as StoreData;
+    fn(next);
+    const safeNext = sanitizeStoreData(next);
+    const mutationVersion = ++localMutationVersionRef.current;
+    const mutationSession = session;
+    const successMessage = mutationSuccessMessage(message, Boolean(session), persist);
+    dataRef.current = safeNext;
+    setData(safeNext);
+    if (session && persist) {
+      appStateSaveQueue.current = appStateSaveQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (sessionRef.current !== mutationSession) return null;
+          const { version } = await appStateApi.save(dataRef.current, appStateVersionRef.current);
+          if (sessionRef.current !== mutationSession) return null;
+          return version;
+        })
+        .then((version) => {
+          if (version === null || sessionRef.current !== mutationSession) return;
+          appStateVersionRef.current = version;
+          setAppStateVersion(version);
+          if (successMessage) notify(successMessage, 'success');
+        })
+        .catch((error) => {
+          if (mutationVersion === localMutationVersionRef.current) {
+            dataRef.current = previous;
+            setData(previous);
+          }
+          if (error instanceof AppStateRequestError && error.status === 409) {
+            void refreshAppState(false);
+          }
+          notify(error instanceof Error ? error.message : 'La sauvegarde des données métier a échoué.', 'error');
+          throw error;
+        });
+    } else if (successMessage) {
+      notify(successMessage, 'success');
+    }
+  };
+  const updateCompanyModuleAccess = async (
+    companyId: string,
+    moduleId: ModuleId,
+    status: ModuleAvailability,
+    options: { featureIds?: string[]; configuration?: Record<string, unknown> } = {},
+  ) => {
+    await setCompanyModuleAccess(companyId, moduleId, status, options);
+    mutate((draft) => {
+      const company = draft.companies.find((item) => item.id === companyId);
+      if (!company) return;
+      company.allowedModules =
+        status !== 'INACTIF'
+          ? [...new Set([...company.allowedModules, moduleId])]
+          : company.allowedModules.filter((item) => item !== moduleId);
+      company.refusedModules = company.requestedModules.filter((item) => !company.allowedModules.includes(item));
+      if (options.featureIds) {
+        company.requestedModuleFeatures = {
+          ...(company.requestedModuleFeatures ?? {}),
+          [moduleId]: [...options.featureIds],
+        };
+      }
+      const configuredPackIds = options.configuration?.packIds;
+      if (Array.isArray(configuredPackIds)) {
+        company.requestedModulePackIds = {
+          ...(company.requestedModulePackIds ?? {}),
+          [moduleId]: configuredPackIds.filter((value): value is string => typeof value === 'string'),
+        };
+      }
+      const configuredFeaturePermissions = options.configuration?.featurePermissions;
+      if (configuredFeaturePermissions && typeof configuredFeaturePermissions === 'object' && !Array.isArray(configuredFeaturePermissions)) {
+        company.requestedModulePermissions = {
+          ...(company.requestedModulePermissions ?? {}),
+          [moduleId]: Object.fromEntries(
+            Object.entries(configuredFeaturePermissions as Record<string, unknown>)
+              .filter(([, permissions]) => Array.isArray(permissions))
+              .map(([featureId, permissions]) => [
+                featureId,
+                [...new Set((permissions as unknown[]).filter((permission): permission is string => typeof permission === 'string'))],
+              ]),
+          ),
+        };
+      }
+    });
+    notify(
+      status === 'MAINTENANCE'
+        ? 'Module placé en maintenance pour cette entreprise.'
+        : status === 'INACTIF'
+          ? 'Module désactivé pour cette entreprise.'
+          : status === 'BETA'
+            ? 'Module passé en mode bêta pour cette entreprise.'
+            : 'Module activé pour cette entreprise.',
+      'success',
+    );
+  };
+  const sessionEmployeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
+  const sessionEmployee = sessionEmployeeId
+    ? data.employees.find((employee) => employee.id === sessionEmployeeId)
+    : null;
+  const activeCompanyId =
+    session?.startsWith('company:')
+      ? session.slice('company:'.length)
+      : sessionEmployee?.companyId;
+  const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
+  const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
+  const activeCompanyAllowedModulesKey = activeCompany?.allowedModules.join(',') ?? '';
+  useEffect(() => {
+    if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
+      setServerModuleStatuses(null);
+      setServerModuleAccess(null);
+      setServerModuleAccessReady(true);
+      setServerModuleAccessCompanyId(null);
+      setServerModuleAccessError('');
+      return;
+    }
+
+    let cancelled = false;
+    const cacheKey = `${activeCompanyId}:${activeCompanyAllowedModulesKey}`;
+    const cached = moduleAccessCacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.updatedAt < 30_000) {
+      setServerModuleAccess(cached.access);
+      setServerModuleStatuses(Object.fromEntries(cached.access.map((module) => [module.id, module.status])));
+      setServerModuleAccessReady(true);
+      setServerModuleAccessCompanyId(activeCompanyId);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setServerModuleAccessReady(false);
+    setServerModuleAccessCompanyId(null);
+    setServerModuleAccessError('');
+    void loadCompanyModuleAccess(activeCompanyId, activeCompany?.allowedModules ?? [])
+      .then((access) => {
+        if (!cancelled) {
+          moduleAccessCacheRef.current.set(cacheKey, { access, updatedAt: Date.now() });
+          setServerModuleAccess(access);
+          setServerModuleStatuses(Object.fromEntries(access.map((module) => [module.id, module.status])));
+          setServerModuleAccessReady(true);
+          setServerModuleAccessCompanyId(activeCompanyId);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+           setServerModuleStatuses(null);
+           setServerModuleAccess(null);
+           setServerModuleAccessReady(false);
+          setServerModuleAccessCompanyId(activeCompanyId);
+          setServerModuleAccessError(
+            error instanceof Error
+              ? error.message
+              : 'Les accès modules de cette entreprise ne sont pas confirmés par le serveur.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCompanyId,
+    activeCompanyAllowedModulesKey,
+    sectorTestCompanyId,
+    session,
+  ]);
+  const activeCompanyTheme = companyThemeVariables(activeCompany);
+  const activeNavStyle: CSSProperties | undefined = activeCompany
+    ? {
+        backgroundColor: `hsl(${activeCompanyTheme['--sidebar-active']})`,
+        color: `hsl(${activeCompanyTheme['--sidebar-active-foreground']})`,
+      }
+    : undefined;
+  useLayoutEffect(() => {
+    applyCompanyTheme(activeCompany);
+    return () => applyCompanyTheme(undefined);
+  }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
+  const applyAuthenticatedUser = (user: AuthUser) => {
+    const nextSession = sessionFromAuthUser(user);
+    const clearedData = emptyStoreData();
+    dataRef.current = clearedData;
+    setData(clearedData);
+    appStateVersionRef.current = 0;
+    setAppStateVersion(0);
+    setAppStateError('');
+    moduleAccessCacheRef.current.clear();
+    loginTransitionRef.current = true;
+    setAppStateReady(false);
+    setSession(nextSession);
+    localStorage.setItem('maximus-session', nextSession);
+    setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
+  };
+  const login = async (_space: 'admin' | 'company', email: string, password: string) => {
+    const { user } = await authApi.login(email, password);
+    applyAuthenticatedUser(user);
+  };
+  const startSectorTest = (preset: SectorPreset) => {
+    const testCompanyId = `sector-test-${preset.id}`;
+    const testNodeId = `sector-test-node-${preset.id}`;
+    const testRoleId = `sector-test-role-${preset.id}`;
+    const selectedModules = [...new Set(preset.moduleIds)];
+    const configuredModules = getConfiguredModules(data);
+    const selectedModuleFeatures = Object.fromEntries(
+      selectedModules.map((moduleId) => {
+        const module = configuredModules.find((candidate) => candidate.id === moduleId);
+        const selectedPacks = (module?.featurePacks ?? []).filter((pack) =>
+          preset.modulePackIds?.[moduleId]?.includes(pack.id),
+        );
+        const packFeatureIds = selectedPacks.flatMap((pack) => pack.featureIds);
+        const featureIds = module
+          ? getEffectiveModuleFeatureIds(
+              module,
+              packFeatureIds.length ? packFeatureIds : preset.moduleFeatures?.[moduleId],
+            )
+          : new Set<string>();
+        return [moduleId, [...featureIds]];
+      }),
+    ) as Partial<Record<ModuleId, string[]>>;
+    const selectedModulePermissions = Object.fromEntries(
+      selectedModules.map((moduleId) => {
+        const module = configuredModules.find((candidate) => candidate.id === moduleId);
+        const selectedPacks = (module?.featurePacks ?? []).filter((pack) =>
+          preset.modulePackIds?.[moduleId]?.includes(pack.id),
+        );
+        const packPermissions = selectedPacks.reduce<FeaturePermissionMap>(
+          (permissions, pack) => ({ ...permissions, ...(pack.featurePermissions ?? {}) }),
+          {},
+        );
+        return [
+          moduleId,
+          Object.fromEntries(
+            (selectedModuleFeatures[moduleId] ?? []).map((featureId) => [
+              featureId,
+              [...(packPermissions[featureId] ?? ['voir'])],
+            ]),
+          ),
+        ];
+      }),
+    ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
+    const testCompany: Company = {
+      id: testCompanyId,
+      name: preset.name,
+      manager: `Administration ${preset.name}`,
+      email: `admin.${preset.id}@maximus.local`,
+      phone: '',
+      country: 'Sénégal',
+      sector: preset.name,
+      status: 'ACTIF',
+      requestedModules: selectedModules,
+      requestedModulePackIds: Object.fromEntries(
+        Object.entries(preset.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+      ),
+      requestedModuleFeatures: Object.fromEntries(
+        Object.entries(selectedModuleFeatures).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]]),
+      ),
+      requestedModulePermissions: selectedModulePermissions,
+      allowedModules: selectedModules,
+      refusedModules: modules.map((module) => module.id).filter((moduleId) => !selectedModules.includes(moduleId)),
+      createdAt: new Date().toISOString().slice(0, 10),
+      managerRoleId: testRoleId,
+    };
+    const testNode: OrgNode = {
+      id: testNodeId,
+      companyId: testCompanyId,
+      code: 'TEST',
+      name: preset.name,
+      parentId: null,
+      moduleIds: selectedModules,
+      modulePackIds: Object.fromEntries(
+        Object.entries(preset.modulePackIds ?? {}).map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+      ),
+      moduleFeatures: selectedModuleFeatures,
+    };
+    mutate((draft) => {
+      draft.companies = [
+        ...draft.companies.filter((company) => !company.id.startsWith('sector-test-')),
+        testCompany,
+      ];
+      draft.orgNodes = [
+        ...draft.orgNodes.filter((node) => !node.companyId?.startsWith('sector-test-')),
+        testNode,
+      ];
+      draft.roles = draft.roles.filter((role) => !role.companyId?.startsWith('sector-test-'));
+      synchronizeUnitPackRoles(draft, testCompany, testNode);
+
+      const generatedPackRoles = draft.roles.filter(
+        (role) => role.companyId === testCompanyId && role.sectorId === testNodeId && role.packId,
+      );
+      const modulePermissions = generatedPackRoles.reduce<Record<string, string[]>>((permissions, role) => {
+        Object.entries(role.modulePermissions).forEach(([key, values]) => {
+          permissions[key] = [...new Set([...(permissions[key] ?? []), ...values])];
+        });
+        return permissions;
+      }, {});
+      selectedModules.forEach((moduleId) => {
+        if (!Object.keys(modulePermissions).some((key) => key === moduleId || key.startsWith(`${moduleId}:`) || key.startsWith('presence.'))) {
+          modulePermissions[moduleId] = ['voir'];
+        }
+      });
+      draft.roles.push({
+        id: testRoleId,
+        name: `Administrateur · ${preset.name}`,
+        description: `Droits temporaires de l’entreprise préprogrammée « ${preset.name} », calculés depuis ses modules et packs.`,
+        companyId: testCompanyId,
+        sectorId: testNodeId,
+        modulePermissions,
+      });
+    }, undefined, false);
+    localStorage.setItem('maximus-sector-test-company', testCompanyId);
+    const nextSession = `company:${testCompanyId}` as Session;
+    setSession(nextSession);
+    localStorage.setItem('maximus-session', nextSession);
+    setLocation('/entreprise/dashboard');
+    notify(`Test réel lancé pour le secteur « ${preset.name} ».`);
+  };
+  const exitSectorTest = () => {
+    if (!sectorTestCompanyId) return logout();
+    mutate((draft) => {
+      draft.companies = draft.companies.filter((company) => company.id !== sectorTestCompanyId);
+      draft.orgNodes = draft.orgNodes.filter((node) => node.companyId !== sectorTestCompanyId);
+      draft.employees = draft.employees.filter((employee) => employee.companyId !== sectorTestCompanyId);
+      draft.roles = draft.roles.filter((role) => role.companyId !== sectorTestCompanyId);
+    }, undefined, false);
+    localStorage.removeItem('maximus-sector-test-company');
+    setSession('admin');
+    localStorage.setItem('maximus-session', 'admin');
+    setLocation('/maximus/secteurs');
+    notify('Test réel terminé. Retour à la configuration des secteurs.', 'success');
+  };
+  const companyLoginMatch = pathname.match(/^\/entreprise\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
+  const companyLoginSlug = companyLoginMatch ? decodeURIComponent(companyLoginMatch[1]) : null;
+  const logout = (destinationOverride?: string) => {
+    const isCompanySession = Boolean(session && session !== 'admin');
+    const companyLoginPath =
+      activeCompany?.loginCustomAllowed && (activeCompany.loginMode ?? 'MAXIMUS') === 'CUSTOM'
+        ? activeCompany.loginUrl
+          ?? (activeCompany.loginSlug
+            ? `/entreprise/${encodeURIComponent(activeCompany.loginSlug)}/connexion`
+            : null)
+        : null;
+    const destination = destinationOverride ?? (isCompanySession && companyLoginPath ? companyLoginPath : '/');
+    applyCompanyTheme(undefined);
+    const clearedData = emptyStoreData();
+    dataRef.current = clearedData;
+    setData(clearedData);
+    appStateVersionRef.current = 0;
+    setAppStateVersion(0);
+    setAppStateError('');
+    moduleAccessCacheRef.current.clear();
+    setAppStateReady(true);
+    setSession(null);
+    localStorage.removeItem('maximus-session');
+    setLocation(destination);
+    void authApi.logout().catch(() => undefined);
+  };
+  useEffect(() => {
+    if (
+      !companyLoginSlug
+      || !session
+      || !appStateReady
+    ) {
+      return;
+    }
+    logout(location);
+  }, [appStateReady, companyLoginSlug, location, session]);
+  useEffect(() => {
+    const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
+    if (!state?.maximus) {
+      window.history.replaceState({ ...(state ?? {}), maximus: true, maximusIndex: 0 }, '', window.location.href);
+    }
+  }, []);
+  const navigate = (path: string) => {
+    const state = window.history.state as { maximusIndex?: number } | null;
+    const currentIndex = typeof state?.maximusIndex === 'number' ? state.maximusIndex : 0;
+    const nextPath = canonicalAppPath(path);
+    setLocation(nextPath, {
+      state: {
+        ...(window.history.state ?? {}),
+        maximus: true,
+        maximusIndex: currentIndex + 1,
+      },
+    });
+    setMobileOpen(false);
+  };
+  const goBack = (fallback: string) => {
+    const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
+    if (state?.maximus && (state.maximusIndex ?? 0) > 0) {
+      window.history.back();
+      return;
+    }
+    navigate(fallback);
+  };
+
+  if (!installationReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
+        <h1 className="text-lg font-bold">Préparation de votre espace…</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          Vérification de la configuration de l’installation MAXIMUS.
+        </p>
+      </section>
+    </div>;
+  }
+  if (location === '/inscription' && installationProfile?.companyOnly)
+    return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
+  if (location === '/inscription')
+    return session === 'admin' ? (
+      <AdminCreateCompanyPage
+        data={data}
+        mutate={mutate}
+        onComplete={() => {
+          notify('Entreprise créée et activée depuis l’administration MAXIMUS.', 'success');
+          setLocation('/maximus/entreprises');
+        }}
+        onCancel={() => setLocation('/maximus/entreprises')}
+      />
+    ) : (
+      <Signup
+        key={`signup-${registrationCatalogVersion}`}
+        data={data}
+        intelligentRegistrationEnabled={publicRegistrationEnabled}
+        onIntelligent={() => setLocation('/onboarding')}
+        onComplete={() => {
+          notify('Votre demande a bien été envoyée.', 'success');
+          setLocation('/');
+        }}
+      />
+    );
+  if (location === '/onboarding' && installationProfile?.companyOnly) {
+    return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
+  }
+  if (location === '/onboarding' && !session) {
+    if (!publicRegistrationEnabled) {
+      return <PublicRegistrationClosed onBack={() => setLocation('/')} />;
+    }
+    return (
+      <IntelligentOnboardingPage
+        data={data}
+        onManual={() => setLocation('/inscription')}
+        onComplete={() => {
+          notify('Votre demande a bien été envoyée.', 'success');
+          setLocation('/');
+        }}
+        onSubmitRequest={async ({ draftId, identity }) => {
+          const { passwordConfirm: _passwordConfirm, ...requestIdentity } = identity;
+          await onboardingApi.confirmDraft(draftId, requestIdentity);
+        }}
+      />
+    );
+  }
+  if (pathname === '/client-app' || pathname.startsWith('/client-app/')) {
+    const pwaEntry = parseClientPwaPath(pathname);
+    if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
+    if (pwaEntry?.domain) return <PublicShopPage domain clientApp />;
+  }
+  if (pathname === '/' && isPotentialCustomStoreHost()) {
+    return <PublicShopPage domain />;
+  }
+  if (companyLoginSlug && session && appStateReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
+        <h1 className="text-lg font-bold">Changement d’espace en cours…</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          La session de l’autre entreprise est en cours de fermeture.
+        </p>
+      </section>
+    </div>;
+  }
+  if (companyLoginSlug && !session) {
+    return (
+      <CompanyLoginPage
+        slug={companyLoginSlug}
+        onAuthenticated={(user) => {
+          localStorage.setItem('maximus-last-company-login-path', pathname);
+          applyAuthenticatedUser(user);
+        }}
+      />
+    );
+  }
+  const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
+  if (publicShopMatch) {
+    return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
+  }
+  if (session && !appStateReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
+        <h1 className="text-lg font-bold">{appStateError ? 'Les données métier ne sont pas accessibles' : 'Chargement de l’espace…'}</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+          {appStateError || 'Connexion à votre espace entreprise en cours.'}
+        </p>
+        {appStateError && <button type="button" onClick={() => {
+          setAppStateError('');
+          void refreshAppState().then((ready) => setAppStateReady(ready));
+        }} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button>}
+      </section>
+    </div>;
+  }
+  const loginEmployees = [
+    ...data.employees,
+  ];
+  if (location === '/' || !session) {
+    return (
+      <Login
+        onLogin={login}
+        employees={loginEmployees}
+        registrationEnabled={installationProfile?.companyOnly ? false : publicRegistrationEnabled}
+        installationProfile={installationProfile}
+      />
+    );
+  }
+  const isAdmin = session === 'admin' && !installationProfile?.companyOnly;
+  const companyAdmin = session.startsWith('company:');
+  const employeeId = sessionEmployeeId;
+  const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
+  const companyId = activeCompanyId ?? '';
+  const currentCompany = activeCompany;
+  const {
+    accessRole,
+    employeeNode,
+    allowed,
+    canManagePeople,
+    commerceTabIds,
+    hasPermission,
+    hasPresencePermission,
+    presenceEmployees,
+    selectedPresenceFeatureIds,
+    selectedEcommerceFeatureIds,
+    selectedPayrollFeatureIds,
+    selectedTransportFeatureIds,
+    transportFeaturePermissions,
+    ecommerceFeaturePermissions,
+    payrollFeaturePermissions,
+    commerceTabPermissions,
+    moduleFeaturePermissions,
+    sidebarFeatureGroups,
+    stockPermissions,
+    sectorManager,
+  } = buildAppAccessContext({
+    data,
+    session,
+    employee,
+    activeCompanyId,
+    activeCompany: currentCompany,
+    sectorTestCompanyId,
+    serverModuleStatuses,
+    serverModuleAccess,
+    serverModuleAccessReady:
+      serverModuleAccessReady && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId),
+  });
+  const adminAssistantScope = buildAdminAssistantScope(data, 'Administration principale');
+  const baseMeta =
+    pageMeta[normalizeRoutePath(location)] ??
+    modulePageMeta[normalizeRoutePath(location)] ??
+    (location.startsWith('/maximus/entreprises/')
+      ? {
+          kicker: 'Administration',
+          title: 'Détail entreprise',
+          description: 'Consultez et ajustez l’espace client sélectionné.',
+        }
+      : pageMeta[isAdmin ? '/maximus/dashboard' : '/entreprise/dashboard']);
+  const companyRoutePath = normalizeRoutePath(location);
+  const currentMeta =
+    !isAdmin && currentCompany
+      ? companyRoutePath === '/entreprise/dashboard'
+        ? {
+            kicker: currentCompany.name,
+            title: `Le rythme de ${currentCompany.name}, en un regard.`,
+            description: `${currentCompany.sector} · ${currentCompany.country}`,
+          }
+        : { ...baseMeta, kicker: currentCompany.name }
+      : baseMeta;
+  const currentPath = companyRoutePath;
+  const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
+  const companyInitials =
+    currentCompany?.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase() || 'KD';
+  const notificationContext = { isAdmin, companyId };
+  const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(
+    (notification) => !notification.read,
+  ).length;
+  return (
+    <div className="app-shell flex h-[100dvh] min-h-0 overflow-hidden" style={activeCompanyTheme as CSSProperties}>
+      <Sidebar
+        session={session}
+        location={location}
+        allowed={allowed}
+        sidebarFeatureGroups={sidebarFeatureGroups}
+        canManagePeople={canManagePeople}
+        onNavigate={navigate}
+        onLogout={sectorTestCompanyId ? exitSectorTest : logout}
+        employee={employee}
+        companyName={currentCompany?.name}
+        companyPhoto={currentCompany?.profilePhoto}
+        adminLogo="/maximus-mark.svg"
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+        activeNavStyle={activeNavStyle}
+        hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+      />
+      <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
+        <Topbar
+          title={currentMeta.title}
+          isAdmin={isAdmin}
+          onNavigate={navigate}
+          onToggleMenu={() => setMobileOpen(true)}
+          notificationPath={isAdmin ? '/maximus/notifications' : '/entreprise/notifications'}
+          unreadCount={unreadNotifications}
+          onRefresh={async () => {
+            window.dispatchEvent(new Event('maximus:refresh'));
+            await refreshAppState();
+          }}
+          onHelp={() => {
+            void alert({
+              title: 'Aide MAXIMUS',
+              description: 'Explorez les vues depuis la navigation de votre espace.',
+              confirmLabel: 'Compris',
+            });
+          }}
+        />
+        <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
+          {sectorTestCompanyId && (
+            <div
+              data-testid="sector-test-banner"
+              className="mb-5 flex flex-col gap-3 rounded-xl border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.08)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <strong className="block text-xs text-[hsl(var(--primary))]">Test réel de secteur en cours</strong>
+                <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">
+                  Vous êtes dans l’espace entreprise réel avec les modules autorisés par ce secteur.
+                </span>
+              </div>
+              <button
+                type="button"
+                data-testid="button-exit-sector-test"
+                onClick={exitSectorTest}
+                className="shrink-0 rounded-lg border border-[hsl(var(--primary)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.1)]"
+              >
+                Quitter le test
+              </button>
+            </div>
+          )}
+          {!hidePageHeader && (
+            <PageHeader
+              {...currentMeta}
+              location={location}
+               onBack={() => goBack(isAdmin ? '/maximus/dashboard' : '/entreprise/dashboard')}
+            />
+          )}
+          {serverModuleAccessError && serverModuleAccessCompanyId === activeCompanyId && !isAdmin && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-[hsl(var(--destructive)/.35)] bg-[hsl(var(--destructive)/.08)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"
+            >
+              <strong className="block">Accès modules non confirmé</strong>
+              <span className="mt-1 block text-xs leading-5">
+                {serverModuleAccessError} Les modules sont masqués par sécurité. Un administrateur MAXIMUS doit
+                resynchroniser cette entreprise avant sa prochaine utilisation.
+              </span>
+            </div>
+          )}
+          <ErrorBoundary resetKey={location}>
+            <Suspense
+              fallback={
+                <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                  Chargement de l’espace…
+                </div>
+              }
+            >
+              {isAdmin ? (
+                <AdminRouter
+                  location={location}
+                  data={data}
+                  mutate={mutate}
+                  notify={notify}
+                  onNavigate={navigate}
+                  onBack={goBack}
+                  onModuleAccess={updateCompanyModuleAccess}
+                   assistantScope={adminAssistantScope}
+                    onAskAssistant={(question, history) => maximusAssistantApi.ask(question, history)}
+                    onPreviewAssistantAction={(action: MaximusAssistantAction) => maximusAssistantApi.previewAction(action)}
+                    onExecuteAssistantAction={(action: MaximusAssistantAction) =>
+                      maximusAssistantApi.executeAction(action).then(async response => {
+                        await refreshAppState();
+                        return response;
+                      })
+                    }
+                   onTestSector={startSectorTest}
+                  screens={{
+                    dashboard: AdminDashboard,
+                     assistant: MaximusAssistantPage,
+                    control: ControlCenterPage,
+                     surveillance: SystemHealthPage,
+                    organization: OrganizationAdminPage,
+                    companyDetail: CompanyModulesDetail,
+                    companies: CompaniesPage,
+                    requests: RequestsPage,
+                    modules: InteractiveModulesPage,
+                    sectors: SectorPresetsPage,
+                    subscriptions: SubscriptionsPage,
+                    notifications: NotificationsPage,
+                    journal: JournalPage,
+                    platformSettings: PlatformSettingsPage,
+                    empty: EmptyState,
+                  }}
+                />
+              ) : (
+                <CompanyRouter
+                  location={location}
+                  mutate={mutate}
+                  notify={notify}
+                  data={data}
+                  onNavigate={navigate}
+                  onBack={goBack}
+                  allowed={allowed}
+                  canManagePeople={canManagePeople}
+                  companyAdmin={companyAdmin}
+                  sectorManager={sectorManager}
+                  scopeNodeId={employeeNode?.id}
+                  companyId={companyId}
+                  employee={employee}
+                  employees={data.employees}
+                  presenceEmployees={presenceEmployees}
+                  hasPermission={hasPermission}
+                  hasPresencePermission={hasPresencePermission}
+                  presenceFeatureIds={selectedPresenceFeatureIds}
+                  ecommerceFeatureIds={selectedEcommerceFeatureIds}
+                  ecommerceFeaturePermissions={ecommerceFeaturePermissions}
+                  payrollFeatureIds={selectedPayrollFeatureIds}
+                  payrollFeaturePermissions={payrollFeaturePermissions}
+                  commerceTabPermissions={commerceTabPermissions}
+                  moduleFeaturePermissions={moduleFeaturePermissions}
+                  transportFeatureIds={selectedTransportFeatureIds}
+                  transportFeaturePermissions={transportFeaturePermissions}
+                  stockPermissions={Object.keys(stockPermissions ?? {}).length ? stockPermissions : undefined}
+                  commerceTabIds={commerceTabIds}
+                  moduleStatuses={serverModuleStatuses ?? {}}
+                   serverModuleAccess={serverModuleAccess}
+                   hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+                  screens={{
+                    dashboard: RoleAwareCompanyDashboard,
+                    control: ControlCenterPage,
+                    notifications: NotificationsPage,
+                    setupGuide: CompanySetupGuide,
+                    organization: CompanyOrganizationAdmin,
+                    empty: EmptyState,
+                    stocks: StockModulePage,
+                    ecommerce: EcommerceModulePage,
+                    finance: FinancePage,
+                    commerce: CommerceModulePage,
+                    operational: OperationalModulePage,
+                    transport: TransportModulePage,
+                    payroll: PayrollModulePage,
+                    humanResources: HumanResourcesWorkspace,
+                    presence: PresenceModulePage,
+                    reports: OperationalReportsPage,
+                  }}
+                />
+              )}
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      </main>
+      <Toaster />
+    </div>
+  );
+}
+
+function Login({
+  onLogin,
+  employees,
+  registrationEnabled,
+  installationProfile,
+}: {
+  onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
+  employees: StoreData['employees'];
+  registrationEnabled: boolean;
+  installationProfile: InstallationProfile | null;
+}) {
+  const showDemoAccounts = false;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loginHelp, setLoginHelp] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const loginWithCredentials = (space: 'admin' | 'company', nextEmail: string, nextPassword: string) => {
+    if (pendingEmail) return;
+    setError('');
+    setPendingEmail(nextEmail);
+    void onLogin(space, nextEmail, nextPassword)
+      .catch((loginError) => setError(loginError instanceof Error ? loginError.message : 'La connexion MAXIMUS a échoué.'))
+      .finally(() => setPendingEmail(''));
+  };
+  const submitLogin = (space: 'admin' | 'company') => loginWithCredentials(space, email, password);
+  const demoAccounts = showDemoAccounts
+    ? [
+        ...defaultDemoAccounts,
+        ...employees
+          .filter(
+            (account) =>
+              account.status === 'ACTIF' &&
+              Boolean(account.loginPassword) &&
+              !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
+          )
+          .map((account) => ({
+            id: account.id,
+            label: `${account.firstName} ${account.lastName} · ${account.position}`,
+            email: account.email,
+            password: account.loginPassword ?? '',
+          })),
+      ]
+    : [];
+  const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError('');
+    loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
+  };
+  return (
+    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
+      <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
+        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
+        <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
+        <Brand inverse large />
+        <div className="relative mt-32 max-w-xl pb-16">
+          <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">
+            La gestion d’entreprise, simplement
+          </p>
+          <h1 className="text-6xl font-bold leading-[.98] tracking-[-.06em]">
+            Toute votre entreprise.
+            <br />
+            <span className="text-[hsl(var(--accent))]">Au même endroit.</span>
+          </h1>
+          <p className="mt-8 max-w-md text-lg leading-8 text-[hsl(var(--sidebar-foreground)/.7)]">
+            MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer
+            aujourd’hui et à grandir demain.
+          </p>
+        </div>
+        <p className="mt-auto mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">
+          Sénégal · Côte d’Ivoire · UEMOA
+        </p>
+      </section>
+      <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12">
+        <div className="w-full max-w-md fade-up">
+          <div className="mb-10 lg:hidden">
+            <Brand large />
+          </div>
+          <div className="mb-8">
+             <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
+               {installationProfile?.companyOnly ? 'Espace entreprise dédié' : 'Accédez à votre espace'}
+             </p>
+             <h2 className="text-3xl font-bold tracking-[-.04em]">
+               {installationProfile?.companyOnly && installationProfile.company
+                 ? `Bienvenue chez ${installationProfile.company.name}`
+                 : 'Gérez votre activité en toute simplicité'}
+             </h2>
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+              Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.
+            </p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitLogin('company');
+            }}
+            className="space-y-5"
+          >
+            <Field
+              label="Adresse email"
+              value={email}
+              onChange={setEmail}
+              type="email"
+              testId="input-login-email"
+              help="Adresse du compte MAXIMUS, de l’entreprise ou de l’employé."
+            />
+            <Field
+              label="Mot de passe"
+              value={password}
+              onChange={setPassword}
+              type="password"
+              testId="input-login-password"
+              help="Mot de passe associé à l’adresse email saisie."
+            />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                data-testid="button-forgot-password"
+                onClick={() => setLoginHelp((value) => !value)}
+                className="text-xs font-semibold text-[hsl(var(--primary))]"
+              >
+                Aide à la connexion
+              </button>
+            </div>
+            {loginHelp && (
+              <p className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                Utilisez l’adresse email et le mot de passe fournis par votre administrateur. Tous les comptes se
+                connectent depuis ce même formulaire.
+              </p>
+            )}
+            {error && (
+              <p
+                data-testid="login-error"
+                className="rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+              >
+                {error}
+              </p>
+            )}
+            <button
+              data-testid="button-login"
+              disabled={Boolean(pendingEmail)}
+              className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)] disabled:cursor-wait disabled:opacity-70"
+              type="submit"
+            >
+              <LogIn size={17} className={pendingEmail ? 'animate-pulse' : ''} />
+              {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
+            </button>
+          </form>
+           {!installationProfile?.companyOnly && (
+             <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+               Pas encore d’espace ?{' '}
+               <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
+                 Créer une entreprise
+               </Link>
+               {!registrationEnabled && (
+                 <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                   L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
+                 </p>
+               )}
+             </div>
+           )}
+          {showDemoAccounts && demoAccounts.length > 0 && (
+            <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
+              <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+                Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {demoAccounts.map((account) => (
+                  <button
+                    type="button"
+                    disabled={Boolean(pendingEmail)}
+                    data-testid={`button-demo-account-${account.id}`}
+                    key={account.id}
+                    onClick={() => selectDemoAccount(account)}
+                    className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
+                  >
+                    <span className="block text-xs font-bold">{account.label}</span>
+                    <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
+                    <span
+                      data-testid={`demo-account-password-${account.id}`}
+                      className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
+                    >
+                      Mot de passe : {account.password}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function InstallationCompanyOnlyNotice({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6">
+      <section className="card-surface w-full max-w-md rounded-2xl p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
+          <Building2 size={22} />
+        </div>
+        <h1 className="mt-6 text-2xl font-bold tracking-tight">Espace entreprise dédié</h1>
+        <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+          Cette installation est réservée à une seule entreprise. Les inscriptions et l’administration générale
+          MAXIMUS sont disponibles uniquement sur l’instance centrale.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-6 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+        >
+          Retour à la connexion
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function Signup({
+  data,
+  intelligentRegistrationEnabled,
+  onIntelligent,
+  onComplete,
+}: {
+  data: StoreData;
+  intelligentRegistrationEnabled: boolean;
+  onIntelligent: () => void;
+  onComplete: () => void;
+}) {
+  const fallbackPreset: SectorPreset = {
+    id: 'default',
+    name: 'Configuration manuelle',
+    moduleIds: ['commerce', 'stocks', 'presences'],
+  };
+  const initialPreset = fallbackPreset;
+  const [step, setStep] = useState(1);
+  const [submitted, setSubmitted] = useState(false);
+  const [name, setName] = useState('');
+  const [manager, setManager] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('Sénégal');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [sector, setSector] = useState('');
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
+  const [selectedModulePackIds, setSelectedModulePackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
+  const [selectedModuleFeatures, setSelectedModuleFeatures] = useState<Partial<Record<ModuleId, string[]>>>(
+    () =>
+      Object.fromEntries(
+        initialPreset.moduleIds.map((moduleId) => {
+          const module = modules.find((item) => item.id === moduleId);
+          return [
+            moduleId,
+            module ? [...getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])] : [],
+          ];
+        }),
+      ) as Partial<Record<ModuleId, string[]>>,
+  );
+  const [selectedModulePermissions, setSelectedModulePermissions] = useState<
+    Partial<Record<ModuleId, FeaturePermissionMap>>
+  >(
+    () =>
+      Object.fromEntries(
+        initialPreset.moduleIds.map((moduleId) => {
+          const module = modules.find((item) => item.id === moduleId);
+          const featureIds = module
+            ? getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])
+            : [];
+          return [moduleId, defaultFeaturePermissions(featureIds)];
+        }),
+      ) as Partial<Record<ModuleId, FeaturePermissionMap>>,
+  );
+  const [moduleError, setModuleError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const configuredModule = (moduleId: ModuleId) => {
+    return getConfiguredModules(data).find((module) => module.id === moduleId);
+  };
+  const changeSector = (nextSector: string) => {
+    const preset = data.sectorPresets.find((item) => item.name === nextSector);
+    const nextModules = preset ? [...preset.moduleIds] : [...fallbackPreset.moduleIds];
+    setSector(nextSector);
+    if (preset?.modulePackIds && Object.keys(preset.modulePackIds).length > 0) {
+      applySectorPacks(preset);
+      setModuleError('');
+      return;
+    }
+    setSelectedModules(nextModules);
+    setSelectedModulePackIds({});
+    setSelectedModuleFeatures(
+      Object.fromEntries(
+        nextModules.map((moduleId) => {
+          const module = configuredModule(moduleId);
+          const requested = preset?.moduleFeatures?.[moduleId];
+          return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, requested)] : []];
+        }),
+      ) as Partial<Record<ModuleId, string[]>>,
+    );
+    setSelectedModulePermissions(
+      Object.fromEntries(
+        nextModules.map((moduleId) => {
+          const module = configuredModule(moduleId);
+          const featureIds = module ? getEffectiveModuleFeatureIds(module, preset?.moduleFeatures?.[moduleId]) : [];
+          return [moduleId, defaultFeaturePermissions(featureIds)];
+        }),
+      ) as Partial<Record<ModuleId, FeaturePermissionMap>>,
+    );
+    setModuleError('');
+  };
+  const applySectorPacks = (preset: SectorPreset) => {
+    const packEntries = Object.entries(preset.modulePackIds ?? {}).filter(([, packIds]) => (packIds ?? []).length) as [
+      ModuleId,
+      string[],
+    ][];
+    const entries = packEntries.length
+      ? packEntries
+      : (Object.entries(preset.moduleFeatures ?? {}) as [ModuleId, string[]][]);
+    setSelectedModules(packEntries.length ? packEntries.map(([moduleId]) => moduleId) : [...preset.moduleIds]);
+    setSelectedModulePackIds(Object.fromEntries(packEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])));
+    setSelectedModuleFeatures(
+      Object.fromEntries(
+        entries.map(([moduleId, featureIds]) => {
+          const module = configuredModule(moduleId);
+          const packFeatures = packEntries.length
+            ? (module?.featurePacks ?? [])
+                .filter((pack) => preset.modulePackIds?.[moduleId]?.includes(pack.id))
+                .flatMap((pack) => pack.featureIds)
+            : featureIds;
+          return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, packFeatures)] : [...packFeatures]];
+        }),
+      ) as Partial<Record<ModuleId, string[]>>,
+    );
+    setSelectedModulePermissions(
+      Object.fromEntries(
+        entries.map(([moduleId]) => {
+          const module = configuredModule(moduleId);
+          const selectedPacks =
+            module?.featurePacks?.filter((pack) => preset.modulePackIds?.[moduleId]?.includes(pack.id)) ?? [];
+          const featureIds = module
+            ? getEffectiveModuleFeatureIds(
+                module,
+                selectedPacks.length
+                  ? selectedPacks.flatMap((pack) => pack.featureIds)
+                  : preset.moduleFeatures?.[moduleId],
+              )
+            : [];
+          const permissions = selectedPacks.reduce<FeaturePermissionMap>(
+            (all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }),
+            {},
+          );
+          return [moduleId, defaultFeaturePermissions(featureIds, permissions)];
+        }),
+      ) as Partial<Record<ModuleId, FeaturePermissionMap>>,
+    );
+    setModuleError('');
+  };
+  const toggle = (id: ModuleId) => {
+    const enabled = selectedModules.includes(id);
+    setSelectedModules((previous) => (enabled ? previous.filter((moduleId) => moduleId !== id) : [...previous, id]));
+    setSelectedModuleFeatures((current) => {
+      if (enabled) {
+        const next = { ...current };
+        delete next[id];
+        setSelectedModulePackIds((packIds) => {
+          const nextPacks = { ...packIds };
+          delete nextPacks[id];
+          return nextPacks;
+        });
+        return next;
+      }
+      const module = configuredModule(id);
+      if (module?.featurePacks?.length) setSelectedModulePackIds((current) => ({ ...current, [id]: [] }));
+      const availableFeatures = getModuleFeatureOptions(module ?? modules[0]).map((feature) => feature.id);
+      setSelectedModulePermissions((current) => ({ ...current, [id]: defaultFeaturePermissions(availableFeatures) }));
+      return { ...current, [id]: module ? [...getEffectiveModuleFeatureIds(module, availableFeatures)] : [] };
+    });
+    if (enabled)
+      setSelectedModulePermissions((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    setModuleError('');
+  };
+  const togglePack = (moduleId: ModuleId, packId: string) => {
+    const module = configuredModule(moduleId);
+    if (!module) return;
+    setSelectedModulePackIds((current) => {
+      const nextIds = current[moduleId]?.includes(packId)
+        ? (current[moduleId] ?? []).filter((id) => id !== packId)
+        : [...(current[moduleId] ?? []), packId];
+      const selectedPacks = (module.featurePacks ?? []).filter((pack) => nextIds.includes(pack.id));
+      const featureIds = selectedPacks.flatMap((pack) => pack.featureIds);
+      setSelectedModuleFeatures((features) => ({
+        ...features,
+        [moduleId]: [...getEffectiveModuleFeatureIds(module, featureIds)],
+      }));
+      setSelectedModulePermissions((permissions) => ({
+        ...permissions,
+        [moduleId]: defaultFeaturePermissions(
+          featureIds,
+          selectedPacks.reduce<FeaturePermissionMap>(
+            (all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }),
+            {},
+          ),
+        ),
+      }));
+      return { ...current, [moduleId]: nextIds };
+    });
+  };
+  const toggleFeature = (moduleId: ModuleId, featureId: string) => {
+    const module = configuredModule(moduleId);
+    if (!module) return;
+    setSelectedModuleFeatures((current) => {
+      const options = getModuleFeatureOptions(module);
+      const selected = new Set(current[moduleId] ?? options.map((feature) => feature.id));
+      if (selected.has(featureId)) selected.delete(featureId);
+      else selected.add(featureId);
+      setSelectedModulePermissions((permissions) => {
+        const next = { ...(permissions[moduleId] ?? {}) };
+        if (selected.has(featureId)) next[featureId] = next[featureId]?.length ? next[featureId] : ['voir'];
+        else delete next[featureId];
+        return { ...permissions, [moduleId]: next };
+      });
+      return { ...current, [moduleId]: [...getEffectiveModuleFeatureIds(module, [...selected])] };
+    });
+  };
+  const selectedPreset = data.sectorPresets.find((preset) => preset.name === sector);
+  const selectedModuleSet = new Set(selectedModules);
+  const selectedPackCount = Object.values(selectedModulePackIds).reduce(
+    (total, packIds) => total + (packIds?.length ?? 0),
+    0,
+  );
+  const selectedFeatureCount = selectedModules.reduce(
+    (total, moduleId) => total + (selectedModuleFeatures[moduleId]?.length ?? 0),
+    0,
+  );
+  const orderedModules = [...modules].sort(
+    (left, right) => Number(selectedModuleSet.has(right.id)) - Number(selectedModuleSet.has(left.id)),
+  );
+  if (submitted) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6">
+        <div className="card-surface w-full max-w-xl rounded-2xl p-8 text-center fade-up">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]">
+            <Check size={25} />
+          </span>
+          <p className="mono mt-6 text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Demande envoyée</p>
+          <h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">Votre entreprise est en attente de validation.</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            Votre demande est en cours d’examen par l’administration MAXIMUS. Vous pourrez configurer votre organisation
+            depuis votre espace après activation.
+          </p>
+          <button
+            data-testid="button-back-after-signup"
+            onClick={onComplete}
+            className="btn mt-8 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+          >
+            Retour à la connexion
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-[hsl(var(--background))]">
+      <header className="flex items-center justify-between border-b border-[hsl(var(--border))] px-6 py-5 lg:px-12">
+        <Brand />
+        <Link
+          data-testid="link-back-login"
+          href="/"
+          className="text-sm font-semibold text-[hsl(var(--muted-foreground))]"
+        >
+          Retour à la connexion
+        </Link>
+      </header>
+      <div className="mx-auto max-w-3xl p-6 py-12 lg:py-20 fade-up">
+        <div className="mb-10">
+          <p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">
+            Nouvel espace entreprise
+          </p>
+          <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1>
+          <p className="mt-3 text-[hsl(var(--muted-foreground))]">
+            Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
+            être construite après l’activation de votre espace.
+          </p>
+          {intelligentRegistrationEnabled ? (
+            <button
+              type="button"
+              onClick={onIntelligent}
+              className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.06)] px-4 py-2.5 text-sm font-bold text-[hsl(var(--primary))] transition hover:bg-[hsl(var(--primary)/.12)]"
+            >
+              <Sparkles size={16} />
+              Décrire mon entreprise à MAXIMUS
+            </button>
+          ) : (
+            <p className="mt-5 rounded-lg bg-[hsl(var(--muted))] px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+              L’inscription automatique est temporairement indisponible. Vous pouvez continuer avec le formulaire manuel ci-dessous.
+            </p>
+          )}
+        </div>
+        <div className="mb-10 flex items-center gap-3">
+          <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />
+          <div className="h-px flex-1 bg-[hsl(var(--border))]" />
+          <Step n={2} label="Fonctionnalités" active={step === 2} done={false} />
+        </div>
+        {step === 1 ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setStep(2);
+            }}
+            className="card-surface rounded-2xl p-6 sm:p-8"
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Nom de l’entreprise"
+                placeholder="Ex. votre entreprise"
+                value={name}
+                onChange={setName}
+                testId="input-company-name"
+              />
+              <Field
+                label="Responsable"
+                placeholder="Prénom Nom"
+                value={manager}
+                onChange={setManager}
+                testId="input-company-manager"
+              />
+              <Field
+                label="Email professionnel"
+                placeholder="vous@entreprise.com"
+                value={email}
+                onChange={setEmail}
+                type="email"
+                testId="input-company-email"
+              />
+              <Field
+                label="Téléphone"
+                placeholder="+221 77 000 00 00"
+                value={phone}
+                onChange={setPhone}
+                testId="input-company-phone"
+              />
+              <Field
+                label="Pays"
+                placeholder="Sénégal"
+                value={country}
+                onChange={setCountry}
+                testId="input-company-country"
+              />
+              <label className="block text-sm font-semibold">
+                Secteur
+                <select
+                  data-testid="select-company-sector"
+                  value={sector}
+                  onChange={(e) => changeSector(e.target.value)}
+                  className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
+                >
+                  <option value="">Aucun secteur — configurer manuellement</option>
+                  {data.sectorPresets.map((preset) => (
+                    <option key={preset.id} value={preset.name}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
+                  Ce choix détermine les modules proposés au démarrage.
+                </span>
+              </label>
+              <Field
+                label="Mot de passe administrateur"
+                placeholder="Au moins 8 caractères"
+                value={password}
+                onChange={setPassword}
+                type="password"
+                testId="input-company-password"
+              />
+              <Field
+                label="Confirmer le mot de passe"
+                placeholder="Répétez le mot de passe"
+                value={passwordConfirm}
+                onChange={setPasswordConfirm}
+                type="password"
+                testId="input-company-password-confirm"
+              />
+            </div>
+            {password && passwordConfirm && password !== passwordConfirm && (
+              <p className="mt-4 text-xs font-semibold text-[hsl(var(--destructive))]">
+                Les mots de passe ne correspondent pas.
+              </p>
+            )}
+            <p className="mt-4 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Ce mot de passe servira à l’administrateur de l’entreprise après validation de votre demande.
+            </p>
+            <button
+              type="submit"
+              disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm}
+              data-testid="button-next-signup"
+              className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Continuer <ChevronRight size={16} />
+            </button>
+          </form>
+        ) : (
+          <div className="card-surface rounded-2xl p-5 sm:p-8">
+            <section className="border-b border-[hsl(var(--border))] pb-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
+                    Étape 2 sur 2
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Choisissez vos modules</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                    Activez uniquement les espaces utiles à votre entreprise. Vous pourrez ajuster les détails
+                    après l’activation de votre compte.
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
+                  <Check size={14} />
+                  {selectedModules.length} module{selectedModules.length > 1 ? 's' : ''} activé{selectedModules.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            </section>
+
+            <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Résumé de la sélection">
+              {[
+                { label: 'Modules activés', value: selectedModules.length, detail: 'espaces de travail' },
+                { label: 'Packs sélectionnés', value: selectedPackCount, detail: 'configurations prêtes à l’emploi' },
+                { label: 'Fonctionnalités', value: selectedFeatureCount, detail: 'droits inclus au démarrage' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.28)] px-4 py-3">
+                  <p className="mono text-[10px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{item.label}</p>
+                  <p className="mt-1 text-xl font-bold">{item.value}</p>
+                  <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">{item.detail}</p>
+                </div>
+              ))}
+            </section>
+
+            <section className="mt-6 rounded-xl border border-[hsl(var(--accent)/.3)] bg-[hsl(var(--accent)/.06)] p-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.15)] text-[hsl(var(--accent))]">
+                  <Sparkles size={16} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-[hsl(var(--accent))]">
+                    {sector ? `Suggestion pour le secteur ${sector}` : 'Configuration manuelle'}
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">
+                    {selectedPreset
+                      ? 'Les packs ci-dessous ont été préparés pour ce secteur. Vous pouvez les retirer ou les compléter.'
+                      : 'Une sélection de départ est affichée. Choisissez les modules et les packs adaptés à votre activité.'}
+                  </p>
+                  {selectedPreset?.modulePackIds && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {Object.entries(selectedPreset.modulePackIds).flatMap(([moduleId, packIds]) =>
+                        (packIds ?? []).map((packId) => (
+                          <span
+                            key={`${moduleId}-${packId}`}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--card))] px-2.5 py-1 text-[11px] font-semibold"
+                          >
+                            <Check size={12} className="text-[hsl(var(--primary))]" />
+                            {configuredModule(moduleId as ModuleId)?.featurePacks?.find((pack) => pack.id === packId)?.name ?? packId}
+                          </span>
+                        )),
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {moduleError && (
+              <p
+                data-testid="signup-module-error"
+                className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+              >
+                {moduleError}
+              </p>
+            )}
+            <div className="mt-6 space-y-3">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold">Modules disponibles</h3>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    Cliquez sur un module pour l’activer ou afficher sa configuration.
+                  </p>
+                </div>
+                <span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{modules.length} au total</span>
+              </div>
+              {orderedModules.map((baseModule) => {
+                const mod = configuredModule(baseModule.id) ?? baseModule;
+                const enabled = selectedModules.includes(mod.id);
+                const featureOptions = getModuleFeatureOptions(mod);
+                const selectedFeatureIds = getEffectiveModuleFeatureIds(mod, selectedModuleFeatures[mod.id]);
+                const ModuleIcon = moduleIconById[mod.id];
+                return (
+                  <div
+                    key={mod.id}
+                    className={`overflow-hidden rounded-xl border transition ${enabled ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--primary)/.035)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/.35)]'}`}
+                  >
+                    <button
+                      type="button"
+                      data-testid={`button-module-${mod.id}`}
+                      onClick={() => toggle(mod.id)}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                    >
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${enabled ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}
+                      >
+                        {ModuleIcon ? <ModuleIcon size={17} /> : <LayoutGrid size={17} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <strong className="text-sm">{mod.name}</strong>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${enabled ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+                            {enabled ? 'Activé' : 'Disponible'}
+                          </span>
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                          {mod.description}
+                        </span>
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`mt-1 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform ${enabled ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    {enabled && (
+                      <div className="border-t border-[hsl(var(--primary)/.16)] px-4 pb-4 pt-4">
+                        {(mod.featurePacks?.length ?? 0) > 0 && (
+                          <div className="mb-3">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-bold">Packs disponibles</p>
+                                <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Un pack active plusieurs fonctionnalités en une fois.</p>
+                              </div>
+                              <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                {selectedModulePackIds[mod.id]?.length ?? 0}/{mod.featurePacks?.length ?? 0}
+                              </span>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {mod.featurePacks?.map((pack) => {
+                                const selected = selectedModulePackIds[mod.id]?.includes(pack.id) ?? false;
+                                return (
+                                  <label
+                                    key={pack.id}
+                                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${selected ? 'border-[hsl(var(--primary)/.45)] bg-[hsl(var(--primary)/.08)]' : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--card))]'}`}
+                                  >
+                                    <input
+                                      data-testid={`checkbox-signup-pack-${mod.id}-${pack.id}`}
+                                      type="checkbox"
+                                      checked={selected}
+                                      onChange={() => togglePack(mod.id, pack.id)}
+                                      className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
+                                    />
+                                    <span className="min-w-0">
+                                      <strong className="block text-xs">{pack.name}</strong>
+                                      <span className="mt-1 block text-[11px] leading-4 text-[hsl(var(--muted-foreground))]">
+                                        {pack.description ?? `${pack.featureIds.length} fonctionnalité(s) incluses`}
+                                      </span>
+                                      <span className="mt-1.5 block text-[10px] font-semibold text-[hsl(var(--primary))]">
+                                        {pack.featureIds.length} fonctionnalité{pack.featureIds.length > 1 ? 's' : ''} incluse{pack.featureIds.length > 1 ? 's' : ''}
+                                      </span>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {((mod.featurePacks?.length ?? 0) === 0 ||
+                          (selectedModulePackIds[mod.id]?.length ?? 0) > 0) && (
+                          <div className="rounded-lg bg-[hsl(var(--muted)/.38)] p-3">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-bold">Fonctionnalités à activer</p>
+                                <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Affinez le contenu de ce module si nécessaire.</p>
+                              </div>
+                              <span className="mono shrink-0 rounded-full bg-[hsl(var(--card))] px-2 py-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                {selectedFeatureIds.size}/{featureOptions.length}
+                              </span>
+                            </div>
+                            <div className="grid gap-1 sm:grid-cols-2">
+                              {featureOptions.map((feature) => {
+                                const included = selectedFeatureIds.has(feature.id);
+                                return (
+                                  <label
+                                    key={feature.id}
+                                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-xs transition hover:bg-[hsl(var(--card)/.8)]"
+                                  >
+                                    <input
+                                      data-testid={`checkbox-signup-feature-${mod.id}-${feature.id}`}
+                                      type="checkbox"
+                                      checked={included}
+                                      onChange={() => toggleFeature(mod.id, feature.id)}
+                                      className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
+                                    />
+                                    <span className={included ? 'font-semibold' : 'text-[hsl(var(--muted-foreground))]'}>{feature.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-8 flex gap-3">
+              <button
+                data-testid="button-back-signup"
+                onClick={() => setStep(1)}
+                className="rounded-lg border px-5 py-3 text-sm font-bold"
+              >
+                Retour
+              </button>
+               {submitError && (
+                 <p role="alert" className="mb-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+                   {submitError}
+                 </p>
+               )}
+               <button
+                  disabled={selectedModules.length === 0}
+                data-testid="button-submit-signup"
+                 onClick={() => {
+                   if (submitting) return;
+                  const requestedModuleFeatures = Object.fromEntries(
+                    selectedModules.map((moduleId) => {
+                      const module = configuredModule(moduleId);
+                      return [
+                        moduleId,
+                        module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : [],
+                      ];
+                    }),
+                  ) as Partial<Record<ModuleId, string[]>>;
+                  const requestedModulePermissions = Object.fromEntries(
+                    selectedModules.map((moduleId) => [
+                      moduleId,
+                      defaultFeaturePermissions(
+                        requestedModuleFeatures[moduleId] ?? [],
+                        selectedModulePermissions[moduleId],
+                      ),
+                    ]),
+                  ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
+                   setSubmitting(true);
+                   setSubmitError('');
+                   void companyRequestApi.create({
+                     name: name.trim(),
+                     manager: manager.trim(),
+                     email: email.trim(),
+                     password,
+                      phone: phone.trim(),
+                      country: country.trim(),
+                     sector: sector.trim(),
+                     requestedModules: selectedModules,
+                     requestedModulePackIds: Object.fromEntries(
+                       Object.entries(selectedModulePackIds).filter(([, packIds]) => (packIds ?? []).length),
+                     ),
+                     requestedModuleFeatures,
+                     requestedModulePermissions,
+                   })
+                     .then(() => setSubmitted(true))
+                     .catch((error) => {
+                       setSubmitError(error instanceof Error ? error.message : 'La demande n’a pas pu être enregistrée.');
+                     })
+                     .finally(() => setSubmitting(false));
+                }}
+                 aria-busy={submitting}
+                className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+              >
+                 {submitting ? 'Enregistrement…' : 'Envoyer la demande'} <Check size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PublicRegistrationClosed({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="flex min-h-[100dvh] flex-col bg-[hsl(var(--background))]">
+      <header className="flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
+            <Building2 size={18} />
+          </div>
+          <span className="font-bold tracking-tight">MAXIMUS</span>
+        </div>
+        <span className="text-sm text-[hsl(var(--muted-foreground))]">Inscription</span>
+      </header>
+      <main className="flex flex-1 items-center justify-center p-6">
+        <section className="card-surface w-full max-w-lg rounded-2xl border p-8 text-center sm:p-10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
+            <LockKeyhole size={26} />
+          </div>
+          <h1 className="mt-6 text-2xl font-bold tracking-tight">Les inscriptions sont momentanément fermées</h1>
+          <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            L’administration MAXIMUS n’accepte pas de nouvelles demandes pour le moment. Réessayez ultérieurement.
+          </p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-7 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+          >
+            Retour à la connexion
+          </button>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function OrganizationAdminPage({
+  data,
+  mutate,
+  onNavigate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onNavigate: (path: string) => void;
+}) {
+  const [companyId, setCompanyId] = useState(
+    data.companies.find((company) => company.status === 'ACTIF')?.id ?? data.companies[0]?.id ?? '',
+  );
+  const company = data.companies.find((item) => item.id === companyId);
+  if (!company)
+    return (
+      <EmptyState
+        title="Entreprise introuvable"
+        text="Créez ou activez d’abord une entreprise."
+        action={() => onNavigate('/maximus/entreprises')}
+      />
+    );
+  return (
+    <div className="space-y-5">
+      <label className="card-surface block rounded-xl p-4 text-sm font-semibold">
+        Entreprise administrée
+        <select
+          data-testid="select-organization-company"
+          value={companyId}
+          onChange={(event) => setCompanyId(event.target.value)}
+          className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"
+        >
+          {data.companies.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name} · {item.status}
+            </option>
+          ))}
+        </select>
+      </label>
+      <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} />
+    </div>
+  );
+}
+function CompanyProfilePage({
+  company,
+  data,
+  mutate,
+}: {
+  company: Company;
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  type ProfileForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'>;
+  const [form, setForm] = useState<ProfileForm>({
+    name: company.name,
+    manager: company.manager,
+    email: company.email,
+    phone: company.phone,
+    country: company.country,
+    sector: company.sector,
+  });
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [error, setError] = useState('');
+  const setField = (field: keyof ProfileForm) => (value: string) =>
+    setForm((current) => ({ ...current, [field]: value }));
+
+  useEffect(() => {
+    setForm({
+      name: company.name,
+      manager: company.manager,
+      email: company.email,
+      phone: company.phone,
+      country: company.country,
+      sector: company.sector,
+    });
+    setNewPassword('');
+    setPasswordConfirm('');
+    setError('');
+  }, [company.id, company.name, company.manager, company.email, company.phone, company.country, company.sector]);
+
+  const save = async () => {
+    const name = form.name.trim();
+    const manager = form.manager.trim();
+    const email = form.email.trim().toLowerCase();
+    const password = newPassword.trim();
+    if (!name || !manager || !email) {
+      setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Saisissez une adresse email valide.');
+      return;
+    }
+    if (data.companies.some((item) => item.id !== company.id && item.email.toLowerCase() === email)) {
+      setError('Une autre entreprise utilise déjà cette adresse email.');
+      return;
+    }
+    if (password && password.length < 8) {
+      setError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    try {
+      if (password) await authApi.updateCompanyPassword(company.id, password);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Le mot de passe n’a pas pu être mis à jour.');
+      return;
+    }
+    mutate(
+      (draft) => {
+        const target = draft.companies.find((item) => item.id === company.id);
+        if (target) {
+          target.name = name;
+          target.manager = manager;
+          target.email = email;
+          target.phone = form.phone.trim();
+          target.country = form.country.trim();
+          target.sector = form.sector.trim();
+        }
+      },
+      password ? 'Profil et mot de passe mis à jour.' : 'Profil entreprise mis à jour.',
+    );
+    setNewPassword('');
+    setPasswordConfirm('');
+  };
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+      <section className="card-surface rounded-2xl p-6">
+        <div className="mb-7">
+          <p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Profil entreprise</p>
+          <h2 className="mt-2 text-2xl font-bold">{company.name}</h2>
+          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+            Ces informations sont utilisées dans votre espace et lors de votre connexion.
+          </p>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field
+            label="Nom de l’entreprise *"
+            value={form.name}
+            onChange={setField('name')}
+            testId="input-profile-company-name"
+          />
+          <Field
+            label="Responsable *"
+            value={form.manager}
+            onChange={setField('manager')}
+            testId="input-profile-manager"
+          />
+          <Field
+            label="Email administrateur *"
+            value={form.email}
+            onChange={setField('email')}
+            type="email"
+            testId="input-profile-email"
+          />
+          <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-profile-phone" />
+          <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-profile-country" />
+          <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-profile-sector" />
+        </div>
+        <div className="mt-7 border-t pt-6">
+          <h3 className="font-bold">Modifier le mot de passe</h3>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+            Laissez ces champs vides pour conserver le mot de passe actuel.
+          </p>
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            <Field
+              label="Nouveau mot de passe"
+              value={newPassword}
+              onChange={setNewPassword}
+              type="password"
+              placeholder="Au moins 8 caractères"
+              testId="input-profile-password"
+            />
+            <Field
+              label="Confirmer le mot de passe"
+              value={passwordConfirm}
+              onChange={setPasswordConfirm}
+              type="password"
+              placeholder="Répétez le mot de passe"
+              testId="input-profile-password-confirm"
+            />
+          </div>
+        </div>
+        {error && (
+          <p
+            data-testid="profile-error"
+            className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+          >
+            {error}
+          </p>
+        )}
+        <div className="mt-7 flex justify-end">
+          <button
+            data-testid="button-save-profile"
+            onClick={save}
+            className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+          >
+            Enregistrer le profil
+          </button>
+        </div>
+      </section>
+      <section className="card-surface h-fit rounded-2xl p-6">
+        <h2 className="font-bold">Accès de votre espace</h2>
+        <div className="mt-5 space-y-4 text-sm">
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Statut</p>
+            <p className="mt-1 font-bold">{company.status}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Connexion</p>
+            <p className="mt-1 leading-6">
+              Utilisez l’email administrateur et votre mot de passe depuis « Espace entreprise ».
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Modules autorisés</p>
+            <p className="mt-1 font-bold">{company.allowedModules.length} module(s)</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CompanyEditModal({
+  company,
+  data,
+  mutate,
+  onClose,
+}: {
+  company: Company;
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onClose: () => void;
+}) {
+  type CompanyForm = Pick<Company, 'name' | 'manager' | 'email' | 'phone' | 'country' | 'sector'>;
+  const [form, setForm] = useState<CompanyForm>({
+    name: company.name,
+    manager: company.manager,
+    email: company.email,
+    phone: company.phone,
+    country: company.country,
+    sector: company.sector,
+  });
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [error, setError] = useState('');
+  const setField = (field: keyof CompanyForm) => (value: string) =>
+    setForm((current) => ({ ...current, [field]: value }));
+  const save = async () => {
+    const name = form.name.trim();
+    const manager = form.manager.trim();
+    const email = form.email.trim().toLowerCase();
+    const nextPassword = password.trim();
+    if (!name || !manager || !email) {
+      setError('Le nom de l’entreprise, le responsable et l’email sont obligatoires.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Saisissez une adresse email valide.');
+      return;
+    }
+    if (data.companies.some((item) => item.id !== company.id && item.email.toLowerCase() === email)) {
+      setError('Une autre entreprise utilise déjà cette adresse email.');
+      return;
+    }
+    if (nextPassword && nextPassword.length < 8) {
+      setError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (nextPassword !== passwordConfirm) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    try {
+      await companyRequestApi.update(company.id, {
+        name,
+        manager,
+        email,
+        phone: form.phone.trim(),
+        country: form.country.trim(),
+        sector: form.sector.trim(),
+      });
+      if (nextPassword) await authApi.updateCompanyPassword(company.id, nextPassword);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Le mot de passe n’a pas pu être mis à jour.');
+      return;
+    }
+    mutate(
+      (draft) => {
+        const target = draft.companies.find((item) => item.id === company.id);
+        if (target) {
+          Object.assign(target, {
+            ...form,
+            name,
+            manager,
+            email,
+            phone: form.phone.trim(),
+            country: form.country.trim(),
+            sector: form.sector.trim(),
+          });
+        }
+      },
+      nextPassword ? 'Entreprise et mot de passe mis à jour.' : 'Entreprise mise à jour.',
+    );
+    onClose();
+  };
+  return (
+    <Modal title={`Modifier ${company.name}`} onClose={onClose}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Nom de l’entreprise *"
+          value={form.name}
+          onChange={setField('name')}
+          testId="input-edit-company-name"
+        />
+        <Field
+          label="Responsable *"
+          value={form.manager}
+          onChange={setField('manager')}
+          testId="input-edit-company-manager"
+        />
+        <Field
+          label="Email administrateur *"
+          value={form.email}
+          onChange={setField('email')}
+          type="email"
+          testId="input-edit-company-email"
+        />
+        <Field label="Téléphone" value={form.phone} onChange={setField('phone')} testId="input-edit-company-phone" />
+        <Field label="Pays" value={form.country} onChange={setField('country')} testId="input-edit-company-country" />
+        <Field label="Secteur" value={form.sector} onChange={setField('sector')} testId="input-edit-company-sector" />
+        <Field
+          label="Nouveau mot de passe"
+          value={password}
+          onChange={setPassword}
+          type="password"
+          placeholder="Laisser vide pour conserver"
+          testId="input-edit-company-password"
+        />
+        <Field
+          label="Confirmer le mot de passe"
+          value={passwordConfirm}
+          onChange={setPasswordConfirm}
+          type="password"
+          placeholder="Répétez le mot de passe"
+          testId="input-edit-company-password-confirm"
+        />
+      </div>
+      {error && (
+        <p
+          role="alert"
+          className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+        >
+          {error}
+        </p>
+      )}
+      <div className="mt-6 flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-xs font-bold">
+          Annuler
+        </button>
+        <ActionButton primary testId="button-save-company-edit" onClick={save}>
+          Enregistrer les modifications
+        </ActionButton>
+      </div>
+    </Modal>
+  );
+}
+
+function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
+  const [pendingRequests, setPendingRequests] = useState<number | null>(null);
+  const refreshPendingRequests = async () => {
+    try {
+      const result = await companyRequestApi.list();
+      setPendingRequests(result.requests.length);
+    } catch {
+      setPendingRequests(null);
+    }
+  };
+  useEffect(() => {
+    void refreshPendingRequests();
+  }, []);
+  useAutoRefresh(refreshPendingRequests);
+  const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
+  return (
+    <div className="space-y-6">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
+        <Metric
+          label="Entreprises actives"
+          value={String(data.companies.filter((c) => c.status === 'ACTIF').length)}
+          detail="+1 ce mois"
+          icon={Building2}
+          accent
+        />
+        <Metric
+          label="Demandes à traiter"
+          value={String(pending).padStart(2, '0')}
+          detail="requiert votre attention"
+          icon={FileClock}
+        />
+        <Metric label="Modules activés" value="05" detail="sur 05 disponibles" icon={LayoutGrid} />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
+        <section className="card-surface overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between border-b p-5">
+            <div>
+              <h2 className="font-bold">Activité récente</h2>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                Les derniers mouvements dans vos espaces
+              </p>
+            </div>
+            <button
+              data-testid="button-see-journal"
+              onClick={() => onNavigate('/maximus/journal')}
+              className="text-xs font-bold text-[hsl(var(--primary))]"
+            >
+              Voir le journal <ChevronRight className="inline" size={14} />
+            </button>
+          </div>
+          <div className="divide-y">
+            {data.activities.slice(0, 4).map((a, i) => (
+              <ActivityRow key={a.id} activity={a} delay={i} />
+            ))}
+          </div>
+        </section>
+        <section className="card-surface rounded-2xl p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-bold">État des espaces</h2>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui</p>
+            </div>
+            <button
+              data-testid="button-see-companies"
+              onClick={() => onNavigate('/maximus/entreprises')}
+              className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
+            >
+              <ChevronRight size={17} />
+            </button>
+          </div>
+          <div className="mt-5 space-y-4">
+            {data.companies.map((c) => (
+              <div data-testid={`row-company-status-${c.id}`} key={c.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-xs font-black text-[hsl(var(--primary))]">
+                    {c.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold">{c.name}</p>
+                    <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                      {c.allowedModules.length} modules actifs
+                    </p>
+                  </div>
+                </div>
+                <StatusBadge status={c.status} />
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+      <section className="grid-lines rounded-2xl border border-dashed border-[hsl(var(--border))] p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <div className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3">
+            <Sparkles size={19} className="text-[hsl(var(--primary))]" />
+          </div>
+          <div>
+            <h2 className="font-bold">MAXIMUS en bref</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              Le centre de contrôle est prêt. Consultez les demandes, ajustez les modules autorisés et gardez une trace
+              de chaque décision.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+function RoleAwareCompanyDashboard({
+  data,
+  onNavigate,
+  allowed,
+}: {
+  data: StoreData;
+  onNavigate: (path: string) => void;
+  allowed: ModuleId[];
+}) {
+  const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
+  const canStocks = allowed.includes('stocks');
+  const canFinance = allowed.includes('finance') || allowed.includes('comptabilite');
+  const canPresences = allowed.includes('presences');
+  const revenue = data.sales
+    .filter((sale) => sale.status === 'VALIDÉ')
+    .reduce((sum, sale) => sum + sale.amount, 0);
+  const low = data.products.filter((product) => product.stock <= product.threshold).length;
+  const cards = [
+    canCommerce ? (
+      <Metric
+        key="sales"
+        label="Ventes validées"
+        value={String(data.sales.filter((sale) => sale.status === 'VALIDÉ').length)}
+        detail="sur les 30 derniers jours"
+        icon={ShoppingCart}
+      />
+    ) : null,
+    canStocks ? (
+      <Metric
+        key="stock"
+        label="Produits à surveiller"
+        value={String(low).padStart(2, '0')}
+        detail="seuil de sécurité atteint"
+        icon={Package}
+        warning
+      />
+    ) : null,
+    canFinance ? (
+      <Metric
+        key="cash"
+        label="Encaissements du mois"
+        value={shortMoney(revenue)}
+        suffix=" FCFA"
+        detail="ventes validées"
+        icon={TrendingUp}
+        accent
+      />
+    ) : null,
+    canPresences ? (
+      <Metric key="presence" label="Présences aujourd’hui" value="18 / 21" detail="85,7% de l’effectif" icon={Users} />
+    ) : null,
+  ].filter(Boolean);
+  const primaryPath = canStocks
+    ? '/entreprise/stocks'
+    : canCommerce
+      ? '/entreprise/commerce'
+      : canFinance
+        ? '/entreprise/finance'
+        : canPresences
+          ? '/entreprise/presences'
+          : '/entreprise/organisation';
+  const primaryLabel = canStocks
+    ? 'Ouvrir Gestion de stock'
+    : canCommerce
+      ? 'Ouvrir Commerce'
+      : canFinance
+        ? 'Ouvrir Finance'
+        : canPresences
+          ? 'Ouvrir Présences'
+          : 'Voir mon organisation';
+  return (
+    <div className="space-y-6">
+      <div className={`mobile-stat-grid grid gap-4 md:grid-cols-2 ${cards.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
+        {cards.length ? (
+          cards
+        ) : (
+          <section className="card-surface rounded-2xl p-6">
+            <h2 className="font-bold">Aucun accès opérationnel</h2>
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+              Votre rôle n’a pas encore reçu de module ou de sous-autorisation.
+            </p>
+          </section>
+        )}
+      </div>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+              Mon espace de travail
+            </p>
+            <h2 className="mt-2 text-xl font-bold">
+              {canStocks
+                ? 'Pilotage du magasin'
+                : canCommerce
+                  ? 'Suivi des ventes'
+                  : canFinance
+                    ? 'Suivi financier'
+                    : canPresences
+                      ? 'Suivi des équipes'
+                      : 'Accès à configurer'}
+            </h2>
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+              Ce tableau de bord est construit à partir des modules et sous-autorisations de votre rôle.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate(primaryPath)}
+            className="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-white"
+          >
+            {primaryLabel}
+          </button>
+        </div>
+      </section>
+      {canCommerce && (
+        <section className="card-surface overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between border-b p-5">
+            <div>
+              <h2 className="font-bold">Dernières ventes</h2>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                Uniquement les données utiles à votre rôle
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate('/entreprise/commerce')}
+              className="text-xs font-bold text-[hsl(var(--primary))]"
+            >
+              Tout voir
+            </button>
+          </div>
+          <DataTable
+            headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
+            rows={data.sales
+              .slice(0, 6)
+              .map((sale) => [
+                sale.reference,
+                sale.client,
+                money(sale.amount),
+                <StatusBadge status={sale.status} />,
+                sale.date,
+              ])}
+          />
+        </section>
+      )}
+      {canStocks && (
+        <section className="card-surface rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-bold">Alerte magasin</h2>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                {low} produit(s) sous le seuil recommandé.
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate('/entreprise/stocks')}
+              className="rounded-lg border px-3 py-2 text-xs font-bold"
+            >
+              Voir le stock
+            </button>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function CompanyDashboard({
+  data,
+  onNavigate,
+  allowed,
+}: {
+  data: StoreData;
+  onNavigate: (path: string) => void;
+  allowed: ModuleId[];
+}) {
+  const revenue = data.sales.filter((sale) => sale.status === 'VALIDÉ').reduce((sum, sale) => sum + sale.amount, 0);
+  const low = data.products.filter((p) => p.stock <= p.threshold).length;
+  const canCommerce = allowed.includes('commerce');
+  const canStocks = allowed.includes('stocks');
+  const canPresences = allowed.includes('presences');
+  return (
+    <div className="space-y-6">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Metric
+          label="Encaissements du mois"
+          value={shortMoney(revenue)}
+          suffix=" FCFA"
+          detail="Ventes validées"
+          icon={TrendingUp}
+          accent
+        />
+        {canCommerce && (
+          <Metric
+            label="Ventes validées"
+            value={String(data.sales.filter((s) => s.status === 'VALIDÉ').length)}
+            detail="sur les 30 derniers jours"
+            icon={ShoppingCart}
+          />
+        )}
+        {canStocks && (
+          <Metric
+            label="Produits à surveiller"
+            value={String(low).padStart(2, '0')}
+            detail="seuil de sécurité atteint"
+            icon={Package}
+            warning
+          />
+        )}
+        {canPresences && (
+          <Metric label="Présences aujourd’hui" value="18 / 21" detail="85,7% de l’effectif" icon={Users} />
+        )}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[1.35fr_.65fr]">
+        {canCommerce && (
+          <section className="card-surface rounded-2xl p-5 sm:p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+                  Performance commerciale
+                </p>
+                <h2 className="mt-2 text-xl font-bold">Les ventes avancent bien.</h2>
+              </div>
+              <button
+                data-testid="button-open-commerce"
+                onClick={() => onNavigate('/entreprise/commerce')}
+                className="rounded-lg border px-3 py-2 text-xs font-bold"
+              >
+                Ouvrir Commerce
+              </button>
+            </div>
+            <div className="mt-8 flex h-48 items-end gap-2 sm:gap-4">
+              {[38, 53, 45, 68, 57, 80, 72, 92, 76, 87, 81, 100].map((v, i) => (
+                <div key={i} className="flex flex-1 flex-col items-center gap-2">
+                  <div
+                    className={`w-full rounded-t-md ${i === 11 ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--primary)/.18)]'}`}
+                    style={{ height: `${v}%` }}
+                  />
+                  <span className="mono text-[9px] text-[hsl(var(--muted-foreground))]">
+                    {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][i]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        <section className="card-surface rounded-2xl p-5 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">À surveiller</p>
+              <h2 className="mt-2 text-xl font-bold">Signaux du jour</h2>
+            </div>
+            <Bell size={18} className="text-[hsl(var(--muted-foreground))]" />
+          </div>
+          <div className="mt-6 space-y-4">
+            {canStocks && (
+              <div className="flex gap-3 border-b pb-4">
+                <span className="h-2 w-2 mt-1.5 rounded-full bg-[hsl(var(--accent))]" />
+                <div>
+                  <p className="text-sm font-bold">Stock bas</p>
+                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                    {low} produits sous leur seuil recommandé.
+                  </p>
+                  <button
+                    onClick={() => onNavigate('/entreprise/stocks')}
+                    className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"
+                  >
+                    Voir les stocks
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <span className="h-2 w-2 mt-1.5 rounded-full bg-[hsl(var(--primary))]" />
+              <div>
+                <p className="text-sm font-bold">Rapport hebdomadaire</p>
+                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Votre synthèse de la semaine est disponible.
+                </p>
+                <button
+                  onClick={() => onNavigate('/entreprise/rapports')}
+                  className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"
+                >
+                  Consulter
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+      {canCommerce && (
+        <section className="card-surface overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between border-b p-5">
+            <div>
+              <h2 className="font-bold">Dernières ventes</h2>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui et hier</p>
+            </div>
+            <button
+              onClick={() => onNavigate('/entreprise/commerce')}
+              className="text-xs font-bold text-[hsl(var(--primary))]"
+            >
+              Tout voir
+            </button>
+          </div>
+          <DataTable
+            headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
+            rows={data.sales.map((s) => [
+              s.reference,
+              s.client,
+              money(s.amount),
+              <StatusBadge status={s.status} />,
+              s.date,
+            ])}
+          />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function CompaniesPage({
+  data,
+  mutate,
+  onNavigate,
+  detail,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onNavigate: (p: string) => void;
+  detail: boolean;
+}) {
+  const { alert, confirm } = useAppDialog();
+  const [search, setSearch] = useState(() => sessionStorage.getItem('maximus-company-search') ?? '');
+  const [filter, setFilter] = useState('Toutes');
+  const directoryCompanies = getCompanyDirectoryCompanies(data.companies);
+  const [selected, setSelected] = useState<Company | null>(
+    detail ? (directoryCompanies[0] ?? null) : null,
+  );
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const list = directoryCompanies
+    .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(
+      (c) =>
+        filter === 'Toutes' ||
+        (filter === 'Actives' && c.status === 'ACTIF') ||
+        (filter === 'En attente' && c.status === 'EN ATTENTE') ||
+        (filter === 'Suspendues' && c.status === 'SUSPENDU'),
+    );
+  const deleteCompany = async (company: Company) => {
+    if (
+      !(await confirm({
+        title: 'Supprimer cette entreprise ?',
+        description: `L’entreprise « ${company.name} » et ses données d’organisation seront supprimées. Cette action est irréversible.`,
+        confirmLabel: 'Supprimer',
+        tone: 'danger',
+      }))
+    )
+      return;
+    try {
+      await companyRequestApi.remove(company.id);
+      mutate((draft) => {
+        draft.companies = draft.companies.filter((item) => item.id !== company.id);
+        draft.employees = draft.employees.filter((item) => item.companyId !== company.id);
+        draft.roles = draft.roles.filter((item) => item.companyId !== company.id);
+        draft.orgNodes = draft.orgNodes.filter((item) => item.companyId !== company.id);
+      }, 'Entreprise archivée et accès révoqués.');
+    } catch (error) {
+      await alert({
+        title: 'Suppression impossible',
+        description: error instanceof Error ? error.message : 'L’entreprise n’a pas pu être archivée.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+    }
+  };
+  if (selected)
+    return (
+      <CompanyDetail
+        company={data.companies.find((c) => c.id === selected.id) ?? selected}
+        mutate={mutate}
+        onBack={() => {
+          setSelected(null);
+          onNavigate('/maximus/entreprises');
+        }}
+      />
+    );
+  return (
+    <section className="card-surface overflow-hidden rounded-2xl">
+      <div className="border-b p-5">
+        <Toolbar
+          search={search}
+          setSearch={(value) => {
+            setSearch(value);
+            sessionStorage.setItem('maximus-company-search', value);
+          }}
+        >
+          <ActionButton primary testId="button-add-company" onClick={() => onNavigate('/inscription')}>
+            Ajouter une entreprise
+          </ActionButton>
+        </Toolbar>
+        <div className="flex gap-2 overflow-x-auto">
+          {['Toutes', 'Actives', 'Suspendues'].map((label) => (
+            <FilterChip key={label} label={label} active={filter === label} onClick={() => setFilter(label)} />
+          ))}
+        </div>
+      </div>
+      <DataTable
+        headers={['Entreprise', 'Responsable', 'Pays', 'Modules', 'Statut', 'Actions']}
+        rows={list.map((c) => [
+          <button
+            data-testid={`button-open-company-${c.id}`}
+            aria-label={`Ouvrir ${c.name}`}
+            onClick={() => {
+              setSelected(c);
+              onNavigate(`/maximus/entreprises/${encodeURIComponent(c.id)}`);
+            }}
+            className="flex items-center gap-3 text-left"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[10px] font-black text-[hsl(var(--primary))]">
+              {c.name.slice(0, 2).toUpperCase()}
+            </span>
+            <span>
+              <strong className="block">{c.name}</strong>
+              <small className="text-xs text-[hsl(var(--muted-foreground))]">{c.email}</small>
+            </span>
+          </button>,
+          c.manager,
+          c.country,
+          `${c.allowedModules.length} / ${c.requestedModules.length}`,
+          <StatusBadge status={c.status} />,
+          <div className="flex flex-wrap items-center gap-2">
+             <button
+               type="button"
+               data-testid={`button-open-company-installation-${c.id}`}
+               aria-label={`Ouvrir l’installation de ${c.name}`}
+               title={`Installation de ${c.name}`}
+               onClick={(event) => {
+                 event.stopPropagation();
+                 setSelected(c);
+                 onNavigate(`/maximus/entreprises/${encodeURIComponent(c.id)}`);
+               }}
+               className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] px-2.5 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
+             >
+               <KeyRound size={14} />
+               <span>Installation</span>
+             </button>
+            <button
+              type="button"
+              data-testid={`button-edit-company-${c.id}`}
+              aria-label={`Modifier ${c.name}`}
+              title={`Modifier ${c.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setEditingCompany(c);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold hover:bg-[hsl(var(--muted))]"
+            >
+              <Edit3 size={14} />
+              <span>Modifier</span>
+            </button>
+            <button
+              data-testid={`button-delete-company-${c.id}`}
+              aria-label={`Supprimer ${c.name}`}
+              title={`Supprimer ${c.name}`}
+              onClick={() => deleteCompany(c)}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Trash2 size={14} />
+              <span>Supprimer</span>
+            </button>
+          </div>,
+        ])}
+      />
+      {editingCompany && (
+        <CompanyEditModal
+          company={editingCompany}
+          data={data}
+          mutate={mutate}
+          onClose={() => setEditingCompany(null)}
+        />
+      )}
+    </section>
+  );
+}
+function FilterChip({ label, active = false, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
+  return (
+    <button
+      data-testid={`button-filter-${label.toLowerCase().replace(/\s/g, '-')}`}
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'hover:bg-[hsl(var(--muted))]'}`}
+    >
+      {label}
+    </button>
+  );
+}
+function CompanyDetail({
+  company,
+  mutate,
+  onBack,
+}: {
+  company: Company;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onBack: () => void;
+}) {
+  const { confirm } = useAppDialog();
+  const [active, setActive] = useState(company.allowedModules);
+  const [installationBusy, setInstallationBusy] = useState(false);
+  const [loginSettings, setLoginSettings] = useState<{
+    customAllowed: boolean;
+    mode: 'MAXIMUS' | 'CUSTOM';
+    slug: string;
+    url: string;
+  } | null>(null);
+  const [loginSaving, setLoginSaving] = useState(false);
+  const [customDomains, setCustomDomains] = useState<EcommerceDomain[]>([]);
+  const [domainInput, setDomainInput] = useState('');
+  const [domainLoading, setDomainLoading] = useState(true);
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [domainError, setDomainError] = useState('');
+  const toggle = (id: ModuleId) =>
+    setActive((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  useEffect(() => {
+    let cancelled = false;
+    void companyRequestApi.loginSettings(company.id)
+      .then(({ settings }) => {
+        if (!cancelled) setLoginSettings(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setLoginSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDomainLoading(true);
+    setDomainError('');
+    void createEcommerceApi(company.id).bootstrap()
+      .then(({ domains }) => {
+        if (!cancelled) setCustomDomains(Array.isArray(domains) ? domains : []);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCustomDomains([]);
+          setDomainError(error instanceof Error ? error.message : 'Les domaines personnalisés sont indisponibles.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDomainLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }) => {
+    setLoginSaving(true);
+    try {
+      const result = await companyRequestApi.updateLoginSettings(company.id, input);
+      setLoginSettings(result.settings);
+      mutate((draft) => {
+        const target = draft.companies.find((item) => item.id === company.id);
+        if (target) Object.assign(target, result.company);
+      }, input.customAllowed === false ? 'La connexion personnalisée a été désactivée.' : 'Paramètres de connexion enregistrés.');
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.', 'error');
+    } finally {
+      setLoginSaving(false);
+    }
+  };
+
+  const refreshCustomDomains = async () => {
+    const { domains } = await createEcommerceApi(company.id).bootstrap();
+    setCustomDomains(Array.isArray(domains) ? domains : []);
+  };
+
+  const createCustomDomain = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const domain = domainInput.trim();
+    if (!domain) return;
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).createDomain(domain);
+      await refreshCustomDomains();
+      setDomainInput('');
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être créé.');
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const verifyCustomDomain = async (domain: EcommerceDomain) => {
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).verifyDomain(domain.id);
+      await refreshCustomDomains();
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'La vérification DNS a échoué.');
+      try {
+        await refreshCustomDomains();
+      } catch {
+        // Keep the verification error visible when the refresh also fails.
+      }
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const deleteCustomDomain = async (domain: EcommerceDomain) => {
+    if (!window.confirm(`Retirer le domaine « ${domain.domain} » ?`)) return;
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).deleteDomain(domain.id);
+      await refreshCustomDomains();
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être retiré.');
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const downloadInstallationManifest = async () => {
+    try {
+      const manifest = await companyRequestApi.installationManifest(company.id);
+      const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-installation-${company.id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Le manifeste d’installation n’a pas pu être exporté.', 'error');
+    }
+  };
+
+  const prepareInstallation = async (mode: 'dedicated' | 'on_premise') => {
+    try {
+      const result = await companyRequestApi.issueInstallation(company.id, { mode });
+      const blob = new Blob([JSON.stringify(result.bootstrap, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      window.alert('Le fichier d’enrôlement a été téléchargé. Conservez son jeton secret et transférez-le uniquement au VPS de cette entreprise.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'L’enrôlement de l’installation n’a pas pu être préparé.');
+    }
+  };
+
+  const revokeInstallation = async () => {
+    const confirmed = await confirm({
+      title: 'Révoquer cette installation ?',
+      description: `Le jeton de « ${company.name} » ne pourra plus être utilisé pour les prochaines synchronisations. Cette action ne coupe pas automatiquement un serveur déjà démarré.`,
+      confirmLabel: 'Révoquer le jeton',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setInstallationBusy(true);
+    try {
+      await companyRequestApi.revokeInstallation(company.id);
+      window.alert('Installation révoquée. Arrêtez également le service du VPS si la coupure doit être immédiate.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.');
+    } finally {
+      setInstallationBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <button
+        data-testid="button-back-companies"
+        onClick={onBack}
+        className="text-xs font-bold text-[hsl(var(--primary))]"
+      >
+        ← Retour aux entreprises
+      </button>
+      <div className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row">
+          <div className="flex gap-4">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary))] text-lg font-black text-[hsl(var(--primary-foreground))]">
+              {company.name.slice(0, 2).toUpperCase()}
+            </span>
+            <div>
+              <h2 className="text-2xl font-bold">{company.name}</h2>
+              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                {company.sector} · {company.country}
+              </p>
+              <div className="mt-3">
+                <StatusBadge status={company.status} />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton
+              testId="button-prepare-dedicated-installation"
+              onClick={() => void prepareInstallation('dedicated')}
+            >
+              Préparer le VPS dédié
+            </ActionButton>
+            <ActionButton
+              testId="button-prepare-on-premise-installation"
+              onClick={() => void prepareInstallation('on_premise')}
+            >
+              Préparer l’installation locale
+            </ActionButton>
+            <ActionButton
+              testId="button-download-installation-manifest"
+              onClick={() => void downloadInstallationManifest()}
+            >
+              Télécharger le manifeste d’installation
+            </ActionButton>
+            <ActionButton
+              testId="button-suspend-company"
+              icon={company.status === 'SUSPENDU' ? RefreshCw : ShieldCheck}
+              onClick={() =>
+                mutate(
+                  (d) => {
+                    const c = d.companies.find((x) => x.id === company.id);
+                    if (c) c.status = c.status === 'SUSPENDU' ? 'ACTIF' : 'SUSPENDU';
+                  },
+                  company.status === 'SUSPENDU' ? 'Entreprise réactivée.' : 'Entreprise suspendue.',
+                )
+              }
+            >
+              {company.status === 'SUSPENDU' ? 'Réactiver' : 'Suspendre'}
+            </ActionButton>
+          </div>
+        </div>
+        <div className="mt-8 grid gap-4 border-t pt-5 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Responsable</p>
+            <p className="mt-1 font-bold">{company.manager}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Email</p>
+            <p className="mt-1 font-bold">{company.email}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Demande reçue</p>
+            <p className="mt-1 font-bold">{company.createdAt}</p>
+          </div>
+        </div>
+      </div>
+      <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <KeyRound size={18} className="text-[hsl(var(--primary))]" />
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+                Réservé à l’administration MAXIMUS
+              </p>
+            </div>
+            <h2 className="mt-2 text-xl font-bold">Installation dédiée ou locale</h2>
+            <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              Préparez ici l’enrôlement du serveur de cette entreprise. MAXIMUS crée le lien sécurisé,
+              télécharge le fichier bootstrap JSON et conserve la configuration centrale. Le fichier doit
+              ensuite être transféré manuellement au VPS par SSH/SCP.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
+            Entreprise {company.status === 'ACTIF' ? 'active' : 'à activer'}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">1. Préparer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Choisissez le type de serveur et téléchargez le bootstrap secret.
+            </p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">2. Transférer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Envoyez le JSON au VPS avec SSH/SCP, jamais dans le code ou une URL publique.
+            </p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">3. Installer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le script du VPS récupère ensuite les modules, packs et permissions publiés.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <ActionButton
+            primary
+            testId="button-prepare-dedicated-installation-card"
+            onClick={() => void prepareInstallation('dedicated')}
+          >
+            Préparer le VPS dédié
+          </ActionButton>
+          <ActionButton
+            testId="button-prepare-on-premise-installation-card"
+            onClick={() => void prepareInstallation('on_premise')}
+          >
+            Préparer le serveur local
+          </ActionButton>
+          <ActionButton
+            testId="button-download-installation-manifest-card"
+            onClick={() => void downloadInstallationManifest()}
+          >
+            Télécharger le manifeste
+          </ActionButton>
+          <button
+            type="button"
+            data-testid="button-revoke-installation"
+            disabled={installationBusy}
+            onClick={() => void revokeInstallation()}
+            className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {installationBusy ? 'Révocation…' : 'Révoquer le jeton'}
+          </button>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          Une entreprise doit être <strong>ACTIF</strong> avant la préparation. La révocation bloque les
+          synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
+        </p>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Connexion et domaine</p>
+            <h2 className="mt-2 font-bold">Accès de connexion de l’entreprise</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              Cette configuration appartient à MAXIMUS. Activez ou désactivez la page personnalisée, choisissez le mode utilisé et partagez le lien généré depuis cette section.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-custom-login"
+            checked={Boolean(loginSettings?.customAllowed)}
+            disabled={!loginSettings || loginSaving}
+            onChange={(event) => void saveLoginSettings({ customAllowed: event.target.checked })}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser la page de connexion personnalisée</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le lien est généré à partir du nom de l’entreprise et reste stable même si son nom est modifié plus tard.
+            </span>
+          </span>
+        </label>
+        <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <label className="block text-sm font-semibold">
+            Mode actuellement utilisé
+            <select
+              data-testid="select-company-login-mode"
+              value={loginSettings?.mode ?? 'MAXIMUS'}
+              disabled={!loginSettings?.customAllowed || loginSaving}
+              onChange={(event) => void saveLoginSettings({ mode: event.target.value as 'MAXIMUS' | 'CUSTOM' })}
+              className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"
+            >
+              <option value="MAXIMUS">Connexion MAXIMUS actuelle</option>
+              <option value="CUSTOM">Page personnalisée</option>
+            </select>
+          </label>
+          <div className="rounded-xl bg-[hsl(var(--muted)/.55)] p-4">
+            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Lien généré</p>
+            {loginSettings?.url ? (
+              <>
+                <p className="mt-2 break-all font-mono text-xs">{window.location.origin}{loginSettings.url}</p>
+                <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
+              </>
+            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
+          </div>
+        </div>
+        <div className="mt-6 border-t pt-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="font-bold">Domaine personnalisé</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Créez ici le domaine public de l’entreprise. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
+              {domainLoading ? 'Chargement…' : `${customDomains.length} domaine${customDomains.length > 1 ? 's' : ''}`}
+            </span>
+          </div>
+          <form onSubmit={createCustomDomain} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm font-semibold">
+              Nom de domaine
+              <input
+                data-testid="input-company-custom-domain"
+                value={domainInput}
+                onChange={(event) => setDomainInput(event.target.value)}
+                placeholder="connexion.exemple.sn"
+                disabled={domainSaving}
+                className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
+              />
+            </label>
+            <button
+              type="submit"
+              data-testid="button-create-company-custom-domain"
+              disabled={domainSaving || !domainInput.trim()}
+              className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {domainSaving ? 'Enregistrement…' : 'Créer le domaine'}
+            </button>
+          </form>
+          {domainError && (
+            <p data-testid="company-custom-domain-error" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+              {domainError}
+            </p>
+          )}
+          <div className="mt-4 space-y-3">
+            {customDomains.length === 0 && !domainLoading ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                Aucun domaine personnalisé n’est encore configuré pour cette entreprise.
+              </p>
+            ) : customDomains.map((domain) => (
+              <article key={domain.id} data-testid={`card-company-custom-domain-${domain.id}`} className="rounded-xl border p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="break-all">{domain.domain}</strong>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${domain.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {domain.status === 'ACTIVE' ? 'ACTIF' : 'EN ATTENTE DNS'}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:grid-cols-2">
+                      <p><span className="font-bold">TXT :</span> {domain.verificationName} → <code className="break-all">{domain.verificationValue}</code></p>
+                      <p><span className="font-bold">CNAME :</span> {domain.domain} → <code className="break-all">{domain.targetHost}</code></p>
+                    </div>
+                    {domain.lastError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]">{domain.lastError}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      data-testid={`button-verify-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void verifyCustomDomain(domain)}
+                      className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
+                    >
+                      Vérifier
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`button-delete-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void deleteCustomDomain(domain)}
+                      className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-bold">Modules autorisés</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajustez le périmètre de l’espace.</p>
+          </div>
+          <span className="mono text-xs text-[hsl(var(--muted-foreground))]">{active.length} / 5</span>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {modules.map((m) => (
+            <button
+              data-testid={`button-toggle-company-module-${m.id}`}
+              key={m.id}
+              onClick={() => toggle(m.id)}
+              className={`flex items-center justify-between rounded-xl border p-4 text-left ${active.includes(m.id) ? 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)] opacity-65'}`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-[hsl(var(--muted))] p-2">
+                  <LayoutGrid size={16} />
+                </span>
+                <div>
+                  <strong className="text-sm">{m.name}</strong>
+                  <p className="text-[11px] text-[hsl(var(--muted-foreground))]">{m.description}</p>
+                </div>
+              </div>
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full border ${active.includes(m.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white' : ''}`}
+              >
+                {active.includes(m.id) && <Check size={13} />}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-6 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-modules"
+            onClick={() =>
+              mutate((d) => {
+                const c = d.companies.find((x) => x.id === company.id);
+                if (c) {
+                  c.allowedModules = active;
+                  c.refusedModules = c.requestedModules.filter((x) => !active.includes(x));
+                }
+              }, 'Configuration enregistrée.')
+            }
+          >
+            Enregistrer la configuration
+          </ActionButton>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RequestsPage({
+  data,
+  mutate,
+  notify,
+  onNavigate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  notify: (message: string) => void;
+  onNavigate: (p: string) => void;
+}) {
+  const [requests, setRequests] = useState<CompanyRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pendingCompanyId, setPendingCompanyId] = useState<string | null>(null);
+  const refreshRequests = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const result = await companyRequestApi.list();
+      setRequests(result.requests);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Les demandes sont indisponibles.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+  useEffect(() => {
+    void refreshRequests();
+  }, []);
+  useAutoRefresh(() => refreshRequests(true));
+  const approveRequest = async (company: Company) => {
+    setPendingCompanyId(company.id);
+    try {
+      const result = await companyRequestApi.approve(company.id);
+      mutate((d) => {
+        const target = d.companies.find((item) => item.id === company.id);
+        if (target) {
+          Object.assign(target, result.company);
+        } else {
+          d.companies.push(result.company);
+        }
+      }, 'Entreprise activée et compte administrateur synchronisé.');
+      setRequests((current) => current.filter((item) => item.id !== company.id));
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'La synchronisation du compte entreprise a échoué.');
+    } finally {
+      setPendingCompanyId(null);
+    }
+  };
+  const rejectRequest = async (company: Company) => {
+    setPendingCompanyId(company.id);
+    try {
+      await companyRequestApi.reject(company.id);
+      mutate((d) => {
+        const target = d.companies.find((item) => item.id === company.id);
+        if (target) target.status = 'REFUSÉ';
+      });
+      setRequests((current) => current.filter((item) => item.id !== company.id));
+      notify('Demande refusée.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Le refus de la demande a échoué.');
+    } finally {
+      setPendingCompanyId(null);
+    }
+  };
+  return (
+    <div className="space-y-4">
+      {loading ? (
+        <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement des demandes…</div>
+      ) : requests.length === 0 ? (
+        <EmptyState
+          title="Aucune demande en attente"
+          text="Toutes les demandes ont été traitées."
+          action={() => onNavigate('/maximus/entreprises')}
+        />
+      ) : (
+        requests.map((request) => {
+          const c = request.company;
+          return (
+          <section data-testid={`card-request-${c.id}`} key={c.id} className="card-surface rounded-2xl p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+              <div className="flex gap-4">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--accent)/.24)] font-black">
+                  {c.name.slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <h2 className="font-bold">{c.name}</h2>
+                  <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                    {c.manager} · {c.email} · {c.country}
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {c.requestedModules.map((moduleId) => {
+                      const requestedFeatures = c.requestedModuleFeatures?.[moduleId];
+                      const module = modules.find((item) => item.id === moduleId);
+                      return (
+                        <div key={moduleId} className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-[10px]">
+                          <strong className="block">{module?.name ?? moduleId}</strong>
+                          <span className="text-[hsl(var(--muted-foreground))]">
+                            {requestedFeatures === undefined
+                              ? 'Fonctionnalités par défaut'
+                              : `${requestedFeatures.length} fonctionnalité${requestedFeatures.length > 1 ? 's' : ''} choisie${requestedFeatures.length > 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <ActionButton
+                  testId={`button-refuse-request-${c.id}`}
+                  icon={X}
+                  disabled={pendingCompanyId === c.id}
+                  onClick={() => void rejectRequest(c)}
+                >
+                  Refuser
+                </ActionButton>
+                <ActionButton
+                  primary
+                  testId={`button-approve-request-${c.id}`}
+                  icon={Check}
+                  disabled={pendingCompanyId === c.id}
+                  onClick={() => void approveRequest(c)}
+                >
+                  {pendingCompanyId === c.id ? 'Synchronisation…' : 'Autoriser l’espace'}
+                </ActionButton>
+              </div>
+            </div>
+          </section>
+          );
+        })
+      )}
+    </div>
+  );
+}
+function CatalogWorkflowBar({
+  data,
+  mutate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  const { confirm } = useAppDialog();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const impact = getCatalogImpact(data);
+  const validation = validateCatalogDraft(data);
+  const hasDraft = Boolean(data.catalogDraft);
+
+  if (!hasDraft) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] px-4 py-3">
+        <div className="flex items-center gap-2 text-xs">
+          <Check size={15} className="text-[hsl(var(--primary))]" />
+          <span>
+            Catalogue publié · version <strong>{data.catalogVersion ?? 1}</strong>
+          </span>
+        </div>
+        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+          Toute modification sera d’abord enregistrée en brouillon.
+        </span>
+      </div>
+    );
+  }
+
+  const discard = async () => {
+    if (
+      !(await confirm({
+        title: 'Annuler le brouillon du catalogue ?',
+        description: 'Toutes les modifications non publiées sur les modules, packs et secteurs seront abandonnées.',
+        confirmLabel: 'Annuler le brouillon',
+        tone: 'danger',
+      }))
+    )
+      return;
+    mutate((draft) => discardCatalogDraft(draft), 'Brouillon du catalogue annulé.');
+  };
+
+  const publish = () => {
+    if (validation.errors.length > 0) return;
+    mutate((draft) => publishCatalogDraft(draft), `Catalogue publié · version ${(data.catalogVersion ?? 1) + 1}.`);
+  };
+
+  return (
+    <section
+      data-testid="catalog-workflow-bar"
+      className="rounded-2xl border border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.05)] p-4"
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="rounded-lg bg-[hsl(var(--primary)/.14)] p-2 text-[hsl(var(--primary))]">
+            <GitBranch size={17} />
+          </span>
+          <div>
+            <p className="text-xs font-bold">Brouillon du catalogue</p>
+            <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+              Les changements ne seront proposés aux inscriptions et aux entreprises qu’après publication.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid="button-catalog-impact"
+            onClick={() => setDetailsOpen((value) => !value)}
+            className="rounded-lg border px-3 py-2 text-[10px] font-bold"
+          >
+            {detailsOpen ? 'Masquer les impacts' : 'Voir les impacts'}
+          </button>
+          <button type="button" onClick={discard} className="rounded-lg border px-3 py-2 text-[10px] font-bold">
+            Annuler
+          </button>
+          <button
+            type="button"
+            data-testid="button-publish-catalog"
+            disabled={validation.errors.length > 0}
+            onClick={publish}
+            className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Publier les changements
+          </button>
+        </div>
+      </div>
+      {detailsOpen && (
+        <div className="mt-4 grid gap-2 border-t border-[hsl(var(--primary)/.15)] pt-4 text-[11px] sm:grid-cols-4">
+          <span><strong>{impact.changedModules}</strong> module(s) modifié(s)</span>
+          <span><strong>{impact.changedSectors}</strong> secteur(s) modifié(s)</span>
+          <span><strong>{impact.affectedCompanies}</strong> entreprise(s) concernée(s)</span>
+          <span><strong>{impact.affectedUnits}</strong> unité(s) concernée(s)</span>
+        </div>
+      )}
+      {validation.errors.length > 0 && (
+        <div className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.1)] px-3 py-2 text-[11px] font-semibold text-[hsl(var(--destructive))]">
+          <p>Publication bloquée : {validation.errors[0]}</p>
+          {validation.errors.length > 1 && <p className="mt-1 font-normal">+ {validation.errors.length - 1} autre(s) erreur(s)</p>}
+        </div>
+      )}
+      {validation.errors.length === 0 && validation.warnings.length > 0 && (
+        <p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">
+          Attention : {validation.warnings[0]}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ModulesPage({
+  data,
+  mutate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {modules.map((m, i) => {
+        const active = (data.moduleStatuses?.[m.id] ?? m.status) !== 'INACTIF';
+        return (
+          <section
+            data-testid={`card-module-${m.id}`}
+            key={m.id}
+            className={`card-surface rounded-2xl p-5 fade-up fade-up-delay-${Math.min(i + 1, 3)}`}
+          >
+            <div className="flex items-start justify-between">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+                <LayoutGrid size={19} />
+              </span>
+              <StatusBadge status={active ? m.status : 'INACTIF'} />
+            </div>
+            <h2 className="mt-5 text-lg font-bold">{m.name}</h2>
+            <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{m.description}</p>
+            <div className="mt-5 space-y-2 border-t pt-4">
+              {m.features.map((f) => (
+                <div key={f} className="flex items-center gap-2 text-xs">
+                  <Check size={14} className="text-[hsl(var(--primary))]" />
+                  {f}
+                </div>
+              ))}
+            </div>
+            <button
+              data-testid={`button-toggle-module-${m.id}`}
+              onClick={() =>
+                mutate(
+                  (draft) => {
+                    draft.moduleStatuses = { ...(draft.moduleStatuses ?? {}), [m.id]: active ? 'INACTIF' : m.status };
+                  },
+                  active ? `${m.name} désactivé.` : `${m.name} activé.`,
+                )
+              }
+              className="mt-5 text-xs font-bold text-[hsl(var(--primary))]"
+            >
+              {active ? 'Désactiver' : 'Activer'} <ChevronRight className="inline" size={14} />
+            </button>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+function SectorPresetsPage({
+  data,
+  mutate,
+  onTestSector,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onTestSector: (preset: SectorPreset) => void;
+}) {
+  const { confirm } = useAppDialog();
+  const [sectorName, setSectorName] = useState('');
+  const [sectorModules, setSectorModules] = useState<ModuleId[]>([]);
+  const [sectorPackIds, setSectorPackIds] = useState<Partial<Record<ModuleId, string[]>>>({});
+  const [editingSector, setEditingSector] = useState<SectorPreset | null>(null);
+  const [sectorError, setSectorError] = useState('');
+  const [sectorModalOpen, setSectorModalOpen] = useState(false);
+  const catalog = getCatalogSnapshot(data);
+  const sectorPresets = catalog.sectorPresets;
+  const moduleForSector = (id: ModuleId) => {
+    return getConfiguredModules(catalog).find((module) => module.id === id);
+  };
+  const moduleName = (id: ModuleId) => moduleForSector(id)?.name ?? id;
+
+  const toggleSectorPack = (moduleId: ModuleId, packId: string) => {
+    const module = moduleForSector(moduleId);
+    if (!module) return;
+    setSectorError('');
+    setSectorPackIds((current) => {
+      const currentIds = current[moduleId] ?? [];
+      const nextIds = currentIds.includes(packId) ? currentIds.filter((id) => id !== packId) : [...currentIds, packId];
+      const next = { ...current, [moduleId]: nextIds };
+      if (nextIds.length === 0) delete next[moduleId];
+      return next;
+    });
+  };
+
+  const toggleSectorModule = (moduleId: ModuleId) => {
+    setSectorError('');
+    setSectorModules((current) => {
+      if (current.includes(moduleId)) {
+        setSectorPackIds((packIds) => {
+          const next = { ...packIds };
+          delete next[moduleId];
+          return next;
+        });
+        return current.filter((id) => id !== moduleId);
+      }
+      return [...current, moduleId];
+    });
+  };
+
+  const openSector = (preset?: SectorPreset) => {
+    setSectorModalOpen(true);
+    setEditingSector(preset ?? null);
+    setSectorName(preset?.name ?? '');
+    const legacyPackIds = Object.fromEntries(
+      (preset?.businessProfiles ?? []).flatMap((profile) => Object.entries(profile.modulePackIds ?? {})),
+    ) as Partial<Record<ModuleId, string[]>>;
+    const packIds = preset?.modulePackIds ?? legacyPackIds;
+    const selectedModuleIds = Object.keys(packIds).length
+      ? (Object.keys(packIds) as ModuleId[])
+      : preset
+        ? [...preset.moduleIds]
+        : [];
+    setSectorModules(selectedModuleIds);
+    setSectorPackIds(
+      Object.fromEntries(
+        Object.entries(packIds).map(([moduleId, selectedPackIds]) => [moduleId, [...(selectedPackIds ?? [])]]),
+      ),
+    );
+    setSectorError('');
+  };
+
+  const buildSectorPreset = (): SectorPreset | null => {
+    const normalizedName = sectorName.trim();
+    if (!normalizedName) {
+      setSectorError('Saisissez le nom du secteur.');
+      return null;
+    }
+    if (
+      sectorPresets.some(
+        (preset) => preset.id !== editingSector?.id && preset.name.toLowerCase() === normalizedName.toLowerCase(),
+      )
+    ) {
+      setSectorError('Ce secteur existe déjà.');
+      return null;
+    }
+    if (sectorModules.length === 0) {
+      setSectorError('Sélectionnez au moins un module.');
+      return null;
+    }
+    const selectedPackEntries = sectorModules.map(
+      (moduleId) => [moduleId, sectorPackIds[moduleId] ?? []] as [ModuleId, string[]],
+    );
+    if (selectedPackEntries.some(([, packIds]) => packIds.length === 0)) {
+      setSectorError('Sélectionnez au moins un pack dans chaque module choisi.');
+      return null;
+    }
+    const moduleIds = selectedPackEntries.map(([moduleId]) => moduleId);
+    const moduleFeatures = Object.fromEntries(
+      selectedPackEntries.map(([moduleId, packIds]) => {
+        const module = moduleForSector(moduleId);
+        const featureIds =
+          module?.featurePacks?.filter((pack) => packIds.includes(pack.id)).flatMap((pack) => pack.featureIds) ?? [];
+        return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, featureIds)] : featureIds];
+      }),
+    ) as Partial<Record<ModuleId, string[]>>;
+    return {
+      id: editingSector?.id ?? uid('sector'),
+      name: normalizedName,
+      moduleIds,
+      modulePackIds: Object.fromEntries(selectedPackEntries.map(([moduleId, packIds]) => [moduleId, [...packIds]])),
+      moduleFeatures,
+    };
+  };
+
+  const createSector = (event: FormEvent) => {
+    event.preventDefault();
+    const preset = buildSectorPreset();
+    if (!preset) return;
+    mutate(
+      (draft) => {
+        updateCatalogDraft(draft, (catalogDraft) => {
+          catalogDraft.sectorPresets = editingSector
+            ? catalogDraft.sectorPresets.map((item) => (item.id === editingSector.id ? preset : item))
+            : [...catalogDraft.sectorPresets, preset];
+        });
+      },
+      editingSector ? 'Secteur modifié.' : 'Secteur et modules par défaut enregistrés.',
+    );
+    setSectorName('');
+    setSectorModules([]);
+    setSectorPackIds({});
+    setEditingSector(null);
+    setSectorError('');
+    setSectorModalOpen(false);
+  };
+
+  const testDraftSector = () => {
+    const preset = buildSectorPreset();
+    if (preset) onTestSector(preset);
+  };
+
+  const closeSectorModal = () => {
+    setSectorModalOpen(false);
+    setEditingSector(null);
+    setSectorName('');
+    setSectorModules([]);
+    setSectorPackIds({});
+    setSectorError('');
+  };
+
+  const deleteSector = async (preset: SectorPreset) => {
+    const affectedCompanies = data.companies.filter((company) => company.sector === preset.name);
+    if (
+      !(await confirm({
+        title: 'Supprimer ce secteur ?',
+        description: affectedCompanies.length > 0
+          ? `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions. ${affectedCompanies.length} entreprise(s) existante(s) le conservent comme historique.`
+          : `Le secteur « ${preset.name} » ne sera plus proposé lors des nouvelles inscriptions.`,
+        confirmLabel: 'Supprimer',
+        tone: 'danger',
+      }))
+    )
+      return;
+    mutate((draft) => {
+      updateCatalogDraft(draft, (catalogDraft) => {
+        catalogDraft.sectorPresets = catalogDraft.sectorPresets.filter((item) => item.id !== preset.id);
+      });
+    }, 'Secteur retiré du brouillon. Publiez les changements pour confirmer.');
+  };
+
+  return (
+    <div className="space-y-5">
+      <CatalogWorkflowBar data={data} mutate={mutate} />
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3 text-[hsl(var(--foreground))]">
+              <Building2 size={19} />
+            </span>
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
+                Configuration du catalogue
+              </p>
+              <h2 className="mt-2 text-xl font-bold">Configurer un secteur d’activité</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Un secteur sélectionne directement les packs déjà définis dans les modules. Aucun nom de métier ou de pack
+                n’est recréé ici.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            data-testid="button-add-sector"
+            onClick={() => openSector()}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition hover:opacity-90"
+          >
+            <Plus size={15} />
+            Ajouter un secteur d’activité
+          </button>
+        </div>
+        {sectorModalOpen && (
+          <Modal
+            title={editingSector ? 'Modifier le secteur d’activité' : 'Ajouter un secteur d’activité'}
+            onClose={closeSectorModal}
+            className="max-h-[88vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
+          >
+            <form onSubmit={createSector} className="space-y-5">
+          <label className="block max-w-md text-sm font-semibold">
+            Nom du secteur
+            <input
+              data-testid="input-sector-name"
+              value={sectorName}
+              onChange={(event) => setSectorName(event.target.value)}
+              placeholder="Ex. Bâtiment et travaux publics"
+              className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
+            />
+          </label>
+          <p className="mt-5 text-sm font-semibold">Modules et packs proposés à l’inscription</p>
+          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+            Sélectionnez d’abord un module. Ses packs déjà nommés et configurés apparaîtront ensuite.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {modules.filter((baseModule) => !catalog.removedModules.includes(baseModule.id)).map((baseModule) => {
+              const module = moduleForSector(baseModule.id) ?? baseModule;
+              const packs = module.featurePacks ?? [];
+              const selectedModule = sectorModules.includes(module.id);
+              return (
+                <div
+                  key={module.id}
+                  className={`rounded-xl border p-3 transition ${selectedModule ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
+                >
+                  <button
+                    type="button"
+                    data-testid={`button-sector-module-${module.id}`}
+                    onClick={() => toggleSectorModule(module.id)}
+                    className="flex w-full items-start gap-3 text-left"
+                  >
+                    <span
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${selectedModule ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}
+                    >
+                      {selectedModule && <Check size={13} />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block text-sm">{module.name}</strong>
+                      <span className="mt-1 block text-[11px] text-[hsl(var(--muted-foreground))]">
+                        {selectedModule
+                          ? 'Sélectionnez ses packs ci-dessous.'
+                          : 'Sélectionnez ce module pour afficher ses packs.'}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`mt-1 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform ${selectedModule ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {selectedModule &&
+                    (packs.length === 0 ? (
+                      <p className="mt-3 border-t pt-3 text-[10px] text-[hsl(var(--muted-foreground))]">
+                        Aucun pack disponible dans ce module.
+                      </p>
+                    ) : (
+                      <div className="mt-3 space-y-1 border-t pt-2">
+                        {packs.map((pack) => {
+                          const selected = sectorPackIds[module.id]?.includes(pack.id) ?? false;
+                          return (
+                            <label
+                              key={pack.id}
+                              className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--muted))]"
+                            >
+                              <input
+                                data-testid={`checkbox-sector-pack-${module.id}-${pack.id}`}
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleSectorPack(module.id, pack.id)}
+                                className="mt-0.5 accent-[hsl(var(--primary))]"
+                              />
+                               <span>
+                                 <strong className="block">{pack.name}</strong>
+                                 <span className="mt-1 block text-[9px] leading-4 text-[hsl(var(--muted-foreground))]">
+                                   {pack.description || 'Description à compléter.'}
+                                 </span>
+                                 <span className="mt-1 block text-[9px] text-[hsl(var(--muted-foreground))]">
+                                   {pack.featureIds.length} fonctionnalité(s)
+                                 </span>
+                               </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+          {sectorError && (
+            <p
+              data-testid="sector-error"
+              className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+            >
+              {sectorError}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="button-test-sector"
+              onClick={testDraftSector}
+              className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--primary)/.45)] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.06)]"
+            >
+              <Gauge size={15} />
+              Tester ce secteur
+            </button>
+            <button
+              data-testid="button-create-sector"
+              type="submit"
+              className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+            >
+              {editingSector ? <Edit3 size={15} /> : <Plus size={15} />}
+              {editingSector ? 'Enregistrer les modifications' : 'Enregistrer le secteur'}
+            </button>
+            {editingSector && (
+              <button
+                type="button"
+                onClick={closeSectorModal}
+                className="rounded-lg border px-4 py-2.5 text-xs font-bold"
+              >
+                Annuler la modification
+              </button>
+            )}
+          </div>
+            </form>
+          </Modal>
+        )}
+      </section>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div>
+            <h2 className="font-bold">Secteurs configurés</h2>
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              {sectorPresets.length} secteur{sectorPresets.length > 1 ? 's' : ''} disponible
+              {sectorPresets.length > 1 ? 's' : ''} à l’inscription
+            </p>
+          </div>
+        </div>
+        {sectorPresets.map((preset) => {
+          const packCount = Object.values(preset.modulePackIds ?? {}).reduce(
+            (total, packIds) => total + (packIds?.length ?? 0),
+            0,
+          );
+          return (
+            <article
+              data-testid={`card-sector-preset-${preset.id}`}
+              key={preset.id}
+              className="card-surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center"
+            >
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]">
+                  <Building2 size={19} />
+                </span>
+                <div>
+                  <strong>{preset.name}</strong>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    {preset.moduleIds.length} module{preset.moduleIds.length > 1 ? 's' : ''} · {packCount} pack
+                    {packCount > 1 ? 's' : ''} sélectionné{packCount > 1 ? 's' : ''}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {Object.entries(preset.modulePackIds ?? {}).flatMap(([moduleId, packIds]) =>
+                      (packIds ?? []).map((packId) => (
+                        <span
+                          key={`${moduleId}-${packId}`}
+                          className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-semibold"
+                        >
+                          {moduleName(moduleId as ModuleId)} ·{' '}
+                          {moduleForSector(moduleId as ModuleId)?.featurePacks?.find((pack) => pack.id === packId)
+                            ?.name ?? packId}
+                        </span>
+                      )),
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex self-start sm:self-center">
+                <button
+                  type="button"
+                  data-testid={`button-test-sector-${preset.id}`}
+                  onClick={() => onTestSector(preset)}
+                  aria-label={`Tester le secteur ${preset.name}`}
+                  className="rounded-lg p-2 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
+                >
+                  <Gauge size={16} />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`button-edit-sector-${preset.id}`}
+                  onClick={() => openSector(preset)}
+                  aria-label={`Modifier le secteur ${preset.name}`}
+                  className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`button-delete-sector-${preset.id}`}
+                  onClick={() => deleteSector(preset)}
+                  aria-label={`Supprimer le secteur ${preset.name}`}
+                  className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+        {sectorPresets.length === 0 && (
+          <div className="card-surface rounded-2xl border-dashed p-10 text-center">
+            <Building2 className="mx-auto text-[hsl(var(--muted-foreground))]" size={26} />
+            <h3 className="mt-4 font-bold">Aucun secteur configuré</h3>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Ajoutez un premier secteur pour guider les inscriptions.
+            </p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+function SimpleAdminPage({
+  type,
+  data,
+  onNavigate,
+}: {
+  type: 'users';
+  data: StoreData;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <section className="card-surface overflow-hidden rounded-2xl">
+      <div className="border-b p-5">
+        <Toolbar search={''} setSearch={() => {}}>
+          <ActionButton
+            primary
+            testId="button-add-user"
+            onClick={() => onNavigate('/maximus/entreprises/organisation')}
+          >
+            Gérer les comptes employés
+          </ActionButton>
+        </Toolbar>
+      </div>
+      <DataTable
+        headers={['Utilisateur', 'Espace', 'Dernière activité', 'Statut']}
+        rows={[
+          ...data.employees.map((e) => [
+            `${e.firstName} ${e.lastName}`,
+            data.companies.find((company) => company.id === e.companyId)?.name ?? 'Entreprise',
+            'Compte actif',
+            <StatusBadge status={e.status} />,
+          ]),
+        ]}
+      />
+    </section>
+  );
+}
+function RolesPage({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
+  if (data.roles.length === 0)
+    return (
+      <EmptyState
+        title="Aucun rôle configuré"
+        text="Créez les rôles depuis l’organisation de l’entreprise concernée."
+        action={() => onNavigate('/maximus/entreprises/organisation')}
+      />
+    );
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      {data.roles.map((role) => (
+        <section key={role.id} data-testid={`card-role-${role.id}`} className="card-surface rounded-2xl p-5">
+          <div className="flex items-start justify-between">
+            <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]">
+              <KeyRound size={18} />
+            </span>
+            <button
+              data-testid={`button-edit-role-${role.id}`}
+              title="Modifier dans l’organisation"
+              onClick={() => onNavigate('/maximus/entreprises/organisation')}
+              className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
+            >
+              <SlidersHorizontal size={16} />
+            </button>
+          </div>
+          <h2 className="mt-5 font-bold">{role.name}</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{role.description}</p>
+          <div className="mt-5 space-y-2">
+            {Object.keys(role.modulePermissions).map((key) => (
+              <div key={key} className="flex items-center justify-between text-xs">
+                <span>{modules.find((m) => m.id === key)?.name ?? key}</span>
+                <span className="text-[hsl(var(--muted-foreground))]">{role.modulePermissions[key].join(' · ')}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+function SubscriptionsPage({
+  data,
+  onNavigate,
+}: {
+  data: StoreData;
+  onNavigate: (path: string) => void;
+}) {
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(data.subscriptions[0]?.id ?? '');
+  const [searchTerm, setSearchTerm] = useState('');
+  const subscriptions = data.subscriptions;
+  const formatDate = (value: string | null) => {
+    if (!value) return '—';
+    return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
+  };
+  const formatAmount = (value: number) => `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value)} FCFA`;
+
+  useEffect(() => {
+    if (subscriptions.some((subscription) => subscription.id === selectedSubscriptionId)) return;
+    setSelectedSubscriptionId(subscriptions[0]?.id ?? '');
+  }, [subscriptions, selectedSubscriptionId]);
+
+  const filteredSubscriptions = subscriptions.filter((subscription) => {
+    const company = data.companies.find((item) => item.id === subscription.companyId);
+    const query = searchTerm.trim().toLowerCase();
+    return !query || `${company?.name ?? ''} ${subscription.planName} ${subscription.status} ${subscription.paymentStatus}`.toLowerCase().includes(query);
+  });
+  const selectedSubscription = subscriptions.find((subscription) => subscription.id === selectedSubscriptionId);
+  const selectedCompany = data.companies.find((company) => company.id === selectedSubscription?.companyId);
+  const selectedPlan = subscriptionPlans.find((plan) => plan.id === selectedSubscription?.planId);
+  const selectedEmployees = selectedCompany ? data.employees.filter((employee) => employee.companyId === selectedCompany.id).length : 0;
+  const activeSubscriptions = subscriptions.filter((subscription) => subscription.status === 'ACTIF' || subscription.status === 'ESSAI');
+  const monthlyRevenue = activeSubscriptions.reduce(
+    (total, subscription) => total + (subscription.interval === 'ANNUEL' ? subscription.amount / 12 : subscription.amount),
+    0,
+  );
+  const unpaidSubscriptions = subscriptions.filter((subscription) => subscription.paymentStatus === 'IMPAYÉ').length;
+  const overdueInvoices = subscriptions.flatMap((subscription) => subscription.invoices).filter((invoice) => invoice.status === 'EN RETARD').length;
+
+  if (subscriptions.length === 0) {
+    return (
+      <div className="space-y-6">
+        <MaximusWalletPanel formatAmount={formatAmount} />
+        <EmptyState
+          title="Aucun abonnement enregistré"
+          text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
+          action={() => onNavigate('/maximus/demandes')}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(120deg,hsl(var(--sidebar)),hsl(var(--sidebar)/.88))] p-6 text-[hsl(var(--sidebar-foreground))] shadow-sm sm:p-8">
+        <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div className="max-w-2xl">
+            <p className="mono text-[10px] uppercase tracking-[.22em] text-[hsl(var(--accent))]">Gestion financière</p>
+            <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Abonnements, paiements et échéances.</h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--sidebar-foreground)/.72)]">
+              Chaque souscription possède son propre plan, son cycle de vie, ses limites et son historique de facturation.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+            <CreditCard size={20} className="text-[hsl(var(--accent))]" />
+            <div>
+              <p className="text-xs font-bold">Suivi des souscriptions</p>
+              <p className="mt-1 text-[10px] text-[hsl(var(--sidebar-foreground)/.62)]">Plans · paiements · factures</p>
+            </div>
+          </div>
+        </div>
+        <div className="absolute -right-14 -top-16 h-48 w-48 rounded-full border border-white/10 bg-white/[.03]" />
+      </section>
+
+      <MaximusWalletPanel formatAmount={formatAmount} />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Souscriptions actives', value: activeSubscriptions.length, detail: `${subscriptions.length} enregistrée(s)`, icon: ShieldCheck },
+          { label: 'Revenu mensuel prévu', value: formatAmount(monthlyRevenue), detail: 'sur les plans actifs', icon: TrendingUp },
+          { label: 'Paiements impayés', value: unpaidSubscriptions, detail: 'souscription(s) à relancer', icon: CreditCard },
+          { label: 'Factures en retard', value: overdueInvoices, detail: 'à régulariser', icon: FileBarChart },
+        ].map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <section key={metric.label} className="card-surface rounded-2xl p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">{metric.label}</p>
+                  <p className="mt-3 text-2xl font-bold tracking-tight">{metric.value}</p>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{metric.detail}</p>
+                </div>
+                <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-2.5 text-[hsl(var(--primary))]"><Icon size={17} /></span>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(390px,.98fr)]">
+        <section className="card-surface overflow-hidden rounded-2xl">
+          <div className="border-b border-[hsl(var(--border))] p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div>
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Registre</p>
+                <h2 className="mt-2 text-xl font-bold">Souscriptions clientes</h2>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les données de paiement sont rattachées à une souscription, pas seulement à une entreprise.</p>
+              </div>
+              <button type="button" onClick={() => onNavigate('/maximus/demandes')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.55)]">
+                <FileClock size={14} /> Voir les demandes
+              </button>
+            </div>
+            <label className="relative mt-5 block">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Rechercher une entreprise, un plan ou un statut…" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[hsl(var(--primary))]" />
+            </label>
+          </div>
+          <div className="divide-y divide-[hsl(var(--border))]">
+            {filteredSubscriptions.map((subscription) => {
+              const company = data.companies.find((item) => item.id === subscription.companyId);
+              const isSelected = subscription.id === selectedSubscriptionId;
+              return (
+                <button type="button" key={subscription.id} data-testid={`subscription-row-${subscription.id}`} onClick={() => setSelectedSubscriptionId(subscription.id)} className={`flex w-full items-center gap-4 px-5 py-4 text-left transition sm:px-6 ${isSelected ? 'bg-[hsl(var(--primary)/.07)]' : 'hover:bg-[hsl(var(--muted)/.35)]'}`}>
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${isSelected ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))]'}`}>
+                    {(company?.name ?? '?').slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2"><strong className="truncate text-sm">{company?.name ?? subscription.companyId}</strong><StatusBadge status={subscription.status} /></span>
+                    <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{subscription.planName} · {subscription.paymentStatus}</span>
+                  </span>
+                  <span className="hidden shrink-0 text-right sm:block"><strong className="block text-sm">{formatAmount(subscription.amount)}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">/ {subscription.interval === 'MENSUEL' ? 'mois' : 'an'}</span></span>
+                  <ChevronRight size={16} className={isSelected ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'} />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {selectedSubscription && (
+          <section className="card-surface rounded-2xl p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Souscription sélectionnée</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-bold">{selectedCompany?.name ?? selectedSubscription.companyId}</h2><StatusBadge status={selectedSubscription.status} /></div>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{selectedSubscription.planName} · créée le {formatDate(selectedSubscription.startedAt)}</p>
+              </div>
+              {selectedCompany && <button type="button" title="Ouvrir la fiche entreprise" onClick={() => onNavigate(`/maximus/entreprises/${selectedCompany.id}`)} className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))]"><Building2 size={17} /></button>}
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-[hsl(var(--border))] p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Plan</p><strong className="mt-2 block text-lg">{selectedSubscription.planName}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedPlan?.description}</span></div>
+              <div className="rounded-xl border border-[hsl(var(--border))] p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Tarif</p><strong className="mt-2 block text-lg">{formatAmount(selectedSubscription.amount)}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">par {selectedSubscription.interval === 'MENSUEL' ? 'mois' : 'an'}</span></div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {[
+                ['Début', formatDate(selectedSubscription.startedAt)],
+                ['Fin', formatDate(selectedSubscription.endsAt)],
+                ['Prochain renouvellement', formatDate(selectedSubscription.nextRenewalAt)],
+                ['Fin d’essai', formatDate(selectedSubscription.trialEndsAt)],
+              ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 text-xs"><span className="text-[hsl(var(--muted-foreground))]">{label}</span><strong>{value}</strong></div>)}
+            </div>
+
+            <div className="mt-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.28)] p-4">
+              <div className="flex items-start gap-3"><CreditCard size={17} className="mt-0.5 text-[hsl(var(--primary))]" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">Paiement</p><StatusBadge status={selectedSubscription.paymentStatus} /></div><p className="mt-2 text-sm font-semibold">{selectedSubscription.paymentMethod.label}{selectedSubscription.paymentMethod.last4 ? ` · ···· ${selectedSubscription.paymentMethod.last4}` : ''}</p></div></div>
+            </div>
+
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold">Limites du plan</p><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedEmployees} / {selectedSubscription.limits.employees} employés</span></div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Employés', used: selectedEmployees, limit: selectedSubscription.limits.employees, Icon: Users },
+                  { label: 'Modules', used: selectedSubscription.moduleIds.length, limit: selectedSubscription.limits.modules, Icon: Package },
+                  { label: 'Stockage', used: '—', limit: selectedSubscription.limits.storageGb, Icon: FolderKanban },
+                ].map(({ label, used, limit, Icon: MetricIcon }) => {
+                  return <div key={label} className="rounded-lg border border-[hsl(var(--border))] p-3"><MetricIcon size={14} className="text-[hsl(var(--primary))]" /><strong className="mt-2 block text-sm">{used} <span className="text-[10px] font-normal text-[hsl(var(--muted-foreground))]">/ {limit}{label === 'Stockage' ? ' Go' : ''}</span></strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{label}</span></div>;
+                })}
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold">Factures récentes</p><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{selectedSubscription.invoices.length} document(s)</span></div>
+              <div className="mt-3 space-y-2">
+                {selectedSubscription.invoices.map((invoice) => <div key={invoice.id} className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5"><FileBarChart size={14} className="text-[hsl(var(--primary))]" /><div className="min-w-0 flex-1"><strong className="block truncate text-xs">{invoice.number}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">Échéance {formatDate(invoice.dueAt)}</span></div><span className="hidden text-xs font-bold sm:block">{formatAmount(invoice.amount)}</span><StatusBadge status={invoice.status} /></div>)}
+                {selectedSubscription.invoices.length === 0 && <p className="rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">Aucune facture enregistrée.</p>}
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-xs font-bold">Historique du cycle de vie</p>
+              <div className="mt-3 space-y-3 border-l border-[hsl(var(--border))] pl-4">
+                {selectedSubscription.history.map((event) => <div key={event.id} className="relative"><span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-[hsl(var(--primary))]" /><p className="text-xs font-semibold">{event.label}</p><p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{formatDate(event.date)} · {event.actor}</p></div>)}
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+
+      <section>
+        <div className="mb-3"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Catalogue</p><h2 className="mt-2 text-xl font-bold">Plans disponibles</h2></div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {subscriptionPlans.map((plan) => <section key={plan.id} className={`card-surface rounded-2xl p-5 ${selectedSubscription?.planId === plan.id ? 'border-[hsl(var(--primary)/.55)] ring-1 ring-[hsl(var(--primary)/.22)]' : ''}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{plan.name}</h3><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{plan.description}</p></div>{selectedSubscription?.planId === plan.id && <StatusBadge status="ACTIF" />}</div><p className="mt-5 text-2xl font-bold">{formatAmount(plan.monthlyAmount)}<span className="text-xs font-normal text-[hsl(var(--muted-foreground))]"> / mois</span></p><div className="mt-4 space-y-2 text-xs text-[hsl(var(--muted-foreground))]"><p className="flex justify-between"><span>Employés</span><strong className="text-[hsl(var(--foreground))]">{plan.limits.employees}</strong></p><p className="flex justify-between"><span>Modules</span><strong className="text-[hsl(var(--foreground))]">{plan.limits.modules}</strong></p><p className="flex justify-between"><span>Stockage</span><strong className="text-[hsl(var(--foreground))]">{plan.limits.storageGb} Go</strong></p></div></section>)}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) => string }) {
+  const [bootstrap, setBootstrap] = useState<MaximusWalletBootstrap | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [beneficiaryName, setBeneficiaryName] = useState('');
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  const load = async (preserveForm = false) => {
+    try {
+      const response = await platformSettingsApi.maximusWallet();
+      setBootstrap(response);
+      if (!preserveForm) {
+        setMobile(response.wallet.payoutMobile);
+        setBeneficiaryName(response.wallet.payoutName);
+      }
+    } catch (error) {
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Le solde MAXIMUS est indisponible.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+  useAutoRefresh(() => load(true), { enabled: Boolean(bootstrap) });
+
+  const savePayoutAccount = async () => {
+    if (mobile.trim().length < 8 || beneficiaryName.trim().length < 2) {
+      setMessage({ tone: 'error', text: 'Indiquez un numéro mobile et un nom de bénéficiaire valides.' });
+      return false;
+    }
+    await platformSettingsApi.updateMaximusPayoutAccount({
+      provider: 'WAVE',
+      mobile: mobile.trim(),
+      beneficiaryName: beneficiaryName.trim(),
+    });
+    return true;
+  };
+
+  const requestWithdrawal = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!bootstrap) return;
+    const requestedAmount = Number(amount);
+    if (!Number.isInteger(requestedAmount) || requestedAmount < 1000 || requestedAmount > bootstrap.wallet.availableBalance) {
+      setMessage({ tone: 'error', text: 'Le retrait doit être entier, d’au moins 1 000 FCFA et couvert par le solde disponible.' });
+      return;
+    }
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      const accountSaved = await savePayoutAccount();
+      if (!accountSaved) return;
+      const response = await platformSettingsApi.requestMaximusWithdrawal({
+        amount: requestedAmount,
+        provider: 'WAVE',
+        mobile: mobile.trim(),
+        beneficiaryName: beneficiaryName.trim(),
+        idempotencyKey: uid('maximus-withdrawal'),
+      });
+      setAmount('');
+      setMessage({
+        tone: response.withdrawal.status === 'FAILED' ? 'error' : 'success',
+        text: response.withdrawal.status === 'SUCCEEDED'
+          ? 'Le retrait MAXIMUS a été confirmé.'
+          : response.withdrawal.status === 'FAILED'
+            ? response.withdrawal.failureReason || 'Le retrait MAXIMUS a échoué.'
+            : 'Le retrait MAXIMUS est en cours de traitement.',
+      });
+      await load();
+    } catch (error) {
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Le retrait MAXIMUS a échoué.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section data-testid="maximus-wallet-panel" className="card-surface overflow-hidden rounded-2xl">
+      <div className="border-b border-[hsl(var(--border))] p-5 sm:p-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Compte plateforme</p>
+            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions e-commerce</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Chaque vente est répartie automatiquement : {bootstrap?.commissionPolicy.label ?? '3 % DiamanoPay, 2 % MAXIMUS, 95 % vendeur.'}
+            </p>
+          </div>
+          <WalletCards size={22} className="text-[hsl(var(--primary))]" />
+        </div>
+      </div>
+
+      {loading && <p className="p-6 text-sm text-[hsl(var(--muted-foreground))]">Chargement du compte MAXIMUS…</p>}
+      {!loading && !bootstrap && <p className="p-6 text-sm text-[hsl(var(--destructive))]">Le compte MAXIMUS n’a pas pu être chargé.</p>}
+      {bootstrap && (
+        <div className="space-y-6 p-5 sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { label: 'Disponible', value: bootstrap.wallet.availableBalance, icon: CircleDollarSign },
+              { label: 'Réservé', value: bootstrap.wallet.reservedBalance, icon: ShieldCheck },
+              { label: 'Commissions cumulées', value: bootstrap.wallet.totalCredited, icon: TrendingUp },
+            ].map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <div key={metric.label} className="rounded-xl border border-[hsl(var(--border))] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">{metric.label}</p>
+                    <Icon size={16} className="text-[hsl(var(--primary))]" />
+                  </div>
+                  <p className="mt-3 text-xl font-bold">{formatAmount(metric.value)}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
+            <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.2)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold">Répartition appliquée</p>
+                <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{bootstrap.commissionPolicy.totalPercent} % de commission</span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {[
+                  ['DiamanoPay', bootstrap.commissionPolicy.providerPercent],
+                  ['MAXIMUS', bootstrap.commissionPolicy.maximusPercent],
+                  ['Vendeur', bootstrap.commissionPolicy.sellerPercent],
+                ].map(([label, percent]) => (
+                  <div key={label} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background)/.65)] p-3">
+                    <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{label}</p>
+                    <strong className="mt-1 block text-lg">{percent} %</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={requestWithdrawal} className="rounded-xl border border-[hsl(var(--border))] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold">Retirer le solde MAXIMUS</p>
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Minimum 1 000 FCFA</span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-semibold">Montant à recevoir<input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" min="1000" step="1" placeholder="1000" className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label>
+                <label className="text-xs font-semibold">Mobile WAVE<input value={mobile} onChange={(event) => setMobile(event.target.value)} type="tel" placeholder="77 000 00 00" className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label>
+              </div>
+              <label className="mt-3 block text-xs font-semibold">Bénéficiaire<input value={beneficiaryName} onChange={(event) => setBeneficiaryName(event.target.value)} placeholder="Nom du bénéficiaire" className="mt-1 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label>
+              <p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Le montant est débité du compte MAXIMUS et envoyé au compte configuré via DiamanoPay.</p>
+              {message && <p role="alert" className={`mt-3 rounded-lg p-3 text-xs font-semibold ${message.tone === 'error' ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]'}`}>{message.text}</p>}
+              <button type="submit" disabled={busy} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">
+                <ArrowUpFromLine size={15} />{busy ? 'Traitement…' : 'Demander le retrait'}
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold">Derniers retraits MAXIMUS</p>
+              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{bootstrap.withdrawals.length} demande(s)</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {bootstrap.withdrawals.slice(0, 5).map((withdrawal) => (
+                <div key={withdrawal.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5">
+                  <ArrowUpFromLine size={14} className="text-[hsl(var(--primary))]" />
+                  <div className="min-w-0 flex-1"><strong className="block text-xs">{formatAmount(withdrawal.amount)}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{withdrawal.mobile} · {withdrawal.beneficiaryName}</span></div>
+                  <StatusBadge status={withdrawal.status} />
+                </div>
+              ))}
+              {bootstrap.withdrawals.length === 0 && <p className="rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">Aucun retrait MAXIMUS enregistré.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NotificationsPage({
+  data,
+  mutate,
+  context,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  context: { isAdmin: boolean; companyId?: string };
+}) {
+  const notifications = getVisibleNotifications(data.notifications, context);
+  return (
+    <div className="space-y-3">
+      {notifications.length === 0 && (
+        <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+          Aucune notification pour le moment.
+        </div>
+      )}
+      {notifications.map((n) => (
+        <section
+          data-testid={`notification-${n.id}`}
+          key={n.id}
+          className={`card-surface flex items-start gap-4 rounded-2xl p-5 ${!n.read ? 'border-l-4 border-l-[hsl(var(--accent))]' : ''}`}
+        >
+          <span
+            className={`rounded-xl p-3 ${n.severity === 'warning' ? 'bg-[hsl(var(--accent)/.2)] text-[hsl(var(--primary))]' : n.severity === 'error' ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--muted))]'}`}
+          >
+            <Bell size={17} />
+          </span>
+          <div className="flex-1">
+            <div className="flex justify-between gap-3">
+              <h2 className="font-bold">{n.title}</h2>
+              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{n.date}</span>
+            </div>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{n.text}</p>
+            {n.href && (
+              <Link href={n.href} className="mt-3 mr-3 inline-block text-xs font-bold text-[hsl(var(--primary))]">
+                Ouvrir
+              </Link>
+            )}
+            {!n.read && (
+              <button
+                data-testid={`button-read-notification-${n.id}`}
+                onClick={() =>
+                  mutate((d) => {
+                    const x = d.notifications.find((y) => y.id === n.id);
+                    if (x) x.read = true;
+                  }, 'Notification marquée comme lue.')
+                }
+                className="mt-3 text-xs font-bold text-[hsl(var(--primary))]"
+              >
+                Marquer comme lue
+              </button>
+            )}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+function JournalPage({ data }: { data: StoreData }) {
+  const [search, setSearch] = useState('');
+  const rows = data.activities.filter((a) =>
+    `${a.user} ${a.action} ${a.object}`.toLowerCase().includes(search.toLowerCase()),
+  );
+  return (
+    <section className="card-surface overflow-hidden rounded-2xl">
+      <div className="border-b p-5">
+        <Toolbar search={search} setSearch={setSearch}>
+          <button
+            data-testid="button-filter-journal"
+            onClick={() => setSearch(search ? '' : 'finance')}
+            className="flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"
+          >
+            <SlidersHorizontal size={14} />
+            {search ? 'Réinitialiser' : 'Filtrer Finance'}
+          </button>
+        </Toolbar>
+      </div>
+      <DataTable
+        headers={['Utilisateur', 'Action', 'Module', 'Objet', 'Date', 'État']}
+        rows={rows.map((a) => [a.user, a.action, a.module, a.object, a.date, <StatusBadge status={a.status} />])}
+      />
+    </section>
+  );
+}
+
+function OrganisationPage({
+  data,
+  mutate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  const [modal, setModal] = useState<OrgNode | 'new' | null>(null);
+  const [name, setName] = useState('');
+  const [parent, setParent] = useState<string | null>(null);
+  const roots = data.orgNodes.filter((n) => !n.parentId);
+  const open = (node: OrgNode | 'new') => {
+    setModal(node);
+    setName(node === 'new' ? '' : node.name);
+    setParent(node === 'new' ? null : node.parentId);
+  };
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <section className="card-surface rounded-2xl p-5 sm:p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold">Arborescence</h2>
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              Déployez vos équipes à la profondeur qui vous convient.
+            </p>
+          </div>
+          <ActionButton primary testId="button-add-org-node" onClick={() => open('new')}>
+            Ajouter un nœud
+          </ActionButton>
+        </div>
+        <div className="space-y-2">
+          {roots.map((node) => (
+            <OrgTree
+              key={node.id}
+              node={node}
+              nodes={data.orgNodes}
+              onEdit={open}
+              onDelete={(id) =>
+                mutate((d) => {
+                  d.orgNodes = d.orgNodes.filter((n) => n.id !== id && n.parentId !== id);
+                }, 'Nœud supprimé.')
+              }
+            />
+          ))}
+        </div>
+      </section>
+      <section className="card-surface grid-lines rounded-2xl p-5">
+        <GitBranch size={19} className="text-[hsl(var(--primary))]" />
+        <h2 className="mt-5 font-bold">Une structure vivante</h2>
+        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+           Chaque unité peut accueillir ses propres sous-unités.
+        </p>
+        <div className="mt-6 border-t pt-4">
+          <p className="mono text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Total nœuds</p>
+          <p className="mt-1 text-2xl font-bold">{data.orgNodes.length}</p>
+        </div>
+      </section>
+      {modal && (
+        <Modal title={modal === 'new' ? 'Nouveau nœud' : 'Modifier le nœud'} onClose={() => setModal(null)}>
+          <div className="space-y-4">
+            <Field label="Nom" value={name} onChange={setName} testId="input-org-name" />
+            <label className="block text-sm font-semibold">
+              Parent
+              <select
+                data-testid="select-org-parent"
+                value={parent ?? ''}
+                onChange={(e) => setParent(e.target.value || null)}
+                className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"
+              >
+                <option value="">Racine</option>
+                {data.orgNodes
+                  .filter((n) => modal === 'new' || n.id !== (modal as OrgNode).id)
+                  .map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                data-testid="button-cancel-org"
+                onClick={() => setModal(null)}
+                className="rounded-lg border px-4 py-2 text-sm font-bold"
+              >
+                Annuler
+              </button>
+              <ActionButton
+                primary
+                testId="button-save-org"
+                onClick={() => {
+                  if (!name) return;
+                  mutate((d) => {
+                    if (modal === 'new') d.orgNodes.push({ id: uid('org'), name, parentId: parent });
+                    else {
+                      const x = d.orgNodes.find((n) => n.id === (modal as OrgNode).id);
+                      if (x) {
+                        x.name = name;
+                        x.parentId = parent;
+                      }
+                    }
+                  }, 'Organisation mise à jour.');
+                  setModal(null);
+                }}
+              >
+                Enregistrer
+              </ActionButton>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function OrgTree({
+  node,
+  nodes,
+  onEdit,
+  onDelete,
+  depth = 0,
+}: {
+  node: OrgNode;
+  nodes: OrgNode[];
+  onEdit: (n: OrgNode) => void;
+  onDelete: (id: string) => void;
+  depth?: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const children = nodes.filter((n) => n.parentId === node.id);
+  return (
+    <div style={{ marginLeft: depth * 22 }}>
+      <div className="group flex items-center gap-2 rounded-lg px-2 py-2.5 hover:bg-[hsl(var(--muted)/.6)]">
+        <button
+          data-testid={`button-expand-org-${node.id}`}
+          onClick={() => setExpanded(!expanded)}
+          className="text-[hsl(var(--muted-foreground))]"
+        >
+          {children.length ? (
+            <ChevronDown size={15} className={expanded ? '' : '-rotate-90'} />
+          ) : (
+            <span className="block w-[15px]" />
+          )}
+        </button>
+        <span className="rounded-lg bg-[hsl(var(--primary)/.1)] p-2 text-[hsl(var(--primary))]">
+          <Building2 size={14} />
+        </span>
+        <span className="flex-1 text-sm font-bold">{node.name}</span>
+        <button
+          data-testid={`button-edit-org-${node.id}`}
+          onClick={() => onEdit(node)}
+          className="invisible rounded p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] group-hover:visible"
+        >
+          <Settings size={14} />
+        </button>
+        <button
+          data-testid={`button-delete-org-${node.id}`}
+          onClick={() => onDelete(node.id)}
+          className="invisible rounded p-1.5 text-[hsl(var(--destructive))] group-hover:visible"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+      {expanded &&
+        children.map((child) => (
+          <OrgTree key={child.id} node={child} nodes={nodes} onEdit={onEdit} onDelete={onDelete} depth={depth + 1} />
+        ))}
+    </div>
+  );
+}
+function EmployeesPage({
+  data,
+  mutate,
+  companyAdmin,
+  sectorAdminDepartment,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  companyAdmin: boolean;
+  sectorAdminDepartment?: string;
+}) {
+  const { confirm } = useAppDialog();
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState<Employee | 'new' | null>(null);
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    position: '',
+    department: sectorAdminDepartment ?? 'Commerce',
+    role: 'Vendeur',
+    loginPassword: '',
+    isSectorAdmin: false,
+  });
+  const list = data.employees
+    .filter((e) => !sectorAdminDepartment || e.department === sectorAdminDepartment)
+    .filter((e) =>
+      `${e.firstName} ${e.lastName} ${e.position} ${e.email}`.toLowerCase().includes(search.toLowerCase()),
+    );
+  const resetForm = () =>
+    setForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      position: '',
+      department: sectorAdminDepartment ?? 'Commerce',
+      role: 'Vendeur',
+      loginPassword: '',
+      isSectorAdmin: false,
+    });
+  const openEmployee = (employee?: Employee) => {
+    setModal(employee ?? 'new');
+    setForm(
+      employee
+        ? {
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            email: employee.email,
+            phone: employee.phone,
+            position: employee.position,
+            department: employee.department,
+            role: employee.role,
+            loginPassword: employee.loginPassword ?? '',
+            isSectorAdmin: Boolean(employee.isSectorAdmin),
+          }
+        : {
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            position: '',
+            department: sectorAdminDepartment ?? 'Commerce',
+            role: 'Vendeur',
+            loginPassword: '',
+            isSectorAdmin: false,
+          },
+    );
+  };
+  const saveEmployee = () => {
+    if (!form.firstName || !form.lastName || !form.email || !form.position || !form.loginPassword) return;
+    if (
+      data.employees.some(
+        (e) =>
+          e.id !== (modal !== 'new' && modal ? modal.id : '') &&
+          e.email.toLowerCase() === form.email.trim().toLowerCase(),
+      )
+    )
+      return;
+    mutate(
+      (d) => {
+        if (modal !== 'new' && modal) {
+          const target = d.employees.find((employee) => employee.id === modal.id);
+          if (target)
+            Object.assign(target, {
+              ...form,
+              email: form.email.trim().toLowerCase(),
+              isSectorAdmin: companyAdmin && form.isSectorAdmin,
+            });
+        } else {
+          d.employees.push({
+            id: uid('emp'),
+            ...form,
+            email: form.email.trim().toLowerCase(),
+            subDepartment: '',
+            status: 'ACTIF',
+            isSectorAdmin: companyAdmin && form.isSectorAdmin,
+          });
+        }
+      },
+      modal !== 'new' && modal
+        ? 'Compte employé modifié.'
+        : companyAdmin && form.isSectorAdmin
+          ? 'Administrateur de secteur créé avec ses identifiants.'
+          : 'Compte employé créé avec ses identifiants.',
+    );
+    setModal(null);
+    resetForm();
+  };
+  return (
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.05)] p-5">
+        <div className="flex items-start gap-3">
+          <span className="rounded-xl bg-[hsl(var(--primary)/.12)] p-3 text-[hsl(var(--primary))]">
+            <KeyRound size={18} />
+          </span>
+          <div>
+            <h2 className="font-bold">
+              {companyAdmin ? 'Administration des secteurs' : `Administration du secteur ${sectorAdminDepartment}`}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              {companyAdmin
+                ? 'Créez un administrateur pour chaque secteur. Il pourra ensuite gérer les employés de son secteur.'
+                : 'Vous pouvez gérer les employés de votre secteur. Leur rôle définit les modules et actions accessibles après connexion.'}
+            </p>
+          </div>
+        </div>
+      </section>
+      <section className="card-surface overflow-hidden rounded-2xl">
+        <div className="border-b p-5">
+          <Toolbar search={search} setSearch={setSearch}>
+            <ActionButton primary testId="button-add-employee" onClick={() => openEmployee()}>
+              <UserPlus size={15} />
+              {companyAdmin ? 'Créer un compte' : 'Créer un employé'}
+            </ActionButton>
+          </Toolbar>
+        </div>
+        <DataTable
+          headers={['Employé', 'Poste', 'Département', 'Rôle autorisé', 'Accès de connexion', 'Statut', '']}
+          rows={list.map((e) => [
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.28)] text-[10px] font-black">
+                {e.firstName[0]}
+                {e.lastName[0]}
+              </span>
+              <span>
+                <strong className="block">
+                  {e.firstName} {e.lastName}
+                </strong>
+                <small className="text-xs text-[hsl(var(--muted-foreground))]">{e.email}</small>
+              </span>
+            </div>,
+            e.position,
+            `${e.department}${e.subDepartment ? ` · ${e.subDepartment}` : ''}`,
+            <div>
+              <strong>{e.role}</strong>
+              {e.isSectorAdmin && (
+                <span className="ml-2 rounded-full bg-[hsl(var(--accent)/.28)] px-2 py-1 text-[9px] font-bold">
+                  Admin secteur
+                </span>
+              )}
+            </div>,
+            <div className="text-xs">
+              <span className="block font-semibold">Email + mot de passe</span>
+              <small className="text-[hsl(var(--muted-foreground))]">{e.loginPassword ? 'Mot de passe configuré' : 'Non configuré'}</small>
+            </div>,
+            <StatusBadge status={e.status} />,
+            <div className="flex gap-1">
+              <button
+                data-testid={`button-edit-employee-${e.id}`}
+                title="Modifier"
+                onClick={() => openEmployee(e)}
+                className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
+              >
+                <Settings size={15} />
+              </button>
+              <button
+                data-testid={`button-remove-employee-${e.id}`}
+                title="Supprimer"
+                onClick={() =>
+                  void confirm({
+                    title: 'Supprimer ce compte employé ?',
+                    description: `Le compte de ${e.firstName} ${e.lastName} sera supprimé.`,
+                    confirmLabel: 'Supprimer',
+                    tone: 'danger',
+                  }).then((ok) => {
+                    if (ok)
+                      mutate((d) => {
+                        d.employees = d.employees.filter((x) => x.id !== e.id);
+                      }, 'Compte employé supprimé.');
+                  })
+                }
+                className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>,
+          ])}
+        />
+      </section>
+      {modal && (
+        <Modal
+          title={
+            modal === 'new'
+              ? companyAdmin
+                ? 'Créer un compte de secteur'
+                : 'Créer un compte employé'
+              : 'Modifier le compte employé'
+          }
+          onClose={() => {
+            setModal(null);
+            resetForm();
+          }}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Prénom"
+              value={form.firstName}
+              onChange={(v) => setForm({ ...form, firstName: v })}
+              testId="input-employee-firstname"
+            />
+            <Field
+              label="Nom"
+              value={form.lastName}
+              onChange={(v) => setForm({ ...form, lastName: v })}
+              testId="input-employee-lastname"
+            />
+            <Field
+              label="Email de connexion"
+              value={form.email}
+              onChange={(v) => setForm({ ...form, email: v })}
+              type="email"
+              testId="input-employee-email"
+            />
+            <Field
+              label="Téléphone"
+              value={form.phone}
+              onChange={(v) => setForm({ ...form, phone: v })}
+              testId="input-employee-phone"
+            />
+            <Field
+              label="Poste"
+              value={form.position}
+              onChange={(v) => setForm({ ...form, position: v })}
+              testId="input-employee-position"
+            />
+            <Field
+              label="Mot de passe initial"
+              value={form.loginPassword}
+              onChange={(v) => setForm({ ...form, loginPassword: v })}
+              type="text"
+              testId="input-employee-password"
+            />
+          </div>
+          <label className="mt-4 block text-sm font-semibold">
+            Département
+            <select
+              disabled={!companyAdmin}
+              data-testid="select-employee-department"
+              value={form.department}
+              onChange={(e) => setForm({ ...form, department: e.target.value })}
+              className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm disabled:opacity-60"
+            >
+              <option>Commerce</option>
+              <option>Finance</option>
+              <option>Opérations</option>
+              <option>RH</option>
+              <option>Direction</option>
+            </select>
+          </label>
+          <label className="mt-4 block text-sm font-semibold">
+            Rôle et poste autorisé
+            <select
+              data-testid="select-employee-role"
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm"
+            >
+              {data.roles.map((role) => (
+                <option key={role.id} value={role.name}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {companyAdmin && (
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-[hsl(var(--border))] p-3 text-sm">
+              <input
+                data-testid="checkbox-sector-admin"
+                type="checkbox"
+                checked={form.isSectorAdmin}
+                onChange={(e) => setForm({ ...form, isSectorAdmin: e.target.checked })}
+                className="mt-1"
+              />
+              <span>
+                <strong className="block">Administrateur de secteur</strong>
+                <small className="font-normal text-[hsl(var(--muted-foreground))]">
+                  Autoriser ce compte à gérer les employés de son département.
+                </small>
+              </span>
+            </label>
+          )}
+          <p className="mt-4 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+            L’employé se connectera avec cet email et ce mot de passe. Son rôle détermine les modules visibles et les
+            actions autorisées.
+          </p>
+          <div className="mt-6 flex justify-end">
+            <ActionButton primary testId="button-save-employee" onClick={saveEmployee}>
+              {modal === 'new' ? 'Créer le compte' : 'Enregistrer les modifications'}
+            </ActionButton>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function CompanyRolesPage({
+  data,
+  mutate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  const { alert, confirm } = useAppDialog();
+  const [modal, setModal] = useState<Role | 'new' | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const open = (role?: Role) => {
+    setModal(role ?? 'new');
+    setName(role?.name ?? '');
+    setDescription(role?.description ?? '');
+  };
+  const save = () => {
+    if (!name.trim()) return;
+    const permissions: Role['modulePermissions'] = { finance: ['voir'] };
+    mutate(
+      (d) => {
+        if (modal !== 'new' && modal) {
+          const target = d.roles.find((role) => role.id === modal.id);
+          if (target) {
+            target.name = name.trim();
+            target.description = description.trim() || 'Rôle personnalisé entreprise.';
+          }
+        } else
+          d.roles.push({
+            id: uid('role'),
+            name: name.trim(),
+            description: description.trim() || 'Rôle personnalisé entreprise.',
+            modulePermissions: permissions,
+          });
+      },
+      modal !== 'new' && modal ? 'Rôle modifié.' : 'Rôle créé.',
+    );
+    setModal(null);
+    setName('');
+    setDescription('');
+  };
+  const remove = async (role: Role) => {
+    if (data.employees.some((employee) => employee.roleId === role.id || employee.role === role.name)) {
+      await alert({
+        title: 'Suppression impossible',
+        description: 'Ce rôle est utilisé par un ou plusieurs employés. Réaffectez-les avant de le supprimer.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+      return;
+    }
+    if (
+      !(await confirm({
+        title: 'Supprimer ce rôle ?',
+        description: `Le rôle « ${role.name} » sera supprimé.`,
+        confirmLabel: 'Supprimer',
+        tone: 'danger',
+      }))
+    )
+      return;
+    mutate((d) => {
+      d.roles = d.roles.filter((item) => item.id !== role.id);
+    }, 'Rôle supprimé.');
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <ActionButton primary testId="button-add-company-role" onClick={() => open()}>
+          Ajouter un rôle
+        </ActionButton>
+      </div>
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
+        {data.roles.map((r) => (
+          <section data-testid={`card-company-role-${r.id}`} key={r.id} className="card-surface rounded-2xl p-5">
+            <div className="flex items-start justify-between">
+              <span className="rounded-xl bg-[hsl(var(--primary)/.1)] p-3 text-[hsl(var(--primary))]">
+                <ShieldCheck size={18} />
+              </span>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  data-testid={`button-edit-company-role-${r.id}`}
+                  aria-label={`Modifier le rôle ${r.name}`}
+                  title="Modifier"
+                  onClick={() => open(r)}
+                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"
+                >
+                  <Settings size={13} />
+                  <span>Modifier</span>
+                </button>
+                <button
+                  data-testid={`button-delete-company-role-${r.id}`}
+                  aria-label={`Supprimer le rôle ${r.name}`}
+                  title="Supprimer"
+                  onClick={() => remove(r)}
+                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
+                >
+                  <Trash2 size={13} />
+                  <span>Supprimer</span>
+                </button>
+              </div>
+            </div>
+            <h2 className="mt-5 font-bold">{r.name}</h2>
+            <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{r.description}</p>
+            <div className="mt-5 flex flex-wrap gap-1.5">
+              {Object.keys(r.modulePermissions).map((m) => (
+                <span key={m} className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold">
+                  {modules.find((x) => x.id === m)?.name}
+                </span>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+      {modal && (
+        <Modal title={modal === 'new' ? 'Nouveau rôle' : 'Modifier le rôle'} onClose={() => setModal(null)}>
+          <Field label="Nom du rôle" value={name} onChange={setName} testId="input-role-name" />
+          <Field label="Description" value={description} onChange={setDescription} testId="input-role-description" />
+          <div className="mt-6 flex justify-end">
+            <ActionButton primary testId="button-save-role" onClick={save}>
+              {modal === 'new' ? 'Créer le rôle' : 'Enregistrer les modifications'}
+            </ActionButton>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function StocksPage({ data, mutate }: { data: StoreData; mutate: (fn: (d: StoreData) => void, msg?: string) => void }) {
+  const { alert, confirm } = useAppDialog();
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState<StoreData['products'][number] | 'new' | null>(null);
+  const [form, setForm] = useState({ name: '', sku: '', category: 'Divers', stock: 0, threshold: 0, price: 0 });
+  const products = data.products.filter((p) => `${p.name} ${p.sku}`.toLowerCase().includes(search.toLowerCase()));
+  const open = (product?: StoreData['products'][number]) => {
+    setModal(product ?? 'new');
+    setForm(
+      product
+        ? {
+            name: product.name,
+            sku: product.sku,
+            category: product.category,
+            stock: product.stock,
+            threshold: product.threshold,
+            price: product.price,
+          }
+        : { name: '', sku: '', category: 'Divers', stock: 0, threshold: 0, price: 0 },
+    );
+  };
+  const save = () => {
+    if (!form.name.trim() || !form.sku.trim()) return;
+    if (
+      data.products.some(
+        (product) =>
+          product.id !== (modal !== 'new' && modal ? modal.id : '') &&
+          product.sku.toLowerCase() === form.sku.trim().toLowerCase(),
+      )
+    ) {
+      void alert({
+        title: 'Référence déjà utilisée',
+        description: 'Cette référence existe déjà dans le catalogue.',
+        confirmLabel: 'Compris',
+      });
+      return;
+    }
+    mutate(
+      (d) => {
+        if (modal !== 'new' && modal) {
+          const target = d.products.find((product) => product.id === modal.id);
+          if (target) Object.assign(target, { ...form, name: form.name.trim(), sku: form.sku.trim() });
+        } else d.products.push({ id: uid('p'), ...form, name: form.name.trim(), sku: form.sku.trim() });
+      },
+      modal !== 'new' && modal ? 'Produit modifié.' : 'Produit ajouté au catalogue.',
+    );
+    setModal(null);
+  };
+  const remove = async (product: StoreData['products'][number]) => {
+    if (data.sales.some((sale) => sale.items.some((item) => item.productId === product.id))) {
+      await alert({
+        title: 'Suppression impossible',
+        description: 'Ce produit est référencé par une vente et ne peut pas être supprimé.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+      return;
+    }
+    if (
+      !(await confirm({
+        title: 'Supprimer ce produit ?',
+        description: `Le produit « ${product.name} » sera supprimé du catalogue.`,
+        confirmLabel: 'Supprimer',
+        tone: 'danger',
+      }))
+    )
+      return;
+    mutate((d) => {
+      d.products = d.products.filter((item) => item.id !== product.id);
+    }, 'Produit supprimé.');
+  };
+  return (
+    <div className="space-y-5">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
+        <Metric
+          label="Références actives"
+          value={String(data.products.length)}
+          detail="dans le catalogue entreprise"
+          icon={Package}
+          accent
+        />
+        <Metric
+          label="Unités en stock"
+          value={String(data.products.reduce((a, p) => a + p.stock, 0))}
+          detail="toutes localisations"
+          icon={Boxes}
+        />
+        <Metric
+          label="Alertes de seuil"
+          value={String(data.products.filter((p) => p.stock <= p.threshold).length)}
+          detail="à réapprovisionner"
+          icon={Bell}
+          warning
+        />
+      </div>
+      <section className="card-surface overflow-hidden rounded-2xl">
+        <div className="border-b p-5">
+          <Toolbar search={search} setSearch={setSearch}>
+            <ActionButton primary testId="button-add-product" onClick={() => open()}>
+              Ajouter un produit
+            </ActionButton>
+          </Toolbar>
+        </div>
+        <DataTable
+          headers={['Produit', 'SKU', 'Catégorie', 'Stock actuel', 'Seuil', 'Prix unitaire', 'État', 'Actions']}
+          rows={products.map((p) => [
+            <strong>{p.name}</strong>,
+            <span className="mono text-xs">{p.sku}</span>,
+            p.category,
+            <span className={p.stock <= p.threshold ? 'font-bold text-[hsl(var(--destructive))]' : 'font-bold'}>
+              {p.stock}
+            </span>,
+            p.threshold,
+            money(p.price),
+            p.stock <= p.threshold ? <StatusBadge status="SUSPENDU" /> : <StatusBadge status="ACTIF" />,
+            <div className="flex flex-wrap gap-1">
+              <button
+                aria-label={`Modifier ${p.name}`}
+                title="Modifier"
+                onClick={() => open(p)}
+                className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"
+              >
+                <Settings size={13} />
+                <span>Modifier</span>
+              </button>
+              <button
+                aria-label={`Supprimer ${p.name}`}
+                title="Supprimer"
+                onClick={() => remove(p)}
+                className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
+              >
+                <Trash2 size={13} />
+                <span>Supprimer</span>
+              </button>
+            </div>,
+          ])}
+        />
+      </section>
+      {modal && (
+        <Modal title={modal === 'new' ? 'Nouveau produit' : 'Modifier le produit'} onClose={() => setModal(null)}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Nom"
+              value={form.name}
+              onChange={(value) => setForm({ ...form, name: value })}
+              testId="input-product-name"
+            />
+            <Field
+              label="SKU"
+              value={form.sku}
+              onChange={(value) => setForm({ ...form, sku: value })}
+              testId="input-product-sku"
+            />
+            <Field
+              label="Catégorie"
+              value={form.category}
+              onChange={(value) => setForm({ ...form, category: value })}
+              testId="input-product-category"
+            />
+            <Field
+              label="Stock actuel"
+              type="number"
+              value={String(form.stock)}
+              onChange={(value) => setForm({ ...form, stock: Number(value) })}
+              testId="input-product-stock"
+            />
+            <Field
+              label="Seuil"
+              type="number"
+              value={String(form.threshold)}
+              onChange={(value) => setForm({ ...form, threshold: Number(value) })}
+              testId="input-product-threshold"
+            />
+            <Field
+              label="Prix unitaire"
+              type="number"
+              value={String(form.price)}
+              onChange={(value) => setForm({ ...form, price: Number(value) })}
+              testId="input-product-price"
+            />
+          </div>
+          <div className="mt-6 flex justify-end">
+            <ActionButton primary testId="button-save-product" onClick={save}>
+              {modal === 'new' ? 'Créer le produit' : 'Enregistrer les modifications'}
+            </ActionButton>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function FinancePage({
+  data,
+  companyId,
+}: {
+  data: StoreData;
+  companyId?: string;
+  mutate?: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  const accountingEntries = companyId
+    ? data.accountingEntries.filter((entry) => entry.companyId === companyId)
+    : data.accountingEntries;
+  return (
+    <div className="space-y-5">
+      <div className="mobile-stat-grid grid gap-4 md:grid-cols-2">
+        <Metric
+          label="Écritures comptables"
+           value={String(accountingEntries.length)}
+          detail="Journaux enregistrés"
+          icon={FileText}
+          accent
+        />
+        <Metric
+          label="Débit total"
+           value={shortMoney(accountingEntries.reduce((sum, entry) => sum + entry.debit, 0))}
+          suffix=" FCFA"
+          detail="Écritures comptables"
+          icon={TrendingUp}
+        />
+        <Metric label="Crédit total" value={shortMoney(accountingEntries.reduce((sum, entry) => sum + entry.credit, 0))} suffix=" FCFA" detail="Écritures comptables" icon={CircleDollarSign} />
+      </div>
+      <section className="card-surface overflow-hidden rounded-2xl">
+        <div className="border-b p-5">
+          <h2 className="font-bold">Journal comptable</h2>
+        </div>
+        <DataTable
+          headers={['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date', 'Statut']}
+           rows={accountingEntries.map((entry) => [
+            <strong key={entry.id}>{entry.reference}</strong>,
+            entry.journal,
+            entry.label,
+            money(entry.debit),
+            money(entry.credit),
+            entry.date,
+            <StatusBadge key={`${entry.id}-status`} status={entry.status} />,
+          ])}
+        />
+      </section>
+    </div>
+  );
+}
+function CommercePage({
+  data,
+  mutate,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+}) {
+  const { confirm } = useAppDialog();
+  const [modal, setModal] = useState<Sale | 'new' | null>(null);
+  const [client, setClient] = useState('');
+  const [amount, setAmount] = useState('');
+  const open = (sale?: Sale) => {
+    setModal(sale ?? 'new');
+    setClient(sale?.client ?? '');
+    setAmount(sale ? String(sale.amount) : '');
+  };
+  const validateSale = (sale: Sale) =>
+    mutate((d) => {
+      const s = d.sales.find((x) => x.id === sale.id);
+      if (!s || s.status === 'VALIDÉ') return;
+      s.status = 'VALIDÉ';
+      s.items.forEach((item) => {
+        const p = d.products.find((x) => x.id === item.productId);
+        if (p) {
+          p.stock -= item.quantity;
+          d.movements.unshift({
+            id: uid('m'),
+            product: p.name,
+            quantity: item.quantity,
+            type: 'SORTIE',
+            date: 'À l’instant',
+            user: 'Aminata Diop',
+            location: 'Boutique Dakar',
+          });
+        }
+      });
+      d.activities.unshift({
+        id: uid('a'),
+        user: 'Aminata Diop',
+        action: 'a validé une vente',
+        module: 'Commerce',
+        object: sale.reference,
+        date: 'À l’instant',
+        status: 'VALIDÉ',
+      });
+    }, 'Vente validée et stock mis à jour.');
+  const save = () => {
+    if (!client.trim() || !amount || Number(amount) < 0) return;
+    mutate(
+      (d) => {
+        if (modal !== 'new' && modal) {
+          const target = d.sales.find((sale) => sale.id === modal.id);
+          if (target) {
+            target.client = client.trim();
+            target.amount = Number(amount);
+          }
+        } else
+          d.sales.unshift({
+            id: uid('sale'),
+            reference: `VTE-${Date.now().toString().slice(-6)}`,
+            client: client.trim(),
+            amount: Number(amount),
+            status: 'BROUILLON',
+            date: 'À l’instant',
+            items: [],
+          });
+      },
+      modal !== 'new' && modal ? 'Vente modifiée.' : 'Vente enregistrée en brouillon.',
+    );
+    setModal(null);
+  };
+  const remove = async (sale: Sale) => {
+    if (
+      !(await confirm({
+        title: 'Supprimer ce brouillon ?',
+        description: `Le brouillon ${sale.reference} sera supprimé.`,
+        confirmLabel: 'Supprimer',
+        tone: 'danger',
+      }))
+    )
+      return;
+    mutate((d) => {
+      d.sales = d.sales.filter((item) => item.id !== sale.id);
+    }, 'Vente supprimée.');
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Metric
+          label="Chiffre d’affaires"
+          value={shortMoney(data.sales.filter((s) => s.status === 'VALIDÉ').reduce((a, s) => a + s.amount, 0))}
+          suffix=" FCFA"
+          detail="ventes validées ce mois"
+          icon={ShoppingCart}
+          accent
+        />
+        <Metric
+          label="Ventes du mois"
+          value={String(data.sales.length)}
+          detail="+8,4% vs. mois dernier"
+          icon={TrendingUp}
+        />
+        <Metric
+          label="Panier moyen"
+          value={shortMoney(data.sales.length ? data.sales.reduce((a, s) => a + s.amount, 0) / data.sales.length : 0)}
+          suffix=" FCFA"
+          detail="sur les ventes enregistrées"
+          icon={Store}
+        />
+      </div>
+      <section className="card-surface overflow-hidden rounded-2xl">
+        <div className="flex items-center justify-between border-b p-5">
+          <div>
+            <h2 className="font-bold">Ventes</h2>
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              Valider une vente met à jour le stock automatiquement.
+            </p>
+          </div>
+          <ActionButton primary testId="button-add-sale" onClick={() => open()}>
+            Nouvelle vente
+          </ActionButton>
+        </div>
+        <DataTable
+          headers={['Référence', 'Client', 'Montant', 'Date', 'Statut', 'Actions']}
+          rows={data.sales.map((s) => [
+            <strong>{s.reference}</strong>,
+            s.client,
+            money(s.amount),
+            s.date,
+            <StatusBadge status={s.status} />,
+            s.status === 'BROUILLON' ? (
+              <div className="flex flex-wrap gap-1">
+                <button
+                  data-testid={`button-edit-sale-${s.id}`}
+                  aria-label={`Modifier la vente ${s.reference}`}
+                  title="Modifier"
+                  onClick={() => open(s)}
+                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"
+                >
+                  <Settings size={13} />
+                  <span>Modifier</span>
+                </button>
+                <button
+                  data-testid={`button-delete-sale-${s.id}`}
+                  aria-label={`Supprimer la vente ${s.reference}`}
+                  title="Supprimer"
+                  onClick={() => remove(s)}
+                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
+                >
+                  <Trash2 size={13} />
+                  <span>Supprimer</span>
+                </button>
+                <button
+                  data-testid={`button-validate-sale-${s.id}`}
+                  onClick={() => validateSale(s)}
+                  className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))]"
+                >
+                  Valider
+                </button>
+              </div>
+            ) : (
+              <Check size={16} className="text-[hsl(var(--primary))]" />
+            ),
+          ])}
+        />
+      </section>
+      {modal && (
+        <Modal title={modal === 'new' ? 'Nouvelle vente' : 'Modifier la vente'} onClose={() => setModal(null)}>
+          <div className="space-y-4">
+            <Field
+              label="Client"
+              value={client}
+              onChange={setClient}
+              placeholder="Nom du client"
+              testId="input-sale-client"
+            />
+            <Field
+              label="Montant (FCFA)"
+              value={amount}
+              onChange={setAmount}
+              type="number"
+              testId="input-sale-amount"
+            />
+          </div>
+          <div className="mt-6 flex justify-end">
+            <ActionButton primary testId="button-save-sale" onClick={save}>
+              {modal === 'new' ? 'Enregistrer le brouillon' : 'Enregistrer les modifications'}
+            </ActionButton>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function RHPage({ data, companyId }: { data: StoreData; companyId: string }) {
+  const units = data.orgNodes.filter((node) => node.companyId === companyId);
+  const employees = data.employees.filter((employee) => employee.companyId === companyId);
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_.8fr]">
+      <section className="card-surface rounded-2xl p-6">
+        <h2 className="font-bold">Vue équipe</h2>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+          Répartition selon les unités réellement créées par l’entreprise.
+        </p>
+        <div className="mt-8 space-y-5">
+          {units.map((unit) => {
+            const count = employees.filter((employee) => employee.sectorId === unit.id).length;
+            const width = employees.length ? Math.max((count / employees.length) * 100, count ? 8 : 0) : 0;
+            return (
+              <div key={unit.id}>
+                <div className="mb-2 flex justify-between text-sm">
+                  <span className="font-bold">{unit.name}</span>
+                  <span className="mono text-xs text-[hsl(var(--muted-foreground))]">
+                    {count} personne{count > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-[hsl(var(--muted))]">
+                  <div className="h-full rounded-full bg-[hsl(var(--primary))]" style={{ width: `${width}%` }} />
+                </div>
+              </div>
+            );
+          })}
+          {units.length === 0 && (
+            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+              Aucune unité n’a encore été créée par l’entreprise.
+            </p>
+          )}
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <Users size={19} className="text-[hsl(var(--primary))]" />
+        <h2 className="mt-5 font-bold">Effectif total</h2>
+        <p className="mt-1 text-4xl font-bold">{employees.length}</p>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">collaborateurs enregistrés dans l’entreprise</p>
+        <div className="mt-6 border-t pt-5 text-xs leading-6 text-[hsl(var(--muted-foreground))]">
+          {employees.filter((employee) => employee.sectorId).length} employé(s) affecté(s) à une unité créée par
+          l’entreprise.
+        </div>
+      </section>
+    </div>
+  );
+}
+function PresencesPage({ data, companyId, visibleFeatureIds, preview = false }: { data: StoreData; companyId: string; visibleFeatureIds?: string[]; preview?: boolean }) {
+  const employees = data.employees.filter((employee) => employee.companyId === companyId);
+  return (
+    <PresenceModulePage
+      companyId={companyId}
+      employees={employees}
+      nodes={data.orgNodes.filter((node) => node.companyId === companyId)}
+      currentEmployee={null}
+      canView
+      canCreate={!preview}
+      canEdit={!preview}
+      canCorrect={!preview}
+      canValidate={!preview}
+      canManage={!preview}
+      canGenerateQr={false}
+      canExport
+      canDelete={!preview}
+      visibleFeatureIds={visibleFeatureIds}
+      preview={preview}
+    />
+  );
+}
+function ReportsPage({ data }: { data: StoreData }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <ReportCard
+        title="Synthèse hebdomadaire"
+        text="Ventes, encaissements, stocks et équipe sur les 7 derniers jours."
+        date="Semaine du 12 au 18 juin"
+      />
+      <ReportCard
+        title="État des stocks"
+        text={`${data.products.filter((p) => p.stock <= p.threshold).length} références demandent votre attention.`}
+        date="Actualisé aujourd’hui"
+      />
+      <ReportCard
+        title="Performance commerciale"
+        text="Une lecture des ventes validées et du panier moyen."
+        date="Mois de juin 2024"
+      />
+      <ReportCard
+        title="Rapport d’activité"
+        text="L’historique des actions importantes de l’espace entreprise."
+        date="Dernières 30 jours"
+      />
+    </div>
+  );
+}
+function ReportCard({ title, text, date }: { title: string; text: string; date: string }) {
+  return (
+    <section data-testid={`card-report-${title}`} className="card-surface rounded-2xl p-5">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+        <FileBarChart size={19} />
+      </span>
+      <h2 className="mt-5 font-bold">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{text}</p>
+      <div className="mt-5 flex items-center justify-between border-t pt-4">
+        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{date}</span>
+        <button
+          data-testid={`button-open-report-${title}`}
+          onClick={() => window.print()}
+          className="text-xs font-bold text-[hsl(var(--primary))]"
+        >
+          Consulter <ChevronRight className="inline" size={14} />
+        </button>
+      </div>
+    </section>
+  );
+}
+function Modal({
+  title,
+  onClose,
+  children,
+  className = '',
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm">
+      <div className={`modal-panel card-surface w-full max-w-4xl rounded-2xl p-6 fade-up ${className}`}>
+        <div className="modal-header mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold">{title}</h2>
+          <button
+            data-testid="button-close-modal"
+            onClick={onClose}
+            className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+function EmptyState({ title, text, action }: { title: string; text: string; action: () => void }) {
+  return (
+    <div className="card-surface flex flex-col items-center justify-center rounded-2xl px-6 py-20 text-center">
+      <span className="rounded-2xl bg-[hsl(var(--muted))] p-4 text-[hsl(var(--muted-foreground))]">
+        <FolderKanban size={24} />
+      </span>
+      <h2 className="mt-5 text-lg font-bold">{title}</h2>
+      <p className="mt-2 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">{text}</p>
+      <button
+        data-testid="button-empty-action"
+        onClick={action}
+        className="mt-6 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+      >
+        Revenir au cockpit
+      </button>
+    </div>
+  );
+}
+
+function InteractiveModulesPage({
+  data,
+  mutate,
+  notify,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  notify: (message: string) => void;
+}) {
+  const search = useSearch();
+  const [, setLocation] = useLocation();
+  const readSelectedModule = (value: string) => {
+    const requested = new URLSearchParams(value).get('module');
+    return requested && modules.some((module) => module.id === requested) ? (requested as ModuleId) : null;
+  };
+  const [selectedId, setSelectedId] = useState<ModuleId | null>(() => readSelectedModule(search));
+  const pendingSelection = useRef<ModuleId | null | undefined>(undefined);
+  const [editingModule, setEditingModule] = useState<(typeof modules)[number] | null>(null);
+  const [deletingModule, setDeletingModule] = useState<(typeof modules)[number] | null>(null);
+  const [moduleForm, setModuleForm] = useState({ name: '', description: '', features: '' });
+  const [editingPackId, setEditingPackId] = useState<string | null>(null);
+  const [packForm, setPackForm] = useState<ModulePackDraft>(() => emptyModulePackDraft());
+  const [packDialogOpen, setPackDialogOpen] = useState(false);
+  const [testPack, setTestPack] = useState<ModuleFeaturePack | null>(null);
+  const [testModule, setTestModule] = useState(false);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('Toutes');
+  const [statusFilter, setStatusFilter] = useState<'TOUTES' | 'ACTIFS' | 'INACTIFS'>('TOUTES');
+  const catalog = getCatalogSnapshot(data);
+  const moduleDefinitions = getConfiguredModules(catalog);
+  useEffect(() => {
+    const requested = readSelectedModule(search);
+    if (pendingSelection.current !== undefined) {
+      if (requested !== pendingSelection.current) return;
+      pendingSelection.current = undefined;
+    }
+    setSelectedId(requested);
+  }, [search]);
+  const selectModule = (moduleId: ModuleId | null, replace = false) => {
+    const url = new URL(window.location.href);
+    if (moduleId) {
+      url.searchParams.set('module', moduleId);
+    } else {
+      url.searchParams.delete('module');
+    }
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    const historyState = {
+      ...(window.history.state ?? {}),
+      maximus: true,
+      maximusIndex:
+        typeof window.history.state?.maximusIndex === 'number'
+          ? window.history.state.maximusIndex + (replace ? 0 : 1)
+          : replace
+            ? 0
+            : 1,
+    };
+    pendingSelection.current = moduleId;
+    setSelectedId(moduleId);
+    setLocation(nextUrl, { replace, state: historyState });
+  };
+  const statusOf = (moduleId: ModuleId): ModuleAvailability =>
+    catalog.removedModules.includes(moduleId)
+      ? 'INACTIF'
+      : (catalog.moduleStatuses[moduleId] ?? modules.find((module) => module.id === moduleId)?.status ?? 'INACTIF');
+  const selected = selectedId ? (moduleDefinitions.find((module) => module.id === selectedId) ?? null) : null;
+  const categories = ['Toutes', 'Commerce', 'Finance', 'Ressources humaines', 'Opérations'];
+  const categoryOf = (moduleId: ModuleId) => {
+    if (['commerce', 'ventes', 'achats', 'crm', 'fournisseurs', 'logistique'].includes(moduleId)) return 'Commerce';
+    if (['finance', 'comptabilite', 'rapports'].includes(moduleId)) return 'Finance';
+    if (['rh', 'presences', 'paie'].includes(moduleId)) return 'Ressources humaines';
+    return 'Opérations';
+  };
+  const visibleModules = moduleDefinitions.filter((module) => {
+    const matchesQuery = `${module.name} ${module.description} ${module.features.join(' ')}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase());
+    const matchesCategory = category === 'Toutes' || categoryOf(module.id) === category;
+    const isActive = statusOf(module.id) !== 'INACTIF';
+    const matchesStatus = statusFilter === 'TOUTES' || (statusFilter === 'ACTIFS' ? isActive : !isActive);
+    return matchesQuery && matchesCategory && matchesStatus;
+  });
+  const activeCount = moduleDefinitions.filter((module) => statusOf(module.id) !== 'INACTIF').length;
+  const betaCount = moduleDefinitions.filter((module) => statusOf(module.id) === 'BETA').length;
+
+  const openEdit = (module: (typeof modules)[number]) => {
+    setEditingModule(module);
+    setModuleForm({ name: module.name, description: module.description, features: module.features.join('\n') });
+    resetPackForm();
+  };
+
+  const saveModule = () => {
+    if (!editingModule || !moduleForm.name.trim() || !moduleForm.description.trim()) return;
+    const features = moduleForm.features
+      .split(/[\n,]/)
+      .map((feature) => feature.trim())
+      .filter(Boolean);
+    if (features.length === 0) return;
+    const moduleForPack = { ...editingModule, features };
+    const nextPack = packForm.name.trim()
+      ? buildModulePack(moduleForPack, packForm, uid(`pack-${editingModule.id}`))
+      : null;
+    if (packForm.name.trim() && (!packForm.description.trim() || !nextPack)) return;
+    mutate(
+      (draft) => {
+        updateCatalogDraft(draft, (catalogDraft) => {
+          const currentOverride = catalogDraft.moduleOverrides[editingModule.id] ?? {};
+          const nextOverride = {
+            ...currentOverride,
+            name: moduleForm.name.trim(),
+            description: moduleForm.description.trim(),
+            features,
+          };
+          if (nextPack) {
+            const currentPacks =
+              currentOverride.featurePacks ??
+              modules.find((module) => module.id === editingModule.id)?.featurePacks ??
+              [];
+            nextOverride.featurePacks = [...currentPacks, nextPack];
+          }
+          catalogDraft.moduleOverrides = { ...catalogDraft.moduleOverrides, [editingModule.id]: nextOverride };
+        });
+      },
+      packForm.name.trim()
+        ? `${moduleForm.name.trim()} et son pack métier ont été enregistrés.`
+        : `${moduleForm.name.trim()} a été modifié.`,
+    );
+    setEditingModule(null);
+    resetPackForm();
+  };
+
+  const removeModule = (module: (typeof modules)[number]) => {
+    mutate((draft) => {
+      updateCatalogDraft(draft, (catalogDraft) => {
+        catalogDraft.moduleStatuses = { ...catalogDraft.moduleStatuses, [module.id]: 'INACTIF' };
+        catalogDraft.removedModules = [...new Set([...catalogDraft.removedModules, module.id])];
+        catalogDraft.sectorPresets = catalogDraft.sectorPresets.map((preset) => ({
+          ...preset,
+          moduleIds: preset.moduleIds.filter((id) => id !== module.id),
+          modulePackIds: Object.fromEntries(
+            Object.entries(preset.modulePackIds ?? {}).filter(([moduleId]) => moduleId !== module.id),
+          ),
+          moduleFeatures: Object.fromEntries(
+            Object.entries(preset.moduleFeatures ?? {}).filter(([moduleId]) => moduleId !== module.id),
+          ),
+        }));
+      });
+    }, `${module.name} sera retiré à la prochaine publication.`);
+    if (selectedId === module.id) selectModule(null, true);
+    setDeletingModule(null);
+  };
+
+  const toggleModule = (moduleId: ModuleId) => {
+    const module = moduleDefinitions.find((item) => item.id === moduleId);
+    if (!module) return;
+    const isActive = statusOf(moduleId) !== 'INACTIF';
+    mutate(
+      (draft) => {
+        updateCatalogDraft(draft, (catalogDraft) => {
+          catalogDraft.moduleStatuses = {
+            ...catalogDraft.moduleStatuses,
+            [moduleId]: isActive ? 'INACTIF' : 'ACTIF',
+          };
+        });
+      },
+      isActive ? `${module.name} sera désactivé à la prochaine publication.` : `${module.name} sera activé à la prochaine publication.`,
+    );
+  };
+
+  const resetPackForm = () => {
+    setEditingPackId(null);
+    setPackForm(emptyModulePackDraft());
+  };
+
+  const openPackEdit = (pack: ModuleFeaturePack) => {
+    setEditingPackId(pack.id);
+    const featurePermissions = defaultFeaturePermissions(pack.featureIds, pack.featurePermissions);
+    setPackForm({
+      name: pack.name,
+      description: pack.description ?? '',
+      featureIds: [...pack.featureIds],
+      featurePermissions,
+    });
+    setPackDialogOpen(true);
+  };
+
+  const openPackCreate = () => {
+    resetPackForm();
+    setPackDialogOpen(true);
+  };
+
+  const closePackDialog = () => {
+    setPackDialogOpen(false);
+    resetPackForm();
+  };
+
+  const setPackFeaturePermission = (featureId: string, level: string) => {
+    setPackForm((current) => updatePackPermission(current, featureId, level));
+  };
+
+  const savePack = () => {
+    if (!selected || !packForm.name.trim() || !packForm.description.trim() || packForm.featureIds.length === 0) return;
+    const nextPack = buildModulePack(selected, packForm, editingPackId ?? uid(`pack-${selected.id}`));
+    if (!nextPack) return;
+    mutate(
+      (draft) => {
+        updateCatalogDraft(draft, (catalogDraft) => {
+          const current =
+            catalogDraft.moduleOverrides[selected.id]?.featurePacks ??
+            modules.find((module) => module.id === selected.id)?.featurePacks ??
+            [];
+          catalogDraft.moduleOverrides = {
+            ...catalogDraft.moduleOverrides,
+            [selected.id]: {
+              ...(catalogDraft.moduleOverrides[selected.id] ?? {}),
+              featurePacks: editingPackId
+                ? current.map((pack) => (pack.id === editingPackId ? nextPack : pack))
+                : [...current, nextPack],
+            },
+          };
+        });
+      },
+      editingPackId ? 'Pack métier mis à jour.' : 'Pack métier créé.',
+    );
+    resetPackForm();
+    setPackDialogOpen(false);
+  };
+
+  const deletePack = (packId: string) => {
+    if (!selected) return;
+    const referencedBySector = catalog.sectorPresets.some((preset) =>
+      (preset.modulePackIds?.[selected.id] ?? []).includes(packId),
+    );
+    const referencedByUnit = data.orgNodes.some((node) =>
+      (node.modulePackIds?.[selected.id] ?? []).includes(packId),
+    );
+    if (referencedBySector || referencedByUnit) {
+      notify('Ce pack est utilisé par un secteur ou une unité. Modifiez d’abord ces configurations avant de le retirer.');
+      return;
+    }
+    mutate((draft) => {
+      updateCatalogDraft(draft, (catalogDraft) => {
+        const current =
+          catalogDraft.moduleOverrides[selected.id]?.featurePacks ??
+          modules.find((module) => module.id === selected.id)?.featurePacks ??
+          [];
+        catalogDraft.moduleOverrides = {
+          ...catalogDraft.moduleOverrides,
+          [selected.id]: {
+            ...(catalogDraft.moduleOverrides[selected.id] ?? {}),
+            featurePacks: current.filter((pack) => pack.id !== packId),
+          },
+        };
+      });
+    }, 'Pack métier retiré du brouillon.');
+    if (editingPackId === packId) resetPackForm();
+  };
+
+  if (selected && (testPack || testModule)) {
+    return (
+      <ModulePackTestWorkbench
+        module={selected}
+        pack={testPack ?? undefined}
+        data={data}
+        mutate={mutate}
+        onBack={() => {
+          setTestPack(null);
+          setTestModule(false);
+        }}
+      />
+    );
+  }
+
+  if (selected) {
+    const status = statusOf(selected.id);
+    const isActive = status !== 'INACTIF';
+    return (
+      <div className="space-y-5">
+        <CatalogWorkflowBar data={data} mutate={mutate} />
+        <button
+          data-testid="button-back-modules"
+          onClick={() => selectModule(null, true)}
+          className="text-xs font-bold text-[hsl(var(--primary))]"
+        >
+          ← Retour au catalogue
+        </button>
+        <div className="grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
+          <section className="card-surface rounded-2xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              {(() => {
+                const ModuleIcon = moduleIconById[selected.id] ?? LayoutGrid;
+                return (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+                    <ModuleIcon size={21} />
+                  </span>
+                );
+              })()}
+              <StatusBadge status={status} />
+            </div>
+            <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
+              <h2 className="text-2xl font-bold">{selected.name}</h2>
+              <div className="flex gap-1">
+                <button
+                  data-testid={`button-edit-module-${selected.id}`}
+                  title="Modifier le module"
+                  onClick={() => openEdit(selected)}
+                  className="rounded-lg border p-2 hover:bg-[hsl(var(--muted))]"
+                >
+                  <Edit3 size={15} />
+                </button>
+                <button
+                  data-testid={`button-delete-module-${selected.id}`}
+                  title="Supprimer le module"
+                  onClick={() => setDeletingModule(selected)}
+                  className="rounded-lg border p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selected.description}</p>
+            <div className="mt-6 space-y-3 border-t pt-5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[hsl(var(--muted-foreground))]">Fonctionnalités</span>
+                <strong>{selected.features.length}</strong>
+              </div>
+            </div>
+            <div className="mt-7 flex flex-wrap gap-2">
+              <button
+                data-testid={`button-test-module-${selected.id}`}
+                onClick={() => {
+                  setTestPack(null);
+                  setTestModule(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+              >
+                Tester le module complet <ChevronRight size={14} />
+              </button>
+              <button
+                data-testid={`button-detail-toggle-module-${selected.id}`}
+                onClick={() => toggleModule(selected.id)}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${isActive ? 'border border-[hsl(var(--destructive)/.35)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'}`}
+              >
+                {isActive ? 'Désactiver le module' : 'Activer le module'} <ChevronRight size={14} />
+              </button>
+            </div>
+          </section>
+          <section className="card-surface rounded-2xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
+                  Configuration métier
+                </p>
+                <h2 className="mt-2 text-xl font-bold">Packs métiers du module</h2>
+                <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+                  Des packs Employé et Manager sont préconfigurés avec les fonctionnalités utiles de ce module.
+                  Vous pouvez aussi créer, modifier ou supprimer vos propres packs selon votre organisation. Les
+                  secteurs pourront ensuite les sélectionner.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Package size={19} className="text-[hsl(var(--primary))]" />
+                <button
+                  type="button"
+                  data-testid={`button-add-role-pack-${selected.id}`}
+                  onClick={openPackCreate}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition hover:opacity-90"
+                >
+                  <Plus size={14} />
+                  Ajouter un pack de rôle
+                </button>
+              </div>
+            </div>
+            <div className="mt-6 space-y-3">
+              {(selected.featurePacks ?? []).map((pack) => (
+                <div
+                  data-testid={`row-module-pack-${selected.id}-${pack.id}`}
+                  key={pack.id}
+                  className="rounded-xl border p-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <strong className="text-sm">{pack.name}</strong>
+                      <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                        {pack.description || 'Aucune description.'}
+                      </p>
+                      <p className="mt-2 text-[10px] font-semibold text-[hsl(var(--primary))]">
+                        {pack.featureIds.length} fonctionnalité(s) avec droits configurés
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        data-testid={`button-test-module-pack-${pack.id}`}
+                        onClick={() => setTestPack(pack)}
+                        className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--primary-foreground))]"
+                      >
+                        Tester le pack
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`button-edit-module-pack-${pack.id}`}
+                        onClick={() => openPackEdit(pack)}
+                        className="rounded-lg p-2 text-xs font-bold hover:bg-[hsl(var(--muted))]"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`button-delete-module-pack-${pack.id}`}
+                        onClick={() => deletePack(pack.id)}
+                        className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(selected.featurePacks ?? []).length === 0 && (
+                <p className="rounded-xl border border-dashed p-5 text-xs text-[hsl(var(--muted-foreground))]">
+                  Aucun pack métier n’est encore configuré pour ce module.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+        {packDialogOpen && (
+          <Modal
+            title={`${editingPackId ? 'Modifier' : 'Ajouter'} un pack de rôle`}
+            onClose={closePackDialog}
+            className="max-h-[86vh] w-[min(94vw,1120px)] max-w-[1120px] overflow-y-auto sm:p-8"
+          >
+            <div className="space-y-5">
+              <div className="rounded-xl bg-[hsl(var(--muted)/.45)] p-4">
+                <p className="text-xs font-bold text-[hsl(var(--primary))]">{selected.name}</p>
+                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Définissez un modèle de rôle réutilisable et choisissez les droits accordés à chaque fonctionnalité.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Nom du pack"
+                  value={packForm.name}
+                  onChange={(value) => setPackForm((current) => ({ ...current, name: value }))}
+                  placeholder="Ex. Gestionnaire de stock"
+                  testId="input-module-pack-name"
+                />
+                <Field
+                  label="Description"
+                  value={packForm.description}
+                  onChange={(value) => setPackForm((current) => ({ ...current, description: value }))}
+                  placeholder="À quoi sert ce pack ?"
+                  testId="input-module-pack-description"
+                />
+              </div>
+              <div className="overflow-hidden rounded-xl border">
+                <div className="border-b bg-[hsl(var(--muted)/.45)] px-4 py-3">
+                  <p className="text-xs font-bold">Droits par fonctionnalité</p>
+                  <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                    Une fonctionnalité non incluse ne sera pas transmise au rôle.
+                  </p>
+                </div>
+                <div className="max-h-[44vh] overflow-y-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-[hsl(var(--card))] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                      <tr>
+                        <th className="px-4 py-3 font-bold">Fonctionnalité</th>
+                        <th className="px-4 py-3 text-right font-bold">Niveau d’accès</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {getModuleFeatureOptions(selected).map((feature) => (
+                        <tr key={feature.id} className="transition hover:bg-[hsl(var(--muted)/.3)]">
+                          <td className="px-4 py-3">
+                            <span className="font-semibold">{feature.label}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <select
+                              data-testid={`select-pack-permission-${selected.id}-${feature.id}`}
+                              value={permissionLevelFor(packForm.featurePermissions[feature.id])}
+                              onChange={(event) => setPackFeaturePermission(feature.id, event.target.value)}
+                              className="rounded-md border bg-[hsl(var(--card))] px-2 py-2 text-[10px] font-semibold"
+                            >
+                              <option value="none">Non incluse</option>
+                              <option value="view">Voir seulement</option>
+                              <option value="create">Voir et créer</option>
+                              <option value="edit">Voir, créer et modifier</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <button
+                  type="button"
+                  onClick={closePackDialog}
+                  className="rounded-lg border px-4 py-2.5 text-xs font-bold hover:bg-[hsl(var(--muted))]"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  data-testid="button-save-module-pack"
+                   disabled={!packForm.name.trim() || !packForm.description.trim() || packForm.featureIds.length === 0}
+                  onClick={savePack}
+                  className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {editingPackId ? 'Mettre à jour' : 'Créer le pack'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+        {editingModule && (
+          <Modal
+            title="Modifier le module"
+            onClose={() => {
+              setEditingModule(null);
+              resetPackForm();
+            }}
+          >
+            <div className="space-y-4">
+              <Field
+                label="Nom du module"
+                value={moduleForm.name}
+                onChange={(value) => setModuleForm((current) => ({ ...current, name: value }))}
+                testId="input-module-name"
+              />
+              <Field
+                label="Description"
+                value={moduleForm.description}
+                onChange={(value) => setModuleForm((current) => ({ ...current, description: value }))}
+                testId="input-module-description"
+              />
+              <label className="block text-sm font-semibold">
+                Fonctionnalités
+                <textarea
+                  data-testid="input-module-features"
+                  value={moduleForm.features}
+                  onChange={(event) => setModuleForm((current) => ({ ...current, features: event.target.value }))}
+                  placeholder="Une fonctionnalité par ligne"
+                  rows={5}
+                  className="mt-2 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3.5 py-3 text-sm font-normal focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]"
+                />
+              </label>
+              <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">
+                Les fonctionnalités peuvent être séparées par des lignes ou des virgules.
+              </p>
+              <ModulePackDraftForm
+                module={{
+                  ...editingModule,
+                  features: moduleForm.features
+                    .split(/[\n,]/)
+                    .map((feature) => feature.trim())
+                    .filter(Boolean),
+                }}
+                packForm={packForm}
+                onChange={setPackForm}
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingModule(null);
+                    resetPackForm();
+                  }}
+                  className="rounded-lg border px-4 py-2.5 text-xs font-bold"
+                >
+                  Annuler
+                </button>
+                <ActionButton primary testId="button-save-module" onClick={saveModule}>
+                  Enregistrer les modifications
+                </ActionButton>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <CatalogWorkflowBar data={data} mutate={mutate} />
+      <section className="card-surface rounded-2xl p-5 sm:p-6">
+        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">
+              Catalogue des modules
+            </p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[-.03em]">Vos modules métier</h2>
+            <p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Chaque module est une capacité métier partagée. Activez uniquement celles dont vos entreprises ont besoin.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <div className="rounded-xl bg-[hsl(var(--muted)/.65)] px-4 py-3">
+              <p className="mono text-[10px] uppercase text-[hsl(var(--muted-foreground))]">Actives</p>
+              <p className="mt-1 text-xl font-bold">
+                {activeCount}
+                <span className="ml-1 text-xs font-normal text-[hsl(var(--muted-foreground))]">/ {modules.length}</span>
+              </p>
+            </div>
+            <div className="rounded-xl bg-[hsl(var(--muted)/.65)] px-4 py-3">
+              <p className="mono text-[10px] uppercase text-[hsl(var(--muted-foreground))]">Bêta</p>
+              <p className="mt-1 text-xl font-bold">{betaCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 flex flex-col gap-3 border-t pt-5 xl:flex-row xl:items-center">
+          <label className="relative block flex-1">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]"
+              size={16}
+            />
+            <input
+              data-testid="input-search-modules"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher une application..."
+              className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]"
+            />
+          </label>
+          <div className="flex shrink-0 rounded-xl bg-[hsl(var(--muted)/.65)] p-1">
+            {(['TOUTES', 'ACTIFS', 'INACTIFS'] as const).map((filter) => (
+              <button
+                type="button"
+                data-testid={`button-filter-modules-${filter.toLowerCase()}`}
+                key={filter}
+                onClick={() => setStatusFilter(filter)}
+                className={`rounded-lg px-3 py-2 text-xs font-bold transition ${statusFilter === filter ? 'bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm' : 'text-[hsl(var(--muted-foreground))]'}`}
+              >
+                {filter === 'TOUTES' ? 'Toutes' : filter === 'ACTIFS' ? 'Actives' : 'Inactives'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {categories.map((item) => (
+            <button
+              type="button"
+              data-testid={`button-category-modules-${item.toLowerCase().replace(/\s+/g, '-')}`}
+              key={item}
+              onClick={() => setCategory(item)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${category === item ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]' : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/.5)]'}`}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </section>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <p className="text-sm font-semibold">
+          {visibleModules.length} application{visibleModules.length > 1 ? 's' : ''} affichée
+          {visibleModules.length > 1 ? 's' : ''}
+        </p>
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+          Cliquez sur une application pour voir ses détails et la tester.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {visibleModules.map((module, index) => {
+          const status = statusOf(module.id);
+          const isActive = status !== 'INACTIF';
+          const ModuleIcon = moduleIconById[module.id] ?? LayoutGrid;
+          return (
+            <article
+              data-testid={`card-module-${module.id}`}
+              key={module.id}
+              className={`card-surface group relative flex min-h-[180px] flex-col rounded-2xl p-4 text-center transition hover:-translate-y-1 hover:border-[hsl(var(--primary)/.45)] hover:shadow-lg fade-up fade-up-delay-${Math.min(index + 1, 3)} ${isActive ? '' : 'opacity-65'}`}
+            >
+              <button
+                type="button"
+                data-testid={`button-open-module-${module.id}`}
+                onClick={() => selectModule(module.id)}
+                aria-label={`Ouvrir l’application ${module.name}`}
+                className="flex flex-1 flex-col items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))]"
+              >
+                <span
+                  className={`absolute right-3 top-3 h-2 w-2 rounded-full ${isActive ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted-foreground)/.45)]'}`}
+                  title={isActive ? 'Application active' : 'Application inactive'}
+                />
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))] transition group-hover:scale-105">
+                  <ModuleIcon size={25} />
+                </span>
+                <span className="mt-4 line-clamp-2 text-sm font-bold leading-5">{module.name}</span>
+                <span className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{categoryOf(module.id)}</span>
+                <span className="mt-2 line-clamp-3 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">{module.description}</span>
+              </button>
+              <div className="mt-3 flex justify-center gap-1 border-t pt-3">
+                <button
+                  type="button"
+                  data-testid={`button-edit-module-${module.id}`}
+                  title="Modifier le module"
+                  onClick={() => openEdit(module)}
+                  className="rounded-lg p-2 text-xs hover:bg-[hsl(var(--muted))]"
+                >
+                  <Edit3 size={14} />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`button-delete-module-${module.id}`}
+                  title="Supprimer le module"
+                  onClick={() => setDeletingModule(module)}
+                  className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+        {visibleModules.length === 0 && (
+          <div className="card-surface col-span-full rounded-2xl p-10 text-center">
+            <Package className="mx-auto text-[hsl(var(--muted-foreground))]" size={28} />
+            <h2 className="mt-4 font-bold">Aucune application trouvée</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Modifiez votre recherche ou réinitialisez les filtres.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('');
+                setCategory('Toutes');
+                setStatusFilter('TOUTES');
+              }}
+              className="mt-4 text-xs font-bold text-[hsl(var(--primary))]"
+            >
+              Réinitialiser les filtres
+            </button>
+          </div>
+        )}
+      </div>
+      {deletingModule && (
+        <Modal title="Confirmer la suppression" onClose={() => setDeletingModule(null)}>
+          <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+            Voulez-vous vraiment supprimer le module{' '}
+            <strong className="text-[hsl(var(--foreground))]">{deletingModule.name}</strong> ? Il sera retiré du
+            catalogue et désactivé pour tous les espaces.
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              data-testid="button-cancel-delete-module"
+              onClick={() => setDeletingModule(null)}
+              className="rounded-lg border px-4 py-2.5 text-xs font-bold"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              data-testid="button-confirm-delete-module"
+              onClick={() => removeModule(deletingModule)}
+              className="rounded-lg bg-[hsl(var(--destructive))] px-4 py-2.5 text-xs font-bold text-white"
+            >
+              Supprimer le module
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function ModulePackTestWorkbench({
+  module,
+  pack,
+  data,
+  mutate,
+  onBack,
+}: {
+  module: (typeof modules)[number];
+  pack?: ModuleFeaturePack;
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onBack: () => void;
+}) {
+  const operationalModules: ModuleId[] = [
+    'achats',
+    'comptabilite',
+    'paie',
+    'crm',
+    'fournisseurs',
+    'logistique',
+    'documents',
+  ];
+  const previewCompany = data.companies[0];
+  const previewCompanyId = previewCompany?.id ?? '';
+  const featureOptions = getModuleFeatureOptions(module);
+  const fullFeatureIds = featureOptions.map((feature) => feature.id);
+  const testFeatureIds = pack
+    ? fullFeatureIds.filter((featureId) => pack.featureIds.includes(featureId))
+    : fullFeatureIds;
+  const configuredPermissions = pack
+    ? defaultFeaturePermissions(testFeatureIds, pack.featurePermissions)
+    : defaultFeaturePermissions(
+        fullFeatureIds,
+        Object.fromEntries(fullFeatureIds.map((featureId) => [featureId, ['voir', 'créer', 'modifier']])),
+      );
+  const authorizedFeatures = testFeatureIds.filter((featureId) => configuredPermissions[featureId]?.length);
+  const featureLabelById = new Map(featureOptions.map((feature) => [feature.id, feature.label]));
+  const canCreate = authorizedFeatures.some((featureId) => configuredPermissions[featureId]?.includes('créer'));
+  const canModify = authorizedFeatures.some((featureId) => configuredPermissions[featureId]?.includes('modifier'));
+  const stockPermissions = Object.fromEntries(
+    authorizedFeatures.map((featureId) => [featureId, configuredPermissions[featureId] ?? ['voir']]),
+  );
+  const commerceFeatureToTab: Record<string, CommerceTabId> = {
+    clients: 'clients',
+    sales: 'sales',
+    products: 'products',
+    suppliers: 'suppliers',
+    purchases: 'purchases',
+    expenses: 'expenses',
+    cash: 'cash',
+    credit: 'credit',
+    invoices: 'invoices',
+    returns: 'returns',
+    reports: 'reports',
+    activity: 'activity',
+    team: 'team',
+    settings: 'settings',
+    devis: 'sales',
+    commandes: 'sales',
+    facturation: 'invoices',
+  };
+  const allowedCommerceTabs = authorizedFeatures
+    .map((featureId) => commerceFeatureToTab[featureId])
+    .filter((tab): tab is CommerceTabId => Boolean(tab));
+  const commerceTabPermissions = allowedCommerceTabs.reduce<Partial<Record<CommerceTabId, string[]>>>((all, tab) => {
+    const permissions = authorizedFeatures
+      .filter((featureId) => commerceFeatureToTab[featureId] === tab)
+      .flatMap((featureId) => configuredPermissions[featureId] ?? []);
+    all[tab] = [...new Set(permissions)];
+    return all;
+  }, {});
+  return (
+    <div data-testid="module-pack-workbench" className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          data-testid="button-back-pack-test"
+          onClick={onBack}
+          className="text-xs font-bold text-[hsl(var(--primary))]"
+        >
+          ← Retour au module
+        </button>
+        <span className="rounded-full bg-[hsl(var(--accent)/.2)] px-3 py-1.5 text-[10px] font-bold">
+          {pack ? 'TEST DU PACK MÉTIER' : 'TEST DU MODULE COMPLET'}
+        </span>
+      </div>
+      <section className="card-surface rounded-2xl p-5">
+        <div className="border-b pb-4">
+          <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Aperçu fonctionnel</p>
+          <h2 className="mt-2 text-xl font-bold">
+            {module.name}
+            {pack ? ` avec le pack « ${pack.name} »` : ''}
+          </h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+            {pack
+              ? 'Les mêmes écrans que ceux utilisés par une entreprise sont ouverts avec le périmètre et les droits de ce pack.'
+              : 'Le parcours complet du module est ouvert avec toutes ses fonctionnalités.'}
+          </p>
+        </div>
+        <div className="mt-4 rounded-xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] px-4 py-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          Aperçu administratif isolé : les données de production ne sont pas sollicitées et les actions d’écriture sont désactivées.
+        </div>
+        <div className="mt-4 rounded-xl border bg-[hsl(var(--muted)/.18)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold">Périmètre testé</p>
+              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
+                Seules les fonctionnalités autorisées par ce pack sont affichées ci-dessous.
+              </p>
+            </div>
+            <span className="rounded-full border px-2.5 py-1 text-[10px] font-bold">
+              {authorizedFeatures.length} fonctionnalité{authorizedFeatures.length > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {authorizedFeatures.map((featureId) => (
+              <span key={featureId} className="rounded-lg border bg-[hsl(var(--card))] px-2.5 py-1.5 text-[10px] font-semibold">
+                {featureLabelById.get(featureId) ?? featureId}
+                <span className="ml-1.5 text-[hsl(var(--muted-foreground))]">
+                  · {(configuredPermissions[featureId] ?? []).join(' · ')}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5">
+          {module.id === 'stocks' && (
+            <StockModulePage
+              companyId={previewCompanyId || 'module-preview'}
+              stockPermissions={stockPermissions}
+              canCreate={false}
+              canModify={false}
+              preview
+            />
+          )}
+          {(module.id === 'commerce' || module.id === 'ventes') && (
+            <CommerceModulePage
+              companyId={previewCompanyId}
+              data={data}
+              mutate={mutate}
+              tabPermissions={commerceTabPermissions}
+              allowedTabs={allowedCommerceTabs}
+              initialTab={allowedCommerceTabs[0] ?? (module.id === 'ventes' ? 'sales' : 'dashboard')}
+            />
+          )}
+           {module.id === 'finance' && <FinancePage data={data} />}
+          {module.id === 'rh' && previewCompany && (
+            <CompanyOrganizationAdmin company={previewCompany} data={data} mutate={mutate} />
+          )}
+            {module.id === 'presences' && <PresencesPage data={data} companyId={previewCompanyId} visibleFeatureIds={authorizedFeatures} preview />}
+            {module.id === 'paie' && <PayrollModulePage companyId={previewCompanyId || 'module-preview'} employees={[]} canCreate={false} canModify={false} visibleFeatureIds={authorizedFeatures} preview />}
+           {module.id === 'ecommerce' && (
+             <EcommerceModulePage
+               companyId={previewCompanyId || 'module-preview'}
+               canCreate={false}
+               canModify={false}
+                allowedFeatureIds={authorizedFeatures}
+               preview
+             />
+           )}
+          {module.id === 'transport' && (
+            <TransportModulePage
+              companyId={previewCompanyId || 'module-preview'}
+              canCreate={false}
+              canModify={false}
+              preview
+            />
+          )}
+          {operationalModules.includes(module.id) && module.id !== 'paie' && (
+            <OperationalModulePage
+              moduleId={module.id}
+              data={data}
+              mutate={mutate}
+              featurePermissions={configuredPermissions}
+            />
+          )}
+          {module.id === 'rapports' && <OperationalReportsPage data={data} />}
+          {!['stocks', 'commerce', 'ventes', 'ecommerce', 'transport', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
+            module.id,
+          ) && (
+            <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+              L’aperçu de ce module sera disponible quand son écran métier sera connecté.
+            </p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OperationalReportsPage({
+  data,
+  companyId,
+  reportPermissions,
+  canExport,
+}: {
+  data: StoreData;
+  companyId?: string;
+  reportPermissions?: Partial<Record<'sales' | 'stock' | 'finance' | 'activity', boolean>>;
+  canExport?: boolean;
+}) {
+  type ReportId = 'sales' | 'stock' | 'finance' | 'activity';
+  const [report, setReport] = useState<ReportId>('sales');
+  const [query, setQuery] = useState('');
+  const scoped = <T extends { companyId?: string }>(items: T[]) =>
+    companyId ? items.filter((item) => item.companyId === companyId) : items;
+  const definitions: Record<ReportId, { label: string; description: string; headers: string[]; rows: string[][] }> = {
+    sales: {
+      label: 'Ventes',
+      description: 'Chiffre d’affaires et commandes clients.',
+      headers: ['Référence', 'Client', 'Montant', 'Statut', 'Date'],
+       rows: scoped(data.sales).map((item) => [item.reference, item.client, money(item.amount), item.status, item.date]),
+    },
+    stock: {
+      label: 'Gestion de stock',
+      description: 'Valorisation et niveaux des produits.',
+      headers: ['Produit', 'SKU', 'Catégorie', 'Stock', 'Valeur'],
+       rows: scoped(data.products).map((item) => [
+        item.name,
+        item.sku,
+        item.category,
+        String(item.stock),
+        money(item.stock * item.price),
+      ]),
+    },
+    finance: {
+      label: 'Finance',
+      description: 'Écritures comptables enregistrées.',
+      headers: ['Référence', 'Journal', 'Libellé', 'Débit', 'Crédit', 'Date'],
+       rows: scoped(data.accountingEntries).map((item) => [item.reference, item.journal, item.label, money(item.debit), money(item.credit), item.date]),
+    },
+    activity: {
+      label: 'Activité',
+      description: 'Traçabilité des actions réalisées.',
+      headers: ['Utilisateur', 'Action', 'Module', 'Objet', 'Date'],
+       rows: scoped(data.activities).map((item) => [item.user, item.action, item.module, item.object, item.date]),
+    },
+  };
+  const visibleDefinitions = (Object.entries(definitions) as [ReportId, typeof definitions[ReportId]][])
+    .filter(([id]) => reportPermissions?.[id] !== false);
+  const activeReport = visibleDefinitions.some(([id]) => id === report) ? report : visibleDefinitions[0]?.[0];
+  if (!activeReport) {
+    return (
+      <section className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+        Aucun rapport n’est autorisé pour votre rôle.
+      </section>
+    );
+  }
+  const active = definitions[activeReport];
+  const rows = active.rows.filter((row) => row.join(' ').toLowerCase().includes(query.toLowerCase()));
+  const exportCsv = () => {
+    if (!canExport) return;
+    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const csv = [active.headers, ...rows].map((row) => row.map(escape).join(';')).join('\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+     link.download = `rapport-${activeReport}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {visibleDefinitions.map(([id, item]) => (
+          <button
+            key={id}
+            onClick={() => setReport(id)}
+            className={`card-surface rounded-2xl p-5 text-left transition ${report === id ? 'ring-2 ring-[hsl(var(--primary))]' : 'hover:-translate-y-0.5'}`}
+          >
+            <FileBarChart size={18} className="text-[hsl(var(--primary))]" />
+            <p className="mt-4 font-bold">{item.label}</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{item.description}</p>
+          </button>
+        ))}
+      </div>
+      <section className="card-surface overflow-hidden rounded-2xl">
+        <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="font-bold">Rapport {active.label}</h2>
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              {rows.length} lignes calculées depuis les données de l’entreprise.
+            </p>
+          </div>
+          <div className="flex gap-2">
+             {canExport && (
+               <>
+                 <button onClick={() => window.print()} className="rounded-lg border px-4 py-2.5 text-xs font-bold">
+                   Imprimer
+                 </button>
+                 <button
+                   onClick={exportCsv}
+                   className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"
+                 >
+                   Exporter CSV
+                 </button>
+               </>
+             )}
+          </div>
+        </div>
+        <div className="p-5">
+          <label className="relative block max-w-md">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]"
+              size={15}
+            />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filtrer le rapport..."
+              className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm"
+            />
+          </label>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="bg-[hsl(var(--muted)/.55)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+              <tr>
+                {active.headers.map((header) => (
+                  <th key={header} className="px-4 py-3">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((row, index) => (
+                <tr key={`${report}-${index}`} className="hover:bg-[hsl(var(--muted)/.35)]">
+                  {row.map((cell, cellIndex) => (
+                    <td key={`${cellIndex}-${cell}`} className="px-4 py-3">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={active.headers.length}
+                    className="px-4 py-12 text-center text-[hsl(var(--muted-foreground))]"
+                  >
+                    Aucune donnée pour ce filtre.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function HumanResourcesWorkspace({
+  data,
+  mutate,
+  companyAdmin,
+  employee,
+  companyId,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  companyAdmin: boolean;
+  employee: StoreData['employees'][number] | null;
+  companyId: string;
+}) {
+  const company = data.companies.find((item) => item.id === companyId);
+  if (companyAdmin && company) return <CompanyOrganizationAdmin company={company} data={data} mutate={mutate} />;
+  return <RHPage data={data} companyId={companyId} />;
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ConfirmDialogProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <AppContent />
+          </WouterRouter>
+        </TooltipProvider>
+      </ConfirmDialogProvider>
+    </QueryClientProvider>
+  );
+}
+
+function AdminCreateCompanyPage({
+  data,
+  mutate,
+  onComplete,
+  onCancel,
+}: {
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+  onComplete: () => void;
+  onCancel: () => void;
+}) {
+  const fallbackPreset: SectorPreset = {
+    id: 'default',
+    name: 'Distribution',
+    moduleIds: ['commerce', 'stocks', 'presences'],
+  };
+  const catalog = getCatalogSnapshot(data);
+  const availableSectorPresets = catalog.sectorPresets.length > 0 ? catalog.sectorPresets : [fallbackPreset];
+  const initialPreset = fallbackPreset;
+  const [name, setName] = useState('');
+  const [manager, setManager] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('Sénégal');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [sector, setSector] = useState('');
+  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([...initialPreset.moduleIds]);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const changeSector = (nextSector: string) => {
+    const preset = availableSectorPresets.find((item) => item.name === nextSector);
+    setSector(nextSector);
+    setSelectedModules(preset ? [...preset.moduleIds] : [...initialPreset.moduleIds]);
+    setError('');
+  };
+
+  const toggle = (id: ModuleId) => {
+    setSelectedModules((previous) =>
+      previous.includes(id) ? previous.filter((moduleId) => moduleId !== id) : [...previous, id],
+    );
+    setError('');
+  };
+  const save = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (
+      !name.trim() ||
+      !manager.trim() ||
+      !normalizedEmail ||
+      !country.trim() ||
+      password.length < 8 ||
+       password !== passwordConfirm
+    ) {
+      setError('Complétez les informations de l’entreprise et vérifiez le mot de passe.');
+      return;
+    }
+    if (selectedModules.length === 0) {
+      setError('Sélectionnez au moins un module.');
+      return;
+    }
+    if (data.companies.some((company) => company.email.toLowerCase() === normalizedEmail)) {
+      setError('Une entreprise utilise déjà cette adresse email.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const preset = availableSectorPresets.find((item) => item.name === sector);
+       await companyRequestApi.createAdministrative({
+        name: name.trim(),
+        manager: manager.trim(),
+        email: normalizedEmail,
+        password,
+        phone: phone.trim(),
+        country: country.trim(),
+        sector,
+        requestedModules: [...selectedModules],
+        requestedModulePackIds: Object.fromEntries(
+          Object.entries(preset?.modulePackIds ?? {})
+            .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
+            .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
+      });
+      onComplete();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'La synchronisation des modules a échoué.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <section className="card-surface rounded-2xl p-6 sm:p-8">
+        <div className="mb-8">
+          <p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">
+            Création administrative
+          </p>
+          <h2 className="mt-3 text-2xl font-bold">Nouvelle entreprise</h2>
+          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+             Cette entreprise sera créée et activée immédiatement par l’administration MAXIMUS.
+          </p>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field
+            label="Nom de l’entreprise"
+            value={name}
+            onChange={setName}
+            placeholder="Ex. votre entreprise"
+            testId="input-admin-company-name"
+          />
+          <Field
+            label="Responsable"
+            value={manager}
+            onChange={setManager}
+            placeholder="Prénom Nom"
+            testId="input-admin-company-manager"
+          />
+          <Field
+            label="Email administrateur"
+            value={email}
+            onChange={setEmail}
+            type="email"
+            placeholder="admin@entreprise.com"
+            testId="input-admin-company-email"
+          />
+          <Field
+            label="Téléphone"
+            value={phone}
+            onChange={setPhone}
+            placeholder="+221 77 000 00 00"
+            testId="input-admin-company-phone"
+          />
+          <Field
+            label="Pays"
+            value={country}
+            onChange={setCountry}
+            placeholder="Sénégal"
+            testId="input-admin-company-country"
+          />
+           <label className="block text-sm font-semibold">
+             Secteur <span className="font-normal text-[hsl(var(--muted-foreground))]">(facultatif)</span>
+            <select
+              data-testid="select-admin-company-sector"
+              value={sector}
+              onChange={(event) => changeSector(event.target.value)}
+              className="mt-2 w-full rounded-lg border bg-transparent px-3 py-3 text-sm font-normal"
+            >
+               <option value="">Aucun secteur — configurer manuellement</option>
+              {availableSectorPresets.map((preset) => (
+                <option key={preset.id} value={preset.name}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field
+            label="Mot de passe administrateur"
+            value={password}
+            onChange={setPassword}
+            type="password"
+            placeholder="Au moins 8 caractères"
+            testId="input-admin-company-password"
+          />
+          <Field
+            label="Confirmer le mot de passe"
+            value={passwordConfirm}
+            onChange={setPasswordConfirm}
+            type="password"
+            placeholder="Répétez le mot de passe"
+            testId="input-admin-company-password-confirm"
+          />
+        </div>
+        <div className="mt-8 rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+          L’organisation sera configurée après la création de l’entreprise. MAXIMUS ou l’entreprise pourra créer ses propres types d’unités, puis construire sa hiérarchie depuis la page Organisation.
+        </div>
+        <div className="mt-8 border-t pt-6">
+          <h3 className="font-bold">Modules autorisés</h3>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+            Ces modules seront accessibles dès la première connexion.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {modules.map((module) => (
+              <button
+                type="button"
+                data-testid={`button-admin-module-${module.id}`}
+                key={module.id}
+                onClick={() => toggle(module.id)}
+                className={`flex items-start gap-3 rounded-xl border p-4 text-left ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'border-[hsl(var(--border))]'}`}
+              >
+                <span
+                  className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-md border ${selectedModules.includes(module.id) ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))]'}`}
+                >
+                  {selectedModules.includes(module.id) && <Check size={13} />}
+                </span>
+                <span>
+                  <strong className="block text-sm">{module.name}</strong>
+                  <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{module.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {error && (
+          <p
+            data-testid="admin-create-error"
+            className="mt-5 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+          >
+            {error}
+          </p>
+        )}
+        <div className="mt-8 flex justify-end gap-3">
+          <button
+            data-testid="button-cancel-admin-company"
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded-lg border px-5 py-3 text-sm font-bold"
+          >
+            Annuler
+          </button>
+          <button
+            data-testid="button-save-admin-company"
+            onClick={save}
+            disabled={saving}
+            className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
+          >
+            {saving ? 'Synchronisation…' : 'Créer l’entreprise'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+const permissionActions = [
+  { id: 'voir', label: 'Voir' },
+  { id: 'créer', label: 'Créer' },
+  { id: 'modifier', label: 'Modifier' },
+] as const;
+
+function normalizeFeaturePermissionMap(value: unknown): FeaturePermissionMap {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, permissions]) => Array.isArray(permissions))
+      .map(([featureId, permissions]) => [
+        featureId,
+        [...new Set((permissions as unknown[]).filter((permission): permission is string => typeof permission === 'string'))],
+      ]),
+  );
+}
+
+function selectedFeaturePermissions(
+  featureIds: string[],
+  preferred: FeaturePermissionMap,
+  fallback: FeaturePermissionMap = {},
+): FeaturePermissionMap {
+  return Object.fromEntries(
+    featureIds.map((featureId) => [
+      featureId,
+      preferred[featureId] !== undefined
+        ? [...preferred[featureId]!]
+        : fallback[featureId] !== undefined
+          ? [...fallback[featureId]!]
+          : ['voir'],
+    ]),
+  );
+}
+
+function CompanyModulesDetail({
+  company,
+  data,
+  mutate,
+  onModuleAccess,
+  onBack,
+}: {
+  company: Company;
+  data: StoreData;
+  mutate: (fn: (d: StoreData) => void, msg?: string) => void;
+   onModuleAccess: (
+     companyId: string,
+     moduleId: ModuleId,
+     status: ModuleAvailability,
+     options?: { featureIds?: string[]; configuration?: Record<string, unknown> },
+   ) => Promise<void>;
+  onBack: () => void;
+}) {
+  const { confirm } = useAppDialog();
+  const configuredModules = getConfiguredModules({
+    moduleOverrides: data.moduleOverrides ?? {},
+    removedModules: data.removedModules ?? [],
+    customModules: data.customModules ?? [],
+  });
+  const defaultStatuses = () =>
+    Object.fromEntries(
+      configuredModules.map((module) => [module.id, company.allowedModules.includes(module.id) ? 'ACTIF' : 'INACTIF']),
+    ) as Record<ModuleId, ModuleAvailability>;
+  const [moduleStatuses, setModuleStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
+  const [savedStatuses, setSavedStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
+  const [featureSelections, setFeatureSelections] = useState<Record<ModuleId, string[]>>({});
+  const [savedFeatureSelections, setSavedFeatureSelections] = useState<Record<ModuleId, string[]>>({});
+  const [featurePermissions, setFeaturePermissions] = useState<Record<ModuleId, FeaturePermissionMap>>({});
+  const [savedFeaturePermissions, setSavedFeaturePermissions] = useState<Record<ModuleId, FeaturePermissionMap>>({});
+  const [packSelections, setPackSelections] = useState<Record<ModuleId, string[]>>({});
+  const [savedPackSelections, setSavedPackSelections] = useState<Record<ModuleId, string[]>>({});
+  const [hiddenWorkspaceFeatures, setHiddenWorkspaceFeatures] = useState<CompanyWorkspaceFeatureId[]>(
+    () => normalizeCompanyWorkspaceFeatureIds(company.hiddenWorkspaceFeatures),
+  );
+  const [savedHiddenWorkspaceFeatures, setSavedHiddenWorkspaceFeatures] = useState<CompanyWorkspaceFeatureId[]>(
+    () => normalizeCompanyWorkspaceFeatureIds(company.hiddenWorkspaceFeatures),
+  );
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
+  const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
+  const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
+  const [paymentLoading, setPaymentLoading] = useState(true);
+  const [loginSettings, setLoginSettings] = useState<{
+    customAllowed: boolean;
+    mode: 'MAXIMUS' | 'CUSTOM';
+    slug: string;
+    url: string;
+  } | null>(null);
+  const [loginSaving, setLoginSaving] = useState(false);
+  const [customDomains, setCustomDomains] = useState<EcommerceDomain[]>([]);
+  const [domainInput, setDomainInput] = useState('');
+  const [domainLoading, setDomainLoading] = useState(true);
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [domainError, setDomainError] = useState('');
+  const [installationBusy, setInstallationBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fallback = defaultStatuses();
+    setModuleStatuses(fallback);
+    setSavedStatuses(fallback);
+    void loadCompanyModuleAccess(company.id)
+      .then((access) => {
+        if (cancelled) return;
+        const next = {
+          ...fallback,
+          ...Object.fromEntries(access.filter((item) => item.id in fallback).map((item) => [item.id, item.status])),
+        } as Record<ModuleId, ModuleAvailability>;
+        setModuleStatuses(next);
+        setSavedStatuses(next);
+        const nextPacks = Object.fromEntries(
+          configuredModules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const configuredPackIds = Array.isArray(serverModule?.configuration?.packIds)
+              ? serverModule.configuration.packIds.filter((packId): packId is string => typeof packId === 'string')
+              : null;
+            const candidatePackIds = configuredPackIds ?? company.requestedModulePackIds?.[module.id] ?? [];
+            const availablePackIds = new Set((module.featurePacks ?? []).map((pack) => pack.id));
+            return [module.id, [...new Set(candidatePackIds.filter((packId) => availablePackIds.has(packId)))]];
+          }),
+        ) as Record<ModuleId, string[]>;
+        const nextFeatures = Object.fromEntries(
+          configuredModules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const serverHasExplicitSelection =
+              Boolean(serverModule)
+              && (Boolean(serverModule?.featureIds?.length) || serverModule?.configuration?.featureScope === 'explicit');
+            const configured = serverHasExplicitSelection
+              ? serverModule?.featureIds ?? []
+              : company.requestedModuleFeatures?.[module.id];
+            const candidateFeatureIds = configured === undefined
+              ? getModuleFeatureOptions(module).map((feature) => feature.id)
+              : configured;
+            const featureIds = normalizeFeatureIdsForSelectedPacks(
+              module,
+              candidateFeatureIds,
+              nextPacks[module.id] ?? [],
+            );
+            return [module.id, [...new Set(featureIds)]];
+          }),
+        ) as Record<ModuleId, string[]>;
+        const nextPermissions = Object.fromEntries(
+          configuredModules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const serverConfiguration = serverModule?.configuration;
+            const hasServerPermissions = Boolean(
+              serverConfiguration
+              && Object.prototype.hasOwnProperty.call(serverConfiguration, 'featurePermissions'),
+            );
+            const serverPermissions = normalizeFeaturePermissionMap(serverConfiguration?.featurePermissions);
+            const companyPermissions = normalizeFeaturePermissionMap(company.requestedModulePermissions?.[module.id]);
+            const selectedPackIds = nextPacks[module.id] ?? [];
+            const packPermissions = (module.featurePacks ?? [])
+              .filter((pack) => selectedPackIds.includes(pack.id))
+              .reduce<FeaturePermissionMap>(
+                (all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }),
+                {},
+              );
+            const preferred = hasServerPermissions
+              ? serverPermissions
+              : Object.keys(companyPermissions).length > 0
+                ? companyPermissions
+                : packPermissions;
+            return [
+              module.id,
+              selectedFeaturePermissions(nextFeatures[module.id] ?? [], preferred),
+            ];
+          }),
+        ) as Record<ModuleId, FeaturePermissionMap>;
+        setFeatureSelections(nextFeatures);
+        setSavedFeatureSelections(nextFeatures);
+        setFeaturePermissions(nextPermissions);
+        setSavedFeaturePermissions(nextPermissions);
+        setPackSelections(nextPacks);
+        setSavedPackSelections(nextPacks);
+      })
+      .catch(() => {
+        // The local company model remains a safe fallback while the server is unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    company.id,
+    company.allowedModules.join('|'),
+    JSON.stringify(company.requestedModuleFeatures ?? {}),
+    JSON.stringify(company.requestedModulePackIds ?? {}),
+    JSON.stringify(company.requestedModulePermissions ?? {}),
+  ]);
+
+  useEffect(() => {
+    const next = normalizeCompanyWorkspaceFeatureIds(company.hiddenWorkspaceFeatures);
+    setHiddenWorkspaceFeatures(next);
+    setSavedHiddenWorkspaceFeatures(next);
+  }, [company.id, JSON.stringify(company.hiddenWorkspaceFeatures ?? [])]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPaymentLoading(true);
+    void loadCompanyPaymentAccess(company.id)
+      .then((access) => {
+        if (cancelled) return;
+        setPaymentEnabled(access.enabled);
+        setSavedPaymentEnabled(access.enabled);
+        setPaymentProviders(access.providers.length > 0 ? access.providers : ['DIAMANOPAY']);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPaymentEnabled(false);
+          setSavedPaymentEnabled(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void companyRequestApi.loginSettings(company.id)
+      .then(({ settings }) => {
+        if (!cancelled) setLoginSettings(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setLoginSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDomainLoading(true);
+    setDomainError('');
+    void createEcommerceApi(company.id).bootstrap()
+      .then(({ domains }) => {
+        if (!cancelled) setCustomDomains(Array.isArray(domains) ? domains : []);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCustomDomains([]);
+          setDomainError(error instanceof Error ? error.message : 'Les domaines personnalisés sont indisponibles.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDomainLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  const setModuleStatus = (id: ModuleId, status: ModuleAvailability) => {
+    setModuleStatuses((previous) => ({ ...previous, [id]: status }));
+  };
+
+  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }) => {
+    setLoginSaving(true);
+    try {
+      const result = await companyRequestApi.updateLoginSettings(company.id, input);
+      setLoginSettings(result.settings);
+      mutate((draft) => {
+        const target = draft.companies.find((item) => item.id === company.id);
+        if (target) Object.assign(target, result.company);
+      }, input.customAllowed === false ? 'La connexion personnalisée a été désactivée.' : 'Paramètres de connexion enregistrés.');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.');
+    } finally {
+      setLoginSaving(false);
+    }
+  };
+
+  const refreshCustomDomains = async () => {
+    const { domains } = await createEcommerceApi(company.id).bootstrap();
+    setCustomDomains(Array.isArray(domains) ? domains : []);
+  };
+
+  const createCustomDomain = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const domain = domainInput.trim();
+    if (!domain) return;
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).createDomain(domain);
+      await refreshCustomDomains();
+      setDomainInput('');
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être créé.');
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const verifyCustomDomain = async (domain: EcommerceDomain) => {
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).verifyDomain(domain.id);
+      await refreshCustomDomains();
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'La vérification DNS a échoué.');
+      try {
+        await refreshCustomDomains();
+      } catch {
+        // Keep the verification error visible when the refresh also fails.
+      }
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const deleteCustomDomain = async (domain: EcommerceDomain) => {
+    if (!window.confirm(`Retirer le domaine « ${domain.domain} » ?`)) return;
+    setDomainSaving(true);
+    setDomainError('');
+    try {
+      await createEcommerceApi(company.id).deleteDomain(domain.id);
+      await refreshCustomDomains();
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être retiré.');
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const downloadInstallationManifest = async () => {
+    try {
+      const manifest = await companyRequestApi.installationManifest(company.id);
+      const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-installation-${company.id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Le manifeste d’installation n’a pas pu être exporté.');
+    }
+  };
+
+  const prepareInstallation = async (mode: 'dedicated' | 'on_premise') => {
+    try {
+      const result = await companyRequestApi.issueInstallation(company.id, { mode });
+      const blob = new Blob([JSON.stringify(result.bootstrap, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showAppToast('Le fichier bootstrap a été téléchargé. Transférez-le uniquement au VPS de cette entreprise.', 'success');
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'L’installation n’a pas pu être préparée.', 'error');
+    }
+  };
+
+  const revokeInstallation = async () => {
+    const confirmed = await confirm({
+      title: 'Révoquer cette installation ?',
+      description: `Le jeton de « ${company.name} » ne fonctionnera plus pour les prochaines synchronisations. Cette action ne coupe pas automatiquement un serveur déjà démarré.`,
+      confirmLabel: 'Révoquer le jeton',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setInstallationBusy(true);
+    try {
+      await companyRequestApi.revokeInstallation(company.id);
+      showAppToast('Installation révoquée. Arrêtez aussi le service du VPS si la coupure doit être immédiate.', 'success');
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.', 'error');
+    } finally {
+      setInstallationBusy(false);
+    }
+  };
+
+  const toggleFeature = (moduleId: ModuleId, featureId: string) => {
+    setFeatureSelections((previous) => {
+      const selected = new Set(previous[moduleId] ?? []);
+      if (selected.has(featureId)) selected.delete(featureId);
+      else selected.add(featureId);
+      setFeaturePermissions((permissions) => ({
+        ...permissions,
+        [moduleId]: selectedFeaturePermissions(
+          [...selected],
+          permissions[moduleId] ?? {},
+        ),
+      }));
+      return { ...previous, [moduleId]: [...selected] };
+    });
+  };
+
+  const setModulePacks = (moduleId: ModuleId, packIds: string[]) => {
+    const module = configuredModules.find((item) => item.id === moduleId);
+    const featureIds = module
+      ? [...new Set(
+          (module.featurePacks ?? [])
+            .filter((pack) => packIds.includes(pack.id))
+            .flatMap((pack) => pack.featureIds),
+        )]
+      : [];
+    const selectedPacks = (module?.featurePacks ?? []).filter((pack) => packIds.includes(pack.id));
+    const packPermissions = selectedPacks.reduce<FeaturePermissionMap>(
+      (all, pack) => ({ ...all, ...(pack.featurePermissions ?? {}) }),
+      {},
+    );
+    setPackSelections((previous) => ({ ...previous, [moduleId]: packIds }));
+    if (packIds.length > 0) {
+      setFeatureSelections((previous) => ({ ...previous, [moduleId]: featureIds }));
+    }
+    setFeaturePermissions((previous) => ({
+      ...previous,
+      [moduleId]: selectedFeaturePermissions(
+        featureIds,
+        packPermissions,
+        previous[moduleId] ?? {},
+      ),
+    }));
+  };
+
+  const setFeaturePermission = (
+    moduleId: ModuleId,
+    featureId: string,
+    permission: (typeof permissionActions)[number]['id'],
+    enabled: boolean,
+  ) => {
+    setFeaturePermissions((previous) => {
+      const nextPermissions = { ...(previous[moduleId] ?? {}) };
+      const current = new Set(nextPermissions[featureId] ?? []);
+      if (permission === 'voir') {
+        if (enabled) current.add('voir');
+        else current.clear();
+      } else if (permission === 'créer') {
+        if (enabled) {
+          current.add('voir');
+          current.add('créer');
+        } else {
+          current.delete('créer');
+          current.delete('modifier');
+        }
+      } else if (enabled) {
+        current.add('voir');
+        current.add('créer');
+        current.add('modifier');
+      } else {
+        current.delete('modifier');
+      }
+      if (current.size > 0) nextPermissions[featureId] = [...current];
+      else delete nextPermissions[featureId];
+      return { ...previous, [moduleId]: nextPermissions };
+    });
+    setFeatureSelections((previous) => {
+      const selected = new Set(previous[moduleId] ?? []);
+      if (permission === 'voir' && enabled) selected.add(featureId);
+      if (permission === 'voir' && !enabled) selected.delete(featureId);
+      return { ...previous, [moduleId]: [...selected] };
+    });
+  };
+
+  const toggleWorkspaceFeature = (featureId: CompanyWorkspaceFeatureId) => {
+    setHiddenWorkspaceFeatures((previous) =>
+      previous.includes(featureId)
+        ? previous.filter((item) => item !== featureId)
+        : [...previous, featureId],
+    );
+  };
+
+  const saveWorkspaceFeatures = () => {
+    mutate((draft) => {
+      const target = draft.companies.find((item) => item.id === company.id);
+      if (target) target.hiddenWorkspaceFeatures = [...hiddenWorkspaceFeatures];
+    }, 'Visibilité de l’espace entreprise enregistrée.');
+    setSavedHiddenWorkspaceFeatures(hiddenWorkspaceFeatures);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const normalizedFeatureSelections = Object.fromEntries(
+        configuredModules.map((module) => [
+          module.id,
+          normalizeFeatureIdsForSelectedPacks(
+            module,
+            featureSelections[module.id] ?? [],
+            packSelections[module.id] ?? [],
+          ),
+        ]),
+      ) as Record<ModuleId, string[]>;
+      const normalizedFeaturePermissions = Object.fromEntries(
+        configuredModules.map((module) => [
+          module.id,
+          selectedFeaturePermissions(
+            normalizedFeatureSelections[module.id] ?? [],
+            featurePermissions[module.id] ?? {},
+          ),
+        ]),
+      ) as Record<ModuleId, FeaturePermissionMap>;
+      const changes = configuredModules
+        .filter((module) =>
+          moduleStatuses[module.id] !== savedStatuses[module.id]
+          || JSON.stringify(featureSelections[module.id] ?? []) !== JSON.stringify(savedFeatureSelections[module.id] ?? [])
+          || JSON.stringify(packSelections[module.id] ?? []) !== JSON.stringify(savedPackSelections[module.id] ?? [])
+          || JSON.stringify(featurePermissions[module.id] ?? {}) !== JSON.stringify(savedFeaturePermissions[module.id] ?? {}),
+        )
+        .map((module) => {
+          const featureIds = normalizedFeatureSelections[module.id] ?? [];
+          const configuredPermissions = normalizedFeaturePermissions[module.id] ?? {};
+          return onModuleAccess(company.id, module.id, moduleStatuses[module.id], {
+            featureIds,
+            configuration: {
+              featureScope: 'explicit',
+              packIds: packSelections[module.id] ?? [],
+              featurePermissions: configuredPermissions,
+            },
+          });
+        });
+      const paymentChanged = paymentEnabled !== savedPaymentEnabled;
+      await Promise.all([
+        ...changes,
+        ...(paymentChanged
+          ? [setCompanyPaymentAccess(company.id, paymentEnabled, paymentProviders)]
+          : []),
+      ]);
+      setFeatureSelections(normalizedFeatureSelections);
+      setFeaturePermissions(normalizedFeaturePermissions);
+      setSavedStatuses(moduleStatuses);
+      setSavedFeatureSelections(normalizedFeatureSelections);
+      setSavedFeaturePermissions(normalizedFeaturePermissions);
+      setSavedPackSelections(packSelections);
+      setSavedPaymentEnabled(paymentEnabled);
+    } catch (error) {
+       setModuleStatuses(savedStatuses);
+       setFeatureSelections(savedFeatureSelections);
+        setFeaturePermissions(savedFeaturePermissions);
+       setPackSelections(savedPackSelections);
+       setPaymentEnabled(savedPaymentEnabled);
+      showAppToast(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <button
+        data-testid="button-back-companies"
+        onClick={onBack}
+        className="text-xs font-bold text-[hsl(var(--primary))]"
+      >
+        ← Retour aux entreprises
+      </button>
+      <div className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row">
+          <div className="flex gap-4">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--primary))] text-lg font-black text-[hsl(var(--primary-foreground))]">
+              {company.name.slice(0, 2).toUpperCase()}
+            </span>
+            <div>
+              <h2 className="text-2xl font-bold">{company.name}</h2>
+              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                {company.sector} · {company.country}
+              </p>
+              <div className="mt-3">
+                <StatusBadge status={company.status} />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton testId="button-edit-company-detail" icon={Edit3} onClick={() => setEditing(true)}>
+              Modifier
+            </ActionButton>
+            <ActionButton
+              testId="button-suspend-company"
+              icon={company.status === 'SUSPENDU' ? RefreshCw : ShieldCheck}
+              onClick={() =>
+                mutate(
+                  (draft) => {
+                    const target = draft.companies.find((item) => item.id === company.id);
+                    if (target) target.status = target.status === 'SUSPENDU' ? 'ACTIF' : 'SUSPENDU';
+                  },
+                  company.status === 'SUSPENDU' ? 'Entreprise réactivée.' : 'Entreprise suspendue.',
+                )
+              }
+            >
+              {company.status === 'SUSPENDU' ? 'Réactiver' : 'Suspendre'}
+            </ActionButton>
+          </div>
+        </div>
+        <div className="mt-8 grid gap-4 border-t pt-5 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Responsable</p>
+            <p className="mt-1 font-bold">{company.manager}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Email</p>
+            <p className="mt-1 font-bold">{company.email}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Modules accessibles</p>
+            <p className="mt-1 font-bold">
+              {configuredModules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {configuredModules.length}
+            </p>
+          </div>
+        </div>
+      </div>
+      <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2">
+              <KeyRound size={18} className="text-[hsl(var(--primary))]" />
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+                Réservé à l’administration MAXIMUS
+              </p>
+            </div>
+            <h2 className="mt-2 text-xl font-bold">Installation dédiée ou locale</h2>
+            <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              MAXIMUS crée ici le fichier bootstrap JSON secret. Vous le téléchargez, puis vous le transférez
+              au serveur de l’entreprise par SSH/SCP avant de lancer le script d’installation.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
+            {company.status === 'ACTIF' ? 'Entreprise active' : 'Entreprise à activer'}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">1. Préparer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Générez le bootstrap depuis MAXIMUS principal.</p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">2. Transférer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Envoyez le JSON au VPS avec SSH/SCP.</p>
+          </div>
+          <div className="rounded-xl border p-4">
+            <p className="font-bold">3. Installer</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le VPS récupère les modules et permissions publiés.</p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <ActionButton
+            primary
+            testId="button-prepare-dedicated-installation"
+            onClick={() => void prepareInstallation('dedicated')}
+          >
+            Préparer le VPS dédié
+          </ActionButton>
+          <ActionButton
+            testId="button-prepare-on-premise-installation"
+            onClick={() => void prepareInstallation('on_premise')}
+          >
+            Préparer le serveur local
+          </ActionButton>
+          <ActionButton
+            testId="button-download-installation-manifest"
+            onClick={() => void downloadInstallationManifest()}
+          >
+            Télécharger le manifeste
+          </ActionButton>
+          <button
+            type="button"
+            data-testid="button-revoke-installation"
+            disabled={installationBusy}
+            onClick={() => void revokeInstallation()}
+            className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {installationBusy ? 'Révocation…' : 'Révoquer le jeton'}
+          </button>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          L’entreprise doit être <strong>ACTIF</strong> avant la préparation. La révocation bloque les
+          synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
+        </p>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Connexion et domaine</p>
+            <h2 className="mt-2 font-bold">Accès de connexion de l’entreprise</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              Cette configuration est administrée uniquement par MAXIMUS. Activez ou désactivez la page personnalisée, choisissez le mode utilisé et partagez le lien généré depuis cette section.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-custom-login"
+            checked={Boolean(loginSettings?.customAllowed)}
+            disabled={!loginSettings || loginSaving}
+            onChange={(event) => void saveLoginSettings({ customAllowed: event.target.checked })}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser la page de connexion personnalisée</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le lien est généré à partir du nom de l’entreprise et reste stable même si son nom est modifié plus tard.
+            </span>
+          </span>
+        </label>
+        <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <label className="block text-sm font-semibold">
+            Mode actuellement utilisé
+            <select
+              data-testid="select-company-login-mode"
+              value={loginSettings?.mode ?? 'MAXIMUS'}
+              disabled={!loginSettings?.customAllowed || loginSaving}
+              onChange={(event) => void saveLoginSettings({ mode: event.target.value as 'MAXIMUS' | 'CUSTOM' })}
+              className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm"
+            >
+              <option value="MAXIMUS">Connexion MAXIMUS actuelle</option>
+              <option value="CUSTOM">Page personnalisée</option>
+            </select>
+          </label>
+          <div className="rounded-xl bg-[hsl(var(--muted)/.55)] p-4">
+            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Lien généré</p>
+            {loginSettings?.url ? (
+              <>
+                <p className="mt-2 break-all font-mono text-xs">{window.location.origin}{loginSettings.url}</p>
+                <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
+              </>
+            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
+          </div>
+        </div>
+      </section>
+      {loginSettings?.customAllowed && (
+        <section className="card-surface rounded-2xl p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Domaine personnalisé</p>
+              <h2 className="mt-2 font-bold">Connecter le domaine de l’entreprise</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                Ajoutez le domaine utilisé par l’entreprise personnalisée. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
+              {domainLoading ? 'Chargement…' : `${customDomains.length} domaine${customDomains.length > 1 ? 's' : ''}`}
+            </span>
+          </div>
+          <form onSubmit={createCustomDomain} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-sm font-semibold">
+              Nom de domaine
+              <input
+                data-testid="input-company-custom-domain"
+                value={domainInput}
+                onChange={(event) => setDomainInput(event.target.value)}
+                placeholder="connexion.exemple.sn"
+                disabled={domainSaving}
+                className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
+              />
+            </label>
+            <button
+              type="submit"
+              data-testid="button-create-company-custom-domain"
+              disabled={domainSaving || !domainInput.trim()}
+              className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {domainSaving ? 'Enregistrement…' : 'Connecter le domaine'}
+            </button>
+          </form>
+          {domainError && (
+            <p data-testid="company-custom-domain-error" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+              {domainError}
+            </p>
+          )}
+          <div className="mt-4 space-y-3">
+            {customDomains.length === 0 && !domainLoading ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                Aucun domaine personnalisé n’est encore configuré pour cette entreprise.
+              </p>
+            ) : customDomains.map((domain) => (
+              <article key={domain.id} data-testid={`card-company-custom-domain-${domain.id}`} className="rounded-xl border p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="break-all">{domain.domain}</strong>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${domain.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {domain.status === 'ACTIVE' ? 'ACTIF' : 'EN ATTENTE DNS'}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:grid-cols-2">
+                      <p><span className="font-bold">TXT :</span> {domain.verificationName} → <code className="break-all">{domain.verificationValue}</code></p>
+                      <p><span className="font-bold">CNAME :</span> {domain.domain} → <code className="break-all">{domain.targetHost}</code></p>
+                    </div>
+                    {domain.lastError && <p className="mt-2 text-xs font-semibold text-[hsl(var(--destructive))]">{domain.lastError}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      data-testid={`button-verify-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void verifyCustomDomain(domain)}
+                      className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
+                    >
+                      Vérifier
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`button-delete-company-custom-domain-${domain.id}`}
+                      disabled={domainSaving}
+                      onClick={() => void deleteCustomDomain(domain)}
+                      className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Fonctionnalités de l’espace entreprise</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Choisissez les fonctionnalités visibles dans le menu de cette entreprise. Le réglage est
+              enregistré pour tous ses utilisateurs et bloque aussi l’accès direct à la route.
+            </p>
+          </div>
+          <span className="mono shrink-0 text-xs text-[hsl(var(--muted-foreground))]">
+            {companyWorkspaceFeatureDefinitions.length - hiddenWorkspaceFeatures.length} / {companyWorkspaceFeatureDefinitions.length} visibles
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {companyWorkspaceFeatureDefinitions.map((feature) => {
+            const visible = !hiddenWorkspaceFeatures.includes(feature.id);
+            return (
+              <label
+                key={feature.id}
+                data-testid={`card-company-workspace-feature-${feature.id}`}
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                  visible
+                    ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'
+                    : 'bg-[hsl(var(--muted)/.4)] opacity-70'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  data-testid={`checkbox-company-workspace-feature-${feature.id}`}
+                  checked={visible}
+                  onChange={() => toggleWorkspaceFeature(feature.id)}
+                  className="mt-1"
+                />
+                <span className="min-w-0">
+                  <strong className="block text-sm">{feature.label}</strong>
+                  <span className="mt-1 block text-[11px] leading-5 text-[hsl(var(--muted-foreground))]">
+                    {feature.description}
+                  </span>
+                  <span className="mt-2 block text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--primary))]">
+                    {visible ? 'Visible' : 'Masquée'}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-workspace-features"
+            disabled={JSON.stringify(hiddenWorkspaceFeatures) === JSON.stringify(savedHiddenWorkspaceFeatures)}
+            onClick={saveWorkspaceFeatures}
+          >
+            Enregistrer la visibilité
+          </ActionButton>
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Systèmes de paiement</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Ce contrôle indépendant autorise ou bloque les encaissements DiamanoPay et les retraits de cette entreprise.
+              Les commandes déjà payées restent consultables.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${paymentEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {paymentLoading ? 'Chargement…' : paymentEnabled ? 'Activés' : 'Désactivés'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${paymentEnabled ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-payment-systems"
+            checked={paymentEnabled}
+            disabled={paymentLoading || saving}
+            onChange={(event) => setPaymentEnabled(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser les systèmes de paiement</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Fournisseur configuré : {paymentProviders.join(', ') || 'Aucun'}.
+              La décision est vérifiée côté serveur pour chaque opération sensible.
+            </span>
+          </span>
+        </label>
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-payment-systems"
+            disabled={paymentLoading || paymentEnabled === savedPaymentEnabled}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const access = await setCompanyPaymentAccess(company.id, paymentEnabled, paymentProviders);
+                setPaymentEnabled(access.enabled);
+                setSavedPaymentEnabled(access.enabled);
+              } catch (error) {
+                setPaymentEnabled(savedPaymentEnabled);
+                showAppToast(error instanceof Error ? error.message : 'La configuration des paiements n’a pas pu être enregistrée.', 'error');
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            Enregistrer le paiement
+          </ActionButton>
+        </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-bold">Modules autorisés</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajustez le périmètre de l’espace.</p>
+          </div>
+          <span className="mono text-xs text-[hsl(var(--muted-foreground))]">
+            {modules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {modules.length}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {modules.map((module) => {
+            const status = moduleStatuses[module.id] ?? 'INACTIF';
+            return (
+              <div
+                data-testid={`card-company-module-${module.id}`}
+                key={module.id}
+                 className={`rounded-xl border p-4 ${status === 'INACTIF' ? 'bg-[hsl(var(--muted)/.4)] opacity-65' : 'border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.05)]'}`}
+              >
+                 <div className="flex items-start justify-between gap-4">
+                   <div className="flex min-w-0 items-center gap-3">
+                     <span className="rounded-lg bg-[hsl(var(--muted))] p-2">
+                       <LayoutGrid size={16} />
+                     </span>
+                     <div className="min-w-0">
+                       <strong className="block text-sm">{module.name}</strong>
+                       <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{module.description}</p>
+                     </div>
+                  </div>
+                   <select
+                     data-testid={`select-company-module-status-${module.id}`}
+                     value={status}
+                     onChange={(event) => setModuleStatus(module.id, event.target.value as ModuleAvailability)}
+                     className="shrink-0 rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold"
+                   >
+                     <option value="ACTIF">Actif</option>
+                     <option value="BETA">Bêta</option>
+                     <option value="MAINTENANCE">Maintenance</option>
+                     <option value="INACTIF">Désactivé</option>
+                   </select>
+                 </div>
+                 {status !== 'INACTIF' && (module.featurePacks?.length || getModuleFeatureOptions(module).length) ? (
+                   <div className="mt-4 space-y-3 border-t border-[hsl(var(--border)/.7)] pt-3">
+                     {(module.featurePacks ?? []).length > 0 && (
+                       <div>
+                         <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Packs autorisés</p>
+                         <div className="grid gap-2 sm:grid-cols-2">
+                           {(module.featurePacks ?? []).map((pack) => (
+                             <label key={pack.id} className="flex items-start gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card)/.65)] p-2 text-xs">
+                               <input
+                                 type="checkbox"
+                                 checked={(packSelections[module.id] ?? []).includes(pack.id)}
+                                 onChange={(event) => setModulePacks(
+                                   module.id,
+                                   event.target.checked
+                                     ? [...new Set([...(packSelections[module.id] ?? []), pack.id])]
+                                     : (packSelections[module.id] ?? []).filter((id) => id !== pack.id),
+                                 )}
+                                 className="mt-0.5"
+                               />
+                               <span><strong className="block">{pack.name}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{pack.description}</span></span>
+                             </label>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                     <div>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Fonctionnalités et droits</p>
+                          <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Voir · Créer · Modifier</span>
+                        </div>
+                        {module.id === 'ecommerce' && <p className="mb-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour autoriser les produits, cochez <strong>Vente de produits physiques</strong>, <strong>Vente de produits numériques</strong>, ou les deux.</p>}
+                        <div className="space-y-2">
+                          {getModuleFeatureOptions(module).map((feature) => {
+                            const selected = (featureSelections[module.id] ?? []).includes(feature.id);
+                            const permissions = featurePermissions[module.id]?.[feature.id] ?? [];
+                            return (
+                              <div key={feature.id} className={`rounded-lg border p-3 ${selected ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card)/.65)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] opacity-75'}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <label className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+                                    <input
+                                      type="checkbox"
+                                      data-testid={`checkbox-company-feature-${module.id}-${feature.id}`}
+                                      checked={selected}
+                                      onChange={() => toggleFeature(module.id, feature.id)}
+                                      className="rounded"
+                                    />
+                                    <span>{feature.label}</span>
+                                  </label>
+                                  <div className="flex flex-wrap gap-3">
+                                    {permissionActions.map((action) => (
+                                      <label key={action.id} className="flex items-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
+                                        <input
+                                          type="checkbox"
+                                          data-testid={`checkbox-company-permission-${module.id}-${feature.id}-${action.id}`}
+                                          checked={permissions.includes(action.id)}
+                                          disabled={action.id !== 'voir' && !permissions.includes('voir')}
+                                          onChange={(event) => setFeaturePermission(module.id, feature.id, action.id, event.target.checked)}
+                                          className="rounded"
+                                        />
+                                        {action.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
+                              </div>
+                            );
+                          })}
+                       </div>
+                     </div>
+                   </div>
+                 ) : null}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-6 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-modules"
+            onClick={() => {
+              if (!saving) void save();
+            }}
+          >
+            {saving ? 'Enregistrement…' : 'Enregistrer la configuration'}
+          </ActionButton>
+        </div>
+      </section>
+      {editing && <CompanyEditModal company={company} data={data} mutate={mutate} onClose={() => setEditing(false)} />}
+    </div>
+  );
+}
+export default App;

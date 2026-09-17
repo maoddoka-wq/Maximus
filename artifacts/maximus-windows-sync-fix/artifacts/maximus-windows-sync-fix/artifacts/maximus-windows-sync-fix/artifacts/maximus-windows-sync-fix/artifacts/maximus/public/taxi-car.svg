@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Véhicule Taxi</title>
+  <desc id="desc">Illustration d'un véhicule taxi jaune vu de face</desc>
+  <defs>
+    <linearGradient id="body" x1="0" x2="1">
+      <stop offset="0" stop-color="#f2a900"/>
+      <stop offset="1" stop-color="#ffd65a"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="420" rx="38" fill="#0b1b2b"/>
+  <path d="M164 224 212 122c8-17 24-28 43-28h210c19 0 35 11 43 28l48 102 29 13c13 6 22 20 22 35v52c0 14-11 25-25 25h-29c-7 22-27 37-51 37s-44-15-51-37H269c-7 22-27 37-51 37s-44-15-51-37h-29c-14 0-25-11-25-25v-52c0-15 9-29 22-35l29-13Z" fill="url(#body)"/>
+  <path d="M250 125c4-10 14-17 26-17h182c12 0 22 7 26 17l27 73H223l27-73Z" fill="#c7e8f4"/>
+  <path d="M360 113v85" stroke="#0b1b2b" stroke-width="8" opacity=".35"/>
+  <rect x="330" y="58" width="60" height="34" rx="8" fill="#f2a900"/>
+  <text x="360" y="82" fill="#0b1b2b" font-family="Arial, sans-serif" font-size="19" font-weight="800" text-anchor="middle">TAXI</text>
+  <rect x="142" y="218" width="436" height="20" rx="10" fill="#0b1b2b" opacity=".16"/>
+  <circle cx="218" cy="333" r="33" fill="#172033"/><circle cx="218" cy="333" r="14" fill="#cbd5e1"/>
+  <circle cx="502" cy="333" r="33" fill="#172033"/><circle cx="502" cy="333" r="14" fill="#cbd5e1"/>
+  <rect x="148" y="254" width="424" height="34" rx="17" fill="#0b1b2b" opacity=".88"/>
+  <path d="M176 271h34m330 0h34" stroke="#ffd65a" stroke-width="8" stroke-linecap="round"/>
+</svg>

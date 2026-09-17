@@ -210,3 +210,17 @@ mtime_ms = 1789574401847
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bc327e84-9b93-444e-be32-7d7c364d1503/68f4cd2c-aa7f-407d-be8c-16400ad2767d"
 storage_version_token = "1789574408688017"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "6ptHXG2zPzCIvah1Qiltc"
+uri = "file://artifacts/maximus-windows-sync-fix.zip"
+type = "unspecified"
+title = "MAXIMUS — archive Windows corrigée"
+description = "Archive contenant le correctif de synchronisation des permissions héritées, le script d’installation et le frontend construit. Les secrets locaux et vendor sont exclus."
+logical_id = "38247283-2533-446b-981e-f19c746b34bc"
+content_hash = "sha256:4b00bc89c126e6d213f4cd5daa1e5565a91236d44eafa9b8c0c209a2d3eb744a"
+size = 46450946
+mtime_ms = 1789664811533
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/38247283-2533-446b-981e-f19c746b34bc/68bff7c8-516a-416b-bdef-36104bfa9caa"
+storage_version_token = "1789664819651408"
+content_type = "application/octet-stream"

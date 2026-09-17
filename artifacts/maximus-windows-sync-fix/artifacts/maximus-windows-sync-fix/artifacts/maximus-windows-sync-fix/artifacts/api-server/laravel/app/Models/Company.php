@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Company extends Model
+{
+    protected $table = 'companies';
+
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
+    protected $fillable = [
+        'id',
+        'name',
+        'manager',
+        'email',
+        'phone',
+        'country',
+        'sector',
+        'status',
+        'requested_modules',
+        'requested_module_pack_ids',
+        'requested_module_features',
+        'requested_module_permissions',
+        'profile_photo',
+        'profile_photo_data',
+        'profile_photo_mime',
+        'primary_color',
+        'accent_color',
+        'sidebar_color',
+        'login_custom_allowed',
+        'login_mode',
+        'login_slug',
+        'rejection_reason',
+        'deleted_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'requested_modules' => 'array',
+            'requested_module_pack_ids' => 'array',
+            'requested_module_features' => 'array',
+            'requested_module_permissions' => 'array',
+            'deleted_at' => 'datetime',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'login_custom_allowed' => 'boolean',
+        ];
+    }
+}

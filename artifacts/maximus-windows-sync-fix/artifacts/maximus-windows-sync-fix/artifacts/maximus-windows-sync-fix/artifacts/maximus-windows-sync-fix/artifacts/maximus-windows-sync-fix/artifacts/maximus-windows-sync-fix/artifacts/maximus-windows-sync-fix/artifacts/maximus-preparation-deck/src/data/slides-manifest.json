@@ -1,0 +1,82 @@
+[
+  {
+    "id": "4f0b8a31-3d79-4f76-9a3b-2e6b5b2f1011",
+    "position": 1,
+    "filepath": "src/pages/slides/Slide1.tsx",
+    "title": "MAXIMUS ERP",
+    "description": "Présentation de préparation de MAXIMUS ERP.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c20a0f24-ff1e-46f4-b2d4-50e1d8182c12",
+    "position": 2,
+    "filepath": "src/pages/slides/Slide2.tsx",
+    "title": "Le besoin : reprendre le contrôle de l’activité",
+    "description": "Les enjeux opérationnels auxquels MAXIMUS répond.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "f0a1d8bd-8e8e-41d1-a7d4-4ef6a2dd3313",
+    "position": 3,
+    "filepath": "src/pages/slides/Slide3.tsx",
+    "title": "La réponse MAXIMUS",
+    "description": "La proposition de valeur de la plateforme.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "7a4a8db8-4b20-4a11-9e07-6ad6a8c44214",
+    "position": 4,
+    "filepath": "src/pages/slides/Slide4.tsx",
+    "title": "Une organisation maîtrisée par entreprise",
+    "description": "Structure, rôles, permissions et traçabilité.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9b8c2f1d-7a60-4d41-9f2f-0d7b5a6b5515",
+    "position": 5,
+    "filepath": "src/pages/slides/Slide5.tsx",
+    "title": "Les modules au cœur de l’activité",
+    "description": "Les modules opérationnels de MAXIMUS.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "d2f7a8c3-5b44-43cc-a28c-9e1f6b7d6616",
+    "position": 6,
+    "filepath": "src/pages/slides/Slide6.tsx",
+    "title": "Une expérience e-commerce complète",
+    "description": "Boutiques publiques, clients, produits et livraisons.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "e3a6b9d4-6c55-44dd-b39d-af2a7c8e7717",
+    "position": 7,
+    "filepath": "src/pages/slides/Slide7.tsx",
+    "title": "Du paiement au règlement",
+    "description": "Paiements, stock, commissions et portefeuilles.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "b4c7d0e5-7d66-45ee-c4ae-b03b8d9f8818",
+    "position": 8,
+    "filepath": "src/pages/slides/Slide8.tsx",
+    "title": "MAXIMUS accompagne la décision",
+    "description": "Assistant MAXI et gouvernance du catalogue métier.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a5d8e1f6-8e77-46ff-d5bf-c14c9e0a9919",
+    "position": 9,
+    "filepath": "src/pages/slides/Slide9.tsx",
+    "title": "Une base technique prête pour la production",
+    "description": "Architecture, données, fichiers et déploiement.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "f6e9a2b7-9f88-4700-e6c0-d25d0fab1020",
+    "position": 10,
+    "filepath": "src/pages/slides/Slide10.tsx",
+    "title": "Préparer la démonstration",
+    "description": "Parcours de démonstration et conclusion.",
+    "speakerNotes": ""
+  }
+]
