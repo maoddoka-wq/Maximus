@@ -248,6 +248,12 @@ bootstrap_company_id="$(bootstrap_value "$BOOTSTRAP_FILE" companyId)" || fail "L
 bootstrap_installation_id="$(bootstrap_value "$BOOTSTRAP_FILE" installationId)" || fail "Le manifeste ne contient pas installationId."
 bootstrap_application_version="$(bootstrap_value "$BOOTSTRAP_FILE" applicationVersion)" || fail "Le manifeste est ancien et ne contient pas applicationVersion. Générez un nouveau bootstrap depuis MAXIMUS principal."
 bootstrap_sync_protocol_version="$(bootstrap_value "$BOOTSTRAP_FILE" syncProtocolVersion)" || fail "Le manifeste est ancien et ne contient pas syncProtocolVersion. Générez un nouveau bootstrap depuis MAXIMUS principal."
+if command -v git >/dev/null 2>&1 && git -C "$WORKSPACE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local_git_version="$(git -C "$WORKSPACE_DIR" rev-parse HEAD)"
+    [[ "$local_git_version" == "$bootstrap_application_version" ]] \
+        || fail "Le commit local ($local_git_version) ne correspond pas à la version du bootstrap ($bootstrap_application_version). Clonez le commit déployé par MAXIMUS principal."
+    printf '%s\n' "$local_git_version" > "$LARAVEL_DIR/MAXIMUS_BUILD_VERSION"
+fi
 case "$bootstrap_mode" in
     dedicated|on_premise) ;;
     *) fail "Le mode du manifeste doit être dedicated ou on_premise." ;;
