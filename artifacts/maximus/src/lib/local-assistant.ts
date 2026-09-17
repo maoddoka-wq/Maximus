@@ -88,7 +88,7 @@ function hasModule(allowedModules: ModuleId[], ...modules: ModuleId[]): boolean 
 function moduleLabel(moduleId: ModuleId): string {
   return {
     commerce: 'commerce',
-    ecommerce: 'e-commerce',
+    ecommerce: 'E-commerce',
     stocks: 'stocks',
     presences: 'présences',
     paie: 'paie',

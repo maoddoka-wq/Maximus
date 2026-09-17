@@ -61,14 +61,14 @@ final class ModuleCatalog
                 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres'],
                 'feature_packs' => [
                     ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'finances', 'parametres']],
-                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion E-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
                     ['id' => 'ecommerce-vente-numerique', 'name' => 'Vente de produits numériques', 'description' => 'Publier des fichiers numériques et les délivrer après paiement.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-numerique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
                     ['id' => 'ecommerce-vente-complete', 'name' => 'Ventes physiques et numériques', 'description' => 'Vendre des produits physiques et des produits numériques dans la même boutique.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
                     ['id' => 'ecommerce-location', 'name' => 'Location & réservation', 'description' => 'Présenter et gérer les offres de location de maisons, bâches, véhicules et équipements.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'location', 'commandes', 'clients', 'parametres']],
                     ['id' => 'ecommerce-supervision', 'name' => 'Supervision boutique', 'description' => 'Superviser les ventes physiques et numériques, les promotions, la location, les livraisons et les retraits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres']],
                     [
                         'id' => 'ecommerce-employe',
-                        'name' => 'Employé e-commerce',
+                        'name' => 'Employé E-commerce',
                         'description' => 'Traiter les commandes et accompagner les clients sans modifier la configuration de la boutique.',
                         'feature_ids' => ['dashboard', 'commandes', 'clients'],
                         'feature_permissions' => [
@@ -79,7 +79,7 @@ final class ModuleCatalog
                     ],
                     [
                         'id' => 'ecommerce-manager',
-                        'name' => 'Manager e-commerce',
+                        'name' => 'Manager E-commerce',
                         'description' => 'Piloter la boutique, le catalogue, les ventes, les livraisons et les résultats.',
                         'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres'],
                         'feature_permissions' => [

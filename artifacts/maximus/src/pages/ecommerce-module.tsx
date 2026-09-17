@@ -315,7 +315,7 @@ export default function EcommerceModulePage({
       setWalletData(nextWalletData);
       setError('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace e-commerce.');
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace E-commerce.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -398,14 +398,14 @@ export default function EcommerceModulePage({
             items={visibleTabs}
             activeId={tab}
             onChange={id => navigate(id as EcommerceTab)}
-            ariaLabel="Fonctionnalités e-commerce"
+            ariaLabel="Fonctionnalités E-commerce"
             testIdPrefix="ecommerce-tab"
             className="flex-wrap"
           />
         </section>
       )}
 
-      {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
+      {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité E-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
       {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}

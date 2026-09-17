@@ -4896,7 +4896,7 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Compte plateforme</p>
-            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions e-commerce</h2>
+            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions E-commerce</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
               Chaque vente est répartie automatiquement : {bootstrap?.commissionPolicy.label ?? '3 % DiamanoPay, 2 % MAXIMUS, 95 % vendeur.'}
             </p>
