@@ -7511,7 +7511,45 @@ function AdminCreateCompanyPage({
     setSaving(true);
     try {
       const preset = availableSectorPresets.find((item) => item.name === sector);
-       await companyRequestApi.createAdministrative({
+      const configuredModules = getConfiguredModules(data);
+      const requestedModulePackIds = Object.fromEntries(
+        selectedModules.flatMap((moduleId) => {
+          const module = configuredModules.find((candidate) => candidate.id === moduleId);
+          const availablePackIds = new Set((module?.featurePacks ?? []).map((pack) => pack.id));
+          const packIds = (preset?.modulePackIds?.[moduleId] ?? []).filter((packId) => availablePackIds.has(packId));
+          return packIds.length ? [[moduleId, [...packIds]]] : [];
+        }),
+      ) as Partial<Record<ModuleId, string[]>>;
+      const requestedModuleFeatures = Object.fromEntries(
+        selectedModules.map((moduleId) => {
+          const module = configuredModules.find((candidate) => candidate.id === moduleId);
+          const packIds = requestedModulePackIds[moduleId] ?? [];
+          const packFeatureIds = (module?.featurePacks ?? [])
+            .filter((pack) => packIds.includes(pack.id))
+            .flatMap((pack) => pack.featureIds);
+          const featureIds = module
+            ? [...getEffectiveModuleFeatureIds(module, packFeatureIds.length ? packFeatureIds : undefined)]
+            : [];
+          return [moduleId, featureIds];
+        }),
+      ) as Partial<Record<ModuleId, string[]>>;
+      const requestedModulePermissions = Object.fromEntries(
+        selectedModules.map((moduleId) => {
+          const module = configuredModules.find((candidate) => candidate.id === moduleId);
+          const packIds = requestedModulePackIds[moduleId] ?? [];
+          const selectedPacks = (module?.featurePacks ?? []).filter((pack) => packIds.includes(pack.id));
+          const packPermissions = selectedPacks.reduce<FeaturePermissionMap>(
+            (permissions, pack) => ({ ...permissions, ...(pack.featurePermissions ?? {}) }),
+            {},
+          );
+          return [
+            moduleId,
+            defaultFeaturePermissions(requestedModuleFeatures[moduleId] ?? [], packPermissions),
+          ];
+        }),
+      ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
+
+      await companyRequestApi.createAdministrative({
         name: name.trim(),
         manager: manager.trim(),
         email: normalizedEmail,
@@ -7520,11 +7558,9 @@ function AdminCreateCompanyPage({
         country: country.trim(),
         sector,
         requestedModules: [...selectedModules],
-        requestedModulePackIds: Object.fromEntries(
-          Object.entries(preset?.modulePackIds ?? {})
-            .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
-            .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
-        ),
+        requestedModulePackIds,
+        requestedModuleFeatures,
+        requestedModulePermissions,
       });
       onComplete();
     } catch (saveError) {
