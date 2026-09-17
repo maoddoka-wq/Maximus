@@ -119,3 +119,20 @@ export function getEffectiveModuleFeatureIds(module: Module, allowedFeatureIds?:
 
   return new Set(normalizeModuleFeatureIds(module, allowedFeatureIds).filter(featureId => allFeatureIds.includes(featureId)));
 }
+
+export function normalizeFeatureIdsForSelectedPacks(
+  module: Module,
+  values: Iterable<string>,
+  selectedPackIds: Iterable<string>,
+) {
+  const featureIds = [...getEffectiveModuleFeatureIds(module, [...values])];
+  const packIds = [...selectedPackIds];
+  if (packIds.length === 0) return featureIds;
+
+  const selectedPackFeatures = new Set(
+    (module.featurePacks ?? [])
+      .filter(pack => packIds.includes(pack.id))
+      .flatMap(pack => pack.featureIds),
+  );
+  return featureIds.filter(featureId => selectedPackFeatures.has(featureId));
+}

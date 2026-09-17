@@ -26,3 +26,9 @@ Les secteurs doivent recalculer leurs fonctionnalités à partir des packs séle
 **Why:** un changement de packs laisse parfois `moduleFeatures` dans l’ancien état et bloque alors la publication avec une fonctionnalité « hors des packs choisis ».
 
 **How to apply:** lors de la création du snapshot catalogue, intersecter `moduleFeatures` avec l’union des fonctionnalités des packs sélectionnés, puis publier ce snapshot nettoyé.
+
+Les sélections de fonctionnalités d’une entreprise doivent être intersectées avec les packs du module avant toute sauvegarde d’accès.
+
+**Why:** les entreprises historiques peuvent conserver des fonctionnalités d’un ancien pack ; l’API refuse alors correctement la combinaison, mais l’écran d’administration ne doit pas continuer à l’envoyer.
+
+**How to apply:** normaliser les sélections au chargement et juste avant `PATCH` des accès module, puis conserver l’état local normalisé après succès.

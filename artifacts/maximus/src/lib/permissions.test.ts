@@ -19,7 +19,11 @@ import {
 } from './commerce-permissions';
 import { parseQueryTab } from './query-tab';
 import { featureSlug, resolveFeatureDependencies } from './permission-keys';
-import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from './module-features';
+import {
+  getEffectiveModuleFeatureIds,
+  getModuleFeatureOptions,
+  normalizeFeatureIdsForSelectedPacks,
+} from './module-features';
 import { presenceFeatureDefinitions, presenceFeaturePacks } from './presence-features';
 import { emptyStoreData, recordControlEvent, sectorPresets, stockSubmoduleDependencies } from './store';
 import { modules } from './store';
@@ -230,6 +234,20 @@ test('n’affiche que les fonctionnalités explicitement incluses dans un pack P
   assert.deepEqual([...selected], ['tableau-de-bord', 'présences', 'absences', 'historique']);
   assert.equal(selected.has('pointage'), false);
   assert.equal(selected.has('rapports'), false);
+});
+
+test('borne les fonctionnalités d’une entreprise aux packs sélectionnés', () => {
+  const ecommerceModule = modules.find(module => module.id === 'ecommerce');
+  assert.ok(ecommerceModule);
+
+  assert.deepEqual(
+    normalizeFeatureIdsForSelectedPacks(
+      ecommerceModule,
+      ['dashboard', 'catalogue', 'commandes'],
+      ['ecommerce-catalogue'],
+    ),
+    ['dashboard', 'catalogue'],
+  );
 });
 
 test('ne transforme pas une permission opérationnelle globale en fonctionnalités visibles', () => {

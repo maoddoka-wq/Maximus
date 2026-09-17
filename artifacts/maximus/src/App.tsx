@@ -103,7 +103,11 @@ import { canonicalAppPath, normalizeRoutePath, type Session } from '@/lib/naviga
 import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
-import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
+import {
+  getEffectiveModuleFeatureIds,
+  getModuleFeatureOptions,
+  normalizeFeatureIdsForSelectedPacks,
+} from '@/lib/module-features';
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
@@ -7788,22 +7792,6 @@ function CompanyModulesDetail({
         } as Record<ModuleId, ModuleAvailability>;
         setModuleStatuses(next);
         setSavedStatuses(next);
-        const nextFeatures = Object.fromEntries(
-          configuredModules.map((module) => {
-            const serverModule = access.find((item) => item.id === module.id);
-            const serverHasExplicitSelection =
-              Boolean(serverModule)
-              && (serverModule?.featureIds?.length || serverModule?.configuration?.featureScope === 'explicit');
-            const configured = serverHasExplicitSelection
-              ? serverModule?.featureIds ?? []
-              : company.requestedModuleFeatures?.[module.id];
-            const availableFeatureIds = new Set(getModuleFeatureOptions(module).map((feature) => feature.id));
-            const featureIds = configured?.length
-              ? configured.filter((featureId) => availableFeatureIds.has(featureId))
-              : getModuleFeatureOptions(module).map((feature) => feature.id);
-            return [module.id, [...new Set(featureIds)]];
-          }),
-        ) as Record<ModuleId, string[]>;
         const nextPacks = Object.fromEntries(
           configuredModules.map((module) => {
             const serverModule = access.find((item) => item.id === module.id);
@@ -7813,6 +7801,26 @@ function CompanyModulesDetail({
             const candidatePackIds = configuredPackIds ?? company.requestedModulePackIds?.[module.id] ?? [];
             const availablePackIds = new Set((module.featurePacks ?? []).map((pack) => pack.id));
             return [module.id, [...new Set(candidatePackIds.filter((packId) => availablePackIds.has(packId)))]];
+          }),
+        ) as Record<ModuleId, string[]>;
+        const nextFeatures = Object.fromEntries(
+          configuredModules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const serverHasExplicitSelection =
+              Boolean(serverModule)
+              && (Boolean(serverModule?.featureIds?.length) || serverModule?.configuration?.featureScope === 'explicit');
+            const configured = serverHasExplicitSelection
+              ? serverModule?.featureIds ?? []
+              : company.requestedModuleFeatures?.[module.id];
+            const candidateFeatureIds = configured === undefined
+              ? getModuleFeatureOptions(module).map((feature) => feature.id)
+              : configured;
+            const featureIds = normalizeFeatureIdsForSelectedPacks(
+              module,
+              candidateFeatureIds,
+              nextPacks[module.id] ?? [],
+            );
+            return [module.id, [...new Set(featureIds)]];
           }),
         ) as Record<ModuleId, string[]>;
         const nextPermissions = Object.fromEntries(
@@ -8156,6 +8164,25 @@ function CompanyModulesDetail({
   const save = async () => {
     setSaving(true);
     try {
+      const normalizedFeatureSelections = Object.fromEntries(
+        configuredModules.map((module) => [
+          module.id,
+          normalizeFeatureIdsForSelectedPacks(
+            module,
+            featureSelections[module.id] ?? [],
+            packSelections[module.id] ?? [],
+          ),
+        ]),
+      ) as Record<ModuleId, string[]>;
+      const normalizedFeaturePermissions = Object.fromEntries(
+        configuredModules.map((module) => [
+          module.id,
+          selectedFeaturePermissions(
+            normalizedFeatureSelections[module.id] ?? [],
+            featurePermissions[module.id] ?? {},
+          ),
+        ]),
+      ) as Record<ModuleId, FeaturePermissionMap>;
       const changes = configuredModules
         .filter((module) =>
           moduleStatuses[module.id] !== savedStatuses[module.id]
@@ -8164,11 +8191,8 @@ function CompanyModulesDetail({
           || JSON.stringify(featurePermissions[module.id] ?? {}) !== JSON.stringify(savedFeaturePermissions[module.id] ?? {}),
         )
         .map((module) => {
-          const featureIds = featureSelections[module.id] ?? [];
-          const configuredPermissions = selectedFeaturePermissions(
-            featureIds,
-            featurePermissions[module.id] ?? {},
-          );
+          const featureIds = normalizedFeatureSelections[module.id] ?? [];
+          const configuredPermissions = normalizedFeaturePermissions[module.id] ?? {};
           return onModuleAccess(company.id, module.id, moduleStatuses[module.id], {
             featureIds,
             configuration: {
@@ -8185,9 +8209,11 @@ function CompanyModulesDetail({
           ? [setCompanyPaymentAccess(company.id, paymentEnabled, paymentProviders)]
           : []),
       ]);
+      setFeatureSelections(normalizedFeatureSelections);
+      setFeaturePermissions(normalizedFeaturePermissions);
       setSavedStatuses(moduleStatuses);
-      setSavedFeatureSelections(featureSelections);
-      setSavedFeaturePermissions(featurePermissions);
+      setSavedFeatureSelections(normalizedFeatureSelections);
+      setSavedFeaturePermissions(normalizedFeaturePermissions);
       setSavedPackSelections(packSelections);
       setSavedPaymentEnabled(paymentEnabled);
     } catch (error) {
