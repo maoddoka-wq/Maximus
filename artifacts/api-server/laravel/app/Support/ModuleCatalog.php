@@ -15,7 +15,6 @@ final class ModuleCatalog
                 'name' => 'Gestion commerciale',
                 'description' => 'Piloter les ventes, les clients, les achats et la performance commerciale.',
                 'features' => ['Clients', 'Devis et commandes', 'Chiffre d’affaires'],
-                'feature_ids' => ['dashboard', 'sales', 'products', 'clients', 'suppliers', 'purchases', 'expenses', 'cash', 'credit', 'invoices', 'returns', 'reports', 'activity', 'team', 'settings'],
                 'feature_packs' => [
                     ['id' => 'commerce-consultation', 'name' => 'Consultation commerciale', 'description' => 'Consulter les clients et le suivi commercial.', 'feature_ids' => ['dashboard', 'clients']],
                     ['id' => 'commerce-gestion', 'name' => 'Gestion commerciale', 'description' => 'Gérer les ventes, clients et indicateurs.', 'feature_ids' => ['dashboard', 'clients', 'sales', 'products', 'reports']],
@@ -58,17 +57,16 @@ final class ModuleCatalog
                 'name' => 'E-commerce',
                 'description' => 'Boutique en ligne, catalogue public et commandes clients.',
                     'features' => ['Tableau de bord', 'Catalogue', 'Vente physique', 'Vente numérique', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
-                'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres'],
                 'feature_packs' => [
                     ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'finances', 'parametres']],
-                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion E-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
+                    ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
                     ['id' => 'ecommerce-vente-numerique', 'name' => 'Vente de produits numériques', 'description' => 'Publier des fichiers numériques et les délivrer après paiement.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-numerique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
                     ['id' => 'ecommerce-vente-complete', 'name' => 'Ventes physiques et numériques', 'description' => 'Vendre des produits physiques et des produits numériques dans la même boutique.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
                     ['id' => 'ecommerce-location', 'name' => 'Location & réservation', 'description' => 'Présenter et gérer les offres de location de maisons, bâches, véhicules et équipements.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'location', 'commandes', 'clients', 'parametres']],
                     ['id' => 'ecommerce-supervision', 'name' => 'Supervision boutique', 'description' => 'Superviser les ventes physiques et numériques, les promotions, la location, les livraisons et les retraits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres']],
                     [
                         'id' => 'ecommerce-employe',
-                        'name' => 'Employé E-commerce',
+                        'name' => 'Employé e-commerce',
                         'description' => 'Traiter les commandes et accompagner les clients sans modifier la configuration de la boutique.',
                         'feature_ids' => ['dashboard', 'commandes', 'clients'],
                         'feature_permissions' => [
@@ -79,7 +77,7 @@ final class ModuleCatalog
                     ],
                     [
                         'id' => 'ecommerce-manager',
-                        'name' => 'Manager E-commerce',
+                        'name' => 'Manager e-commerce',
                         'description' => 'Piloter la boutique, le catalogue, les ventes, les livraisons et les résultats.',
                         'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-numerique', 'categories', 'commandes', 'clients', 'promotions', 'location', 'livraisons', 'finances', 'parametres'],
                         'feature_permissions' => [
@@ -431,7 +429,6 @@ final class ModuleCatalog
 
         $validFeatureIds = collect($packs)
             ->flatMap(fn (array $pack): array => is_array($pack['feature_ids'] ?? null) ? $pack['feature_ids'] : [])
-            ->merge(is_array($definition['feature_ids'] ?? null) ? $definition['feature_ids'] : [])
             ->merge(collect(is_array($definition['features'] ?? null) ? $definition['features'] : [])
                 ->map(fn (mixed $feature): string => Str::slug((string) $feature)))
             ->map(fn (mixed $feature): string => (string) $feature)
@@ -440,10 +437,10 @@ final class ModuleCatalog
             ->values()
             ->all();
         $featureIds = array_values(array_unique(array_map('strval', $featureIds)));
-        // A company request can outlive a catalog revision. Unknown feature ids
-        // cannot grant access, so discard them instead of blocking the whole
-        // company creation or installation synchronization.
-        $featureIds = array_values(array_intersect($featureIds, $validFeatureIds));
+        $unknownFeatures = array_values(array_diff($featureIds, $validFeatureIds));
+        if ($unknownFeatures !== []) {
+            throw new \InvalidArgumentException("Le module « {$moduleId} » référence une fonctionnalité absente.");
+        }
 
         $packFeatureIds = $packIds === []
             ? []
@@ -466,10 +463,7 @@ final class ModuleCatalog
         $actions = ['voir', 'créer', 'modifier'];
         $featurePermissions = [];
         foreach ($rawPermissions as $featureId => $permissions) {
-            if (! in_array((string) $featureId, $featureIds, true)) {
-                continue;
-            }
-            if (! is_array($permissions)) {
+            if (! in_array((string) $featureId, $featureIds, true) || ! is_array($permissions)) {
                 throw new \InvalidArgumentException('Une permission référence une fonctionnalité non sélectionnée.');
             }
             $permissions = array_values(array_unique(array_map('strval', $permissions)));
@@ -589,7 +583,6 @@ final class ModuleCatalog
             : ($row?->payload ?? []);
         $state = is_array($payload) ? $payload : [];
         $custom = is_array($state['customModules'] ?? null) ? $state['customModules'] : [];
-        $overrides = is_array($state['moduleOverrides'] ?? null) ? $state['moduleOverrides'] : [];
 
         $normalizedCustom = collect($custom)
             ->filter(static fn (mixed $module): bool => is_array($module) && is_string($module['id'] ?? null))
@@ -617,56 +610,9 @@ final class ModuleCatalog
             ->values()
             ->all();
 
-        $definitions = [
+        return [
             ...self::definitions(),
             ...$normalizedCustom,
         ];
-
-        return collect($definitions)
-            ->map(static function (array $definition) use ($overrides): array {
-                $override = is_array($overrides[$definition['id']] ?? null)
-                    ? $overrides[$definition['id']]
-                    : [];
-                if ($override === []) {
-                    return $definition;
-                }
-
-                $featurePacks = $definition['feature_packs'] ?? [];
-                if (array_key_exists('featurePacks', $override) && is_array($override['featurePacks'])) {
-                    $featurePacks = collect($override['featurePacks'])
-                        ->filter(static fn (mixed $pack): bool => is_array($pack))
-                        ->map(static fn (array $pack): array => [
-                            'id' => (string) ($pack['id'] ?? ''),
-                            'name' => (string) ($pack['name'] ?? ''),
-                            'description' => (string) ($pack['description'] ?? ''),
-                            'feature_ids' => is_array($pack['featureIds'] ?? null) ? $pack['featureIds'] : [],
-                            'feature_permissions' => is_array($pack['featurePermissions'] ?? null)
-                                ? $pack['featurePermissions']
-                                : [],
-                        ])
-                        ->filter(static fn (array $pack): bool => $pack['id'] !== '')
-                        ->values()
-                        ->all();
-                }
-
-                return [
-                    ...$definition,
-                    'name' => is_string($override['name'] ?? null)
-                        ? $override['name']
-                        : $definition['name'],
-                    'description' => is_string($override['description'] ?? null)
-                        ? $override['description']
-                        : $definition['description'],
-                    'features' => is_array($override['features'] ?? null)
-                        ? array_values(array_filter($override['features'], 'is_string'))
-                        : $definition['features'],
-                    'feature_packs' => $featurePacks,
-                    'feature_dependencies' => is_array($override['featureDependencies'] ?? null)
-                        ? $override['featureDependencies']
-                        : ($definition['feature_dependencies'] ?? []),
-                ];
-            })
-            ->values()
-            ->all();
     }
 }

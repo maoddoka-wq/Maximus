@@ -1,4 +1,4 @@
-import { commerceTabDefinitions, commerceTabIdForLegacyFeature } from './commerce-permissions';
+import { commerceTabDefinitions } from './commerce-permissions';
 import { ecommerceFeatureDefinitions } from './ecommerce-features';
 import { featureSlug } from './permission-keys';
 import { normalizePayrollFeatureIds, payrollFeatureDefinitions } from './payroll-features';
@@ -104,9 +104,6 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
 
 export function normalizeModuleFeatureIds(module: Module, values: Iterable<string>) {
   const rawValues = [...values].map(value => {
-    if (module.id === 'commerce') {
-      return commerceTabIdForLegacyFeature[value] ?? value;
-    }
     if (module.id !== 'paie') return value;
     return normalizePayrollFeatureIds([value])[0] ?? value;
   });

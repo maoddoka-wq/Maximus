@@ -433,7 +433,7 @@ class EcommerceController extends Controller
         $query = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $company);
         $existing = $query->first();
         if (! $existing) {
-            return response()->json(['error' => 'Produit E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         $existingFulfillment = (string) ($existing->fulfillment_type ?? 'PHYSICAL');
         if (! $this->allowsProductFulfillment($company, $existingFulfillment)) {
@@ -491,7 +491,7 @@ class EcommerceController extends Controller
             ->where('company_id', $company)
             ->first();
         if (! $product) {
-            return response()->json(['error' => 'Produit E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
 
         $input = Validator::make($request->all(), [
@@ -533,7 +533,7 @@ class EcommerceController extends Controller
         $company = $this->company($request);
         $product = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $company)->first();
         if (! $product) {
-            return response()->json(['error' => 'Produit E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
 
         $this->storeGalleryImages($request, $company, 'product', $id, 'gallery', 20, 10240);
@@ -550,7 +550,7 @@ class EcommerceController extends Controller
         $company = $this->company($request);
         $product = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $company)->first();
         if (! $product) {
-            return response()->json(['error' => 'Produit E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         if (! $this->deleteGalleryImage($company, $imageId, 'product', $id, 'gallery')) {
             return response()->json(['error' => 'Image du produit introuvable.'], 404);
@@ -571,7 +571,7 @@ class EcommerceController extends Controller
             ->where('company_id', $company)
             ->first();
         if (! $product) {
-            return response()->json(['error' => 'Produit E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         if (($product->fulfillment_type ?? 'PHYSICAL') !== 'DIGITAL') {
             return response()->json(['error' => 'Seuls les produits numériques peuvent recevoir un fichier.'], 422);
@@ -704,7 +704,7 @@ class EcommerceController extends Controller
 
         $row = DB::table('ecommerce_products')->where('id', $id)->where('company_id', $this->company($request))->first();
         if (! $row) {
-            return response()->json(['error' => 'Produit E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
         DB::table('ecommerce_products')->where('id', $id)->update(['status' => 'ARCHIVED', 'updated_at' => now()]);
 
@@ -977,7 +977,7 @@ class EcommerceController extends Controller
         $query = DB::table('ecommerce_orders')->where('id', $id)->where('company_id', $company);
         $order = $query->first();
         if (! $order) {
-            return response()->json(['error' => 'Commande E-commerce introuvable.'], 404);
+            return response()->json(['error' => 'Commande e-commerce introuvable.'], 404);
         }
         if (! in_array($input['status'], self::ORDER_TRANSITIONS[$order->status] ?? [], true)) {
             return response()->json(['error' => 'Cette transition de commande n’est pas autorisée.'], 422);

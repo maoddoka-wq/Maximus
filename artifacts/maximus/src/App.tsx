@@ -96,7 +96,6 @@ import {
   publishCatalogDraft,
   updateCatalogDraft,
   validateCatalogDraft,
-  type CatalogDraft,
 } from '@/lib/catalog-workflow';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
@@ -4896,7 +4895,7 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Compte plateforme</p>
-            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions E-commerce</h2>
+            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions e-commerce</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
               Chaque vente est répartie automatiquement : {bootstrap?.commissionPolicy.label ?? '3 % DiamanoPay, 2 % MAXIMUS, 95 % vendeur.'}
             </p>
@@ -6445,19 +6444,6 @@ function InteractiveModulesPage({
     setDeletingModule(null);
   };
 
-  const removeModuleFromSectors = (catalogDraft: CatalogDraft, moduleId: ModuleId) => {
-    catalogDraft.sectorPresets = catalogDraft.sectorPresets.map((preset) => ({
-      ...preset,
-      moduleIds: preset.moduleIds.filter((id) => id !== moduleId),
-      modulePackIds: Object.fromEntries(
-        Object.entries(preset.modulePackIds ?? {}).filter(([presetModuleId]) => presetModuleId !== moduleId),
-      ),
-      moduleFeatures: Object.fromEntries(
-        Object.entries(preset.moduleFeatures ?? {}).filter(([presetModuleId]) => presetModuleId !== moduleId),
-      ),
-    }));
-  };
-
   const toggleModule = (moduleId: ModuleId) => {
     const module = moduleDefinitions.find((item) => item.id === moduleId);
     if (!module) return;
@@ -6469,7 +6455,6 @@ function InteractiveModulesPage({
             ...catalogDraft.moduleStatuses,
             [moduleId]: isActive ? 'INACTIF' : 'ACTIF',
           };
-           if (isActive) removeModuleFromSectors(catalogDraft, moduleId);
         });
       },
       isActive ? `${module.name} sera désactivé à la prochaine publication.` : `${module.name} sera activé à la prochaine publication.`,
@@ -7526,45 +7511,7 @@ function AdminCreateCompanyPage({
     setSaving(true);
     try {
       const preset = availableSectorPresets.find((item) => item.name === sector);
-      const configuredModules = getConfiguredModules(data);
-      const requestedModulePackIds = Object.fromEntries(
-        selectedModules.flatMap((moduleId) => {
-          const module = configuredModules.find((candidate) => candidate.id === moduleId);
-          const availablePackIds = new Set((module?.featurePacks ?? []).map((pack) => pack.id));
-          const packIds = (preset?.modulePackIds?.[moduleId] ?? []).filter((packId) => availablePackIds.has(packId));
-          return packIds.length ? [[moduleId, [...packIds]]] : [];
-        }),
-      ) as Partial<Record<ModuleId, string[]>>;
-      const requestedModuleFeatures = Object.fromEntries(
-        selectedModules.map((moduleId) => {
-          const module = configuredModules.find((candidate) => candidate.id === moduleId);
-          const packIds = requestedModulePackIds[moduleId] ?? [];
-          const packFeatureIds = (module?.featurePacks ?? [])
-            .filter((pack) => packIds.includes(pack.id))
-            .flatMap((pack) => pack.featureIds);
-          const featureIds = module
-            ? [...getEffectiveModuleFeatureIds(module, packFeatureIds.length ? packFeatureIds : undefined)]
-            : [];
-          return [moduleId, featureIds];
-        }),
-      ) as Partial<Record<ModuleId, string[]>>;
-      const requestedModulePermissions = Object.fromEntries(
-        selectedModules.map((moduleId) => {
-          const module = configuredModules.find((candidate) => candidate.id === moduleId);
-          const packIds = requestedModulePackIds[moduleId] ?? [];
-          const selectedPacks = (module?.featurePacks ?? []).filter((pack) => packIds.includes(pack.id));
-          const packPermissions = selectedPacks.reduce<FeaturePermissionMap>(
-            (permissions, pack) => ({ ...permissions, ...(pack.featurePermissions ?? {}) }),
-            {},
-          );
-          return [
-            moduleId,
-            defaultFeaturePermissions(requestedModuleFeatures[moduleId] ?? [], packPermissions),
-          ];
-        }),
-      ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
-
-      await companyRequestApi.createAdministrative({
+       await companyRequestApi.createAdministrative({
         name: name.trim(),
         manager: manager.trim(),
         email: normalizedEmail,
@@ -7573,9 +7520,11 @@ function AdminCreateCompanyPage({
         country: country.trim(),
         sector,
         requestedModules: [...selectedModules],
-        requestedModulePackIds,
-        requestedModuleFeatures,
-        requestedModulePermissions,
+        requestedModulePackIds: Object.fromEntries(
+          Object.entries(preset?.modulePackIds ?? {})
+            .filter(([moduleId]) => selectedModules.includes(moduleId as ModuleId))
+            .map(([moduleId, packIds]) => [moduleId, [...(packIds ?? [])]]),
+        ),
       });
       onComplete();
     } catch (saveError) {

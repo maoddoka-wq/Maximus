@@ -22,7 +22,6 @@
 - [Exports Fast Refresh](fast-refresh-exports.md) — les fichiers de composants React doivent éviter les exports de constantes ou utilitaires non visuels.
 - [Frontière des abonnements](subscription-boundary.md) — un abonnement est une entité de facturation distincte des modules autorisés d’une entreprise.
 - [Publication du catalogue](catalog-workflow.md) — les changements modules, packs et secteurs restent en brouillon jusqu’à validation et publication explicite.
-- [Normalisation du catalogue historique](catalog-legacy-normalization.md) — nettoyer les anciens identifiants de fonctionnalités et les secteurs lors de la publication, surtout avant une désactivation.
 - [Séparation production et démonstration](production-demo-separation.md) — les fixtures KORA restent locales et le fallback production ne doit contenir aucune donnée fictive.
 - [Espace client e-commerce](ecommerce-customer-space.md) — les sessions, commandes, adresses, favoris et paniers sont toujours bornés par client et entreprise.
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
@@ -78,5 +77,3 @@
 - [Autorisation par fonctionnalité Présences](presence-feature-authorization.md) — une permission détaillée ne doit jamais retomber sur l’action d’une autre fonctionnalité.
 - [Connexion entreprise personnalisée](company-branded-login.md) — MAXIMUS autorise le mode marqué, l’entreprise choisit son entrée, et le serveur résout toujours le tenant par slug.
 - [Installations isolées](isolated-installations.md) — le mode central reste le défaut ; une installation dédiée est bornée par une entreprise configurée côté serveur et ne crée jamais d’admin global.
-- [URL canonique des bootstraps](installation-bootstrap-canonical-url.md) — générer les bootstraps depuis l’URL publique HTTPS configurée, jamais depuis l’hôte de requête reconstruit par Render.
-- [Synchronisation du catalogue dédié](dedicated-catalog-sync.md) — une installation dédiée reçoit le catalogue publié central et remplace seulement ses clés de catalogue, jamais son état métier.

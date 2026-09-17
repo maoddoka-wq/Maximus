@@ -39,7 +39,7 @@ export const ecommerceFeaturePacks = [
   },
   {
     id: 'ecommerce-gestion',
-    name: 'Gestion E-commerce',
+    name: 'Gestion e-commerce',
     description: 'Piloter le catalogue, les commandes et les clients.',
     featureIds: ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres'],
     featurePermissions: {
