@@ -1,0 +1,16 @@
+:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel>php artisan --version
+PHP Fatal error:  Uncaught Error: Class "Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance" not found in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php:166
+Stack trace:
+#0 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\bootstrap\app.php(8): Illuminate\Foundation\Configuration\ApplicationBuilder->withRouting(Object(Closure), 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', NULL, NULL, '/up')
+#1 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan(14): require_once('C:\\Users\\FIS-TS...')
+#2 {main}
+  thrown in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php on line 166
+
+Fatal error: Uncaught Error: Class "Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance" not found in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php:166
+Stack trace:
+#0 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\bootstrap\app.php(8): Illuminate\Foundation\Configuration\ApplicationBuilder->withRouting(Object(Closure), 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', 'C:\\Users\\FIS-TS...', NULL, NULL, '/up')
+#1 C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan(14): require_once('C:\\Users\\FIS-TS...')
+#2 {main}
+  thrown in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\vendor\laravel\framework\src\Illuminate\Foundation\Configuration\ApplicationBuilder.php on line 166
+
+C:\Users\FIS-TS\Desktop\L3 pc uca
