@@ -3346,7 +3346,7 @@ function CompanyDetail({
         if (target) Object.assign(target, result.company);
       }, input.customAllowed === false ? 'La connexion personnalisée a été désactivée.' : 'Paramètres de connexion enregistrés.');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.');
+      showAppToast(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.', 'error');
     } finally {
       setLoginSaving(false);
     }
@@ -3417,7 +3417,7 @@ function CompanyDetail({
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Le manifeste d’installation n’a pas pu être exporté.');
+      showAppToast(error instanceof Error ? error.message : 'Le manifeste d’installation n’a pas pu être exporté.', 'error');
     }
   };
 
@@ -7731,9 +7731,14 @@ function CompanyModulesDetail({
   onBack: () => void;
 }) {
   const { confirm } = useAppDialog();
+  const configuredModules = getConfiguredModules({
+    moduleOverrides: data.moduleOverrides ?? {},
+    removedModules: data.removedModules ?? [],
+    customModules: data.customModules ?? [],
+  });
   const defaultStatuses = () =>
     Object.fromEntries(
-      modules.map((module) => [module.id, company.allowedModules.includes(module.id) ? 'ACTIF' : 'INACTIF']),
+      configuredModules.map((module) => [module.id, company.allowedModules.includes(module.id) ? 'ACTIF' : 'INACTIF']),
     ) as Record<ModuleId, ModuleAvailability>;
   const [moduleStatuses, setModuleStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
   const [savedStatuses, setSavedStatuses] = useState<Record<ModuleId, ModuleAvailability>>(defaultStatuses);
@@ -7784,7 +7789,7 @@ function CompanyModulesDetail({
         setModuleStatuses(next);
         setSavedStatuses(next);
         const nextFeatures = Object.fromEntries(
-          modules.map((module) => {
+          configuredModules.map((module) => {
             const serverModule = access.find((item) => item.id === module.id);
             const serverHasExplicitSelection =
               Boolean(serverModule)
@@ -7792,14 +7797,26 @@ function CompanyModulesDetail({
             const configured = serverHasExplicitSelection
               ? serverModule?.featureIds ?? []
               : company.requestedModuleFeatures?.[module.id];
+            const availableFeatureIds = new Set(getModuleFeatureOptions(module).map((feature) => feature.id));
             const featureIds = configured?.length
-              ? configured
+              ? configured.filter((featureId) => availableFeatureIds.has(featureId))
               : getModuleFeatureOptions(module).map((feature) => feature.id);
             return [module.id, [...new Set(featureIds)]];
           }),
         ) as Record<ModuleId, string[]>;
+        const nextPacks = Object.fromEntries(
+          configuredModules.map((module) => {
+            const serverModule = access.find((item) => item.id === module.id);
+            const configuredPackIds = Array.isArray(serverModule?.configuration?.packIds)
+              ? serverModule.configuration.packIds.filter((packId): packId is string => typeof packId === 'string')
+              : null;
+            const candidatePackIds = configuredPackIds ?? company.requestedModulePackIds?.[module.id] ?? [];
+            const availablePackIds = new Set((module.featurePacks ?? []).map((pack) => pack.id));
+            return [module.id, [...new Set(candidatePackIds.filter((packId) => availablePackIds.has(packId)))]];
+          }),
+        ) as Record<ModuleId, string[]>;
         const nextPermissions = Object.fromEntries(
-          modules.map((module) => {
+          configuredModules.map((module) => {
             const serverModule = access.find((item) => item.id === module.id);
             const serverConfiguration = serverModule?.configuration;
             const hasServerPermissions = Boolean(
@@ -7808,7 +7825,7 @@ function CompanyModulesDetail({
             );
             const serverPermissions = normalizeFeaturePermissionMap(serverConfiguration?.featurePermissions);
             const companyPermissions = normalizeFeaturePermissionMap(company.requestedModulePermissions?.[module.id]);
-            const selectedPackIds = company.requestedModulePackIds?.[module.id] ?? [];
+            const selectedPackIds = nextPacks[module.id] ?? [];
             const packPermissions = (module.featurePacks ?? [])
               .filter((pack) => selectedPackIds.includes(pack.id))
               .reduce<FeaturePermissionMap>(
@@ -7826,12 +7843,6 @@ function CompanyModulesDetail({
             ];
           }),
         ) as Record<ModuleId, FeaturePermissionMap>;
-        const nextPacks = Object.fromEntries(
-          modules.map((module) => [
-            module.id,
-            [...(company.requestedModulePackIds?.[module.id] ?? [])],
-          ]),
-        ) as Record<ModuleId, string[]>;
         setFeatureSelections(nextFeatures);
         setSavedFeatureSelections(nextFeatures);
         setFeaturePermissions(nextPermissions);
@@ -8018,9 +8029,9 @@ function CompanyModulesDetail({
       link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      window.alert('Le fichier bootstrap a été téléchargé. Transférez-le uniquement au VPS de cette entreprise.');
+      showAppToast('Le fichier bootstrap a été téléchargé. Transférez-le uniquement au VPS de cette entreprise.', 'success');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être préparée.');
+      showAppToast(error instanceof Error ? error.message : 'L’installation n’a pas pu être préparée.', 'error');
     }
   };
 
@@ -8035,9 +8046,9 @@ function CompanyModulesDetail({
     setInstallationBusy(true);
     try {
       await companyRequestApi.revokeInstallation(company.id);
-      window.alert('Installation révoquée. Arrêtez aussi le service du VPS si la coupure doit être immédiate.');
+      showAppToast('Installation révoquée. Arrêtez aussi le service du VPS si la coupure doit être immédiate.', 'success');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.');
+      showAppToast(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.', 'error');
     } finally {
       setInstallationBusy(false);
     }
@@ -8060,7 +8071,7 @@ function CompanyModulesDetail({
   };
 
   const setModulePacks = (moduleId: ModuleId, packIds: string[]) => {
-    const module = modules.find((item) => item.id === moduleId);
+    const module = configuredModules.find((item) => item.id === moduleId);
     const featureIds = module
       ? [...new Set(
           (module.featurePacks ?? [])
@@ -8145,7 +8156,7 @@ function CompanyModulesDetail({
   const save = async () => {
     setSaving(true);
     try {
-      const changes = modules
+      const changes = configuredModules
         .filter((module) =>
           moduleStatuses[module.id] !== savedStatuses[module.id]
           || JSON.stringify(featureSelections[module.id] ?? []) !== JSON.stringify(savedFeatureSelections[module.id] ?? [])
@@ -8185,7 +8196,7 @@ function CompanyModulesDetail({
         setFeaturePermissions(savedFeaturePermissions);
        setPackSelections(savedPackSelections);
        setPaymentEnabled(savedPaymentEnabled);
-      window.alert(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.');
+      showAppToast(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.', 'error');
     } finally {
       setSaving(false);
     }
@@ -8249,7 +8260,7 @@ function CompanyModulesDetail({
           <div>
             <p className="text-xs text-[hsl(var(--muted-foreground))]">Modules accessibles</p>
             <p className="mt-1 font-bold">
-              {modules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {modules.length}
+              {configuredModules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {configuredModules.length}
             </p>
           </div>
         </div>
@@ -8563,7 +8574,7 @@ function CompanyModulesDetail({
                 setSavedPaymentEnabled(access.enabled);
               } catch (error) {
                 setPaymentEnabled(savedPaymentEnabled);
-                window.alert(error instanceof Error ? error.message : 'La configuration des paiements n’a pas pu être enregistrée.');
+                showAppToast(error instanceof Error ? error.message : 'La configuration des paiements n’a pas pu être enregistrée.', 'error');
               } finally {
                 setSaving(false);
               }
