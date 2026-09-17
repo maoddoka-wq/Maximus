@@ -17,7 +17,8 @@ class SystemHealthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('ok', true)
             ->assertJsonPath('database', true)
-            ->assertJsonPath('status', 'OPERATIONAL');
+            ->assertJsonPath('status', 'OPERATIONAL')
+            ->assertJsonPath('syncProtocolVersion', 2);
     }
 
     public function test_api_root_is_a_fast_liveness_endpoint(): void

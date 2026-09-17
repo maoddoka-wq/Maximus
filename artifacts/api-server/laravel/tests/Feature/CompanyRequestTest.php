@@ -134,6 +134,7 @@ class CompanyRequestTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('installation.companyId', $companyId)
             ->assertJsonPath('installation.mode', 'dedicated')
+            ->assertJsonPath('bootstrap.syncProtocolVersion', 2)
             ->assertJsonPath('bootstrap.centralUrl', 'https://maximus-erp.onrender.com');
 
         $bootstrapToken = (string) $response->json('bootstrap.token');
@@ -202,6 +203,24 @@ class CompanyRequestTest extends TestCase
         $this->assertSame([$pack['id']], $selection['configuration']['packIds']);
         $this->assertSame(['dashboard', 'catalogue'], $selection['featureIds']);
         $this->assertSame($pack['featurePermissions'], $selection['configuration']['featurePermissions']);
+    }
+
+    public function test_isolated_installation_drops_permissions_for_unselected_legacy_features(): void
+    {
+        $selection = ModuleCatalog::normalizeSelection(
+            'commerce',
+            ['dashboard'],
+            [
+                'packIds' => ['commerce-consultation'],
+                'featurePermissions' => [
+                    'dashboard' => ['voir'],
+                    'clients' => ['voir', 'modifier'],
+                ],
+            ],
+            true,
+        );
+
+        $this->assertSame(['dashboard' => ['voir']], $selection['configuration']['featurePermissions']);
     }
 
     public function test_rejecting_a_request_is_persisted_and_cannot_be_approved_afterward(): void

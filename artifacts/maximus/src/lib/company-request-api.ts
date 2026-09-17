@@ -85,6 +85,8 @@ export const companyRequestApi = {
     request<{
       manifestVersion: 1;
       source: 'maximus-central';
+       applicationVersion: string;
+       syncProtocolVersion: number;
       exportedAt: string;
       company: {
         id: string;
@@ -121,6 +123,8 @@ export const companyRequestApi = {
         installationId: string;
         companyId: string;
         mode: 'dedicated' | 'on_premise';
+        applicationVersion: string;
+        syncProtocolVersion: number;
         token: string;
       };
     }>(`/companies/${encodeURIComponent(companyId)}/installation`, {

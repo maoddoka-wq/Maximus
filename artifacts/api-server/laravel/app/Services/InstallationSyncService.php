@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Support\ModuleCatalog;
+use App\Support\ApplicationIdentity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -33,6 +34,24 @@ final class InstallationSyncService
         $payload = $response->json();
         if (! is_array($payload) || ! is_array($payload['company'] ?? null)) {
             throw new RuntimeException('La configuration reçue de MAXIMUS est invalide.');
+        }
+        $centralVersion = trim((string) ($payload['applicationVersion'] ?? ''));
+        $expectedVersion = ApplicationIdentity::expectedVersion();
+        $packageVersion = ApplicationIdentity::packageVersion();
+        if ($centralVersion === '' || $centralVersion === 'unknown') {
+            throw new RuntimeException('MAXIMUS principal ne publie pas encore son identifiant de version. Déployez la version actuelle avant de synchroniser.');
+        }
+        if ($expectedVersion === '' || $expectedVersion !== $centralVersion) {
+            throw new RuntimeException('Le bootstrap ne correspond pas à la version actuellement servie par MAXIMUS principal. Générez un nouveau bootstrap.');
+        }
+        if ($packageVersion === '' || $packageVersion === 'unknown') {
+            throw new RuntimeException('Cette copie locale ne contient pas son identifiant de build. Utilisez une archive générée par l’outil de packaging à jour.');
+        }
+        if ($packageVersion !== $centralVersion) {
+            throw new RuntimeException('La copie locale ('.$packageVersion.') ne correspond pas à MAXIMUS principal ('.$centralVersion.'). Recréez l’archive depuis le même commit déployé.');
+        }
+        if ((int) ($payload['syncProtocolVersion'] ?? 0) !== ApplicationIdentity::SYNC_PROTOCOL_VERSION) {
+            throw new RuntimeException('La version du protocole de synchronisation est incompatible. Générez une archive depuis la version actuelle.');
         }
 
         return $payload;
@@ -81,6 +100,7 @@ final class InstallationSyncService
                             'packIds' => is_array($packIds[$moduleId] ?? null) ? $packIds[$moduleId] : [],
                             'featurePermissions' => is_array($permissions[$moduleId] ?? null) ? $permissions[$moduleId] : [],
                         ],
+                        true,
                     );
                 } catch (\InvalidArgumentException $exception) {
                     throw new RuntimeException($exception->getMessage(), previous: $exception);

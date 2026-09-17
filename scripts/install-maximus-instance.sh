@@ -246,6 +246,8 @@ bootstrap_url="$(bootstrap_value "$BOOTSTRAP_FILE" centralUrl)" || fail "Le mani
 bootstrap_token="$(bootstrap_value "$BOOTSTRAP_FILE" token)" || fail "Le manifeste ne contient pas le jeton."
 bootstrap_company_id="$(bootstrap_value "$BOOTSTRAP_FILE" companyId)" || fail "Le manifeste ne contient pas companyId."
 bootstrap_installation_id="$(bootstrap_value "$BOOTSTRAP_FILE" installationId)" || fail "Le manifeste ne contient pas installationId."
+bootstrap_application_version="$(bootstrap_value "$BOOTSTRAP_FILE" applicationVersion)" || fail "Le manifeste est ancien et ne contient pas applicationVersion. Générez un nouveau bootstrap depuis MAXIMUS principal."
+bootstrap_sync_protocol_version="$(bootstrap_value "$BOOTSTRAP_FILE" syncProtocolVersion)" || fail "Le manifeste est ancien et ne contient pas syncProtocolVersion. Générez un nouveau bootstrap depuis MAXIMUS principal."
 case "$bootstrap_mode" in
     dedicated|on_premise) ;;
     *) fail "Le mode du manifeste doit être dedicated ou on_premise." ;;
@@ -257,6 +259,7 @@ set_env_value MAXIMUS_INSTALLATION_TOKEN "$bootstrap_token"
 set_env_value MAXIMUS_INSTALLATION_ID "$bootstrap_installation_id"
 set_env_value MAXIMUS_INSTALLATION_COMPANY_ID "$bootstrap_company_id"
 set_env_value MAXIMUS_INSTALLATION_BOOTSTRAP "$BOOTSTRAP_FILE"
+set_env_value MAXIMUS_EXPECTED_APPLICATION_VERSION "$bootstrap_application_version"
 
 log "Collecte de la configuration de PostgreSQL"
 set_env_value DB_CONNECTION "pgsql"
