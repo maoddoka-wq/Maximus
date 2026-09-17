@@ -1,0 +1,33 @@
+IS-TS@DESKTOP-0STECI3 MINGW64 ~/Desktop/L3 pc ucad/MEDIA PLUS/spark 7/AUTRUIS/INTERNET/Music/Downloads/MAXIMUS/Maximus-main
+$ bash ./scripts/install-maximus-instance.sh --bootstrap-file ./maximus-bootstrap-bab818df-731b-455f-b399-2a312c13f2b2-on_premise.json --skip-composer --skip-build --skip-healthcheck
+
+==> Collecte de la configuration de l’entreprise
+
+==> Collecte de la configuration de PostgreSQL
+Hôte PostgreSQL [127.0.0.1] : 127.o.o.1
+Port PostgreSQL [5432] : 5432
+Base PostgreSQL [maximus] : maximus
+Utilisateur PostgreSQL [maximus] : maximus
+Mot de passe PostgreSQL :
+
+==> Configuration de l’administrateur entreprise
+Email de l’administrateur entreprise : ana@gmail.com
+Mot de passe initial de l’administrateur :
+
+==> Installation des dépendances Laravel
+Composer ignoré (--skip-composer).
+PHP Warning:  require(C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel/vendor/autoload.php): Failed to open stream: No such file or directory in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan on line 10
+
+Warning: require(C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel/vendor/autoload.php): Failed to open stream: No such file or directory in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan on line 10
+PHP Fatal error:  Uncaught Error: Failed opening required 'C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel/vendor/autoload.php' (include_path='.;C:\php\pear') in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan:10
+Stack trace:
+#0 {main}
+  thrown in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan on line 10
+
+Fatal error: Uncaught Error: Failed opening required 'C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel/vendor/autoload.php' (include_path='.;C:\php\pear') in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan:10
+Stack trace:
+#0 {main}
+  thrown in C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main\artifacts\api-server\laravel\artisan on line 10
+
+FIS-TS@DESKTOP-0STECI3 MINGW64 ~/Desktop/L3 pc ucad/MEDIA PLUS/spark 7/AUTRUIS/INTERNET/Music/Downloads/MAXIMUS/Maximus-main
+$
