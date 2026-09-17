@@ -96,6 +96,7 @@ import {
   publishCatalogDraft,
   updateCatalogDraft,
   validateCatalogDraft,
+  type CatalogDraft,
 } from '@/lib/catalog-workflow';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
@@ -6444,6 +6445,19 @@ function InteractiveModulesPage({
     setDeletingModule(null);
   };
 
+  const removeModuleFromSectors = (catalogDraft: CatalogDraft, moduleId: ModuleId) => {
+    catalogDraft.sectorPresets = catalogDraft.sectorPresets.map((preset) => ({
+      ...preset,
+      moduleIds: preset.moduleIds.filter((id) => id !== moduleId),
+      modulePackIds: Object.fromEntries(
+        Object.entries(preset.modulePackIds ?? {}).filter(([presetModuleId]) => presetModuleId !== moduleId),
+      ),
+      moduleFeatures: Object.fromEntries(
+        Object.entries(preset.moduleFeatures ?? {}).filter(([presetModuleId]) => presetModuleId !== moduleId),
+      ),
+    }));
+  };
+
   const toggleModule = (moduleId: ModuleId) => {
     const module = moduleDefinitions.find((item) => item.id === moduleId);
     if (!module) return;
@@ -6455,6 +6469,7 @@ function InteractiveModulesPage({
             ...catalogDraft.moduleStatuses,
             [moduleId]: isActive ? 'INACTIF' : 'ACTIF',
           };
+           if (isActive) removeModuleFromSectors(catalogDraft, moduleId);
         });
       },
       isActive ? `${module.name} sera désactivé à la prochaine publication.` : `${module.name} sera activé à la prochaine publication.`,

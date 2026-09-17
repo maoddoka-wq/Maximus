@@ -1,12 +1,13 @@
 import type {
   ModuleOverrides,
   ModuleStatusMap,
+  Module,
   ModuleId,
   SectorPreset,
   StoreData,
 } from './store';
 import { getConfiguredModules, modules } from './store';
-import { getModuleFeatureOptions } from './module-features';
+import { getModuleFeatureOptions, normalizeModuleFeatureIds } from './module-features';
 
 export interface CatalogDraft {
   moduleOverrides: ModuleOverrides;
@@ -38,6 +39,54 @@ export interface CatalogValidation {
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+function normalizeCatalogModule(module: Module): Module {
+  const validFeatureIds = new Set(getModuleFeatureOptions(module).map(feature => feature.id));
+  const featurePacks = (module.featurePacks ?? [])
+    .map(pack => {
+      const featureIds = [...new Set(
+        normalizeModuleFeatureIds(module, pack.featureIds)
+          .filter(featureId => validFeatureIds.has(featureId)),
+      )];
+      const featurePermissions = Object.fromEntries(
+        Object.entries(pack.featurePermissions ?? {})
+          .filter(([featureId]) => featureIds.includes(featureId)),
+      );
+      return { ...pack, featureIds, featurePermissions };
+    })
+    .filter(pack => pack.featureIds.length > 0);
+  const featureDependencies = Object.fromEntries(
+    Object.entries(module.featureDependencies ?? {})
+      .filter(([featureId, dependencies]) =>
+        validFeatureIds.has(featureId)
+        && (dependencies ?? []).every(dependency => validFeatureIds.has(dependency)),
+      ),
+  );
+
+  return { ...module, featurePacks, featureDependencies };
+}
+
+function normalizeCatalogModules(modulesToNormalize: Module[]): Module[] {
+  return modulesToNormalize.map(normalizeCatalogModule);
+}
+
+function normalizedModuleOverrides(
+  overrides: ModuleOverrides,
+  configuredModules: Module[],
+): ModuleOverrides {
+  const modulesById = new Map(configuredModules.map(module => [module.id, module]));
+  return Object.fromEntries(
+    Object.entries(overrides).map(([moduleId, override]) => {
+      const module = modulesById.get(moduleId as ModuleId);
+      if (!module) return [moduleId, override];
+      return [moduleId, {
+        ...override,
+        featurePacks: module.featurePacks,
+        featureDependencies: module.featureDependencies,
+      }];
+    }),
+  ) as ModuleOverrides;
+}
 
 export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
   const draft = data.catalogDraft;
@@ -76,11 +125,11 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   const snapshot = getCatalogSnapshot(data);
   const errors: string[] = [];
   const warnings: string[] = [];
-  const configuredModules = getConfiguredModules({
+  const configuredModules = normalizeCatalogModules(getConfiguredModules({
     moduleOverrides: snapshot.moduleOverrides,
     removedModules: [],
     customModules: snapshot.customModules,
-  });
+  }));
   const moduleById = new Map(configuredModules.map(module => [module.id, module]));
   const moduleIds = new Set(configuredModules.map(module => module.id));
   const availableModuleIds = new Set(
@@ -238,7 +287,6 @@ export function publishCatalogDraft(data: StoreData) {
   if (!data.catalogDraft) return;
   if (validateCatalogDraft(data).errors.length > 0) return;
   const draft = getCatalogSnapshot(data);
-  data.moduleOverrides = draft.moduleOverrides;
   data.moduleStatuses = draft.moduleStatuses;
   data.removedModules = draft.removedModules;
   data.customModules = draft.customModules ?? [];
@@ -248,13 +296,15 @@ export function publishCatalogDraft(data: StoreData) {
     removedModules: [],
     customModules: draft.customModules ?? [],
   });
+  const normalizedModules = normalizeCatalogModules(publishedModules);
+  data.moduleOverrides = normalizedModuleOverrides(draft.moduleOverrides, normalizedModules);
   const activeModuleIds = new Set(
-    publishedModules
+    normalizedModules
       .filter(module => !draft.removedModules.includes(module.id))
       .filter(module => (draft.moduleStatuses[module.id] ?? module.status) !== 'INACTIF')
       .map(module => module.id),
   );
-  const moduleById = new Map(publishedModules.map(module => [module.id, module]));
+  const moduleById = new Map(normalizedModules.map(module => [module.id, module]));
   const selectedFeaturesFor = (moduleId: ModuleId, packIds: string[] = [], featureIds: string[] = []) => {
     const module = moduleById.get(moduleId);
     if (!module) return { packIds: [], featureIds: [] };
