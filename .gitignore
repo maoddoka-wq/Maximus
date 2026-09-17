@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Dedicated MAXIMUS instances
+artifacts/api-server/laravel/MAXIMUS_BUILD_VERSION

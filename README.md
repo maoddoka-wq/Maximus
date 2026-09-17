@@ -152,6 +152,61 @@ différentes de `/api/healthz` et les déploiements centraux qui ne publient pas
 encore leur identifiant de build. Il exclut les secrets locaux, `vendor` et les
 données persistantes.
 
+### Mettre à jour une installation locale depuis GitHub
+
+Une installation locale durable doit être créée depuis un clone Git, et non
+depuis une succession de ZIP. Le premier démarrage se fait depuis un clone
+propre :
+
+```bash
+git clone https://github.com/maoddoka-wq/Maximus.git maximus-local
+cd maximus-local
+./scripts/install-maximus-instance.sh --bootstrap-file ./maximus-bootstrap.json
+```
+
+Après chaque changement publié sur GitHub et déployé sur Render, la mise à jour
+Windows se fait avec PowerShell :
+
+```powershell
+.\scripts\update-maximus-instance.ps1
+```
+
+Ou avec Git Bash/Linux :
+
+```bash
+./scripts/update-maximus-instance.sh
+```
+
+Les scripts vérifient que GitHub et Render servent exactement le même commit,
+refusent les modifications locales non sauvegardées et refusent une branche
+locale divergente. Ils mettent à jour le code, les dépendances, les migrations
+et la configuration de l’entreprise, mais ne remplacent jamais `.env`, `vendor`,
+`storage`, la base PostgreSQL ni les fichiers téléversés.
+
+Pour une exécution automatique Windows, créer une tâche planifiée qui lance
+PowerShell avec :
+
+```text
+-NoProfile -ExecutionPolicy Bypass -File C:\chemin\vers\maximus-local\scripts\update-maximus-instance.ps1 -SkipHealthcheck
+```
+
+Ou créer directement la tâche depuis le dossier du projet :
+
+```powershell
+.\scripts\register-maximus-auto-update.ps1 -IntervalMinutes 10
+```
+
+Pour la supprimer :
+
+```powershell
+.\scripts\register-maximus-auto-update.ps1 -Remove
+```
+
+Il est recommandé de lancer cette tâche après le déploiement Render, ou toutes
+les 5 à 15 minutes si l’installation doit suivre automatiquement les versions
+publiées. Une mise à jour est toujours refusée tant que Render ne sert pas le
+commit GitHub correspondant.
+
 ### Workflows du projet
 
 Les trois workflows habituels sont :
