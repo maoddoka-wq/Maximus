@@ -15,6 +15,7 @@ final class ModuleCatalog
                 'name' => 'Gestion commerciale',
                 'description' => 'Piloter les ventes, les clients, les achats et la performance commerciale.',
                 'features' => ['Clients', 'Devis et commandes', 'Chiffre d’affaires'],
+                'feature_ids' => ['dashboard', 'sales', 'products', 'clients', 'suppliers', 'purchases', 'expenses', 'cash', 'credit', 'invoices', 'returns', 'reports', 'activity', 'team', 'settings'],
                 'feature_packs' => [
                     ['id' => 'commerce-consultation', 'name' => 'Consultation commerciale', 'description' => 'Consulter les clients et le suivi commercial.', 'feature_ids' => ['dashboard', 'clients']],
                     ['id' => 'commerce-gestion', 'name' => 'Gestion commerciale', 'description' => 'Gérer les ventes, clients et indicateurs.', 'feature_ids' => ['dashboard', 'clients', 'sales', 'products', 'reports']],
@@ -429,6 +430,7 @@ final class ModuleCatalog
 
         $validFeatureIds = collect($packs)
             ->flatMap(fn (array $pack): array => is_array($pack['feature_ids'] ?? null) ? $pack['feature_ids'] : [])
+            ->merge(is_array($definition['feature_ids'] ?? null) ? $definition['feature_ids'] : [])
             ->merge(collect(is_array($definition['features'] ?? null) ? $definition['features'] : [])
                 ->map(fn (mixed $feature): string => Str::slug((string) $feature)))
             ->map(fn (mixed $feature): string => (string) $feature)
@@ -437,10 +439,10 @@ final class ModuleCatalog
             ->values()
             ->all();
         $featureIds = array_values(array_unique(array_map('strval', $featureIds)));
-        $unknownFeatures = array_values(array_diff($featureIds, $validFeatureIds));
-        if ($unknownFeatures !== []) {
-            throw new \InvalidArgumentException("Le module « {$moduleId} » référence une fonctionnalité absente.");
-        }
+        // A company request can outlive a catalog revision. Unknown feature ids
+        // cannot grant access, so discard them instead of blocking the whole
+        // company creation or installation synchronization.
+        $featureIds = array_values(array_intersect($featureIds, $validFeatureIds));
 
         $packFeatureIds = $packIds === []
             ? []
@@ -463,7 +465,10 @@ final class ModuleCatalog
         $actions = ['voir', 'créer', 'modifier'];
         $featurePermissions = [];
         foreach ($rawPermissions as $featureId => $permissions) {
-            if (! in_array((string) $featureId, $featureIds, true) || ! is_array($permissions)) {
+            if (! in_array((string) $featureId, $featureIds, true)) {
+                continue;
+            }
+            if (! is_array($permissions)) {
                 throw new \InvalidArgumentException('Une permission référence une fonctionnalité non sélectionnée.');
             }
             $permissions = array_values(array_unique(array_map('strval', $permissions)));

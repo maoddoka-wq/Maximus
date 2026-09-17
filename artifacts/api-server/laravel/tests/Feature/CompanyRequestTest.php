@@ -36,6 +36,28 @@ class CompanyRequestTest extends TestCase
         ]);
     }
 
+    public function test_unknown_legacy_feature_does_not_block_company_creation(): void
+    {
+        $payload = $this->requestPayload();
+        $payload['requestedModuleFeatures'] = [
+            'commerce' => ['commerce', 'sales'],
+        ];
+        $payload['requestedModulePermissions'] = [
+            'commerce' => [
+                'commerce' => ['voir'],
+                'sales' => ['voir', 'créer'],
+            ],
+        ];
+
+        $this->postJson('/api/company-requests', $payload)
+            ->assertCreated()
+            ->assertJsonPath('status', 'PENDING');
+
+        $company = Company::query()->where('email', 'owner@atelier.test')->firstOrFail();
+        $this->assertSame(['sales'], $company->requested_module_features['commerce']);
+        $this->assertSame(['sales' => ['voir', 'créer']], $company->requested_module_permissions['commerce']);
+    }
+
     public function test_maximus_can_approve_a_request_and_provision_the_admin_and_modules(): void
     {
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
