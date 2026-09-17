@@ -78,3 +78,4 @@
 - [Connexion entreprise personnalisée](company-branded-login.md) — MAXIMUS autorise le mode marqué, l’entreprise choisit son entrée, et le serveur résout toujours le tenant par slug.
 - [Installations isolées](isolated-installations.md) — le mode central reste le défaut ; une installation dédiée est bornée par une entreprise configurée côté serveur et ne crée jamais d’admin global.
 - [Cache Composer Windows](composer-windows-cache.md) — si un fichier Laravel manque malgré Composer, vider le cache Composer puis réinstaller le paquet framework.
+- [Version des installations dédiées](dedicated-installation-versioning.md) — comparer le commit du package au commit réellement servi par Render avant toute synchronisation.

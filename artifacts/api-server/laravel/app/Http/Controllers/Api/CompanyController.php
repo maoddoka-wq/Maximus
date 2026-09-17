@@ -10,6 +10,7 @@ use App\Models\CompanyRequest;
 use App\Support\CompanyRegistry;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
+use App\Support\ApplicationIdentity;
 use App\Services\CompanyRequestCreationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -383,6 +384,8 @@ class CompanyController extends Controller
         return response()->json([
             'manifestVersion' => 1,
             'source' => 'maximus-central',
+            'applicationVersion' => ApplicationIdentity::deployedVersion(),
+            'syncProtocolVersion' => ApplicationIdentity::SYNC_PROTOCOL_VERSION,
             'exportedAt' => now()->toISOString(),
             'company' => [
                 'id' => (string) $company->id,

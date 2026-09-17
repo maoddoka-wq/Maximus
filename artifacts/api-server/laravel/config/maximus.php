@@ -16,4 +16,6 @@ return [
     'central_url' => env('MAXIMUS_CENTRAL_URL'),
     'central_public_url' => env('MAXIMUS_CENTRAL_PUBLIC_URL', env('APP_URL', 'http://localhost')),
     'installation_token' => env('MAXIMUS_INSTALLATION_TOKEN'),
+    'application_version' => env('MAXIMUS_APPLICATION_VERSION', env('RENDER_GIT_COMMIT', 'unknown')),
+    'expected_application_version' => env('MAXIMUS_EXPECTED_APPLICATION_VERSION'),
 ];

@@ -140,6 +140,18 @@ Options utiles :
 ./scripts/install-maximus-instance.sh --skip-composer --skip-healthcheck
 ```
 
+Pour produire une archive d’installation qui correspond strictement à la version
+réellement servie par MAXIMUS principal sur Render, utilisez :
+
+```bash
+./scripts/package-maximus-instance.sh maximus-instance.zip
+```
+
+Le packaging refuse les changements Git non commités, les versions locales
+différentes de `/api/healthz` et les déploiements centraux qui ne publient pas
+encore leur identifiant de build. Il exclut les secrets locaux, `vendor` et les
+données persistantes.
+
 ### Workflows du projet
 
 Les trois workflows habituels sont :

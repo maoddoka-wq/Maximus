@@ -16,6 +16,7 @@ use App\Services\SystemHealthService;
 use App\Support\InstallationContext;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+use App\Support\ApplicationIdentity;
 
 Route::get('/', function () {
     return response()->json([
@@ -31,6 +32,8 @@ Route::get('/healthz', function () {
             'ok' => DB::select('select 1') !== [],
             'database' => true,
             'status' => 'OPERATIONAL',
+                'applicationVersion' => ApplicationIdentity::deployedVersion(),
+                'syncProtocolVersion' => ApplicationIdentity::SYNC_PROTOCOL_VERSION,
             'checkedAt' => now()->toISOString(),
         ]);
     } catch (Throwable $exception) {

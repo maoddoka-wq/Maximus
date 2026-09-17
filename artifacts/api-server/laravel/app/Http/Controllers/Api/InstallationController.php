@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Support\ModuleCatalog;
+use App\Support\ApplicationIdentity;
 
 final class InstallationController extends Controller
 {
@@ -55,6 +56,8 @@ final class InstallationController extends Controller
                 'installationId' => $id,
                 'companyId' => (string) $companyId,
                 'mode' => $input['mode'],
+                'applicationVersion' => ApplicationIdentity::deployedVersion(),
+                'syncProtocolVersion' => ApplicationIdentity::SYNC_PROTOCOL_VERSION,
                 'token' => $token,
             ],
         ], 201);
@@ -102,6 +105,8 @@ final class InstallationController extends Controller
 
         return response()->json([
             'configurationVersion' => (int) $installation->configuration_version,
+            'applicationVersion' => ApplicationIdentity::deployedVersion(),
+            'syncProtocolVersion' => ApplicationIdentity::SYNC_PROTOCOL_VERSION,
             'installation' => [
                 'id' => $installation->id,
                 'companyId' => $company->id,

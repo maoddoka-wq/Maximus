@@ -7,6 +7,7 @@ use App\Models\AuthUser;
 use App\Services\InstallationSyncService;
 use App\Support\InstallationContext;
 use App\Support\MaximusPassword;
+use App\Support\ApplicationIdentity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -20,6 +21,10 @@ final class InstallCompanyInstance extends Command
     {
         if (! InstallationContext::isCompanyOnly()) {
             $this->error('MAXIMUS_DEPLOYMENT_MODE doit être dedicated ou on_premise.');
+            return self::FAILURE;
+        }
+        if (ApplicationIdentity::packageVersion() === 'unknown') {
+            $this->error('Cette copie locale ne contient pas son identifiant de build. Utilisez une archive générée par scripts/package-maximus-instance.sh.');
             return self::FAILURE;
         }
 
