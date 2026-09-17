@@ -75,6 +75,7 @@ class CompanyRequestTest extends TestCase
             ->postJson('/api/company-requests/'.$companyId.'/approve')
             ->assertOk();
 
+        config(['app.url' => 'https://maximus-erp.onrender.com']);
         $response = $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
             ->postJson('/api/companies/'.$companyId.'/installation', [
@@ -83,7 +84,8 @@ class CompanyRequestTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('installation.companyId', $companyId)
-            ->assertJsonPath('installation.mode', 'dedicated');
+            ->assertJsonPath('installation.mode', 'dedicated')
+            ->assertJsonPath('bootstrap.centralUrl', 'https://maximus-erp.onrender.com');
 
         $bootstrapToken = (string) $response->json('bootstrap.token');
         $this->assertStringStartsWith('mxinstall_', $bootstrapToken);
