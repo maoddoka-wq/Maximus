@@ -46,11 +46,16 @@ final class InstallationController extends Controller
             ],
         );
 
+        $centralUrl = rtrim((string) config('app.url', ''), '/');
+        if ($centralUrl === '' || $centralUrl === 'http://localhost') {
+            $centralUrl = rtrim((string) $request->getSchemeAndHttpHost(), '/');
+        }
+
         return response()->json([
             'ok' => true,
             'installation' => $this->payload(DB::table('maximus_installations')->where('id', $id)->first(), $company),
             'bootstrap' => [
-                'centralUrl' => rtrim((string) $request->getSchemeAndHttpHost(), '/'),
+                'centralUrl' => $centralUrl,
                 'installationId' => $id,
                 'companyId' => (string) $companyId,
                 'mode' => $input['mode'],
