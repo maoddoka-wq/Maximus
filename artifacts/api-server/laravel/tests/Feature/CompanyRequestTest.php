@@ -58,6 +58,51 @@ class CompanyRequestTest extends TestCase
         $this->assertSame(['sales' => ['voir', 'créer']], $company->requested_module_permissions['commerce']);
     }
 
+    public function test_company_creation_accepts_the_complete_ecommerce_feature_selection(): void
+    {
+        $payload = $this->requestPayload();
+        $payload['requestedModules'] = ['ecommerce'];
+        $payload['requestedModulePackIds'] = [
+            'ecommerce' => ['ecommerce-supervision'],
+        ];
+        $payload['requestedModuleFeatures'] = [
+            'ecommerce' => [
+                'dashboard',
+                'catalogue',
+                'vente-physique',
+                'vente-numerique',
+                'categories',
+                'commandes',
+                'clients',
+                'promotions',
+                'location',
+                'livraisons',
+                'finances',
+                'parametres',
+            ],
+        ];
+        $payload['requestedModulePermissions'] = [
+            'ecommerce' => [
+                'dashboard' => ['voir'],
+                'catalogue' => ['voir', 'créer', 'modifier'],
+                'vente-physique' => ['voir', 'créer', 'modifier'],
+                'vente-numerique' => ['voir', 'créer', 'modifier'],
+                'categories' => ['voir', 'créer', 'modifier'],
+                'commandes' => ['voir', 'créer', 'modifier'],
+                'clients' => ['voir'],
+                'promotions' => ['voir', 'créer', 'modifier'],
+                'location' => ['voir', 'créer', 'modifier'],
+                'livraisons' => ['voir', 'créer', 'modifier'],
+                'finances' => ['voir', 'créer', 'modifier'],
+                'parametres' => ['voir', 'modifier'],
+            ],
+        ];
+
+        $this->postJson('/api/company-requests', $payload)
+            ->assertCreated()
+            ->assertJsonPath('status', 'PENDING');
+    }
+
     public function test_maximus_can_approve_a_request_and_provision_the_admin_and_modules(): void
     {
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
