@@ -50,7 +50,7 @@ final class InstallationController extends Controller
             'ok' => true,
             'installation' => $this->payload(DB::table('maximus_installations')->where('id', $id)->first(), $company),
             'bootstrap' => [
-                'centralUrl' => rtrim((string) $request->getSchemeAndHttpHost(), '/'),
+                'centralUrl' => rtrim((string) config('maximus.central_public_url'), '/'),
                 'installationId' => $id,
                 'companyId' => (string) $companyId,
                 'mode' => $input['mode'],

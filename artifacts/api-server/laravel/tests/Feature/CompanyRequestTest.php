@@ -114,6 +114,7 @@ class CompanyRequestTest extends TestCase
 
     public function test_maximus_can_issue_a_vps_installation_token_and_the_vps_can_pull_approved_configuration(): void
     {
+        config(['maximus.central_public_url' => 'https://maximus-erp.onrender.com']);
         $this->postJson('/api/company-requests', $this->requestPayload())->assertCreated();
         $companyId = Company::query()->where('email', 'owner@atelier.test')->value('id');
         $maximusToken = $this->issueMaximusSession();
@@ -131,7 +132,8 @@ class CompanyRequestTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('installation.companyId', $companyId)
-            ->assertJsonPath('installation.mode', 'dedicated');
+            ->assertJsonPath('installation.mode', 'dedicated')
+            ->assertJsonPath('bootstrap.centralUrl', 'https://maximus-erp.onrender.com');
 
         $bootstrapToken = (string) $response->json('bootstrap.token');
         $this->assertStringStartsWith('mxinstall_', $bootstrapToken);
