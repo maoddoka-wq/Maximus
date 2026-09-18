@@ -8,6 +8,7 @@ Prototype web interactif d’un ERP SaaS multi-entreprises en français, avec ad
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000, legacy Express entrypoint)
 - `artifacts/api-server` workflow — runs Laravel on PostgreSQL through `server.php`; development provisions the demo idempotently, while production migrates the schema and provisions only the MAXIMUS admin from environment secrets.
 - `MAXIMUS_DEPLOYMENT_MODE=central` keeps the shared SaaS instance. `dedicated` and `on_premise` require `MAXIMUS_INSTALLATION_COMPANY_ID` plus company/admin variables, then `render-entrypoint.sh` runs `maximus:install-company` instead of creating a global MAXIMUS admin.
+- Dedicated/local operations, explicit employee-access cutover, offline recovery, Windows startup and DNS/TLS prerequisites: `docs/guides/maximus-local-resilience.md`.
 - Public shop, domain, image and Transport routes also pass through the installation-company guard in isolated modes; a slug, domain or asset identifier from another company returns `404` instead of being resolved.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages

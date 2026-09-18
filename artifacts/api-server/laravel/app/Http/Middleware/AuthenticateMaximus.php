@@ -16,6 +16,9 @@ class AuthenticateMaximus
         $user = MaximusAuth::userFromRequest($request);
 
         if (!$user) {
+            if ($denial = $request->attributes->get(MaximusAuth::DEDICATED_ACCESS_ATTRIBUTE)) {
+                return response()->json($denial, 403);
+            }
             return response()->json([
                 'error' => 'Session MAXIMUS absente ou expirée.',
             ], 401);

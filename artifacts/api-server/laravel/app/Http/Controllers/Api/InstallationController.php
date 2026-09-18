@@ -14,7 +14,7 @@ use App\Support\ApplicationIdentity;
 
 final class InstallationController extends Controller
 {
-    public function issue(Request $request, string $companyId): JsonResponse
+    public function issue(Request $request, string $companyId, ?string $installationId = null): JsonResponse
     {
         if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
             return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
@@ -26,18 +26,28 @@ final class InstallationController extends Controller
         $input = Validator::make($request->all(), [
             'mode' => ['required', 'in:dedicated,on_premise'],
             'endpointUrl' => ['nullable', 'url', 'max:500'],
+            'installationId' => ['nullable', 'string', 'max:255'],
+            'createNew' => ['sometimes', 'boolean'],
         ])->validate();
         $token = 'mxinstall_'.Str::random(64);
-        $existing = DB::table('maximus_installations')->where('company_id', $companyId)->first();
+        $installationId ??= $input['installationId'] ?? null;
+        $query = DB::table('maximus_installations')->where('company_id', $companyId);
+        $existing = $installationId ? (clone $query)->where('id', $installationId)->first() : null;
+        abort_if($installationId && !$existing, 404);
+        if (!$installationId && !($input['createNew'] ?? false)) {
+            abort_if((clone $query)->count() > 1, 409, 'Précisez installationId pour renouveler une installation, ou createNew pour en créer une.');
+            $existing = $query->first();
+        }
+        abort_if($existing && $existing->mode !== $input['mode'] && DB::table('maximus_installation_addresses')->where('installation_id', $existing->id)->exists(), 409, 'Supprimez les adresses avant de modifier le mode.');
         $id = $existing?->id ?? 'installation-'.Str::uuid();
         DB::table('maximus_installations')->updateOrInsert(
-            ['company_id' => $companyId],
+            ['id' => $id],
             [
-                'id' => $id,
+                'company_id' => $companyId,
                 'mode' => $input['mode'],
                 'status' => 'READY',
                 'token_hash' => hash('sha256', $token),
-                'endpoint_url' => $input['endpointUrl'] ?? null,
+                'endpoint_url' => $existing?->endpoint_url ?? ($input['endpointUrl'] ?? null),
                 'configuration_version' => ((int) ($existing?->configuration_version ?? 0)) + 1,
                 'last_seen_at' => null,
                 'last_sync_at' => null,
@@ -63,12 +73,17 @@ final class InstallationController extends Controller
         ], 201);
     }
 
-    public function revoke(Request $request, string $companyId): JsonResponse
+    public function revoke(Request $request, string $companyId, ?string $installationId = null): JsonResponse
     {
         if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
             return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
         }
-        DB::table('maximus_installations')->where('company_id', $companyId)->update([
+        $query = DB::table('maximus_installations')->where('company_id', $companyId);
+        if ($installationId !== null) {
+            $query->where('id', $installationId);
+            abort_unless((clone $query)->exists(), 404);
+        }
+        $query->update([
             'status' => 'REVOKED',
             'revoked_at' => now(),
             'updated_at' => now(),
@@ -121,6 +136,10 @@ final class InstallationController extends Controller
                 'country' => (string) ($company->country ?? ''),
                 'sector' => (string) ($company->sector ?? ''),
                 'loginSlug' => (string) ($company->login_slug ?? ''),
+                'profilePhoto' => $company->profile_photo,
+                'primaryColor' => $company->primary_color ?: '#F2B705',
+                'accentColor' => $company->accent_color ?: ($company->primary_color ?: '#F2B705'),
+                'sidebarColor' => $company->sidebar_color ?: '#161D27',
             ],
             'modules' => [
                 'ids' => $company->requested_modules ?? [],
@@ -130,7 +149,17 @@ final class InstallationController extends Controller
             ],
             'catalog' => ModuleCatalog::publishedCatalog($company->requested_modules ?? []),
             'domains' => $domains,
+            'erpAccess' => $this->erpAccess((string) $installation->id),
         ]);
+    }
+
+    private function erpAccess(string $installationId): array
+    {
+        $addresses = DB::table('maximus_installation_addresses')->where('installation_id', $installationId)->where('status', 'ACTIVE')->get();
+        return [
+            'canonicalUrl' => $addresses->firstWhere('is_primary', true)?->url,
+            'allowedHosts' => $addresses->pluck('hostname')->unique()->values()->all(),
+        ];
     }
 
     public function heartbeat(Request $request): JsonResponse

@@ -6,6 +6,7 @@ use App\Models\AuthSession;
 use App\Models\AuthUser;
 use App\Services\InstallationSyncService;
 use App\Support\InstallationContext;
+use App\Support\InstallationSyncState;
 use App\Support\MaximusPassword;
 use App\Support\ApplicationIdentity;
 use Illuminate\Console\Command;
@@ -23,13 +24,24 @@ final class InstallCompanyInstance extends Command
             $this->error('MAXIMUS_DEPLOYMENT_MODE doit être dedicated ou on_premise.');
             return self::FAILURE;
         }
+        // Entrypoints may run this command again at startup. An enrolled local
+        // instance must start offline and must not reset a recovered password.
+        $configuredCompanyId = InstallationContext::companyId();
+        if ($configuredCompanyId !== null && InstallationSyncState::summary()['lastSuccessAt'] !== null
+            && InstallationContext::company() !== null
+            && AuthUser::query()->whereKey('company-admin:'.$configuredCompanyId)
+                ->where('company_id', $configuredCompanyId)->where('role', 'company_admin')->exists()) {
+            $this->info('Installation déjà initialisée ; configuration et administrateur locaux conservés, sans appel central.');
+            $this->line('La synchronisation périodique reste indépendante du démarrage.');
+            return self::SUCCESS;
+        }
         if (ApplicationIdentity::packageVersion() === 'unknown') {
             $this->error('Cette copie locale ne contient pas son identifiant de build. Utilisez une archive générée par scripts/package-maximus-instance.sh.');
             return self::FAILURE;
         }
 
         try {
-            $company = $sync->apply($sync->fetch());
+            $company = $sync->apply($sync->fetch(true), true);
         } catch (\Throwable $exception) {
             $this->error('Configuration centrale indisponible : '.$exception->getMessage());
             return self::FAILURE;
@@ -42,6 +54,16 @@ final class InstallCompanyInstance extends Command
         if ($companyId === null || $companyId !== (string) $company->id) {
             $this->error('MAXIMUS_INSTALLATION_COMPANY_ID doit correspondre à l’entreprise validée par MAXIMUS principal.');
             return self::FAILURE;
+        }
+        $existingAdmin = AuthUser::query()->find('company-admin:'.$companyId);
+        if ($existingAdmin) {
+            if ($existingAdmin->role !== 'company_admin' || (string) $existingAdmin->company_id !== $companyId) {
+                $this->error('Identité administrateur locale incompatible. Aucun compte modifié.');
+                return self::FAILURE;
+            }
+            $this->info('Configuration synchronisée ; administrateur local existant conservé.');
+            $this->line('Pour récupérer le mot de passe local : php artisan maximus:recover-admin');
+            return self::SUCCESS;
         }
         if (! filter_var($adminEmail, FILTER_VALIDATE_EMAIL) || strlen($adminPassword) < 8) {
             $this->error('MAXIMUS_ADMIN_USER doit être valide et MAXIMUS_ADMIN_PASSWORD doit contenir au moins 8 caractères.');

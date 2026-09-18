@@ -427,7 +427,8 @@ class CompanyController extends Controller
     public function uploadProfilePhoto(Request $request, string $companyId): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
-        if (($actor['role'] ?? null) !== 'maximus_admin' && ($actor['companyId'] ?? null) !== $companyId) {
+        if (($actor['role'] ?? null) !== 'maximus_admin'
+            && !(($actor['role'] ?? null) === 'company_admin' && ($actor['companyId'] ?? null) === $companyId)) {
             return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
         }
 
@@ -462,7 +463,8 @@ class CompanyController extends Controller
     public function deleteProfilePhoto(Request $request, string $companyId): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
-        if (($actor['role'] ?? null) !== 'maximus_admin' && ($actor['companyId'] ?? null) !== $companyId) {
+        if (($actor['role'] ?? null) !== 'maximus_admin'
+            && !(($actor['role'] ?? null) === 'company_admin' && ($actor['companyId'] ?? null) === $companyId)) {
             return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
         }
 

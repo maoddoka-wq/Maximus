@@ -26,7 +26,8 @@ if (!basePath) {
 const apiProxy = {
   '/api': {
     target: 'http://127.0.0.1:8080',
-    changeOrigin: true,
+    // Installation routing must see the original ERP/shop hostname.
+    changeOrigin: false,
   },
 };
 

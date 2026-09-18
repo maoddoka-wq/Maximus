@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Company;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
+use App\Support\InstallationContext;
+use App\Support\InstallationSyncState;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +17,23 @@ use RuntimeException;
 final class InstallationSyncService
 {
     /** @return array<string, mixed> */
-    public function fetch(): array
+    public function fetch(bool $initial = false): array
+    {
+        InstallationSyncState::record(['lastAttemptAt' => now()->toIso8601String(), 'state' => 'syncing', 'lastError' => null]);
+        try {
+            return $this->fetchConfiguration($initial);
+        } catch (ConnectionException $exception) {
+            InstallationSyncState::record(['state' => 'unreachable', 'lastError' => 'MAXIMUS principal est injoignable. Dernière configuration locale conservée.']);
+            throw new RuntimeException('MAXIMUS principal est injoignable. Dernière configuration locale conservée.', previous: $exception);
+        } catch (\Throwable $exception) {
+            if (InstallationSyncState::summary()['state'] === 'syncing') {
+                InstallationSyncState::record(['state' => 'rejected', 'lastError' => 'Configuration centrale refusée. Dernière configuration locale conservée.']);
+            }
+            throw $exception;
+        }
+    }
+
+    private function fetchConfiguration(bool $initial): array
     {
         $baseUrl = rtrim((string) config('maximus.central_url', ''), '/');
         $token = trim((string) config('maximus.installation_token', ''));
@@ -23,17 +42,50 @@ final class InstallationSyncService
         }
 
         $response = Http::timeout(20)
+            ->connectTimeout(5)
+            ->withoutRedirecting()
             ->acceptJson()
             ->withToken($token)
             ->get($baseUrl.'/api/installation-sync/configuration');
 
         if (! $response->successful()) {
-            throw new RuntimeException('MAXIMUS principal a refusé la synchronisation (HTTP '.$response->status().').');
+            $code = $response->json('code');
+            $state = $code === 'INSTALLATION_REVOKED' ? 'revoked'
+                : ($response->serverError() || in_array($response->status(), [408, 429], true) ? 'unreachable'
+                    : (in_array($response->status(), [401, 403], true) ? 'authentication_rejected' : 'rejected'));
+            $message = match ($state) {
+                'revoked' => 'Enrôlement explicitement révoqué par MAXIMUS principal. Données locales conservées.',
+                'authentication_rejected' => 'Authentification d’installation refusée : jeton invalide ou révoqué (HTTP '.$response->status().'). Ce n’est pas une panne réseau.',
+                'unreachable' => 'MAXIMUS principal temporairement indisponible (HTTP '.$response->status().'). Dernière configuration locale conservée.',
+                default => 'Configuration refusée par MAXIMUS principal (HTTP '.$response->status().'). Dernière configuration locale conservée.',
+            };
+            InstallationSyncState::record(['state' => $state, 'lastError' => $message]);
+            throw new RuntimeException($message);
         }
 
         $payload = $response->json();
         if (! is_array($payload) || ! is_array($payload['company'] ?? null)) {
             throw new RuntimeException('La configuration reçue de MAXIMUS est invalide.');
+        }
+        $this->validatePayload($payload, $initial);
+        return $payload;
+    }
+
+    private function validatePayload(array $payload, bool $initial): ?string
+    {
+        $companyId = InstallationContext::companyId();
+        $installationId = trim((string) config('maximus.installation_id', ''));
+        $identity = is_array($payload['installation'] ?? null) ? $payload['installation'] : [];
+        if (! InstallationContext::isCompanyOnly() || $companyId === null || $installationId === ''
+            || ($payload['company']['id'] ?? null) !== $companyId
+            || ($payload['installationId'] ?? $identity['id'] ?? null) !== $installationId
+            || (isset($identity['id']) && $identity['id'] !== $installationId)
+            || (isset($identity['companyId']) && $identity['companyId'] !== $companyId)
+            || (isset($identity['mode']) && $identity['mode'] !== InstallationContext::mode())) {
+            throw new RuntimeException('Identité entreprise/installation reçue différente de la configuration locale.');
+        }
+        if ((int) ($payload['syncProtocolVersion'] ?? 0) !== ApplicationIdentity::SYNC_PROTOCOL_VERSION) {
+            throw new RuntimeException('La version du protocole de synchronisation est incompatible.');
         }
         $centralVersion = trim((string) ($payload['applicationVersion'] ?? ''));
         $expectedVersion = ApplicationIdentity::expectedVersion();
@@ -41,31 +93,77 @@ final class InstallationSyncService
         if ($centralVersion === '' || $centralVersion === 'unknown') {
             throw new RuntimeException('MAXIMUS principal ne publie pas encore son identifiant de version. Déployez la version actuelle avant de synchroniser.');
         }
-        if ($expectedVersion === '' || $expectedVersion !== $centralVersion) {
+        $strict = $initial || InstallationSyncState::summary()['lastSuccessAt'] === null;
+        if ($strict && ($expectedVersion === '' || $expectedVersion !== $centralVersion)) {
             throw new RuntimeException('Le bootstrap ne correspond pas à la version actuellement servie par MAXIMUS principal. Générez un nouveau bootstrap.');
         }
         if ($packageVersion === '' || $packageVersion === 'unknown') {
             throw new RuntimeException('Cette copie locale ne contient pas son identifiant de build. Utilisez une archive générée par l’outil de packaging à jour.');
         }
-        if ($packageVersion !== $centralVersion) {
+        if ($strict && $packageVersion !== $centralVersion) {
             throw new RuntimeException('La copie locale ('.$packageVersion.') ne correspond pas à MAXIMUS principal ('.$centralVersion.'). Recréez l’archive depuis le même commit déployé.');
         }
-        if ((int) ($payload['syncProtocolVersion'] ?? 0) !== ApplicationIdentity::SYNC_PROTOCOL_VERSION) {
-            throw new RuntimeException('La version du protocole de synchronisation est incompatible. Générez une archive depuis la version actuelle.');
-        }
-
-        return $payload;
+        return $packageVersion !== $centralVersion
+            ? 'Versions applicatives différentes ; protocole compatible. Aucune mise à jour automatique du logiciel.'
+            : null;
     }
 
     /** @param array<string, mixed> $payload */
-    public function apply(array $payload): Company
+    public function apply(array $payload, bool $initial = false): Company
+    {
+        try {
+            $warning = $this->validatePayload($payload, $initial);
+            $access = array_key_exists('erpAccess', $payload)
+                ? $this->validateErpAccess($payload['erpAccess']) : InstallationSyncState::erpAccess();
+            $company = $this->applyValidated($payload);
+            // Publish the entire access snapshot only after the database transaction succeeds.
+            InstallationSyncState::record([
+                'lastSuccessAt' => now()->toIso8601String(), 'state' => 'synced', 'lastError' => null,
+                'versionWarning' => $warning, 'erpAccess' => $access,
+                'configurationVersion' => (int) ($payload['configurationVersion'] ?? 0),
+            ]);
+            return $company;
+        } catch (\Throwable $exception) {
+            InstallationSyncState::record(['state' => 'rejected', 'lastError' => 'Configuration non appliquée intégralement. Vérifier le diagnostic local avant de réessayer.']);
+            throw $exception;
+        }
+    }
+
+    private function validateErpAccess(mixed $access): array
+    {
+        if (! is_array($access) || ! is_array($access['allowedHosts'] ?? null)) {
+            throw new RuntimeException('Configuration des adresses ERP invalide.');
+        }
+        $hosts = [];
+        foreach ($access['allowedHosts'] as $host) {
+            if (! is_string($host) || strlen($host) > 253
+                || ! filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)
+                || str_contains($host, '*')) {
+                throw new RuntimeException('Hôte ERP invalide.');
+            }
+            $hosts[] = strtolower($host);
+        }
+        $url = $access['canonicalUrl'] ?? null;
+        if ($url !== null) {
+            $parts = is_string($url) ? parse_url($url) : false;
+            if (! is_array($parts) || ! in_array($parts['scheme'] ?? '', ['https', 'http'], true)
+                || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])
+                || ! in_array(strtolower($parts['host'] ?? ''), $hosts, true)
+                || ! in_array($parts['path'] ?? '', ['', '/'], true)) {
+                throw new RuntimeException('URL ERP canonique invalide.');
+            }
+        }
+        return ['canonicalUrl' => $url, 'allowedHosts' => array_values(array_unique($hosts))];
+    }
+
+    private function applyValidated(array $payload): Company
     {
         $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
         $companyId = trim((string) ($companyData['id'] ?? ''));
         $moduleData = is_array($payload['modules'] ?? null) ? $payload['modules'] : [];
         $moduleIds = array_values(array_unique(array_map('strval', is_array($moduleData['ids'] ?? null) ? $moduleData['ids'] : [])));
         $catalog = is_array($payload['catalog'] ?? null) ? $payload['catalog'] : [];
-        if ($companyId === '' || $moduleIds === []) {
+        if ($companyId === '' || ! is_array($payload['modules']['ids'] ?? null)) {
             throw new RuntimeException('La configuration centrale ne contient pas d’entreprise ou de module.');
         }
 
@@ -110,6 +208,22 @@ final class InstallationSyncService
                 $normalizedPermissions[$moduleId] = $selection['configuration']['featurePermissions'];
             }
 
+            $branding = [];
+            foreach (['primaryColor' => 'primary_color', 'accentColor' => 'accent_color', 'sidebarColor' => 'sidebar_color'] as $key => $column) {
+                if (isset($companyData[$key]) && is_string($companyData[$key]) && preg_match('/^#[a-f0-9]{6}$/i', $companyData[$key])) {
+                    $branding[$column] = $companyData[$key];
+                }
+            }
+            // Central photo paths point to bytes held centrally, not on this server.
+            // Never copy that URL or fetch arbitrary media. Keep the local upload and
+            // its bytes intact; a sysadmin can upload the logo through the local UI.
+            $existing = Company::query()->find($companyId);
+            if (! $existing) {
+                $branding += ['login_custom_allowed' => false, 'login_mode' => 'MAXIMUS'];
+            }
+            if (array_key_exists('loginSlug', $companyData)) {
+                $branding['login_slug'] = trim((string) $companyData['loginSlug']) ?: null;
+            }
             $company = Company::query()->updateOrCreate(
                 ['id' => $companyId],
                 [
@@ -124,12 +238,9 @@ final class InstallationSyncService
                     'requested_module_pack_ids' => $normalizedPacks,
                     'requested_module_features' => $normalizedFeatures,
                     'requested_module_permissions' => $normalizedPermissions,
-                    'login_custom_allowed' => false,
-                    'login_mode' => 'MAXIMUS',
-                    'login_slug' => trim((string) ($companyData['loginSlug'] ?? '')) ?: null,
                     'deleted_at' => null,
                     'updated_at' => now(),
-                ],
+                ] + $branding,
             );
 
             DB::table('maximus_company_modules')->where('company_id', $companyId)->delete();
@@ -180,8 +291,17 @@ final class InstallationSyncService
         if ($baseUrl === '' || $token === '') {
             return;
         }
-        Http::timeout(10)->withToken($token)->post($baseUrl.'/api/installation-sync/heartbeat', [
-            'appliedVersion' => (int) DB::table('maximus_installations')->max('configuration_version'),
-        ]);
+        try {
+            $response = Http::timeout(10)->connectTimeout(5)->withoutRedirecting()->withToken($token)->post($baseUrl.'/api/installation-sync/heartbeat', [
+                'appliedVersion' => InstallationSyncState::configurationVersion(),
+            ]);
+            if (! $response->successful()) {
+                throw new RuntimeException('Accusé de synchronisation indisponible.');
+            }
+        } catch (\Throwable $exception) {
+            // The configuration is already committed. A lost acknowledgement does
+            // not roll it back and is retried on the next scheduled synchronization.
+            InstallationSyncState::record(['lastError' => 'Configuration appliquée ; accusé de synchronisation non reçu. Nouvel essai à la prochaine échéance.']);
+        }
     }
 }

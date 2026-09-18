@@ -340,7 +340,7 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
     log "Construction du frontend MAXIMUS"
     command_required corepack
     (cd "$WORKSPACE_DIR" && corepack pnpm install --frozen-lockfile)
-    (cd "$WORKSPACE_DIR" && PORT=10000 BASE_PATH=/ NODE_ENV=production corepack pnpm --filter @workspace/maximus run build)
+    (cd "$WORKSPACE_DIR" && MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' MSYS2_ENV_CONV_EXCL='BASE_PATH' PORT=10000 BASE_PATH=/ NODE_ENV=production corepack pnpm --filter @workspace/maximus run build)
     cp -R "$FRONTEND_DIR/dist/public/." "$LARAVEL_DIR/public/"
 else
     printf '%s\n' "Construction frontend ignorée (--skip-build)."
@@ -360,8 +360,8 @@ if [[ "$SKIP_HEALTHCHECK" -eq 0 ]]; then
         health_port="$((18080 + RANDOM % 1000))"
         health_log="$(mktemp)"
         (
-            cd "$LARAVEL_DIR"
-            php -S "127.0.0.1:${health_port}" server.php
+            cd "$LARAVEL_DIR/public"
+            php -S "127.0.0.1:${health_port}" -t "$LARAVEL_DIR/public" "$LARAVEL_DIR/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
         ) >"$health_log" 2>&1 &
         health_pid=$!
         health_ok=0
@@ -388,4 +388,5 @@ fi
 printf '\nInstallation MAXIMUS terminée.\n'
 printf 'Mode : installation entreprise isolée\n'
 printf 'Fichier de configuration : %s\n' "$ENV_FILE"
-printf 'Démarrage local possible avec : cd %s && php -S 0.0.0.0:8080 server.php\n' "$LARAVEL_DIR"
+printf 'Démarrage Windows local : powershell -File scripts/start-maximus-local.ps1 (depuis la racine du projet).\n'
+printf 'Démarrage POSIX local : cd "%s/public" && php -S 127.0.0.1:8080 -t "%s/public" "%s/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"\n' "$LARAVEL_DIR" "$LARAVEL_DIR" "$LARAVEL_DIR"

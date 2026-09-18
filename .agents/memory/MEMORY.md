@@ -63,7 +63,7 @@
 - [Routage Apache des PWA](apache-pwa-routing.md) — ne jamais rediriger les routes SPA profondes vers le port Apache interne de Render.
 - [Publication GitHub de secours](github-push-fallback.md) — si le push Git refuse l’authentification, publier via l’intégration GitHub puis resynchroniser la branche locale.
 - [Liaison PostgreSQL Render](render-database-binding.md) — la production doit utiliser la base Render gérée, pas une ancienne URL Neon fixe.
-- [Routage domaine boutique](custom-domain-routing.md) — un domaine personnalisé doit ouvrir directement la vitrine, avant tout rendu de la connexion MAXIMUS.
+- [Routage des domaines](custom-domain-routing.md) — distinguer ERP, boutique autorisée et hôte inconnu côté serveur, sans détection approximative par suffixe.
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
 - [Frontière Transport Taxi](transport-module-boundary.md) — le cycle Taxi reste séparé de la Location e-commerce, avec ses propres ressources, permissions et données tenant-scoped.
 - [Rapprochement GPS Taxi](transport-gps-matching.md) — sélectionner côté serveur un chauffeur actif, libre et géolocalisé récemment, sans API cartographique externe.
@@ -75,8 +75,8 @@
 - [Contrôle paiement par entreprise](company-payment-control.md) — l’autorisation de paiement est indépendante des modules et de l’abonnement, avec blocage serveur des nouveaux encaissements et retraits.
 - [Synchronisation rôles et comptes](role-auth-permissions-sync.md) — toute modification de rôle doit mettre à jour les permissions du compte authentifié des employés affectés avant confirmation.
 - [Autorisation par fonctionnalité Présences](presence-feature-authorization.md) — une permission détaillée ne doit jamais retomber sur l’action d’une autre fonctionnalité.
-- [Connexion entreprise personnalisée](company-branded-login.md) — MAXIMUS autorise le mode marqué, l’entreprise choisit son entrée, et le serveur résout toujours le tenant par slug.
+- [Connexion entreprise personnalisée](company-branded-login.md) — le mode marqué mutualisé est facultatif ; la connexion dédiée est intrinsèque et bornée par le serveur.
 - [Installations isolées](isolated-installations.md) — le mode central reste le défaut ; une installation dédiée est bornée par une entreprise configurée côté serveur et ne crée jamais d’admin global.
 - [Cache Composer Windows](composer-windows-cache.md) — si un fichier Laravel manque malgré Composer, vider le cache Composer puis réinstaller le paquet framework.
 - [Chemin Vite sous Windows](windows-vite-base-path.md) — construire depuis PowerShell natif pour éviter que Git Bash transforme BASE_PATH=/ en chemin Program Files/Git.
-- [Version des installations dédiées](dedicated-installation-versioning.md) — comparer le commit du package au commit réellement servi par Render avant toute synchronisation.
+- [Version des installations dédiées](dedicated-installation-versioning.md) — premier enrôlement à commit identique ; échanges ultérieurs bornés par identité et protocole compatible.

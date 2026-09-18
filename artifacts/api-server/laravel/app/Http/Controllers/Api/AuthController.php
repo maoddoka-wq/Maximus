@@ -44,11 +44,17 @@ class AuthController extends Controller
         if (
             ! $user
             || ! MaximusPassword::check($data['password'], $user->password_hash)
-            || ! MaximusAuth::canAuthenticate($user)
         ) {
             return response()->json([
                 'error' => 'Email ou mot de passe incorrect.',
             ], 401);
+        }
+
+        if (($denial = MaximusAuth::dedicatedAccessDenial($user)) !== null) {
+            return response()->json($denial, 403);
+        }
+        if (!MaximusAuth::canAuthenticate($user)) {
+            return response()->json(['error' => 'Email ou mot de passe incorrect.'], 401);
         }
 
         if (MaximusPassword::needsRehash($user->password_hash)) {
@@ -128,7 +134,13 @@ class AuthController extends Controller
             ->where('email', Str::lower(trim($data['email'])))
             ->where('status', 'ACTIF')
             ->first();
-        if (! $user || ! MaximusPassword::check($data['password'], $user->password_hash) || ! MaximusAuth::canAuthenticate($user)) {
+        if (! $user || ! MaximusPassword::check($data['password'], $user->password_hash)) {
+            return response()->json(['error' => 'Email ou mot de passe incorrect.'], 401);
+        }
+        if (($denial = MaximusAuth::dedicatedAccessDenial($user)) !== null) {
+            return response()->json($denial, 403);
+        }
+        if (!MaximusAuth::canAuthenticate($user)) {
             return response()->json(['error' => 'Email ou mot de passe incorrect.'], 401);
         }
         if (MaximusPassword::needsRehash($user->password_hash)) {
@@ -347,6 +359,9 @@ class AuthController extends Controller
     public function session(Request $request): JsonResponse
     {
         $user = MaximusAuth::userFromRequest($request);
+        if ($denial = $request->attributes->get(MaximusAuth::DEDICATED_ACCESS_ATTRIBUTE)) {
+            return response()->json($denial, 403);
+        }
 
         return response()->json([
             'user' => $user ? MaximusAuth::actor($user) : null,

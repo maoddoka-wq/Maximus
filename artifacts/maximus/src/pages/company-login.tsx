@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
 import { Building2, LogIn, ShieldAlert } from 'lucide-react';
 import { authApi, type AuthUser, type PublicCompanyLogin } from '@/lib/auth-api';
+import type { InstallationProfile } from '@/lib/installation-api';
 
 function readableColor(hex: string): string {
   const value = hex.replace('#', '');
@@ -11,18 +12,35 @@ function readableColor(hex: string): string {
   return red * 299 + green * 587 + blue * 114 > 150000 ? '#161D27' : '#FFFFFF';
 }
 
-export function CompanyLoginPage({ slug, onAuthenticated }: { slug: string; onAuthenticated: (user: AuthUser) => void }) {
+type CompanyLoginProps = {
+  onAuthenticated: (user: AuthUser) => void;
+} & (
+  | { slug: string; installationCompany?: never }
+  | { slug?: never; installationCompany: NonNullable<InstallationProfile['company']> }
+);
+
+export function CompanyLoginPage({ slug, installationCompany, onAuthenticated }: CompanyLoginProps) {
   const [company, setCompany] = useState<PublicCompanyLogin | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [showRecovery, setShowRecovery] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setError('');
+    setCompany(null);
+    setPassword('');
+    if (installationCompany) {
+      setCompany({ ...installationCompany, slug: installationCompany.slug ?? '' });
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    void authApi.companyLoginInfo(slug)
+    void authApi.companyLoginInfo(slug!)
       .then(({ company: nextCompany }) => {
         if (!cancelled) setCompany(nextCompany);
       })
@@ -35,17 +53,26 @@ export function CompanyLoginPage({ slug, onAuthenticated }: { slug: string; onAu
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, installationCompany, retry]);
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    if (company) document.title = `${company.name} — Connexion`;
+    return () => { document.title = previousTitle; };
+  }, [company]);
 
   const primary = company?.primaryColor ?? '#F2B705';
   const foreground = useMemo(() => readableColor(primary), [primary]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (pending) return;
+    if (pending || !company) return;
     setError('');
     setPending(true);
-    void authApi.companyLogin(slug, email, password)
+    const login = installationCompany
+      ? authApi.login(email, password)
+      : authApi.companyLogin(slug!, email, password);
+    void login
       .then(({ user }) => onAuthenticated(user))
       .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'La connexion a échoué.'))
       .finally(() => setPending(false));
@@ -97,13 +124,16 @@ export function CompanyLoginPage({ slug, onAuthenticated }: { slug: string; onAu
             <p className="mt-2 text-sm leading-6 text-slate-500">Utilisez les identifiants fournis par l’administrateur de votre entreprise.</p>
           </div>
           {error && (
-            <div className="mt-6 flex gap-2 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
+            <div role="alert" className="mt-6 flex gap-2 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
               <ShieldAlert size={16} className="shrink-0" />
               <span>{error}</span>
             </div>
           )}
-          {!company && !error ? (
-            <div className="mt-6 rounded-xl bg-slate-100 p-4 text-sm text-slate-600">Cette connexion personnalisée est indisponible.</div>
+          {!company ? (
+            <div className="mt-6 rounded-xl bg-slate-100 p-4 text-sm text-slate-600">
+              <p>Cette connexion entreprise est indisponible.</p>
+              <button type="button" onClick={() => setRetry((value) => value + 1)} className="mt-3 rounded-lg border px-4 py-2 font-semibold">Réessayer</button>
+            </div>
           ) : (
             <form onSubmit={submit} className="mt-7 space-y-5">
               <label className="block text-sm font-semibold">
@@ -120,9 +150,21 @@ export function CompanyLoginPage({ slug, onAuthenticated }: { slug: string; onAu
               </button>
             </form>
           )}
+          {installationCompany && (
+            <div className="mt-5 text-sm text-slate-600">
+              <button type="button" aria-expanded={showRecovery} onClick={() => setShowRecovery((value) => !value)} className="underline underline-offset-4">
+                Besoin d’aide pour vous connecter ?
+              </button>
+              {showRecovery && <p className="mt-3 rounded-xl bg-slate-50 p-4 leading-6">
+                Contactez l’administrateur de votre entreprise. Si son accès est également perdu,
+                le responsable du serveur dispose d’une procédure locale de récupération sécurisée.
+                Les identifiants MAXIMUS central ne permettent pas de se connecter ici.
+              </p>}
+            </div>
+          )}
           <div className="mt-8 flex items-center justify-center gap-2 border-t pt-5 text-xs text-slate-400">
             <Building2 size={14} />
-            <span>Connexion sécurisée par MAXIMUS</span>
+            <span>{installationCompany ? `Espace privé · ${company?.name ?? installationCompany.name}` : 'Connexion sécurisée par MAXIMUS'}</span>
           </div>
         </section>
       </div>

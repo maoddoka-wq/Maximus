@@ -169,7 +169,7 @@ fi
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
     log "Construction du frontend MAXIMUS"
     (cd "$WORKSPACE_DIR" && corepack pnpm install --frozen-lockfile)
-    (cd "$WORKSPACE_DIR" && PORT=10000 BASE_PATH=/ NODE_ENV=production corepack pnpm --filter @workspace/maximus run build)
+    (cd "$WORKSPACE_DIR" && MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' MSYS2_ENV_CONV_EXCL='BASE_PATH' PORT=10000 BASE_PATH=/ NODE_ENV=production corepack pnpm --filter @workspace/maximus run build)
     cp -R "$FRONTEND_DIR/dist/public/." "$LARAVEL_DIR/public/"
 fi
 
@@ -183,8 +183,8 @@ if [[ "$SKIP_HEALTHCHECK" -eq 0 ]]; then
     health_port="$((18080 + RANDOM % 1000))"
     health_log="$(mktemp)"
     (
-        cd "$LARAVEL_DIR"
-        php -S "127.0.0.1:${health_port}" server.php
+        cd "$LARAVEL_DIR/public"
+        php -S "127.0.0.1:${health_port}" -t "$LARAVEL_DIR/public" "$LARAVEL_DIR/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
     ) >"$health_log" 2>&1 &
     health_pid=$!
     health_ok=0

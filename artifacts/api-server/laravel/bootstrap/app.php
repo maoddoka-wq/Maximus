@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->appendToGroup('api', [
             \App\Http\Middleware\NoStoreApiResponses::class,
+            \App\Http\Middleware\RequireInstallationHost::class,
         ]);
 
         $middleware->encryptCookies([

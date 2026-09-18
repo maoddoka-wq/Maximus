@@ -112,6 +112,10 @@ import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-regist
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { installationApi, type InstallationProfile } from '@/lib/installation-api';
+import { installationLogoutPath, resolveInstallationEntry } from '@/lib/installation-routing';
+import { InstallationUnavailable } from '@/components/installation-unavailable';
+import { InstallationSyncNotice } from '@/components/installation-sync-notice';
+import { CompanyInstallationAccess } from '@/components/company-installation-access';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
@@ -150,15 +154,6 @@ import {
 const queryClient = new QueryClient();
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
-
-function isPotentialCustomStoreHost(): boolean {
-  if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname.toLowerCase();
-  if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
-
-  return !['.replit.dev', '.replit.app', '.repl.co', '.onrender.com'].some((suffix) => hostname.endsWith(suffix));
-}
 
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
@@ -400,6 +395,8 @@ function AppContent() {
   const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
   const [installationProfile, setInstallationProfile] = useState<InstallationProfile | null>(null);
   const [installationReady, setInstallationReady] = useState(false);
+  const [installationError, setInstallationError] = useState('');
+  const [installationRetry, setInstallationRetry] = useState(0);
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [appStateError, setAppStateError] = useState('');
   const [appStateReady, setAppStateReady] = useState(
@@ -440,6 +437,8 @@ function AppContent() {
     showAppToast(message, kind);
   useEffect(() => {
     let cancelled = false;
+    setInstallationReady(false);
+    setInstallationError('');
     void installationApi
       .profile()
       .then((profile) => {
@@ -453,11 +452,10 @@ function AppContent() {
           void authApi.logout().catch(() => undefined);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
-          // The server remains authoritative. Keep the central UI fallback so
-          // a temporary configuration request failure does not blank the app.
           setInstallationProfile(null);
+          setInstallationError(error instanceof Error ? error.message : 'La configuration de cette installation est indisponible.');
         }
       })
       .finally(() => {
@@ -466,7 +464,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [installationRetry]);
   useEffect(() => {
     if (!localStorage.getItem('maximus-session')) return undefined;
     void authApi
@@ -949,7 +947,9 @@ function AppContent() {
             ? `/entreprise/${encodeURIComponent(activeCompany.loginSlug)}/connexion`
             : null)
         : null;
-    const destination = destinationOverride ?? (isCompanySession && companyLoginPath ? companyLoginPath : '/');
+    const destination = destinationOverride ?? installationLogoutPath(
+      Boolean(installationProfile?.companyOnly), isCompanySession ? companyLoginPath : null,
+    );
     applyCompanyTheme(undefined);
     const clearedData = emptyStoreData();
     dataRef.current = clearedData;
@@ -1012,6 +1012,16 @@ function AppContent() {
       </section>
     </div>;
   }
+  const installationEntry = resolveInstallationEntry(installationProfile);
+  if (installationEntry === 'unavailable') {
+    return <InstallationUnavailable
+      message={installationError || 'L’adresse utilisée ou la configuration de cette installation n’est pas reconnue. Vérifiez l’adresse fournie par votre entreprise.'}
+      onRetry={() => setInstallationRetry((value) => value + 1)}
+    />;
+  }
+  if (installationProfile?.companyOnly && pathname.startsWith('/maximus')) {
+    return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
+  }
   if (location === '/inscription' && installationProfile?.companyOnly)
     return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
   if (location === '/inscription')
@@ -1064,7 +1074,7 @@ function AppContent() {
     if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
     if (pwaEntry?.domain) return <PublicShopPage domain clientApp />;
   }
-  if (pathname === '/' && isPotentialCustomStoreHost()) {
+  if (pathname === '/' && installationEntry === 'shop') {
     return <PublicShopPage domain />;
   }
   if (companyLoginSlug && session && appStateReady) {
@@ -1078,6 +1088,12 @@ function AppContent() {
     </div>;
   }
   if (companyLoginSlug && !session) {
+    if (installationProfile?.companyOnly) {
+      if (companyLoginSlug !== installationProfile.company?.slug) {
+        return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
+      }
+      return <CompanyLoginPage installationCompany={installationProfile.company!} onAuthenticated={applyAuthenticatedUser} />;
+    }
     return (
       <CompanyLoginPage
         slug={companyLoginSlug}
@@ -1110,6 +1126,9 @@ function AppContent() {
     ...data.employees,
   ];
   if (location === '/' || !session) {
+    if (installationProfile?.companyOnly && installationProfile.company) {
+      return <CompanyLoginPage installationCompany={installationProfile.company} onAuthenticated={applyAuthenticatedUser} />;
+    }
     return (
       <Login
         onLogin={login}
@@ -1236,6 +1255,9 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
+          {installationProfile?.companyOnly && (companyAdmin || sectorManager) && (
+            <InstallationSyncNotice sync={installationProfile.sync} onRefresh={() => setInstallationRetry((value) => value + 1)} />
+          )}
           {sectorTestCompanyId && (
             <div
               data-testid="sector-test-banner"
@@ -3290,6 +3312,8 @@ function CompanyDetail({
   const { confirm } = useAppDialog();
   const [active, setActive] = useState(company.allowedModules);
   const [installationBusy, setInstallationBusy] = useState(false);
+  const [installationEndpoint, setInstallationEndpoint] = useState('');
+  const [installationRefreshKey, setInstallationRefreshKey] = useState(0);
   const [loginSettings, setLoginSettings] = useState<{
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
@@ -3426,8 +3450,18 @@ function CompanyDetail({
   };
 
   const prepareInstallation = async (mode: 'dedicated' | 'on_premise') => {
+    if (installationBusy) return;
+    if (company.status !== 'ACTIF') {
+      showAppToast('Activez l’entreprise avant de préparer son installation.', 'error');
+      return;
+    }
+    setInstallationBusy(true);
     try {
-      const result = await companyRequestApi.issueInstallation(company.id, { mode });
+      const result = await companyRequestApi.issueInstallation(company.id, {
+        mode,
+        createNew: true,
+        ...(installationEndpoint.trim() ? { endpointUrl: installationEndpoint.trim() } : {}),
+      });
       const blob = new Blob([JSON.stringify(result.bootstrap, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -3435,26 +3469,30 @@ function CompanyDetail({
       link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      window.alert('Le fichier d’enrôlement a été téléchargé. Conservez son jeton secret et transférez-le uniquement au VPS de cette entreprise.');
+      setInstallationRefreshKey((value) => value + 1);
+      showAppToast('Fichier d’installation téléchargé. Conservez-le en lieu sûr : il contient un jeton secret.', 'success');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'L’enrôlement de l’installation n’a pas pu être préparé.');
+      showAppToast(error instanceof Error ? error.message : 'L’enrôlement de l’installation n’a pas pu être préparé.', 'error');
+    } finally {
+      setInstallationBusy(false);
     }
   };
 
   const revokeInstallation = async () => {
     const confirmed = await confirm({
-      title: 'Révoquer cette installation ?',
-      description: `Le jeton de « ${company.name} » ne pourra plus être utilisé pour les prochaines synchronisations. Cette action ne coupe pas automatiquement un serveur déjà démarré.`,
-      confirmLabel: 'Révoquer le jeton',
+      title: 'Révoquer toutes les installations de cette entreprise ?',
+      description: `Tous les jetons de « ${company.name} » seront révoqués. Pour ne révoquer qu’une installation, utilisez son bouton dans « Accès ERP et installations ». Les serveurs déjà démarrés ne seront pas arrêtés.`,
+      confirmLabel: 'Révoquer tous les jetons',
       tone: 'danger',
     });
     if (!confirmed) return;
     setInstallationBusy(true);
     try {
       await companyRequestApi.revokeInstallation(company.id);
-      window.alert('Installation révoquée. Arrêtez également le service du VPS si la coupure doit être immédiate.');
+      setInstallationRefreshKey((value) => value + 1);
+      showAppToast('Tous les jetons sont révoqués. Les serveurs en fonctionnement ne sont pas arrêtés.', 'success');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.');
+      showAppToast(error instanceof Error ? error.message : 'La révocation a échoué.', 'error');
     } finally {
       setInstallationBusy(false);
     }
@@ -3547,9 +3585,9 @@ function CompanyDetail({
             </div>
             <h2 className="mt-2 text-xl font-bold">Installation dédiée ou locale</h2>
             <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Préparez ici l’enrôlement du serveur de cette entreprise. MAXIMUS crée le lien sécurisé,
-              télécharge le fichier bootstrap JSON et conserve la configuration centrale. Le fichier doit
-              ensuite être transféré manuellement au VPS par SSH/SCP.
+              Préparez une installation séparée pour cette entreprise. Les employés utiliseront les comptes
+              de cette installation et sa propre page de connexion, pas l’administration MAXIMUS.
+              Transférez le fichier d’enrôlement uniquement au responsable du serveur concerné.
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/.1)] px-3 py-1.5 text-xs font-bold text-[hsl(var(--primary))]">
@@ -3603,21 +3641,33 @@ function CompanyDetail({
             onClick={() => void revokeInstallation()}
             className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {installationBusy ? 'Révocation…' : 'Révoquer le jeton'}
+            {installationBusy ? 'Opération en cours…' : 'Révoquer tous les jetons'}
           </button>
         </div>
+        <label className="mt-5 block max-w-xl text-sm font-semibold">
+          Adresse ERP prévue (facultative)
+          <input type="url" value={installationEndpoint} onChange={(event) => setInstallationEndpoint(event.target.value)}
+            placeholder="https://gestion.entreprise.com" disabled={installationBusy}
+            className="mt-2 w-full rounded-xl border bg-[hsl(var(--background))] px-3 py-2.5 font-normal"
+          />
+          <span className="mt-2 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">
+            Pour le local : http://127.0.0.1:8080 ou l’adresse intranet. Un domaine public doit être vérifié avant activation.
+          </span>
+        </label>
         <p className="mt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
           Une entreprise doit être <strong>ACTIF</strong> avant la préparation. La révocation bloque les
           synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
         </p>
       </section>
+      <CompanyInstallationAccess companyId={company.id} companyName={company.name} refreshKey={installationRefreshKey} />
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Connexion et domaine</p>
-            <h2 className="mt-2 font-bold">Accès de connexion de l’entreprise</h2>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Hébergement mutualisé</p>
+            <h2 className="mt-2 font-bold">Connexion sur MAXIMUS central</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Cette configuration appartient à MAXIMUS. Activez ou désactivez la page personnalisée, choisissez le mode utilisé et partagez le lien généré depuis cette section.
+              Ces réglages concernent uniquement l’accès mutualisé. Sur une installation dédiée ou locale,
+              la connexion entreprise est automatique et indépendante de cette autorisation.
             </p>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
@@ -3667,9 +3717,9 @@ function CompanyDetail({
         <div className="mt-6 border-t pt-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h3 className="font-bold">Domaine personnalisé</h3>
+              <h3 className="font-bold">Domaines de la boutique e-commerce</h3>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                Créez ici le domaine public de l’entreprise. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
+                Ces adresses ouvrent la boutique pour les clients, pas l’ERP des employés. Configurez une adresse distincte dans « Accès ERP et installations » pour la gestion interne.
               </p>
             </div>
             <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
@@ -7776,7 +7826,7 @@ function CompanyModulesDetail({
   const [domainLoading, setDomainLoading] = useState(true);
   const [domainSaving, setDomainSaving] = useState(false);
   const [domainError, setDomainError] = useState('');
-  const [installationBusy, setInstallationBusy] = useState(false);
+  const [installationRefreshKey, setInstallationRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -8028,8 +8078,15 @@ function CompanyModulesDetail({
   };
 
   const prepareInstallation = async (mode: 'dedicated' | 'on_premise') => {
+    const confirmed = await confirm({
+      title: 'Créer une nouvelle installation ?',
+      description: `Voulez-vous générer un bootstrap pour une NOUVELLE installation ${mode === 'dedicated' ? 'dédiée' : 'sur site'} ? Les installations existantes continueront de fonctionner.`,
+      confirmLabel: 'Créer l’installation',
+      tone: 'default',
+    });
+    if (!confirmed) return;
     try {
-      const result = await companyRequestApi.issueInstallation(company.id, { mode });
+      const result = await companyRequestApi.issueInstallation(company.id, { mode, createNew: true });
       const blob = new Blob([JSON.stringify(result.bootstrap, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -8037,28 +8094,10 @@ function CompanyModulesDetail({
       link.download = `maximus-bootstrap-${company.id}-${mode}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      showAppToast('Le fichier bootstrap a été téléchargé. Transférez-le uniquement au VPS de cette entreprise.', 'success');
+      setInstallationRefreshKey(k => k + 1);
+      showAppToast('Le fichier bootstrap a été téléchargé. Transférez-le au serveur de cette nouvelle installation.', 'success');
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'L’installation n’a pas pu être préparée.', 'error');
-    }
-  };
-
-  const revokeInstallation = async () => {
-    const confirmed = await confirm({
-      title: 'Révoquer cette installation ?',
-      description: `Le jeton de « ${company.name} » ne fonctionnera plus pour les prochaines synchronisations. Cette action ne coupe pas automatiquement un serveur déjà démarré.`,
-      confirmLabel: 'Révoquer le jeton',
-      tone: 'danger',
-    });
-    if (!confirmed) return;
-    setInstallationBusy(true);
-    try {
-      await companyRequestApi.revokeInstallation(company.id);
-      showAppToast('Installation révoquée. Arrêtez aussi le service du VPS si la coupure doit être immédiate.', 'success');
-    } catch (error) {
-      showAppToast(error instanceof Error ? error.message : 'L’installation n’a pas pu être révoquée.', 'error');
-    } finally {
-      setInstallationBusy(false);
     }
   };
 
@@ -8330,13 +8369,13 @@ function CompanyModulesDetail({
             testId="button-prepare-dedicated-installation"
             onClick={() => void prepareInstallation('dedicated')}
           >
-            Préparer le VPS dédié
+            Créer une installation dédiée
           </ActionButton>
           <ActionButton
             testId="button-prepare-on-premise-installation"
             onClick={() => void prepareInstallation('on_premise')}
           >
-            Préparer le serveur local
+            Créer une installation locale
           </ActionButton>
           <ActionButton
             testId="button-download-installation-manifest"
@@ -8344,21 +8383,14 @@ function CompanyModulesDetail({
           >
             Télécharger le manifeste
           </ActionButton>
-          <button
-            type="button"
-            data-testid="button-revoke-installation"
-            disabled={installationBusy}
-            onClick={() => void revokeInstallation()}
-            className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {installationBusy ? 'Révocation…' : 'Révoquer le jeton'}
-          </button>
         </div>
         <p className="mt-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-          L’entreprise doit être <strong>ACTIF</strong> avant la préparation. La révocation bloque les
-          synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
+          L’entreprise doit être <strong>ACTIF</strong> avant la préparation.
         </p>
       </section>
+
+      <CompanyInstallationAccess companyId={company.id} companyName={company.name} refreshKey={installationRefreshKey} />
+
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -8417,10 +8449,10 @@ function CompanyModulesDetail({
         <section className="card-surface rounded-2xl p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Domaine personnalisé</p>
-              <h2 className="mt-2 font-bold">Connecter le domaine de l’entreprise</h2>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Domaine de la boutique publique</p>
+              <h2 className="mt-2 font-bold">Connecter le domaine public</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                Ajoutez le domaine utilisé par l’entreprise personnalisée. Après création, ajoutez l’enregistrement DNS affiché puis lancez la vérification.
+                Ajoutez le domaine utilisé pour la boutique publique de l'entreprise. L'accès ERP des employés se gère via les installations ci-dessus.
               </p>
             </div>
             <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs font-bold">
@@ -8434,7 +8466,7 @@ function CompanyModulesDetail({
                 data-testid="input-company-custom-domain"
                 value={domainInput}
                 onChange={(event) => setDomainInput(event.target.value)}
-                placeholder="connexion.exemple.sn"
+                placeholder="boutique.exemple.sn"
                 disabled={domainSaving}
                 className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm font-normal"
               />

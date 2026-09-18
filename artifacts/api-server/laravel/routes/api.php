@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
+use App\Http\Controllers\Api\InstallationAccessController;
 use App\Services\SystemHealthService;
 use App\Support\InstallationContext;
 use Illuminate\Support\Facades\Route;
@@ -84,11 +85,23 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->gro
     Route::get('/{companyId}/installation-manifest', [CompanyController::class, 'installationManifest']);
     Route::post('/{companyId}/installation', [InstallationController::class, 'issue']);
     Route::delete('/{companyId}/installation', [InstallationController::class, 'revoke']);
+    Route::post('/{companyId}/installations/{installationId}', [InstallationController::class, 'issue']);
+    Route::delete('/{companyId}/installations/{installationId}', [InstallationController::class, 'revoke']);
+    Route::get('/{companyId}/installation-access', [InstallationAccessController::class, 'index']);
+    Route::post('/{companyId}/installation-access/{installationId}/use-as-primary', [InstallationAccessController::class, 'useAsPrimary']);
+    Route::delete('/{companyId}/installation-access/primary', [InstallationAccessController::class, 'clearPrimary']);
+    Route::post('/{companyId}/installation-access/{installationId}/addresses', [InstallationAccessController::class, 'store']);
+    Route::post('/{companyId}/installation-access/{installationId}/addresses/{addressId}/verify', [InstallationAccessController::class, 'verify']);
+    Route::post('/{companyId}/installation-access/{installationId}/addresses/{addressId}/activate', [InstallationAccessController::class, 'activate']);
+    Route::delete('/{companyId}/installation-access/{installationId}/addresses/{addressId}', [InstallationAccessController::class, 'destroy']);
     Route::get('/{companyId}/payment-settings', [CompanyPaymentController::class, 'show']);
     Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
+    Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
+});
+
+Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
     Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);
     Route::delete('/{companyId}/profile-photo', [CompanyController::class, 'deleteProfilePhoto']);
-    Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
 
 Route::middleware(['maximus.central', 'maximus.installation.token'])->prefix('installation-sync')->group(function (): void {

@@ -22,11 +22,16 @@ final class AuthenticateInstallationToken
 
         $installation = DB::table('maximus_installations')
             ->where('token_hash', hash('sha256', $token))
-            ->whereNull('revoked_at')
             ->first();
 
-        if (! $installation || $installation->status === 'REVOKED') {
+        if (! $installation) {
             return response()->json(['error' => 'Jeton d’installation invalide ou révoqué.'], 401);
+        }
+        if ($installation->revoked_at !== null || $installation->status === 'REVOKED') {
+            return response()->json([
+                'error' => 'Cette installation a été révoquée par MAXIMUS.',
+                'code' => 'INSTALLATION_REVOKED',
+            ], 401);
         }
 
         $request->attributes->set('installation', $installation);

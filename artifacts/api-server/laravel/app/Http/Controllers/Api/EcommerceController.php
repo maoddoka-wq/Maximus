@@ -308,7 +308,19 @@ class EcommerceController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ];
-        DB::table('ecommerce_domains')->insert($row);
+        DB::transaction(function () use ($domain, $row): void {
+            \App\Services\InstallationAddressVerifier::lockHostname($domain);
+            $centralHost = strtolower((string) parse_url((string) config('maximus.central_public_url'), PHP_URL_HOST));
+            if (DB::table('maximus_installation_addresses')->where('hostname', $domain)->where('validation_method', 'public')->exists()
+                || in_array($domain, \App\Support\InstallationContext::trustedHosts(), true)
+                || $domain === $centralHost) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['domain' => 'Ce nom d’hôte est réservé à un accès ERP.']);
+            }
+            if (DB::table('ecommerce_domains')->where('domain', $domain)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['domain' => 'Ce domaine est déjà rattaché à une boutique.']);
+            }
+            DB::table('ecommerce_domains')->insert($row);
+        });
 
         return response()->json($this->domain((object) $row), 201);
     }

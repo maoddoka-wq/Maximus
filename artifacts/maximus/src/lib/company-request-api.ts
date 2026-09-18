@@ -105,7 +105,7 @@ export const companyRequestApi = {
         permissions: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
       };
     }>(`/companies/${encodeURIComponent(companyId)}/installation-manifest`),
-  issueInstallation: (companyId: string, input: { mode: 'dedicated' | 'on_premise'; endpointUrl?: string }) =>
+  issueInstallation: (companyId: string, input: { mode: 'dedicated' | 'on_premise'; endpointUrl?: string; createNew?: boolean; installationId?: string }) =>
     request<{
       ok: true;
       installation: {
