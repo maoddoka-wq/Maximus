@@ -202,6 +202,42 @@ class TransportController extends Controller
         return response()->json($this->driver((object) $row), 201);
     }
 
+    public function deleteDriver(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'drivers')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $driver = DB::table('transport_drivers')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $driver) {
+            return response()->json(['error' => 'Chauffeur introuvable.'], 404);
+        }
+        if (DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('driver_id', $id)
+            ->exists()) {
+            return response()->json([
+                'error' => 'Ce chauffeur est encore rattaché à un véhicule. Supprimez ou réaffectez ce véhicule avant de supprimer le chauffeur.',
+            ], 409);
+        }
+        if (DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('driver_id', $id)
+            ->exists()) {
+            return response()->json([
+                'error' => 'Ce chauffeur est conservé car il figure dans l’historique des courses.',
+            ], 409);
+        }
+
+        DB::table('transport_drivers')->where('id', $id)->where('company_id', $company)->delete();
+
+        return response()->json(['id' => $id]);
+    }
+
     public function updateDriverLocation(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
@@ -473,9 +509,10 @@ class TransportController extends Controller
         if (DB::table('transport_trips')
             ->where('company_id', $company)
             ->where('vehicle_id', $id)
-            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS'])
             ->exists()) {
-            return response()->json(['error' => 'Un véhicule engagé dans une course en cours ne peut pas être supprimé.'], 422);
+            return response()->json([
+                'error' => 'Ce véhicule est conservé car il figure dans l’historique des courses.',
+            ], 409);
         }
 
         DB::table('transport_vehicles')->where('id', $id)->where('company_id', $company)->delete();

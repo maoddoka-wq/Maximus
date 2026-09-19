@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'])->prefix('transport')->group(function (): void {
     Route::get('/bootstrap', [TransportController::class, 'bootstrap']);
     Route::post('/drivers', [TransportController::class, 'createDriver']);
+    Route::delete('/drivers/{id}', [TransportController::class, 'deleteDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
     Route::patch('/drivers/{id}/availability', [TransportController::class, 'updateDriverAvailability']);
     Route::patch('/settings', [TransportController::class, 'updateSettings']);

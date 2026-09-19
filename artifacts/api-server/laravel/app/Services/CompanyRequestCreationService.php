@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyRequest;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -61,39 +62,47 @@ final class CompanyRequestCreationService
         }
 
         $companyId = (string) Str::uuid();
-        $company = DB::transaction(function () use (
-            $input,
-            $email,
-            $requestedModules,
-            $requestedPacks,
-            $requestedFeatures,
-            $requestedPermissions,
-            $companyId,
-        ): Company {
-            $company = Company::query()->create([
-                'id' => $companyId,
-                'name' => trim((string) $input['name']),
-                'manager' => trim((string) $input['manager']),
-                'email' => $email,
-                'phone' => trim((string) ($input['phone'] ?? '')),
-                'country' => trim((string) ($input['country'] ?? '')),
-                'sector' => trim((string) ($input['sector'] ?? '')),
-                'status' => 'EN ATTENTE',
-                'requested_modules' => $requestedModules,
-                'requested_module_pack_ids' => $requestedPacks,
-                'requested_module_features' => $requestedFeatures,
-                'requested_module_permissions' => $requestedPermissions,
-            ]);
+        try {
+            $company = DB::transaction(function () use (
+                $input,
+                $email,
+                $requestedModules,
+                $requestedPacks,
+                $requestedFeatures,
+                $requestedPermissions,
+                $companyId,
+            ): Company {
+                $company = Company::query()->create([
+                    'id' => $companyId,
+                    'name' => trim((string) $input['name']),
+                    'manager' => trim((string) $input['manager']),
+                    'email' => $email,
+                    'phone' => trim((string) ($input['phone'] ?? '')),
+                    'country' => trim((string) ($input['country'] ?? '')),
+                    'sector' => trim((string) ($input['sector'] ?? '')),
+                    'status' => 'EN ATTENTE',
+                    'requested_modules' => $requestedModules,
+                    'requested_module_pack_ids' => $requestedPacks,
+                    'requested_module_features' => $requestedFeatures,
+                    'requested_module_permissions' => $requestedPermissions,
+                ]);
 
-            CompanyRequest::query()->create([
-                'id' => (string) Str::uuid(),
-                'company_id' => $company->id,
-                'status' => 'PENDING',
-                'admin_password_hash' => MaximusPassword::hash((string) $input['password']),
-            ]);
+                CompanyRequest::query()->create([
+                    'id' => (string) Str::uuid(),
+                    'company_id' => $company->id,
+                    'status' => 'PENDING',
+                    'admin_password_hash' => MaximusPassword::hash((string) $input['password']),
+                ]);
 
-            return $company;
-        });
+                return $company;
+            });
+        } catch (QueryException $exception) {
+            if (str_contains(Str::lower($exception->getMessage()), 'unique')) {
+                throw new RuntimeException('Une demande ou une entreprise utilise déjà cette adresse email.', previous: $exception);
+            }
+
+            throw $exception;
+        }
 
         return [
             'company' => $company,

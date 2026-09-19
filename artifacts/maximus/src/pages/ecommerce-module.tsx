@@ -1003,7 +1003,7 @@ function CategoryManager({ data, canCreate, canModify, run }: { data: EcommerceB
     if (result) setEditing(null);
   };
   const remove = async (category: EcommerceCategory) => {
-    if (!await confirm({ title: 'Supprimer cette catégorie ?', description: `Les produits seront conservés sans catégorie : « ${category.name} ».`, confirmLabel: 'Supprimer', tone: 'danger' })) return;
+    if (!await confirm({ title: 'Supprimer cette catégorie ?', description: `Les produits et locations seront conservés sans catégorie : « ${category.name} ».`, confirmLabel: 'Supprimer', tone: 'danger' })) return;
     await run(() => createEcommerceApi(data.store.companyId).deleteCategory(category.id), 'Catégorie supprimée.');
   };
      return <div className="space-y-5 fade-up">

@@ -351,6 +351,162 @@ class MaximusAuthTest extends TestCase
         ]);
     }
 
+    public function test_deleted_employee_email_can_be_reused_without_reactivating_identity_or_losing_history(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'employee-deletion-admin',
+            'email' => 'employee-deletion-admin@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $otherAdmin = AuthUser::query()->create([
+            'id' => 'employee-deletion-other-admin',
+            'email' => 'employee-deletion-admin@other.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Admin autre entreprise',
+            'role' => 'company_admin',
+            'company_id' => 'other-company',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $oldEmployee = AuthUser::query()->create([
+            'id' => 'old-auth-identity',
+            'email' => 'reusable.employee@kora.demo',
+            'password_hash' => MaximusPassword::hash('OldPassword2026!'),
+            'display_name' => 'Employé historique',
+            'role' => 'sector_manager',
+            'company_id' => 'kora',
+            'employee_id' => 'historical-employee-id',
+            'sector_ids' => ['historical-sector'],
+            'permissions' => ['stocks:products' => ['voir', 'modifier']],
+            'status' => 'ACTIF',
+        ]);
+        $oldToken = MaximusAuth::issueSession($oldEmployee);
+        DB::table('control_tasks')->insert([
+            'id' => 'historical-employee-task',
+            'company_id' => 'kora',
+            'sector_id' => 'historical-sector',
+            'title' => 'Tâche historique',
+            'description' => 'Conserver la référence employé',
+            'assignee_employee_id' => 'historical-employee-id',
+            'assignee_name' => 'Employé historique',
+            'created_by' => 'Admin Kora',
+            'status' => 'TERMINÉ',
+            'priority' => 'NORMALE',
+            'requires_approval' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $otherToken = MaximusAuth::issueSession($otherAdmin);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $otherToken)
+            ->deleteJson('/api/auth/accounts/historical-employee-id')
+            ->assertForbidden();
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'old-auth-identity',
+            'email' => 'reusable.employee@kora.demo',
+            'status' => 'ACTIF',
+        ]);
+
+        $adminToken = MaximusAuth::issueSession($admin);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->deleteJson('/api/auth/accounts/historical-employee-id')
+            ->assertNoContent();
+
+        $retiredEmployee = $oldEmployee->fresh();
+        $this->assertNotNull($retiredEmployee);
+        $this->assertNotSame('ACTIF', $retiredEmployee->status);
+        $this->assertNotSame('reusable.employee@kora.demo', $retiredEmployee->email);
+        $this->assertSame('historical-employee-id', $retiredEmployee->employee_id);
+        $this->assertDatabaseMissing('auth_sessions', [
+            'token_hash' => MaximusAuth::hashToken($oldToken),
+        ]);
+        $this->assertDatabaseHas('control_tasks', [
+            'id' => 'historical-employee-task',
+            'assignee_employee_id' => 'historical-employee-id',
+            'assignee_name' => 'Employé historique',
+        ]);
+        $retiredEmail = $retiredEmployee->email;
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->deleteJson('/api/auth/accounts/historical-employee-id')
+            ->assertNoContent();
+        $this->assertSame($retiredEmail, $oldEmployee->fresh()?->email);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $oldToken)
+            ->getJson('/api/auth/session')
+            ->assertOk()
+            ->assertJson(['user' => null]);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $oldToken)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertUnauthorized();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->postJson('/api/auth/accounts', [
+                'id' => 'attempted-old-auth-reuse',
+                'email' => 'reusable.employee@kora.demo',
+                'displayName' => 'Tentative de réactivation',
+                'companyId' => 'kora',
+                'employeeId' => 'historical-employee-id',
+                'sectorIds' => ['new-sector'],
+                'role' => 'employee',
+                'password' => 'NewPassword2026!',
+            ])
+            ->assertConflict();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->postJson('/api/auth/accounts', [
+                'id' => 'new-auth-identity',
+                'email' => 'REUSABLE.EMPLOYEE@KORA.DEMO',
+                'displayName' => 'Nouvel employé',
+                'companyId' => 'kora',
+                'employeeId' => 'new-employee-id',
+                'sectorIds' => ['new-sector'],
+                'role' => 'employee',
+                'permissions' => ['presences' => ['voir']],
+                'password' => 'NewPassword2026!',
+            ])
+            ->assertCreated();
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'reusable.employee@kora.demo',
+            'password' => 'OldPassword2026!',
+        ])->assertUnauthorized();
+        $this->postJson('/api/auth/login', [
+            'email' => 'reusable.employee@kora.demo',
+            'password' => 'NewPassword2026!',
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.employeeId', 'new-employee-id')
+            ->assertJsonPath('user.role', 'employee')
+            ->assertJsonPath('user.permissions.presences.0', 'voir')
+            ->assertJsonMissingPath('user.permissions.stocks:products');
+
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'old-auth-identity',
+            'employee_id' => 'historical-employee-id',
+        ]);
+        $this->assertDatabaseHas('auth_users', [
+            'id' => 'new-auth-identity',
+            'email' => 'reusable.employee@kora.demo',
+            'employee_id' => 'new-employee-id',
+        ]);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $otherToken)
+            ->deleteJson('/api/auth/accounts/new-employee-id')
+            ->assertForbidden();
+    }
+
     public function test_deleted_company_invalidates_credentials_sessions_tokens_and_protected_data_access(): void
     {
         Company::query()->create([
@@ -359,6 +515,7 @@ class MaximusAuthTest extends TestCase
             'manager' => 'Administrateur supprimé',
             'email' => 'admin@deleted-company.test',
             'status' => 'ACTIF',
+            'deletion_locked' => false,
             'requested_modules' => ['presences', 'stocks', 'ecommerce'],
         ]);
 

@@ -8,6 +8,7 @@ use App\Models\AuthUser;
 use App\Models\Company;
 use App\Models\CompanyRequest;
 use App\Support\CompanyRegistry;
+use App\Support\AuthIdentityRetirement;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
@@ -22,6 +23,11 @@ use Illuminate\Support\Str;
 
 class CompanyController extends Controller
 {
+    public function __construct(
+        private readonly AuthIdentityRetirement $identityRetirement,
+    ) {
+    }
+
     public function createAdministrative(
         Request $request,
         CompanyRequestCreationService $companyRequests,
@@ -134,7 +140,14 @@ class CompanyController extends Controller
                 $admin = AuthUser::query()->whereKey($adminId)->first();
                 $emailOwner = AuthUser::query()->where('email', $company->email)->first();
                 if ($emailOwner && $emailOwner->id !== $adminId) {
-                    throw new \DomainException('Cette adresse email est déjà utilisée.');
+                    $ownerCompany = $emailOwner->company_id
+                        ? Company::query()->whereKey($emailOwner->company_id)->first()
+                        : null;
+                    if ($ownerCompany && $ownerCompany->deleted_at !== null) {
+                        $this->identityRetirement->retireUser($emailOwner);
+                    } else {
+                        throw new \DomainException('Cette adresse email est déjà utilisée.');
+                    }
                 }
 
                 $values = [
