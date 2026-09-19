@@ -3297,7 +3297,7 @@ function CompaniesPage({
         </div>
       </div>
       <DataTable
-        headers={['Entreprise', 'Responsable', 'Pays', 'Modules', 'Accès ERP', 'Statut', 'Actions']}
+        headers={['Entreprise', 'Responsable', 'Pays', 'Modules', 'Statut', 'Actions']}
         rows={list.map((c) => [
           <button
             data-testid={`button-open-company-${c.id}`}
@@ -3319,23 +3319,6 @@ function CompaniesPage({
           c.manager,
           c.country,
           `${c.allowedModules.length} / ${c.requestedModules.length}`,
-          c.installationAccess?.state === 'primary' ? (
-            <a
-              href={c.installationAccess.endpointUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold text-[hsl(var(--primary))] hover:underline"
-              onClick={event => event.stopPropagation()}
-            >
-              {c.installationAccess.mode === 'dedicated' ? 'ERP dédié ↗' : 'ERP local ↗'}
-            </a>
-          ) : c.installationAccess?.state === 'unavailable' ? (
-            <span className="font-semibold text-[hsl(var(--destructive))]">ERP indisponible</span>
-          ) : c.installationAccess?.state === 'prepared' ? (
-            <span title="Installation en préparation, sans bascule">Central · préparation</span>
-          ) : (
-            <span>Central mutualisé</span>
-          ),
           <StatusBadge status={c.status} />,
           <div className="flex flex-wrap items-center gap-2">
              <button
@@ -3432,15 +3415,12 @@ function CompanyDetail({
   const [installationBusy, setInstallationBusy] = useState(false);
   const [installationEndpoint, setInstallationEndpoint] = useState('');
   const [installationRefreshKey, setInstallationRefreshKey] = useState(0);
-  const [installationPresentation, setInstallationPresentation] = useState(company.installationAccess);
   const [loginSettings, setLoginSettings] = useState<{
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
     slug: string;
     url: string;
   } | null>(null);
-  const [loginSettingsLoading, setLoginSettingsLoading] = useState(true);
-  const [loginSettingsError, setLoginSettingsError] = useState('');
   const [loginSaving, setLoginSaving] = useState(false);
   const [customDomains, setCustomDomains] = useState<EcommerceDomain[]>([]);
   const [domainInput, setDomainInput] = useState('');
@@ -3451,20 +3431,12 @@ function CompanyDetail({
     setActive((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   useEffect(() => {
     let cancelled = false;
-    setLoginSettingsLoading(true);
-    setLoginSettingsError('');
     void companyRequestApi.loginSettings(company.id)
       .then(({ settings }) => {
         if (!cancelled) setLoginSettings(settings);
       })
-      .catch((error) => {
-        if (!cancelled) {
-          setLoginSettings(null);
-          setLoginSettingsError(error instanceof Error ? error.message : 'Les réglages de connexion centrale sont indisponibles.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoginSettingsLoading(false);
+      .catch(() => {
+        if (!cancelled) setLoginSettings(null);
       });
     return () => {
       cancelled = true;
@@ -3788,28 +3760,8 @@ function CompanyDetail({
           synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
         </p>
       </section>
-      <CompanyInstallationAccess
-        companyId={company.id}
-        companyName={company.name}
-        refreshKey={installationRefreshKey}
-        onPresentationChange={(presentation) => {
-          setInstallationPresentation(presentation);
-          mutate((draft) => {
-            const target = draft.companies.find(item => item.id === company.id);
-            if (target) target.installationAccess = presentation;
-          });
-        }}
-      />
-      <details
-        className="rounded-2xl border bg-[hsl(var(--card))]"
-        open={installationPresentation?.state !== 'primary' && installationPresentation?.state !== 'unavailable'}
-      >
-        <summary className="cursor-pointer px-6 py-4 text-sm font-bold">
-          {installationPresentation?.state === 'primary' || installationPresentation?.state === 'unavailable'
-            ? 'Accès central historique, connexion mutualisée et boutique'
-            : 'Connexion mutualisée et domaines publics'}
-        </summary>
-      <section className="border-t p-6">
+      <CompanyInstallationAccess companyId={company.id} companyName={company.name} refreshKey={installationRefreshKey} />
+      <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Hébergement mutualisé</p>
@@ -3820,14 +3772,9 @@ function CompanyDetail({
             </p>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
-            {loginSettingsLoading ? 'Chargement…' : loginSettingsError ? 'Indisponible' : loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
+            {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
           </span>
         </div>
-        {loginSettingsError && (
-          <p role="alert" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
-            {loginSettingsError}
-          </p>
-        )}
         <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
           <input
             type="checkbox"
@@ -3953,7 +3900,6 @@ function CompanyDetail({
           </div>
         </div>
       </section>
-      </details>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex items-center justify-between">
           <div>

@@ -199,9 +199,6 @@ export const createTransportApi = (companyId: string) => {
       headers: { 'Content-Type': 'application/json' },
     }),
     createDriver: (body: CreateDriverInput) => request<Driver>(withCompany('/transport/drivers'), json(body)),
-    deleteDriver: (id: string) => request<{ id: string }>(withCompany(`/transport/drivers/${encodeURIComponent(id)}`), {
-      method: 'DELETE',
-    }),
     updateDriverLocation: (id: string, body: { latitude: number; longitude: number }) =>
       request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/location`), {
         method: 'PATCH',

@@ -106,21 +106,6 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('category', 'Épicerie fine')
             ->json();
 
-        DB::table('ecommerce_rentals')->insert([
-            'id' => 'foreign-rental-category-guard',
-            'company_id' => 'other-company',
-            'name' => 'Location étrangère',
-            'description' => '',
-            'category' => 'Catégorie étrangère',
-            'category_id' => $category['id'],
-            'price' => 1000,
-            'billing_unit' => 'JOUR',
-            'availability' => 1,
-            'status' => 'DRAFT',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
         $request->patchJson('/api/ecommerce/categories/'.$category['id'].'?companyId=kora', [
             'name' => 'Épicerie premium',
         ])->assertOk();
@@ -134,12 +119,6 @@ class EcommerceTest extends TestCase
             'category' => 'Général',
         ]);
         $this->assertDatabaseMissing('ecommerce_categories', ['id' => $category['id']]);
-        $this->assertDatabaseHas('ecommerce_rentals', [
-            'id' => 'foreign-rental-category-guard',
-            'company_id' => 'other-company',
-            'category_id' => $category['id'],
-            'category' => 'Catégorie étrangère',
-        ]);
     }
 
     public function test_product_and_category_slugs_are_generated_and_scoped_to_the_company(): void

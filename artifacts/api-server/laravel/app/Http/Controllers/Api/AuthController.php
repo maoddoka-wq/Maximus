@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AuthSession;
 use App\Models\AuthUser;
 use App\Models\Company;
-use App\Support\AuthIdentityRetirement;
 use App\Support\CompanyAuthorization;
 use App\Support\InstallationContext;
 use App\Support\MaximusAuth;
@@ -203,11 +202,6 @@ class AuthController extends Controller
             )) {
             return response()->json(['error' => 'Le compte existant est hors périmètre administrable.'], 403);
         }
-        if ($existing && $existing->status !== 'ACTIF') {
-            return response()->json([
-                'error' => 'Ce compte historique ne peut pas être réactivé. Créez un nouvel employé avec un nouvel identifiant.',
-            ], 409);
-        }
         if (! $existing && empty($data['password'])) {
             return response()->json(['error' => 'Un mot de passe initial est requis pour ce compte.'], 400);
         }
@@ -354,7 +348,10 @@ class AuthController extends Controller
             return response()->json(['error' => 'Révocation du compte hors périmètre autorisé.'], 403);
         }
 
-        DB::transaction(fn () => app(AuthIdentityRetirement::class)->retireUser($user));
+        DB::transaction(function () use ($user): void {
+            $user->update(['status' => 'SUSPENDU', 'updated_at' => now()]);
+            AuthSession::query()->where('user_id', $user->id)->delete();
+        });
 
         return response()->noContent();
     }

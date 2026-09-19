@@ -57,7 +57,6 @@ export interface Company {
   loginUrl?: string;
   deletionLocked?: boolean;
   managerRoleId?: string;
-  installationAccess?: import('./installation-access-presentation').InstallationAccessPresentation;
 }
 
 export interface ModuleFeaturePack {

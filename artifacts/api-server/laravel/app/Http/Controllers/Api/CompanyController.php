@@ -8,11 +8,9 @@ use App\Models\AuthUser;
 use App\Models\Company;
 use App\Models\CompanyRequest;
 use App\Support\CompanyRegistry;
-use App\Support\AuthIdentityRetirement;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
-use App\Support\CompanyInstallationAccess;
 use App\Services\CompanyRequestCreationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,11 +21,6 @@ use Illuminate\Support\Str;
 
 class CompanyController extends Controller
 {
-    public function __construct(
-        private readonly AuthIdentityRetirement $identityRetirement,
-    ) {
-    }
-
     public function createAdministrative(
         Request $request,
         CompanyRequestCreationService $companyRequests,
@@ -104,13 +97,8 @@ class CompanyController extends Controller
             ->with('company')
             ->where('status', 'PENDING')
             ->latest()
-            ->get();
-        $installationAccess = CompanyInstallationAccess::forCompanies($requests->pluck('company_id'));
-        $requests = $requests
-            ->map(fn (CompanyRequest $companyRequest): array => $this->requestPayload(
-                $companyRequest,
-                $installationAccess->get((string) $companyRequest->company_id),
-            ))
+            ->get()
+            ->map(fn (CompanyRequest $companyRequest): array => $this->requestPayload($companyRequest))
             ->values();
 
         return response()->json(['requests' => $requests]);
@@ -140,14 +128,7 @@ class CompanyController extends Controller
                 $admin = AuthUser::query()->whereKey($adminId)->first();
                 $emailOwner = AuthUser::query()->where('email', $company->email)->first();
                 if ($emailOwner && $emailOwner->id !== $adminId) {
-                    $ownerCompany = $emailOwner->company_id
-                        ? Company::query()->whereKey($emailOwner->company_id)->first()
-                        : null;
-                    if ($ownerCompany && $ownerCompany->deleted_at !== null) {
-                        $this->identityRetirement->retireUser($emailOwner);
-                    } else {
-                        throw new \DomainException('Cette adresse email est déjà utilisée.');
-                    }
+                    throw new \DomainException('Cette adresse email est déjà utilisée.');
                 }
 
                 $values = [
@@ -573,7 +554,7 @@ class CompanyController extends Controller
         }
     }
 
-    private function companyPayload(Company $company, ?array $installationAccess = null): array
+    private function companyPayload(Company $company): array
     {
         return [
             'id' => $company->id,
@@ -602,7 +583,6 @@ class CompanyController extends Controller
             'loginUrl' => $company->login_slug
                 ? '/entreprise/'.rawurlencode($company->login_slug).'/connexion'
                 : null,
-            'installationAccess' => $installationAccess ?? CompanyInstallationAccess::forCompany((string) $company->id),
         ];
     }
 
@@ -658,13 +638,13 @@ class CompanyController extends Controller
         }
     }
 
-    private function requestPayload(CompanyRequest $request, ?array $installationAccess = null): array
+    private function requestPayload(CompanyRequest $request): array
     {
         return [
             'id' => $request->company_id,
             'requestId' => $request->id,
             'status' => $request->status,
-            'company' => $request->company ? $this->companyPayload($request->company, $installationAccess) : null,
+            'company' => $request->company ? $this->companyPayload($request->company) : null,
             'createdAt' => optional($request->created_at)->toISOString(),
             'rejectionReason' => $request->rejection_reason,
         ];

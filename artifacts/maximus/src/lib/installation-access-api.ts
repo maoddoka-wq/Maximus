@@ -30,7 +30,6 @@ export interface InstallationAccessResponse {
   installations: Installation[];
   centralLoginUrl: string;
   primaryInstallationId: string | null;
-  presentation?: import('./installation-access-presentation').InstallationAccessPresentation;
 }
 
 export const installationAccessApi = {

@@ -267,17 +267,12 @@ class EcommerceController extends Controller
         if (! $category) {
             return response()->json(['error' => 'Catégorie introuvable.'], 404);
         }
-        DB::table('ecommerce_products')->where('company_id', $company)->where('category_id', $id)->update([
+        DB::table('ecommerce_products')->where('category_id', $id)->update([
             'category_id' => null,
             'category' => 'Général',
             'updated_at' => now(),
         ]);
-        DB::table('ecommerce_rentals')->where('company_id', $company)->where('category_id', $id)->update([
-            'category_id' => null,
-            'category' => 'Général',
-            'updated_at' => now(),
-        ]);
-        DB::table('ecommerce_categories')->where('id', $id)->where('company_id', $company)->delete();
+        DB::table('ecommerce_categories')->where('id', $id)->delete();
 
         return response()->json(['ok' => true]);
     }
@@ -723,9 +718,9 @@ class EcommerceController extends Controller
         if (! $row) {
             return response()->json(['error' => 'Produit e-commerce introuvable.'], 404);
         }
-        DB::table('ecommerce_products')->where('id', $id)->where('company_id', $this->company($request))->update(['status' => 'ARCHIVED', 'updated_at' => now()]);
+        DB::table('ecommerce_products')->where('id', $id)->update(['status' => 'ARCHIVED', 'updated_at' => now()]);
 
-        return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->where('company_id', $this->company($request))->first()));
+        return response()->json($this->product(DB::table('ecommerce_products')->where('id', $id)->first()));
     }
 
     public function createRental(Request $request): JsonResponse

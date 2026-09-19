@@ -50,21 +50,21 @@ export function EmployeesTab({
 
   const deleteEmployee = async (employee: Employee) => {
     const ok = await confirm({
-      title: 'Supprimer définitivement cet accès employé ?',
-      description: `L’accès de ${employee.firstName} ${employee.lastName} sera révoqué et son email pourra servir à un nouveau compte. Son identifiant et ses références historiques seront conservés. Cette action ne suspend pas temporairement le compte et ne peut pas être annulée.`,
-      confirmLabel: 'Supprimer définitivement',
+      title: 'Supprimer ce compte employé ?',
+      description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`,
+      confirmLabel: 'Supprimer',
       tone: 'danger',
     });
     if (!ok) return;
     try {
-      await authApi.deleteAccount(employee.id);
+      await authApi.revokeAccount(employee.id);
       mutate(draft => {
         draft.employees = draft.employees.filter(item => item.id !== employee.id);
-      }, 'Accès employé supprimé. Les références historiques sont conservées.');
+      }, 'Employé supprimé.');
     } catch (error) {
       await alert({
         title: 'Suppression impossible',
-        description: error instanceof Error ? error.message : 'La suppression définitive de l’accès a échoué.',
+        description: error instanceof Error ? error.message : 'La révocation du compte a échoué.',
         confirmLabel: 'Compris',
         tone: 'danger',
       });

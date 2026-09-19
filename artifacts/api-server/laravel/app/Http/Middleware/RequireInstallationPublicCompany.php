@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Services\EcommerceDomainVerifier;
-use App\Support\CompanyRegistry;
 use App\Support\InstallationContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -19,9 +18,12 @@ final class RequireInstallationPublicCompany
 
     public function handle(Request $request, Closure $next): Response
     {
-        $installationCompanyId = InstallationContext::companyId();
-        if (! InstallationContext::isCentral()
-            && ($installationCompanyId === null || ! $this->isActiveCompany($installationCompanyId))) {
+        if (InstallationContext::isCentral()) {
+            return $next($request);
+        }
+
+        $companyId = InstallationContext::companyId();
+        if ($companyId === null) {
             return $this->notFound();
         }
 
@@ -34,8 +36,9 @@ final class RequireInstallationPublicCompany
             ? $company
             : $companyIdParameter;
         if (is_string($explicitCompany) && $explicitCompany !== '') {
-            return $this->allowsCompany($explicitCompany, $installationCompanyId)
-                ? $next($request) : $this->notFound();
+            return $explicitCompany === $companyId
+                ? $next($request)
+                : $this->notFound();
         }
 
         if (is_string($slug) && $slug !== '') {
@@ -44,34 +47,17 @@ final class RequireInstallationPublicCompany
                 ->where('status', 'PUBLISHED')
                 ->value('company_id');
 
-            if ($storeCompanyId !== null) {
-                return $this->allowsCompany((string) $storeCompanyId, $installationCompanyId)
-                    ? $next($request) : $this->notFound();
-            }
-
-            return InstallationContext::isCentral() ? $next($request) : $this->notFound();
+            return (string) $storeCompanyId === $companyId
+                ? $next($request)
+                : $this->notFound();
         }
 
         $domain = $this->domainVerifier->activeForHost($request->getHost());
-        if ($domain) {
-            return $this->allowsCompany((string) $domain->company_id, $installationCompanyId)
-                ? $next($request) : $this->notFound();
+        if ($domain && (string) $domain->company_id === $companyId) {
+            return $next($request);
         }
 
-        // Central controllers retain their normal response for an unknown domain.
-        // A company-only installation must never use an unresolved host as a tenant selector.
-        return InstallationContext::isCentral() ? $next($request) : $this->notFound();
-    }
-
-    private function allowsCompany(string $companyId, ?string $installationCompanyId): bool
-    {
-        return (InstallationContext::isCentral() || $companyId === $installationCompanyId)
-            && $this->isActiveCompany($companyId);
-    }
-
-    private function isActiveCompany(string $companyId): bool
-    {
-        return CompanyRegistry::isActive($companyId);
+        return $this->notFound();
     }
 
     private function notFound(): Response

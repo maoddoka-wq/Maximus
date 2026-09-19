@@ -79,7 +79,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('metrics.todayRevenue', 3500);
     }
 
-    public function test_vehicle_deletion_preserves_trip_history_and_unused_registration_can_be_recreated(): void
+    public function test_vehicle_can_be_updated_and_deleted_but_not_while_on_an_active_trip(): void
     {
         $request = $this->asActor();
         $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
@@ -115,62 +115,16 @@ class TransportTest extends TestCase
         ])->assertCreated();
 
         $request->deleteJson('/api/transport/vehicles/'.$vehicle->json('id').'?companyId=kora')
-            ->assertStatus(409)
-            ->assertJsonPath('error', 'Ce véhicule est conservé car il figure dans l’historique des courses.');
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Un véhicule engagé dans une course en cours ne peut pas être supprimé.');
 
         $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
             'status' => 'COMPLETED',
         ])->assertOk();
         $request->deleteJson('/api/transport/vehicles/'.$vehicle->json('id').'?companyId=kora')
-            ->assertStatus(409)
-            ->assertJsonPath('error', 'Ce véhicule est conservé car il figure dans l’historique des courses.');
-        $this->assertDatabaseHas('transport_vehicles', ['id' => $vehicle->json('id')]);
-
-        $unused = $request->postJson('/api/transport/vehicles?companyId=kora', [
-            'registration' => 'DK-UNUSED-01',
-            'model' => 'Toyota Yaris',
-            'vehicleType' => 'BERLINE',
-            'driverId' => $otherDriver = $request->postJson('/api/transport/drivers?companyId=kora', [
-                'employeeId' => $this->createDriverEmployee('unused-vehicle-driver'),
-                'licenseNumber' => 'SN-UNUSED-001',
-            ])->assertCreated()->json('id'),
-            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        ])->assertCreated();
-        $request->deleteJson('/api/transport/vehicles/'.$unused->json('id').'?companyId=kora')
             ->assertOk()
-            ->assertJsonPath('id', $unused->json('id'));
-        $this->assertDatabaseMissing('transport_vehicles', ['id' => $unused->json('id')]);
-        $request->postJson('/api/transport/vehicles?companyId=kora', [
-            'registration' => 'DK-UNUSED-01',
-            'model' => 'Toyota Yaris recréée',
-            'vehicleType' => 'BERLINE',
-            'driverId' => $otherDriver,
-            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        ])->assertCreated();
-    }
-
-    public function test_driver_deletion_is_tenant_scoped_and_preserves_vehicle_and_trip_references(): void
-    {
-        $request = $this->asActor();
-        $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
-            'employeeId' => $this->createDriverEmployee('driver-delete-guard'),
-            'licenseNumber' => 'SN-DELETE-GUARD',
-        ])->assertCreated();
-        $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
-            'registration' => 'DK-DELETE-01',
-            'model' => 'Toyota',
-            'vehicleType' => 'TAXI',
-            'driverId' => $driver->json('id'),
-            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        ])->assertCreated();
-
-        $request->deleteJson('/api/transport/drivers/'.$driver->json('id').'?companyId=kora')
-            ->assertStatus(409)
-            ->assertJsonPath('error', 'Ce chauffeur est encore rattaché à un véhicule. Supprimez ou réaffectez ce véhicule avant de supprimer le chauffeur.');
-
-        $request->deleteJson('/api/transport/vehicles/'.$vehicle->json('id').'?companyId=kora')->assertOk();
-        $request->deleteJson('/api/transport/drivers/'.$driver->json('id').'?companyId=kora')->assertOk();
-        $this->assertDatabaseMissing('transport_drivers', ['id' => $driver->json('id')]);
+            ->assertJsonPath('id', $vehicle->json('id'));
+        $this->assertDatabaseMissing('transport_vehicles', ['id' => $vehicle->json('id')]);
     }
 
     public function test_dispatch_assigns_a_trip_and_requires_the_pickup_code_to_start(): void
