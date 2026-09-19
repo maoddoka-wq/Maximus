@@ -1,0 +1,584 @@
+Tu es l’agent de sécurité chargé d’effectuer un SAFE SECURITY AUDIT du projet MAXIMUS ERP.
+
+⚠️ RÈGLE ABSOLUE :
+TA PRIORITÉ N°1 EST DE NE PAS CASSER, SUPPRIMER, RÉINITIALISER OU DÉGRADER L’APPLICATION.
+
+Tu as accès au projet local, au dépôt GitHub et aux informations/configurations Render disponibles dans ton environnement.
+
+Tu dois travailler en mode :
+
+AUDITER → OBSERVER → PROUVER → RAPPORTER
+
+et NON :
+
+AUDITER → MODIFIER → DÉPLOYER.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. INTERDICTIONS ABSOLUES
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pendant toute cette mission :
+
+❌ Ne supprime aucun fichier.
+❌ Ne supprime aucune table.
+❌ Ne supprime aucune colonne.
+❌ Ne supprime aucune route.
+❌ Ne supprime aucune donnée.
+❌ Ne fais aucun DROP DATABASE / DROP TABLE.
+❌ Ne fais aucun TRUNCATE.
+❌ Ne fais aucun migrate:fresh.
+❌ Ne fais aucun reset de base.
+❌ Ne fais aucun rollback de migration existante.
+❌ Ne lance aucune commande destructive.
+❌ Ne modifies aucun mot de passe réel.
+❌ Ne modifies aucun compte utilisateur réel.
+❌ Ne modifies aucune donnée de production.
+❌ Ne déclenche aucun paiement réel.
+❌ Ne modifies aucune configuration Render de production.
+❌ Ne redéploies pas automatiquement.
+❌ Ne changes pas les variables d’environnement de production.
+❌ Ne modifies pas les secrets.
+❌ Ne modifies pas les domaines.
+❌ Ne modifies pas les données financières.
+❌ Ne modifies pas les données commerciales.
+❌ Ne modifies pas les données de transport.
+❌ Ne modifies pas les données de stock.
+❌ Ne modifies pas les données de présence.
+
+N'effectue aucune action qui pourrait provoquer une perte de données ou une indisponibilité.
+
+Si une vérification risque d'avoir un effet de bord :
+→ NE L'EXÉCUTE PAS.
+→ Signale-la dans le rapport comme "TEST NON EXÉCUTÉ — RISQUE DESTRUCTIF".
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. AVANT TOUT TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commence par inspecter le projet et lire :
+
+- replit.md
+- package.json
+- tsconfig.json
+- tsconfig.base.json
+- configuration Laravel
+- routes Laravel
+- middleware
+- Policies
+- FormRequests
+- Controllers
+- Actions
+- Services
+- modèles Eloquent
+- migrations
+- tests existants
+- configuration PostgreSQL
+- configuration Render
+- configuration GitHub/CI si présente.
+
+Respecte impérativement l'architecture documentée dans replit.md.
+
+MAXIMUS utilise actuellement :
+
+- React / TypeScript côté frontend
+- Laravel comme API active
+- PostgreSQL comme base active
+- Express comme ancien/legacy backend
+- Laravel comme source de vérité pour les corrections de sécurité.
+
+NE TRANSFORME PAS l'architecture.
+
+NE FAIS PAS de migration Laravel → Express ou Express → Laravel.
+
+NE REMPLACE PAS PostgreSQL.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. GIT — PROTECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Avant toute éventuelle modification, vérifie :
+
+- branche actuelle
+- état git
+- derniers commits
+- modifications locales
+- fichiers non suivis.
+
+Si une modification devait exceptionnellement être nécessaire plus tard :
+
+→ créer une branche dédiée de sécurité
+→ ne jamais travailler directement sur main
+→ ne jamais écraser les modifications existantes.
+
+IMPORTANT :
+
+Pour cette première phase, tu n'as PAS l'autorisation de modifier le code.
+
+Commence uniquement par l'audit.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. AUDIT DE L'APPLICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Effectue une inspection complète mais NON DESTRUCTIVE.
+
+Cherche notamment :
+
+A. AUTHENTIFICATION
+
+- login
+- logout
+- sessions
+- cookies
+- expiration
+- fixation de session
+- récupération de mot de passe
+- changement de mot de passe
+- protection des comptes sensibles.
+
+B. AUTORISATION
+Vérifie particulièrement :
+
+- Policies
+- middleware
+- permissions
+- rôles
+- modules
+- sous-fonctionnalités
+- actions
+- company scope
+- unit scope.
+
+Respecte la chaîne obligatoire définie dans replit.md :
+
+module existe / non supprimé
+→ company allowedModules
+→ unit moduleIds
+→ rôle appartenant à la même company/unit/ancestor
+→ rôle possède "voir"
+→ sous-feature possède "voir"
+→ action possède sa propre permission.
+
+Le scope le plus restrictif doit toujours s'appliquer.
+
+C. MULTI-TENANT / IDOR / BOLA
+
+Cherche les possibilités permettant à un utilisateur d'accéder aux données d'une autre entreprise en modifiant :
+
+- ID
+- companyId
+- unitId
+- roleId
+- resourceId
+- slug
+- URL
+- paramètres HTTP
+- payload JSON.
+
+IMPORTANT :
+
+Tu peux analyser le code et effectuer des tests non destructifs.
+
+Tu ne dois PAS modifier les données pour démontrer une vulnérabilité.
+
+D. SEC-001 — COMPANY PASSWORD
+
+Vérifie spécifiquement la route de changement du mot de passe company/admin précédemment identifiée.
+
+Détermine :
+
+- qui peut appeler la route
+- quel middleware protège la route
+- quelle Policy intervient
+- quel rôle peut modifier quel compte
+- si un utilisateur standard peut cibler un compte administrateur
+- si une réauthentification est nécessaire.
+
+Ne change aucun mot de passe réel.
+
+Si nécessaire, reproduis le problème uniquement avec des comptes de test/localement.
+
+E. ENDPOINTS PUBLICS
+
+Inspecte notamment :
+
+- /api/healthz
+- /api/installation
+- autres routes publiques.
+
+Détermine si elles exposent inutilement :
+
+- version
+- environnement
+- état PostgreSQL
+- informations d'installation
+- configuration interne
+- données sensibles.
+
+Ne désactive aucune route pendant l'audit.
+
+F. FINANCES / DIAMANOPAY
+
+Inspecte :
+
+- paiements
+- webhooks
+- transactions
+- idempotence
+- vérification des signatures
+- montant
+- devise
+- statut
+- association utilisateur/entreprise.
+
+Ne déclenche AUCUN paiement réel.
+
+Ne rejoue aucun webhook réel contre la production.
+
+G. E-COMMERCE
+
+Vérifie :
+
+- panier
+- commandes
+- produits
+- prix
+- stock
+- paiement
+- isolation multi-tenant
+- manipulation des IDs
+- double soumission.
+
+H. UPLOADS
+
+Inspecte :
+
+- validation MIME
+- extension
+- taille
+- nom de fichier
+- stockage
+- accès aux fichiers
+- fichiers exécutables
+- path traversal.
+
+Ne téléverse aucun fichier dangereux en production.
+
+I. INJECTION / XSS
+
+Inspecte :
+
+- SQL injection
+- XSS
+- commandes système
+- template injection
+- HTML non échappé.
+
+Utilise uniquement des tests inoffensifs et non persistants.
+
+J. CSRF / CORS
+
+Vérifie :
+
+- configuration CORS
+- cookies
+- credentials
+- CSRF
+- origines autorisées.
+
+K. SECRETS
+
+Recherche :
+
+- API keys
+- tokens
+- passwords
+- secrets
+- clés privées
+- credentials
+- secrets dans frontend
+- secrets dans Git.
+
+IMPORTANT :
+
+Ne révèle pas les valeurs secrètes dans le rapport.
+
+Si tu trouves un secret :
+
+→ indique seulement son emplacement et son type
+→ masque sa valeur.
+
+Exemple :
+
+SECRET DÉTECTÉ :
+fichier : xxx
+type : API key
+valeur : [MASQUÉE]
+
+L. DÉPENDANCES
+
+Analyse :
+
+- npm/pnpm audit si disponible
+- dépendances Laravel/PHP
+- packages obsolètes
+- vulnérabilités connues.
+
+Ne mets aucune dépendance à jour automatiquement.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. TESTS HTTP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si tu peux utiliser l'environnement Render :
+
+Effectue uniquement des tests HTTP NON DESTRUCTIFS.
+
+Autorisé :
+
+GET
+OPTIONS
+HEAD
+
+et éventuellement des requêtes POST/PATCH/DELETE uniquement si :
+
+- elles utilisent un environnement de test/local
+- aucune donnée réelle n'est modifiée
+- leur innocuité est certaine.
+
+Interdit sur production :
+
+❌ DELETE réel
+❌ changement de mot de passe
+❌ création de paiement
+❌ modification de données métier
+❌ suppression
+❌ reset
+❌ upload dangereux.
+
+Pour chaque test, indique :
+
+METHOD
+URL
+AUTH REQUISE
+RÉSULTAT
+RISQUE
+CONCLUSION.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. TESTS LOCAUX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si des tests automatisés existent, exécute uniquement les tests sûrs.
+
+Utilise notamment si compatibles avec le projet :
+
+pnpm run typecheck
+
+pnpm run build
+
+git diff --check
+
+et les tests Laravel existants.
+
+Pour Laravel, respecte la règle de replit.md :
+
+Les tests doivent utiliser PostgreSQL et non SQLite/mock lorsqu'ils vérifient le comportement réel de l'application.
+
+Ne détruis jamais la base locale existante pour lancer un test.
+
+Si un test nécessite une base de données dédiée, indique-le au lieu de réinitialiser la base existante.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. VÉRIFICATIONS PRIORITAIRES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Analyse en priorité :
+
+SEC-001
+Changement de mot de passe company/admin.
+
+SEC-002
+Exposition de /api/installation.
+
+SEC-003
+Exposition de /api/healthz.
+
+Puis :
+
+- IDOR/BOLA
+- multi-tenant isolation
+- permissions
+- rôles
+- finance
+- webhooks
+- ecommerce
+- uploads
+- XSS
+- injection
+- CSRF
+- CORS
+- secrets
+- dépendances.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. AUCUNE CORRECTION AUTOMATIQUE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT :
+
+À LA FIN DE L'AUDIT, TU NE MODIFIES PAS LE CODE.
+
+Tu dois d'abord produire un rapport.
+
+Pour chaque problème :
+
+ID
+Titre
+Sévérité
+Fichier/route concerné
+Preuve
+Comment le reproduire sans danger
+Impact potentiel
+Statut
+Correction proposée
+Risque de la correction.
+
+Utilise uniquement ces statuts :
+
+CONFIRMÉ
+NON CONFIRMÉ
+POTENTIEL
+NON REPRODUCTIBLE
+TEST NON EXÉCUTÉ
+DÉJÀ CORRIGÉ.
+
+Ne transforme pas automatiquement "potentiel" en vulnérabilité confirmée.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. FORMAT DU RAPPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MAXIMUS ERP — SAFE SECURITY AUDIT
+
+1. État général
+
+- branche
+- commit
+- état Git
+- environnement analysé
+- Laravel
+- PostgreSQL
+- Express legacy
+- tests exécutés.
+
+2. Résumé
+
+Nombre de problèmes :
+
+CRITIQUES :
+ÉLEVÉS :
+MOYENS :
+FAIBLES :
+NON CONFIRMÉS :
+
+3. Vulnérabilités confirmées
+
+Pour chaque problème :
+
+SEC-XXX — TITRE
+
+Sévérité :
+Statut :
+
+Zone :
+
+Preuve :
+
+Reproduction sûre :
+
+Impact :
+
+Correction proposée :
+
+Risque de correction :
+
+4. Points déjà correctement protégés
+
+Liste les mécanismes de sécurité qui fonctionnent correctement.
+
+5. Tests non exécutés
+
+Explique précisément pourquoi certains tests n'ont pas été exécutés.
+
+6. Corrections proposées
+
+Liste les corrections MINIMALES.
+
+IMPORTANT :
+Aucune correction ne doit être appliquée pendant cette phase.
+
+7. Tests recommandés après correction
+
+Donne les tests à exécuter avant tout déploiement.
+
+8. Conclusion
+
+Indique clairement si l'audit est :
+
+AUDIT TERMINÉ — AUCUNE MODIFICATION EFFECTUÉE.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. RÈGLE FINALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si tu rencontres une situation ambiguë :
+
+NE PRENDS PAS D'INITIATIVE.
+
+Si une action peut :
+
+- supprimer une donnée
+- modifier une donnée
+- casser une route
+- modifier PostgreSQL
+- modifier Render
+- modifier un secret
+- modifier un compte
+- interrompre l'application
+
+→ ARRÊTE L'ACTION.
+
+→ DOCUMENTE ce que tu voulais vérifier.
+
+→ INDIQUE ce qui doit être fait manuellement après validation.
+
+À LA FIN :
+
+NE MODIFIE PAS LE CODE.
+
+NE COMMIT PAS.
+
+NE PUSH PAS.
+
+NE DÉPLOIE PAS.
+
+NE MODIFIE PAS RENDER.
+
+Produis uniquement le rapport d'audit.
+
+L'objectif de cette mission est de savoir EXACTEMENT ce qui est vulnérable avant de toucher à MAXIMUS.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commence maintenant par :
+
+1. lire replit.md ;
+2. inspecter la structure Laravel ;
+3. inspecter les routes et autorisations ;
+4. vérifier l'état Git ;
+5. effectuer l'audit statique ;
+6. effectuer uniquement les tests dynamiques non destructifs autorisés ;
+7. produire le rapport ;
+8. NE RIEN MODIFIER.
