@@ -23,19 +23,7 @@ function normalizeDefinedFeatureIds(
     id: definition.id,
     label: definition.label,
   }));
-  const byId = new Map(options.map(option => [option.id, option]));
-  const byLabel = new Map(options.map(option => [featureSlug(option.label), option]));
-
-  return [...new Set(
-    [...values]
-      .map(value => {
-        const direct = byId.get(value);
-        if (direct) return direct.id;
-        const normalized = byLabel.get(featureSlug(value));
-        return normalized?.id;
-      })
-      .filter((featureId): featureId is string => Boolean(featureId)),
-  )];
+  return normalizeValuesAgainstOptions(values, options);
 }
 
 function normalizeValuesAgainstOptions(
@@ -44,10 +32,15 @@ function normalizeValuesAgainstOptions(
 ) {
   const byId = new Map(options.map(option => [option.id, option.id]));
   const byLabel = new Map(options.map(option => [featureSlug(option.label), option.id]));
+  const unaccented = (value: string) => featureSlug(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const byAlias = new Map(options.flatMap(option => [
+    [unaccented(option.id), option.id],
+    [unaccented(option.label), option.id],
+  ]));
 
   return [...new Set(
     [...values]
-      .map(value => byId.get(value) ?? byLabel.get(featureSlug(value)))
+      .map(value => byId.get(value) ?? byLabel.get(featureSlug(value)) ?? byAlias.get(unaccented(value)))
       .filter((featureId): featureId is string => Boolean(featureId)),
   )];
 }
@@ -104,6 +97,10 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
 
 export function normalizeModuleFeatureIds(module: Module, values: Iterable<string>) {
   const rawValues = [...values].map(value => {
+    if (module.id === 'commerce') {
+      const aliases: Record<string, string> = { 'devis-et-commandes': 'sales', 'chiffre-d-affaires': 'dashboard' };
+      return aliases[featureSlug(value)] ?? value;
+    }
     if (module.id !== 'paie') return value;
     return normalizePayrollFeatureIds([value])[0] ?? value;
   });
@@ -132,7 +129,18 @@ export function normalizeFeatureIdsForSelectedPacks(
   const selectedPackFeatures = new Set(
     (module.featurePacks ?? [])
       .filter(pack => packIds.includes(pack.id))
-      .flatMap(pack => pack.featureIds),
+      .flatMap(pack => normalizeModuleFeatureIds(module, pack.featureIds)),
   );
   return featureIds.filter(featureId => selectedPackFeatures.has(featureId));
+}
+
+/** Never treat pack references as new features or silently hide broken packs. */
+export function getModulePackError(module: Module, packIds: readonly string[]): string | null {
+  for (const id of packIds) {
+    const pack = module.featurePacks?.find(item => item.id === id);
+    if (!pack) return `Le pack « ${id} » n’est plus publié. Retirez-le puis choisissez à nouveau.`;
+    const missing = pack.featureIds.filter(value => normalizeModuleFeatureIds(module, [value]).length === 0);
+    if (missing.length) return `Le pack « ${pack.name} » référence une fonctionnalité absente : ${missing.join(', ')}. Choisissez un autre pack ou des fonctionnalités individuelles.`;
+  }
+  return null;
 }

@@ -160,6 +160,7 @@ class CompanyController extends Controller
                             (string) $moduleId,
                             $company->requested_module_features[$moduleId] ?? [],
                             [
+                                'featureScope' => array_key_exists($moduleId, $company->requested_module_features ?? []) ? 'explicit' : null,
                                 'packIds' => $company->requested_module_pack_ids[$moduleId] ?? [],
                                 'featurePermissions' => $company->requested_module_permissions[$moduleId] ?? [],
                             ],
@@ -406,20 +407,50 @@ class CompanyController extends Controller
         ]);
     }
 
+    public function updateDeletionLock(Request $request, string $companyId): JsonResponse
+    {
+        if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
+        }
+
+        $input = Validator::make($request->all(), [
+            'locked' => ['required', 'boolean'],
+        ])->validate();
+
+        $company = Company::query()->whereKey($companyId)->whereNull('deleted_at')->first();
+        if (! $company) {
+            return response()->json(['error' => 'Entreprise introuvable ou inactive.'], 404);
+        }
+
+        $company->update(['deletion_locked' => (bool) $input['locked']]);
+
+        return response()->json([
+            'ok' => true,
+            'company' => $this->companyPayload($company->fresh()),
+        ]);
+    }
+
     public function destroy(Request $request, string $companyId): JsonResponse
     {
         if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
             return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
         }
 
-        DB::transaction(function () use ($companyId): void {
-            $company = Company::query()->whereKey($companyId)->lockForUpdate()->first();
-            if (! $company) {
-                return;
-            }
-            $company->update(['status' => 'ARCHIVÉ', 'deleted_at' => now()]);
-            CompanyRegistry::removeTenantData($companyId);
-        });
+        try {
+            DB::transaction(function () use ($companyId): void {
+                $company = Company::query()->whereKey($companyId)->lockForUpdate()->first();
+                if (! $company) {
+                    return;
+                }
+                if ($company->deletion_locked !== false) {
+                    throw new \DomainException('Déverrouillez la suppression de cette entreprise avant de continuer.');
+                }
+                $company->update(['status' => 'ARCHIVÉ', 'deleted_at' => now()]);
+                CompanyRegistry::removeTenantData($companyId);
+            });
+        } catch (\DomainException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 423);
+        }
 
         return response()->json(['ok' => true]);
     }
@@ -546,6 +577,7 @@ class CompanyController extends Controller
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
             'loginCustomAllowed' => (bool) $company->login_custom_allowed,
+            'deletionLocked' => (bool) ($company->deletion_locked ?? true),
             'loginMode' => $company->login_mode ?: 'MAXIMUS',
             'loginSlug' => $company->login_slug,
             'loginUrl' => $company->login_slug

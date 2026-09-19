@@ -354,6 +354,7 @@ class CompanyRequestTest extends TestCase
             'email' => 'archive@atelier.test',
             'status' => 'ACTIF',
             'requested_modules' => ['commerce'],
+            'deletion_locked' => false,
         ]);
         $user = AuthUser::query()->create([
             'id' => 'company-admin:'.$company->id,
@@ -381,6 +382,136 @@ class CompanyRequestTest extends TestCase
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->getJson('/api/app-state/bootstrap')
             ->assertUnauthorized();
+    }
+
+    public function test_locked_company_rejects_direct_deletion_until_maximus_unlocks_it(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'synthetic-locked-company',
+            'name' => 'Entreprise synthétique verrouillée',
+            'manager' => 'Responsable',
+            'email' => 'synthetic-locked@maximus.test',
+            'status' => 'ACTIF',
+            'requested_modules' => [],
+        ]);
+        $token = $this->issueMaximusSession();
+
+        $this->assertTrue($company->fresh()->deletion_locked);
+        DB::table('maximus_app_states')->updateOrInsert(
+            ['scope' => 'workspace'],
+            [
+                'company_id' => null,
+                'payload' => json_encode([
+                    'companies' => [[
+                        'id' => $company->id,
+                        'name' => $company->name,
+                        'deletionLocked' => false,
+                    ]],
+                ], JSON_THROW_ON_ERROR),
+                'version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.companies.0.deletionLocked', true);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->deleteJson('/api/companies/'.$company->id)
+            ->assertStatus(423);
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'status' => 'ACTIF',
+            'deletion_locked' => true,
+            'deleted_at' => null,
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->patchJson('/api/companies/'.$company->id.'/deletion-lock', ['locked' => false])
+            ->assertOk()
+            ->assertJsonPath('company.deletionLocked', false);
+        $this->assertFalse($company->fresh()->deletion_locked);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->deleteJson('/api/companies/'.$company->id)
+            ->assertOk();
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'status' => 'ARCHIVÉ',
+            'deletion_locked' => false,
+        ]);
+    }
+
+    public function test_company_actor_cannot_toggle_or_clear_the_server_owned_deletion_lock(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'synthetic-company-lock-permissions',
+            'name' => 'Entreprise synthétique permissions',
+            'manager' => 'Responsable',
+            'email' => 'synthetic-permissions@maximus.test',
+            'status' => 'ACTIF',
+            'requested_modules' => [],
+        ]);
+        $user = AuthUser::query()->create([
+            'id' => 'company-admin:'.$company->id,
+            'email' => $company->email,
+            'password_hash' => MaximusPassword::hash('Secret2026!'),
+            'display_name' => $company->manager,
+            'role' => 'company_admin',
+            'company_id' => $company->id,
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($user);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->patchJson('/api/companies/'.$company->id.'/deletion-lock', ['locked' => false])
+            ->assertForbidden();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->patchJson('/api/companies/'.$company->id, [
+                'name' => 'Entreprise renommée',
+                'manager' => $company->manager,
+                'email' => $company->email,
+                'phone' => '',
+                'country' => '',
+                'sector' => '',
+                'deletionLocked' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('company.deletionLocked', true);
+
+        $bootstrap = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk();
+        $state = $bootstrap->json('data');
+        $state['companies'][0]['deletionLocked'] = false;
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->putJson('/api/app-state', [
+                'version' => $bootstrap->json('version'),
+                'data' => $state,
+            ])
+            ->assertOk();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.companies.0.deletionLocked', true);
+
+        $this->assertTrue($company->fresh()->deletion_locked);
     }
 
     private function issueMaximusSession(): string

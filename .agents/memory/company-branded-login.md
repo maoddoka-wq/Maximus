@@ -16,3 +16,9 @@ Sur une origine partagée, l’ouverture de n’importe quel lien `/entreprise/<
 **Why:** Sans cette étape, le routeur peut traiter le lien de l’entreprise B comme une route interne de l’entreprise A et afficher directement l’espace A.
 
 **How to apply:** Détecter le conflit avant le rendu de l’espace authentifié, invalider l’état local et la session serveur, conserver l’URL du slug demandé, puis afficher la page de connexion sans se baser sur le slug présent dans un état métier potentiellement ancien.
+
+Le retour après déconnexion doit conserver l’origine de la connexion réussie, liée à l’entreprise authentifiée, plutôt que la reconstruire depuis le catalogue métier.
+
+**Why:** Le chargement et l’effacement du catalogue peuvent perdre le slug alors que la session est valide ; le retour retombait alors sur MAXIMUS après actualisation. Une connexion générique ne doit pas hériter de l’origine d’un autre compte.
+
+**How to apply:** Restaurer ce contexte uniquement après confirmation serveur de la même entreprise, l’effacer pour une connexion générique et garder la racine locale pour une installation dédiée.

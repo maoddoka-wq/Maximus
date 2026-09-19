@@ -186,6 +186,7 @@ class AppStateController extends Controller
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
+                    'deletionLocked' => (bool) ($company->deletion_locked ?? true),
                 ];
             },
         );
@@ -244,6 +245,7 @@ class AppStateController extends Controller
                 'primaryColor' => $company?->primary_color,
                 'accentColor' => $company?->accent_color,
                 'sidebarColor' => $company?->sidebar_color,
+                'deletionLocked' => (bool) ($company?->deletion_locked ?? true),
             ];
         })->values()->all();
 
@@ -589,6 +591,7 @@ class AppStateController extends Controller
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
+                    'deletionLocked' => (bool) ($company->deletion_locked ?? true),
                 ]);
             },
             $state['companies'],
@@ -637,6 +640,7 @@ class AppStateController extends Controller
             'primaryColor' => $company->primary_color,
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
+            'deletionLocked' => (bool) ($company->deletion_locked ?? true),
         ];
 
         $companies = collect($state['companies'] ?? []);

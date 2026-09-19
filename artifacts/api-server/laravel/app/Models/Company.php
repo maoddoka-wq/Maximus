@@ -34,6 +34,7 @@ class Company extends Model
         'login_custom_allowed',
         'login_mode',
         'login_slug',
+        'deletion_locked',
         'rejection_reason',
         'deleted_at',
     ];
@@ -49,6 +50,7 @@ class Company extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'login_custom_allowed' => 'boolean',
+            'deletion_locked' => 'boolean',
         ];
     }
 }

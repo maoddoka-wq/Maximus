@@ -35,6 +35,12 @@ Les secteurs doivent recalculer leurs fonctionnalités à partir des packs séle
 
 Les sélections de fonctionnalités d’une entreprise doivent être intersectées avec les packs du module avant toute sauvegarde d’accès.
 
+Les packs regroupent des identités de fonctionnalités existantes ; ils ne définissent pas eux-mêmes les identités autorisées. Sans pack, la sélection individuelle reste possible, et une sélection explicitement vide ne signifie jamais « toutes les fonctionnalités ».
+
+**Why:** Déduire les identités des références de packs autorisait des références obsolètes et rejetait des fonctionnalités valides hors pack ; les écarts de normalisation des accents pouvaient bloquer une sélection pourtant affichée.
+
+**How to apply:** Normaliser les alias contre les options canoniques avant de comparer l’appartenance aux packs ; conserver la distinction entre sélection omise et vide jusqu’à l’approbation et aux modifications d’accès.
+
 **Why:** les entreprises historiques peuvent conserver des fonctionnalités d’un ancien pack ; l’API refuse alors correctement la combinaison, mais l’écran d’administration ne doit pas continuer à l’envoyer.
 
 **How to apply:** normaliser les sélections au chargement et juste avant `PATCH` des accès module, puis conserver l’état local normalisé après succès.

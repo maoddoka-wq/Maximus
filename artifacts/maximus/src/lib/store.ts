@@ -55,6 +55,7 @@ export interface Company {
   loginMode?: 'MAXIMUS' | 'CUSTOM';
   loginSlug?: string;
   loginUrl?: string;
+  deletionLocked?: boolean;
   managerRoleId?: string;
 }
 
@@ -514,6 +515,7 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
         requestedModules: normalizeStringArray(raw.requestedModules) as ModuleId[],
         allowedModules: normalizeStringArray(raw.allowedModules) as ModuleId[],
         refusedModules: normalizeStringArray(raw.refusedModules) as ModuleId[],
+        deletionLocked: typeof raw.deletionLocked === 'boolean' ? raw.deletionLocked : true,
       };
       if (raw.hiddenWorkspaceFeatures !== undefined) {
         normalizedCompany.hiddenWorkspaceFeatures = normalizeStringArray(raw.hiddenWorkspaceFeatures)

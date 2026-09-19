@@ -65,6 +65,11 @@ export const companyRequestApi = {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
+  updateDeletionLock: (companyId: string, locked: boolean) =>
+    request<{ ok: true; company: Company }>(`/companies/${encodeURIComponent(companyId)}/deletion-lock`, {
+      method: 'PATCH',
+      body: JSON.stringify({ locked }),
+    }),
   loginSettings: (companyId: string) =>
     request<{ settings: { companyId: string; customAllowed: boolean; mode: 'MAXIMUS' | 'CUSTOM'; slug: string; url: string } }>(
       `/companies/${encodeURIComponent(companyId)}/login-settings`,

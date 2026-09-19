@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { InstallationProfile } from './installation-api';
-import { installationLogoutPath, resolveInstallationEntry } from './installation-routing';
+import {
+  companyLoginPathFromStoredContext,
+  createCompanyLoginReturnContext,
+  installationLogoutPath,
+  resolveInstallationEntry,
+} from './installation-routing';
 
 const central: InstallationProfile = {
   mode: 'central', companyOnly: false, ready: true, adminLoginEnabled: true,
@@ -39,4 +44,42 @@ test('isolated logout stays local regardless of the historical central slug', ()
   assert.equal(installationLogoutPath(true, '/entreprise/ancienne/connexion'), '/');
   assert.equal(installationLogoutPath(false, '/entreprise/a/connexion'), '/entreprise/a/connexion');
   assert.equal(installationLogoutPath(false), '/');
+});
+
+test('a successful central branded login survives a session reload', () => {
+  const context = createCompanyLoginReturnContext('company-a', '/entreprise/entreprise-a/connexion');
+  assert.deepEqual(context, {
+    companyId: 'company-a',
+    path: '/entreprise/entreprise-a/connexion',
+  });
+  assert.equal(
+    companyLoginPathFromStoredContext(JSON.stringify(context), 'company-a'),
+    '/entreprise/entreprise-a/connexion',
+  );
+});
+
+test('a route cannot be injected for another authenticated company', () => {
+  const stored = JSON.stringify({
+    companyId: 'company-b',
+    path: '/entreprise/entreprise-b/connexion',
+  });
+  assert.equal(companyLoginPathFromStoredContext(stored, 'company-a'), null);
+  assert.equal(
+    companyLoginPathFromStoredContext(
+      JSON.stringify({ companyId: 'company-a', path: '/entreprise/entreprise-b/connexion?next=/maximus' }),
+      'company-a',
+    ),
+    null,
+  );
+});
+
+test('generic and expired sessions do not inherit a branded return path', () => {
+  const stored = JSON.stringify({
+    companyId: 'company-a',
+    path: '/entreprise/entreprise-a/connexion',
+  });
+  assert.equal(companyLoginPathFromStoredContext(stored, undefined), null);
+  assert.equal(companyLoginPathFromStoredContext(null, 'company-a'), null);
+  assert.equal(companyLoginPathFromStoredContext('{broken', 'company-a'), null);
+  assert.equal(createCompanyLoginReturnContext('company-a', '/'), null);
 });

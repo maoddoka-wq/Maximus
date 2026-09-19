@@ -428,32 +428,30 @@ final class ModuleCatalog
             throw new \InvalidArgumentException("Le module « {$moduleId} » référence un pack absent.");
         }
 
-        $validFeatureIds = collect($packs)
-            ->flatMap(fn (array $pack): array => is_array($pack['feature_ids'] ?? null) ? $pack['feature_ids'] : [])
-            ->merge(collect(is_array($definition['features'] ?? null) ? $definition['features'] : [])
-                ->map(fn (mixed $feature): string => Str::slug((string) $feature)))
-            ->map(fn (mixed $feature): string => (string) $feature)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-        $featureIds = array_values(array_unique(array_map('strval', $featureIds)));
-        $unknownFeatures = array_values(array_diff($featureIds, $validFeatureIds));
-        if ($unknownFeatures !== []) {
-            throw new \InvalidArgumentException("Le module « {$moduleId} » référence une fonctionnalité absente.");
-        }
+        // Packs reference the published feature registry; they must never extend it.
+        $aliases = self::featureAliases($definition);
+        $canonicalize = static function (mixed $value) use ($aliases, $moduleId): string {
+            $value = (string) $value;
+            $canonical = $aliases[$value] ?? $aliases[self::featureSlug($value)] ?? $aliases[Str::slug($value)] ?? null;
+            if ($canonical === null) {
+                throw new \InvalidArgumentException("Le module « {$moduleId} » référence une fonctionnalité absente : {$value}.");
+            }
+            return $canonical;
+        };
+        $featureIds = array_values(array_unique(array_map($canonicalize, $featureIds)));
 
         $packFeatureIds = $packIds === []
             ? []
             : collect($packIds)
                 ->flatMap(fn (string $packId): array => $packById->get($packId)['feature_ids'] ?? [])
+                ->map($canonicalize)
                 ->unique()
                 ->values()
                 ->all();
         if ($packIds !== [] && array_diff($featureIds, $packFeatureIds) !== []) {
             throw new \InvalidArgumentException('Une fonctionnalité sélectionnée ne appartient pas aux packs choisis.');
         }
-        if ($packIds !== [] && $featureIds === []) {
+        if ($packIds !== [] && $featureIds === [] && ($configuration['featureScope'] ?? null) !== 'explicit') {
             $featureIds = $packFeatureIds;
         }
 
@@ -464,6 +462,11 @@ final class ModuleCatalog
         $actions = ['voir', 'créer', 'modifier'];
         $featurePermissions = [];
         foreach ($rawPermissions as $featureId => $permissions) {
+            // Approval may encounter permissions for a removed, unselected feature.
+            if ($ignoreUnknownPermissions && ! isset($aliases[(string) $featureId]) && ! isset($aliases[self::featureSlug((string) $featureId)]) && ! isset($aliases[Str::slug((string) $featureId)])) {
+                continue;
+            }
+            $featureId = $canonicalize($featureId);
             if (! in_array((string) $featureId, $featureIds, true) || ! is_array($permissions)) {
                 if ($ignoreUnknownPermissions) {
                     continue;
@@ -485,6 +488,65 @@ final class ModuleCatalog
                 'featurePermissions' => $featurePermissions,
             ],
         ];
+    }
+
+    private static function featureSlug(string $value): string
+    {
+        // Match permission-keys.ts: accents are part of persisted permission IDs.
+        return trim(preg_replace('/[^a-z0-9à-ÿ]+/u', '-', mb_strtolower(trim($value))), '-');
+    }
+
+    /** Feature identities, independent of editable pack membership. */
+    private static function featureAliases(array $definition): array
+    {
+        // These modules expose fixed operational tabs in getModuleFeatureOptions.
+        $fixed = [
+            'commerce' => [
+                'dashboard' => 'Tableau de bord', 'sales' => 'Ventes & caisse', 'products' => 'Produits & stock',
+                'clients' => 'Clients', 'suppliers' => 'Fournisseurs', 'purchases' => 'Achats',
+                'expenses' => 'Dépenses', 'cash' => 'Comptes de caisse', 'credit' => 'Crédit clients',
+                'invoices' => 'Factures & reçus', 'returns' => 'Retours & avoirs', 'reports' => 'Rapports',
+                'activity' => 'Journal d’activité', 'team' => 'Équipe & droits', 'settings' => 'Paramètres',
+            ],
+            'stocks' => [
+                'dashboard' => 'Tableau de bord', 'products' => 'Articles', 'entries' => 'Entrées de stock',
+                'exits' => 'Sorties de stock', 'requests' => 'Demandes', 'inventory' => 'Inventaire',
+                'reports' => 'Rapports', 'references' => 'Référentiels', 'users' => 'Utilisateurs', 'settings' => 'Paramètres',
+            ],
+            'ecommerce' => [
+                'dashboard' => 'Tableau de bord', 'catalogue' => 'Catalogue', 'vente-physique' => 'Vente de produits physiques',
+                'vente-numerique' => 'Vente de produits numériques', 'categories' => 'Catégories', 'commandes' => 'Commandes',
+                'clients' => 'Clients', 'promotions' => 'Promotions', 'location' => 'Location', 'livraisons' => 'Livraisons',
+                'finances' => 'Finances & retraits', 'parametres' => 'Paramètres',
+            ],
+            'transport' => [
+                'overview' => 'Vue d’ensemble', 'trips' => 'Courses', 'drivers' => 'Chauffeurs',
+                'vehicles' => 'Véhicules', 'historique' => 'Historique', 'parametres' => 'Paramètres',
+            ],
+        ];
+        $options = $fixed[$definition['id']] ?? collect($definition['features'] ?? [])
+            ->mapWithKeys(fn ($label): array => [self::featureSlug((string) $label) => (string) $label])->all();
+        $aliases = [];
+        foreach ($options as $id => $label) {
+            foreach ([$id, self::featureSlug($label), Str::slug($label), Str::slug($id)] as $alias) {
+                // An ambiguous transliteration must not point at another identity.
+                if (isset($aliases[$alias]) && $aliases[$alias] !== $id) {
+                    continue;
+                }
+                $aliases[$alias] = $id;
+            }
+        }
+        $legacy = match ($definition['id']) {
+            'commerce' => ['devis-et-commandes' => 'sales', 'chiffre-d-affaires' => 'dashboard'],
+            'paie' => ['dashboard' => 'tableau-de-bord', 'preparation' => 'préparer-une-paie', 'solde-paie' => 'solde-de-paie'],
+            default => [],
+        };
+        foreach ($legacy as $alias => $id) {
+            if (isset($options[$id])) {
+                $aliases[$alias] = $id;
+            }
+        }
+        return $aliases;
     }
 
     public static function isEnabled(string $companyId, string $moduleId): bool
@@ -838,17 +900,7 @@ final class ModuleCatalog
                 'name' => (string) ($module['name'] ?? $module['id']),
                 'description' => (string) ($module['description'] ?? ''),
                 'features' => is_array($module['features'] ?? null) ? $module['features'] : [],
-                'feature_packs' => collect(is_array($module['featurePacks'] ?? null) ? $module['featurePacks'] : [])
-                    ->map(static fn (mixed $pack): array => [
-                        'id' => (string) ($pack['id'] ?? ''),
-                        'name' => (string) ($pack['name'] ?? ''),
-                        'description' => (string) ($pack['description'] ?? ''),
-                        'feature_ids' => is_array($pack['featureIds'] ?? null) ? $pack['featureIds'] : [],
-                        'feature_permissions' => is_array($pack['featurePermissions'] ?? null) ? $pack['featurePermissions'] : [],
-                    ])
-                    ->filter(static fn (array $pack): bool => $pack['id'] !== '')
-                    ->values()
-                    ->all(),
+                'feature_packs' => self::normalizeFeaturePacks($module['featurePacks'] ?? $module['feature_packs'] ?? []),
                 'feature_dependencies' => is_array($module['featureDependencies'] ?? null) ? $module['featureDependencies'] : [],
                 'status' => in_array(($module['status'] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)
                     ? ($module['status'] ?? 'ACTIF')

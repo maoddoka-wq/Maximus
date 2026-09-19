@@ -55,7 +55,47 @@ test('normalise les champs textuels optionnels d’une entreprise avant le formu
     allowedModules: ['commerce'],
     refusedModules: [],
     createdAt: '2026-09-07',
+    deletionLocked: true,
   });
+});
+
+test('verrouille par défaut les anciennes entreprises et conserve un déverrouillage explicite', () => {
+  const normalized = normalizeStoreData({
+    companies: [
+      {
+        id: 'legacy-company-lock',
+        name: 'Entreprise historique',
+        manager: 'Responsable',
+        email: 'legacy-lock@test.local',
+        phone: '',
+        country: '',
+        sector: '',
+        status: 'ACTIF',
+        requestedModules: [],
+        allowedModules: [],
+        refusedModules: [],
+        createdAt: '2026-09-07',
+      },
+      {
+        id: 'explicitly-unlocked-company',
+        name: 'Entreprise déverrouillée',
+        manager: 'Responsable',
+        email: 'unlocked@test.local',
+        phone: '',
+        country: '',
+        sector: '',
+        status: 'ACTIF',
+        requestedModules: [],
+        allowedModules: [],
+        refusedModules: [],
+        createdAt: '2026-09-07',
+        deletionLocked: false,
+      },
+    ] as never,
+  });
+
+  assert.equal(normalized.companies[0]?.deletionLocked, true);
+  assert.equal(normalized.companies[1]?.deletionLocked, false);
 });
 
 test('répare les tableaux de droits absents des anciennes fiches entreprise', () => {

@@ -68,6 +68,10 @@ class ModuleController extends Controller
         $configuration = array_key_exists('configuration', $input)
             ? ($input['configuration'] ?? [])
             : (json_decode($existing?->configuration ?? '{}', true) ?: []);
+        // An explicitly submitted empty list is a revocation, not "use the pack".
+        if (array_key_exists('featureIds', $input)) {
+            $configuration['featureScope'] = 'explicit';
+        }
         if (array_key_exists('featureIds', $input) || array_key_exists('configuration', $input)) {
             try {
                 $selection = ModuleCatalog::normalizeSelection($moduleId, is_array($featureIds) ? $featureIds : [], is_array($configuration) ? $configuration : []);

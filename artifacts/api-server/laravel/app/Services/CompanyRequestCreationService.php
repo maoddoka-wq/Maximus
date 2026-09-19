@@ -47,6 +47,7 @@ final class CompanyRequestCreationService
                     $moduleId,
                     is_array($rawFeatures[$moduleId] ?? null) ? $rawFeatures[$moduleId] : [],
                     [
+                        'featureScope' => array_key_exists($moduleId, $rawFeatures) ? 'explicit' : null,
                         'packIds' => is_array($rawPacks[$moduleId] ?? null) ? $rawPacks[$moduleId] : [],
                         'featurePermissions' => is_array($rawPermissions[$moduleId] ?? null) ? $rawPermissions[$moduleId] : [],
                     ],

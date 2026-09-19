@@ -107,12 +107,18 @@ import {
   getEffectiveModuleFeatureIds,
   getModuleFeatureOptions,
   normalizeFeatureIdsForSelectedPacks,
+  getModulePackError,
 } from '@/lib/module-features';
 import { moduleIconById, modulePageMeta, modulePaths } from '@/lib/module-registry';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
 import { authApi, type AuthUser } from '@/lib/auth-api';
 import { installationApi, type InstallationProfile } from '@/lib/installation-api';
-import { installationLogoutPath, resolveInstallationEntry } from '@/lib/installation-routing';
+import {
+  companyLoginPathFromStoredContext,
+  createCompanyLoginReturnContext,
+  installationLogoutPath,
+  resolveInstallationEntry,
+} from '@/lib/installation-routing';
 import { InstallationUnavailable } from '@/components/installation-unavailable';
 import { InstallationSyncNotice } from '@/components/installation-sync-notice';
 import { CompanyInstallationAccess } from '@/components/company-installation-access';
@@ -152,6 +158,7 @@ import {
 } from '@/lib/company-workspace-features';
 
 const queryClient = new QueryClient();
+const companyLoginContextStorageKey = 'maximus-company-login-context';
 type DemoAccount = { id: string; label: string; email: string; password: string };
 const defaultDemoAccounts: DemoAccount[] = [];
 
@@ -405,6 +412,7 @@ function AppContent() {
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
+  const [companyLoginReturnPath, setCompanyLoginReturnPath] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
   const [serverModuleAccess, setServerModuleAccess] = useState<ServerModuleAccess[] | null>(null);
@@ -447,6 +455,8 @@ function AppContent() {
         setPublicRegistrationEnabled(profile.registrationEnabled);
         if (profile.companyOnly && localStorage.getItem('maximus-session') === 'admin') {
           localStorage.removeItem('maximus-session');
+          localStorage.removeItem(companyLoginContextStorageKey);
+          setCompanyLoginReturnPath(null);
           setSession(null);
           setAppStateReady(true);
           void authApi.logout().catch(() => undefined);
@@ -473,6 +483,8 @@ function AppContent() {
         if (!user) {
           setSession(null);
           localStorage.removeItem('maximus-session');
+          localStorage.removeItem(companyLoginContextStorageKey);
+          setCompanyLoginReturnPath(null);
           return;
         }
         const nextSession = sessionFromAuthUser(user);
@@ -490,10 +502,18 @@ function AppContent() {
         }
         setSession(nextSession);
         localStorage.setItem('maximus-session', nextSession);
+        const restoredCompanyLoginPath = companyLoginPathFromStoredContext(
+          localStorage.getItem(companyLoginContextStorageKey),
+          user.companyId,
+        );
+        setCompanyLoginReturnPath(restoredCompanyLoginPath);
+        if (!restoredCompanyLoginPath) localStorage.removeItem(companyLoginContextStorageKey);
       })
       .catch(() => {
         setSession(null);
         localStorage.removeItem('maximus-session');
+        localStorage.removeItem(companyLoginContextStorageKey);
+        setCompanyLoginReturnPath(null);
       });
   }, []);
   useEffect(() => {
@@ -562,6 +582,8 @@ function AppContent() {
         if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
           setSession(null);
           localStorage.removeItem('maximus-session');
+          localStorage.removeItem(companyLoginContextStorageKey);
+          setCompanyLoginReturnPath(null);
           localStorage.removeItem('maximus-sector-test-company');
           notify('Votre session MAXIMUS n’est plus active.', 'warning');
           return false;
@@ -784,8 +806,11 @@ function AppContent() {
     applyCompanyTheme(activeCompany);
     return () => applyCompanyTheme(undefined);
   }, [activeCompany?.id, activeCompany?.primaryColor, activeCompany?.accentColor, activeCompany?.sidebarColor]);
-  const applyAuthenticatedUser = (user: AuthUser) => {
+  const applyAuthenticatedUser = (user: AuthUser, companyLoginPath?: string) => {
     const nextSession = sessionFromAuthUser(user);
+    const companyLoginContext = companyLoginPath
+      ? createCompanyLoginReturnContext(user.companyId, companyLoginPath)
+      : null;
     const clearedData = emptyStoreData();
     dataRef.current = clearedData;
     setData(clearedData);
@@ -797,6 +822,12 @@ function AppContent() {
     setAppStateReady(false);
     setSession(nextSession);
     localStorage.setItem('maximus-session', nextSession);
+    setCompanyLoginReturnPath(companyLoginContext?.path ?? null);
+    if (companyLoginContext) {
+      localStorage.setItem(companyLoginContextStorageKey, JSON.stringify(companyLoginContext));
+    } else {
+      localStorage.removeItem(companyLoginContextStorageKey);
+    }
     setLocation(user.role === 'maximus_admin' ? '/maximus/dashboard' : '/entreprise/dashboard');
   };
   const login = async (_space: 'admin' | 'company', email: string, password: string) => {
@@ -866,6 +897,7 @@ function AppContent() {
       allowedModules: selectedModules,
       refusedModules: modules.map((module) => module.id).filter((moduleId) => !selectedModules.includes(moduleId)),
       createdAt: new Date().toISOString().slice(0, 10),
+      deletionLocked: true,
       managerRoleId: testRoleId,
     };
     const testNode: OrgNode = {
@@ -938,17 +970,10 @@ function AppContent() {
   };
   const companyLoginMatch = pathname.match(/^\/entreprise\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
   const companyLoginSlug = companyLoginMatch ? decodeURIComponent(companyLoginMatch[1]) : null;
-  const logout = (destinationOverride?: string) => {
+  const logoutTo = (destinationOverride?: string) => {
     const isCompanySession = Boolean(session && session !== 'admin');
-    const companyLoginPath =
-      activeCompany?.loginCustomAllowed && (activeCompany.loginMode ?? 'MAXIMUS') === 'CUSTOM'
-        ? activeCompany.loginUrl
-          ?? (activeCompany.loginSlug
-            ? `/entreprise/${encodeURIComponent(activeCompany.loginSlug)}/connexion`
-            : null)
-        : null;
     const destination = destinationOverride ?? installationLogoutPath(
-      Boolean(installationProfile?.companyOnly), isCompanySession ? companyLoginPath : null,
+      Boolean(installationProfile?.companyOnly), isCompanySession ? companyLoginReturnPath : null,
     );
     applyCompanyTheme(undefined);
     const clearedData = emptyStoreData();
@@ -961,9 +986,13 @@ function AppContent() {
     setAppStateReady(true);
     setSession(null);
     localStorage.removeItem('maximus-session');
+    localStorage.removeItem(companyLoginContextStorageKey);
+    setCompanyLoginReturnPath(null);
     setLocation(destination);
     void authApi.logout().catch(() => undefined);
   };
+  // A button passes its click event; never interpret that event as a return URL.
+  const logout = () => logoutTo();
   useEffect(() => {
     if (
       !companyLoginSlug
@@ -972,7 +1001,7 @@ function AppContent() {
     ) {
       return;
     }
-    logout(location);
+    logoutTo(location);
   }, [appStateReady, companyLoginSlug, location, session]);
   useEffect(() => {
     const state = window.history.state as { maximus?: boolean; maximusIndex?: number } | null;
@@ -1098,8 +1127,7 @@ function AppContent() {
       <CompanyLoginPage
         slug={companyLoginSlug}
         onAuthenticated={(user) => {
-          localStorage.setItem('maximus-last-company-login-path', pathname);
-          applyAuthenticatedUser(user);
+          applyAuthenticatedUser(user, pathname);
         }}
       />
     );
@@ -1662,7 +1690,7 @@ function Signup({
           const module = modules.find((item) => item.id === moduleId);
           return [
             moduleId,
-            module ? [...getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])] : [],
+            module ? [...getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId] ?? [])] : [],
           ];
         }),
       ) as Partial<Record<ModuleId, string[]>>,
@@ -1675,7 +1703,7 @@ function Signup({
         initialPreset.moduleIds.map((moduleId) => {
           const module = modules.find((item) => item.id === moduleId);
           const featureIds = module
-            ? getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId])
+            ? getEffectiveModuleFeatureIds(module, initialPreset.moduleFeatures?.[moduleId] ?? [])
             : [];
           return [moduleId, defaultFeaturePermissions(featureIds)];
         }),
@@ -1684,8 +1712,13 @@ function Signup({
   const [moduleError, setModuleError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const publishedModules = getConfiguredModules({
+    moduleOverrides: data.moduleOverrides,
+    customModules: data.customModules,
+    removedModules: data.removedModules,
+  });
   const configuredModule = (moduleId: ModuleId) => {
-    return getConfiguredModules(data).find((module) => module.id === moduleId);
+    return publishedModules.find((module) => module.id === moduleId);
   };
   const changeSector = (nextSector: string) => {
     const preset = data.sectorPresets.find((item) => item.name === nextSector);
@@ -1703,7 +1736,7 @@ function Signup({
         nextModules.map((moduleId) => {
           const module = configuredModule(moduleId);
           const requested = preset?.moduleFeatures?.[moduleId];
-          return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, requested)] : []];
+          return [moduleId, module ? [...getEffectiveModuleFeatureIds(module, requested ?? [])] : []];
         }),
       ) as Partial<Record<ModuleId, string[]>>,
     );
@@ -1711,7 +1744,7 @@ function Signup({
       Object.fromEntries(
         nextModules.map((moduleId) => {
           const module = configuredModule(moduleId);
-          const featureIds = module ? getEffectiveModuleFeatureIds(module, preset?.moduleFeatures?.[moduleId]) : [];
+          const featureIds = module ? getEffectiveModuleFeatureIds(module, preset?.moduleFeatures?.[moduleId] ?? []) : [];
           return [moduleId, defaultFeaturePermissions(featureIds)];
         }),
       ) as Partial<Record<ModuleId, FeaturePermissionMap>>,
@@ -1752,7 +1785,7 @@ function Signup({
                 module,
                 selectedPacks.length
                   ? selectedPacks.flatMap((pack) => pack.featureIds)
-                  : preset.moduleFeatures?.[moduleId],
+                  : preset.moduleFeatures?.[moduleId] ?? [],
               )
             : [];
           const permissions = selectedPacks.reduce<FeaturePermissionMap>(
@@ -1781,7 +1814,7 @@ function Signup({
       }
       const module = configuredModule(id);
       if (module?.featurePacks?.length) setSelectedModulePackIds((current) => ({ ...current, [id]: [] }));
-      const availableFeatures = getModuleFeatureOptions(module ?? modules[0]).map((feature) => feature.id);
+      const availableFeatures: string[] = [];
       setSelectedModulePermissions((current) => ({ ...current, [id]: defaultFeaturePermissions(availableFeatures) }));
       return { ...current, [id]: module ? [...getEffectiveModuleFeatureIds(module, availableFeatures)] : [] };
     });
@@ -1796,12 +1829,18 @@ function Signup({
   const togglePack = (moduleId: ModuleId, packId: string) => {
     const module = configuredModule(moduleId);
     if (!module) return;
+    const error = getModulePackError(module, [packId]);
+    if (error && !selectedModulePackIds[moduleId]?.includes(packId)) {
+      setModuleError(error);
+      return;
+    }
+    setModuleError('');
     setSelectedModulePackIds((current) => {
       const nextIds = current[moduleId]?.includes(packId)
         ? (current[moduleId] ?? []).filter((id) => id !== packId)
         : [...(current[moduleId] ?? []), packId];
       const selectedPacks = (module.featurePacks ?? []).filter((pack) => nextIds.includes(pack.id));
-      const featureIds = selectedPacks.flatMap((pack) => pack.featureIds);
+      const featureIds = [...getEffectiveModuleFeatureIds(module, selectedPacks.flatMap((pack) => pack.featureIds))];
       setSelectedModuleFeatures((features) => ({
         ...features,
         [moduleId]: [...getEffectiveModuleFeatureIds(module, featureIds)],
@@ -1823,8 +1862,7 @@ function Signup({
     const module = configuredModule(moduleId);
     if (!module) return;
     setSelectedModuleFeatures((current) => {
-      const options = getModuleFeatureOptions(module);
-      const selected = new Set(current[moduleId] ?? options.map((feature) => feature.id));
+      const selected = new Set(current[moduleId] ?? []);
       if (selected.has(featureId)) selected.delete(featureId);
       else selected.add(featureId);
       setSelectedModulePermissions((permissions) => {
@@ -1846,7 +1884,7 @@ function Signup({
     (total, moduleId) => total + (selectedModuleFeatures[moduleId]?.length ?? 0),
     0,
   );
-  const orderedModules = [...modules].sort(
+  const orderedModules = [...publishedModules].sort(
     (left, right) => Number(selectedModuleSet.has(right.id)) - Number(selectedModuleSet.has(left.id)),
   );
   if (submitted) {
@@ -2104,7 +2142,10 @@ function Signup({
                 const mod = configuredModule(baseModule.id) ?? baseModule;
                 const enabled = selectedModules.includes(mod.id);
                 const featureOptions = getModuleFeatureOptions(mod);
-                const selectedFeatureIds = getEffectiveModuleFeatureIds(mod, selectedModuleFeatures[mod.id]);
+                const selectedFeatureIds = getEffectiveModuleFeatureIds(mod, selectedModuleFeatures[mod.id] ?? []);
+                const selectableFeatureIds = new Set(normalizeFeatureIdsForSelectedPacks(
+                  mod, featureOptions.map(feature => feature.id), selectedModulePackIds[mod.id] ?? [],
+                ));
                 const ModuleIcon = moduleIconById[mod.id];
                 return (
                   <div
@@ -2140,12 +2181,29 @@ function Signup({
                     </button>
                     {enabled && (
                       <div className="border-t border-[hsl(var(--primary)/.16)] px-4 pb-4 pt-4">
+                        {getModulePackError(mod, selectedModulePackIds[mod.id] ?? []) && (
+                          <p role="alert" className="mb-3 text-xs text-[hsl(var(--destructive))]">
+                            {getModulePackError(mod, selectedModulePackIds[mod.id] ?? [])}
+                            <button type="button" data-testid={`button-signup-clear-stale-packs-${mod.id}`} className="ml-2 underline" onClick={() => {
+                              setSelectedModulePackIds(current => ({ ...current, [mod.id]: [] }));
+                              setSelectedModuleFeatures(current => ({ ...current, [mod.id]: [] }));
+                              setSelectedModulePermissions(current => ({ ...current, [mod.id]: {} }));
+                              setModuleError('');
+                            }}>Retirer les packs</button>
+                          </p>
+                        )}
                         {(mod.featurePacks?.length ?? 0) > 0 && (
                           <div className="mb-3">
                             <div className="mb-2 flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-xs font-bold">Packs disponibles</p>
-                                <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Un pack active plusieurs fonctionnalités en une fois.</p>
+                                <p className="text-xs font-bold">Packs disponibles — facultatifs</p>
+                                <button type="button" data-testid={`button-signup-no-pack-${mod.id}`} className="mt-1 text-xs underline" onClick={() => {
+                                  setSelectedModulePackIds(current => ({ ...current, [mod.id]: [] }));
+                                  setSelectedModuleFeatures(current => ({ ...current, [mod.id]: [] }));
+                                  setSelectedModulePermissions(current => ({ ...current, [mod.id]: {} }));
+                                  setModuleError('');
+                                }}>Choisir sans pack</button>
+                                <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Un pack active plusieurs fonctionnalités en une fois. Sans pack, choisissez vos fonctionnalités ci-dessous.</p>
                               </div>
                               <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">
                                 {selectedModulePackIds[mod.id]?.length ?? 0}/{mod.featurePacks?.length ?? 0}
@@ -2181,8 +2239,7 @@ function Signup({
                             </div>
                           </div>
                         )}
-                        {((mod.featurePacks?.length ?? 0) === 0 ||
-                          (selectedModulePackIds[mod.id]?.length ?? 0) > 0) && (
+                        {(
                           <div className="rounded-lg bg-[hsl(var(--muted)/.38)] p-3">
                             <div className="mb-2 flex items-center justify-between gap-2">
                               <div>
@@ -2194,7 +2251,7 @@ function Signup({
                               </span>
                             </div>
                             <div className="grid gap-1 sm:grid-cols-2">
-                              {featureOptions.map((feature) => {
+                              {featureOptions.filter(feature => selectableFeatureIds.has(feature.id)).map((feature) => {
                                 const included = selectedFeatureIds.has(feature.id);
                                 return (
                                   <label
@@ -2239,12 +2296,20 @@ function Signup({
                 data-testid="button-submit-signup"
                  onClick={() => {
                    if (submitting) return;
+                    for (const moduleId of selectedModules) {
+                      const module = configuredModule(moduleId);
+                      const error = module ? getModulePackError(module, selectedModulePackIds[moduleId] ?? []) : `Le module « ${moduleId} » n’est plus publié.`;
+                      if (error) {
+                        setModuleError(error);
+                        return;
+                      }
+                    }
                   const requestedModuleFeatures = Object.fromEntries(
                     selectedModules.map((moduleId) => {
                       const module = configuredModule(moduleId);
                       return [
                         moduleId,
-                        module ? [...getEffectiveModuleFeatureIds(module, selectedModuleFeatures[moduleId])] : [],
+                        module ? normalizeFeatureIdsForSelectedPacks(module, selectedModuleFeatures[moduleId] ?? [], selectedModulePackIds[moduleId] ?? []) : [],
                       ];
                     }),
                   ) as Partial<Record<ModuleId, string[]>>;
@@ -3144,6 +3209,7 @@ function CompaniesPage({
     detail ? (directoryCompanies[0] ?? null) : null,
   );
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [updatingDeletionLock, setUpdatingDeletionLock] = useState<string | null>(null);
   const list = directoryCompanies
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     .filter(
@@ -3178,6 +3244,25 @@ function CompaniesPage({
         confirmLabel: 'Compris',
         tone: 'danger',
       });
+    }
+  };
+  const toggleDeletionLock = async (company: Company) => {
+    setUpdatingDeletionLock(company.id);
+    try {
+      const response = await companyRequestApi.updateDeletionLock(company.id, company.deletionLocked === false);
+      mutate((draft) => {
+        const item = draft.companies.find((candidate) => candidate.id === company.id);
+        if (item) item.deletionLocked = response.company.deletionLocked;
+      }, response.company.deletionLocked ? 'Suppression verrouillée.' : 'Suppression déverrouillée.');
+    } catch (error) {
+      await alert({
+        title: 'Modification impossible',
+        description: error instanceof Error ? error.message : 'Le verrou de suppression n’a pas pu être modifié.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+    } finally {
+      setUpdatingDeletionLock(null);
     }
   };
   if (selected)
@@ -3266,9 +3351,25 @@ function CompaniesPage({
               <span>Modifier</span>
             </button>
             <button
+              type="button"
+              data-testid={`button-toggle-company-deletion-lock-${c.id}`}
+              aria-label={`${c.deletionLocked !== false ? 'Déverrouiller' : 'Verrouiller'} la suppression de ${c.name}`}
+              title={`${c.deletionLocked !== false ? 'Déverrouiller' : 'Verrouiller'} la suppression de ${c.name}`}
+              disabled={updatingDeletionLock === c.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                void toggleDeletionLock(c);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold hover:bg-[hsl(var(--muted))] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <LockKeyhole size={14} />
+              <span>{c.deletionLocked !== false ? 'Déverrouiller' : 'Verrouiller'}</span>
+            </button>
+            <button
               data-testid={`button-delete-company-${c.id}`}
               aria-label={`Supprimer ${c.name}`}
-              title={`Supprimer ${c.name}`}
+              title={c.deletionLocked !== false ? `Suppression verrouillée pour ${c.name}` : `Supprimer ${c.name}`}
+              disabled={c.deletionLocked !== false}
               onClick={() => deleteCompany(c)}
               className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)] disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -7849,8 +7950,7 @@ function CompanyModulesDetail({
               ? serverModule.configuration.packIds.filter((packId): packId is string => typeof packId === 'string')
               : null;
             const candidatePackIds = configuredPackIds ?? company.requestedModulePackIds?.[module.id] ?? [];
-            const availablePackIds = new Set((module.featurePacks ?? []).map((pack) => pack.id));
-            return [module.id, [...new Set(candidatePackIds.filter((packId) => availablePackIds.has(packId)))]];
+            return [module.id, [...new Set(candidatePackIds)]];
           }),
         ) as Record<ModuleId, string[]>;
         const nextFeatures = Object.fromEntries(
@@ -8119,8 +8219,13 @@ function CompanyModulesDetail({
 
   const setModulePacks = (moduleId: ModuleId, packIds: string[]) => {
     const module = configuredModules.find((item) => item.id === moduleId);
+    const error = module ? getModulePackError(module, packIds) : null;
+    if (error) {
+      showAppToast(error, 'error');
+      return;
+    }
     const featureIds = module
-      ? [...new Set(
+      ? [...getEffectiveModuleFeatureIds(module,
           (module.featurePacks ?? [])
             .filter((pack) => packIds.includes(pack.id))
             .flatMap((pack) => pack.featureIds),
@@ -8132,9 +8237,7 @@ function CompanyModulesDetail({
       {},
     );
     setPackSelections((previous) => ({ ...previous, [moduleId]: packIds }));
-    if (packIds.length > 0) {
-      setFeatureSelections((previous) => ({ ...previous, [moduleId]: featureIds }));
-    }
+    setFeatureSelections((previous) => ({ ...previous, [moduleId]: featureIds }));
     setFeaturePermissions((previous) => ({
       ...previous,
       [moduleId]: selectedFeaturePermissions(
@@ -8203,6 +8306,10 @@ function CompanyModulesDetail({
   const save = async () => {
     setSaving(true);
     try {
+      for (const module of configuredModules) {
+        const error = getModulePackError(module, packSelections[module.id] ?? []);
+        if (error) throw new Error(error);
+      }
       const normalizedFeatureSelections = Object.fromEntries(
         configuredModules.map((module) => [
           module.id,
@@ -8649,11 +8756,11 @@ function CompanyModulesDetail({
             <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ajustez le périmètre de l’espace.</p>
           </div>
           <span className="mono text-xs text-[hsl(var(--muted-foreground))]">
-            {modules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {modules.length}
+            {configuredModules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {configuredModules.length}
           </span>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {modules.map((module) => {
+          {configuredModules.map((module) => {
             const status = moduleStatuses[module.id] ?? 'INACTIF';
             return (
               <div
@@ -8683,11 +8790,19 @@ function CompanyModulesDetail({
                      <option value="INACTIF">Désactivé</option>
                    </select>
                  </div>
+                 {getModulePackError(module, packSelections[module.id] ?? []) && (
+                   <p role="alert" className="mt-3 text-xs text-[hsl(var(--destructive))]">
+                     {getModulePackError(module, packSelections[module.id] ?? [])}
+                     <button type="button" className="ml-2 underline" data-testid={`button-company-clear-stale-packs-${module.id}`} onClick={() => setModulePacks(module.id, [])}>Retirer les packs</button>
+                   </p>
+                 )}
                  {status !== 'INACTIF' && (module.featurePacks?.length || getModuleFeatureOptions(module).length) ? (
                    <div className="mt-4 space-y-3 border-t border-[hsl(var(--border)/.7)] pt-3">
                      {(module.featurePacks ?? []).length > 0 && (
                        <div>
-                         <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Packs autorisés</p>
+                        <p className="mb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Packs autorisés — facultatifs</p>
+                        {getModulePackError(module, packSelections[module.id] ?? []) && <p role="alert" className="mb-2 text-xs text-[hsl(var(--destructive))]">{getModulePackError(module, packSelections[module.id] ?? [])}</p>}
+                        <button type="button" data-testid={`button-company-no-pack-${module.id}`} className="mb-2 text-xs underline" onClick={() => setModulePacks(module.id, [])}>Choisir sans pack</button>
                          <div className="grid gap-2 sm:grid-cols-2">
                            {(module.featurePacks ?? []).map((pack) => (
                              <label key={pack.id} className="flex items-start gap-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card)/.65)] p-2 text-xs">
@@ -8715,7 +8830,7 @@ function CompanyModulesDetail({
                         </div>
                         {module.id === 'ecommerce' && <p className="mb-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour autoriser les produits, cochez <strong>Vente de produits physiques</strong>, <strong>Vente de produits numériques</strong>, ou les deux.</p>}
                         <div className="space-y-2">
-                          {getModuleFeatureOptions(module).map((feature) => {
+                          {getModuleFeatureOptions(module).filter(feature => normalizeFeatureIdsForSelectedPacks(module, [feature.id], packSelections[module.id] ?? []).length > 0).map((feature) => {
                             const selected = (featureSelections[module.id] ?? []).includes(feature.id);
                             const permissions = featurePermissions[module.id]?.[feature.id] ?? [];
                             return (

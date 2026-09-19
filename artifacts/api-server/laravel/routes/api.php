@@ -80,6 +80,7 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('company-requests
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {
     Route::post('/', [CompanyController::class, 'createAdministrative']);
     Route::patch('/{companyId}', [CompanyController::class, 'update']);
+    Route::patch('/{companyId}/deletion-lock', [CompanyController::class, 'updateDeletionLock']);
     Route::get('/{companyId}/login-settings', [CompanyController::class, 'loginSettings']);
     Route::patch('/{companyId}/login-settings', [CompanyController::class, 'updateLoginSettings']);
     Route::get('/{companyId}/installation-manifest', [CompanyController::class, 'installationManifest']);
