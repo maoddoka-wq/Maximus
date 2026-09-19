@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Models\Company;
+use App\Support\CompanyInstallationAccess;
 use App\Support\ModuleCatalog;
 use App\Services\PublicRegistrationPolicy;
 use Illuminate\Http\JsonResponse;
@@ -574,9 +575,10 @@ class AppStateController extends Controller
             ->whereIn('id', $companyIds)
             ->get()
             ->keyBy('id');
+        $installationAccess = CompanyInstallationAccess::forCompanies($companyIds);
 
         $state['companies'] = array_map(
-            function (mixed $item) use ($companies): mixed {
+            function (mixed $item) use ($companies, $installationAccess): mixed {
                 if (!is_array($item)) {
                     return $item;
                 }
@@ -592,6 +594,7 @@ class AppStateController extends Controller
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
                     'deletionLocked' => (bool) ($company->deletion_locked ?? true),
+                    'installationAccess' => $installationAccess->get((string) $company->id),
                 ]);
             },
             $state['companies'],

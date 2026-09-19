@@ -11,6 +11,7 @@ use App\Support\CompanyRegistry;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
+use App\Support\CompanyInstallationAccess;
 use App\Services\CompanyRequestCreationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -97,8 +98,13 @@ class CompanyController extends Controller
             ->with('company')
             ->where('status', 'PENDING')
             ->latest()
-            ->get()
-            ->map(fn (CompanyRequest $companyRequest): array => $this->requestPayload($companyRequest))
+            ->get();
+        $installationAccess = CompanyInstallationAccess::forCompanies($requests->pluck('company_id'));
+        $requests = $requests
+            ->map(fn (CompanyRequest $companyRequest): array => $this->requestPayload(
+                $companyRequest,
+                $installationAccess->get((string) $companyRequest->company_id),
+            ))
             ->values();
 
         return response()->json(['requests' => $requests]);
@@ -554,7 +560,7 @@ class CompanyController extends Controller
         }
     }
 
-    private function companyPayload(Company $company): array
+    private function companyPayload(Company $company, ?array $installationAccess = null): array
     {
         return [
             'id' => $company->id,
@@ -583,6 +589,7 @@ class CompanyController extends Controller
             'loginUrl' => $company->login_slug
                 ? '/entreprise/'.rawurlencode($company->login_slug).'/connexion'
                 : null,
+            'installationAccess' => $installationAccess ?? CompanyInstallationAccess::forCompany((string) $company->id),
         ];
     }
 
@@ -638,13 +645,13 @@ class CompanyController extends Controller
         }
     }
 
-    private function requestPayload(CompanyRequest $request): array
+    private function requestPayload(CompanyRequest $request, ?array $installationAccess = null): array
     {
         return [
             'id' => $request->company_id,
             'requestId' => $request->id,
             'status' => $request->status,
-            'company' => $request->company ? $this->companyPayload($request->company) : null,
+            'company' => $request->company ? $this->companyPayload($request->company, $installationAccess) : null,
             'createdAt' => optional($request->created_at)->toISOString(),
             'rejectionReason' => $request->rejection_reason,
         ];

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Services\InstallationAddressVerifier;
 use App\Support\InstallationContext;
+use App\Support\CompanyInstallationAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,7 @@ class InstallationAccessController extends Controller
                 'addresses' => DB::table('maximus_installation_addresses')->where('installation_id', $row->id)->orderByDesc('is_primary')->orderBy('created_at')->get()->map(fn ($address) => self::addressPayload($address))->all(),
             ])->all(),
             'centralLoginUrl' => rtrim((string) config('maximus.central_public_url', config('app.url')), '/').'/',
+            'presentation' => CompanyInstallationAccess::forCompany($companyId),
         ]);
     }
 

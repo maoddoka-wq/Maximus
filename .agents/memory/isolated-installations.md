@@ -24,3 +24,9 @@ Créer une installation de préparation ne ferme pas l’accès mutualisé. La b
 **Why:** Une entreprise doit pouvoir tester et préparer plusieurs installations sans interrompre le service courant ; une panne de la destination ne doit pas réactiver implicitement un second environnement de comptes.
 
 **How to apply:** Séparer le choix d’accès principal des statuts de domaines et de jetons ; conserver l’accès global MAXIMUS pour administrer et rétablir ce choix.
+
+La présentation centrale doit conserver la fiche d’administration, mais privilégier l’accès ERP réellement principal et reléguer les liens mutualisés historiques au second plan.
+
+**Why:** La présence du lien personnalisé central faisait croire que l’entreprise dédiée utilisait encore le mutualisé. Masquer toute sa fiche supprimerait pourtant les outils nécessaires au suivi et au rétablissement.
+
+**How to apply:** Distinguer préparation et bascule effective ; une destination principale indisponible ne doit jamais faire réapparaître le mutualisé comme accès courant.

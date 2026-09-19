@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { installationAccessApi, ErpAddress, Installation } from '@/lib/installation-access-api';
+import { getInstallationAccessPresentation, type InstallationAccessPresentation } from '@/lib/installation-access-presentation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,9 +25,10 @@ interface CompanyInstallationAccessProps {
   companyId: string;
   companyName: string;
   refreshKey?: number;
+  onPresentationChange?: (presentation: InstallationAccessPresentation) => void;
 }
 
-export function CompanyInstallationAccess({ companyId, companyName, refreshKey }: CompanyInstallationAccessProps) {
+export function CompanyInstallationAccess({ companyId, companyName, refreshKey, onPresentationChange }: CompanyInstallationAccessProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -36,6 +38,11 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
     queryKey,
     queryFn: () => installationAccessApi.get(companyId),
   });
+  const presentation = data ? getInstallationAccessPresentation(data) : null;
+
+  React.useEffect(() => {
+    if (presentation) onPresentationChange?.(presentation);
+  }, [presentation?.state, presentation?.installationId, presentation?.endpointUrl, presentation?.mode]);
 
   const [addDialogInstallationId, setAddDialogInstallationId] = useState<string | null>(null);
   const [newUrl, setNewUrl] = useState('');
@@ -188,8 +195,9 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
 
   if (isLoading) {
     return (
-      <div className="flex justify-center p-8">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center gap-3 rounded-xl border p-8 text-sm text-muted-foreground">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Chargement de l’accès ERP…
       </div>
     );
   }
@@ -211,11 +219,12 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Accès ERP et installations</CardTitle>
-          <CardDescription>Aucune installation en cours pour {companyName}.</CardDescription>
+          <CardDescription>Accès principal : MAXIMUS central mutualisé.</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Veuillez utiliser les boutons de préparation de l'entreprise pour générer une nouvelle installation.
+            Aucune installation dédiée ou locale n’est en préparation pour {companyName}. Les réglages centralisés
+            décrivent le registre, le catalogue et la configuration ; les données métier restent dans l’ERP utilisé.
           </p>
         </CardContent>
       </Card>
@@ -231,17 +240,28 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
         </p>
       </div>
       
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className={`${presentation?.state === 'primary' ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20' : presentation?.state === 'unavailable' ? 'border-red-300 bg-red-50/60 dark:bg-red-950/20' : 'border-primary/20 bg-primary/5'}`}>
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-primary">Hébergement actuel</p>
-              <p className="text-sm font-medium mt-1">
-                {data.primaryInstallationId === null 
-                  ? 'Mutualisé central (SaaS)' 
-                  : 'Dédié ou Local principal'}
+              <p className="text-sm font-semibold text-primary">Accès principal des employés</p>
+              <p className="mt-1 text-lg font-bold">
+                {presentation?.state === 'primary'
+                  ? `ERP ${presentation.mode === 'dedicated' ? 'dédié' : 'local'}`
+                  : presentation?.state === 'unavailable'
+                    ? 'ERP dédié ou local indisponible'
+                    : 'MAXIMUS central mutualisé'}
               </p>
+              {presentation?.state === 'prepared' && <p className="mt-1 text-sm text-muted-foreground">Une installation est en préparation, mais aucune bascule n’a été effectuée.</p>}
+              {presentation?.state === 'unavailable' && <p className="mt-1 text-sm text-red-700 dark:text-red-300">La bascule reste enregistrée, mais aucune adresse ERP validée ne peut être proposée. Aucun lien central de remplacement n’est affiché.</p>}
+              {presentation?.state === 'primary' && <p className="mt-1 break-all font-mono text-sm">{presentation.endpointUrl}</p>}
             </div>
+            <div className="flex flex-wrap gap-2">
+            {presentation?.state === 'primary' && (
+              <Button asChild>
+                <a href={presentation.endpointUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Ouvrir l’ERP</a>
+              </Button>
+            )}
             {data.primaryInstallationId !== null && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -269,6 +289,11 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 border-t pt-4 text-xs text-muted-foreground sm:grid-cols-2">
+            <p><strong className="text-foreground">MAXIMUS central</strong><br />Conserve le registre de l’entreprise, le catalogue, les modules, permissions et adresses validées.</p>
+            <p><strong className="text-foreground">ERP dédié ou local</strong><br />Conserve les comptes employés et les données métier utilisées au quotidien.</p>
           </div>
         </CardContent>
       </Card>
@@ -580,8 +605,10 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
         );
       })}
 
-      {data.centralLoginUrl && (
-        <Card className="bg-muted/30 border-dashed">
+      {data.centralLoginUrl && presentation?.state === 'primary' && (
+        <details className="rounded-xl border border-dashed bg-muted/30">
+          <summary className="cursor-pointer px-6 py-4 text-sm font-semibold">Accès central historique et options secondaires</summary>
+        <Card className="border-0 bg-transparent shadow-none">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -608,6 +635,7 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
             </div>
           </CardContent>
         </Card>
+        </details>
       )}
     </div>
   );
