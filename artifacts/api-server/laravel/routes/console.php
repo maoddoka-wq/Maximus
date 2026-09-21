@@ -10,8 +10,9 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Configuration only, not application updates. Failed attempts retain local
-// access and are retried on the next tick; an external scheduler must be enabled.
+// access and are retried on the next five-minute tick; an external scheduler
+// must be enabled on each dedicated installation.
 Schedule::command('maximus:sync-central-installation')
-    ->everyFifteenMinutes()
+    ->everyFiveMinutes()
     ->withoutOverlapping(60)
     ->when(fn (): bool => InstallationContext::isCompanyOnly());
