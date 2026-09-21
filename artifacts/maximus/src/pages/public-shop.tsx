@@ -1038,7 +1038,6 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   };
 
   useEffect(() => {
-    locate();
     return stopLocationTracking;
   }, []);
 
@@ -1125,20 +1124,21 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--shop-accent)]">
       <ArrowLeft size={16} /> Retour à la boutique
     </button>
-    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#0b1b2b] p-4 text-white shadow-xl sm:rounded-[2rem] sm:p-10">
-      <div className="pointer-events-none absolute inset-0"><img src={heroImageUrl} alt="" aria-hidden="true" className="h-full w-full object-cover object-center opacity-100" /><div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,18,31,.72)_0%,rgba(5,18,31,.46)_48%,rgba(5,18,31,.16)_100%)]" /><div className="absolute inset-0 bg-gradient-to-br from-[#071522]/10 via-transparent to-[#d69e2e]/20" /></div>
+    <div className="relative overflow-hidden rounded-[1.25rem] bg-[#0b1b2b] p-3 text-white shadow-xl sm:rounded-[2rem] sm:p-10">
+      <div className="pointer-events-none absolute inset-0"><img src={heroImageUrl} alt="" aria-hidden="true" className="h-full w-full object-cover object-center opacity-100" /><div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,18,31,.42)_0%,rgba(5,18,31,.22)_48%,rgba(5,18,31,.08)_100%)]" /><div className="absolute inset-0 bg-gradient-to-br from-[#071522]/5 via-transparent to-[#d69e2e]/15" /></div>
       <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[var(--shop-primary)]/25 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-5rem] right-1/3 h-40 w-40 rounded-full border border-white/10" />
-      <div className="relative grid gap-5 sm:gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
+      <div className="relative grid gap-3 sm:gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[.12em] text-white/80 sm:px-3 sm:text-xs sm:tracking-[.14em]"><CarFront size={14} /> Taxi à la demande</span>
-          <h1 className="mt-4 max-w-xl text-[2rem] font-black leading-[1.08] tracking-[-.06em] sm:mt-5 sm:text-5xl">Votre chauffeur, en un seul geste.</h1>
-          <p className="mt-3 max-w-xl text-[13px] leading-6 text-white/70 sm:mt-4 sm:text-sm sm:leading-7">Votre départ est détecté automatiquement. Entrez votre destination, confirmez votre téléphone et nous cherchons le chauffeur disponible le plus proche.</p>
-          <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-semibold text-white/75 sm:mt-6 sm:gap-x-5 sm:text-xs"><span className="inline-flex items-center gap-2"><MapPin size={14} className="text-[var(--shop-primary)]" />Position GPS automatique</span><span className="inline-flex items-center gap-2"><Phone size={14} className="text-[var(--shop-primary)]" />Contact direct</span></div>
+          <h1 className="mt-3 max-w-xl text-[1.7rem] font-black leading-[1.05] tracking-[-.06em] sm:mt-5 sm:text-5xl">Votre chauffeur, en un seul geste.</h1>
+          <p className="mt-2 max-w-xl text-[12px] leading-5 text-white/80 sm:mt-4 sm:text-sm sm:leading-7">Votre départ est détecté automatiquement. Entrez votre destination, confirmez votre téléphone et nous cherchons le chauffeur disponible le plus proche.</p>
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] font-semibold text-white/85 sm:mt-6 sm:gap-x-5 sm:text-xs"><span className="inline-flex items-center gap-2"><MapPin size={14} className="text-[var(--shop-primary)]" />Position GPS automatique</span><span className="inline-flex items-center gap-2"><Phone size={14} className="text-[var(--shop-primary)]" />Contact direct</span></div>
+          {(phone || whatsappHref) && <div className="mt-3 grid max-w-sm grid-cols-2 gap-2 sm:mt-5"><>{phone && <a href={`tel:${phone}`} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-[11px] font-bold text-white backdrop-blur-sm transition hover:bg-white/20"><Phone size={14} />Appeler</a>}{whatsappHref && <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 bg-[#25D366]/20 px-3 py-2.5 text-[11px] font-bold text-white backdrop-blur-sm transition hover:bg-[#25D366]/30"><MessageCircle size={14} />WhatsApp</a>}</></div>}
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/[.08] p-3 backdrop-blur-sm sm:rounded-2xl sm:p-4">
+        <div className="rounded-xl border border-white/15 bg-black/[.16] p-2.5 backdrop-blur-sm sm:rounded-2xl sm:bg-white/[.08] sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/65 sm:text-xs"><span>État de la localisation</span><span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 ${locationState === 'ready' ? 'bg-emerald-400/15 text-emerald-200' : locationState === 'error' ? 'bg-rose-400/15 text-rose-200' : 'bg-white/10 text-white/70'}`}><span className={`h-1.5 w-1.5 rounded-full ${locationState === 'ready' ? 'bg-emerald-300' : locationState === 'error' ? 'bg-rose-300' : 'bg-amber-300'}`} />{locationState === 'ready' ? 'Prête' : locationState === 'locating' ? 'Recherche…' : locationState === 'error' ? 'À autoriser' : 'En attente'}</span></div>
-           <p className="mt-2 text-[13px] leading-6 text-white/85 sm:mt-3 sm:text-sm">{locationState === 'ready' ? 'Votre position de départ est prête. Vous n’avez pas besoin de saisir une adresse.' : locationMessage || 'Nous préparons automatiquement votre position de départ.'}</p>
+            <p className="mt-1.5 text-[12px] leading-5 text-white/90 sm:mt-3 sm:text-sm">{locationState === 'ready' ? 'Votre position de départ est prête. Vous n’avez pas besoin de saisir une adresse.' : locationMessage || 'Appuyez sur « Commander » pour autoriser votre position.'}</p>
            {locationState === 'ready' && position && <p className="mt-2 text-[11px] font-semibold text-white/65">Précision GPS : environ {Math.round(position.accuracy)} m</p>}
           {locationState === 'error' && <button type="button" onClick={locate} className="mt-2 text-xs font-bold text-[var(--shop-primary)] underline sm:mt-3">Autoriser ma position</button>}
         </div>
@@ -1152,7 +1152,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           <p className="mt-5 text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Départ automatique</p>
           <h2 className="mt-2 text-2xl font-black tracking-[-.04em]">Prêt à partir ?</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">Un clic pour commencer. Votre position GPS sera envoyée uniquement pour trouver le chauffeur le plus proche.</p>
-          <button type="button" onClick={() => { setFormOpen(true); if (locationState === 'error') locate(); }} disabled={locationState === 'locating'} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-5 py-4 text-sm font-black text-white shadow-lg shadow-black/10 transition hover:translate-y-[-1px] disabled:cursor-wait disabled:opacity-60">{locationState === 'locating' ? <RefreshCw size={17} className="animate-spin" /> : <CarFront size={17} />}{locationState === 'locating' ? 'Localisation en cours…' : 'Commander un taxi'}<ArrowRight size={16} /></button>
+           <button type="button" onClick={() => { setFormOpen(true); if (locationState !== 'ready') locate(); }} disabled={locationState === 'locating'} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-black/10 transition hover:translate-y-[-1px] disabled:cursor-wait disabled:opacity-60 sm:mt-6 sm:py-4">{locationState === 'locating' ? <RefreshCw size={17} className="animate-spin" /> : <CarFront size={17} />}{locationState === 'locating' ? 'Localisation en cours…' : 'Commander un taxi'}<ArrowRight size={16} /></button>
         </div>}
         {formOpen && !trip && <form onSubmit={submit} className="space-y-5">
            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Étape finale</p><h2 className="mt-1 text-xl font-black tracking-[-.04em] sm:text-2xl">Où allez-vous ?</h2></div><button type="button" onClick={() => setFormOpen(false)} className="text-xs font-bold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">Retour</button></div>
