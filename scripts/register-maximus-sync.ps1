@@ -40,6 +40,7 @@ $trigger = New-ScheduledTaskTrigger `
     -RepetitionDuration (New-TimeSpan -Days 3650)
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
+    -Hidden `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
 
 Register-ScheduledTask `
