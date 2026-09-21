@@ -82,3 +82,4 @@
 - [Version des installations dédiées](dedicated-installation-versioning.md) — premier enrôlement à commit identique ; échanges ultérieurs bornés par identité et protocole compatible.
 - [Chemins PowerShell](powershell-script-root.md) — résoudre le dossier du script après le bloc param, car PSScriptRoot peut être vide pendant l’évaluation Windows.
 - [DNS Render depuis PHP Windows](windows-php-render-dns.md) — PHP cURL peut expirer sur la résolution Render alors que curl.exe fonctionne ; préférer IPv4 et réessayer les connexions.
+- [Fréquence du scheduler Windows](windows-sync-scheduler.md) — appeler le scheduler toutes les cinq minutes et réenregistrer la tâche pour supprimer les lancements fréquents visibles.

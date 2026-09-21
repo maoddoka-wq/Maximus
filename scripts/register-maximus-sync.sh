@@ -5,7 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 LARAVEL_DIR="$WORKSPACE_DIR/artifacts/api-server/laravel"
-INTERVAL_MINUTES=1
+INTERVAL_MINUTES=5
 REMOVE=0
 TASK_MARKER="# maximus-central-scheduler"
 
@@ -18,7 +18,7 @@ La synchronisation centrale reste limitée aux installations dédiées.
 
 Options:
   --workspace-dir PATH     Racine du workspace MAXIMUS
-  --interval-minutes N     Fréquence du scheduler (défaut: 1)
+  --interval-minutes N     Fréquence du scheduler (défaut: 5)
   --remove                 Supprimer le déclencheur installé par ce script
   -h, --help               Afficher cette aide
 EOF

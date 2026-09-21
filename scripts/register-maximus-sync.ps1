@@ -3,7 +3,7 @@ param(
     [string]$WorkspaceDir = "",
     [string]$TaskName = "MAXIMUS central scheduler",
     [ValidateRange(1, 1440)]
-    [int]$IntervalMinutes = 1,
+    [int]$IntervalMinutes = 5,
     [switch]$Remove
 )
 

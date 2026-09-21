@@ -101,9 +101,9 @@ Sous Windows, le même script est disponible en PowerShell :
 .\scripts\register-maximus-sync.ps1
 ```
 
-Le déclencheur système appelle `schedule:run` toutes les minutes ; Laravel
-déclenche ensuite la synchronisation toutes les 5 minutes. Le scheduler peut
-aussi être lancé au premier plan par l'exploitant :
+Le déclencheur système appelle `schedule:run` toutes les 5 minutes, comme la
+fréquence de synchronisation Laravel. Le scheduler peut aussi être lancé au
+premier plan par l'exploitant :
 
 ```sh
 cd artifacts/api-server/laravel
