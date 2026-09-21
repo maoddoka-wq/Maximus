@@ -20,7 +20,7 @@ if ($Remove) {
     exit 0
 }
 
-$phpCommand = Get-Command php.exe -ErrorAction SilentlyContinue
+ $phpCommand = Get-Command php.exe -ErrorAction SilentlyContinue
 if (-not $phpCommand) {
     $phpCommand = Get-Command php -ErrorAction SilentlyContinue
 }
@@ -28,9 +28,23 @@ if (-not $phpCommand) {
     throw "PHP est introuvable dans PATH."
 }
 
+$powerShellCommand = Get-Command powershell.exe -ErrorAction SilentlyContinue
+if (-not $powerShellCommand) {
+    throw "Windows PowerShell est introuvable dans PATH."
+}
+
+$phpLiteral = $phpCommand.Source.Replace("'", "''")
+$laravelLiteral = $LaravelDir.Replace("'", "''")
+$hiddenCommand = @"
+`$process = Start-Process -FilePath '$phpLiteral' -ArgumentList @('artisan', 'schedule:run', '--no-ansi') -WorkingDirectory '$laravelLiteral' -WindowStyle Hidden -Wait -PassThru
+exit `$process.ExitCode
+"@
+$encodedCommand = [Convert]::ToBase64String(
+    [System.Text.Encoding]::Unicode.GetBytes($hiddenCommand)
+)
 $action = New-ScheduledTaskAction `
-    -Execute $phpCommand.Source `
-    -Argument "artisan schedule:run --no-ansi" `
+    -Execute $powerShellCommand.Source `
+    -Argument "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encodedCommand" `
     -WorkingDirectory $LaravelDir
 $startAt = (Get-Date).AddMinutes(1)
 $trigger = New-ScheduledTaskTrigger `
@@ -50,6 +64,7 @@ Register-ScheduledTask `
     -Settings $settings `
     -Description "Déclenche le scheduler Laravel MAXIMUS pour synchroniser la configuration centrale." `
     -Force | Out-Null
+Enable-ScheduledTask -TaskName $TaskName | Out-Null
 
 Write-Host "Scheduler MAXIMUS activé : $TaskName"
-Write-Host "Déclenchement toutes les $IntervalMinutes minute(s), synchronisation centrale selon la règle Laravel."
+Write-Host "Déclenchement toutes les $IntervalMinutes minute(s), sans fenêtre visible."
