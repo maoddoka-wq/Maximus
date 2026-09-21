@@ -156,6 +156,40 @@ Sous Windows :
 .\scripts\register-maximus-sync.ps1 -Remove
 ```
 
+### Gestionnaire PowerShell MAXIMUS
+
+Le gestionnaire regroupe les contrôles et les opérations locales sans recréer
+la logique d’installation ou de mise à jour :
+
+```powershell
+# Lecture seule
+.\scripts\MaximusManager.ps1 -HealthCheck
+.\scripts\MaximusManager.ps1 -CheckUpdate
+.\scripts\MaximusManager.ps1 -Logs
+
+# Sauvegarde PostgreSQL, .env et fichiers persistants
+.\scripts\MaximusManager.ps1 -Backup
+
+# Opérations avec confirmation interactive
+.\scripts\MaximusManager.ps1 -Update
+.\scripts\MaximusManager.ps1 -Repair
+.\scripts\MaximusManager.ps1 -Start
+.\scripts\MaximusManager.ps1 -Stop
+```
+
+Une mise à jour crée d’abord une sauvegarde validée et s’arrête si elle échoue.
+En mode automatisé, les opérations modifiant le système exigent explicitement
+`-Approve` :
+
+```powershell
+.\scripts\MaximusManager.ps1 -Update -NonInteractive -Approve
+```
+
+Le gestionnaire n’utilise ni `git reset --hard`, ni `git clean -fd`, ni
+`DROP DATABASE`. Les contrôles de santé et de version peuvent être exécutés sans
+modifier l’application ; `-CheckUpdate` met toutefois à jour les références Git
+locales avec `git fetch`.
+
 Pour produire une archive d’installation qui correspond strictement à la version
 réellement servie par MAXIMUS principal sur Render, utilisez :
 
