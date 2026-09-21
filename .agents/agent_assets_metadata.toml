@@ -252,3 +252,17 @@ mtime_ms = 1789974382282
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/f6144f09-88c7-4f37-a7c8-26a17a416ec6/23286a36-0fc8-4a63-8de6-09d56247457b"
 storage_version_token = "1789974387472994"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Zf8BjXmRrWTU7FnqXTmh8"
+uri = "file://reports/maximus-security-audit-2026-09-21.pdf"
+type = "pdf"
+title = "Rapport d’audit de sécurité MAXIMUS"
+description = "Rapport PDF en français couvrant les dépendances, le code, GitHub, Render, la production et le plan d’action priorisé."
+logical_id = "0bb185c0-6647-4305-90f6-8c4c2e8a5617"
+content_hash = "sha256:8bc8fe03492437e743b19b29742c70b3b55f5122d7def31d3f8d876a5e27ee25"
+size = 53083
+mtime_ms = 1789991673221
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/0bb185c0-6647-4305-90f6-8c4c2e8a5617/fff3a148-c639-4d8a-a6de-8efd0157d102"
+storage_version_token = "1789991678081980"
+content_type = "application/pdf"
