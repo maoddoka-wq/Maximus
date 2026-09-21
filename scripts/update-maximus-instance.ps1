@@ -146,6 +146,13 @@ try {
     Pop-Location
 }
 
+$syncScheduler = Join-Path $WorkspaceDir "scripts/register-maximus-sync.ps1"
+if (Test-Path $syncScheduler -PathType Leaf) {
+    Write-Host "`n==> Activation du scheduler de synchronisation centrale"
+    & $syncScheduler -WorkspaceDir $WorkspaceDir
+    if ($LASTEXITCODE -ne 0) { Fail "L’activation du scheduler de synchronisation a échoué." }
+}
+
 if (-not $SkipHealthcheck) {
     Write-Host "`n==> Vérification locale"
     $port = Get-Random -Minimum 18080 -Maximum 19080

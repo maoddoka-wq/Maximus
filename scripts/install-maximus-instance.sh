@@ -11,6 +11,7 @@ NON_INTERACTIVE=0
 SKIP_BUILD=0
 SKIP_COMPOSER=0
 SKIP_HEALTHCHECK=0
+SKIP_SCHEDULER=0
 BOOTSTRAP_FILE=""
 
 usage() {
@@ -29,6 +30,7 @@ Options:
   --skip-composer          Ne pas exécuter composer install
   --skip-build             Ne pas construire ni copier le frontend
   --skip-healthcheck       Ne pas appeler /api/healthz à la fin
+  --skip-scheduler         Ne pas installer le scheduler système automatiquement
   -h, --help               Afficher cette aide
 
 Variables utiles:
@@ -214,6 +216,7 @@ while [[ "$#" -gt 0 ]]; do
         --skip-composer) SKIP_COMPOSER=1; shift ;;
         --skip-build) SKIP_BUILD=1; shift ;;
         --skip-healthcheck) SKIP_HEALTHCHECK=1; shift ;;
+        --skip-scheduler) SKIP_SCHEDULER=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) fail "Option inconnue : $1" ;;
     esac
@@ -350,6 +353,13 @@ log "Migration PostgreSQL et initialisation de l’entreprise"
 (cd "$LARAVEL_DIR" && php artisan config:clear --no-interaction)
 (cd "$LARAVEL_DIR" && php artisan migrate --force --no-interaction)
 (cd "$LARAVEL_DIR" && php artisan maximus:install-company --no-interaction)
+
+if [[ "$SKIP_SCHEDULER" -eq 0 ]]; then
+    log "Activation du scheduler de synchronisation centrale"
+    "$SCRIPT_DIR/register-maximus-sync.sh" --workspace-dir "$WORKSPACE_DIR"
+else
+    printf '%s\n' "Scheduler non installé (--skip-scheduler). Configurez-le avant la mise en production."
+fi
 
 if [[ "$SKIP_HEALTHCHECK" -eq 0 ]]; then
     log "Vérification de santé"

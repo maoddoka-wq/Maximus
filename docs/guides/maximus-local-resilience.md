@@ -86,18 +86,37 @@ Une entrée `hosts` ou DNS ne constitue pas à elle seule une validation central
 ## Synchronisation planifiée, pas mise à jour automatique
 
 La tâche Laravel `maximus:sync-central-installation` est définie toutes les
-15 minutes, sans chevauchement (verrou expirant après 60 minutes), uniquement en
+5 minutes, sans chevauchement (verrou expirant après 60 minutes), uniquement en
 mode entreprise. Un échec est retenté à l'échéance suivante, sans boucle agressive.
-Le scheduler doit être lancé par l'exploitant :
+Les scripts d'installation et de mise à jour enregistrent automatiquement le
+déclencheur du scheduler :
+
+```sh
+./scripts/register-maximus-sync.sh
+```
+
+Sous Windows, le même script est disponible en PowerShell :
+
+```powershell
+.\scripts\register-maximus-sync.ps1
+```
+
+Le déclencheur système appelle `schedule:run` toutes les minutes ; Laravel
+déclenche ensuite la synchronisation toutes les 5 minutes. Le scheduler peut
+aussi être lancé au premier plan par l'exploitant :
 
 ```sh
 cd artifacts/api-server/laravel
 php artisan schedule:work
 ```
 
-Ou configurer cron / le Planificateur de tâches Windows pour appeler
-`php artisan schedule:run` chaque minute, avec le bon dossier de travail, compte
-et cache persistant partagé par les invocations. Pour un essai manuel :
+Pour supprimer le déclencheur POSIX :
+
+```sh
+./scripts/register-maximus-sync.sh --remove
+```
+
+Pour un essai manuel :
 
 ```sh
 php artisan maximus:sync-central-installation

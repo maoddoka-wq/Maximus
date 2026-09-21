@@ -12,6 +12,7 @@ CENTRAL_URL="${MAXIMUS_CENTRAL_URL:-https://maximus-erp.onrender.com}"
 SKIP_BUILD=0
 SKIP_COMPOSER=0
 SKIP_HEALTHCHECK=0
+SKIP_SCHEDULER=0
 
 usage() {
     cat <<'EOF'
@@ -27,6 +28,7 @@ Options:
   --skip-composer          Ne pas exécuter composer install
   --skip-build             Ne pas reconstruire le frontend
   --skip-healthcheck       Ne pas lancer la sonde locale
+  --skip-scheduler         Ne pas mettre à jour le scheduler système
   -h, --help               Afficher cette aide
 EOF
 }
@@ -103,6 +105,7 @@ while [[ "$#" -gt 0 ]]; do
         --skip-composer) SKIP_COMPOSER=1; shift ;;
         --skip-build) SKIP_BUILD=1; shift ;;
         --skip-healthcheck) SKIP_HEALTHCHECK=1; shift ;;
+        --skip-scheduler) SKIP_SCHEDULER=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) fail "Option inconnue : $1" ;;
     esac
@@ -177,6 +180,11 @@ log "Migration et synchronisation de l’entreprise"
 (cd "$LARAVEL_DIR" && php artisan config:clear --no-interaction)
 (cd "$LARAVEL_DIR" && php artisan migrate --force --no-interaction)
 (cd "$LARAVEL_DIR" && php artisan maximus:install-company --no-interaction)
+
+if [[ "$SKIP_SCHEDULER" -eq 0 ]]; then
+    log "Vérification du scheduler de synchronisation centrale"
+    "$SCRIPT_DIR/register-maximus-sync.sh" --workspace-dir "$WORKSPACE_DIR"
+fi
 
 if [[ "$SKIP_HEALTHCHECK" -eq 0 ]]; then
     log "Vérification locale"
