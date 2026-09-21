@@ -175,7 +175,7 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       className="w-full h-48 p-5 bg-[hsl(var(--muted)/.5)] border-2 border-[hsl(var(--border))] rounded-xl text-base placeholder:text-[hsl(var(--muted-foreground)/.7)] focus:outline-none focus:border-[hsl(var(--primary))] focus:ring-0 transition-colors resize-none"
                       autoFocus
                     />
-                    <div className="absolute bottom-4 right-4 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                    <div className="mt-2 text-xs font-medium text-[hsl(var(--muted-foreground))]">
                       Plus vous êtes précis, plus la configuration sera exacte.
                     </div>
                   </div>
