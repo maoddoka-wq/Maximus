@@ -488,9 +488,10 @@ function Invoke-Update {
 
 function Get-AppPort {
     $values = Get-EnvMap
+    $appUrl = Get-EnvValue $values "APP_URL" "http://127.0.0.1:8080"
     $uri = $null
-    [Uri]::TryCreate((Get-EnvValue $values "APP_URL" "http://127.0.0.1:8080"), [UriKind]::Absolute, [ref]$uri) | Out-Null
-    if ($uri -and $uri.Port -gt 0) {
+    [Uri]::TryCreate($appUrl, [UriKind]::Absolute, [ref]$uri) | Out-Null
+    if ($uri -and -not $uri.IsDefaultPort -and $uri.Port -gt 0) {
         return $uri.Port
     }
     return 8080
@@ -506,6 +507,17 @@ function Invoke-Start {
     if ($existing.Count -gt 0) {
         Fail "Le port $port est déjà utilisé. Aucun second serveur ne sera lancé."
     }
+    $publicDir = Join-Path $LaravelDir "public"
+    $router = Join-Path $LaravelDir "server.php"
+    if (-not (Test-Path $publicDir -PathType Container)) {
+        Fail "Document root Laravel introuvable : $publicDir"
+    }
+    if (-not (Test-Path (Join-Path $publicDir "index.html") -PathType Leaf)) {
+        Fail "Frontend compilé absent de public/index.html. Construisez le frontend avant de démarrer MAXIMUS."
+    }
+    if (-not (Test-Path $router -PathType Leaf)) {
+        Fail "Routeur MAXIMUS server.php introuvable : $router"
+    }
 
     New-Item -ItemType Directory -Path $ManagerStateDir -Force | Out-Null
     $logDir = Join-Path $LaravelDir "storage/logs"
@@ -513,7 +525,7 @@ function Invoke-Start {
     $stdout = Join-Path $logDir "manager-server.out.log"
     $stderr = Join-Path $logDir "manager-server.err.log"
     $process = Start-Process -FilePath $php `
-        -ArgumentList @("-S", "127.0.0.1:$port", "server.php") `
+        -ArgumentList @("-S", "127.0.0.1:$port", "-t", $publicDir, $router) `
         -WorkingDirectory $LaravelDir `
         -RedirectStandardOutput $stdout `
         -RedirectStandardError $stderr `
@@ -521,6 +533,38 @@ function Invoke-Start {
         -WindowStyle Hidden
     @{ pid = $process.Id; startedAt = (Get-Date).ToUniversalTime().ToString("o"); port = $port } |
         ConvertTo-Json | Set-Content -LiteralPath $ServerStateFile -Encoding UTF8
+    $ready = $false
+    try {
+        for ($attempt = 0; $attempt -lt 10; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            if ($process.HasExited) {
+                break
+            }
+            try {
+                $response = Invoke-WebRequest `
+                    -Uri "http://127.0.0.1:$port/api/healthz" `
+                    -TimeoutSec 2 `
+                    -UseBasicParsing
+                if ($response.StatusCode -eq 200) {
+                    $ready = $true
+                    break
+                }
+            } catch {}
+        }
+    } finally {
+        if (-not $ready -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if (-not $ready) {
+        Remove-Item -LiteralPath $ServerStateFile -Force -ErrorAction SilentlyContinue
+        $errorTail = if (Test-Path $stderr -PathType Leaf) {
+            (Get-Content -LiteralPath $stderr -Tail 20) -join " "
+        } else {
+            "aucun journal d’erreur disponible"
+        }
+        Fail "Le serveur PHP n’est pas resté accessible sur http://127.0.0.1:$port. $errorTail"
+    }
     Write-Host "MAXIMUS démarré sur http://127.0.0.1:$port (PID $($process.Id))."
 }
 
