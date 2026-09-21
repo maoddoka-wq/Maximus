@@ -32,8 +32,10 @@ $action = New-ScheduledTaskAction `
     -Execute $phpCommand.Source `
     -Argument "artisan schedule:run --no-ansi" `
     -WorkingDirectory $LaravelDir
+$startAt = (Get-Date).AddMinutes(1)
 $trigger = New-ScheduledTaskTrigger `
-    -Once (Get-Date).AddMinutes(1) `
+    -Once `
+    -At $startAt `
     -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) `
     -RepetitionDuration (New-TimeSpan -Days 3650)
 $settings = New-ScheduledTaskSettingsSet `
