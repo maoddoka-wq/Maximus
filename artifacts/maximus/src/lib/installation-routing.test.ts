@@ -56,6 +56,11 @@ test('a successful central branded login survives a session reload', () => {
     companyLoginPathFromStoredContext(JSON.stringify(context), 'company-a'),
     '/entreprise/entreprise-a/connexion',
   );
+  const legacyContext = createCompanyLoginReturnContext('company-a', '/kora/entreprise-a/connexion');
+  assert.deepEqual(legacyContext, {
+    companyId: 'company-a',
+    path: '/kora/entreprise-a/connexion',
+  });
 });
 
 test('a route cannot be injected for another authenticated company', () => {

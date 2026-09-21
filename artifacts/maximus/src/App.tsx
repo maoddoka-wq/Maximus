@@ -968,7 +968,7 @@ function AppContent() {
     setLocation('/maximus/secteurs');
     notify('Test réel terminé. Retour à la configuration des secteurs.', 'success');
   };
-  const companyLoginMatch = pathname.match(/^\/entreprise\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
+  const companyLoginMatch = pathname.match(/^\/(?:entreprise|kora)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/connexion$/);
   const companyLoginSlug = companyLoginMatch ? decodeURIComponent(companyLoginMatch[1]) : null;
   const logoutTo = (destinationOverride?: string) => {
     const isCompanySession = Boolean(session && session !== 'admin');

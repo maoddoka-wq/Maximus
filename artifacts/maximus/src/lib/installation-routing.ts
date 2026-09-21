@@ -6,7 +6,7 @@ export type CompanyLoginReturnContext = {
   path: string;
 };
 
-const companyLoginPathPattern = /^\/entreprise\/[a-z0-9]+(?:-[a-z0-9]+)*\/connexion$/;
+const companyLoginPathPattern = /^\/(?:entreprise|kora)\/[a-z0-9]+(?:-[a-z0-9]+)*\/connexion$/;
 
 /** The server resolves the installation and host; never infer a shop from a hostname suffix. */
 export function resolveInstallationEntry(profile: InstallationProfile | null): InstallationEntry {

@@ -420,6 +420,25 @@ class InstallationAccessTest extends TestCase
         ]);
     }
 
+    public function test_enabling_custom_login_activates_the_branded_link_and_login(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        $response = $this->patchJson('/api/companies/access-company/login-settings', [
+            'customAllowed' => true,
+        ])->assertOk();
+
+        $response->assertJsonPath('settings.customAllowed', true)
+            ->assertJsonPath('settings.mode', 'CUSTOM')
+            ->assertJsonPath('settings.url', '/entreprise/access-company/connexion')
+            ->assertJsonPath('company.loginUrl', '/entreprise/access-company/connexion');
+
+        $user = $this->cutoverUser();
+        $this->postJson('/api/auth/company-login/access-company', [
+            'email' => $user->email,
+            'password' => 'Admin123!',
+        ])->assertOk()->assertJsonPath('user.companyId', 'access-company');
+    }
+
     public function test_cutover_is_explicit_blocks_both_central_logins_and_sessions_and_can_be_rolled_back(): void
     {
         $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);

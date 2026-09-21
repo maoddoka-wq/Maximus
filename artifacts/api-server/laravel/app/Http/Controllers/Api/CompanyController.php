@@ -341,9 +341,7 @@ class CompanyController extends Controller
         $changes = [];
         if (array_key_exists('customAllowed', $input)) {
             $changes['login_custom_allowed'] = (bool) $input['customAllowed'];
-            if (! $changes['login_custom_allowed']) {
-                $changes['login_mode'] = 'MAXIMUS';
-            }
+            $changes['login_mode'] = $changes['login_custom_allowed'] ? 'CUSTOM' : 'MAXIMUS';
         }
         if (array_key_exists('mode', $input)) {
             if ($input['mode'] === 'CUSTOM' && ! ((bool) $company->login_custom_allowed || ($changes['login_custom_allowed'] ?? false))) {
