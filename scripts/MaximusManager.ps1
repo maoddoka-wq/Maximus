@@ -435,22 +435,48 @@ function Invoke-Install {
 function Invoke-Update {
     Confirm-RiskyAction "sauvegarder puis mettre à jour MAXIMUS"
     Ensure-UnixShellForNodeScripts
+    $gitState = Get-GitState
+    $managerPath = Join-Path $WorkspaceDir "scripts/MaximusManager.ps1"
+    $temporaryManager = Join-Path $env:TEMP ("MaximusManager-$PID.ps1")
+    $restoreManager = $gitState.Status -match '(?m)^\?\? scripts[/\\]MaximusManager\.ps1$'
+    if ($restoreManager -and (Test-Path $managerPath -PathType Leaf)) {
+        Copy-Item -LiteralPath $managerPath -Destination $temporaryManager -Force
+    }
+    $stashName = $null
+    if ($gitState.Status) {
+        $stashName = "MAXIMUS avant mise a jour $(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Write-Step "Conservation réversible des changements locaux"
+        Invoke-NativeChecked $gitState.Git @("-C", $WorkspaceDir, "stash", "push", "--include-untracked", "-m", $stashName)
+        if ($LASTEXITCODE -ne 0) {
+            Fail "Impossible de conserver les changements locaux dans Git."
+        }
+    }
     $backupDir = New-MaximusBackup
     $updateScript = Join-Path $WorkspaceDir "scripts/update-maximus-instance.ps1"
     if (-not (Test-Path $updateScript -PathType Leaf)) {
         Fail "Script de mise à jour introuvable."
     }
 
-    Write-Step "Mise à jour MAXIMUS après sauvegarde validée"
-    $arguments = @("-WorkspaceDir", $WorkspaceDir, "-Branch", $Branch, "-CentralUrl", $CentralUrl)
-    if ($SkipComposer) { $arguments += "-SkipComposer" }
-    if ($SkipBuild) { $arguments += "-SkipBuild" }
-    if ($SkipHealthcheck) { $arguments += "-SkipHealthcheck" }
-    & $updateScript @arguments
-    if ($LASTEXITCODE -ne 0) {
-        Fail "La mise à jour a échoué. La sauvegarde reste disponible : $backupDir"
+    try {
+        Write-Step "Mise à jour MAXIMUS après sauvegarde validée"
+        $arguments = @("-WorkspaceDir", $WorkspaceDir, "-Branch", $Branch, "-CentralUrl", $CentralUrl)
+        if ($SkipComposer) { $arguments += "-SkipComposer" }
+        if ($SkipBuild) { $arguments += "-SkipBuild" }
+        if ($SkipHealthcheck) { $arguments += "-SkipHealthcheck" }
+        & $updateScript @arguments
+        if ($LASTEXITCODE -ne 0) {
+            Fail "La mise à jour a échoué. La sauvegarde reste disponible : $backupDir"
+        }
+    } finally {
+        if ($restoreManager -and -not (Test-Path $managerPath -PathType Leaf) -and (Test-Path $temporaryManager -PathType Leaf)) {
+            Copy-Item -LiteralPath $temporaryManager -Destination $managerPath -Force
+        }
+        Remove-Item -LiteralPath $temporaryManager -Force -ErrorAction SilentlyContinue
     }
     Write-Host "Mise à jour terminée. Sauvegarde conservée : $backupDir"
+    if ($stashName) {
+        Write-Host "Changements locaux conservés dans Git : $stashName"
+    }
 }
 
 function Get-AppPort {

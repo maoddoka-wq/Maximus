@@ -96,7 +96,13 @@ $currentBranch = Get-CommandOutput $git @("-C", $WorkspaceDir, "branch", "--show
 if ($currentBranch -ne $Branch) {
     Fail "La branche locale est « $currentBranch », la branche attendue est « $Branch »."
 }
-$status = Get-CommandOutput $git @("-C", $WorkspaceDir, "status", "--porcelain", "--untracked-files=all")
+    $statusLines = @(& $git -C $WorkspaceDir status --porcelain --untracked-files=all)
+    $status = ($statusLines |
+        Where-Object {
+            $_ -notmatch '^\?\? maximus-sauvegardes([/\\]|$)' -and
+            $_ -notmatch '^\?\? scripts[/\\]MaximusManager\.ps1$'
+        } |
+        Out-String).Trim()
 if ($status) {
     Fail "Le workspace contient des changements locaux. Sauvegardez-les ou annulez-les avant la mise à jour."
 }
