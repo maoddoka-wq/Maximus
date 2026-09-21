@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$WorkspaceDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+    [string]$WorkspaceDir = "",
     [string]$TaskName = "MAXIMUS automatic update",
     [ValidateRange(5, 1440)]
     [int]$IntervalMinutes = 10,
@@ -8,6 +8,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($WorkspaceDir)) {
+    $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+    if ([string]::IsNullOrWhiteSpace($scriptDirectory)) {
+        throw "Impossible de déterminer le dossier du script."
+    }
+    $WorkspaceDir = (Resolve-Path (Join-Path $scriptDirectory "..")).Path
+}
 
 $updateScript = Join-Path $WorkspaceDir "scripts/update-maximus-instance.ps1"
 if (-not (Test-Path $updateScript)) {

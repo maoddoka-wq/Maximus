@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$WorkspaceDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+    [string]$WorkspaceDir = "",
     [string]$Branch = "main",
     [string]$CentralUrl = "https://maximus-erp.onrender.com",
     [switch]$SkipComposer,
@@ -9,6 +9,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($WorkspaceDir)) {
+    $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+    if ([string]::IsNullOrWhiteSpace($scriptDirectory)) {
+        throw "Impossible de déterminer le dossier du script."
+    }
+    $WorkspaceDir = (Resolve-Path (Join-Path $scriptDirectory "..")).Path
+}
 
 $LaravelDir = Join-Path $WorkspaceDir "artifacts/api-server/laravel"
 $FrontendDir = Join-Path $WorkspaceDir "artifacts/maximus"

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$WorkspaceDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+    [string]$WorkspaceDir = "",
     [string]$TaskName = "MAXIMUS central scheduler",
     [ValidateRange(1, 1440)]
     [int]$IntervalMinutes = 1,
@@ -8,6 +8,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($WorkspaceDir)) {
+    $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+    if ([string]::IsNullOrWhiteSpace($scriptDirectory)) {
+        throw "Impossible de déterminer le dossier du script."
+    }
+    $WorkspaceDir = (Resolve-Path (Join-Path $scriptDirectory "..")).Path
+}
 
 $LaravelDir = Join-Path $WorkspaceDir "artifacts/api-server/laravel"
 if (-not (Test-Path $LaravelDir -PathType Container)) {

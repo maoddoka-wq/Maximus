@@ -1,12 +1,19 @@
 [CmdletBinding()]
 param(
-    [string]$WorkspaceDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+    [string]$WorkspaceDir = "",
     [ValidateRange(1, 65535)][int]$Port = 8080,
     [string]$BindAddress = "127.0.0.1",
     [string]$PhpExecutable = ""
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($WorkspaceDir)) {
+    $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+    if ([string]::IsNullOrWhiteSpace($scriptDirectory)) {
+        throw "Impossible de déterminer le dossier du script."
+    }
+    $WorkspaceDir = (Resolve-Path (Join-Path $scriptDirectory "..")).Path
+}
 if (-not $PhpExecutable) {
     $PhpCommand = Get-Command php -ErrorAction SilentlyContinue
     if ($PhpCommand) {
