@@ -8,6 +8,7 @@ use App\Support\ApplicationIdentity;
 use App\Support\InstallationContext;
 use App\Support\InstallationSyncState;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -41,8 +42,7 @@ final class InstallationSyncService
             throw new RuntimeException('MAXIMUS_CENTRAL_URL et MAXIMUS_INSTALLATION_TOKEN sont requis.');
         }
 
-        $response = Http::timeout(20)
-            ->connectTimeout(5)
+        $response = $this->centralRequest()
             ->withoutRedirecting()
             ->acceptJson()
             ->withToken($token)
@@ -292,7 +292,7 @@ final class InstallationSyncService
             return;
         }
         try {
-            $response = Http::timeout(10)->connectTimeout(5)->withoutRedirecting()->withToken($token)->post($baseUrl.'/api/installation-sync/heartbeat', [
+            $response = $this->centralRequest()->withToken($token)->post($baseUrl.'/api/installation-sync/heartbeat', [
                 'appliedVersion' => InstallationSyncState::configurationVersion(),
             ]);
             if (! $response->successful()) {
@@ -303,5 +303,21 @@ final class InstallationSyncService
             // not roll it back and is retried on the next scheduled synchronization.
             InstallationSyncState::record(['lastError' => 'Configuration appliquée ; accusé de synchronisation non reçu. Nouvel essai à la prochaine échéance.']);
         }
+    }
+
+    private function centralRequest(): PendingRequest
+    {
+        // Some Windows PHP/cURL installations time out while resolving Render
+        // over IPv6 even though the operating system curl client succeeds.
+        // Prefer IPv4 and retry transient DNS/connectivity failures.
+        return Http::retry(
+            3,
+            250,
+            static fn (\Throwable $exception): bool => $exception instanceof ConnectionException,
+            false,
+        )
+            ->timeout(20)
+            ->connectTimeout(10)
+            ->withOptions(['force_ip_resolve' => 'v4']);
     }
 }
