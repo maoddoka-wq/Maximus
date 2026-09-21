@@ -12,6 +12,25 @@ function readableColor(hex: string): string {
   return red * 299 + green * 587 + blue * 114 > 150000 ? '#161D27' : '#FFFFFF';
 }
 
+function companyInitials(name: string): string {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+
+  return initials || 'EN';
+}
+
+function faviconForCompany(name: string, color: string): string {
+  const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : '#F2B705';
+  const initials = companyInitials(name);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="${safeColor}"/><text x="32" y="39" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="${readableColor(safeColor)}">${initials}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 type CompanyLoginProps = {
   onAuthenticated: (user: AuthUser) => void;
 } & (
@@ -57,9 +76,33 @@ export function CompanyLoginPage({ slug, installationCompany, onAuthenticated }:
 
   useEffect(() => {
     const previousTitle = document.title;
-    if (company) document.title = `${company.name} — Connexion`;
-    return () => { document.title = previousTitle; };
-  }, [company]);
+    const previousThemeColor = document.querySelector('meta[name="theme-color"]')?.getAttribute('content');
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
+    const previousFavicon = favicon?.getAttribute('href');
+    const previousFaviconType = favicon?.getAttribute('type');
+    const companyName = company?.name ?? installationCompany?.name ?? (slug ? slug.replace(/-/g, ' ') : 'Entreprise');
+    const companyColor = company?.primaryColor ?? installationCompany?.primaryColor ?? '#F2B705';
+    const companyFavicon = company?.profilePhoto
+      ? new URL(company.profilePhoto, window.location.origin).href
+      : faviconForCompany(companyName, companyColor);
+
+    document.title = `${companyName} — Connexion`;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', companyColor);
+    if (favicon) {
+      favicon.href = companyFavicon;
+      favicon.removeAttribute('type');
+    }
+
+    return () => {
+      document.title = previousTitle;
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      if (themeColor && previousThemeColor) themeColor.setAttribute('content', previousThemeColor);
+      if (favicon) {
+        if (previousFavicon) favicon.href = previousFavicon;
+        if (previousFaviconType) favicon.type = previousFaviconType;
+      }
+    };
+  }, [company, installationCompany, slug]);
 
   const primary = company?.primaryColor ?? '#F2B705';
   const foreground = useMemo(() => readableColor(primary), [primary]);
@@ -91,7 +134,7 @@ export function CompanyLoginPage({ slug, installationCompany, onAuthenticated }:
               <img src={company.profilePhoto} alt="" className="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/20" />
             ) : (
               <span className="flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-black" style={{ backgroundColor: primary, color: foreground }}>
-                {(company?.name ?? 'EN').slice(0, 2).toUpperCase()}
+                {companyInitials(company?.name ?? 'EN')}
               </span>
             )}
             <div>
@@ -113,7 +156,7 @@ export function CompanyLoginPage({ slug, installationCompany, onAuthenticated }:
               <img src={company.profilePhoto} alt="" className="h-12 w-12 rounded-xl object-cover" />
             ) : (
               <span className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-black" style={{ backgroundColor: primary, color: foreground }}>
-                {(company?.name ?? 'EN').slice(0, 2).toUpperCase()}
+                {companyInitials(company?.name ?? 'EN')}
               </span>
             )}
             <p className="font-bold">{company?.name ?? 'Espace entreprise'}</p>
