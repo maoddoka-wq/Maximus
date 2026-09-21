@@ -158,6 +158,10 @@ function New-MaximusBackup {
     if (-not $pgDump) {
         Fail "pg_dump est introuvable. Installez le client PostgreSQL avant de sauvegarder."
     }
+    $pgRestore = Get-CommandPath @("pg_restore.exe", "pg_restore")
+    if (-not $pgRestore) {
+        Fail "pg_restore est introuvable. La sauvegarde ne peut pas être validée."
+    }
 
     $db = Get-DatabaseConfig
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -215,6 +219,10 @@ function New-MaximusBackup {
         }
         if (-not (Test-Path $dumpFile -PathType Leaf) -or (Get-Item $dumpFile).Length -le 0) {
             Fail "pg_dump n’a pas produit une sauvegarde exploitable."
+        }
+        $null = & $pgRestore "--list" $dumpFile 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Fail "pg_restore ne peut pas lire la sauvegarde PostgreSQL produite."
         }
 
         $digitalProducts = Join-Path $LaravelDir "storage/app/digital-products"
