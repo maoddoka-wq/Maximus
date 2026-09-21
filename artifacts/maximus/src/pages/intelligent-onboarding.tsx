@@ -131,15 +131,15 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
   const passwordMismatch = identity.password !== identity.passwordConfirm;
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex flex-col font-sans text-slate-900">
-      <header className="flex-none px-6 py-4 flex items-center justify-between bg-white border-b border-slate-200">
+    <div className="min-h-[100dvh] bg-[hsl(var(--background))] flex flex-col font-sans text-[hsl(var(--foreground))]">
+      <header className="flex-none px-6 py-4 flex items-center justify-between bg-[hsl(var(--sidebar))] border-b border-[hsl(var(--sidebar-border))] text-[hsl(var(--sidebar-foreground))]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded bg-[hsl(var(--accent))] flex items-center justify-center text-[hsl(var(--accent-foreground))]">
+            <Building2 className="w-5 h-5" />
           </div>
           <span className="font-semibold text-lg tracking-tight">MAXIMUS</span>
         </div>
-        <div className="text-sm font-medium text-slate-500">
+        <div className="text-sm font-medium text-[hsl(var(--sidebar-foreground)/.7)]">
           Configuration Intelligente
         </div>
       </header>
@@ -155,12 +155,12 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
           )}
 
           {step === 'describe' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] p-8 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
               <div className="max-w-2xl mx-auto">
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                   Parlez-nous de votre entreprise
                 </h1>
-                <p className="text-slate-500 text-lg mb-8 leading-relaxed">
+                <p className="text-[hsl(var(--muted-foreground))] text-lg mb-8 leading-relaxed">
                   Décrivez votre activité, la taille de votre équipe, et vos processus actuels. 
                   MAXIMUS analysera vos besoins pour concevoir un espace de travail sur mesure, 
                   avec les modules adaptés.
@@ -172,10 +172,10 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Nous sommes une entreprise de distribution avec 15 employés. Nous avons besoin de gérer nos stocks, facturer nos clients B2B et suivre les présences de nos techniciens..."
-                      className="w-full h-48 p-5 bg-slate-50 border-2 border-slate-200 rounded-xl text-base placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-0 transition-colors resize-none"
+                      className="w-full h-48 p-5 bg-[hsl(var(--muted)/.5)] border-2 border-[hsl(var(--border))] rounded-xl text-base placeholder:text-[hsl(var(--muted-foreground)/.7)] focus:outline-none focus:border-[hsl(var(--primary))] focus:ring-0 transition-colors resize-none"
                       autoFocus
                     />
-                    <div className="absolute bottom-4 right-4 text-xs font-medium text-slate-400">
+                    <div className="absolute bottom-4 right-4 text-xs font-medium text-[hsl(var(--muted-foreground))]">
                       Plus vous êtes précis, plus la configuration sera exacte.
                     </div>
                   </div>
@@ -184,7 +184,7 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                     <button
                       type="submit"
                       disabled={!description.trim()}
-                      className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white rounded-xl font-medium text-base hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-8 py-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-xl font-medium text-base hover:brightness-95 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
                     >
                       <Sparkles className="w-5 h-5" />
                       Générer ma configuration
@@ -192,7 +192,7 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                     <button
                       type="button"
                       onClick={onManual}
-                      className="w-full sm:w-auto px-8 py-4 bg-white text-slate-600 rounded-xl font-medium text-base hover:bg-slate-50 border border-slate-200 active:scale-[0.98] transition-all"
+                      className="w-full sm:w-auto px-8 py-4 bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] rounded-xl font-medium text-base hover:bg-[hsl(var(--muted))] border border-[hsl(var(--border))] active:scale-[0.98] transition-all"
                     >
                       Configuration manuelle
                     </button>
@@ -203,34 +203,34 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
           )}
 
           {(step === 'generating' || step === 'refining') && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-16 flex flex-col items-center justify-center text-center min-h-[400px] animate-in fade-in duration-300">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-6 relative">
-                <div className="absolute inset-0 border-2 border-slate-900 rounded-full border-t-transparent animate-spin" />
-                <Sparkles className="w-8 h-8 text-slate-900" />
+            <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] p-8 sm:p-16 flex flex-col items-center justify-center text-center min-h-[400px] animate-in fade-in duration-300">
+              <div className="w-16 h-16 bg-[hsl(var(--primary)/.14)] rounded-full flex items-center justify-center mb-6 relative">
+                <div className="absolute inset-0 border-2 border-[hsl(var(--primary))] rounded-full border-t-transparent animate-spin" />
+                <Sparkles className="w-8 h-8 text-[hsl(var(--primary))]" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight mb-3">
                 {step === 'generating' ? 'Analyse de votre activité' : 'Ajustement de la proposition'}
               </h2>
-              <p className="text-slate-500 max-w-md mx-auto">
+              <p className="text-[hsl(var(--muted-foreground))] max-w-md mx-auto">
                 MAXIMUS cartographie vos processus métier et sélectionne les modules les plus pertinents pour votre structure.
               </p>
               
               <div className="mt-12 w-full max-w-sm space-y-4">
-                <div className="h-12 bg-slate-50 rounded-lg animate-pulse" />
-                <div className="h-24 bg-slate-50 rounded-lg animate-pulse" />
-                <div className="h-12 bg-slate-50 rounded-lg animate-pulse" />
+                <div className="h-12 bg-[hsl(var(--muted))] rounded-lg animate-pulse" />
+                <div className="h-24 bg-[hsl(var(--muted))] rounded-lg animate-pulse" />
+                <div className="h-12 bg-[hsl(var(--muted))] rounded-lg animate-pulse" />
               </div>
             </div>
           )}
 
           {step === 'review' && draft && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-8 py-8 sm:px-10 sm:py-10 border-b border-slate-100 bg-slate-900 text-white">
+              <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] overflow-hidden">
+                <div className="px-8 py-8 sm:px-10 sm:py-10 border-b border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] text-[hsl(var(--sidebar-foreground))]">
                   <h1 className="text-3xl font-bold tracking-tight mb-3">
                     Proposition de configuration
                   </h1>
-                  <p className="text-slate-300 text-lg max-w-2xl">
+                  <p className="text-[hsl(var(--sidebar-foreground)/.72)] text-lg max-w-2xl">
                     Nous avons analysé votre demande. Voici les modules et paramètres recommandés pour {draft.proposal.companyProfile.businessType.toLowerCase()}.
                   </p>
                 </div>
@@ -239,28 +239,28 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                   {/* Modules Section */}
                   <div>
                     <h3 className="text-xl font-bold tracking-tight flex items-center gap-2 mb-6">
-                      <Package className="w-6 h-6 text-slate-400" />
+                      <Package className="w-6 h-6 text-[hsl(var(--primary))]" />
                       Modules recommandés
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {draft.proposal.recommendedModules.map(mod => (
-                        <div key={mod.moduleId} className="p-5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-colors relative overflow-hidden group">
+                        <div key={mod.moduleId} className="p-5 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.45)] hover:bg-[hsl(var(--card))] transition-colors relative overflow-hidden group">
                           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                             <CheckCircle2 className="w-24 h-24" />
                           </div>
                           <div className="relative z-10">
                             <div className="flex items-start justify-between mb-3">
                               <h4 className="font-bold text-lg">{mod.moduleName}</h4>
-                              <div className="px-2.5 py-1 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-600 shadow-sm">
+                              <div className="px-2.5 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-full text-xs font-semibold text-[hsl(var(--muted-foreground))] shadow-sm">
                                 {Math.round(mod.confidence * 100)}% de pertinence
                               </div>
                             </div>
-                            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                            <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mb-4">
                               {mod.reason}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {mod.packIds.map(pack => (
-                                <span key={pack} className="px-2 py-1 bg-slate-200/50 text-slate-700 text-xs font-medium rounded">
+                                <span key={pack} className="px-2 py-1 bg-[hsl(var(--primary)/.12)] text-[hsl(var(--foreground))] text-xs font-medium rounded">
                                   {pack}
                                 </span>
                               ))}
@@ -275,21 +275,21 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                       <h3 className="text-lg font-bold tracking-tight flex items-center gap-2 mb-4">
-                        <Briefcase className="w-5 h-5 text-slate-400" />
+                        <Briefcase className="w-5 h-5 text-[hsl(var(--primary))]" />
                         Profil identifié
                       </h3>
-                      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+                      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-5 space-y-4">
                         <div>
-                          <div className="text-sm font-medium text-slate-500 mb-1">Secteur</div>
+                          <div className="text-sm font-medium text-[hsl(var(--muted-foreground))] mb-1">Secteur</div>
                           <div className="font-semibold">{draft.proposal.companyProfile.sector}</div>
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-slate-500 mb-1">Type d'activité</div>
+                          <div className="text-sm font-medium text-[hsl(var(--muted-foreground))] mb-1">Type d'activité</div>
                           <div className="font-semibold">{draft.proposal.companyProfile.businessType}</div>
                         </div>
                         {draft.proposal.companyProfile.employeeEstimate && (
                           <div>
-                            <div className="text-sm font-medium text-slate-500 mb-1">Effectif estimé</div>
+                            <div className="text-sm font-medium text-[hsl(var(--muted-foreground))] mb-1">Effectif estimé</div>
                             <div className="font-semibold">{draft.proposal.companyProfile.employeeEstimate} collaborateurs</div>
                           </div>
                         )}
@@ -299,15 +299,15 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                     {Object.keys(draft.proposal.suggestedSettings).length > 0 && (
                       <div>
                         <h3 className="text-lg font-bold tracking-tight flex items-center gap-2 mb-4">
-                          <Settings className="w-5 h-5 text-slate-400" />
+                        <Settings className="w-5 h-5 text-[hsl(var(--primary))]" />
                           Paramètres suggérés
                         </h3>
-                        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+                        <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-5 space-y-4">
                           {Object.entries(draft.proposal.suggestedSettings).map(([key, setting]) => (
                             <div key={key} className="flex flex-col">
-                              <span className="text-sm font-medium text-slate-500">{key}</span>
+                              <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">{key}</span>
                               <span className="font-semibold">{setting.value}</span>
-                              <span className="text-xs text-slate-400 mt-0.5">Basé sur: {setting.source}</span>
+                              <span className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">Basé sur: {setting.source}</span>
                             </div>
                           ))}
                         </div>
@@ -338,7 +338,7 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
 
               {/* Refinement or Accept */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+                  <div className="lg:col-span-2 bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] p-6 sm:p-8">
                   <h3 className="font-bold tracking-tight mb-4">Une modification à apporter ?</h3>
                   <form onSubmit={handleRefine} className="flex flex-col sm:flex-row gap-3">
                     <input
@@ -346,23 +346,23 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       value={refinement}
                       onChange={(e) => setRefinement(e.target.value)}
                       placeholder="Ex: Ajoutez aussi la gestion des RH pour 5 personnes..."
-                      className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-0 transition-colors"
+                      className="flex-1 px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl text-sm focus:outline-none focus:border-[hsl(var(--primary))] focus:ring-0 transition-colors"
                     />
                     <button
                       type="submit"
                       disabled={!refinement.trim()}
-                      className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium text-sm hover:bg-slate-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+                      className="px-6 py-3 bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] rounded-xl font-medium text-sm hover:bg-[hsl(var(--secondary))] transition-colors disabled:opacity-50 whitespace-nowrap"
                     >
                       Ajuster
                     </button>
                   </form>
                 </div>
-                <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 sm:p-8 flex flex-col justify-center">
-                  <h3 className="font-bold tracking-tight text-white mb-2">Tout est correct ?</h3>
-                  <p className="text-slate-400 text-sm mb-6">Passez à la création de votre compte pour activer cet espace.</p>
+                <div className="bg-[hsl(var(--sidebar))] rounded-2xl shadow-sm border border-[hsl(var(--sidebar-border))] p-6 sm:p-8 flex flex-col justify-center text-[hsl(var(--sidebar-foreground))]">
+                  <h3 className="font-bold tracking-tight mb-2">Tout est correct ?</h3>
+                  <p className="text-[hsl(var(--sidebar-foreground)/.68)] text-sm mb-6">Passez à la création de votre compte pour activer cet espace.</p>
                   <button
                     onClick={() => setStep('identity')}
-                    className="w-full px-6 py-3 bg-white text-slate-900 rounded-xl font-medium text-sm hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 group"
+                    className="w-full px-6 py-3 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-xl font-medium text-sm hover:brightness-95 transition-colors flex items-center justify-center gap-2 group"
                   >
                     Valider et continuer
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -373,10 +373,10 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
           )}
 
           {step === 'identity' && draft && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-right-8 duration-500">
-              <div className="px-8 py-8 sm:px-12 sm:py-10 border-b border-slate-100">
+            <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] overflow-hidden animate-in fade-in slide-in-from-right-8 duration-500">
+              <div className="px-8 py-8 sm:px-12 sm:py-10 border-b border-[hsl(var(--border))]">
                 <h2 className="text-3xl font-bold tracking-tight mb-2">Dernière étape</h2>
-                <p className="text-slate-500 text-lg">
+                <p className="text-[hsl(var(--muted-foreground))] text-lg">
                   Créez le compte administrateur pour votre espace MAXIMUS configuré sur mesure.
                 </p>
               </div>
@@ -384,8 +384,8 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
               <form onSubmit={handleIdentitySubmit} className="p-8 sm:p-12 space-y-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Store className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <Store className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Nom de l'entreprise
                     </label>
                     <input
@@ -393,14 +393,14 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       type="text"
                       value={identity.name}
                       onChange={e => setIdentity(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors"
                       placeholder="Acme Corp"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <Users className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Nom du dirigeant / administrateur
                     </label>
                     <input
@@ -408,14 +408,14 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       type="text"
                       value={identity.manager}
                       onChange={e => setIdentity(prev => ({ ...prev, manager: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors"
                       placeholder="Jean Dupont"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Email professionnel
                     </label>
                     <input
@@ -423,14 +423,14 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       type="email"
                       value={identity.email}
                       onChange={e => setIdentity(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors"
                       placeholder="jean@acme.fr"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Mot de passe administrateur
                     </label>
                     <input
@@ -438,15 +438,15 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       type="password"
                       value={identity.password}
                       onChange={e => setIdentity(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors"
                       placeholder="••••••••"
                       minLength={8}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Confirmer le mot de passe
                     </label>
                     <input
@@ -454,18 +454,18 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       type="password"
                       value={identity.passwordConfirm}
                       onChange={e => setIdentity(prev => ({ ...prev, passwordConfirm: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors"
                       placeholder="Répétez le mot de passe"
                       minLength={8}
                     />
                     {passwordMismatch && (
-                      <p className="text-xs font-semibold text-red-700">Les mots de passe ne correspondent pas.</p>
+                      <p className="text-xs font-semibold text-[hsl(var(--destructive))]">Les mots de passe ne correspondent pas.</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Téléphone
                     </label>
                     <input
@@ -473,21 +473,21 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       type="tel"
                       value={identity.phone}
                       onChange={e => setIdentity(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors"
                       placeholder="+33 6 12 34 56 78"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-slate-400" />
+                    <label className="text-sm font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-[hsl(var(--primary))]" />
                       Pays
                     </label>
                     <select
                       required
                       value={identity.country}
                       onChange={e => setIdentity(prev => ({ ...prev, country: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-slate-900 focus:bg-white transition-colors appearance-none"
+                      className="w-full px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl focus:outline-none focus:border-[hsl(var(--primary))] focus:bg-[hsl(var(--card))] transition-colors appearance-none"
                     >
                       <option value="France">France</option>
                       <option value="Belgique">Belgique</option>
@@ -500,18 +500,18 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-4 justify-between">
+                <div className="pt-8 border-t border-[hsl(var(--border))] flex flex-col sm:flex-row items-center gap-4 justify-between">
                   <button
                     type="button"
                     onClick={() => setStep('review')}
-                    className="text-slate-500 hover:text-slate-900 font-medium text-sm px-4 py-2 transition-colors"
+                    className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] font-medium text-sm px-4 py-2 transition-colors"
                   >
                     Retour à la proposition
                   </button>
                   <button
                     type="submit"
                     disabled={passwordMismatch || identity.password.length < 8}
-                    className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white rounded-xl font-medium text-base hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full sm:w-auto px-8 py-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-xl font-medium text-base hover:brightness-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Créer mon espace MAXIMUS
                     <ArrowRight className="w-5 h-5" />
@@ -522,10 +522,10 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
           )}
 
           {step === 'submitting' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-16 flex flex-col items-center justify-center text-center">
-              <Loader2 className="w-12 h-12 text-slate-900 animate-spin mb-6" />
+            <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] p-16 flex flex-col items-center justify-center text-center">
+              <Loader2 className="w-12 h-12 text-[hsl(var(--primary))] animate-spin mb-6" />
               <h2 className="text-2xl font-bold tracking-tight mb-2">Création de l'espace...</h2>
-              <p className="text-slate-500">
+              <p className="text-[hsl(var(--muted-foreground))]">
                 Veuillez patienter pendant que MAXIMUS déploie votre environnement configuré.
               </p>
             </div>
