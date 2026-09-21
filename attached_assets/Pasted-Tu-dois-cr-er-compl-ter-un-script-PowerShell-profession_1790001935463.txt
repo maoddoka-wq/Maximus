@@ -1,0 +1,318 @@
+Tu dois créer/compléter un script PowerShell professionnel nommé "MaximusManager.ps1" pour MAXIMUS.
+
+OBJECTIF
+Le script doit être capable de gérer tout le cycle de vie d'une installation MAXIMUS sur Windows :
+
+- nouvelle installation ;
+- détection d'une installation existante ;
+- vérification des mises à jour ;
+- sauvegarde de la base de données avant toute mise à jour ;
+- mise à jour de l'application ;
+- installation/réparation des dépendances ;
+- migrations Laravel ;
+- build frontend ;
+- vérifications finales ;
+- démarrage de MAXIMUS ;
+- diagnostic et réparation contrôlée.
+
+IMPORTANT — RÈGLE ABSOLUE DE SÉCURITÉ
+Le script ne doit jamais effectuer d'opération destructive automatiquement.
+
+INTERDICTIONS :
+
+- "git reset --hard"
+- "git clean -fd"
+- suppression automatique de la base PostgreSQL
+- "DROP DATABASE"
+- suppression massive de fichiers
+- suppression automatique du ".env"
+- écrasement irréversible de fichiers de configuration
+- force push Git
+- modification destructive des données métier.
+
+Avant toute opération risquée, le script doit sauvegarder ce qui est nécessaire et demander confirmation à l'utilisateur.
+
+1. DÉTECTION DE L'INSTALLATION
+
+Au démarrage, rechercher automatiquement une installation MAXIMUS.
+
+Déterminer :
+
+- chemin du projet ;
+- présence de Laravel ;
+- présence de "artisan" ;
+- présence de "composer.json" ;
+- présence de "package.json" ;
+- présence de "pnpm-lock.yaml" ;
+- présence de ".env" ;
+- configuration PostgreSQL ;
+- version locale de MAXIMUS ;
+- état Git ;
+- présence du frontend compilé ;
+- état de l'API "/api/healthz".
+
+Si aucune installation n'est trouvée, proposer automatiquement le processus d'installation.
+
+2. INSTALLATION
+
+Installer/configurer les dépendances nécessaires uniquement si elles sont absentes :
+
+- PHP ;
+- Composer ;
+- Node.js/Corepack ;
+- pnpm.
+
+Utiliser les versions compatibles avec le projet.
+
+Installer les dépendances Laravel et frontend.
+
+Ne pas modifier inutilement les versions du projet.
+
+Configurer ".env" uniquement si nécessaire.
+
+Ne jamais remplacer silencieusement un ".env" existant.
+Si un ".env" existe, le sauvegarder avant toute modification.
+
+3. BASE DE DONNÉES
+
+Détecter PostgreSQL et récupérer les paramètres nécessaires depuis ".env".
+
+Avant toute migration lors d'une mise à jour :
+
+Afficher clairement :
+
+"Une sauvegarde de la base de données va être effectuée."
+
+Demander les informations sensibles nécessaires à l'utilisateur de manière sécurisée.
+
+Ne jamais afficher les mots de passe dans la console.
+Ne jamais enregistrer les mots de passe dans les logs.
+Ne jamais écrire les mots de passe dans un fichier temporaire non sécurisé.
+
+Utiliser "pg_dump" pour créer une sauvegarde.
+
+Vérifier que la sauvegarde existe et que sa taille est cohérente avant de continuer.
+
+Organiser les sauvegardes dans un dossier dédié, par exemple :
+
+"maximus-sauvegardes"
+
+Conserver les anciennes sauvegardes.
+
+Ne jamais supprimer automatiquement la dernière sauvegarde fonctionnelle.
+
+4. VÉRIFICATION DES MISES À JOUR
+
+Pour une installation existante :
+
+- déterminer la version locale ;
+- récupérer les informations de version disponibles depuis la source officielle configurée par MAXIMUS ;
+- comparer les versions ;
+- afficher clairement :
+
+Version actuelle
+Version disponible
+Mise à jour nécessaire : OUI/NON
+
+Si aucune mise à jour n'est disponible :
+ne rien modifier.
+
+5. PROCESSUS DE MISE À JOUR
+
+Si une mise à jour existe :
+
+Afficher un résumé et demander confirmation.
+
+Avant modification :
+
+1. sauvegarder la base ;
+2. sauvegarder ".env" ;
+3. sauvegarder les fichiers de configuration importants ;
+4. vérifier que le backup est valide ;
+5. vérifier l'espace disque ;
+6. vérifier l'état Git.
+
+Ensuite seulement :
+
+- récupérer la nouvelle version ;
+- installer les dépendances nécessaires ;
+- exécuter les migrations Laravel ;
+- synchroniser la configuration MAXIMUS ;
+- construire le frontend ;
+- placer le frontend compilé dans le répertoire public attendu ;
+- nettoyer uniquement les caches Laravel nécessaires ;
+- effectuer les vérifications finales.
+
+Ne jamais utiliser de commande Git destructive.
+
+6. GESTION DES ERREURS
+
+Chaque étape doit vérifier son code de retour.
+
+Exemple :
+
+ÉTAPE 1/10 — Vérification environnement
+OK
+
+ÉTAPE 2/10 — Sauvegarde base
+OK
+
+ÉTAPE 3/10 — Mise à jour code
+OK
+
+ÉTAPE 4/10 — Migrations
+ERREUR
+
+Dans ce cas :
+
+- arrêter immédiatement ;
+- afficher précisément l'étape qui a échoué ;
+- conserver toutes les sauvegardes ;
+- ne pas supprimer les données ;
+- afficher les prochaines actions possibles.
+
+Ne jamais continuer silencieusement après une erreur critique.
+
+7. VÉRIFICATION FINALE
+
+Après installation ou mise à jour, vérifier :
+
+- PHP ;
+- Laravel ;
+- PostgreSQL ;
+- migrations ;
+- frontend ;
+- "public/index.html" ;
+- API "/api/healthz" ;
+- version applicative ;
+- configuration MAXIMUS ;
+- connexion à la base.
+
+Afficher un rapport final :
+
+========================================
+MAXIMUS — RAPPORT FINAL
+
+Installation : OK
+Base de données : OK
+Migrations : OK
+Frontend : OK
+API : OK
+Version : XXXXX
+Sauvegarde : XXXXX
+Statut : OPÉRATIONNEL
+
+8. DÉMARRAGE
+
+Prévoir une option permettant de démarrer MAXIMUS localement avec la configuration actuelle.
+
+Ne pas lancer plusieurs serveurs identiques simultanément.
+
+Vérifier le port avant démarrage.
+
+Afficher l'adresse locale lorsque le serveur démarre correctement.
+
+9. MENU PRINCIPAL
+
+Créer un menu clair :
+
+[1] Installer MAXIMUS
+[2] Vérifier les mises à jour
+[3] Mettre à jour MAXIMUS
+[4] Sauvegarder la base
+[5] Vérifier l'installation
+[6] Réparer les composants manquants
+[7] Démarrer MAXIMUS
+[8] Arrêter MAXIMUS
+[9] Afficher les journaux
+[0] Quitter
+
+10. MODE AUTOMATIQUE
+
+Prévoir également un mode non interactif permettant de lancer les vérifications automatiquement.
+
+Exemples :
+
+"MaximusManager.ps1 -CheckUpdate"
+
+"MaximusManager.ps1 -Install"
+
+"MaximusManager.ps1 -Update"
+
+"MaximusManager.ps1 -Backup"
+
+"MaximusManager.ps1 -HealthCheck"
+
+Mais les opérations sensibles doivent toujours respecter les règles de sécurité définies ci-dessus.
+
+11. LOGS
+
+Créer des journaux lisibles avec :
+
+- date/heure ;
+- étape ;
+- statut ;
+- message d'erreur.
+
+Ne jamais écrire :
+
+- mots de passe ;
+- tokens ;
+- clés API ;
+- secrets ".env".
+
+12. COMPATIBILITÉ AVEC L'ARCHITECTURE ACTUELLE
+
+Le projet actuel utilise notamment :
+
+Laravel dans :
+"artifacts/api-server/laravel"
+
+Frontend MAXIMUS dans :
+"artifacts/maximus"
+
+Le frontend compilé doit pouvoir être trouvé sous :
+"artifacts/maximus/dist/public"
+
+Le fichier final attendu côté Laravel est notamment :
+"artifacts/api-server/laravel/public/index.html"
+
+Le projet utilise PostgreSQL.
+
+Le système MAXIMUS possède déjà une logique de synchronisation d'installation et de version. Ne recrée pas une deuxième logique concurrente : réutilise les scripts, commandes Artisan, configurations et services existants lorsqu'ils sont disponibles.
+
+IMPORTANT :
+Avant de modifier quoi que ce soit, inspecte le projet existant et identifie les scripts déjà présents, notamment les scripts d'installation, de mise à jour et de démarrage.
+
+Ne réécris pas inutilement les fonctionnalités existantes.
+
+13. AVANT DE MODIFIER
+
+Effectue d'abord un audit du projet.
+
+Liste :
+
+- les scripts existants ;
+- leurs paramètres ;
+- les commandes qu'ils exécutent ;
+- les chemins utilisés ;
+- les dépendances ;
+- les mécanismes de sauvegarde ;
+- les mécanismes de mise à jour.
+
+Puis construis "MaximusManager.ps1" en réutilisant ces éléments.
+
+NE SUPPRIME AUCUN FICHIER EXISTANT POUR SIMPLIFIER LE PROJET.
+
+Le résultat doit être robuste, lisible, idempotent autant que possible, et conçu pour gérer aussi bien une nouvelle installation qu'une installation MAXIMUS déjà opérationnelle.
+
+À la fin, explique exactement :
+
+1. quels fichiers ont été créés ;
+2. quels fichiers ont été modifiés ;
+3. quelles commandes le gestionnaire peut exécuter ;
+4. comment tester le gestionnaire sans modifier MAXIMUS ;
+5. comment lancer une vraie installation ;
+6. comment lancer une mise à jour.
+
+Ne lance aucune opération destructive pendant le développement ou les tests.

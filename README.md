@@ -140,6 +140,22 @@ Options utiles :
 ./scripts/install-maximus-instance.sh --skip-composer --skip-healthcheck
 ```
 
+L’installation active aussi le scheduler de synchronisation centrale. Il appelle
+Laravel chaque minute, et la configuration centrale est récupérée toutes les
+5 minutes. Pour réactiver ou supprimer ce déclencheur séparément :
+
+```bash
+./scripts/register-maximus-sync.sh
+./scripts/register-maximus-sync.sh --remove
+```
+
+Sous Windows :
+
+```powershell
+.\scripts\register-maximus-sync.ps1
+.\scripts\register-maximus-sync.ps1 -Remove
+```
+
 Pour produire une archive d’installation qui correspond strictement à la version
 réellement servie par MAXIMUS principal sur Render, utilisez :
 
