@@ -238,3 +238,17 @@ mtime_ms = 1789665869197
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/931220d4-eb54-4ab8-8bbc-5aa40a071c0e/a82578a4-03a8-4994-97b4-db59a3166903"
 storage_version_token = "1789665876313676"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "qw5Hgxsr0HwwieN5e2VT0"
+uri = "file://reports/maximus-safe-security-audit.pdf"
+type = "pdf"
+title = "MAXIMUS ERP — SAFE SECURITY AUDIT"
+description = "Rapport d’audit de sécurité non destructif : preuves statiques, tests HTTP locaux autorisés, risques confirmés et potentiels, limites de vérification Render/PostgreSQL, sans modification de l’application."
+logical_id = "f6144f09-88c7-4f37-a7c8-26a17a416ec6"
+content_hash = "sha256:e9a4b655da36e5deb4e45bc4b02bfcaa558b96039e9512dca4c983f9d92cf9aa"
+size = 21587
+mtime_ms = 1789974212270
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/f6144f09-88c7-4f37-a7c8-26a17a416ec6/1644f448-7b00-4748-923d-fbb3e3b4c447"
+storage_version_token = "1789974220113770"
+content_type = "application/pdf"
