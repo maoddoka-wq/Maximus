@@ -1,0 +1,58 @@
+S C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> @'
+>> <?php
+>> $ch = curl_init('https://maximus-erp.onrender.com/api/healthz');
+>>
+>> curl_setopt_array($ch, [
+>>     CURLOPT_RETURNTRANSFER => true,
+>>     CURLOPT_CONNECTTIMEOUT => 5,
+>>     CURLOPT_TIMEOUT => 20,
+>> ]);
+>>
+>> $body = curl_exec($ch);
+>>
+>> echo 'errno=' . curl_errno($ch) . PHP_EOL;
+>> echo 'error=' . curl_error($ch) . PHP_EOL;
+>> echo 'http=' . curl_getinfo($ch, CURLINFO_HTTP_CODE) . PHP_EOL;
+>> echo $body . PHP_EOL;
+>>
+>> curl_close($ch);
+>> '@ | php
+﻿errno=28
+error=Resolving timed out after 5579 milliseconds
+http=0
+
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> @'
+>> <?php
+>> require __DIR__ . '/vendor/autoload.php';
+>>
+>> $app = require_once __DIR__ . '/bootstrap/app.php';
+>> $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+>>
+>> $response = Illuminate\Support\Facades\Http::timeout(20)
+>>     ->connectTimeout(5)
+>>     ->withoutRedirecting()
+>>     ->acceptJson()
+>>     ->withToken((string) config('maximus.installation_token'))
+>>     ->get(
+>>         rtrim((string) config('maximus.central_url'), '/')
+>>         . '/api/installation-sync/configuration'
+>>     );
+>>
+>> echo 'HTTP=' . $response->status() . PHP_EOL;
+>> '@ | Set-Content .central-check.php -Encoding utf8
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel>
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> php .central-check.php
+﻿
+In PendingRequest.php line 1810:
+
+  cURL error 28: Resolving timed out after 6392 milliseconds (see https://curl.se/libcurl/c/libcurl-errors.html) for https://maximus-erp.onrende
+  r.com/api/installation-sync/configuration
+
+
+In CurlFactory.php line 1140:
+
+  cURL error 28: Resolving timed out after 6392 milliseconds (see https://curl.se/libcurl/c/libcurl-errors.html) for https://maximus-erp.onrende
+  r.com/api/installation-sync/configuration
+
+
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\lar
