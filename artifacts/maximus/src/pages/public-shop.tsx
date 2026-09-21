@@ -666,11 +666,11 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
      if (path === '/compte') return isAccountRoute;
      return routePath === shopPath(path);
    };
-  return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
-     <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
+  return <div className={`min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--muted)/.22)] ${isTransportRoute ? 'max-sm:h-[100svh] max-sm:overflow-hidden' : ''}`} style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
+      <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 max-w-full shrink items-center gap-3 sm:max-w-[calc(100%-3rem)]">
-              <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
+               <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-2 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100 sm:h-11 sm:w-11 sm:p-1.5">
                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-white" />}
              </button>
              <button type="button" onClick={() => go('')} className="min-w-0 text-left">
@@ -702,7 +702,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
            </div>
          </div>
        </div>}
-      <main className="shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pb-24 pt-6 sm:px-6 sm:py-9 lg:px-8">
+        <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden sm:px-6 lg:px-8 ${isTransportRoute ? 'h-[calc(100svh-11rem)] overflow-hidden px-4 pb-0 pt-0 sm:h-auto sm:overflow-visible sm:pb-24 sm:pt-9' : 'px-4 pb-24 pt-6 sm:py-9'}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
        {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -730,7 +730,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
         : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />}
     </main>
-       {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/transport' ? CarFront : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
+        {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/transport' ? CarFront : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; const mobileLabel = item.path === '/connexion' ? 'Connexion' : item.label; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[9px] font-semibold tracking-[-.01em] ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="whitespace-nowrap">{mobileLabel}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
        {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-20 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:bottom-4 sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
 }
@@ -1140,24 +1140,24 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     void submit(event);
   };
 
-  return <section className="-mx-4 -mt-6 min-h-[calc(100dvh-4rem)] bg-[#f3f6fa] pb-5 sm:mx-0 sm:mt-0 sm:min-h-0 sm:space-y-6 sm:bg-transparent">
-    <div className="relative h-[min(52dvh,31rem)] min-h-[21rem] overflow-hidden bg-[#dce6f2] sm:h-[31rem] sm:rounded-[2rem] sm:shadow-xl">
+  return <section className="-mx-4 flex h-full min-h-0 flex-col overflow-hidden bg-[#f3f6fa] sm:mx-0 sm:mt-0 sm:h-auto sm:min-h-0 sm:space-y-6 sm:overflow-visible sm:bg-transparent">
+    <div className="relative min-h-0 flex-[0_0_59%] overflow-hidden bg-[#dce6f2] sm:h-[31rem] sm:flex-none sm:rounded-[2rem] sm:shadow-xl">
       <img src={heroImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-10" />
-      <div className="absolute inset-0 z-0">
-        <TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} className="h-[20rem] rounded-none border-0 shadow-none sm:h-[29.25rem]" />
+      <div className="absolute inset-0 z-0 h-full">
+        <TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} className="h-full rounded-none border-0 shadow-none" />
       </div>
       <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-slate-950/20 via-transparent to-white/5" />
-      <button type="button" onClick={onBack} className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-slate-800 shadow-lg backdrop-blur sm:left-6 sm:top-6"><ArrowLeft size={15} />Boutique</button>
-      <div className="absolute inset-x-4 top-16 z-20 flex flex-col gap-3 sm:left-6 sm:right-6 sm:top-20 sm:max-w-xl">
+      <button type="button" onClick={onBack} className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-bold text-slate-800 shadow-lg backdrop-blur sm:left-6 sm:top-6"><ArrowLeft size={15} />Boutique</button>
+      <div className="absolute inset-x-4 top-20 z-20 flex flex-col gap-3 sm:left-6 sm:right-6 sm:top-20 sm:max-w-xl">
         <div className="flex items-center gap-3 rounded-2xl bg-white/95 px-3 py-3 shadow-xl backdrop-blur sm:px-4">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><MapPin size={23} /></span>
           <div className="min-w-0 flex-1"><p className="text-[11px] font-medium text-slate-500">Votre départ</p><p className="truncate text-sm font-black text-slate-900">{position ? 'Position actuelle' : 'Activez votre position GPS'}</p></div>
           <span className={`shrink-0 rounded-full px-2.5 py-1.5 text-[10px] font-black ${locationState === 'ready' ? 'bg-emerald-100 text-emerald-700' : locationState === 'error' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>{locationState === 'ready' ? 'GPS actif' : locationState === 'locating' ? 'Recherche…' : locationState === 'error' ? 'À autoriser' : 'GPS en attente'}</span>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-bold text-slate-700 shadow-lg backdrop-blur"><span className="h-2 w-2 rounded-full bg-amber-400" />Service Taxi disponible</div>
       </div>
+      <div className="absolute left-4 top-[47%] z-20 inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-bold text-slate-700 shadow-lg backdrop-blur"><span className="h-2 w-2 rounded-full bg-amber-400" />Service Taxi disponible</div>
     </div>
-    <div className="relative z-30 -mt-9 rounded-t-[2.25rem] bg-white px-4 pb-4 pt-5 shadow-[0_-12px_30px_rgba(15,23,42,.12)] sm:mx-auto sm:-mt-10 sm:max-w-3xl sm:rounded-[2rem] sm:p-7 sm:shadow-xl">
+    <div className="relative z-30 -mt-1 min-h-0 flex-1 overflow-y-auto rounded-t-[2.25rem] bg-white px-4 pb-5 pt-5 shadow-[0_-12px_30px_rgba(15,23,42,.12)] sm:mx-auto sm:-mt-10 sm:max-w-3xl sm:rounded-[2rem] sm:p-7 sm:shadow-xl">
       <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
          {tripEnded && <div className={`mt-4 rounded-xl border px-4 py-3 text-left sm:mt-0 ${tripEnded.status === 'COMPLETED' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><p className="text-xs font-black uppercase tracking-[.14em]">{tripEnded.status === 'COMPLETED' ? 'Course terminée' : 'Course annulée'}</p><p className="mt-1 text-sm font-semibold">{tripEnded.status === 'COMPLETED' ? 'Le parcours est fini. Vous pouvez demander une nouvelle course.' : 'Cette demande n’est plus active. Vous pouvez recommencer.'}</p></div>}
          {!formOpen && !trip && <div className="mt-4 sm:mt-0">
