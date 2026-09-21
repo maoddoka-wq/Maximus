@@ -1,0 +1,30 @@
+ Construction du frontend MAXIMUS
+(node:25292) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Scope: all 10 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+   ╭──────────────────────────────────────────────────────────────────╮
+   │                                                                  │
+   │                Update available! 9.15.9 → 12.5.1.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.5.1   │
+   │            Run "corepack use pnpm@12.5.1" to update.             │
+   │                                                                  │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; es…
+│ 'sh' n'est pas reconnu en tant que commande interne
+│ ou externe, un programme ex�cutable ou un fichier de commandes.
+└─ Failed in 339ms at C:\Users\FIS-TS\maximus-local-propre
+ ELIFECYCLE  Command failed with exit code 1.
+Mise Ã  jour MAXIMUS interrompue : La commande C:\Program Files\nodejs\corepack.cmd a Ã©chouÃ© avec le code 1.
+Au caractère C:\Users\FIS-TS\maximus-local-propre\scripts\update-maximus-instance.ps1:18 : 5
++     throw "Mise Ã  jour MAXIMUS interrompue : $Message"
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Mise Ã  jour MA...avec le code 1.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Mise Ã  jour MAXIMUS interrompue : La commande C:\Program Files\nodejs\corepack.cmd a Ã©chouÃ© avec le code 1.
+
+PS C:\Users\FIS-TS\maximus-local-propre>
+PS C:\Users\FIS-TS\maximus-local-propre>
+PS C:\Users\FIS-TS\maximus-local-propre
