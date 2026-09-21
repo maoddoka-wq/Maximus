@@ -266,3 +266,17 @@ mtime_ms = 1789991673221
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/0bb185c0-6647-4305-90f6-8c4c2e8a5617/fff3a148-c639-4d8a-a6de-8efd0157d102"
 storage_version_token = "1789991678081980"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "_dJmdZVqUujiGSSrRpsvE"
+uri = "file://docs/guides/maximus-module-dedie-synchronisation.pdf"
+type = "pdf"
+title = "MAXIMUS — Module dédié et synchronisation centralisée"
+description = "Dossier technique détaillé pour ingénieur : architecture, enrôlement, bootstrap, contrat HTTP, validation, transaction locale, sécurité, versionnement, scheduler Windows et diagnostic."
+logical_id = "fdb7af4c-4d3d-4f62-b110-510850899c6b"
+content_hash = "sha256:040b1cd452d9e4cecd8c0eb305548767e9873bd732dbd5e2ed6255fc82ecddda"
+size = 319970
+mtime_ms = 1790032060796
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/fdb7af4c-4d3d-4f62-b110-510850899c6b/d8ca12f2-4a46-4499-806f-98a1c31d3613"
+storage_version_token = "1790032073129538"
+content_type = "application/pdf"

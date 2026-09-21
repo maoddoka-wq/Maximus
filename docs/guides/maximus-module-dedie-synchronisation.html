@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>MAXIMUS — Fonctionnement du module dédié et de la synchronisation</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm 18mm 16mm; @bottom-right { content: "MAXIMUS • " counter(page); color: #64748b; font-size: 8pt; } }
+    * { box-sizing: border-box; }
+    body { font-family: "DejaVu Sans", Arial, sans-serif; color: #172033; font-size: 9.6pt; line-height: 1.45; }
+    h1, h2, h3, h4 { color: #102a43; page-break-after: avoid; }
+    h1 { font-size: 25pt; line-height: 1.1; margin: 0 0 10pt; }
+    h2 { font-size: 16pt; margin: 22pt 0 8pt; padding-bottom: 4pt; border-bottom: 2px solid #1f6f8b; }
+    h3 { font-size: 12pt; margin: 15pt 0 5pt; color: #1f6f8b; }
+    h4 { font-size: 10pt; margin: 11pt 0 4pt; }
+    p { margin: 5pt 0 7pt; }
+    ul, ol { margin-top: 4pt; padding-left: 20pt; }
+    li { margin: 2pt 0; }
+    code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; background: #eef4f7; padding: 1pt 3pt; border-radius: 2pt; }
+    pre { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height: 1.35; white-space: pre-wrap; background: #f4f7fa; border-left: 3px solid #1f6f8b; padding: 8pt 9pt; margin: 7pt 0 10pt; page-break-inside: avoid; }
+    table { width: 100%; border-collapse: collapse; margin: 7pt 0 11pt; font-size: 8.2pt; page-break-inside: avoid; }
+    th { background: #dcecf2; color: #102a43; text-align: left; font-weight: 700; }
+    th, td { border: 0.5pt solid #b8c7d1; padding: 5pt 5.5pt; vertical-align: top; }
+    tr:nth-child(even) td { background: #f8fafb; }
+    .cover { min-height: 240mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+    .kicker { color: #1f6f8b; letter-spacing: 1.8pt; text-transform: uppercase; font-size: 9pt; font-weight: 700; margin-bottom: 14pt; }
+    .subtitle { font-size: 14pt; color: #52616b; max-width: 155mm; }
+    .meta { margin-top: 28pt; border-top: 1px solid #b8c7d1; padding-top: 10pt; color: #52616b; }
+    .badge { display: inline-block; padding: 3pt 7pt; background: #e3f2f5; color: #155e75; border-radius: 10pt; font-size: 8pt; font-weight: 700; margin: 2pt 4pt 2pt 0; }
+    .note, .warning, .success { padding: 8pt 10pt; margin: 8pt 0; page-break-inside: avoid; }
+    .note { background: #eef6f8; border-left: 4px solid #1f6f8b; }
+    .warning { background: #fff7e6; border-left: 4px solid #d97706; }
+    .success { background: #eefbf3; border-left: 4px solid #198754; }
+    .small { font-size: 8pt; color: #52616b; }
+    .diagram { font-family: "DejaVu Sans Mono", monospace; font-size: 7.3pt; line-height: 1.35; white-space: pre; background: #102a43; color: #e6f4f1; padding: 10pt; page-break-inside: avoid; overflow: hidden; }
+    .page-break { page-break-before: always; }
+    .avoid { page-break-inside: avoid; }
+    .toc li { margin: 4pt 0; }
+    .ref { color: #52616b; font-family: "DejaVu Sans Mono", monospace; font-size: 7.6pt; }
+    .two-col { display: table; width: 100%; table-layout: fixed; }
+    .two-col > div { display: table-cell; width: 50%; vertical-align: top; padding-right: 9pt; }
+    .two-col > div + div { padding-left: 9pt; padding-right: 0; }
+  </style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="kicker">Dossier d’architecture et d’exploitation</div>
+  <h1>MAXIMUS<br>Module dédié et synchronisation centralisée</h1>
+  <p class="subtitle">Fonctionnement détaillé de l’enrôlement, du bootstrap, de la synchronisation des modules et des données d’entreprise entre MAXIMUS principal et une installation Windows locale.</p>
+  <div style="margin-top:18pt">
+    <span class="badge">Protocole de synchronisation v2</span>
+    <span class="badge">Laravel / PostgreSQL</span>
+    <span class="badge">Windows / PHP cURL</span>
+    <span class="badge">Document technique</span>
+  </div>
+  <div class="meta">
+    <p><strong>Public cible :</strong> ingénieur logiciel, ingénieur système, administrateur de déploiement.</p>
+    <p><strong>Périmètre :</strong> installation <code>dedicated</code> ou <code>on_premise</code>, pilotée par MAXIMUS principal en mode <code>central</code>.</p>
+    <p><strong>Date de référence :</strong> 21 septembre 2026.</p>
+    <p class="small">Ce document décrit le comportement du code présent dans le dépôt au moment de sa génération. Les chemins de fichiers sont relatifs à la racine du dépôt.</p>
+  </div>
+</section>
+
+<h2>Résumé exécutif</h2>
+<p>MAXIMUS fonctionne selon deux périmètres complémentaires :</p>
+<ul>
+  <li><strong>MAXIMUS principal</strong> : installation centrale multi-entreprises. Elle conserve les entreprises, les accès modules, le catalogue publié et les enregistrements d’installations.</li>
+  <li><strong>Installation dédiée</strong> : instance locale ou on-premise limitée à une seule entreprise. Elle reçoit une copie contrôlée de la configuration de cette entreprise et continue à fonctionner avec sa dernière configuration valide si le central est momentanément indisponible.</li>
+</ul>
+<p>La synchronisation n’est pas une réplication SQL et ne donne jamais accès à la base centrale. L’installation dédiée appelle un endpoint HTTPS central avec un jeton d’installation. Le central vérifie le jeton par son hash, identifie l’installation, reconstruit une <strong>photo complète</strong> de la configuration autorisée, puis la renvoie. L’installation locale vérifie l’identité, le protocole, la version et le catalogue avant d’appliquer la photo dans une transaction PostgreSQL.</p>
+<div class="success"><strong>Principe important :</strong> l’accès effectif à un module est reconstruit depuis les lignes persistées de <code>maximus_company_modules</code>. La demande initiale d’inscription n’est qu’un repli historique ; elle ne suffit pas à décrire une activation réalisée plus tard par MAXIMUS.</div>
+
+<h2>Table des matières</h2>
+<ol class="toc">
+  <li>Vocabulaire et modes d’installation</li>
+  <li>Architecture générale et frontières de confiance</li>
+  <li>Cycle de vie complet : émission, bootstrap, synchronisation</li>
+  <li>Enrôlement central et génération du bootstrap</li>
+  <li>Installation locale et validation initiale stricte</li>
+  <li>Contrat HTTP de synchronisation</li>
+  <li>Traitement local détaillé et transaction d’application</li>
+  <li>Persistance locale, fonctionnement hors ligne et heartbeat</li>
+  <li>Scheduler Windows et comportement opérationnel</li>
+  <li>Sécurité et modèle de menace</li>
+  <li>États, erreurs et diagnostic</li>
+  <li>Versionnement et compatibilité</li>
+  <li>Procédures d’exploitation</li>
+  <li>Cartographie du code et invariants à préserver</li>
+</ol>
+
+<h2>1. Vocabulaire et modes d’installation</h2>
+<table>
+  <tr><th>Terme</th><th>Signification</th></tr>
+  <tr><td>Central / principal</td><td>Instance en mode <code>MAXIMUS_DEPLOYMENT_MODE=central</code>. Elle expose l’administration MAXIMUS, les entreprises, le catalogue et les endpoints d’installation.</td></tr>
+  <tr><td>Installation dédiée</td><td>Instance en mode <code>dedicated</code>. Elle sert une seule entreprise et son accès utilisateur est borné par <code>MAXIMUS_INSTALLATION_COMPANY_ID</code>.</td></tr>
+  <tr><td>Installation on-premise</td><td>Même modèle d’isolation qu’une dédiée, avec un mode <code>on_premise</code> adapté à un hébergement local ou contrôlé par l’entreprise.</td></tr>
+  <tr><td>Entreprise</td><td>Tenant métier identifié par <code>companyId</code>. Une installation ne peut synchroniser que cette entreprise.</td></tr>
+  <tr><td>Installation</td><td>Instance technique identifiée par <code>installationId</code>. Une entreprise peut avoir plusieurs installations depuis la migration autorisant plusieurs lignes.</td></tr>
+  <tr><td>Bootstrap</td><td>Manifeste d’enrôlement transmis une seule fois à l’installateur. Il contient l’URL centrale, l’identité, les versions et le jeton en clair.</td></tr>
+  <tr><td>Photo de configuration</td><td>Payload complet renvoyé par <code>GET /api/installation-sync/configuration</code>. Il décrit l’entreprise, ses modules, le catalogue local, ses domaines et ses accès ERP.</td></tr>
+</table>
+
+<h2>2. Architecture générale et frontières de confiance</h2>
+<div class="diagram">
+                         ┌─────────────────────────────────────┐
+                         │        MAXIMUS PRINCIPAL             │
+                         │ mode central / Render + PostgreSQL   │
+                         │                                     │
+                         │ entreprises                         │
+                         │ maximus_company_modules             │
+                         │ catalogue publié                    │
+                         │ maximus_installations               │
+                         │ installation_addresses              │
+                         └───────────────┬─────────────────────┘
+                                         │
+              HTTPS + Authorization: Bearer mxinstall_...
+                                         │
+                          GET configuration / POST heartbeat
+                                         │
+                         ┌───────────────▼─────────────────────┐
+                         │       INSTALLATION DÉDIÉE            │
+                         │ mode dedicated ou on_premise         │
+                         │                                     │
+                         │ .env : identité + jeton              │
+                         │ PostgreSQL local                     │
+                         │ cache de configuration métier        │
+                         │ état local de synchronisation         │
+                         │ scheduler Windows caché              │
+                         └─────────────────────────────────────┘
+</div>
+<p>La frontière est volontairement orientée : le local <strong>tire</strong> la configuration ; le central ne pousse pas de connexion entrante vers le PC Windows. Le serveur central ne reçoit donc pas besoin d’un port entrant sur le réseau de l’entreprise. En retour, le local envoie uniquement un heartbeat après application de la configuration.</p>
+
+<h3>2.1 Responsabilités du central</h3>
+<ul>
+  <li>autoriser un administrateur MAXIMUS à créer ou renouveler une installation ;</li>
+  <li>stocker uniquement le hash SHA-256 du jeton ;</li>
+  <li>conserver l’association installation → entreprise et le mode d’installation ;</li>
+  <li>reconstruire les modules actifs depuis les autorisations persistées ;</li>
+  <li>publier uniquement le catalogue validé ;</li>
+  <li>révoquer une installation et refuser les appels ultérieurs ;</li>
+  <li>observer les dernières connexions et versions de configuration.</li>
+</ul>
+
+<h3>2.2 Responsabilités du local</h3>
+<ul>
+  <li>conserver le jeton et les identifiants de l’installation hors de l’interface utilisateur ;</li>
+  <li>appeler le central périodiquement ;</li>
+  <li>refuser tout payload qui ne correspond pas à son entreprise ou son installation ;</li>
+  <li>valider le protocole, la version de build et le catalogue avant écriture ;</li>
+  <li>appliquer la configuration de façon transactionnelle ;</li>
+  <li>continuer avec la dernière configuration valide en cas d’échec réseau.</li>
+</ul>
+
+<h2>3. Cycle de vie complet</h2>
+<div class="diagram">
+  1. ADMIN MAXIMUS
+       │  crée / renouvelle une installation
+       ▼
+  2. CENTRAL : ligne maximus_installations + token_hash
+       │  renvoie le bootstrap une seule fois
+       ▼
+  3. TRANSFERT HORS BANDE DU BOOTSTRAP
+       │  fichier JSON protégé vers le serveur Windows
+       ▼
+  4. INSTALLATEUR LOCAL
+       │  écrit .env, vérifie le commit et lance l’application initiale
+       ▼
+  5. SYNCHRONISATION INITIALE STRICTE
+       │  identité + protocole + applicationVersion + packageVersion
+       ▼
+  6. INSTALLATION ACTIVE
+       │  scheduler toutes les 5 minutes
+       ▼
+  7. SYNCHRONISATION PÉRIODIQUE
+       │  fetch → validation → transaction → état local → heartbeat
+       ▼
+  8. HORS LIGNE OU RÉVOCATION
+       ├─ réseau indisponible : dernière configuration conservée
+       ├─ token révoqué : appels refusés, exploitation à arrêter
+       └─ payload invalide : transaction annulée, données précédentes conservées
+</div>
+
+<h2>4. Enrôlement central et génération du bootstrap</h2>
+<h3>4.1 Autorisation</h3>
+<p>Les routes d’installation sont protégées par <code>maximus.central</code> et <code>maximus.auth</code>. Le contrôleur vérifie en plus que l’acteur authentifié possède le rôle <code>maximus_admin</code>. L’entreprise doit être active et non supprimée.</p>
+
+<h3>4.2 Routes d’administration</h3>
+<table>
+  <tr><th>Méthode</th><th>Route</th><th>Fonction</th></tr>
+  <tr><td>GET</td><td><code>/api/companies/{companyId}/installation-manifest</code></td><td>Consulter le manifeste disponible côté administration.</td></tr>
+  <tr><td>POST</td><td><code>/api/companies/{companyId}/installation</code></td><td>Créer ou renouveler l’installation par défaut.</td></tr>
+  <tr><td>POST</td><td><code>/api/companies/{companyId}/installations/{installationId}</code></td><td>Renouveler une installation précise ou la réémettre.</td></tr>
+  <tr><td>DELETE</td><td><code>/api/companies/{companyId}/installation[s]/{installationId?}</code></td><td>Révoquer une installation ou toutes les installations ciblées selon la route.</td></tr>
+</table>
+
+<h3>4.3 Création du jeton</h3>
+<p>À chaque émission, le central génère un nouveau jeton aléatoire préfixé <code>mxinstall_</code>. La valeur en clair n’est jamais enregistrée dans la base centrale : seule <code>hash('sha256', $token)</code> est persistée dans <code>maximus_installations.token_hash</code>.</p>
+<p>Une réémission sur une installation existante remplace donc le hash précédent et invalide immédiatement l’ancien jeton. La version de configuration est incrémentée et l’état d’installation revient à <code>READY</code>.</p>
+
+<h3>4.4 Bootstrap retourné</h3>
+<pre>{
+  "centralUrl": "https://maximus-erp.onrender.com",
+  "installationId": "installation-&lt;uuid&gt;",
+  "companyId": "&lt;company-id&gt;",
+  "mode": "dedicated",
+  "applicationVersion": "&lt;commit-deploye&gt;",
+  "syncProtocolVersion": 2,
+  "token": "mxinstall_&lt;valeur-secrete&gt;"
+}</pre>
+<div class="warning"><strong>Le bootstrap est un secret d’enrôlement.</strong> Il doit être transmis par un canal protégé, ne pas être ajouté à Git, ne pas être copié dans un ticket public et ne pas être affiché dans les logs. Le script d’installation le recopie dans <code>.env</code> avec des permissions restreintes.</div>
+
+<h2>5. Installation locale et validation initiale</h2>
+<p><code>scripts/install-maximus-instance.sh</code> installe une archive qui doit correspondre au commit fourni par le bootstrap. Le script collecte le manifeste, vérifie les champs obligatoires et écrit notamment :</p>
+<table>
+  <tr><th>Variable</th><th>Rôle</th></tr>
+  <tr><td><code>MAXIMUS_DEPLOYMENT_MODE</code></td><td><code>dedicated</code> ou <code>on_premise</code>. Toute autre valeur est refusée pour une installation isolée.</td></tr>
+  <tr><td><code>MAXIMUS_CENTRAL_URL</code></td><td>Base HTTPS du central.</td></tr>
+  <tr><td><code>MAXIMUS_INSTALLATION_TOKEN</code></td><td>Secret local utilisé dans l’en-tête Bearer.</td></tr>
+  <tr><td><code>MAXIMUS_INSTALLATION_ID</code></td><td>Identité technique de cette instance.</td></tr>
+  <tr><td><code>MAXIMUS_INSTALLATION_COMPANY_ID</code></td><td>Tenant unique autorisé localement.</td></tr>
+  <tr><td><code>MAXIMUS_EXPECTED_APPLICATION_VERSION</code></td><td>Version exigée par le bootstrap initial.</td></tr>
+  <tr><td><code>MAXIMUS_BUILD_VERSION</code></td><td>Version de l’archive locale, matérialisée dans <code>MAXIMUS_BUILD_VERSION</code>.</td></tr>
+</table>
+
+<h3>5.1 Preuve de version initiale</h3>
+<p>Lors de la première installation, <code>InstallationSyncService::validatePayload()</code> est appelé avec <code>$initial=true</code>. Le local refuse si :</p>
+<ul>
+  <li>le mode n’est pas dédié ou on-premise ;</li>
+  <li>l’ID entreprise ou l’ID installation du payload ne correspond pas au fichier <code>.env</code> ;</li>
+  <li>le mode reçu ne correspond pas au mode local ;</li>
+  <li>le protocole reçu n’est pas la version <code>2</code> ;</li>
+  <li>le central ne publie pas une <code>applicationVersion</code> ;</li>
+  <li>la version attendue ou la version du package local ne correspond pas à celle du central.</li>
+</ul>
+<p>Cette preuve empêche d’installer un package qui n’est pas celui pour lequel le bootstrap a été émis. Après une première synchronisation réussie, une différence de commit peut être tolérée si le protocole reste compatible ; elle produit alors un avertissement de version et aucune mise à jour automatique du logiciel.</p>
+
+<h2>6. Contrat HTTP de synchronisation</h2>
+<h3>6.1 Authentification</h3>
+<p>Le local envoie :</p>
+<pre>Authorization: Bearer mxinstall_&lt;secret&gt;
+Accept: application/json</pre>
+<p>Le middleware <code>AuthenticateInstallationToken</code> accepte aussi, pour compatibilité, <code>X-MAXIMUS-INSTALLATION-TOKEN</code>. Il calcule le SHA-256 du secret reçu, cherche une ligne correspondante et refuse si la ligne n’existe pas, si <code>revoked_at</code> est défini ou si le statut vaut <code>REVOKED</code>.</p>
+
+<h3>6.2 Endpoint de configuration</h3>
+<pre>GET /api/installation-sync/configuration</pre>
+<p>La route est protégée par <code>maximus.central</code> puis par <code>maximus.installation.token</code>. L’installation identifiée par le jeton est placée dans les attributs de requête ; le contrôleur ne prend pas le <code>companyId</code> depuis le client.</p>
+
+<h3>6.3 Reconstitution des modules</h3>
+<p>Le central appelle <code>synchronizedModuleIds()</code> :</p>
+<ol>
+  <li>il part de <code>companies.requested_modules</code> ;</li>
+  <li>il charge les statuts persistés dans <code>maximus_company_modules</code> pour l’entreprise ;</li>
+  <li>il conserve les statuts <code>ACTIF</code>, <code>BETA</code> et <code>MAINTENANCE</code> ;</li>
+  <li>il retire les modules dont le statut est <code>INACTIF</code> ;</li>
+  <li>il ajoute les modules actifs trouvés dans la table d’accès même s’ils manquent encore dans la demande historique.</li>
+</ol>
+<div class="note"><strong>Pourquoi cette double source contrôlée ?</strong> <code>requested_modules</code> reflète l’inscription initiale et peut être ancien. La ligne d’accès persistée est la source de vérité effective. Le contrôleur de modification maintient toutefois aussi <code>requested_modules</code> cohérent pour les anciens consommateurs.</div>
+
+<h3>6.4 Exemple de réponse anonymisée</h3>
+<pre>{
+  "configurationVersion": 12,
+  "applicationVersion": "&lt;commit-deploye&gt;",
+  "syncProtocolVersion": 2,
+  "installation": {
+    "id": "installation-&lt;uuid&gt;",
+    "companyId": "&lt;company-id&gt;",
+    "mode": "dedicated"
+  },
+  "company": {
+    "id": "&lt;company-id&gt;",
+    "name": "Entreprise exemple",
+    "manager": "Responsable",
+    "email": "admin@example.invalid",
+    "phone": "",
+    "country": "",
+    "sector": "",
+    "loginSlug": "entreprise-exemple",
+    "profilePhoto": null,
+    "primaryColor": "#F2B705",
+    "accentColor": "#F2B705",
+    "sidebarColor": "#161D27"
+  },
+  "modules": {
+    "ids": ["commerce", "payroll"],
+    "packIds": {"commerce": ["commerce-standard"]},
+    "featureIds": {"commerce": ["products", "orders"]},
+    "permissions": {"commerce": {"products": ["voir", "modifier"]}}
+  },
+  "catalog": [],
+  "domains": [],
+  "erpAccess": {
+    "canonicalUrl": "https://erp.example.invalid",
+    "allowedHosts": ["erp.example.invalid"]
+  }
+}</pre>
+<p>Le catalogue est celui publié par le central pour les IDs transmis. Les modules ne sont pas librement importés par le local : <code>ModuleCatalog::isPublishedModule()</code> doit les reconnaître après import du catalogue.</p>
+
+<h3>6.5 Endpoint heartbeat</h3>
+<pre>POST /api/installation-sync/heartbeat
+Content-Type: application/json
+
+{"appliedVersion": 12}</pre>
+<p>Après application locale, le local envoie l’ACK. Le central met l’installation à <code>CONNECTED</code>, met à jour <code>last_seen_at</code>, <code>last_sync_at</code> et efface <code>last_error</code>. Si l’ACK échoue après une application locale réussie, la configuration n’est pas annulée ; l’erreur est conservée pour le prochain cycle.</p>
+
+<h2>7. Traitement local détaillé</h2>
+<h3>7.1 Pipeline exact</h3>
+<div class="diagram">
+  SyncCentralInstallation::handle()
+        │
+        ├─ vérifie InstallationContext::isCompanyOnly()
+        │
+        ├─ InstallationSyncService::fetch()
+        │    ├─ écrit lastAttemptAt + state=syncing
+        │    ├─ appelle le central en HTTPS
+        │    ├─ traduit les erreurs HTTP / connexion
+        │    └─ valide identité, protocole et versions
+        │
+        ├─ InstallationSyncService::apply()
+        │    ├─ revalide le payload
+        │    ├─ valide erpAccess
+        │    ├─ ouvre une transaction DB
+        │    ├─ importe le catalogue publié
+        │    ├─ normalise packs / features / permissions
+        │    ├─ met à jour l’entreprise
+        │    ├─ remplace les accès modules
+        │    ├─ remplace les domaines e-commerce
+        │    ├─ commit
+        │    └─ publie l’état local synced
+        │
+        ├─ heartbeat()
+        │
+        └─ code 0 + message de succès
+</div>
+
+<h3>7.2 Validation d’identité</h3>
+<p>Le central peut être joignable sans être autorisé à modifier le local. Le payload doit identifier exactement :</p>
+<ul>
+  <li><code>company.id</code> égal à <code>MAXIMUS_INSTALLATION_COMPANY_ID</code> ;</li>
+  <li><code>installation.id</code> ou <code>installationId</code> égal à <code>MAXIMUS_INSTALLATION_ID</code> ;</li>
+  <li><code>installation.companyId</code> égal à l’entreprise locale ;</li>
+  <li><code>installation.mode</code> égal au mode local.</li>
+</ul>
+<p>Un écart déclenche <code>Identité entreprise/installation reçue différente de la configuration locale.</code> avant toute écriture métier.</p>
+
+<h3>7.3 Validation des accès ERP</h3>
+<p><code>erpAccess.allowedHosts</code> doit être un tableau d’hôtes valides, sans wildcard. L’URL canonique doit être HTTP ou HTTPS, sans identifiant, mot de passe, query string ni fragment, et son hostname doit apparaître dans <code>allowedHosts</code>. Cette validation évite de faire entrer dans le contrôle d’hôte une URL arbitraire issue du réseau.</p>
+
+<h3>7.4 Application transactionnelle</h3>
+<p>L’application est encapsulée dans une transaction. Elle effectue les opérations suivantes :</p>
+<ol>
+  <li>importe le catalogue fourni et s’assure de sa structure locale ;</li>
+  <li>vérifie que chaque module reçu est publié localement ;</li>
+  <li>normalise les packs, fonctionnalités et permissions avec le catalogue ;</li>
+  <li>met à jour ou crée l’entreprise avec statut <code>ACTIF</code> ;</li>
+  <li>met à jour les couleurs et le slug de connexion ;</li>
+  <li>ne copie pas une URL de photo centrale et ne télécharge pas de média arbitraire ; les octets d’un logo local sont conservés ;</li>
+  <li>supprime puis recrée les lignes locales de <code>maximus_company_modules</code> correspondant à la photo reçue ;</li>
+  <li>remplace les domaines e-commerce locaux de l’entreprise par le snapshot central ;</li>
+  <li>commit la transaction.</li>
+</ol>
+<div class="warning"><strong>Conséquence :</strong> le payload est une photo complète pour l’entreprise, pas un patch. Toute modification du code d’application qui ajoute une nouvelle section au snapshot doit préserver l’atomicité et les règles de validation avant écriture.</div>
+
+<h3>7.5 Ce qui n’est jamais remplacé par la synchronisation</h3>
+<ul>
+  <li>les mots de passe administrateur locaux après installation ;</li>
+  <li>les sessions locales ;</li>
+  <li>les octets de logo téléversés localement ;</li>
+  <li>la base locale entière ;</li>
+  <li>le logiciel lui-même : une synchronisation de configuration n’est pas une mise à jour de code.</li>
+</ul>
+
+<h2>8. Persistance locale et mode hors ligne</h2>
+<p><code>InstallationSyncState</code> conserve un fichier JSON dans <code>storage/app/installation-sync/</code>. Le nom dépend d’un hash de l’entreprise, de l’installation et du mode ; un fichier d’une autre installation n’est donc pas accepté.</p>
+<table>
+  <tr><th>Champ</th><th>Rôle</th></tr>
+  <tr><td><code>lastAttemptAt</code></td><td>Dernière tentative, même échouée.</td></tr>
+  <tr><td><code>lastSuccessAt</code></td><td>Dernière configuration appliquée avec succès.</td></tr>
+  <tr><td><code>state</code></td><td>État opérationnel courant.</td></tr>
+  <tr><td><code>lastError</code></td><td>Message non secret destiné au diagnostic.</td></tr>
+  <tr><td><code>versionWarning</code></td><td>Avertissement de divergence de build compatible.</td></tr>
+  <tr><td><code>erpAccess</code></td><td>Dernier mapping canonique et liste d’hôtes autorisés.</td></tr>
+  <tr><td><code>configurationVersion</code></td><td>Version centrale appliquée.</td></tr>
+</table>
+<p>Les écritures sont protégées par un verrou fichier, réalisées dans un fichier temporaire puis publiées par renommage atomique. Les permissions du fichier temporaire sont fixées à <code>0600</code>.</p>
+<p>En cas d’échec réseau, le service enregistre <code>unreachable</code> et ne supprime ni l’entreprise ni les modules ni le mapping ERP déjà appliqués. Le serveur local continue donc à servir sa dernière configuration valide.</p>
+
+<h2>9. Scheduler Windows</h2>
+<h3>9.1 Fonctionnement</h3>
+<p><code>routes/console.php</code> définit la tâche Laravel toutes les cinq minutes et la conditionne au mode entreprise. <code>scripts/register-maximus-sync.ps1</code> crée la tâche Windows <code>MAXIMUS central scheduler</code> :</p>
+<ul>
+  <li>déclenchement par répétition toutes les cinq minutes ;</li>
+  <li>tâche marquée cachée ;</li>
+  <li>PowerShell lancé avec <code>-WindowStyle Hidden</code> ;</li>
+  <li>processus PHP lancé avec <code>-WindowStyle Hidden</code> ;</li>
+  <li>limite d’exécution de deux minutes ;</li>
+  <li>verrou Laravel <code>withoutOverlapping(60)</code> pour éviter deux synchronisations simultanées.</li>
+</ul>
+<p>Une tâche déjà enregistrée conserve son ancienne fréquence. Après une mise à jour du script, il faut donc la réenregistrer. Une ancienne tâche réglée à une minute peut expliquer des fenêtres fréquentes ou une charge inutile.</p>
+
+<h3>9.2 Résolution DNS Windows</h3>
+<p>Le client PHP cURL peut avoir un comportement différent de <code>curl.exe</code> sous Windows. Dans le code actuel, les appels centraux préfèrent IPv4 et réessaient les exceptions de connexion transitoires. Les réponses HTTP <code>401</code>, <code>403</code> et <code>5xx</code> ne sont pas masquées : elles conservent leur signification métier.</p>
+
+<h2>10. Sécurité</h2>
+<h3>10.1 Jeton</h3>
+<ul>
+  <li>génération aléatoire côté central ;</li>
+  <li>stockage central par hash SHA-256, jamais en clair ;</li>
+  <li>transport par HTTPS et en-tête Bearer ;</li>
+  <li>rotation par réémission ;</li>
+  <li>révocation centrale immédiate ;</li>
+  <li>absence dans les messages d’erreur et dans l’état local public.</li>
+</ul>
+<h3>10.2 Isolation tenant</h3>
+<p>Le <code>companyId</code> local est lu depuis la configuration serveur. Le payload central n’a pas le pouvoir de changer le périmètre : il doit correspondre à cette valeur. L’installation ne choisit pas une autre entreprise en modifiant une URL ou une query string.</p>
+<h3>10.3 Réduction de surface</h3>
+<ul>
+  <li>les routes de sync sont limitées au mode central et au middleware de jeton ;</li>
+  <li>les installations révoquées ne sont plus acceptées ;</li>
+  <li>les hôtes ERP sont validés et les wildcards sont refusés ;</li>
+  <li>les médias centraux ne sont pas téléchargés automatiquement ;</li>
+  <li>le code local ne crée jamais d’administrateur global MAXIMUS.</li>
+</ul>
+
+<h2>11. États et erreurs</h2>
+<table>
+  <tr><th>Symptôme / HTTP</th><th>État</th><th>Interprétation</th><th>Action</th></tr>
+  <tr><td>DNS, timeout, cURL error 28</td><td><code>unreachable</code></td><td>Le transport n’a pas atteint le central.</td><td>Tester DNS/HTTPS, vérifier PHP cURL, laisser le retry et conserver la dernière config.</td></tr>
+  <tr><td>401 sans code de révocation</td><td><code>authentication_rejected</code></td><td>Jeton absent, invalide ou réémis.</td><td>Ne pas modifier la base locale ; réémettre un bootstrap.</td></tr>
+  <tr><td>401 + <code>INSTALLATION_REVOKED</code></td><td><code>revoked</code></td><td>L’installation a été explicitement révoquée.</td><td>Stopper l’exploitation dédiée et traiter l’enrôlement depuis MAXIMUS.</td></tr>
+  <tr><td>409 entreprise inactive</td><td><code>rejected</code></td><td>L’entreprise centrale n’est plus active.</td><td>Réactiver ou corriger l’état métier côté central.</td></tr>
+  <tr><td>Protocole incompatible</td><td><code>rejected</code></td><td>Le local et le central ne parlent pas le même contrat.</td><td>Déployer une version compatible, sans forcer la base.</td></tr>
+  <tr><td>Identité différente</td><td><code>rejected</code></td><td>Le bootstrap, le .env ou le central ne désignent pas la même installation.</td><td>Comparer les IDs non secrets et régénérer le bootstrap si nécessaire.</td></tr>
+  <tr><td>Module non publié localement</td><td><code>rejected</code></td><td>Le catalogue reçu ne peut pas matérialiser un module.</td><td>Publier un catalogue compatible et refaire la synchronisation.</td></tr>
+  <tr><td>Erreur de transaction</td><td><code>rejected</code></td><td>La nouvelle configuration n’est pas appliquée intégralement.</td><td>La transaction est annulée ; diagnostiquer sans supprimer la dernière configuration.</td></tr>
+</table>
+
+<h2>12. Versionnement et compatibilité</h2>
+<p>Deux notions sont distinctes :</p>
+<table>
+  <tr><th>Version</th><th>Usage</th></tr>
+  <tr><td><code>syncProtocolVersion</code></td><td>Version du contrat de synchronisation. Elle vaut actuellement <code>2</code>. Un écart est bloquant.</td></tr>
+  <tr><td><code>applicationVersion</code></td><td>Identifiant du code déployé au central, généralement le commit Git.</td></tr>
+  <tr><td><code>MAXIMUS_BUILD_VERSION</code></td><td>Identifiant du package logiciel local.</td></tr>
+  <tr><td><code>configurationVersion</code></td><td>Compteur de configuration d’installation côté central. Il est renvoyé et mémorisé localement.</td></tr>
+</table>
+<div class="warning"><strong>Point d’attention d’architecture :</strong> dans le code actuel, <code>configurationVersion</code> est incrémenté lors de l’émission d’une installation et lors des changements d’adresses ERP. Les changements d’accès modules sont récupérés par le polling complet même s’ils ne font pas nécessairement progresser ce compteur. Il ne faut donc pas utiliser ce numéro comme unique condition pour décider de ne pas appeler le central.</div>
+
+<h2>13. Procédures d’exploitation</h2>
+<h3>13.1 Vérifier le central</h3>
+<pre>curl.exe -i --connect-timeout 10 --max-time 30 `
+  https://maximus-erp.onrender.com/api/healthz</pre>
+<p>Le résultat attendu est HTTP 200 avec <code>ok=true</code>, <code>database=true</code>, <code>status=OPERATIONAL</code> et un <code>applicationVersion</code> non vide.</p>
+
+<h3>13.2 Forcer une synchronisation locale</h3>
+<pre>cd C:\Chemin\vers\maximus-local-propre\artifacts\api-server\laravel
+php artisan config:clear
+php artisan maximus:sync-central-installation</pre>
+<p>Le succès affiche <code>Configuration centrale synchronisée pour ...</code>. La commande ne fait ni <code>git pull</code>, ni build, ni migration, ni mise à jour du logiciel.</p>
+
+<h3>13.3 Réenregistrer le scheduler Windows</h3>
+<pre>cd C:\Chemin\vers\maximus-local-propre
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\register-maximus-sync.ps1 `
+  -WorkspaceDir (Get-Location).Path `
+  -IntervalMinutes 5</pre>
+<p>Cette commande remplace la tâche portant le même nom. Elle est nécessaire après un changement de fréquence ou de comportement caché.</p>
+
+<h3>13.4 Désactiver temporairement la tâche</h3>
+<pre>Disable-ScheduledTask -TaskName "MAXIMUS central scheduler"</pre>
+<p>Cette action arrête la synchronisation automatique mais ne supprime pas la configuration locale. Pour remettre la tâche, réexécuter l’enregistrement ci-dessus.</p>
+
+<h3>13.5 Vérifier l’absence de fuite de secret</h3>
+<ul>
+  <li>ne pas afficher <code>MAXIMUS_INSTALLATION_TOKEN</code> ;</li>
+  <li>ne pas envoyer le bootstrap dans un ticket ou un dépôt ;</li>
+  <li>ne pas utiliser <code>git diff</code> sur un fichier <code>.env</code> dans un canal partagé ;</li>
+  <li>ne publier que l’URL, l’ID d’entreprise, l’ID d’installation et les codes HTTP nécessaires au diagnostic.</li>
+</ul>
+
+<h2>14. Cartographie du code</h2>
+<table>
+  <tr><th>Fichier</th><th>Responsabilité</th></tr>
+  <tr><td class="ref">app/Http/Controllers/Api/InstallationController.php</td><td>Émission, renouvellement, révocation et construction du payload central.</td></tr>
+  <tr><td class="ref">app/Http/Controllers/Api/InstallationAccessController.php</td><td>Adresses ERP, vérification DNS/HTTPS, adresse primaire et compteur de configuration.</td></tr>
+  <tr><td class="ref">app/Http/Middleware/AuthenticateInstallationToken.php</td><td>Vérification Bearer/X-Header, hash et révocation.</td></tr>
+  <tr><td class="ref">app/Services/InstallationSyncService.php</td><td>Client HTTP, validation, transaction d’application, état local et heartbeat.</td></tr>
+  <tr><td class="ref">app/Support/InstallationContext.php</td><td>Mode, entreprise configurée, installation configurée, hôtes de confiance et entrée utilisateur.</td></tr>
+  <tr><td class="ref">app/Support/InstallationSyncState.php</td><td>Snapshot JSON local, verrou fichier, état opérationnel sans secret.</td></tr>
+  <tr><td class="ref">app/Support/ApplicationIdentity.php</td><td>Version de build, version attendue et protocole v2.</td></tr>
+  <tr><td class="ref">app/Console/Commands/InstallCompanyInstance.php</td><td>Bootstrap initial, création/conservation de l’administrateur entreprise.</td></tr>
+  <tr><td class="ref">app/Console/Commands/SyncCentralInstallation.php</td><td>Commande périodique : fetch, apply, heartbeat.</td></tr>
+  <tr><td class="ref">routes/api.php</td><td>Routes d’administration et routes <code>installation-sync</code>.</td></tr>
+  <tr><td class="ref">routes/console.php</td><td>Planification Laravel toutes les cinq minutes.</td></tr>
+  <tr><td class="ref">scripts/install-maximus-instance.sh</td><td>Installation de l’archive dédiée et écriture sécurisée du .env.</td></tr>
+  <tr><td class="ref">scripts/package-maximus-instance.sh</td><td>Création d’une archive seulement si le commit local correspond au central.</td></tr>
+  <tr><td class="ref">scripts/register-maximus-sync.ps1</td><td>Tâche Windows cachée, cadence de cinq minutes.</td></tr>
+  <tr><td class="ref">database/migrations/2026_09_16_000048_create_maximus_installations_table.php</td><td>Identité, hash du jeton, statut, version et observabilité d’installation.</td></tr>
+  <tr><td class="ref">database/migrations/2026_09_16_000049_create_installation_addresses.php</td><td>Plusieurs adresses ERP par installation et adresses primaires.</td></tr>
+</table>
+
+<h2>15. Invariants à préserver lors d’une évolution</h2>
+<ol>
+  <li>Ne jamais prendre le tenant depuis une valeur envoyée par le navigateur ou un paramètre de synchronisation.</li>
+  <li>Ne jamais stocker le jeton central en clair côté central.</li>
+  <li>Ne jamais appliquer une partie du payload avant d’avoir validé l’identité et le protocole.</li>
+  <li>Ne jamais remplacer la dernière configuration locale par une réponse réseau partielle ou invalide.</li>
+  <li>Ne jamais confondre synchronisation de configuration et mise à jour du logiciel.</li>
+  <li>Ne jamais utiliser uniquement <code>requested_modules</code> pour calculer les modules effectivement autorisés.</li>
+  <li>Ne jamais supposer que <code>configurationVersion</code> est un curseur complet de toutes les modifications métier.</li>
+  <li>Ne jamais afficher le jeton dans une exception, un log, un PDF, un ticket ou un commit.</li>
+  <li>Conserver la compatibilité de <code>syncProtocolVersion</code> ou faire évoluer central et package local ensemble.</li>
+  <li>Tester les modes hors ligne, token révoqué, identité incorrecte, catalogue incomplet, timeout DNS et double exécution du scheduler.</li>
+</ol>
+
+<div class="note">
+  <strong>Conclusion opérationnelle :</strong> une installation dédiée est une instance autonome pour l’exécution quotidienne, mais son autorité de configuration reste centrale. Le mécanisme est un pull périodique authentifié, borné par tenant, validé par version et appliqué atomiquement. La panne réseau conserve la dernière vérité locale connue ; la révocation et les incohérences d’identité, elles, doivent rester visibles et bloquantes.
+</div>
+
+<p class="small">Fin du document — MAXIMUS / module dédié et synchronisation centralisée.</p>
+</body>
+</html>
