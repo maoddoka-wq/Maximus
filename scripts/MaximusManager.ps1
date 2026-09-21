@@ -64,6 +64,29 @@ function Convert-ToBashPath([string]$Path) {
     return $Path
 }
 
+function Ensure-UnixShellForNodeScripts {
+    if (Get-Command sh.exe -ErrorAction SilentlyContinue) {
+        return
+    }
+
+    $gitBinCandidates = @()
+    if ($env:ProgramFiles) {
+        $gitBinCandidates += (Join-Path $env:ProgramFiles "Git\bin")
+    }
+    if (${env:ProgramFiles(x86)}) {
+        $gitBinCandidates += (Join-Path ${env:ProgramFiles(x86)} "Git\bin")
+    }
+
+    foreach ($gitBin in $gitBinCandidates) {
+        if (Test-Path (Join-Path $gitBin "sh.exe") -PathType Leaf) {
+            $env:Path = "$gitBin;$env:Path"
+            return
+        }
+    }
+
+    Fail "Git for Windows est installé mais sh.exe est introuvable. Le build frontend ne peut pas s’exécuter."
+}
+
 function Get-EnvMap {
     $values = @{}
     if (-not (Test-Path $EnvFile -PathType Leaf)) {
@@ -357,6 +380,9 @@ function Invoke-Repair {
     if (-not $php -or -not $composer -or -not $corepack) {
         Fail "PHP, Composer et Corepack doivent être installés avant une réparation."
     }
+    if (-not $SkipBuild) {
+        Ensure-UnixShellForNodeScripts
+    }
 
     if (-not $SkipComposer) {
         Write-Step "Réinstallation contrôlée des dépendances Laravel"
@@ -408,6 +434,7 @@ function Invoke-Install {
 
 function Invoke-Update {
     Confirm-RiskyAction "sauvegarder puis mettre à jour MAXIMUS"
+    Ensure-UnixShellForNodeScripts
     $backupDir = New-MaximusBackup
     $updateScript = Join-Path $WorkspaceDir "scripts/update-maximus-instance.ps1"
     if (-not (Test-Path $updateScript -PathType Leaf)) {

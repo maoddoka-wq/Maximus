@@ -33,6 +33,29 @@ function Get-CommandOutput([string]$File, [string[]]$Arguments) {
     return ($output -join "`n").Trim()
 }
 
+function Ensure-UnixShellForNodeScripts {
+    if (Get-Command sh.exe -ErrorAction SilentlyContinue) {
+        return
+    }
+
+    $gitBinCandidates = @()
+    if ($env:ProgramFiles) {
+        $gitBinCandidates += (Join-Path $env:ProgramFiles "Git\bin")
+    }
+    if (${env:ProgramFiles(x86)}) {
+        $gitBinCandidates += (Join-Path ${env:ProgramFiles(x86)} "Git\bin")
+    }
+
+    foreach ($gitBin in $gitBinCandidates) {
+        if (Test-Path (Join-Path $gitBin "sh.exe") -PathType Leaf) {
+            $env:Path = "$gitBin;$env:Path"
+            return
+        }
+    }
+
+    Fail "Git for Windows est installé mais sh.exe est introuvable. Le script preinstall du frontend ne peut pas s’exécuter."
+}
+
 function Set-EnvValue([string]$Key, [string]$Value) {
     $escaped = $Value.Replace("\", "\\").Replace('"', '\"')
     $line = "$Key=`"$escaped`""
@@ -60,6 +83,7 @@ $php = (Get-Command php -ErrorAction Stop).Source
 $curl = (Get-Command curl.exe -ErrorAction Stop).Source
 if (-not $SkipComposer) { $composer = (Get-Command composer -ErrorAction Stop).Source }
 if (-not $SkipBuild) { $corepack = (Get-Command corepack -ErrorAction Stop).Source }
+if (-not $SkipBuild) { Ensure-UnixShellForNodeScripts }
 
 try {
     $isWorkTree = Get-CommandOutput $git @("-C", $WorkspaceDir, "rev-parse", "--is-inside-work-tree")
