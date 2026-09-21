@@ -60,11 +60,9 @@ class AuthController extends Controller
             && (bool) ($company = Company::query()->whereKey($user->company_id)->where('status', 'ACTIF')->whereNull('deleted_at')->first())?->login_custom_allowed
             && (($company->login_mode ?: 'MAXIMUS') === 'CUSTOM')
         ) {
-            $loginUrl = '/entreprise/'.rawurlencode((string) $company->login_slug).'/connexion';
             return response()->json([
                 'code' => 'COMPANY_CUSTOM_LOGIN',
-                'error' => 'Cette entreprise utilise sa page de connexion personnalisée. Connectez-vous sur '.$loginUrl.'.',
-                'loginUrl' => $loginUrl,
+                'error' => 'Connexion refusée : cette entreprise utilise une page de connexion personnalisée. Utilisez le lien personnalisé communiqué par MAXIMUS ou par son administrateur.',
             ], 403);
         }
         if (!MaximusAuth::canAuthenticate($user)) {

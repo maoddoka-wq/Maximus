@@ -435,7 +435,8 @@ class InstallationAccessTest extends TestCase
         // A personalized company always uses its branded login, even before dedicated cutover.
         $this->postJson($generic, $credentials)->assertForbidden()
             ->assertJsonPath('code', 'COMPANY_CUSTOM_LOGIN')
-            ->assertJsonPath('loginUrl', '/entreprise/access-company/connexion');
+            ->assertJsonMissingPath('loginUrl')
+            ->assertJsonPath('error', 'Connexion refusée : cette entreprise utilise une page de connexion personnalisée. Utilisez le lien personnalisé communiqué par MAXIMUS ou par son administrateur.');
         $this->postJson($slug, $credentials)->assertOk();
         $this->postJson($select, ['confirmedReady' => true])->assertOk()->assertJsonPath('primaryInstallationId', 'install-a');
         $this->getJson('/api/companies/access-company/installation-access')->assertOk()->assertJsonPath('primaryInstallationId', 'install-a');

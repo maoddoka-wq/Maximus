@@ -3443,7 +3443,7 @@ function CompanyDetail({
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
     slug: string;
-    url: string;
+    url: string | null;
   } | null>(null);
   const [loginSaving, setLoginSaving] = useState(false);
   const [customDomains, setCustomDomains] = useState<EcommerceDomain[]>([]);
@@ -3841,7 +3841,7 @@ function CompanyDetail({
                 <p className="mt-2 break-all font-mono text-xs">{window.location.origin}{loginSettings.url}</p>
                 <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
               </>
-            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
+            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Le lien reste masqué tant que la page personnalisée n’est pas activée.</p>}
           </div>
         </div>}
         <div className="mt-6 border-t pt-5">
@@ -7948,7 +7948,7 @@ function CompanyModulesDetail({
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
     slug: string;
-    url: string;
+    url: string | null;
   } | null>(null);
   const [loginSaving, setLoginSaving] = useState(false);
   const [customDomains, setCustomDomains] = useState<EcommerceDomain[]>([]);
@@ -8577,7 +8577,7 @@ function CompanyModulesDetail({
                 <p className="mt-2 break-all font-mono text-xs">{window.location.origin}{loginSettings.url}</p>
                 <button type="button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}${loginSettings.url}`)} className="mt-3 rounded-lg border px-3 py-2 text-xs font-bold">Copier le lien</button>
               </>
-            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
+            ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Le lien reste masqué tant que la page personnalisée n’est pas activée.</p>}
           </div>
         </div>
       </section>

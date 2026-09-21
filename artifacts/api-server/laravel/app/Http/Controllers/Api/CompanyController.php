@@ -600,7 +600,7 @@ class CompanyController extends Controller
             'loginSlug' => $company->login_slug,
             'primaryInstallationId' => $primaryInstallation?->id,
             'primaryInstallationMode' => $primaryInstallation?->mode,
-            'loginUrl' => $company->login_slug
+            'loginUrl' => $company->login_custom_allowed && ($company->login_mode ?: 'MAXIMUS') === 'CUSTOM' && $company->login_slug
                 ? '/entreprise/'.rawurlencode($company->login_slug).'/connexion'
                 : null,
         ];
@@ -613,7 +613,9 @@ class CompanyController extends Controller
             'customAllowed' => (bool) $company->login_custom_allowed,
             'mode' => $company->login_mode ?: 'MAXIMUS',
             'slug' => (string) $company->login_slug,
-            'url' => '/entreprise/'.rawurlencode((string) $company->login_slug).'/connexion',
+            'url' => $company->login_custom_allowed && ($company->login_mode ?: 'MAXIMUS') === 'CUSTOM' && $company->login_slug
+                ? '/entreprise/'.rawurlencode($company->login_slug).'/connexion'
+                : null,
         ];
     }
 
