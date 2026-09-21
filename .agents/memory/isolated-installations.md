@@ -24,3 +24,9 @@ Créer une installation de préparation ne ferme pas l’accès mutualisé. La b
 **Why:** Une entreprise doit pouvoir tester et préparer plusieurs installations sans interrompre le service courant ; une panne de la destination ne doit pas réactiver implicitement un second environnement de comptes.
 
 **How to apply:** Séparer le choix d’accès principal des statuts de domaines et de jetons ; conserver l’accès global MAXIMUS pour administrer et rétablir ce choix.
+
+Les opérations quotidiennes propres à l’entreprise, comme la modification de son profil et de son branding, doivent être exposées par une route authentifiée commune aux installations et protégées par un contrôle serveur explicite `company_admin` + `companyId`. Les routes d’administration de plateforme restent dans le périmètre central.
+
+**Why:** Mettre une opération tenant-scoped dans le middleware central bloque à tort les administrateurs d’une installation dédiée ; se fier au seul `companyId` sans vérifier le rôle permettrait à un employé de modifier l’entreprise.
+
+**How to apply:** Pour chaque route de gestion d’un tenant, séparer le middleware d’accès à l’installation de l’autorisation métier : l’hôte dédié peut servir l’opération, mais le contrôleur doit refuser tout acteur autre que MAXIMUS ou l’administrateur de cette même entreprise.

@@ -232,7 +232,10 @@ class CompanyController extends Controller
     public function update(Request $request, string $companyId): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
-        if (($actor['role'] ?? null) !== 'maximus_admin' && ($actor['companyId'] ?? null) !== $companyId) {
+        $isMaximusAdmin = ($actor['role'] ?? null) === 'maximus_admin';
+        $isCompanyAdmin = ($actor['role'] ?? null) === 'company_admin'
+            && ($actor['companyId'] ?? null) === $companyId;
+        if (! $isMaximusAdmin && ! $isCompanyAdmin) {
             return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
         }
         $input = Validator::make($request->all(), [

@@ -73,6 +73,51 @@ class InstallationAccessTest extends TestCase
         $this->getJson('/api/companies/access-company/installation-access')->assertNotFound();
     }
 
+    public function test_company_admin_can_update_profile_from_a_dedicated_installation(): void
+    {
+        $admin = AuthUser::query()->create([
+            'id' => 'dedicated-company-admin',
+            'email' => 'admin@access-company.example.com',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administrateur entreprise',
+            'phone' => '',
+            'role' => 'company_admin',
+            'company_id' => 'access-company',
+            'employee_id' => null,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($admin);
+        config([
+            'maximus.deployment_mode' => 'dedicated',
+            'maximus.installation_company_id' => 'access-company',
+            'maximus.installation_id' => 'install-b',
+        ]);
+
+        $this->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
+            ->patchJson('/api/companies/access-company', [
+                'name' => 'Entreprise dédiée modifiée',
+                'manager' => 'Direction locale',
+                'email' => 'direction@access-company.example.com',
+                'phone' => '+221 77 000 00 00',
+                'country' => 'Sénégal',
+                'sector' => 'Commerce',
+                'primaryColor' => '#123456',
+                'accentColor' => '#ABCDEF',
+                'sidebarColor' => '#101820',
+            ])
+            ->assertOk()
+            ->assertJsonPath('company.name', 'Entreprise dédiée modifiée')
+            ->assertJsonPath('company.primaryColor', '#123456');
+
+        $this->assertDatabaseHas('companies', [
+            'id' => 'access-company',
+            'name' => 'Entreprise dédiée modifiée',
+            'email' => 'direction@access-company.example.com',
+        ]);
+    }
+
     public function test_local_activation_keeps_alias_and_protects_primary_without_network(): void
     {
         $verifier = new class extends InstallationAddressVerifier {
