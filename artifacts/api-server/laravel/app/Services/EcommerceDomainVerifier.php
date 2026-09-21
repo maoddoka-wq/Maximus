@@ -39,6 +39,7 @@ final class EcommerceDomainVerifier
         $row = DB::table('ecommerce_domains')
             ->where('domain', $domain)
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $row || ! $this->revalidateIfDue($row)) {
             return null;

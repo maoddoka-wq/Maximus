@@ -600,6 +600,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
@@ -620,6 +621,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
@@ -640,6 +642,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
@@ -673,6 +676,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
@@ -706,6 +710,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
@@ -984,6 +989,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             abort(404);
@@ -1857,6 +1863,7 @@ class TransportController extends Controller
         $domain = DB::table('ecommerce_domains')
             ->where('domain', $request->getHost())
             ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
             ->first();
         if (! $domain) {
             return null;

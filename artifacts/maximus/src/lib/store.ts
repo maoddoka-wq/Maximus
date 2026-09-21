@@ -55,6 +55,8 @@ export interface Company {
   loginMode?: 'MAXIMUS' | 'CUSTOM';
   loginSlug?: string;
   loginUrl?: string;
+  primaryInstallationId?: string | null;
+  primaryInstallationMode?: 'dedicated' | 'on_premise' | null;
   deletionLocked?: boolean;
   managerRoleId?: string;
 }

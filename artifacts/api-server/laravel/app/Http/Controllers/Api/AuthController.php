@@ -53,6 +53,20 @@ class AuthController extends Controller
         if (($denial = MaximusAuth::dedicatedAccessDenial($user)) !== null) {
             return response()->json($denial, 403);
         }
+        if (
+            InstallationContext::isCentral()
+            &&
+            $user->company_id !== null
+            && (bool) ($company = Company::query()->whereKey($user->company_id)->where('status', 'ACTIF')->whereNull('deleted_at')->first())?->login_custom_allowed
+            && (($company->login_mode ?: 'MAXIMUS') === 'CUSTOM')
+        ) {
+            $loginUrl = '/entreprise/'.rawurlencode((string) $company->login_slug).'/connexion';
+            return response()->json([
+                'code' => 'COMPANY_CUSTOM_LOGIN',
+                'error' => 'Cette entreprise utilise sa page de connexion personnalisée. Connectez-vous sur '.$loginUrl.'.',
+                'loginUrl' => $loginUrl,
+            ], 403);
+        }
         if (!MaximusAuth::canAuthenticate($user)) {
             return response()->json(['error' => 'Email ou mot de passe incorrect.'], 401);
         }
@@ -264,7 +278,7 @@ class AuthController extends Controller
 
         $email = Str::lower(trim($data['email']));
         $existing = AuthUser::query()->whereKey($data['id'])->first();
-        $emailOwner = AuthUser::query()->where('email', $email)->first();
+        $emailOwner = AuthUser::query()->where('email', $email)->where('status', 'ACTIF')->first();
         if ($emailOwner && (! $existing || $emailOwner->id !== $existing->id)) {
             return response()->json(['error' => 'Cette adresse email est déjà utilisée.'], 409);
         }

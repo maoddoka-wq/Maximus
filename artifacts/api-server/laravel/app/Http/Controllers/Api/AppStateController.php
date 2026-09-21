@@ -574,9 +574,15 @@ class AppStateController extends Controller
             ->whereIn('id', $companyIds)
             ->get()
             ->keyBy('id');
+        $installationIds = $companies->pluck('erp_installation_id')->filter()->values()->all();
+        $installations = DB::table('maximus_installations')
+            ->whereIn('id', $installationIds)
+            ->whereNull('revoked_at')
+            ->get()
+            ->keyBy('id');
 
         $state['companies'] = array_map(
-            function (mixed $item) use ($companies): mixed {
+            function (mixed $item) use ($companies, $installations): mixed {
                 if (!is_array($item)) {
                     return $item;
                 }
@@ -592,6 +598,8 @@ class AppStateController extends Controller
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
                     'deletionLocked' => (bool) ($company->deletion_locked ?? true),
+                    'primaryInstallationId' => $company->erp_installation_id,
+                    'primaryInstallationMode' => $installations->get($company->erp_installation_id)?->mode,
                 ]);
             },
             $state['companies'],
@@ -619,6 +627,13 @@ class AppStateController extends Controller
         if (!$company) {
             return $state;
         }
+        $primaryInstallation = $company->erp_installation_id
+            ? DB::table('maximus_installations')
+                ->where('id', $company->erp_installation_id)
+                ->where('company_id', $company->id)
+                ->whereNull('revoked_at')
+                ->first()
+            : null;
 
         $registryCompany = [
             'id' => $company->id,
@@ -641,6 +656,8 @@ class AppStateController extends Controller
             'accentColor' => $company->accent_color,
             'sidebarColor' => $company->sidebar_color,
             'deletionLocked' => (bool) ($company->deletion_locked ?? true),
+            'primaryInstallationId' => $primaryInstallation?->id,
+            'primaryInstallationMode' => $primaryInstallation?->mode,
         ];
 
         $companies = collect($state['companies'] ?? []);

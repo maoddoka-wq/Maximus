@@ -350,6 +350,13 @@ class CompanyController extends Controller
         }
         if ($changes !== []) {
             $company->update($changes);
+            if (($changes['login_mode'] ?? $company->login_mode) === 'CUSTOM') {
+                AuthSession::query()
+                    ->whereIn('user_id', function ($query) use ($companyId): void {
+                        $query->select('id')->from('auth_users')->where('company_id', $companyId);
+                    })
+                    ->delete();
+            }
         }
 
         return response()->json([
@@ -556,6 +563,14 @@ class CompanyController extends Controller
 
     private function companyPayload(Company $company): array
     {
+        $primaryInstallation = $company->erp_installation_id
+            ? DB::table('maximus_installations')
+                ->where('id', $company->erp_installation_id)
+                ->where('company_id', $company->id)
+                ->whereNull('revoked_at')
+                ->first()
+            : null;
+
         return [
             'id' => $company->id,
             'name' => (string) ($company->name ?? ''),
@@ -580,6 +595,8 @@ class CompanyController extends Controller
             'deletionLocked' => (bool) ($company->deletion_locked ?? true),
             'loginMode' => $company->login_mode ?: 'MAXIMUS',
             'loginSlug' => $company->login_slug,
+            'primaryInstallationId' => $primaryInstallation?->id,
+            'primaryInstallationMode' => $primaryInstallation?->mode,
             'loginUrl' => $company->login_slug
                 ? '/entreprise/'.rawurlencode($company->login_slug).'/connexion'
                 : null,

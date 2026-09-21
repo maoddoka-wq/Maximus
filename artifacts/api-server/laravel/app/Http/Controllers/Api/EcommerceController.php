@@ -292,7 +292,7 @@ class EcommerceController extends Controller
         }
 
         $company = $this->company($request);
-        if (DB::table('ecommerce_domains')->where('domain', $domain)->exists()) {
+        if (DB::table('ecommerce_domains')->where('domain', $domain)->whereNull('deleted_at')->exists()) {
             return response()->json(['error' => 'Ce domaine est déjà rattaché à une boutique.'], 422);
         }
 
@@ -305,6 +305,7 @@ class EcommerceController extends Controller
             'status' => 'PENDING',
             'last_error' => '',
             'verified_at' => null,
+            'deleted_at' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -316,7 +317,7 @@ class EcommerceController extends Controller
                 || $domain === $centralHost) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['domain' => 'Ce nom d’hôte est réservé à un accès ERP.']);
             }
-            if (DB::table('ecommerce_domains')->where('domain', $domain)->exists()) {
+            if (DB::table('ecommerce_domains')->where('domain', $domain)->whereNull('deleted_at')->exists()) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['domain' => 'Ce domaine est déjà rattaché à une boutique.']);
             }
             DB::table('ecommerce_domains')->insert($row);
@@ -334,6 +335,7 @@ class EcommerceController extends Controller
         $row = DB::table('ecommerce_domains')
             ->where('id', $id)
             ->where('company_id', $this->company($request))
+            ->whereNull('deleted_at')
             ->first();
         if (! $row) {
             return response()->json(['error' => 'Domaine introuvable.'], 404);
@@ -371,7 +373,12 @@ class EcommerceController extends Controller
         $deleted = DB::table('ecommerce_domains')
             ->where('id', $id)
             ->where('company_id', $this->company($request))
-            ->delete();
+            ->whereNull('deleted_at')
+            ->update([
+                'status' => 'ARCHIVED',
+                'deleted_at' => now(),
+                'updated_at' => now(),
+            ]);
         if (! $deleted) {
             return response()->json(['error' => 'Domaine introuvable.'], 404);
         }
@@ -1919,6 +1926,7 @@ class EcommerceController extends Controller
     {
         return DB::table('ecommerce_domains')
             ->where('company_id', $company)
+            ->whereNull('deleted_at')
             ->orderBy('domain')
             ->get()
             ->map(fn ($row) => $this->domain($row))

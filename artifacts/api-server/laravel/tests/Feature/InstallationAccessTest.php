@@ -387,8 +387,10 @@ class InstallationAccessTest extends TestCase
         $this->getJson('/api/companies/access-company/installation-access')->assertOk()->assertJsonPath('primaryInstallationId', null);
         $id = $this->postJson($this->path(), ['url' => 'http://erp.lan'])->assertCreated()->json('address.id');
         $this->postJson($this->path().'/'.$id.'/activate')->assertOk();
-        // Even a validated test installation must leave SaaS usable until explicit cutover.
-        $this->postJson($generic, $credentials)->assertOk();
+        // A personalized company always uses its branded login, even before dedicated cutover.
+        $this->postJson($generic, $credentials)->assertForbidden()
+            ->assertJsonPath('code', 'COMPANY_CUSTOM_LOGIN')
+            ->assertJsonPath('loginUrl', '/entreprise/access-company/connexion');
         $this->postJson($slug, $credentials)->assertOk();
         $this->postJson($select, ['confirmedReady' => true])->assertOk()->assertJsonPath('primaryInstallationId', 'install-a');
         $this->getJson('/api/companies/access-company/installation-access')->assertOk()->assertJsonPath('primaryInstallationId', 'install-a');
@@ -412,7 +414,8 @@ class InstallationAccessTest extends TestCase
         $this->withUnencryptedCookie(MaximusAuth::COOKIE, $this->adminToken);
         $this->getJson('/api/auth/session')->assertOk()->assertJsonPath('user.role', 'maximus_admin');
         $this->deleteJson('/api/companies/access-company/installation-access/primary')->assertOk()->assertJsonPath('primaryInstallationId', null);
-        $this->postJson($generic, $credentials)->assertOk();
+        $this->postJson($generic, $credentials)->assertForbidden()
+            ->assertJsonPath('code', 'COMPANY_CUSTOM_LOGIN');
         $this->postJson($slug, $credentials)->assertOk();
         $this->withUnencryptedCookie(MaximusAuth::COOKIE, $oldSession)->getJson('/api/auth/session')->assertOk()->assertJsonPath('user.companyId', 'access-company');
         $this->assertDatabaseHas('auth_users', ['id' => $user->id, 'status' => 'ACTIF']);

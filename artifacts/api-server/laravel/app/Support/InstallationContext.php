@@ -141,7 +141,10 @@ final class InstallationContext
             return 'company';
         }
         // Central installation rows are never a tenant selector on another server.
-        $shop = DB::table('ecommerce_domains')->where('domain', $host)->where('status', 'ACTIVE');
+        $shop = DB::table('ecommerce_domains')
+            ->where('domain', $host)
+            ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at');
         if (self::isCompanyOnly()) {
             $shop->where('company_id', self::companyId() ?? '');
         }

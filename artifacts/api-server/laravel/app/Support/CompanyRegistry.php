@@ -54,6 +54,14 @@ final class CompanyRegistry
         if (DB::getSchemaBuilder()->hasTable('ecommerce_customer_sessions')) {
             DB::table('ecommerce_customer_sessions')->where('company_id', $companyId)->delete();
         }
+        if (DB::getSchemaBuilder()->hasTable('ecommerce_domains')
+            && DB::getSchemaBuilder()->hasColumn('ecommerce_domains', 'deleted_at')) {
+            DB::table('ecommerce_domains')->where('company_id', $companyId)->update([
+                'status' => 'ARCHIVED',
+                'deleted_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
         if (DB::getSchemaBuilder()->hasTable('ecommerce_customers')) {
             DB::table('ecommerce_customers')->where('company_id', $companyId)->update([
                 'status' => 'SUSPENDU',

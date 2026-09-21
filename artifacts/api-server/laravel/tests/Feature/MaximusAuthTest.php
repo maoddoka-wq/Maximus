@@ -360,6 +360,7 @@ class MaximusAuthTest extends TestCase
             'email' => 'admin@deleted-company.test',
             'status' => 'ACTIF',
             'requested_modules' => ['presences', 'stocks', 'ecommerce'],
+            'deletion_locked' => false,
         ]);
 
         $companyUser = AuthUser::query()->create([

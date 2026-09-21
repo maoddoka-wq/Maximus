@@ -706,7 +706,11 @@ class EcommerceTest extends TestCase
         $request->deleteJson('/api/ecommerce/domains/'.$domainId.'?companyId=kora')
             ->assertOk()
             ->assertJson(['ok' => true]);
-        $this->assertDatabaseMissing('ecommerce_domains', ['id' => $domainId]);
+        $this->assertDatabaseHas('ecommerce_domains', [
+            'id' => $domainId,
+            'status' => 'ARCHIVED',
+        ]);
+        $this->assertNotNull(DB::table('ecommerce_domains')->where('id', $domainId)->value('deleted_at'));
     }
 
     public function test_active_custom_domain_serves_only_its_published_company_store(): void

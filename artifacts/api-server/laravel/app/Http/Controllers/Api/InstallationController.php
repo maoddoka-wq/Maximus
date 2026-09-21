@@ -99,7 +99,11 @@ final class InstallationController extends Controller
         if (! $company) {
             return response()->json(['error' => 'L’entreprise liée à cette installation est inactive.'], 409);
         }
-        $domains = DB::table('ecommerce_domains')->where('company_id', $company->id)->orderBy('domain')->get()
+        $domains = DB::table('ecommerce_domains')
+            ->where('company_id', $company->id)
+            ->whereNull('deleted_at')
+            ->orderBy('domain')
+            ->get()
             ->map(fn (object $domain): array => [
                 'id' => $domain->id,
                 'domain' => $domain->domain,

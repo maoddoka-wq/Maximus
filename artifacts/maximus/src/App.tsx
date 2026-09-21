@@ -3219,6 +3219,8 @@ function CompaniesPage({
         (filter === 'En attente' && c.status === 'EN ATTENTE') ||
         (filter === 'Suspendues' && c.status === 'SUSPENDU'),
     );
+  const dedicatedCompanies = list.filter((company) => Boolean(company.primaryInstallationId));
+  const sharedCompanies = list.filter((company) => !company.primaryInstallationId);
   const deleteCompany = async (company: Company) => {
     if (
       !(await confirm({
@@ -3276,29 +3278,19 @@ function CompaniesPage({
         }}
       />
     );
-  return (
-    <section className="card-surface overflow-hidden rounded-2xl">
-      <div className="border-b p-5">
-        <Toolbar
-          search={search}
-          setSearch={(value) => {
-            setSearch(value);
-            sessionStorage.setItem('maximus-company-search', value);
-          }}
-        >
-          <ActionButton primary testId="button-add-company" onClick={() => onNavigate('/inscription')}>
-            Ajouter une entreprise
-          </ActionButton>
-        </Toolbar>
-        <div className="flex gap-2 overflow-x-auto">
-          {['Toutes', 'Actives', 'Suspendues'].map((label) => (
-            <FilterChip key={label} label={label} active={filter === label} onClick={() => setFilter(label)} />
-          ))}
-        </div>
+  const renderCompanyTable = (title: string, companies: Company[]) => companies.length > 0 ? (
+    <div className="overflow-hidden rounded-2xl border">
+      <div className="border-b bg-[hsl(var(--muted)/.35)] px-5 py-3">
+        <h3 className="font-bold">{title}</h3>
+        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+          {title.startsWith('Installations dédiées')
+            ? 'Ces entreprises utilisent leur propre accès ERP principal. Le lien central reste réservé à une restauration explicite.'
+            : 'Ces entreprises utilisent actuellement l’accès ERP mutualisé MAXIMUS.'}
+        </p>
       </div>
       <DataTable
         headers={['Entreprise', 'Responsable', 'Pays', 'Modules', 'Statut', 'Actions']}
-        rows={list.map((c) => [
+        rows={companies.map((c) => [
           <button
             data-testid={`button-open-company-${c.id}`}
             aria-label={`Ouvrir ${c.name}`}
@@ -3321,21 +3313,21 @@ function CompaniesPage({
           `${c.allowedModules.length} / ${c.requestedModules.length}`,
           <StatusBadge status={c.status} />,
           <div className="flex flex-wrap items-center gap-2">
-             <button
-               type="button"
-               data-testid={`button-open-company-installation-${c.id}`}
-               aria-label={`Ouvrir l’installation de ${c.name}`}
-               title={`Installation de ${c.name}`}
-               onClick={(event) => {
-                 event.stopPropagation();
-                 setSelected(c);
-                 onNavigate(`/maximus/entreprises/${encodeURIComponent(c.id)}`);
-               }}
-               className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] px-2.5 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
-             >
-               <KeyRound size={14} />
-               <span>Installation</span>
-             </button>
+            <button
+              type="button"
+              data-testid={`button-open-company-installation-${c.id}`}
+              aria-label={`Ouvrir l’installation de ${c.name}`}
+              title={`Installation de ${c.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelected(c);
+                onNavigate(`/maximus/entreprises/${encodeURIComponent(c.id)}`);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] px-2.5 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)]"
+            >
+              <KeyRound size={14} />
+              <span>Installation</span>
+            </button>
             <button
               type="button"
               data-testid={`button-edit-company-${c.id}`}
@@ -3379,6 +3371,37 @@ function CompaniesPage({
           </div>,
         ])}
       />
+    </div>
+  ) : null;
+  return (
+    <section className="card-surface overflow-hidden rounded-2xl">
+      <div className="border-b p-5">
+        <Toolbar
+          search={search}
+          setSearch={(value) => {
+            setSearch(value);
+            sessionStorage.setItem('maximus-company-search', value);
+          }}
+        >
+          <ActionButton primary testId="button-add-company" onClick={() => onNavigate('/inscription')}>
+            Ajouter une entreprise
+          </ActionButton>
+        </Toolbar>
+        <div className="flex gap-2 overflow-x-auto">
+          {['Toutes', 'Actives', 'Suspendues'].map((label) => (
+            <FilterChip key={label} label={label} active={filter === label} onClick={() => setFilter(label)} />
+          ))}
+        </div>
+      </div>
+      <div className="space-y-5 p-5">
+        {renderCompanyTable('Installations dédiées / locales principales', dedicatedCompanies)}
+        {renderCompanyTable('Accès mutualisé MAXIMUS', sharedCompanies)}
+        {list.length === 0 && (
+          <p className="rounded-xl border border-dashed p-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
+            Aucune entreprise ne correspond aux filtres actuels.
+          </p>
+        )}
+      </div>
       {editingCompany && (
         <CompanyEditModal
           company={editingCompany}
@@ -3411,6 +3434,7 @@ function CompanyDetail({
   onBack: () => void;
 }) {
   const { confirm } = useAppDialog();
+  const usesDedicatedPrimary = Boolean(company.primaryInstallationId);
   const [active, setActive] = useState(company.allowedModules);
   const [installationBusy, setInstallationBusy] = useState(false);
   const [installationEndpoint, setInstallationEndpoint] = useState('');
@@ -3764,18 +3788,23 @@ function CompanyDetail({
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Hébergement mutualisé</p>
-            <h2 className="mt-2 font-bold">Connexion sur MAXIMUS central</h2>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
+              {usesDedicatedPrimary ? 'Accès central historique' : 'Hébergement mutualisé'}
+            </p>
+            <h2 className="mt-2 font-bold">
+              {usesDedicatedPrimary ? 'Connexion centrale réservée à la restauration' : 'Connexion sur MAXIMUS central'}
+            </h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Ces réglages concernent uniquement l’accès mutualisé. Sur une installation dédiée ou locale,
-              la connexion entreprise est automatique et indépendante de cette autorisation.
+              {usesDedicatedPrimary
+                ? 'Cette entreprise utilise son installation ERP principale. Le lien central n’est pas son accès quotidien et reste conservé uniquement pour une restauration explicite.'
+                : 'Ces réglages concernent uniquement l’accès mutualisé. Sur une installation dédiée ou locale, la connexion entreprise est automatique et indépendante de cette autorisation.'}
             </p>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${loginSettings?.customAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
             {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
           </span>
         </div>
-        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+        {!usesDedicatedPrimary && <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
           <input
             type="checkbox"
             data-testid="checkbox-company-custom-login"
@@ -3790,8 +3819,8 @@ function CompanyDetail({
               Le lien est généré à partir du nom de l’entreprise et reste stable même si son nom est modifié plus tard.
             </span>
           </span>
-        </label>
-        <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        </label>}
+        {!usesDedicatedPrimary && <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <label className="block text-sm font-semibold">
             Mode actuellement utilisé
             <select
@@ -3814,7 +3843,7 @@ function CompanyDetail({
               </>
             ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Génération en cours…</p>}
           </div>
-        </div>
+        </div>}
         <div className="mt-6 border-t pt-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>

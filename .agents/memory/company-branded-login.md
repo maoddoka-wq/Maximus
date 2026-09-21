@@ -22,3 +22,9 @@ Le retour après déconnexion doit conserver l’origine de la connexion réussi
 **Why:** Le chargement et l’effacement du catalogue peuvent perdre le slug alors que la session est valide ; le retour retombait alors sur MAXIMUS après actualisation. Une connexion générique ne doit pas hériter de l’origine d’un autre compte.
 
 **How to apply:** Restaurer ce contexte uniquement après confirmation serveur de la même entreprise, l’effacer pour une connexion générique et garder la racine locale pour une installation dédiée.
+
+Sur le central, le mode `CUSTOM` refuse explicitement le login général et renvoie vers le slug de l’entreprise ; sur `dedicated`/`on_premise`, le formulaire général reste le login local légitime. Le passage en `CUSTOM` révoque les sessions centrales existantes.
+
+**Why:** Le même endpoint de formulaire est partagé par le central et les installations locales, mais la règle de gouvernance ne doit pas empêcher une instance dédiée de fonctionner hors ligne.
+
+**How to apply:** Appliquer le refus personnalisé seulement après résolution du contexte central, et invalider les sessions au changement de mode plutôt que de laisser une session centrale survivre silencieusement.

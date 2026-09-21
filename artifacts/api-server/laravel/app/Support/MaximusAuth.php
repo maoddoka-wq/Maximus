@@ -65,32 +65,36 @@ final class MaximusAuth
             return null;
         }
         $company = Company::query()->whereKey($user->company_id)->where('status', 'ACTIF')->whereNull('deleted_at')->first();
-        if (!$company || $company->erp_installation_id === null) {
+        if (!$company) {
             return null;
         }
         $url = null;
-        $installation = DB::table('maximus_installations')->where('id', $company->erp_installation_id)
-            ->where('company_id', $company->id)->whereNull('revoked_at')->whereIn('status', ['READY', 'CONNECTED'])->first();
-        if ($installation && in_array($installation->mode, ['dedicated', 'on_premise'], true)) {
-            $primary = DB::table('maximus_installation_addresses')->where('installation_id', $installation->id)
-                ->where('is_primary', true)->where('status', 'ACTIVE')->first();
-            if ($primary) {
-                try {
-                    $origin = app(InstallationAddressVerifier::class)->normalize($primary->url, $installation->mode);
-                    if ($origin['hostname'] === $primary->hostname && $origin['local'] === ($primary->validation_method === 'local')) {
-                        $url = $origin['url'].'/';
+        if ($company->erp_installation_id !== null) {
+            $installation = DB::table('maximus_installations')->where('id', $company->erp_installation_id)
+                ->where('company_id', $company->id)->whereNull('revoked_at')->whereIn('status', ['READY', 'CONNECTED'])->first();
+            if ($installation && in_array($installation->mode, ['dedicated', 'on_premise'], true)) {
+                $primary = DB::table('maximus_installation_addresses')->where('installation_id', $installation->id)
+                    ->where('is_primary', true)->where('status', 'ACTIVE')->first();
+                if ($primary) {
+                    try {
+                        $origin = app(InstallationAddressVerifier::class)->normalize($primary->url, $installation->mode);
+                        if ($origin['hostname'] === $primary->hostname && $origin['local'] === ($primary->validation_method === 'local')) {
+                            $url = $origin['url'].'/';
+                        }
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        // A stale/corrupt address must not restore central access or become a redirect.
                     }
-                } catch (\Illuminate\Validation\ValidationException $exception) {
-                    // A stale/corrupt address must not restore central access or become a redirect.
                 }
             }
+            return [
+                'code' => 'COMPANY_DEDICATED_ACCESS',
+                'error' => 'Votre entreprise utilise désormais son installation ERP dédiée. '
+                    .($url ? 'Connectez-vous sur '.$url : 'Demandez l’adresse validée à votre administrateur.'),
+                'loginUrl' => $url,
+            ];
         }
-        return [
-            'code' => 'COMPANY_DEDICATED_ACCESS',
-            'error' => 'Votre entreprise utilise désormais son installation ERP dédiée. '
-                .($url ? 'Connectez-vous sur '.$url : 'Demandez l’adresse validée à votre administrateur.'),
-            'loginUrl' => $url,
-        ];
+
+        return null;
     }
 
     public static function canAuthenticate(AuthUser $user): bool
