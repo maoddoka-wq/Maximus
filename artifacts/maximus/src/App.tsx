@@ -3784,7 +3784,12 @@ function CompanyDetail({
           synchronisations futures ; elle ne remplace pas l’arrêt du service web du VPS.
         </p>
       </section>
-      <CompanyInstallationAccess companyId={company.id} companyName={company.name} refreshKey={installationRefreshKey} />
+      <CompanyInstallationAccess
+        companyId={company.id}
+        companyName={company.name}
+        refreshKey={installationRefreshKey}
+        loginUrl={usesDedicatedPrimary ? null : loginSettings?.url}
+      />
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -8525,7 +8530,12 @@ function CompanyModulesDetail({
         </p>
       </section>
 
-      <CompanyInstallationAccess companyId={company.id} companyName={company.name} refreshKey={installationRefreshKey} />
+      <CompanyInstallationAccess
+        companyId={company.id}
+        companyName={company.name}
+        refreshKey={installationRefreshKey}
+        loginUrl={loginSettings?.url}
+      />
 
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

@@ -24,9 +24,10 @@ interface CompanyInstallationAccessProps {
   companyId: string;
   companyName: string;
   refreshKey?: number;
+  loginUrl?: string | null;
 }
 
-export function CompanyInstallationAccess({ companyId, companyName, refreshKey }: CompanyInstallationAccessProps) {
+export function CompanyInstallationAccess({ companyId, companyName, refreshKey, loginUrl }: CompanyInstallationAccessProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -580,13 +581,17 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
         );
       })}
 
-      {data.centralLoginUrl && (
+      {(loginUrl || data.centralLoginUrl) && (
         <Card className="bg-muted/30 border-dashed">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium">Lien mutualisé historique</p>
-                <p className="text-xs text-muted-foreground mt-1">L'environnement des comptes centraux est séparé de l'accès direct ERP.</p>
+                <p className="text-sm font-medium">{loginUrl ? 'Lien de connexion personnalisé' : 'Lien mutualisé historique'}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {loginUrl
+                    ? 'Ouvrez directement la page de connexion de cette entreprise.'
+                    : 'L’environnement des comptes centraux est séparé de l’accès direct ERP.'}
+                </p>
                 {data.primaryInstallationId !== null && (
                   <p className="text-xs text-destructive mt-1 font-medium">
                     Désactivé pour l'accès employé pendant qu'une installation est principale.
@@ -594,12 +599,12 @@ export function CompanyInstallationAccess({ companyId, companyName, refreshKey }
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
-                <Button variant="outline" size="sm" onClick={() => copyToClipboard(data.centralLoginUrl)}>
+                <Button variant="outline" size="sm" onClick={() => copyToClipboard(loginUrl ?? data.centralLoginUrl)}>
                   <Copy className="w-4 h-4 mr-2" />
                   Copier
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <a href={data.centralLoginUrl} target="_blank" rel="noopener noreferrer">
+                  <a href={loginUrl ?? data.centralLoginUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Ouvrir
                   </a>
