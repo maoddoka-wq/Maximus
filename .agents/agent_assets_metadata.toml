@@ -266,17 +266,3 @@ mtime_ms = 1789991673221
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/0bb185c0-6647-4305-90f6-8c4c2e8a5617/fff3a148-c639-4d8a-a6de-8efd0157d102"
 storage_version_token = "1789991678081980"
 content_type = "application/pdf"
-
-[[outputs]]
-id = "hE5BRmb41BpUn9OQMj0v_"
-uri = "file://.agents/outputs/maximus-strategie-commerciale.pdf"
-type = "pdf"
-title = "MAXIMUS — Stratégie commerciale et présentation"
-description = "Guide complet en français pour présenter MAXIMUS aux entreprises, trouver des prospects, conduire les pitchs, gérer les objections, dépasser la timidité et former une équipe commerciale."
-logical_id = "ae2359df-d7fa-42d2-8cbd-221620a915c1"
-content_hash = "sha256:88f98bd44565432a5fd74051892e66b8ccd705ae68078a0bd22ef42606f086ea"
-size = 358964
-mtime_ms = 1789998336098
-storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/ae2359df-d7fa-42d2-8cbd-221620a915c1/3a615e6f-2195-43eb-b22f-93e61a25badb"
-storage_version_token = "1789998341411234"
-content_type = "application/pdf"

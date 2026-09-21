@@ -80,4 +80,3 @@
 - [Cache Composer Windows](composer-windows-cache.md) — si un fichier Laravel manque malgré Composer, vider le cache Composer puis réinstaller le paquet framework.
 - [Chemin Vite sous Windows](windows-vite-base-path.md) — construire depuis PowerShell natif pour éviter que Git Bash transforme BASE_PATH=/ en chemin Program Files/Git.
 - [Version des installations dédiées](dedicated-installation-versioning.md) — premier enrôlement à commit identique ; échanges ultérieurs bornés par identité et protocole compatible.
-- [Mise en page mobile Transport public](public-transport-mobile-layout.md) — garder en-tête, carte et navigation fixes ; seul le panneau métier doit défiler.
