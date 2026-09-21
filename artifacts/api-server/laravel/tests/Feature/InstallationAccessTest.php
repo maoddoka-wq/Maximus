@@ -356,6 +356,27 @@ class InstallationAccessTest extends TestCase
             ->assertJsonPath('company.primaryColor', '#F2B705');
     }
 
+    public function test_sync_configuration_includes_an_active_module_added_after_registration(): void
+    {
+        Company::query()->whereKey('access-company')->update(['requested_modules' => []]);
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'access-company', 'module_id' => 'paie'],
+            [
+                'id' => 'company-module-access-company-paie',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode([]),
+                'configuration' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->withHeader('Authorization', 'Bearer token-install-a')
+            ->getJson('/api/installation-sync/configuration')
+            ->assertOk()
+            ->assertJsonPath('modules.ids.0', 'paie');
+    }
+
     public function test_known_revoked_token_has_explicit_code_but_unknown_token_does_not(): void
     {
         DB::table('maximus_installations')->where('id', 'install-a')->update(['revoked_at' => now()]);

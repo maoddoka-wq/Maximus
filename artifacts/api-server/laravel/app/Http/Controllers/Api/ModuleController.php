@@ -108,8 +108,20 @@ class ModuleController extends Controller
             }
             $requestedPermissions = $company->requested_module_permissions ?? [];
             $requestedPermissions[$moduleId] = $featurePermissions;
+            $requestedModules = array_values(array_unique(array_map('strval', $company->requested_modules ?? [])));
+            if (in_array($input['status'], ['ACTIF', 'BETA', 'MAINTENANCE'], true)) {
+                if (! in_array($moduleId, $requestedModules, true)) {
+                    $requestedModules[] = $moduleId;
+                }
+            } else {
+                $requestedModules = array_values(array_filter(
+                    $requestedModules,
+                    static fn (string $currentModuleId): bool => $currentModuleId !== $moduleId,
+                ));
+            }
 
             $company->update([
+                'requested_modules' => $requestedModules,
                 'requested_module_features' => $requestedFeatures,
                 'requested_module_pack_ids' => $requestedPacks,
                 'requested_module_permissions' => $requestedPermissions,

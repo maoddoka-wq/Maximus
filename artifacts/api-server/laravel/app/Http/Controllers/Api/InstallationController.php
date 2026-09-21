@@ -121,6 +121,7 @@ final class InstallationController extends Controller
             'last_error' => null,
             'updated_at' => now(),
         ]);
+        $moduleIds = $this->synchronizedModuleIds($company);
 
         return response()->json([
             'configurationVersion' => (int) $installation->configuration_version,
@@ -146,15 +147,42 @@ final class InstallationController extends Controller
                 'sidebarColor' => $company->sidebar_color ?: '#161D27',
             ],
             'modules' => [
-                'ids' => $company->requested_modules ?? [],
+                'ids' => $moduleIds,
                 'packIds' => $company->requested_module_pack_ids ?? [],
                 'featureIds' => $company->requested_module_features ?? [],
                 'permissions' => $company->requested_module_permissions ?? [],
             ],
-            'catalog' => ModuleCatalog::publishedCatalog($company->requested_modules ?? []),
+            'catalog' => ModuleCatalog::publishedCatalog($moduleIds),
             'domains' => $domains,
             'erpAccess' => $this->erpAccess((string) $installation->id),
         ]);
+    }
+
+    /** @return list<string> */
+    private function synchronizedModuleIds(Company $company): array
+    {
+        $requested = array_values(array_unique(array_map('strval', $company->requested_modules ?? [])));
+        $statuses = DB::table('maximus_company_modules')
+            ->where('company_id', $company->id)
+            ->pluck('status', 'module_id')
+            ->map(static fn (mixed $status): string => (string) $status)
+            ->all();
+        $allowedStatuses = ['ACTIF', 'BETA', 'MAINTENANCE'];
+        $moduleIds = [];
+
+        foreach ($requested as $moduleId) {
+            if (! array_key_exists($moduleId, $statuses)
+                || in_array($statuses[$moduleId], $allowedStatuses, true)) {
+                $moduleIds[] = $moduleId;
+            }
+        }
+        foreach ($statuses as $moduleId => $status) {
+            if (in_array($status, $allowedStatuses, true) && ! in_array($moduleId, $moduleIds, true)) {
+                $moduleIds[] = (string) $moduleId;
+            }
+        }
+
+        return $moduleIds;
     }
 
     private function erpAccess(string $installationId): array

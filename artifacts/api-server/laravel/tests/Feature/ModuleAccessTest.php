@@ -44,6 +44,20 @@ class ModuleAccessTest extends TestCase
 
     public function test_maximus_can_activate_a_module_for_a_selected_company(): void
     {
+        $company = Company::query()->firstOrCreate(
+            ['id' => 'acme'],
+            [
+                'name' => 'Acme',
+                'manager' => 'Responsable',
+                'email' => 'acme@maximus.test',
+                'status' => 'ACTIF',
+                'requested_modules' => [],
+            ],
+        );
+        $company->update([
+            'requested_modules' => array_values(array_diff($company->requested_modules ?? [], ['stocks'])),
+        ]);
+
         $maximusAdmin = AuthUser::query()->create([
             'id' => 'module-maximus-admin',
             'email' => 'module-admin@maximus.demo',
@@ -66,6 +80,7 @@ class ModuleAccessTest extends TestCase
             'module_id' => 'stocks',
             'status' => 'ACTIF',
         ]);
+        $this->assertContains('stocks', Company::query()->findOrFail('acme')->requested_modules);
     }
 
     public function test_maximus_can_put_a_module_in_maintenance_for_a_selected_company(): void
