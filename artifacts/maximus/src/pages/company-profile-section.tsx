@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UserRound } from 'lucide-react';
+import { RotateCcw, UserRound } from 'lucide-react';
 import type { Company, StoreData } from '@/lib/store';
 import { authApi } from '@/lib/auth-api';
 import { companyRequestApi } from '@/lib/company-request-api';
@@ -255,9 +255,14 @@ export function CompanyProfileSection({
             </label>)}
           </div>
           <div className="mt-6 border-t pt-5">
-            <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Palettes rapides</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Palettes rapides</p>
+              <button type="button" data-testid="button-reset-maximus-colors" onClick={() => setForm(current => ({ ...current, ...defaultCompanyTheme }))} className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.06)] px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.12)]">
+                <RotateCcw size={12} />Revenir aux couleurs MAXIMUS
+              </button>
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {companyThemePresets.map(preset => <button key={preset.name} type="button" onClick={() => setForm(current => ({ ...current, primaryColor: preset.primaryColor, accentColor: preset.accentColor, sidebarColor: preset.sidebarColor }))} className="inline-flex items-center gap-2 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:border-[hsl(var(--primary))]">
+              {companyThemePresets.filter(preset => preset.name !== 'MAXIMUS').map(preset => <button key={preset.name} type="button" onClick={() => setForm(current => ({ ...current, primaryColor: preset.primaryColor, accentColor: preset.accentColor, sidebarColor: preset.sidebarColor }))} className="inline-flex items-center gap-2 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-[10px] font-bold hover:border-[hsl(var(--primary))]">
                 <span className="flex gap-0.5"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.primaryColor }} /><span className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.accentColor }} /></span>{preset.name}
               </button>)}
             </div>

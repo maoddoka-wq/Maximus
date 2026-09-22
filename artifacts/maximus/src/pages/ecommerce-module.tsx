@@ -18,6 +18,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Settings,
   ShoppingBag,
@@ -93,6 +94,11 @@ const dateLabel = (value: string) => {
 const slugify = (value: string) =>
   value.trim().toLocaleLowerCase('fr-FR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+const maximusShopColors = {
+  primaryColor: '#D69E2E',
+  accentColor: '#172033',
+} as const;
+
 function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: string): EcommerceBootstrap {
   const payload = value && typeof value === 'object' ? value : {} as EcommerceBootstrap;
   const orders = Array.isArray(payload.orders)
@@ -111,8 +117,7 @@ function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: strin
       description: '',
       status: 'DRAFT',
       currency: 'XOF',
-      primaryColor: '#D69E2E',
-      accentColor: '#172033',
+      ...maximusShopColors,
       logoUrl: '',
       heroImages: [],
     },
@@ -286,8 +291,7 @@ export default function EcommerceModulePage({
           description: 'Aperçu administratif sans données de production.',
           status: 'DRAFT',
           currency: 'XOF',
-          primaryColor: '#D69E2E',
-          accentColor: '#172033',
+          ...maximusShopColors,
           logoUrl: '',
           heroImages: [],
         },
@@ -1220,7 +1224,11 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
            {heroFiles.length > 0 && <p className="mt-1 text-[11px] font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p>}
            {store.heroImages.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{store.heroImages.map(url => <span key={url} className="relative"><img src={url} alt="" className="h-20 w-28 rounded-lg object-cover" /><button type="button" disabled={!canModify} onClick={() => { const imageId = url.split('/').pop(); if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de la bannière.'); }} className="absolute right-1 top-1 rounded-full bg-[hsl(var(--destructive))] px-1.5 py-0.5 text-[10px] font-bold text-white disabled:opacity-50" aria-label="Supprimer cette image">×</button></span>)}</div>}
          </div>
-        <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
+         <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] px-4 py-3">
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Utilisez la palette officielle MAXIMUS pour cette vitrine.</p>
+            <button type="button" data-testid="button-reset-maximus-shop-colors" disabled={!canModify} onClick={() => patch(maximusShopColors)} className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)] disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw size={13} />Revenir aux couleurs MAXIMUS</button>
+          </div>
          <div className="flex flex-wrap justify-end gap-2 border-t pt-5"><button type="button" disabled={!canModify || !logoFile} onClick={async () => { if (!logoFile) return; const result = await run(() => createEcommerceApi(store.companyId).uploadStoreLogo(logoFile), 'Logo de la boutique enregistré.'); if (result) setLogoFile(null); }} className="btn inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><Store size={14} />Enregistrer le logo</button><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div>
       </form>
     </Panel>
