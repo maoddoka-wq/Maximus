@@ -67,6 +67,7 @@
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
 - [Frontière Transport Taxi](transport-module-boundary.md) — le cycle Taxi reste séparé de la Location e-commerce, avec ses propres ressources, permissions et données tenant-scoped.
 - [Rapprochement GPS Taxi](transport-gps-matching.md) — sélectionner côté serveur un chauffeur actif, libre et géolocalisé récemment, sans API cartographique externe.
+- [Restauration des courses publiques](public-taxi-trip-persistence.md) — conserver une course active après navigation ou erreur réseau ; ne nettoyer le stockage qu’après état terminal confirmé.
 - [Identifiants du menu Transport](transport-menu-identifiers.md) — générer le menu depuis `overview`, `trips`, `drivers`, `vehicles`, pas depuis les libellés français.
 - [Identifiants canoniques des fonctionnalités](canonical-feature-identities.md) — normaliser libellés, slugs et alias avant de filtrer permissions, menu et onglets internes.
 - [Qualification des chauffeurs](transport-driver-organization.md) — créer l’employé dans Organisation, puis ajouter dans Transport uniquement les données Taxi.
