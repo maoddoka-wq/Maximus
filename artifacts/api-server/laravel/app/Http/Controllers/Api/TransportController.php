@@ -27,8 +27,8 @@ class TransportController extends Controller
         'baseFare' => 500,
         'pricePerKm' => 300,
         'stormPricePerKm' => 300,
-        'primaryColor' => '#0F766E',
-        'accentColor' => '#F59E0B',
+        'primaryColor' => '#161D27',
+        'accentColor' => '#F2B705',
     ];
     private const DAKAR_BOUNDS = [
         'minLatitude' => 14.55,
