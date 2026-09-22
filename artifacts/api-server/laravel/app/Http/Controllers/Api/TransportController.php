@@ -21,6 +21,7 @@ class TransportController extends Controller
     private const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE'];
     private const VEHICLE_STATUSES = ['AVAILABLE', 'ON_TRIP', 'MAINTENANCE'];
     private const TRIP_STATUSES = ['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+    private const MAX_HERO_IMAGES = 4;
     private const DEFAULT_SETTINGS = [
         'gpsValidityMinutes' => 5,
         'trackingIntervalSeconds' => 10,
@@ -126,6 +127,9 @@ class TransportController extends Controller
             'primaryColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'accentColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'heroImageData' => ['sometimes', 'nullable', 'string', 'max:4194304'],
+            'heroImageReplace' => ['sometimes', 'boolean'],
+            'heroImageDataList' => ['sometimes', 'array', 'max:'.self::MAX_HERO_IMAGES],
+            'heroImageDataList.*' => ['string', 'max:2097152'],
         ]);
         $company = $this->company($request);
         $module = DB::table('maximus_company_modules')
@@ -162,7 +166,26 @@ class TransportController extends Controller
             'primaryColor' => $primaryColor,
             'accentColor' => $accentColor,
         ];
-        if (array_key_exists('heroImageData', $input)) {
+        if (($input['heroImageReplace'] ?? false) || array_key_exists('heroImageDataList', $input)) {
+            $imageList = $input['heroImageDataList'] ?? [];
+            $encodedImages = [];
+            foreach ($imageList as $imageData) {
+                $image = $this->decodeImageData((string) $imageData);
+                if ($image === null) {
+                    return response()->json(['error' => 'Chaque photo doit être une image JPG, PNG ou WebP valide de 1 Mo maximum.'], 422);
+                }
+                $encodedImages[] = [
+                    'data' => base64_encode($image['contents']),
+                    'mime' => $image['mime'],
+                ];
+            }
+            unset($configuration['transport']['heroImageData'], $configuration['transport']['heroImageMime']);
+            if ($encodedImages) {
+                $configuration['transport']['heroImages'] = $encodedImages;
+            } else {
+                unset($configuration['transport']['heroImages']);
+            }
+        } elseif (array_key_exists('heroImageData', $input)) {
             if ($input['heroImageData'] === null || trim((string) $input['heroImageData']) === '') {
                 unset($configuration['transport']['heroImageData'], $configuration['transport']['heroImageMime']);
             } else {
@@ -1001,7 +1024,12 @@ class TransportController extends Controller
 
     public function transportHeroImage(Request $request)
     {
-        return $this->serveTransportHeroImage($this->company($request));
+        return $this->serveTransportHeroImage($this->company($request), 0);
+    }
+
+    public function transportHeroImageAt(Request $request, int $index)
+    {
+        return $this->serveTransportHeroImage($this->company($request), $index);
     }
 
     public function publicTransportSettings(Request $request, string $slug): JsonResponse
@@ -1019,6 +1047,7 @@ class TransportController extends Controller
 
         return response()->json([
             'heroImageUrl' => $this->transportHeroImageUrl((string) $store->company_id, $slug),
+            'heroImageUrls' => $this->transportHeroImageUrls((string) $store->company_id, $slug),
             'primaryColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'primaryColor'),
             'accentColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'accentColor'),
         ]);
@@ -1036,12 +1065,18 @@ class TransportController extends Controller
 
         return response()->json([
             'heroImageUrl' => $this->transportHeroImageUrl((string) $store->company_id, null, true),
+            'heroImageUrls' => $this->transportHeroImageUrls((string) $store->company_id, null, true),
             'primaryColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'primaryColor'),
             'accentColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'accentColor'),
         ]);
     }
 
     public function publicTransportHeroImage(Request $request, string $slug)
+    {
+        return $this->publicTransportHeroImageAt($request, $slug, 0);
+    }
+
+    public function publicTransportHeroImageAt(Request $request, string $slug, int $index)
     {
         $store = DB::table('ecommerce_stores')
             ->where('slug', $slug)
@@ -1051,17 +1086,22 @@ class TransportController extends Controller
             abort(404);
         }
 
-        return $this->serveTransportHeroImage((string) $store->company_id);
+        return $this->serveTransportHeroImage((string) $store->company_id, $index);
     }
 
     public function publicDomainTransportHeroImage(Request $request)
+    {
+        return $this->publicDomainTransportHeroImageAt($request, 0);
+    }
+
+    public function publicDomainTransportHeroImageAt(Request $request, int $index)
     {
         $store = $this->publicDomainStore($request);
         if (! $store) {
             abort(404);
         }
 
-        return $this->serveTransportHeroImage((string) $store->company_id);
+        return $this->serveTransportHeroImage((string) $store->company_id, $index);
     }
 
     public function publicDomainVehicleImage(Request $request, string $id)
@@ -2037,31 +2077,81 @@ class TransportController extends Controller
 
     private function transportHeroImageUrl(string $companyId, ?string $slug = null, bool $domain = false): string
     {
-        $settings = $this->rawTransportSettings($companyId);
-        if (empty($settings['heroImageData'])) {
-            return '/taxi-transport-hero.jpg';
-        }
-
-        return $domain
-            ? '/api/shop-domain/transport/hero-image'
-            : '/api/shop/'.rawurlencode((string) $slug).'/transport/hero-image';
+        return $this->transportHeroImageUrls($companyId, $slug, $domain)[0] ?? '/taxi-transport-hero.jpg';
     }
 
-    private function serveTransportHeroImage(string $companyId)
+    private function transportHeroImageUrls(string $companyId, ?string $slug = null, bool $domain = false): array
     {
         $settings = $this->rawTransportSettings($companyId);
-        if (empty($settings['heroImageData'])) {
+        $images = $this->transportHeroImages($settings);
+        if (! $images) {
+            return ['/taxi-transport-hero.jpg'];
+        }
+
+        return array_map(
+            fn (array $image, int $index): string => $domain
+                ? '/api/shop-domain/transport/hero-image/'.$index
+                : '/api/shop/'.rawurlencode((string) $slug).'/transport/hero-image/'.$index,
+            $images,
+            array_keys($images),
+        );
+    }
+
+    private function transportAdminHeroImageUrls(string $companyId): array
+    {
+        $images = $this->transportHeroImages($this->rawTransportSettings($companyId));
+        if (! $images) {
+            return ['/taxi-transport-hero.jpg'];
+        }
+
+        return array_map(
+            fn (array $image, int $index): string => '/api/transport/settings/hero-image/'.$index,
+            $images,
+            array_keys($images),
+        );
+    }
+
+    private function serveTransportHeroImage(string $companyId, int $index)
+    {
+        if ($index < 0 || $index >= self::MAX_HERO_IMAGES) {
             abort(404);
         }
-        $contents = base64_decode((string) $settings['heroImageData'], true);
+        $images = $this->transportHeroImages($this->rawTransportSettings($companyId));
+        $image = $images[$index] ?? null;
+        if (! is_array($image) || empty($image['data'])) {
+            abort(404);
+        }
+        $contents = base64_decode((string) $image['data'], true);
         if (! is_string($contents)) {
             abort(404);
         }
 
         return response($contents, 200, [
-            'Content-Type' => $settings['heroImageMime'] ?? 'application/octet-stream',
+            'Content-Type' => $image['mime'] ?? 'application/octet-stream',
             'Cache-Control' => 'public, max-age=3600',
         ]);
+    }
+
+    private function transportHeroImages(array $settings): array
+    {
+        $images = $settings['heroImages'] ?? null;
+        if (is_array($images)) {
+            $valid = array_values(array_filter($images, static fn ($image): bool =>
+                is_array($image) && is_string($image['data'] ?? null) && $image['data'] !== ''
+            ));
+            if ($valid) {
+                return array_slice($valid, 0, self::MAX_HERO_IMAGES);
+            }
+        }
+
+        if (! empty($settings['heroImageData'])) {
+            return [[
+                'data' => (string) $settings['heroImageData'],
+                'mime' => $settings['heroImageMime'] ?? 'application/octet-stream',
+            ]];
+        }
+
+        return [];
     }
 
     private function rawTransportSettings(string $company): array
@@ -2116,9 +2206,8 @@ class TransportController extends Controller
             'stormPricePerKm' => max(1, min(1000000, (int) ($settings['stormPricePerKm'] ?? ($settings['pricePerKm'] ?? self::DEFAULT_SETTINGS['stormPricePerKm'])))),
             'primaryColor' => $this->transportColor($settings, 'primaryColor'),
             'accentColor' => $this->transportColor($settings, 'accentColor'),
-            'heroImageUrl' => empty($settings['heroImageData'])
-                ? '/taxi-transport-hero.jpg'
-                : '/api/transport/settings/hero-image',
+            'heroImageUrl' => $this->transportAdminHeroImageUrls($company)[0] ?? '/taxi-transport-hero.jpg',
+            'heroImageUrls' => $this->transportAdminHeroImageUrls($company),
         ];
     }
 

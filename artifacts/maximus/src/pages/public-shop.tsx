@@ -921,18 +921,29 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [destinationPlaces, setDestinationPlaces] = useState<PublicTransportPlace[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<PublicTransportPlace | null>(null);
-  const [heroImageUrl, setHeroImageUrl] = useState('/taxi-transport-hero.jpg');
+  const [heroImageUrls, setHeroImageUrls] = useState<string[]>(['/taxi-transport-hero.jpg']);
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
   const locationWatchRef = useRef<number | null>(null);
   const locationTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     void api.getSettings().then(result => {
-      if (result.heroImageUrl) setHeroImageUrl(result.heroImageUrl);
+      const images = Array.from(new Set((result.heroImageUrls?.length ? result.heroImageUrls : [result.heroImageUrl]).filter(Boolean)));
+      setHeroImageUrls(images.length ? images : ['/taxi-transport-hero.jpg']);
+      setHeroImageIndex(0);
       setTransportColors(result);
     }).catch(() => {
       // The shop branding remains visible if the public Transport configuration is unavailable.
     });
   }, [api]);
+
+  useEffect(() => {
+    if (heroImageUrls.length < 2) return undefined;
+    const interval = window.setInterval(() => {
+      setHeroImageIndex(current => (current + 1) % heroImageUrls.length);
+    }, 4500);
+    return () => window.clearInterval(interval);
+  }, [heroImageUrls.length]);
 
   const applyTripResult = (result: { trip: PublicTransportTrip; message: string }) => {
     setTripMessage(result.message);
@@ -1214,12 +1225,36 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       '--transport-accent-foreground': theme.accentForeground,
     } as React.CSSProperties}
   >
-    <header className="flex items-center justify-between border-b border-[#d9dcd6] px-4 py-3.5 sm:px-6">
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#d9dcd6] px-4 py-3.5 sm:px-6">
       <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-[12px] font-bold">
         <ArrowLeft size={16} /> Taxi Urbain
       </button>
-      <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#697173]"><span className="h-2 w-2 bg-[var(--transport-accent)]" /> Dakar</span>
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#697173]"><span className="h-2 w-2 bg-[var(--transport-accent)]" /> Dakar</span>
+        <span
+          className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${locationState === 'ready' ? 'text-emerald-700' : locationState === 'error' ? 'text-rose-700' : locationState === 'locating' ? 'text-amber-700' : 'text-[#697173]'}`}
+          aria-live="polite"
+          title={locationState === 'ready' && position ? `GPS actif · précision ${Math.round(position.accuracy)} mètres` : undefined}
+        >
+          <MapPin size={13} />
+          {locationState === 'ready' && position ? `GPS actif · ${Math.round(position.accuracy)} m` : locationState === 'locating' ? 'GPS en recherche' : locationState === 'error' ? 'GPS indisponible' : 'GPS inactif'}
+        </span>
+      </div>
     </header>
+    <div className="relative overflow-hidden border-b border-[#d9dcd6] bg-[#17202b]">
+      <div className="relative aspect-[16/9] w-full sm:aspect-[16/6]">
+        <img src={heroImageUrls[heroImageIndex] ?? '/taxi-transport-hero.jpg'} alt="Taxi Urbain à Dakar" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
+        <p className="absolute bottom-3 left-4 text-[10px] font-black uppercase tracking-[.18em] text-white sm:bottom-5 sm:left-6">Taxi Urbain · Dakar</p>
+        {heroImageUrls.length > 1 && <>
+          <button type="button" aria-label="Photo précédente" onClick={() => setHeroImageIndex(current => (current - 1 + heroImageUrls.length) % heroImageUrls.length)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm hover:bg-black/65"><ArrowLeft size={16} /></button>
+          <button type="button" aria-label="Photo suivante" onClick={() => setHeroImageIndex(current => (current + 1) % heroImageUrls.length)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm hover:bg-black/65"><ArrowRight size={16} /></button>
+          <div className="absolute bottom-3 right-4 flex items-center gap-1.5 sm:bottom-5 sm:right-6">
+            {heroImageUrls.map((image, index) => <button type="button" key={`${image}-${index}`} aria-label={`Afficher la photo ${index + 1}`} onClick={() => setHeroImageIndex(index)} className={`h-1.5 rounded-full transition-all ${index === heroImageIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/55'}`} />)}
+          </div>
+        </>}
+      </div>
+    </div>
     <div className="px-4 pb-24 pt-5 sm:px-8">
       <div className="flex items-start justify-between gap-4">
        <div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#777f80]">Taxi Urbain · Dakar</p><h1 className="mt-1 text-[25px] font-black tracking-[-.05em] sm:text-3xl">{trip ? 'Votre course' : 'Commander un taxi'}</h1></div>

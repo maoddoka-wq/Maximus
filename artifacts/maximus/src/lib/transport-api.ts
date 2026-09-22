@@ -15,6 +15,9 @@ export interface TransportSettings {
   accentColor: string;
   heroImageUrl: string;
   heroImageData?: string | null;
+  heroImageUrls?: string[];
+  heroImageDataList?: string[] | null;
+  heroImageReplace?: boolean;
 }
 
 export interface Driver {
@@ -265,7 +268,7 @@ export const createTransportApi = (companyId: string) => {
 };
 
 export const createPublicTransportApi = (slug?: string, domain = false) => ({
-  getSettings: () => request<{ heroImageUrl: string; primaryColor?: string; accentColor?: string }>(
+  getSettings: () => request<{ heroImageUrl: string; heroImageUrls?: string[]; primaryColor?: string; accentColor?: string }>(
     domain ? '/shop-domain/transport/settings' : `/shop/${encodeURIComponent(slug ?? '')}/transport/settings`,
   ),
   places: (query: string) => request<{ places: PublicTransportPlace[] }>(
