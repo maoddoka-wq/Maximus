@@ -50,21 +50,28 @@ function readableOn(hex: string): string {
   return colorLuminance(hex) > 0.36 ? '#172033' : '#ffffff';
 }
 
-function publicShopTheme(
-  store: PublicShopBootstrap['store'],
-  transportColors?: { primaryColor?: string; accentColor?: string } | null,
-) {
+function publicShopTheme(store: PublicShopBootstrap['store']) {
+  const configuredPrimary = publicHexColor.test(store.primaryColor) ? store.primaryColor.toLowerCase() : '';
+  const primary = configuredPrimary && configuredPrimary !== '#000000' ? configuredPrimary : '#2563eb';
+  const configuredAccent = publicHexColor.test(store.accentColor) ? store.accentColor.toLowerCase() : '';
+  const accent = configuredAccent && configuredAccent !== '#000000' ? configuredAccent : primary;
+
+  return {
+    primary,
+    accent,
+    primaryForeground: readableOn(primary),
+    accentForeground: readableOn(accent),
+  };
+}
+
+function publicTransportTheme(transportColors: { primaryColor?: string; accentColor?: string } | null) {
   const configuredPrimary = publicHexColor.test(transportColors?.primaryColor ?? '')
     ? transportColors?.primaryColor?.toLowerCase() ?? ''
-    : publicHexColor.test(store.primaryColor)
-      ? store.primaryColor.toLowerCase()
-      : '';
+    : '';
   const primary = configuredPrimary && configuredPrimary !== '#000000' ? configuredPrimary : '#161d27';
   const configuredAccent = publicHexColor.test(transportColors?.accentColor ?? '')
     ? transportColors?.accentColor?.toLowerCase() ?? ''
-    : publicHexColor.test(store.accentColor)
-      ? store.accentColor.toLowerCase()
-      : '';
+    : '';
   const accent = configuredAccent && configuredAccent !== '#000000' ? configuredAccent : '#f2b705';
 
   return {
@@ -891,7 +898,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
   const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
   const [transportColors, setTransportColors] = useState<{ primaryColor?: string; accentColor?: string } | null>(null);
-  const theme = publicShopTheme(store, transportColors);
+  const theme = publicTransportTheme(transportColors);
   const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
   const [form, setForm] = useState({ pickup: 'Ma position GPS', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
