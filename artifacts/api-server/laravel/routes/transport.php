@@ -8,6 +8,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::post('/drivers', [TransportController::class, 'createDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
     Route::patch('/drivers/{id}/availability', [TransportController::class, 'updateDriverAvailability']);
+    Route::patch('/drivers/{id}/pricing-mode', [TransportController::class, 'updateDriverPricingMode']);
     Route::patch('/settings', [TransportController::class, 'updateSettings']);
     Route::get('/settings/hero-image', [TransportController::class, 'transportHeroImage']);
     Route::post('/vehicles', [TransportController::class, 'createVehicle']);

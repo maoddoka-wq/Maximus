@@ -26,6 +26,7 @@ class TransportController extends Controller
         'trackingIntervalSeconds' => 10,
         'baseFare' => 500,
         'pricePerKm' => 300,
+        'stormPricePerKm' => 300,
         'primaryColor' => '#0F766E',
         'accentColor' => '#F59E0B',
     ];
@@ -63,6 +64,13 @@ class TransportController extends Controller
         $drivers = DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get();
         $vehicles = DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get();
         $trips = DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get();
+        $modeEvents = DB::getSchemaBuilder()->hasTable('transport_driver_mode_events')
+            ? DB::table('transport_driver_mode_events')
+                ->where('company_id', $company)
+                ->orderByDesc('created_at')
+                ->limit(100)
+                ->get()
+            : collect();
         $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'employee') {
             $driver = $drivers->firstWhere('employee_id', $actor['employeeId'] ?? null);
@@ -97,6 +105,9 @@ class TransportController extends Controller
                     ->sum('fare'),
             ],
             'settings' => $this->transportSettings($company),
+            'modeEvents' => ($actor['role'] ?? null) === 'employee'
+                ? []
+                : $modeEvents->map(fn (object $event): array => $this->driverModeEvent($event))->values(),
         ]);
     }
 
@@ -111,6 +122,7 @@ class TransportController extends Controller
             'trackingIntervalSeconds' => ['sometimes', 'integer', 'in:10'],
             'baseFare' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
             'pricePerKm' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+            'stormPricePerKm' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
             'primaryColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'accentColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'heroImageData' => ['sometimes', 'nullable', 'string', 'max:4194304'],
@@ -131,6 +143,9 @@ class TransportController extends Controller
         $pricePerKm = array_key_exists('pricePerKm', $input)
             ? (int) $input['pricePerKm']
             : (int) ($transportConfiguration['pricePerKm'] ?? self::DEFAULT_SETTINGS['pricePerKm']);
+        $stormPricePerKm = array_key_exists('stormPricePerKm', $input)
+            ? (int) $input['stormPricePerKm']
+            : (int) ($transportConfiguration['stormPricePerKm'] ?? $pricePerKm);
         $primaryColor = array_key_exists('primaryColor', $input)
             ? strtoupper((string) $input['primaryColor'])
             : $this->transportColor($transportConfiguration, 'primaryColor');
@@ -143,6 +158,7 @@ class TransportController extends Controller
             'trackingIntervalSeconds' => 10,
             'baseFare' => $baseFare,
             'pricePerKm' => $pricePerKm,
+            'stormPricePerKm' => $stormPricePerKm,
             'primaryColor' => $primaryColor,
             'accentColor' => $accentColor,
         ];
@@ -205,6 +221,7 @@ class TransportController extends Controller
             'employee_id' => $employeeId,
             'status' => $input['status'] ?? 'ACTIVE',
             'availability' => 'AVAILABLE',
+            'pricing_mode' => 'NORMAL',
             'availability_updated_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -294,6 +311,76 @@ class TransportController extends Controller
         ]);
 
         return response()->json($this->driver(DB::table('transport_drivers')->where('id', $id)->first()));
+    }
+
+    public function updateDriverPricingMode(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->validated($request, [
+            'pricingMode' => ['required', Rule::in(['NORMAL', 'STORM'])],
+        ]);
+        $company = $this->company($request);
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) !== 'employee' || empty($actor['employeeId'])) {
+            return response()->json(['error' => 'Seul le chauffeur connecté peut modifier son mode tarifaire.'], 403);
+        }
+        $updatedDriver = null;
+        DB::transaction(function () use ($company, $id, $input, $actor, &$updatedDriver): void {
+            $driver = DB::table('transport_drivers')
+                ->where('company_id', $company)
+                ->where('id', $id)
+                ->lockForUpdate()
+                ->first();
+            if (! $driver) {
+                return;
+            }
+            if (($driver->employee_id ?? null) !== ($actor['employeeId'] ?? null)) {
+                return;
+            }
+            if ($driver->status !== 'ACTIVE') {
+                return;
+            }
+            $fromMode = $driver->pricing_mode ?? 'NORMAL';
+            $toMode = $input['pricingMode'];
+            if ($fromMode !== $toMode) {
+                $now = now();
+                DB::table('transport_drivers')
+                    ->where('company_id', $company)
+                    ->where('id', $id)
+                    ->update([
+                        'pricing_mode' => $toMode,
+                        'pricing_mode_updated_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                if (DB::getSchemaBuilder()->hasTable('transport_driver_mode_events')) {
+                    DB::table('transport_driver_mode_events')->insert([
+                        'id' => $this->id('driver-mode-event'),
+                        'company_id' => $company,
+                        'driver_id' => $driver->id,
+                        'driver_name' => $driver->name,
+                        'actor_type' => $actor['role'] ?? 'employee',
+                        'actor_id' => $actor['employeeId'] ?? ($actor['id'] ?? null),
+                        'actor_name' => $actor['displayName'] ?? $driver->name,
+                        'from_mode' => $fromMode,
+                        'to_mode' => $toMode,
+                        'created_at' => $now,
+                    ]);
+                }
+            }
+            $updatedDriver = DB::table('transport_drivers')
+                ->where('company_id', $company)
+                ->where('id', $id)
+                ->first();
+        });
+
+        if (! $updatedDriver) {
+            return response()->json(['error' => 'Vous ne pouvez pas modifier le mode de ce chauffeur.'], 403);
+        }
+
+        return response()->json($this->driver($updatedDriver));
     }
 
     public function createVehicle(Request $request): JsonResponse
@@ -483,7 +570,12 @@ class TransportController extends Controller
         $company = $this->company($request);
         $driverId = $input['driverId'] ?? null;
         $vehicleId = $input['vehicleId'] ?? null;
-        if ($driverId !== null && ! DB::table('transport_drivers')->where('id', $driverId)->where('company_id', $company)->where('status', 'ACTIVE')->exists()) {
+        $driver = $driverId === null ? null : DB::table('transport_drivers')
+            ->where('id', $driverId)
+            ->where('company_id', $company)
+            ->where('status', 'ACTIVE')
+            ->first();
+        if ($driverId !== null && ! $driver) {
             return response()->json(['error' => 'Chauffeur actif introuvable.'], 422);
         }
         if ($vehicleId !== null && $driverId === null) {
@@ -511,6 +603,7 @@ class TransportController extends Controller
             'passenger_name' => trim($input['passengerName']),
             'passenger_phone' => trim($input['passengerPhone']),
             'fare' => (int) $input['fare'],
+            'pricing_mode' => $driver?->pricing_mode === 'STORM' ? 'STORM' : 'NORMAL',
             'driver_id' => $driverId,
             'vehicle_id' => $vehicleId,
             'status' => $status,
@@ -754,6 +847,7 @@ class TransportController extends Controller
             DB::table('transport_trips')->where('id', $id)->update([
                 'driver_id' => $driver->id,
                 'vehicle_id' => $vehicle->id,
+                'pricing_mode' => $driver->pricing_mode === 'STORM' ? 'STORM' : 'NORMAL',
                 'status' => 'ASSIGNED',
                 'offer_expires_at' => null,
                 'assigned_at' => now(),
@@ -1005,10 +1099,25 @@ class TransportController extends Controller
             'status' => $row->status,
             'employeeId' => $row->employee_id ?? null,
             'availability' => $row->availability ?? 'AVAILABLE',
+            'pricingMode' => ($row->pricing_mode ?? 'NORMAL') === 'STORM' ? 'STORM' : 'NORMAL',
             'availabilityUpdatedAt' => $row->availability_updated_at ?? null,
+            'pricingModeUpdatedAt' => $row->pricing_mode_updated_at ?? null,
             'latitude' => $latitude === null ? null : (float) $latitude,
             'longitude' => $longitude === null ? null : (float) $longitude,
             'locationUpdatedAt' => $row->location_updated_at ?? null,
+        ];
+    }
+
+    private function driverModeEvent(object $event): array
+    {
+        return [
+            'id' => $event->id,
+            'driverId' => $event->driver_id,
+            'driverName' => $event->driver_name,
+            'actorName' => $event->actor_name,
+            'fromMode' => $event->from_mode === 'STORM' ? 'STORM' : 'NORMAL',
+            'toMode' => $event->to_mode === 'STORM' ? 'STORM' : 'NORMAL',
+            'createdAt' => $event->created_at,
         ];
     }
 
@@ -1052,6 +1161,7 @@ class TransportController extends Controller
             'passengerName' => $row->passenger_name,
             'passengerPhone' => $row->passenger_phone,
             'fare' => (int) $row->fare,
+            'pricingMode' => ($row->pricing_mode ?? 'NORMAL') === 'STORM' ? 'STORM' : 'NORMAL',
             'driverId' => $row->driver_id,
             'vehicleId' => $row->vehicle_id,
             'status' => $row->status,
@@ -1260,6 +1370,11 @@ class TransportController extends Controller
             'pickupLatitude' => (float) $input['pickupLatitude'],
             'pickupLongitude' => (float) $input['pickupLongitude'],
             'expiresAt' => now()->addMinutes(5)->timestamp,
+            'pricingMode' => $this->publicPricingMode(
+                $company,
+                (float) $input['pickupLatitude'],
+                (float) $input['pickupLongitude'],
+            ),
             'route' => $route,
         ];
 
@@ -1270,7 +1385,8 @@ class TransportController extends Controller
             'destinationLongitude' => $route['destinationLongitude'],
             'distanceKm' => $route['distanceKm'],
             'durationMinutes' => $route['durationMinutes'],
-            'fare' => $this->taxiFare($route['distanceKm'], $company),
+            'fare' => $this->taxiFare($route['distanceKm'], $company, $payload['pricingMode']),
+            'pricingMode' => $payload['pricingMode'],
             'geometry' => $route['geometry'],
         ]);
     }
@@ -1463,7 +1579,10 @@ class TransportController extends Controller
                 'destination' => $destination,
                 'passenger_name' => trim($input['passengerName']),
                 'passenger_phone' => trim($input['passengerPhone']),
-                'fare' => $route ? $this->taxiFare($route['distanceKm'], $company) : $this->transportSettings($company)['baseFare'],
+                'fare' => $route
+                    ? $this->taxiFare($route['distanceKm'], $company, $driver?->pricing_mode)
+                    : $this->transportSettings($company)['baseFare'],
+                'pricing_mode' => $driver?->pricing_mode === 'STORM' ? 'STORM' : 'NORMAL',
                 'driver_id' => $driver?->id,
                 'vehicle_id' => $vehicle?->id,
                 'status' => $status,
@@ -1654,10 +1773,52 @@ class TransportController extends Controller
         return [(float) $coordinates[0], (float) $coordinates[1]];
     }
 
-    private function taxiFare(float $distanceKm, string $company): int
+    private function taxiFare(float $distanceKm, string $company, ?string $pricingMode = 'NORMAL'): int
     {
         $settings = $this->transportSettings($company);
-        return max(1000, $settings['baseFare'] + ((int) ceil($distanceKm) * $settings['pricePerKm']));
+        $pricePerKm = $pricingMode === 'STORM'
+            ? $settings['stormPricePerKm']
+            : $settings['pricePerKm'];
+        return max(1000, $settings['baseFare'] + ((int) ceil($distanceKm) * $pricePerKm));
+    }
+
+    private function publicPricingMode(string $company, float $latitude, float $longitude): string
+    {
+        $drivers = DB::table('transport_drivers')
+            ->where('company_id', $company)
+            ->where('status', 'ACTIVE')
+            ->where(function ($query): void {
+                $query->whereNull('availability')->orWhere('availability', 'AVAILABLE');
+            })
+            ->whereNotNull('employee_id')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where('location_updated_at', '>=', now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes']))
+            ->whereNotExists(function ($query) use ($company): void {
+                $query->select(DB::raw(1))
+                    ->from('transport_trips as active_trip')
+                    ->whereColumn('active_trip.driver_id', 'transport_drivers.id')
+                    ->where('active_trip.company_id', $company)
+                    ->whereIn('active_trip.status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS']);
+            })
+            ->get();
+        $vehicleDriverIds = DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('status', 'AVAILABLE')
+            ->whereNotNull('driver_id')
+            ->pluck('driver_id')
+            ->all();
+        $driver = $drivers
+            ->filter(fn (object $candidate): bool => in_array($candidate->id, $vehicleDriverIds, true))
+            ->sortBy(fn (object $candidate): float => $this->distanceInKm(
+                $latitude,
+                $longitude,
+                (float) $candidate->latitude,
+                (float) $candidate->longitude,
+            ))
+            ->first();
+
+        return ($driver?->pricing_mode ?? 'NORMAL') === 'STORM' ? 'STORM' : 'NORMAL';
     }
 
     private function routeFromQuote(?string $token, string $company, string $destination, float $latitude, float $longitude): ?array
@@ -1707,7 +1868,7 @@ class TransportController extends Controller
                     ->where('company_id', $company)
                     ->where('id', $trip->id)
                     ->update([
-                        'fare' => $this->taxiFare($route['distanceKm'], $company),
+                        'fare' => $this->taxiFare($route['distanceKm'], $company, $trip->pricing_mode ?? 'NORMAL'),
                         'route_pending' => false,
                         'destination_latitude' => $route['destinationLatitude'],
                         'destination_longitude' => $route['destinationLongitude'],
@@ -1952,6 +2113,7 @@ class TransportController extends Controller
             'trackingIntervalSeconds' => 10,
             'baseFare' => max(0, min(1000000, (int) ($settings['baseFare'] ?? self::DEFAULT_SETTINGS['baseFare']))),
             'pricePerKm' => max(1, min(1000000, (int) ($settings['pricePerKm'] ?? self::DEFAULT_SETTINGS['pricePerKm']))),
+            'stormPricePerKm' => max(1, min(1000000, (int) ($settings['stormPricePerKm'] ?? ($settings['pricePerKm'] ?? self::DEFAULT_SETTINGS['stormPricePerKm'])))),
             'primaryColor' => $this->transportColor($settings, 'primaryColor'),
             'accentColor' => $this->transportColor($settings, 'accentColor'),
             'heroImageUrl' => empty($settings['heroImageData'])

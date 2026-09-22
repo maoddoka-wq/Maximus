@@ -2,6 +2,7 @@ import { requestJson } from '@/lib/api-request';
 
 export type DriverStatus = 'ACTIVE' | 'INACTIVE';
 export type DriverAvailability = 'AVAILABLE' | 'PAUSED' | 'ON_TRIP';
+export type DriverPricingMode = 'NORMAL' | 'STORM';
 export type VehicleStatus = 'AVAILABLE' | 'ON_TRIP' | 'MAINTENANCE';
 export type TripStatus = 'REQUESTED' | 'OFFERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export interface TransportSettings {
@@ -9,6 +10,7 @@ export interface TransportSettings {
   trackingIntervalSeconds: number;
   baseFare: number;
   pricePerKm: number;
+  stormPricePerKm: number;
   primaryColor: string;
   accentColor: string;
   heroImageUrl: string;
@@ -23,11 +25,23 @@ export interface Driver {
   licenseNumber: string;
   status: DriverStatus;
   availability: DriverAvailability;
+  pricingMode: DriverPricingMode;
   availabilityUpdatedAt: string | null;
+  pricingModeUpdatedAt: string | null;
   employeeId: string | null;
   latitude: number | null;
   longitude: number | null;
   locationUpdatedAt: string | null;
+}
+
+export interface DriverModeEvent {
+  id: string;
+  driverId: string;
+  driverName: string;
+  actorName: string;
+  fromMode: DriverPricingMode;
+  toMode: DriverPricingMode;
+  createdAt: string;
 }
 
 export interface Vehicle {
@@ -70,6 +84,7 @@ export interface Trip {
   driverPhone?: string | null;
   offerExpiresAt?: string | null;
   pickupCode?: string | null;
+  pricingMode?: DriverPricingMode;
 }
 
 export interface GeoJsonLineString {
@@ -97,6 +112,7 @@ export interface TransportBootstrap {
   trips: Trip[];
   metrics: TransportMetrics;
   settings: TransportSettings;
+  modeEvents: DriverModeEvent[];
 }
 
 export interface CreateDriverInput {
@@ -167,6 +183,7 @@ export interface PublicTransportTrip {
   vehicleType: string | null;
   vehicleImageUrl: string | null;
   pickupCode?: string | null;
+  pricingMode?: DriverPricingMode;
 }
 
 export interface PublicTransportQuote {
@@ -177,6 +194,7 @@ export interface PublicTransportQuote {
   distanceKm: number;
   durationMinutes: number;
   fare: number;
+  pricingMode: DriverPricingMode;
   geometry: GeoJsonLineString;
 }
 
@@ -213,6 +231,12 @@ export const createTransportApi = (companyId: string) => {
       request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/availability`), {
         method: 'PATCH',
         body: JSON.stringify({ availability }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    updateDriverPricingMode: (id: string, pricingMode: DriverPricingMode) =>
+      request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/pricing-mode`), {
+        method: 'PATCH',
+        body: JSON.stringify({ pricingMode }),
         headers: { 'Content-Type': 'application/json' },
       }),
     createVehicle: (body: CreateVehicleInput) => request<Vehicle>(withCompany('/transport/vehicles'), json(body)),
