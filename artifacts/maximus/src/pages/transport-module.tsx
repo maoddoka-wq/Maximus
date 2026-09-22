@@ -50,8 +50,9 @@ import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 import { useQueryTab } from '@/lib/query-tab';
+import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
 
-type TransportTab = 'overview' | 'courses' | 'chauffeurs' | 'vehicules' | 'historique' | 'parametres';
+type TransportTab = TransportTabId;
 type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
 type VehicleFormInput = Omit<CreateVehicleInput, 'imageData'> & { imageData?: string };
 
@@ -69,26 +70,12 @@ function readableOn(hex: string): string {
 
 const tabs: { id: TransportTab; label: string; icon: typeof Gauge; featureId: string }[] = [
   { id: 'overview', label: 'Vue d’ensemble', icon: Gauge, featureId: 'overview' },
-  { id: 'courses', label: 'Courses', icon: Route, featureId: 'trips' },
-  { id: 'chauffeurs', label: 'Chauffeurs', icon: UserRound, featureId: 'drivers' },
-  { id: 'vehicules', label: 'Véhicules', icon: CarFront, featureId: 'vehicles' },
+  { id: 'trips', label: 'Courses', icon: Route, featureId: 'trips' },
+  { id: 'drivers', label: 'Chauffeurs', icon: UserRound, featureId: 'drivers' },
+  { id: 'vehicles', label: 'Véhicules', icon: CarFront, featureId: 'vehicles' },
   { id: 'historique', label: 'Historique', icon: History, featureId: 'historique' },
   { id: 'parametres', label: 'Paramètres', icon: Settings, featureId: 'parametres' },
 ];
-
-const transportTabByFeatureId: Record<string, TransportTab> = {
-  overview: 'overview',
-  trips: 'courses',
-  courses: 'courses',
-  drivers: 'chauffeurs',
-  chauffeurs: 'chauffeurs',
-  vehicles: 'vehicules',
-  vehicules: 'vehicules',
-  historique: 'historique',
-  history: 'historique',
-  parametres: 'parametres',
-  settings: 'parametres',
-};
 
 const tripStatuses: TripStatus[] = ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const openTripStatuses: TripStatus[] = ['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'];
@@ -199,7 +186,7 @@ export default function TransportModulePage({
         : tabs,
     [allowedFeatureIds, currentEmployeeId],
   );
-  const requestedTab = initialTab ? transportTabByFeatureId[initialTab] : undefined;
+  const requestedTab = resolveTransportTab(initialTab);
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(item => item.id),
     defaultTab: requestedTab && visibleTabs.some(item => item.id === requestedTab)
@@ -601,11 +588,11 @@ export default function TransportModulePage({
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}
-        {canOperateTrips && tab === 'courses' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
+        {canOperateTrips && tab === 'trips' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
          {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} onPricingModeChange={updatePricingMode} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />{canModifyDrivers && !locationActive && <button type="button" onClick={() => { setLocationError(''); setLocationRequested(true); }} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-black text-[hsl(var(--primary-foreground))] shadow-sm hover:brightness-95"><MapPin size={14} />{locationError ? 'Réessayer le GPS' : 'Activer le GPS chauffeur'}</button>}</>}</>}
-        {tab === 'courses' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canOperateTrips || canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
-         {tab === 'chauffeurs' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} onPricingModeChange={updatePricingMode} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />{currentDriver && canModifyDrivers && !locationActive && <button type="button" onClick={() => { setLocationError(''); setLocationRequested(true); }} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-black text-[hsl(var(--primary-foreground))] shadow-sm hover:brightness-95"><MapPin size={14} />{locationError ? 'Réessayer le GPS' : 'Activer le GPS chauffeur'}</button>}</>}
-        {tab === 'vehicules' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
+        {tab === 'trips' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canOperateTrips || canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
+         {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} onPricingModeChange={updatePricingMode} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />{currentDriver && canModifyDrivers && !locationActive && <button type="button" onClick={() => { setLocationError(''); setLocationRequested(true); }} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-black text-[hsl(var(--primary-foreground))] shadow-sm hover:brightness-95"><MapPin size={14} />{locationError ? 'Réessayer le GPS' : 'Activer le GPS chauffeur'}</button>}</>}
+        {tab === 'vehicles' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
         {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
       </>}
@@ -639,7 +626,7 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
     </div>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,.6fr)]">
       <section className="card-surface overflow-hidden">
-        <div className="section-heading border-b px-5 py-4"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Flux opérationnel</p><h2 className="mt-1 text-base font-bold">Dernières courses</h2></div><button type="button" onClick={() => onTab('courses')} className="text-xs font-bold text-[hsl(var(--primary))] hover:underline">Voir toutes les courses</button></div>
+        <div className="section-heading border-b px-5 py-4"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Flux opérationnel</p><h2 className="mt-1 text-base font-bold">Dernières courses</h2></div><button type="button" onClick={() => onTab('trips')} className="text-xs font-bold text-[hsl(var(--primary))] hover:underline">Voir toutes les courses</button></div>
          {recentTrips.length ? <TripTable trips={recentTrips} compact onStatusChange={() => undefined} /> : <EmptyState icon={Route} title="Aucune course ouverte" text="Les nouvelles demandes apparaîtront ici dès leur création." />}
       </section>
       <section className="card-surface overflow-hidden">
