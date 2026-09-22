@@ -1,0 +1,61 @@
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel>
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> php artisan maximus:sync-central-installation --no-ansi
+Configuration centrale synchronisée pour Agence Nationale de l'Aquaculture.
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel>
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> Get-ScheduledTask -TaskName "MAXIMUS central scheduler" |
+>>   Select-Object -ExpandProperty Triggers |
+>>   Format-List *
+
+
+Enabled               : True
+EndBoundary           :
+ExecutionTimeLimit    :
+Id                    :
+Repetition            : MSFT_TaskRepetitionPattern
+StartBoundary         : 2026-09-22T14:59:49+00:00
+RandomDelay           :
+PSComputerName        :
+CimClass              : Root/Microsoft/Windows/TaskScheduler : MSFT_TaskTimeTrigger
+CimInstanceProperties : {Enabled, EndBoundary, ExecutionTimeLimit, Id...}
+CimSystemProperties   : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel>
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> Get-ScheduledTask -TaskName "MAXIMUS central scheduler" |
+>>   Select-Object -ExpandProperty Actions |
+>>   Format-List *
+
+
+Id                    :
+Arguments             : -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand JABwAHIAbwBjAGUAcwBzACAAPQA
+                        gAFMAdABhAHIAdAAtAFAAcgBvAGMAZQBzAHMAIAAtAEYAaQBsAGUAUABhAHQAaAAgACcAQwA6AFwAVQBzAGUAcgBzAFwARgBJAFMALQBUAFMAXABwAGgAcABcA
+                        HAAaABwAC4AZQB4AGUAJwAgAC0AQQByAGcAdQBtAGUAbgB0AEwAaQBzAHQAIABAACgAJwBhAHIAdABpAHMAYQBuACcALAAgACcAcwBjAGgAZQBkAHUAbABlADo
+                        AcgB1AG4AJwAsACAAJwAtAC0AbgBvAC0AYQBuAHMAaQAnACkAIAAtAFcAbwByAGsAaQBuAGcARABpAHIAZQBjAHQAbwByAHkAIAAnAEMAOgBcAFUAcwBlAHIAc
+                        wBcAEYASQBTAC0AVABTAFwAbQBhAHgAaQBtAHUAcwAtAGwAbwBjAGEAbAAtAHAAcgBvAHAAcgBlAFwAYQByAHQAaQBmAGEAYwB0AHMAXABhAHAAaQAtAHMAZQB
+                        yAHYAZQByAFwAbABhAHIAYQB2AGUAbAAnACAALQBXAGkAbgBkAG8AdwBTAHQAeQBsAGUAIABIAGkAZABkAGUAbgAgAC0AVwBhAGkAdAAgAC0AUABhAHMAcwBUA
+                        GgAcgB1AA0ACgBlAHgAaQB0ACAAJABwAHIAbwBjAGUAcwBzAC4ARQB4AGkAdABDAG8AZABlAA==
+Execute               : C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe
+WorkingDirectory      : C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel
+PSComputerName        :
+CimClass              : Root/Microsoft/Windows/TaskScheduler : MSFT_TaskExecAction
+CimInstanceProperties : {Id, Arguments, Execute, WorkingDirectory}
+CimSystemProperties   : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel>
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> Get-ScheduledTaskInfo -TaskName "MAXIMUS central scheduler"
+
+
+LastRunTime        : 9/22/2026 2:59:30 PM
+LastTaskResult     : 0
+NextRunTime        : 9/22/2026 3:09:49 PM
+NumberOfMissedRuns : 2
+TaskName           : MAXIMUS central scheduler
+TaskPath           :
+PSComputerName     :
+
+
+
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\
