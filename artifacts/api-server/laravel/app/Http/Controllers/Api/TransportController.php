@@ -239,36 +239,6 @@ class TransportController extends Controller
             'updated_at' => now(),
         ]);
 
-        $activeTrips = DB::table('transport_trips')
-            ->where('company_id', $company)
-            ->where('driver_id', $id)
-            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS'])
-            ->where(function ($query): void {
-                $query->whereNull('pickup_route_updated_at')
-                    ->orWhere('pickup_route_updated_at', '<', now()->subSeconds(15));
-            })
-            ->get();
-        foreach ($activeTrips as $activeTrip) {
-            if ($activeTrip->pickup_latitude === null || $activeTrip->pickup_longitude === null) {
-                continue;
-            }
-            try {
-                $route = $this->calculateRouteCoordinates(
-                    [(float) $input['longitude'], (float) $input['latitude']],
-                    [(float) $activeTrip->pickup_longitude, (float) $activeTrip->pickup_latitude],
-                );
-                DB::table('transport_trips')->where('id', $activeTrip->id)->update([
-                    'pickup_route_distance_km' => $route['distanceKm'],
-                    'pickup_eta_minutes' => $route['durationMinutes'],
-                    'pickup_route_geometry' => json_encode($route['geometry'], JSON_THROW_ON_ERROR),
-                    'pickup_route_updated_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            } catch (\Throwable) {
-                // Keep the last valid route when the routing provider is temporarily unavailable.
-            }
-        }
-
         return response()->json($this->driver(DB::table('transport_drivers')->where('id', $id)->first()));
     }
 
@@ -1080,6 +1050,7 @@ class TransportController extends Controller
             'routeDistanceKm' => $routeDistance === null ? null : (float) $routeDistance,
             'routeDurationMinutes' => $routeDuration === null ? null : (int) $routeDuration,
             'routeGeometry' => $this->decodeGeometry($row->route_geometry ?? null),
+            'routePending' => (bool) ($row->route_pending ?? false),
             'pickupRouteDistanceKm' => $pickupRouteDistance === null ? null : (float) $pickupRouteDistance,
             'pickupEtaMinutes' => $pickupEta === null ? null : (int) $pickupEta,
             'pickupRouteGeometry' => $this->decodeGeometry($row->pickup_route_geometry ?? null),
@@ -1104,6 +1075,7 @@ class TransportController extends Controller
         if (! $trip) {
             return response()->json(['error' => 'Course introuvable.'], 404);
         }
+        $trip = $this->refreshPublicTripRoutes($trip);
 
         $driver = $trip->driver_id
             ? DB::table('transport_drivers')->where('company_id', $store->company_id)->where('id', $trip->driver_id)->first()
@@ -1424,17 +1396,10 @@ class TransportController extends Controller
         if (($input['quoteToken'] ?? null) !== null && $route === null) {
             return response()->json(['error' => 'Le devis Taxi est invalide ou expiré.'], 422);
         }
-        if ($route === null && trim((string) config('services.openrouteservice.api_key')) !== '') {
-            try {
-                $route = $this->calculateRouteToAddress($latitude, $longitude, $destination);
-            } catch (\Throwable $exception) {
-                report($exception);
-                return response()->json(['error' => $this->routeErrorMessage($exception)], 422);
-            }
-        }
         $row = null;
+        $routePending = $route === null;
 
-        DB::transaction(function () use (&$row, $company, $input, $latitude, $longitude, $destination, $route): void {
+        DB::transaction(function () use (&$row, $company, $input, $latitude, $longitude, $destination, $route, $routePending): void {
             $drivers = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('status', 'ACTIVE')
@@ -1482,7 +1447,7 @@ class TransportController extends Controller
                 'destination' => $destination,
                 'passenger_name' => trim($input['passengerName']),
                 'passenger_phone' => trim($input['passengerPhone']),
-                'fare' => $route ? $this->taxiFare($route['distanceKm'], $company) : 0,
+                'fare' => $route ? $this->taxiFare($route['distanceKm'], $company) : $this->transportSettings($company)['baseFare'],
                 'driver_id' => $driver?->id,
                 'vehicle_id' => $vehicle?->id,
                 'status' => $status,
@@ -1498,6 +1463,7 @@ class TransportController extends Controller
                 'route_distance_km' => $route['distanceKm'] ?? null,
                 'route_duration_minutes' => $route['durationMinutes'] ?? null,
                 'route_geometry' => $route ? json_encode($route['geometry'], JSON_THROW_ON_ERROR) : null,
+                'route_pending' => $routePending,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -1515,40 +1481,26 @@ class TransportController extends Controller
         $driver = $tripRow->driver_id
             ? DB::table('transport_drivers')->where('company_id', $company)->where('id', $tripRow->driver_id)->first()
             : null;
-        if ($driver && $tripRow->pickup_latitude !== null && $tripRow->pickup_longitude !== null) {
-            try {
-                $pickupRoute = $this->calculateRouteCoordinates(
-                    [(float) $driver->longitude, (float) $driver->latitude],
-                    [(float) $tripRow->pickup_longitude, (float) $tripRow->pickup_latitude],
-                );
-                DB::table('transport_trips')->where('id', $tripRow->id)->update([
-                    'pickup_route_distance_km' => $pickupRoute['distanceKm'],
-                    'pickup_eta_minutes' => $pickupRoute['durationMinutes'],
-                    'pickup_route_geometry' => json_encode($pickupRoute['geometry'], JSON_THROW_ON_ERROR),
-                    'pickup_route_updated_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $tripRow = DB::table('transport_trips')->where('id', $tripRow->id)->first();
-            } catch (\Throwable) {
-                // The trip remains valid even when live routing is temporarily unavailable.
-            }
-        }
-
         $response = $this->publicTrip(
             $tripRow,
             $driver,
             $tripRow->vehicle_id ? DB::table('transport_vehicles')->where('company_id', $company)->where('id', $tripRow->vehicle_id)->first() : null,
             $tripRow->vehicle_id ? $this->vehicleImageUrl($company, $tripRow->vehicle_id, $domain) : null,
         );
+        $message = $response['status'] === 'ASSIGNED'
+            ? 'Le chauffeur le plus proche a été trouvé. Vous pouvez le contacter directement.'
+            : ($response['status'] === 'OFFERED'
+                ? 'Le chauffeur le plus proche a reçu votre demande. Il doit la valider pour démarrer la course.'
+                : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.');
+        if ($response['routePending']) {
+            $message .= ' Le tarif et l’itinéraire seront finalisés dès que le service cartographique répondra.';
+        }
+
         return response()->json([
             'trip' => $response,
             'cancelToken' => $this->publicTripCancellationToken($company, $tripRow->id, trim($input['passengerPhone'])),
             'matched' => in_array($response['status'], ['OFFERED', 'ASSIGNED'], true),
-            'message' => $response['status'] === 'ASSIGNED'
-                ? 'Le chauffeur le plus proche a été trouvé. Vous pouvez le contacter directement.'
-                : ($response['status'] === 'OFFERED'
-                    ? 'Le chauffeur le plus proche a reçu votre demande. Il doit la valider pour démarrer la course.'
-                    : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.'),
+            'message' => $message,
         ], 201);
     }
 
@@ -1721,6 +1673,95 @@ class TransportController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function refreshPublicTripRoutes(object $trip): object
+    {
+        $company = (string) $trip->company_id;
+
+        if ((bool) ($trip->route_pending ?? false)
+            && $this->claimRouteAttempt((string) $trip->id, 'route_attempted_at')) {
+            try {
+                $route = $this->calculateRouteToAddress(
+                    (float) $trip->pickup_latitude,
+                    (float) $trip->pickup_longitude,
+                    (string) $trip->destination,
+                );
+                DB::table('transport_trips')
+                    ->where('company_id', $company)
+                    ->where('id', $trip->id)
+                    ->update([
+                        'fare' => $this->taxiFare($route['distanceKm'], $company),
+                        'route_pending' => false,
+                        'destination_latitude' => $route['destinationLatitude'],
+                        'destination_longitude' => $route['destinationLongitude'],
+                        'route_distance_km' => $route['distanceKm'],
+                        'route_duration_minutes' => $route['durationMinutes'],
+                        'route_geometry' => json_encode($route['geometry'], JSON_THROW_ON_ERROR),
+                        'updated_at' => now(),
+                    ]);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+            $trip = DB::table('transport_trips')
+                ->where('company_id', $company)
+                ->where('id', $trip->id)
+                ->first() ?? $trip;
+        }
+
+        if ($trip->driver_id === null
+            || $trip->pickup_latitude === null
+            || $trip->pickup_longitude === null
+            || ! $this->claimRouteAttempt((string) $trip->id, 'pickup_route_attempted_at')) {
+            return $trip;
+        }
+
+        $driver = DB::table('transport_drivers')
+            ->where('company_id', $company)
+            ->where('id', $trip->driver_id)
+            ->first();
+        if (! $driver || $driver->latitude === null || $driver->longitude === null) {
+            return $trip;
+        }
+
+        try {
+            $pickupRoute = $this->calculateRouteCoordinates(
+                [(float) $driver->longitude, (float) $driver->latitude],
+                [(float) $trip->pickup_longitude, (float) $trip->pickup_latitude],
+            );
+            DB::table('transport_trips')
+                ->where('company_id', $company)
+                ->where('id', $trip->id)
+                ->update([
+                    'pickup_route_distance_km' => $pickupRoute['distanceKm'],
+                    'pickup_eta_minutes' => $pickupRoute['durationMinutes'],
+                    'pickup_route_geometry' => json_encode($pickupRoute['geometry'], JSON_THROW_ON_ERROR),
+                    'pickup_route_updated_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('id', $trip->id)
+            ->first() ?? $trip;
+    }
+
+    private function claimRouteAttempt(string $tripId, string $column): bool
+    {
+        if (! in_array($column, ['route_attempted_at', 'pickup_route_attempted_at'], true)) {
+            return false;
+        }
+
+        return DB::table('transport_trips')
+            ->where('id', $tripId)
+            ->where(function ($query) use ($column): void {
+                $query->whereNull($column)
+                    ->orWhere($column, '<=', now()->subSeconds(15));
+            })
+            ->update([$column => now()]) === 1;
     }
 
     private function publicTripCancellationToken(string $company, string $tripId, string $passengerPhone): string

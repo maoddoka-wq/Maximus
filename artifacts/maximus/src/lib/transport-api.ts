@@ -60,6 +60,7 @@ export interface Trip {
   routeDistanceKm?: number | null;
   routeDurationMinutes?: number | null;
   routeGeometry?: GeoJsonLineString | null;
+  routePending?: boolean;
   pickupRouteDistanceKm?: number | null;
   pickupEtaMinutes?: number | null;
   pickupRouteGeometry?: GeoJsonLineString | null;
@@ -153,6 +154,7 @@ export interface PublicTransportTrip {
   routeDistanceKm: number | null;
   routeDurationMinutes: number | null;
   routeGeometry: GeoJsonLineString | null;
+  routePending: boolean;
   pickupRouteDistanceKm: number | null;
   pickupEtaMinutes: number | null;
   pickupRouteGeometry: GeoJsonLineString | null;

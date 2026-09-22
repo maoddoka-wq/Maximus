@@ -299,6 +299,7 @@ class TransportTest extends TestCase
 
     public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
     {
+        Http::fake();
         ModuleCatalog::ensureCompanyAccess('kora');
         DB::table('maximus_company_modules')
             ->where('company_id', 'kora')
@@ -405,6 +406,44 @@ class TransportTest extends TestCase
 
     public function test_public_taxi_matches_a_distant_driver_inside_dakar_with_fast_gps_distance_calculation(): void
     {
+        config(['services.openrouteservice.api_key' => '']);
+        Http::fakeSequence()
+            ->push([
+                [
+                    'lat' => '14.7300',
+                    'lon' => '-17.4500',
+                    'display_name' => 'Almadies, Dakar, Sénégal',
+                    'type' => 'neighbourhood',
+                ],
+            ])
+            ->push([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 42000,
+                    'duration' => 3600,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [
+                            [-17.4677, 14.7167],
+                            [-17.4500, 14.7300],
+                        ],
+                    ],
+                ]],
+            ])
+            ->push([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 43000,
+                    'duration' => 3600,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [
+                            [-17.1500, 14.8500],
+                            [-17.4677, 14.7167],
+                        ],
+                    ],
+                ]],
+            ]);
         ModuleCatalog::ensureCompanyAccess('kora');
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-kora-distant-taxi',
@@ -465,11 +504,23 @@ class TransportTest extends TestCase
         $matchedDistance = (float) $trip->json('trip.matchedDistanceKm');
         $this->assertGreaterThan(20.0, $matchedDistance);
         $this->assertLessThan(40.0, $matchedDistance);
+        $this->assertTrue($trip->json('trip.routePending'));
+        $this->assertSame(500, $trip->json('trip.fare'));
+        Http::assertNothingSent();
         $this->assertDatabaseHas('transport_trips', [
             'id' => $trip->json('trip.id'),
             'driver_id' => $driverId,
             'matched_distance_km' => $matchedDistance,
         ]);
+
+        $deferredTripResponse = $this->getJson('/api/shop/kora-distant-taxi/transport/trips/'.$trip->json('trip.id'));
+        $deferredTripResponse
+            ->assertOk()
+            ->assertJsonPath('trip.routePending', false)
+            ->assertJsonPath('trip.routeDistanceKm', 42)
+            ->assertJsonPath('trip.pickupRouteDistanceKm', 43)
+            ->assertJsonPath('trip.fare', 13100);
+        Http::assertSentCount(3);
     }
 
     public function test_public_taxi_quote_uses_a_real_route_and_signed_quote_at_creation(): void
