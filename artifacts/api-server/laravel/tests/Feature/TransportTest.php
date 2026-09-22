@@ -403,6 +403,75 @@ class TransportTest extends TestCase
         $this->assertDatabaseMissing('transport_trips', ['driver_id' => $staleDriver]);
     }
 
+    public function test_public_taxi_matches_a_distant_driver_inside_dakar_with_fast_gps_distance_calculation(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-distant-taxi',
+            'company_id' => 'kora',
+            'slug' => 'kora-distant-taxi',
+            'name' => 'Kora Taxi Distant',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $driverId = 'driver-distant';
+        $this->createDriverEmployee($driverId, 'Chauffeur éloigné', '+221770000003');
+        DB::table('transport_drivers')->insert([
+            'id' => $driverId,
+            'company_id' => 'kora',
+            'name' => 'Chauffeur éloigné',
+            'phone' => '+221770000003',
+            'license_number' => 'GPS-DISTANT',
+            'employee_id' => $driverId,
+            'status' => 'ACTIVE',
+            'availability' => 'AVAILABLE',
+            'latitude' => 14.8500,
+            'longitude' => -17.1500,
+            'location_updated_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('transport_vehicles')->insert([
+            'id' => 'vehicle-distant',
+            'company_id' => 'kora',
+            'registration' => 'DK-DISTANT-01',
+            'model' => 'Toyota Distant',
+            'vehicle_type' => 'TAXI',
+            'driver_id' => $driverId,
+            'status' => 'AVAILABLE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $trip = $this->postJson('/api/shop/kora-distant-taxi/transport/trips', [
+            'pickup' => 'Plateau',
+            'destination' => 'Almadies',
+            'passengerName' => 'Passager longue distance',
+            'passengerPhone' => '+221771111113',
+            'pickupLatitude' => 14.7167,
+            'pickupLongitude' => -17.4677,
+        ])->assertCreated()
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('trip.driverId', $driverId)
+            ->assertJsonPath('trip.status', 'OFFERED');
+
+        $matchedDistance = (float) $trip->json('trip.matchedDistanceKm');
+        $this->assertGreaterThan(20.0, $matchedDistance);
+        $this->assertLessThan(40.0, $matchedDistance);
+        $this->assertDatabaseHas('transport_trips', [
+            'id' => $trip->json('trip.id'),
+            'driver_id' => $driverId,
+            'matched_distance_km' => $matchedDistance,
+        ]);
+    }
+
     public function test_public_taxi_quote_uses_a_real_route_and_signed_quote_at_creation(): void
     {
         ModuleCatalog::ensureCompanyAccess('kora');
