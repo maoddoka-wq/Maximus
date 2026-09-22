@@ -50,10 +50,21 @@ function readableOn(hex: string): string {
   return colorLuminance(hex) > 0.36 ? '#172033' : '#ffffff';
 }
 
-function publicShopTheme(store: PublicShopBootstrap['store']) {
-  const configuredPrimary = publicHexColor.test(store.primaryColor) ? store.primaryColor.toLowerCase() : '';
+function publicShopTheme(
+  store: PublicShopBootstrap['store'],
+  transportColors?: { primaryColor?: string; accentColor?: string } | null,
+) {
+  const configuredPrimary = publicHexColor.test(transportColors?.primaryColor ?? '')
+    ? transportColors?.primaryColor?.toLowerCase() ?? ''
+    : publicHexColor.test(store.primaryColor)
+      ? store.primaryColor.toLowerCase()
+      : '';
   const primary = configuredPrimary && configuredPrimary !== '#000000' ? configuredPrimary : '#2563eb';
-  const configuredAccent = publicHexColor.test(store.accentColor) ? store.accentColor.toLowerCase() : '';
+  const configuredAccent = publicHexColor.test(transportColors?.accentColor ?? '')
+    ? transportColors?.accentColor?.toLowerCase() ?? ''
+    : publicHexColor.test(store.accentColor)
+      ? store.accentColor.toLowerCase()
+      : '';
   const accent = configuredAccent && configuredAccent !== '#000000' ? configuredAccent : primary;
 
   return {
@@ -879,7 +890,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
   const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
-  const theme = publicShopTheme(store);
+  const [transportColors, setTransportColors] = useState<{ primaryColor?: string; accentColor?: string } | null>(null);
+  const theme = publicShopTheme(store, transportColors);
   const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
   const [form, setForm] = useState({ pickup: 'Ma position GPS', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
@@ -909,8 +921,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   useEffect(() => {
     void api.getSettings().then(result => {
       if (result.heroImageUrl) setHeroImageUrl(result.heroImageUrl);
+      setTransportColors(result);
     }).catch(() => {
-      // The default local cover remains visible if the public configuration is unavailable.
+      // The shop branding remains visible if the public Transport configuration is unavailable.
     });
   }, [api]);
 

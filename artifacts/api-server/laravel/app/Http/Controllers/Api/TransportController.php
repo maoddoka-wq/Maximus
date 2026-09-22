@@ -26,6 +26,8 @@ class TransportController extends Controller
         'trackingIntervalSeconds' => 10,
         'baseFare' => 500,
         'pricePerKm' => 300,
+        'primaryColor' => '#0F766E',
+        'accentColor' => '#F59E0B',
     ];
     private const DAKAR_BOUNDS = [
         'minLatitude' => 14.55,
@@ -109,6 +111,8 @@ class TransportController extends Controller
             'trackingIntervalSeconds' => ['sometimes', 'integer', 'in:10'],
             'baseFare' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
             'pricePerKm' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+            'primaryColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'accentColor' => ['sometimes', 'required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'heroImageData' => ['sometimes', 'nullable', 'string', 'max:4194304'],
         ]);
         $company = $this->company($request);
@@ -127,12 +131,20 @@ class TransportController extends Controller
         $pricePerKm = array_key_exists('pricePerKm', $input)
             ? (int) $input['pricePerKm']
             : (int) ($transportConfiguration['pricePerKm'] ?? self::DEFAULT_SETTINGS['pricePerKm']);
+        $primaryColor = array_key_exists('primaryColor', $input)
+            ? strtoupper((string) $input['primaryColor'])
+            : $this->transportColor($transportConfiguration, 'primaryColor');
+        $accentColor = array_key_exists('accentColor', $input)
+            ? strtoupper((string) $input['accentColor'])
+            : $this->transportColor($transportConfiguration, 'accentColor');
         $configuration['transport'] = [
             ...$transportConfiguration,
             'gpsValidityMinutes' => (int) $input['gpsValidityMinutes'],
             'trackingIntervalSeconds' => 10,
             'baseFare' => $baseFare,
             'pricePerKm' => $pricePerKm,
+            'primaryColor' => $primaryColor,
+            'accentColor' => $accentColor,
         ];
         if (array_key_exists('heroImageData', $input)) {
             if ($input['heroImageData'] === null || trim((string) $input['heroImageData']) === '') {
@@ -913,6 +925,8 @@ class TransportController extends Controller
 
         return response()->json([
             'heroImageUrl' => $this->transportHeroImageUrl((string) $store->company_id, $slug),
+            'primaryColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'primaryColor'),
+            'accentColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'accentColor'),
         ]);
     }
 
@@ -928,6 +942,8 @@ class TransportController extends Controller
 
         return response()->json([
             'heroImageUrl' => $this->transportHeroImageUrl((string) $store->company_id, null, true),
+            'primaryColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'primaryColor'),
+            'accentColor' => $this->transportColor($this->rawTransportSettings((string) $store->company_id), 'accentColor'),
         ]);
     }
 
@@ -1936,10 +1952,20 @@ class TransportController extends Controller
             'trackingIntervalSeconds' => 10,
             'baseFare' => max(0, min(1000000, (int) ($settings['baseFare'] ?? self::DEFAULT_SETTINGS['baseFare']))),
             'pricePerKm' => max(1, min(1000000, (int) ($settings['pricePerKm'] ?? self::DEFAULT_SETTINGS['pricePerKm']))),
+            'primaryColor' => $this->transportColor($settings, 'primaryColor'),
+            'accentColor' => $this->transportColor($settings, 'accentColor'),
             'heroImageUrl' => empty($settings['heroImageData'])
                 ? '/taxi-transport-hero.jpg'
                 : '/api/transport/settings/hero-image',
         ];
+    }
+
+    private function transportColor(array $settings, string $key): string
+    {
+        $value = strtoupper(trim((string) ($settings[$key] ?? '')));
+        return preg_match('/^#[0-9A-F]{6}$/', $value) === 1
+            ? $value
+            : self::DEFAULT_SETTINGS[$key];
     }
 
     private function expireOffers(string $company): void
