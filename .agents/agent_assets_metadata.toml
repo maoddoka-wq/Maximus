@@ -280,3 +280,17 @@ mtime_ms = 1790032060796
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/fdb7af4c-4d3d-4f62-b110-510850899c6b/d8ca12f2-4a46-4499-806f-98a1c31d3613"
 storage_version_token = "1790032073129538"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "79yw_UyFv3atxK29Cbakh"
+uri = "file://reports/maximus-audit-complet-2026-09-22.pdf"
+type = "pdf"
+title = "MAXIMUS ERP — Audit complet fonctionnel et technique"
+description = "Audit en français de 15 pages A4 couvrant l’architecture, les parcours, les modules, les packs, les secteurs, les permissions, les données, la sécurité, les paiements, le déploiement, les tests et les risques prioritaires."
+logical_id = "489adac3-6ddd-49fa-8221-a89302e33303"
+content_hash = "sha256:bc2dd66023b0cb9c82b6f46c89e4a832394ab5350f3523f20b13d6cd9241d86e"
+size = 367503
+mtime_ms = 1790108198064
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/489adac3-6ddd-49fa-8221-a89302e33303/c6595920-78d3-4462-b08e-a4920ac81bcc"
+storage_version_token = "1790108206734898"
+content_type = "application/pdf"

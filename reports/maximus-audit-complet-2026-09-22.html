@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>MAXIMUS ERP — Audit complet fonctionnel et technique</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 17mm; }
+    :root {
+      --navy: #161d27;
+      --navy-2: #202b3b;
+      --gold: #f2b705;
+      --ink: #18212b;
+      --muted: #5e6a78;
+      --line: #d9e0e7;
+      --soft: #f4f6f8;
+      --blue: #075985;
+      --green: #166534;
+      --orange: #9a3412;
+      --red: #991b1b;
+    }
+    * { box-sizing: border-box; }
+    html { font-size: 10.3pt; }
+    body {
+      margin: 0; color: var(--ink); font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.48; background: white;
+    }
+    h1, h2, h3, h4 { color: var(--navy); line-height: 1.18; margin: 1.1em 0 .45em; }
+    h1 { font-size: 28pt; letter-spacing: -.03em; }
+    h2 { font-size: 18pt; border-bottom: 2px solid var(--gold); padding-bottom: 5px; margin-top: 1.5em; }
+    h3 { font-size: 13pt; color: var(--navy-2); }
+    h4 { font-size: 10.5pt; text-transform: uppercase; letter-spacing: .05em; }
+    p { margin: .45em 0 .75em; }
+    ul, ol { margin-top: .35em; padding-left: 1.45em; }
+    li { margin: .2em 0; }
+    code, .path { font-family: "Courier New", monospace; font-size: .87em; }
+    .path { color: #334155; word-break: break-word; }
+    .cover {
+      page-break-after: always; min-height: 255mm; margin: -16mm -15mm -17mm;
+      padding: 30mm 22mm; display: flex; flex-direction: column; justify-content: space-between;
+      background: var(--navy); color: white; position: relative; overflow: hidden;
+    }
+    .cover:before, .cover:after { content: ""; position: absolute; border: 1px solid rgba(242,183,5,.55); border-radius: 50%; }
+    .cover:before { width: 190mm; height: 190mm; right: -95mm; top: -65mm; }
+    .cover:after { width: 80mm; height: 80mm; right: 25mm; bottom: -25mm; }
+    .cover > * { position: relative; z-index: 1; }
+    .brand { color: var(--gold); font-weight: 700; letter-spacing: .18em; font-size: 11pt; }
+    .cover h1 { color: white; max-width: 145mm; font-size: 33pt; margin-top: 26mm; }
+    .cover .subtitle { max-width: 135mm; color: #d9e1e8; font-size: 14pt; }
+    .cover .meta { border-top: 1px solid rgba(255,255,255,.28); padding-top: 6mm; color: #bdc8d3; font-size: 9.5pt; }
+    .toc { page-break-after: always; }
+    .toc ol { columns: 2; column-gap: 12mm; }
+    .toc li { break-inside: avoid; margin-bottom: 5px; }
+    .lead { font-size: 12pt; color: #334155; }
+    .callout { border-left: 4px solid var(--gold); background: #fff9e6; padding: 9px 12px; margin: 10px 0; }
+    .callout.blue { border-color: #0284c7; background: #eff8ff; }
+    .callout.green { border-color: #16a34a; background: #f0fdf4; }
+    .callout.red { border-color: #dc2626; background: #fff1f2; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .card { border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; background: white; }
+    .card h3 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 9px 0 14px; font-size: 8.7pt; }
+    th { background: var(--navy); color: white; text-align: left; font-weight: 700; }
+    th, td { border: 1px solid var(--line); padding: 6px 7px; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafbfc; }
+    .badge { display: inline-block; border-radius: 999px; padding: 2px 7px; font-size: 8pt; font-weight: 700; white-space: nowrap; }
+    .badge.green { background: #dcfce7; color: var(--green); }
+    .badge.orange { background: #ffedd5; color: var(--orange); }
+    .badge.red { background: #fee2e2; color: var(--red); }
+    .badge.blue { background: #e0f2fe; color: var(--blue); }
+    .flow { background: var(--soft); border: 1px solid var(--line); padding: 10px 12px; font-weight: 700; color: var(--navy-2); }
+    .flow span { color: var(--gold); padding: 0 4px; }
+    .small { font-size: 8.5pt; color: var(--muted); }
+    .source { font-size: 8.2pt; color: var(--muted); border-top: 1px solid #edf0f2; padding-top: 5px; margin-top: 9px; }
+    .page-break { page-break-before: always; }
+    .avoid { break-inside: avoid; }
+    .risk-row td:first-child { font-weight: 700; }
+    .footnote { font-size: 8.5pt; color: var(--muted); }
+    .checklist li::marker { color: var(--gold); }
+    @media print {
+      a { color: inherit; text-decoration: none; }
+      h2, h3 { break-after: avoid; }
+      table { break-inside: auto; }
+      tr { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="brand">MAXIMUS ERP</div>
+      <h1>Audit complet du fonctionnement de l’application</h1>
+      <p class="subtitle">Architecture, parcours, modules, packs, secteurs, permissions, données, sécurité, paiements, déploiement et points de vigilance.</p>
+    </div>
+    <div class="meta">
+      <p><strong>Date de l’audit :</strong> 22 septembre 2026</p>
+      <p><strong>Périmètre :</strong> dépôt MAXIMUS, frontend React/Vite, API Laravel/PostgreSQL, artefacts associés, documentation et tests disponibles.</p>
+      <p><strong>Nature :</strong> audit fonctionnel et technique fondé sur le code et la documentation. Ce document n’est pas un test d’intrusion ni une certification de conformité.</p>
+    </div>
+  </section>
+
+  <section class="toc">
+    <h1>Sommaire</h1>
+    <ol>
+      <li>Résumé exécutif</li>
+      <li>Périmètre, méthode et limites</li>
+      <li>Architecture générale et runtime actif</li>
+      <li>Modèle métier : catalogue, modules, packs et secteurs</li>
+      <li>Règles d’accès : entreprise, unité, rôle, fonctionnalité, action</li>
+      <li>Parcours complet d’une entreprise</li>
+      <li>Fonctionnement des espaces et de la navigation</li>
+      <li>Modules métier détaillés</li>
+      <li>E-commerce, boutique publique et PWA</li>
+      <li>Transport public / Taxi</li>
+      <li>Paie, paiements, portefeuille et commissions</li>
+      <li>Données, API et persistance</li>
+      <li>Sécurité, isolation et installations dédiées</li>
+      <li>Déploiement et exploitation</li>
+      <li>Tests, état de confiance et limites observées</li>
+      <li>Constats priorisés et plan recommandé</li>
+      <li>Référentiel des fichiers et routes</li>
+    </ol>
+  </section>
+
+  <h2>1. Résumé exécutif</h2>
+  <p class="lead">MAXIMUS est un ERP SaaS multi-entreprises en français. Son modèle central est : un catalogue publié propose des modules et des packs ; une entreprise sélectionne son périmètre ; ses unités composent ce périmètre ; les rôles distribuent des permissions ; les employés voient ensuite une navigation et des actions bornées par ces niveaux.</p>
+  <div class="callout green"><strong>Conclusion générale :</strong> le socle Laravel/PostgreSQL contient les protections importantes de périmètre, de session, de module et d’action. Le frontend React/Vite expose une couverture fonctionnelle large et les tests de permissions sont nombreux. L’application est exploitable comme produit intégré, mais plusieurs domaines doivent encore être considérés comme en consolidation : abonnement réel, couverture E2E des parcours publics et financiers, coexistence Express/Drizzle-Laravel, stockage de médias en base64, absence visible de MFA/réinitialisation de mot de passe et absence de planification de maintenance.</div>
+  <div class="grid">
+    <div class="card"><h3>Ce qui est fort</h3><ul><li>Isolation tenant côté serveur : le <span class="path">companyId</span> du navigateur ne peut pas élargir le périmètre d’un acteur non administrateur.</li><li>Chaîne de permissions cohérente : entreprise → unité → rôle → fonctionnalité → action.</li><li>Contrôles de paiement, QR Présences, sessions et accès aux modules protégés côté Laravel.</li><li>Catalogue publié séparé du brouillon d’administration.</li><li>Déploiement Render avec PostgreSQL, migrations et stockage persistant des fichiers numériques.</li></ul></div>
+    <div class="card"><h3>Ce qui doit rester sous contrôle</h3><ul><li>Express/Drizzle et Laravel/PostgreSQL coexistent : Laravel est actif, Express reste une couche de comparaison et de migration.</li><li>Les abonnements sont surtout modélisés côté frontend/app-state et ne pilotent pas encore l’accès serveur.</li><li>Commerce interne conserve un repli local/prototype.</li><li>Les images sont parfois persistées en base64, avec un risque de volumétrie et de réponse lourde.</li><li>La couverture navigateur complète des paiements, PWA, GPS, uploads et isolation des domaines n’est pas démontrée.</li></ul></div>
+  </div>
+  <h3>Lecture rapide du produit</h3>
+  <div class="flow">Catalogue publié <span>→</span> demande d’entreprise <span>→</span> validation MAXIMUS <span>→</span> modules actifs <span>→</span> unités <span>→</span> rôles <span>→</span> employés <span>→</span> navigation et actions autorisées</div>
+  <p class="source">Sources principales : <span class="path">README.md:1-50,319-370</span>, <span class="path">docs/technical.md:1-18,158-190</span>, <span class="path">artifacts/api-server/laravel/app/Support/ModuleCatalog.php</span>, middlewares Laravel et tests Feature.</p>
+
+  <h2>2. Périmètre, méthode et limites</h2>
+  <h3>2.1 Éléments examinés</h3>
+  <ul>
+    <li>Frontend <span class="path">artifacts/maximus</span> : routes, pages, composants, adaptateurs API, catalogue, permissions, tests et PWA.</li>
+    <li>Backend <span class="path">artifacts/api-server/laravel</span> : routes, middlewares, contrôleurs, services, migrations et tests Feature.</li>
+    <li>Couche Express/Drizzle existante dans <span class="path">artifacts/api-server/src</span> et <span class="path">lib/db</span>, pour identifier la frontière historique.</li>
+    <li>Documentation <span class="path">README.md</span>, <span class="path">docs/technical.md</span>, guides d’installation et audits existants.</li>
+    <li>Configuration Render, workflows Replit et tests exécutables disponibles.</li>
+  </ul>
+  <h3>2.2 Méthode</h3>
+  <ol>
+    <li>Cartographie des artefacts, routes, migrations, tests et commandes.</li>
+    <li>Lecture des règles de catalogue et d’autorisation côté serveur, puis comparaison avec le routage frontend.</li>
+    <li>Reconstitution des parcours de bout en bout : inscription, approbation, organisation, modules, boutique, paiements, Transport, Présences et Paie.</li>
+    <li>Recherche des écarts de persistance, d’isolation, de sécurité et de couverture de test.</li>
+    <li>Vérification de cohérence par les tests et le build déjà disponibles dans l’environnement.</li>
+  </ol>
+  <div class="callout blue"><strong>Limites :</strong> aucun secret n’a été lu ; aucune modification de production, aucun paiement réel, aucune suppression de donnée et aucune requête de base de production n’ont été exécutés pour cet audit. Les risques signalés sont des constats de code ou des zones non prouvées par les tests disponibles, pas des vulnérabilités exploitées.</div>
+
+  <h2>3. Architecture générale et runtime actif</h2>
+  <h3>3.1 Monorepo</h3>
+  <table>
+    <tr><th>Élément</th><th>Responsabilité</th><th>Statut</th></tr>
+    <tr><td><span class="path">artifacts/maximus</span></td><td>Application React + TypeScript + Vite : écrans MAXIMUS, entreprises, employés, boutique et Transport public.</td><td><span class="badge green">Actif</span></td></tr>
+    <tr><td><span class="path">artifacts/api-server/laravel</span></td><td>API Laravel, middleware, contrôleurs, services, migrations et runtime PostgreSQL.</td><td><span class="badge green">Autorité déployée</span></td></tr>
+    <tr><td><span class="path">artifacts/api-server/src</span> + <span class="path">lib/db</span></td><td>Express 5, Drizzle et schéma partiel : couche historique conservée pendant la migration et la preuve de parité.</td><td><span class="badge orange">Legacy / comparaison</span></td></tr>
+    <tr><td><span class="path">artifacts/maximus-preparation-deck</span></td><td>Présentation de préparation du produit.</td><td><span class="badge blue">Artefact séparé</span></td></tr>
+    <tr><td><span class="path">artifacts/mockup-sandbox</span></td><td>Prévisualisation isolée de composants.</td><td><span class="badge blue">Outil design</span></td></tr>
+  </table>
+  <h3>3.2 Démarrage et circulation d’une requête</h3>
+  <div class="flow">Navigateur <span>→</span> Vite / frontend <span>→</span> préfixe <span class="path">/api</span> <span>→</span> Laravel <span>→</span> middleware session/tenant/module <span>→</span> contrôleur/service <span>→</span> PostgreSQL</div>
+  <ul>
+    <li><span class="path">src/main.tsx</span> monte React, installe l’ErrorBoundary et nettoie le thème de tenant avant restauration.</li>
+    <li><span class="path">src/App.tsx</span> orchestre la session, le cache frontend, la navigation et le chargement paresseux des pages.</li>
+    <li><span class="path">src/routes/app-routes.tsx</span> sépare le routeur MAXIMUS du routeur entreprise.</li>
+    <li><span class="path">vite.config.ts</span> exige <span class="path">PORT</span> et <span class="path">BASE_PATH</span>, et configure le proxy API.</li>
+    <li>Le runtime Render cible Apache/PHP/Laravel, applique les migrations puis provisionne le compte MAXIMUS central ou une installation dédiée.</li>
+  </ul>
+  <div class="callout"><strong>Règle opérationnelle :</strong> une correction de sécurité, d’isolation ou de permission doit être faite d’abord dans Laravel. Le frontend peut masquer une route, mais il ne constitue jamais la frontière d’autorisation.</div>
+
+  <h2>4. Modèle métier : catalogue, modules, packs et secteurs</h2>
+  <h3>4.1 Définitions</h3>
+  <table>
+    <tr><th>Objet</th><th>Définition fonctionnelle</th><th>Où il vit principalement</th></tr>
+    <tr><td><strong>Module</strong></td><td>Grand domaine activable pour une entreprise : Commerce, E-commerce, Stocks, Présences, Paie ou Transport.</td><td>Catalogue Laravel, accès entreprise, navigation frontend.</td></tr>
+    <tr><td><strong>Fonctionnalité</strong></td><td>Sous-fonction d’un module : catalogue, commandes, inventaire, pointage, virements, etc.</td><td>Registre catalogue et permissions détaillées.</td></tr>
+    <tr><td><strong>Pack</strong></td><td>Composition prédéfinie d’un module et de ses fonctionnalités, éventuellement avec des permissions.</td><td><span class="path">ModuleCatalog.php</span>, sélection d’inscription et accès entreprise.</td></tr>
+    <tr><td><strong>Secteur</strong></td><td>Profil d’activité proposant une combinaison de modules et fonctionnalités adaptées.</td><td>Presets secteur dans le catalogue/app-state.</td></tr>
+    <tr><td><strong>Accès entreprise</strong></td><td>Ligne persistée qui dit si un module est ACTIF, BETA, MAINTENANCE ou INACTIF, avec son périmètre de fonctionnalités.</td><td><span class="path">maximus_company_modules</span>.</td></tr>
+    <tr><td><strong>Rôle</strong></td><td>Ensemble de permissions donné à une unité et à ses employés.</td><td>App-state organisation + compte serveur.</td></tr>
+  </table>
+  <h3>4.2 Loi de sélection</h3>
+  <ol>
+    <li>Le module doit être publié. Un module retiré, inconnu ou non publié est rejeté.</li>
+    <li>Un pack doit appartenir au module sélectionné et être encore publié.</li>
+    <li>Les fonctionnalités demandées doivent être des identités canoniques connues du module.</li>
+    <li>Une fonctionnalité sélectionnée par un pack doit appartenir à ce pack, sauf sélection explicite sans pack.</li>
+    <li>Les permissions ne peuvent porter que sur les fonctionnalités sélectionnées et utilisent les actions <strong>voir</strong>, <strong>créer</strong> et <strong>modifier</strong>.</li>
+    <li>Une sélection vide explicite reste vide : elle ne signifie pas « tout le pack ».</li>
+    <li>Les dépendances sont affichées et contrôlées dans le catalogue, mais la fermeture automatique des dépendances doit rester vérifiée lors de chaque évolution.</li>
+  </ol>
+  <h3>4.3 Publication et brouillon</h3>
+  <div class="flow">Brouillon catalogue <span>→</span> validation MAXIMUS <span>→</span> catalogue publié <span>→</span> inscription et édition entreprise</div>
+  <p>Le parcours public d’inscription lit le catalogue publié, jamais un brouillon. Les overrides publiés et les modules personnalisés doivent être normalisés avant affichage. Une modification d’un catalogue déjà utilisé ne doit pas réactiver silencieusement une fonctionnalité retirée.</p>
+  <p class="source">Références : <span class="path">app/Support/ModuleCatalog.php:10-327,351-491,557-597,666-724,878-920</span>, <span class="path">AppStateController.php</span>, <span class="path">OnboardingAnalysisService.php</span>, <span class="path">docs/audits/company-catalogue-registration-audit.md</span>.</p>
+
+  <h2>5. Packs, secteurs et composition des accès</h2>
+  <h3>5.1 Packs intégrés par module</h3>
+  <table>
+    <tr><th>Module</th><th>Packs ou familles observés</th><th>Finalité</th></tr>
+    <tr><td>Gestion commerciale</td><td>Consultation commerciale, Gestion commerciale, Employé commercial, Manager commercial.</td><td>Clients, ventes, produits, fournisseurs, achats, caisse, rapports et activité.</td></tr>
+    <tr><td>E-commerce</td><td>Catalogue en ligne, Gestion e-commerce, Vente numérique, Ventes physiques et numériques, Location & réservation, Supervision boutique, Employé, Manager.</td><td>Catalogue public, commandes, clients, numérique, location, livraison, finances et paramètres.</td></tr>
+    <tr><td>Stocks</td><td>Consultation, Gestionnaire de stock, Responsable de stock, Employé, Manager.</td><td>Articles, entrées, sorties, demandes, inventaires, référentiels et réglages.</td></tr>
+    <tr><td>Présences</td><td>Consultation, Gestionnaire, Responsable, Employé, Manager.</td><td>Tableau de bord, pointage, absences, horaires, congés, historique et rapports.</td></tr>
+    <tr><td>Paie</td><td>Consultation paie, Gestionnaire de paie, Responsable paie, Employé, Manager.</td><td>Bénéficiaires, préparation, validation, virements, solde et historique.</td></tr>
+    <tr><td>Transport</td><td>Packs Taxi consultation, gestion, supervision, employé et manager selon le catalogue courant.</td><td>Courses, chauffeurs, véhicules, historique, suivi GPS et paramètres.</td></tr>
+  </table>
+  <h3>5.2 Loi des secteurs</h3>
+  <p>Un secteur est un <strong>profil de proposition</strong>, pas une permission magique. Il peut proposer des modules et des fonctionnalités. Après sélection, l’accès effectif est matérialisé par les accès de l’entreprise, puis réduit par l’unité, le rôle et l’acteur.</p>
+  <ul>
+    <li>Les secteurs retirés ne doivent plus apparaître dans le catalogue d’inscription.</li>
+    <li>Une fonctionnalité dépendante doit être accompagnée de son prérequis ou présentée comme impossible à sélectionner.</li>
+    <li>Un secteur ne doit jamais donner à un employé un droit supérieur au plafond de l’entreprise.</li>
+    <li>Un secteur ne remplace pas le contrôle serveur : il prépare une configuration, puis Laravel la renormalise à la création et à l’approbation.</li>
+  </ul>
+  <div class="callout red"><strong>Point d’attention :</strong> l’audit du code signale que la fermeture automatique des dépendances n’est pas entièrement portée par la normalisation serveur. Toute modification du catalogue doit donc vérifier explicitement les dépendances dans l’inscription, l’approbation, l’édition et l’autorisation runtime.</div>
+
+  <h2>6. Règles d’accès et gouvernance</h2>
+  <h3>6.1 La chaîne de contrôle</h3>
+  <div class="flow">Entreprise <span>→</span> unité/secteur <span>→</span> rôle <span>→</span> sous-fonctionnalité <span>→</span> action</div>
+  <p>Le périmètre le plus restrictif gagne. Un rôle ne peut pas réactiver un module retiré de l’entreprise ou de son unité. Le serveur reprend cette règle ; la visibilité frontend est une conséquence, pas la source d’autorité.</p>
+  <h3>6.2 Acteurs</h3>
+  <table>
+    <tr><th>Acteur</th><th>Ce qu’il peut faire</th><th>Limite principale</th></tr>
+    <tr><td>Administrateur MAXIMUS</td><td>Gérer les entreprises, catalogue, accès modules, installations, paramètres plateforme, contrôle et opérations centrales.</td><td>Accès transversal ; chaque endpoint central doit néanmoins vérifier son intention.</td></tr>
+    <tr><td>Administrateur entreprise</td><td>Gérer son entreprise, ses unités, rôles, employés, modules autorisés et paramètres métier selon le catalogue.</td><td>Une seule entreprise ; ne peut pas élargir le plafond publié ou central.</td></tr>
+    <tr><td>Manager de secteur</td><td>Gérer les employés, rôles et actions dans son secteur et ses descendants autorisés.</td><td>Pas d’accès aux autres unités ; ne peut distribuer que des permissions qu’il possède.</td></tr>
+    <tr><td>Employé</td><td>Utiliser les fonctionnalités et actions attribuées à son rôle.</td><td>Ne peut pas gérer les comptes, l’organisation ou les périmètres hors de son identité.</td></tr>
+    <tr><td>Client boutique</td><td>Compte distinct : panier, commandes, adresses, favoris, téléchargement numérique, suivi et paiement.</td><td>Ne possède aucun accès à l’espace interne MAXIMUS.</td></tr>
+  </table>
+  <h3>6.3 Isolation tenant</h3>
+  <ul>
+    <li><span class="path">AuthenticateMaximus</span> valide la session, l’utilisateur actif et l’installation.</li>
+    <li><span class="path">ResolveCompanyContext</span> force l’entreprise de l’acteur non central ; un <span class="path">companyId</span> client différent est rejeté.</li>
+    <li><span class="path">EnsureModuleEnabled</span> refuse un module inconnu, inactif ou en maintenance.</li>
+    <li><span class="path">ModuleAuthorization</span> vérifie fonctionnalité et action.</li>
+    <li>Les contrôleurs ajoutent les restrictions métier : secteur, employé, propriété de la ressource, état de l’opération.</li>
+  </ul>
+  <p class="source">Références : <span class="path">app/Http/Middleware/AuthenticateMaximus.php</span>, <span class="path">ResolveCompanyContext.php</span>, <span class="path">EnsureModuleEnabled.php</span>, <span class="path">Support/ModuleAuthorization.php</span>, <span class="path">CompanyAuthorization.php</span>.</p>
+
+  <h2>7. Parcours complet d’une entreprise</h2>
+  <h3>7.1 Inscription publique ou demande manuelle</h3>
+  <ol>
+    <li>Le frontend récupère le catalogue publié.</li>
+    <li>L’utilisateur choisit un secteur, des modules, des packs et éventuellement des fonctionnalités individuelles.</li>
+    <li>Le serveur normalise les identifiants, rejette les modules non publiés, les packs incohérents et les permissions hors périmètre.</li>
+    <li>La demande est créée avec une entreprise en attente et un mot de passe haché ; le mot de passe en clair n’est pas stocké.</li>
+    <li>La version intelligente peut analyser une description, mais l’IA propose seulement : elle ne crée ni n’active directement un module.</li>
+  </ol>
+  <h3>7.2 Approbation MAXIMUS</h3>
+  <ol>
+    <li>MAXIMUS vérifie que la demande est encore en attente.</li>
+    <li>La sélection est renormalisée contre le catalogue publié actuel.</li>
+    <li>Les lignes <span class="path">maximus_company_modules</span> sont créées ou mises à jour.</li>
+    <li>Le compte administrateur entreprise est créé ou rafraîchi.</li>
+    <li>La société et la demande passent à l’état actif/approuvé.</li>
+    <li>Une installation dédiée peut ensuite être émise avec une identité, des domaines et un protocole compatibles.</li>
+  </ol>
+  <h3>7.3 Mise en place de l’organisation</h3>
+  <div class="flow">Créer la hiérarchie <span>→</span> configurer les rôles <span>→</span> créer les employés <span>→</span> attribuer les managers <span>→</span> vérifier les accès</div>
+  <ul>
+    <li>Les unités sont reliées par <span class="path">parentId</span>.</li>
+    <li>Les employés sont rattachés à une unité/secteur et à un rôle.</li>
+    <li>La création d’un compte interne passe par l’API serveur avant la mise à jour locale.</li>
+    <li>Un changement de rôle ou de périmètre doit synchroniser les permissions du compte authentifié et révoquer les sessions si nécessaire.</li>
+    <li>La suppression est une suspension serveur ; la révocation de session précède la disparition locale.</li>
+  </ul>
+  <h3>7.4 Exploitation et maintenance</h3>
+  <p>MAXIMUS peut placer un module en <strong>ACTIF</strong>, <strong>BETA</strong>, <strong>MAINTENANCE</strong> ou <strong>INACTIF</strong>. La maintenance est immédiate et par entreprise/module : les appels opérationnels renvoient 503, tandis que MAXIMUS conserve son accès technique.</p>
+  <div class="callout orange"><strong>Limite :</strong> aucune fenêtre de maintenance planifiée avec début/fin n’a été trouvée. Le statut est un interrupteur immédiat, pas un calendrier.</div>
+
+  <h2>8. Espaces, routes et navigation</h2>
+  <table>
+    <tr><th>Espace</th><th>Routes canoniques</th><th>Contenu</th></tr>
+    <tr><td>Connexion</td><td><span class="path">/</span>, connexion entreprise personnalisée</td><td>Session, restauration, déconnexion, liens de création.</td></tr>
+    <tr><td>Inscription</td><td><span class="path">/inscription</span></td><td>Catalogue, secteur, packs, fonctionnalités, demande manuelle ou intelligente.</td></tr>
+    <tr><td>MAXIMUS</td><td><span class="path">/maximus/...</span></td><td>Dashboard, entreprises, demandes, catalogue, secteurs, abonnements, wallet, contrôle, journal, santé, paramètres.</td></tr>
+    <tr><td>Entreprise/employé</td><td><span class="path">/entreprise/...</span></td><td>Dashboard, organisation, contrôle, Commerce, Stocks, Présences, Paie, E-commerce, Transport, rapports.</td></tr>
+    <tr><td>Compatibilité</td><td><span class="path">/kora/...</span></td><td>Alias historique ; les nouvelles routes utilisent <span class="path">/entreprise/...</span>.</td></tr>
+    <tr><td>Public</td><td><span class="path">/shop/...</span> et domaines personnalisés</td><td>Vitrine, catalogue, compte client, panier, checkout, suivi, Transport public et PWA.</td></tr>
+  </table>
+  <p>Les onglets passent par la query string : par exemple <span class="path">/entreprise/stocks?tab=inventory</span>. Les routeurs comparent le chemin sans query string, ce qui évite qu’un onglet interne fasse sortir la route de son espace.</p>
+
+  <h2>9. Modules métier détaillés</h2>
+  <h3>9.1 Gestion commerciale</h3>
+  <p>Le module gère les clients, ventes, produits, fournisseurs, achats, dépenses, caisse, crédit, factures, retours, rapports et activité. Les packs consultation, gestion, employé et manager permettent de réduire le périmètre. Les droits d’un employé commercial sont distincts de ceux d’un manager.</p>
+  <p><strong>Règle :</strong> l’onglet ou la route visible ne suffit pas ; les permissions Commerce doivent être recalculées depuis le rôle, l’unité et le plafond entreprise.</p>
+  <h3>9.2 Gestion de stock</h3>
+  <p>Le serveur expose produits, fournisseurs, entrepôts, emplacements, mouvements, demandes, inventaires et validation. Les ressources doivent appartenir à l’entreprise ; un emplacement doit appartenir au bon entrepôt. Les opérations sensibles demandent une confirmation frontend, mais l’API reste la protection réelle.</p>
+  <p><strong>À surveiller :</strong> tester la concurrence lors de deux mouvements ou validations simultanés, les stocks négatifs, l’idempotence et la cohérence du solde. La surface de route ne prouve pas à elle seule l’intégrité concurrente.</p>
+  <h3>9.3 Présences</h3>
+  <p>Le module gère tableau de bord, pointage, présences, absences, horaires, congés, historique et rapports. Le pointage applique une machine d’état arrivée → sortie, avec pauses selon le modèle. Le QR est signé, borné à l’entreprise/secteur et expiré par date.</p>
+  <ul><li>Un employé ne pointe que pour lui-même.</li><li>Un manager est borné à ses secteurs.</li><li>La génération QR est réservée aux acteurs habilités.</li><li>L’export CSV est actuellement généré côté client et doit être considéré comme peu auditable.</li></ul>
+  <h3>9.4 Paie</h3>
+  <p>Le parcours est : bénéficiaires → brouillon de lot → soumission → validation → alimentation du solde → virement groupé → historique. Les comptes bancaires sont chiffrés dans les éléments de lot ; les montants sont positifs et bornés ; l’idempotence est préparée pour les paiements.</p>
+  <p><strong>Point critique :</strong> l’appel à un prestataire externe et la transaction locale n’ont pas une atomicité globale. Les webhooks, idempotences et réconciliations doivent rester testés contre les doubles appels et les réponses tardives.</p>
+  <h3>9.5 Contrôle & coordination</h3>
+  <p>Le flux central est <strong>événement → tâche → approbation → mise à jour → audit → notification</strong>. Les tâches, événements et audits sont bornés par entreprise, unité et affectation. C’est le socle de traçabilité transverse, pas un moteur complet de workflow arbitraire.</p>
+  <h3>9.6 Modules opérationnels</h3>
+  <p>Le registre frontend contient des modules opérationnels supplémentaires (finance, achats, RH, rapports et autres vues). Ils doivent être distingués des modules Laravel effectivement activés : un identifiant présent dans le registre de navigation n’est pas automatiquement un droit serveur publié.</p>
+  <h3>9.7 Assistant MAXIMUS</h3>
+  <p>L’assistant doit répondre depuis un contexte filtré par session, entreprise et modules autorisés. Une action de mutation doit rester explicite, contrôlée et auditable ; l’assistant ne doit pas transformer une suggestion en mutation implicite.</p>
+
+  <h2>10. E-commerce, boutique publique et PWA</h2>
+  <h3>10.1 Configuration de la boutique</h3>
+  <p>L’administrateur configure nom, slug, description, statut, devise, logo, images de bannière, couleurs, catégories, produits, produits numériques, locations, domaines, zones de livraison et paramètres publics. Les couleurs de boutique restent isolées du thème global entreprise.</p>
+  <h3>10.2 Produit physique et numérique</h3>
+  <ul>
+    <li>Les produits physiques ont prix, stock, images, catégories et état de publication.</li>
+    <li>Les produits numériques sont créés en brouillon, reçoivent leur fichier, puis peuvent être publiés.</li>
+    <li>Le téléchargement n’est visible qu’après paiement confirmé ; il ne dépend pas d’une URL optionnelle mal formée.</li>
+    <li>Le panier impose une unité pour les produits numériques et conserve le type de fulfillment.</li>
+  </ul>
+  <h3>10.3 Parcours client</h3>
+  <div class="flow">Vitrine <span>→</span> catalogue <span>→</span> panier <span>→</span> compte/adresse <span>→</span> commande <span>→</span> checkout DiamanoPay <span>→</span> webhook/confirmation <span>→</span> fulfillment</div>
+  <ul>
+    <li>Les sessions clients sont séparées des sessions internes MAXIMUS.</li>
+    <li>Panier, commandes, adresses et favoris sont bornés par le client et l’entreprise.</li>
+    <li>La commande est verrouillée pendant la création du checkout ; une charge PENDING existante est réutilisée.</li>
+    <li>Le paiement confirme la commande ; le webhook est protégé par signature HMAC.</li>
+    <li>Les zones de livraison actives sont bornées à l’entreprise et leur identité/tarif est figé dans la demande.</li>
+  </ul>
+  <h3>10.4 Commission et portefeuille vendeur</h3>
+  <p>La politique par défaut est 3 % DiamanoPay, 2 % MAXIMUS et 95 % vendeur. Une vente payée peut être réconciliée séparément pour créditer le vendeur et le registre MAXIMUS sans double écriture. Le solde vendeur devient retirable après livraison ou maturation de sept jours sans litige selon la politique.</p>
+  <h3>10.5 PWA</h3>
+  <p>Le service worker met en cache le shell et les ressources GET, mais contourne les routes API. La boutique est donc installable et résiliente pour son interface, pas une application offline complète pour les données, le checkout ou les mutations.</p>
+  <div class="callout red"><strong>Risques principaux :</strong> les images de logo/produit et certaines images Transport sont persistées en base64 ; cela augmente la taille de la base et des réponses. Les médias publics sont volontairement accessibles publiquement : ils ne conviennent pas à des documents confidentiels.</div>
+
+  <h2>11. Transport public / Taxi</h2>
+  <h3>11.1 Configuration interne</h3>
+  <p>Le module configure chauffeurs, disponibilité, GPS, véhicules, tarifs normaux/tempête, paramètres et galerie de couverture. Le chauffeur est créé dans Organisation puis reçoit les informations Taxi spécifiques ; le module Transport ne doit pas devenir une seconde source d’identité RH.</p>
+  <h3>11.2 Parcours public</h3>
+  <div class="flow">Position GPS client <span>→</span> lieux/Dakar <span>→</span> devis routier <span>→</span> course <span>→</span> rapprochement chauffeur libre <span>→</span> offre <span>→</span> acceptation <span>→</span> suivi <span>→</span> fin/annulation</div>
+  <ul>
+    <li>Le périmètre actuel est Dakar, avec bornes géographiques codées.</li>
+    <li>Le devis doit utiliser le géocodage puis la matrice OpenRouteService ; aucune distance inventée ne doit servir de fallback.</li>
+    <li>Le serveur choisit un chauffeur actif, disponible et géolocalisé récemment.</li>
+    <li>Le client conserve un identifiant de course et un jeton d’annulation pour restaurer la course après navigation ou erreur réseau.</li>
+    <li>La course ne doit être nettoyée du stockage navigateur qu’après un état terminal confirmé.</li>
+    <li>Le thème Transport public reste indépendant de la boutique et du thème entreprise.</li>
+  </ul>
+  <h3>11.3 Limites et contrôles</h3>
+  <ul><li>Le GPS est nécessaire dans le parcours actuel ; aucun parcours manuel complet hors Dakar n’est établi.</li><li>Le jeton public réduit le risque d’utiliser le seul identifiant, mais il doit rester non devinable, expiré et borné à la boutique.</li><li>Les appels publics sont ralentis/throttlés ; les tests de rejeu, expiration, cross-tenant et polling doivent être maintenus.</li><li>Les tuiles Leaflet peuvent échouer ; le trajet doit rester exploitable même sans fond cartographique.</li></ul>
+
+  <h2>12. Paiements, commissions et frontière financière</h2>
+  <h3>12.1 DiamanoPay</h3>
+  <p>Le service supporte une configuration par token statique ou OAuth, webhook secret, timeout, retry et clé d’idempotence. Les credentials restent côté serveur. La création d’un checkout ne doit jamais être simulée côté frontend.</p>
+  <h3>12.2 Règle de crédit</h3>
+  <div class="callout green"><strong>Règle :</strong> aucune rémunération vendeur, aucun virement Paie et aucun retrait ne doit être crédité sur la seule base d’un clic de retour frontend. Il faut une confirmation serveur : webhook signé, statut confirmé, commande verrouillée et écriture idempotente.</div>
+  <h3>12.3 Limites observées</h3>
+  <ul><li>La transaction PostgreSQL ne peut pas annuler une opération déjà acceptée par le prestataire externe.</li><li>Les webhooks et la réconciliation doivent couvrir les appels dupliqués, les retards et les divergences de statut.</li><li>Aucun flux complet de remboursement, litige ou chargeback n’a été identifié dans les routes inspectées.</li><li>Les règles d’abonnement décrivent des plans, limites et prix dans le frontend, mais ne constituent pas encore une facturation serveur complète.</li></ul>
+
+  <h2>13. Données, API et persistance</h2>
+  <h3>13.1 PostgreSQL Laravel</h3>
+  <p>Les migrations Laravel couvrent l’identité, les sessions, le contrôle, les présences, les stocks, les accès modules, l’app-state, l’e-commerce, les clients, le portefeuille vendeur, la paie, les domaines, le Transport, les installations et les réglages. La base Render est la source durable du runtime actif.</p>
+  <h3>13.2 App-state et données organisationnelles</h3>
+  <p>Les collections organisationnelles (unités, rôles, employés métier, abonnements descriptifs, catalogue workspace) sont conservées dans un état versionné avec verrouillage de ligne et contrôle de conflit. Les comptes d’authentification, sessions et accès modules sont plus durablement structurés côté serveur.</p>
+  <div class="callout orange"><strong>Écart de durabilité :</strong> la récupération d’état peut reconstruire entreprises, employés, rôles et unités depuis les comptes et accès modules, mais les abonnements sont explicitement reconstruits comme vides. Ils ne doivent donc pas être considérés comme un registre financier durable.</div>
+  <h3>13.3 LocalStorage et fallback</h3>
+  <p>Le navigateur garde session d’interface, préférences, état de menu, recherche, certains états Commerce, et l’état de restauration d’une course Taxi. Ce stockage est utile pour l’ergonomie et la reprise, mais ne doit pas être présenté comme preuve de sauvegarde serveur. Un fallback local peut masquer une panne de persistance si l’écran ne signale pas clairement son mode dégradé.</p>
+  <h3>13.4 Routes Laravel</h3>
+  <table>
+    <tr><th>Fichier</th><th>Famille</th></tr>
+    <tr><td><span class="path">routes/api.php</span></td><td>Santé, auth, inscription, entreprises, modules, installations, contrôle central, paramètres et portefeuille.</td></tr>
+    <tr><td><span class="path">routes/ecommerce.php</span></td><td>Boutique interne/public, produits, commandes, clients, checkout, digital, location, livraison, wallet.</td></tr>
+    <tr><td><span class="path">routes/transport.php</span></td><td>Chauffeurs, véhicules, courses, settings, devis, lieux, suivi et endpoints publics.</td></tr>
+    <tr><td><span class="path">routes/presence.php</span></td><td>Présences, QR, pointage direct et scan.</td></tr>
+    <tr><td><span class="path">routes/stock.php</span></td><td>Référentiels, mouvements, demandes, inventaires et validation.</td></tr>
+    <tr><td><span class="path">routes/payroll.php</span></td><td>Bénéficiaires, lots, validation, solde, virement et historique.</td></tr>
+    <tr><td><span class="path">routes/control.php</span></td><td>Tâches, événements et audit Contrôle & coordination.</td></tr>
+  </table>
+
+  <h2>14. Sécurité, isolation et installations</h2>
+  <h3>14.1 Protections présentes</h3>
+  <ul>
+    <li>Sessions serveur avec jetons stockés hachés et cookie HttpOnly.</li>
+    <li>Hachage des mots de passe, migration transparente des anciens hash après validation.</li>
+    <li>Contexte entreprise imposé côté serveur.</li>
+    <li>Autorisation module/fonctionnalité/action côté contrôleurs.</li>
+    <li>QR Présences signé avec date, entreprise et périmètre.</li>
+    <li>Webhook de paiement signé HMAC.</li>
+    <li>Limites de type/taille sur les téléversements.</li>
+    <li>En-têtes de sécurité : CSP, nosniff, DENY framing, Referrer-Policy et HSTS en production.</li>
+    <li>Verrou de suppression entreprise contrôlé en transaction et renvoyant 423.</li>
+  </ul>
+  <h3>14.2 Points qui nécessitent une décision ou une vérification</h3>
+  <table>
+    <tr><th>Point</th><th>Constat</th><th>Impact possible</th></tr>
+    <tr><td>CSRF</td><td>Cookie SameSite=Lax ; aucun flux CSRF dédié n’est clairement documenté dans l’audit du code.</td><td>À vérifier pour toutes les mutations API basées sur cookie.</td></tr>
+    <tr><td>MFA / mot de passe oublié</td><td>Aucune route complète visible pour MFA ou réinitialisation.</td><td>Risque de récupération de compte et de sécurité opérationnelle.</td></tr>
+    <tr><td>CSP</td><td><span class="path">style-src unsafe-inline</span> et images https larges.</td><td>Surface XSS/supply-chain plus permissive ; à durcir si compatible.</td></tr>
+    <tr><td>Médias base64</td><td>Images produit et Transport parfois stockées en base.</td><td>Volumétrie, sauvegardes et temps de réponse.</td></tr>
+    <tr><td>Token public</td><td>Course et annulation utilisent une preuve publique restaurable par navigateur.</td><td>Tester expiration, rejeu, devinabilité et isolation domaine.</td></tr>
+  </table>
+  <h3>14.3 Installations dédiées</h3>
+  <p>Le mode central reste le défaut. Une installation dédiée est bornée par une entreprise configurée côté serveur, son hôte, son token et son protocole. Elle ne crée jamais d’administrateur global. La synchronisation centrale vérifie l’identité et la compatibilité avant de mettre à jour les modules/domaine.</p>
+
+  <h2>15. Déploiement et exploitation</h2>
+  <h3>15.1 Render central</h3>
+  <ul>
+    <li>Service Docker web <span class="path">maximus-erp</span>.</li>
+    <li>Health check : <span class="path">/api/healthz</span>.</li>
+    <li>PostgreSQL Render géré, <span class="path">DB_CONNECTION=pgsql</span>.</li>
+    <li>Session et cache en base.</li>
+    <li>Disque persistant <span class="path">/var/data</span> pour fichiers numériques.</li>
+    <li>Entrypoint : validation des variables, migrations avec retry, provisionnement admin central ou installation dédiée, puis Apache.</li>
+  </ul>
+  <h3>15.2 Installation locale/dédiée</h3>
+  <p>Les scripts d’installation appliquent les migrations, construisent le frontend, créent le compte <span class="path">company_admin</span>, activent la synchronisation centrale et conservent les fichiers persistants. Ils ne créent pas de <span class="path">maximus_admin</span> dans une installation entreprise.</p>
+  <h3>15.3 Discipline de livraison</h3>
+  <ol class="checklist"><li>Typecheck workspace et artefacts.</li><li>Tests frontend et Laravel.</li><li>Build avec <span class="path">PORT</span> et <span class="path">BASE_PATH</span>.</li><li>Redémarrage du workflow concerné.</li><li>Logs workflow et console navigateur.</li><li>Vérification des routes authentifiées et publiques qui ont changé.</li><li>Ne jamais pousser vers GitHub sans autorisation explicite.</li></ol>
+
+  <h2>16. Tests et niveau de confiance</h2>
+  <h3>16.1 Couverture existante</h3>
+  <ul>
+    <li>Tests frontend dans <span class="path">artifacts/maximus/src/lib/*.test.ts</span> : permissions, navigation, catalogue, app-state, PWA, Commerce, Transport, installation, assistant et mutations.</li>
+    <li>Tests Laravel Feature : auth, contrôle, catalogue, inscription, app-state recovery, installations, e-commerce, digital, wallet vendeur, paie, présences, stock, Transport, sécurité.</li>
+    <li>Audits précédents : une suite intégrée documentée à 32 tests/203 assertions côté Laravel et 147/147 côté frontend pour un périmètre catalogue/inscription ; une vérification de navigateur a également couvert des fixtures synthétiques.</li>
+    <li>Dernière vérification du changement de couleurs : TypeScript réussi, 149 tests frontend réussis, build Vite réussi et workflow MAXIMUS redémarré.</li>
+  </ul>
+  <h3>16.2 Ce qui n’est pas prouvé par les tests actuels</h3>
+  <table>
+    <tr><th>Parcours</th><th>État de preuve</th></tr>
+    <tr><td>Login → refresh → logout pour chaque rôle et installation</td><td><span class="badge orange">À compléter en E2E</span></td></tr>
+    <tr><td>Checkout public → retour → webhook → commande → commission</td><td><span class="badge orange">À compléter avec sandbox prestataire</span></td></tr>
+    <tr><td>Double webhook, double checkout, réconciliation et retrait</td><td><span class="badge orange">À renforcer</span></td></tr>
+    <tr><td>Installation PWA, cache, reprise réseau et version de shell</td><td><span class="badge orange">À compléter</span></td></tr>
+    <tr><td>GPS, permissions navigateur, expiration course, annulation et cross-tenant</td><td><span class="badge orange">À compléter</span></td></tr>
+    <tr><td>Upload à la limite, médias publics, stockage long terme et volume DB</td><td><span class="badge orange">À compléter</span></td></tr>
+    <tr><td>Concurrence Stock/inventaire et validation Paie</td><td><span class="badge orange">À renforcer</span></td></tr>
+    <tr><td>CSRF, MFA, récupération de compte et durcissement CSP</td><td><span class="badge red">Décision + vérification sécurité</span></td></tr>
+  </table>
+
+  <h2>17. Constats priorisés et plan recommandé</h2>
+  <table class="risk-row">
+    <tr><th>Priorité</th><th>Constat</th><th>Pourquoi</th><th>Action recommandée</th></tr>
+    <tr><td><span class="badge red">P0</span></td><td>Renouvellement/abonnement réel non matérialisé côté serveur.</td><td>Le modèle frontend ne suffit pas à bloquer ou facturer un accès.</td><td>Décider la source d’abonnement, créer le registre durable, le cycle de renouvellement, les webhooks et les tests.</td></tr>
+    <tr><td><span class="badge red">P0</span></td><td>Parité Laravel/PostgreSQL avec Express/Drizzle non totalement prouvée.</td><td>Deux frontières de données augmentent le risque d’écart de comportement.</td><td>Finaliser la preuve de parité avant suppression ou changement de responsabilité.</td></tr>
+    <tr><td><span class="badge red">P1</span></td><td>Paiements et retraits sans matrice E2E complète.</td><td>Les side effects externes ne sont pas annulables par une transaction locale.</td><td>Tester webhooks signés, doubles appels, retards, divergences, commission et maturation.</td></tr>
+    <tr><td><span class="badge red">P1</span></td><td>CSRF/MFA/récupération de compte à clarifier.</td><td>Les sessions cookie et comptes métier portent des opérations sensibles.</td><td>Faire une revue sécurité dédiée et décider les contrôles obligatoires.</td></tr>
+    <tr><td><span class="badge orange">P1</span></td><td>Images base64 en base.</td><td>Risque de volumétrie, sauvegarde lente et réponses lourdes.</td><td>Basculer les ressources persistantes vers le stockage objet/disque durable avec métadonnées en base.</td></tr>
+    <tr><td><span class="badge orange">P1</span></td><td>Maintenance sans fenêtre planifiée.</td><td>Un statut immédiat ne permet pas d’organiser un changement à l’avance.</td><td>Ajouter début/fin, message opérateur, fuseau et retour automatique si nécessaire.</td></tr>
+    <tr><td><span class="badge orange">P2</span></td><td>Pas de matrice E2E complète des surfaces publiques.</td><td>Les routes boutique, domaines, PWA et Taxi sont nombreuses.</td><td>Créer une suite navigateur synthétique multi-entreprises et multi-rôles.</td></tr>
+    <tr><td><span class="badge orange">P2</span></td><td>Commerce interne encore en repli local/prototype.</td><td>Un succès d’interface peut masquer une absence de persistance.</td><td>Afficher le mode dégradé et finaliser le cycle serveur ou le déclarer explicitement.</td></tr>
+    <tr><td><span class="badge blue">P2</span></td><td>Export Présences client-side et absence de chargeback détecté.</td><td>Traçabilité et opérations financières peuvent être incomplètes.</td><td>Décider export serveur audité et politique de remboursement/litige.</td></tr>
+  </table>
+  <h3>Ordre conseillé</h3>
+  <ol><li>Verrouiller la source de vérité Laravel/PostgreSQL et la facturation/abonnement.</li><li>Finir la campagne de tests financiers et de séparation de tenants.</li><li>Durcir les comptes et sessions : CSRF, MFA, récupération, rotation et audit.</li><li>Déplacer les fichiers lourds hors base et vérifier la capacité de production.</li><li>Ajouter les E2E des parcours qui touchent argent, identité, domaine public et GPS.</li><li>Seulement ensuite traiter les améliorations UX et les extensions de catalogue.</li></ol>
+
+  <h2>18. Référentiel pratique : quoi, comment, où</h2>
+  <table>
+    <tr><th>Besoin</th><th>Point d’entrée</th><th>Source d’autorité</th></tr>
+    <tr><td>Ajouter un module</td><td><span class="path">ModuleCatalog.php</span>, registre frontend, routes, permissions, tests.</td><td>Catalogue publié + accès entreprise Laravel.</td></tr>
+    <tr><td>Ajouter un pack</td><td>Définition <span class="path">feature_packs</span>, permissions, sélection, normalisation, tests.</td><td>Catalogue publié ; un pack ne crée aucune identité arbitraire.</td></tr>
+    <tr><td>Ajouter un secteur</td><td>Preset secteur et ses propositions module/fonctionnalité.</td><td>Profil de proposition ; pas une autorisation directe.</td></tr>
+    <tr><td>Changer un accès entreprise</td><td>Contrôleur module/entreprise et table <span class="path">maximus_company_modules</span>.</td><td>Laravel + rôle MAXIMUS.</td></tr>
+    <tr><td>Créer un employé</td><td>Organisation → comptes/managers → <span class="path">/api/auth/accounts</span>.</td><td>Compte/auth serveur, puis app-state organisation.</td></tr>
+    <tr><td>Protéger une fonctionnalité</td><td>Identifiant canonique, <span class="path">ModuleAuthorization</span>, route/controller et UI.</td><td>Serveur ; l’UI ne fait que refléter.</td></tr>
+    <tr><td>Modifier la boutique</td><td><span class="path">ecommerce-module.tsx</span> et <span class="path">routes/ecommerce.php</span>.</td><td>Entreprise + module e-commerce + feature/action.</td></tr>
+    <tr><td>Modifier le Transport</td><td><span class="path">transport-module.tsx</span> et <span class="path">routes/transport.php</span>.</td><td>Entreprise + module Transport + permission + ressources tenant.</td></tr>
+    <tr><td>Modifier les Présences</td><td><span class="path">presence-module.tsx</span> et <span class="path">routes/presence.php</span>.</td><td>Entreprise, employé/secteur, feature et état du pointage.</td></tr>
+    <tr><td>Déployer</td><td><span class="path">render.yaml</span>, <span class="path">Dockerfile.render</span>, <span class="path">render-entrypoint.sh</span>.</td><td>Render + PostgreSQL + variables d’environnement gérées.</td></tr>
+    <tr><td>Vérifier avant livraison</td><td>Typecheck, tests, build, logs, preview et routes modifiées.</td><td>Commandes documentées dans <span class="path">README.md</span>.</td></tr>
+  </table>
+
+  <h2>19. Sources de l’audit</h2>
+  <ul>
+    <li><span class="path">README.md</span> — architecture, runtime, installation, déploiement et règles de livraison.</li>
+    <li><span class="path">docs/technical.md</span> — structure frontend, état, permissions, catalogue, organisation, API et tests.</li>
+    <li><span class="path">docs/audits/company-catalogue-registration-audit.md</span> — limites et vérifications du catalogue/inscription.</li>
+    <li><span class="path">artifacts/maximus/src/App.tsx</span>, <span class="path">src/routes/app-routes.tsx</span>, <span class="path">src/lib/*</span> — session, routes, accès, navigation et tests frontend.</li>
+    <li><span class="path">artifacts/api-server/laravel/app/Support/ModuleCatalog.php</span> — modules, fonctionnalités, packs et dépendances.</li>
+    <li><span class="path">artifacts/api-server/laravel/app/Http/Middleware/*</span> — session, tenant, installation et accès modules.</li>
+    <li><span class="path">artifacts/api-server/laravel/routes/*.php</span> — surface API active.</li>
+    <li><span class="path">artifacts/api-server/laravel/database/migrations</span> — modèle PostgreSQL Laravel.</li>
+    <li><span class="path">artifacts/api-server/laravel/tests/Feature</span> et <span class="path">artifacts/maximus/src/lib/*.test.ts</span> — couverture de tests.</li>
+    <li><span class="path">render.yaml</span>, <span class="path">Dockerfile.render</span>, <span class="path">render-entrypoint.sh</span> — exploitation Render.</li>
+  </ul>
+  <div class="callout"><strong>À retenir :</strong> MAXIMUS est organisé pour permettre à MAXIMUS de publier des modules, packs et secteurs, puis à chaque entreprise de composer son espace sans modifier le code. La règle de sécurité non négociable est que le serveur Laravel doit rester la dernière instance de décision pour l’identité, l’entreprise, le module, la fonctionnalité, l’action et la propriété de la donnée.</div>
+  <p class="footnote">Document généré depuis le snapshot de travail du 22 septembre 2026. Les chemins et constats doivent être revalidés après une migration majeure ou un changement de runtime.</p>
+</body>
+</html>
