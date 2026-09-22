@@ -38,6 +38,35 @@ const cartQuantity = (product: CartProduct | PublicProduct, quantity: number) =>
 const money = (value: number, currency: PublicShopBootstrap['store']['currency']) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: currency === 'XOF' ? 0 : 2 }).format(value) + ` ${currency}`;
 
+const publicHexColor = /^#[0-9a-f]{6}$/i;
+
+function colorLuminance(hex: string): number {
+  const channels = [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
+  const linear = channels.map(channel => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function readableOn(hex: string): string {
+  return colorLuminance(hex) > 0.52 ? '#172033' : '#ffffff';
+}
+
+function publicShopTheme(store: PublicShopBootstrap['store']) {
+  const configuredPrimary = publicHexColor.test(store.primaryColor) ? store.primaryColor : '#2563eb';
+  const primary = colorLuminance(configuredPrimary) < 0.08 ? '#2563eb' : configuredPrimary;
+  const configuredAccent = publicHexColor.test(store.accentColor) ? store.accentColor : primary;
+  // A black/dark accent is useful for text, but not for every public action.
+  // Prefer the boutique's primary color for controls so the Taxi page never
+  // collapses into unreadable black blocks when an old store has #000000.
+  const accent = colorLuminance(configuredAccent) < 0.08 ? primary : configuredAccent;
+
+  return {
+    primary,
+    accent,
+    primaryForeground: readableOn(primary),
+    accentForeground: readableOn(accent),
+  };
+}
+
 const readableDate = (value: string) =>
   new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value));
 
@@ -666,19 +695,20 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
      if (path === '/compte') return isAccountRoute;
      return routePath === shopPath(path);
    };
-  return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': store.primaryColor, '--shop-accent': store.accentColor } as React.CSSProperties}>
+   const theme = publicShopTheme(store);
+   return <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': theme.primary, '--shop-accent': theme.accent, '--shop-primary-foreground': theme.primaryForeground, '--shop-accent-foreground': theme.accentForeground } as React.CSSProperties}>
      <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 max-w-full shrink items-center gap-3 sm:max-w-[calc(100%-3rem)]">
               <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
-               {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-white" />}
+                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-[var(--shop-accent-foreground)]" />}
              </button>
              <button type="button" onClick={() => go('')} className="min-w-0 text-left">
                 <span className="line-clamp-2 break-words text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{store.name}</span>
              </button>
            </div>
           <nav id="mobile-shop-menu" className={`${mobileMenu ? 'flex' : 'hidden'} absolute right-4 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border border-black/5 bg-white p-2 shadow-2xl ring-1 ring-black/5 sm:static sm:flex sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:ring-0`}>
-            {publicNav.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${isPublicNavActive(item.path) ? 'bg-[var(--shop-accent)] text-white shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
+             {publicNav.map(item => <button type="button" key={item.path} onClick={() => go(item.path)} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${isPublicNavActive(item.path) ? 'bg-[var(--shop-accent)] text-[var(--shop-accent-foreground)] shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>)}
          </nav>
        </div>
      </header>
@@ -706,7 +736,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
        {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-accent)]"><Download size={18} /></span>
+           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
           <div>
             <p className="text-sm font-bold">Installez cette boutique</p>
             <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
@@ -714,7 +744,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             </p>
           </div>
         </div>
-        {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>
+         {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
           <Download size={15} />Installer l’application
         </button>}
       </div>}
@@ -849,6 +879,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
   const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
+  const theme = publicShopTheme(store);
   const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
   const [form, setForm] = useState({ pickup: 'Ma position GPS', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
@@ -1133,9 +1164,34 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }
   };
 
+  const passengerDetails = <section className="border border-[#d9dcd6] bg-[#f8f9f5] px-4 py-4" aria-label="Coordonnées passager">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[12px] font-bold">Coordonnées passager</p>
+        <p className="mt-1 text-[10px] text-[#7b8182]">Le téléphone est nécessaire pour que le chauffeur puisse vous joindre.</p>
+      </div>
+      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: theme.primary }}>Requis</span>
+    </div>
+    <div className="mt-3 grid gap-3 border-t border-[#e1e3de] pt-3">
+      <label className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">
+        Téléphone
+        <input aria-required="true" type="tel" value={form.passengerPhone} onChange={event => setForm(current => ({ ...current, passengerPhone: event.target.value }))} className="mt-1.5 w-full border border-[#cfd3cd] bg-[#fffefa] px-3 py-2.5 text-[12px] font-medium normal-case tracking-normal outline-none focus:border-[var(--transport-primary)]" placeholder="+221 77 000 00 00" />
+      </label>
+      <label className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">
+        Prénom
+        <input value={form.passengerName === 'Client Taxi' ? '' : form.passengerName} onChange={event => setForm(current => ({ ...current, passengerName: event.target.value || 'Client Taxi' }))} className="mt-1.5 w-full border border-[#cfd3cd] bg-[#fffefa] px-3 py-2.5 text-[12px] font-medium normal-case tracking-normal outline-none focus:border-[var(--transport-primary)]" placeholder="Ex. Awa" />
+      </label>
+    </div>
+  </section>;
+
   return <section
     className="mx-auto w-full max-w-3xl overflow-hidden border border-[#d9dcd6] bg-[#f2f3ef] text-[var(--transport-primary)] shadow-sm sm:max-w-5xl"
-    style={{ '--transport-primary': store.primaryColor, '--transport-accent': store.accentColor } as React.CSSProperties}
+    style={{
+      '--transport-primary': theme.primary,
+      '--transport-accent': theme.accent,
+      '--transport-primary-foreground': theme.primaryForeground,
+      '--transport-accent-foreground': theme.accentForeground,
+    } as React.CSSProperties}
   >
     <header className="flex items-center justify-between border-b border-[#d9dcd6] px-4 py-3.5 sm:px-6">
       <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-[12px] font-bold">
@@ -1153,13 +1209,13 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           const step = index + 1;
           const active = trip ? 3 : form.destination.trim() ? 3 : 2;
           const complete = step < active;
-          return <div key={label} className="flex min-w-0 flex-1 items-center gap-2"><span className={`flex h-6 w-6 shrink-0 items-center justify-center border text-[10px] font-bold ${complete ? 'border-[var(--transport-primary)] bg-[var(--transport-primary)] text-white' : step === active ? 'border-[var(--transport-accent)] bg-[var(--transport-accent)] text-[var(--transport-primary)]' : 'border-[#cfd2cd] text-[#737b7d]'}`}>{complete ? <Check size={13} /> : step}</span><span className={`truncate text-[10px] font-bold ${step === active ? 'text-[var(--transport-primary)]' : 'text-[#747b7d]'}`}>{label}</span>{index < 2 && <span className="ml-auto h-px w-3 bg-[#d5d7d2]" />}</div>;
+          return <div key={label} className="flex min-w-0 flex-1 items-center gap-2"><span className={`flex h-6 w-6 shrink-0 items-center justify-center border text-[10px] font-bold ${complete ? 'border-[var(--transport-primary)] bg-[var(--transport-primary)] text-[var(--transport-primary-foreground)]' : step === active ? 'border-[var(--transport-accent)] bg-[var(--transport-accent)] text-[var(--transport-accent-foreground)]' : 'border-[#cfd2cd] text-[#737b7d]'}`}>{complete ? <Check size={13} /> : step}</span><span className={`truncate text-[10px] font-bold ${step === active ? 'text-[var(--transport-primary)]' : 'text-[#747b7d]'}`}>{label}</span>{index < 2 && <span className="ml-auto h-px w-3 bg-[#d5d7d2]" />}</div>;
         })}
       </nav>
       {tripEnded && <div className={`mt-5 border px-4 py-3 ${tripEnded.status === 'COMPLETED' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><p className="text-xs font-black uppercase tracking-[.14em]">{tripEnded.status === 'COMPLETED' ? 'Course terminée' : 'Course annulée'}</p><p className="mt-1 text-sm font-semibold">{tripEnded.status === 'COMPLETED' ? 'Le parcours est fini. Vous pouvez demander une nouvelle course.' : 'Cette demande n’est plus active. Vous pouvez recommencer.'}</p></div>}
        {restoringTrip && <div className="mt-5 flex items-center gap-3 border border-[var(--transport-primary)]/20 bg-[var(--transport-primary)]/5 px-4 py-4 text-sm font-semibold"><RefreshCw size={17} className="animate-spin" style={{ color: 'var(--transport-primary)' }} /><span>Restauration de votre demande de course en cours…</span></div>}
        {restoreError && !trip && !restoringTrip && <div className="mt-5 border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950"><p className="font-bold">{restoreError}</p><button type="button" onClick={() => window.location.reload()} className="mt-3 inline-flex items-center gap-2 border border-amber-300 px-3 py-2 text-xs font-bold">Réessayer <RefreshCw size={13} /></button></div>}
-       {!formOpen && !trip && !restoringTrip && !restoreError && <div className="mt-5 border border-[#d9dcd6] bg-[#f8f9f5] p-4 sm:p-6"><div className="flex items-start gap-3"><div className="flex h-9 w-9 items-center justify-center bg-[var(--transport-primary)] text-[var(--transport-accent)]"><MapPin size={17} /></div><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#697173]">Départ</p><p className="mt-1 text-sm font-bold">Votre position GPS</p><p className="mt-1 text-xs text-[#657074]">{locationMessage || 'Votre position sera demandée avant la recherche.'}</p></div></div><button type="button" onClick={() => { setFormOpen(true); if (locationState !== 'ready') locate(); }} disabled={locationState === 'locating'} className="mt-5 flex w-full items-center justify-center gap-2 bg-[var(--transport-accent)] px-4 py-3.5 text-[13px] font-black text-[var(--transport-primary)] disabled:cursor-wait disabled:opacity-60">{locationState === 'locating' ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{locationState === 'locating' ? 'Localisation en cours…' : 'Commencer la réservation'}<ArrowRight size={16} /></button></div>}
+        {!trip && !restoringTrip && !restoreError && <div className="mt-5 space-y-3">{passengerDetails}{!formOpen && <div className="border border-[#d9dcd6] bg-[#f8f9f5] p-4 sm:p-6"><div className="flex items-start gap-3"><div className="flex h-9 w-9 items-center justify-center bg-[var(--transport-primary)] text-[var(--transport-accent-foreground)]"><MapPin size={17} /></div><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#697173]">Départ</p><p className="mt-1 text-sm font-bold">Votre position GPS</p><p className="mt-1 text-xs text-[#657074]">{locationMessage || 'Votre position sera demandée avant la recherche.'}</p></div></div><button type="button" onClick={() => { setFormOpen(true); if (locationState !== 'ready') locate(); }} disabled={locationState === 'locating'} className="mt-5 flex w-full items-center justify-center gap-2 bg-[var(--transport-accent)] px-4 py-3.5 text-[13px] font-black text-[var(--transport-accent-foreground)] disabled:cursor-wait disabled:opacity-60">{locationState === 'locating' ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{locationState === 'locating' ? 'Localisation en cours…' : 'Commencer la réservation'}<ArrowRight size={16} /></button></div>}</div>}
        {formOpen && !trip && !restoringTrip && !restoreError && <form id="transport-booking-form" onSubmit={submit} className="mt-5 space-y-3">
         <section className="border border-[#d9dcd6] bg-[#f8f9f5] p-4" aria-label="Détails du trajet">
           <div className="flex items-center justify-between border-b border-[#e1e3de] pb-3"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#697173]">Votre trajet</p><span className={`text-[10px] font-bold ${locationState === 'ready' ? 'text-[#3e805e]' : locationState === 'error' ? 'text-rose-700' : 'text-[#697173]'}`}>{locationState === 'ready' && position ? `GPS précis · ${Math.round(position.accuracy)} m` : locationState === 'locating' ? 'Recherche GPS…' : 'GPS à autoriser'}</span></div>
@@ -1169,7 +1225,6 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
              <div className="relative"><label htmlFor="transport-destination" className="flex items-start gap-3"><div className="flex h-8 w-8 shrink-0 items-center justify-center bg-[var(--transport-accent)] text-[var(--transport-primary)]"><MapPin size={15} /></div><div className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">Destination</span><input id="transport-destination" required autoFocus value={form.destination} onChange={event => { setSelectedPlace(null); setForm(current => ({ ...current, destination: event.target.value })); }} className="mt-1 w-full border-b border-[#aeb4b0] bg-transparent pb-1 text-[13px] font-bold outline-none placeholder:font-medium placeholder:text-[#9a9f9e]" placeholder="Quartier, lieu ou adresse" autoComplete="off" /></div></label>{!isDestinationPlaceCommitted(form.destination, selectedPlace) && (placesLoading || destinationPlaces.length > 0) && <div className="absolute left-11 right-0 top-[57px] z-10 overflow-hidden border border-[#cdd1cb] bg-[#fffefa] shadow-lg">{placesLoading && <p className="px-3 py-3 text-xs font-semibold text-[#657074]">Recherche des lieux à Dakar…</p>}{!placesLoading && destinationPlaces.map(place => <button key={`${place.latitude}-${place.longitude}-${place.label}`} type="button" role="option" onClick={() => { setSelectedPlace(place); setForm(current => ({ ...current, destination: place.label })); setDestinationPlaces([]); setPlacesLoading(false); }} className="block w-full border-b border-[#eceee9] px-3 py-3 text-left last:border-0 hover:bg-[#f2f3ef]"><span className="block text-[12px] font-bold">{place.label.split(',')[0]}</span><span className="mt-0.5 block text-[10px] text-[#7b8182]">{place.label}</span></button>)}</div>}</div>
           </div>
         </section>
-          <section className="border border-[#d9dcd6] bg-[#f8f9f5] px-4 py-4" aria-label="Coordonnées passager"><div className="flex items-start justify-between gap-3"><div><p className="text-[12px] font-bold">Coordonnées passager</p><p className="mt-1 text-[10px] text-[#7b8182]">Le téléphone est nécessaire pour que le chauffeur puisse vous joindre.</p></div><span className="shrink-0 text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: 'var(--transport-primary)' }}>Requis</span></div><div className="mt-3 grid gap-3 border-t border-[#e1e3de] pt-3"><label className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">Téléphone<input aria-required="true" type="tel" value={form.passengerPhone} onChange={event => setForm(current => ({ ...current, passengerPhone: event.target.value }))} className="mt-1.5 w-full border border-[#cfd3cd] bg-[#fffefa] px-3 py-2.5 text-[12px] font-medium normal-case tracking-normal outline-none focus:border-[var(--transport-primary)]" placeholder="+221 77 000 00 00" /></label><label className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">Prénom<input value={form.passengerName === 'Client Taxi' ? '' : form.passengerName} onChange={event => setForm(current => ({ ...current, passengerName: event.target.value || 'Client Taxi' }))} className="mt-1.5 w-full border border-[#cfd3cd] bg-[#fffefa] px-3 py-2.5 text-[12px] font-medium normal-case tracking-normal outline-none focus:border-[var(--transport-primary)]" placeholder="Ex. Awa" /></label></div></section>
         <section className="border border-[#d9dcd6] bg-[#f8f9f5] p-4"><div className="flex items-center justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#697173]">Estimation</p><p className="mt-1 text-[10px] text-[#7b8182]">Position actuelle → {form.destination || 'destination'}</p></div>{quoteLoading ? <RefreshCw size={16} className="animate-spin text-[#697173]" /> : <p className="text-[20px] font-black">{quote ? money(quote.fare, store.currency) : '—'}</p>}</div>{quoteError && !quoteLoading && <p role="alert" className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{quoteError}</p>}{quote && <><div className="mt-3 flex gap-4 border-t border-[#e1e3de] pt-3 text-[10px] font-semibold text-[#687173]"><span><Clock3 size={13} className="mr-1 inline" />{quote.durationMinutes} min</span><span><CarFront size={13} className="mr-1 inline" />{quote.distanceKm.toFixed(1)} km</span></div><TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="mt-3 h-52" /></>}</section>
         {error && <p role="alert" className="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p>}
         <p className="pb-2 text-center text-[11px] text-[#657074]">Vos coordonnées sont partagées uniquement avec le chauffeur affecté par {store.name}.</p>
@@ -1177,7 +1232,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       {trip && <div className="mt-5 border border-[#d9dcd6] bg-[#f8f9f5] p-4"><div className="flex items-center justify-between border-b border-[#e1e3de] pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#3e805e]">Demande enregistrée</p><h2 className="mt-1 text-lg font-black">{trip.status === 'OFFERED' ? 'Chauffeur trouvé' : trip.driverName ? 'Votre chauffeur est en route' : 'Attribution en cours'}</h2></div><Check className="text-[#3e805e]" size={22} /></div><p className="mt-3 text-sm leading-6 text-[#657074]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-4 flex items-center gap-3 border-t border-[#e1e3de] pt-4 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-14 w-20 object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[#657074]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-4 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 border border-[#cfd3cd] px-4 py-3 text-sm font-bold"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 border border-[#b6d9c4] bg-[#edf8f0] px-4 py-3 text-sm font-bold text-[#287047]"><MessageCircle size={16} /> WhatsApp</a></div>}{cancelError && <p role="alert" className="mt-4 border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{cancelError}</p>}{['REQUESTED', 'OFFERED', 'ASSIGNED'].includes(trip.status) && cancelToken && <button type="button" onClick={() => void cancelTrip()} disabled={cancelling} className="mt-4 inline-flex w-full items-center justify-center gap-2 border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 disabled:opacity-60">{cancelling && <RefreshCw size={15} className="animate-spin" />}{cancelling ? 'Annulation…' : 'Annuler la demande'}</button>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setCancelToken(null); setTrip(null); setFormOpen(true); }} className="mt-4 text-xs font-bold underline" style={{ color: 'var(--transport-primary)' }}>Demander une autre course</button></div>}
       {(phone || whatsappHref) && <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[#d9dcd6] pt-4 text-[11px] text-[#657074]"><span className="mr-auto">Besoin d’aide avec {store.name} ?</span>{phone && <a href={`tel:${phone}`} className="inline-flex items-center gap-1.5 border border-[#cfd3cd] px-2.5 py-2 font-bold text-[#172235]"><Phone size={13} /> Appeler</a>}{whatsappHref && <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 border border-[#b6d9c4] bg-[#edf8f0] px-2.5 py-2 font-bold text-[#287047]"><MessageCircle size={13} /> WhatsApp</a>}</div>}
     </div>
-    {formOpen && !trip && !restoringTrip && !restoreError && <div className="sticky bottom-0 z-20 border-t border-[#d3d6d0] bg-[#f2f3ef]/95 px-4 py-3 backdrop-blur-sm sm:px-8"><button form="transport-booking-form" type="submit" disabled={submitting || locationState !== 'ready'} className="flex w-full items-center justify-center gap-2 bg-[var(--transport-accent)] px-4 py-3.5 text-[13px] font-black text-[var(--transport-primary)] disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{submitting ? 'Recherche du chauffeur…' : quote ? 'Confirmer la demande' : 'Demander un chauffeur'}<ArrowRight size={16} /></button></div>}
+    {formOpen && !trip && !restoringTrip && !restoreError && <div className="sticky bottom-0 z-20 border-t border-[#d3d6d0] bg-[#f2f3ef]/95 px-4 py-3 backdrop-blur-sm sm:px-8"><button form="transport-booking-form" type="submit" disabled={submitting || locationState !== 'ready'} className="flex w-full items-center justify-center gap-2 bg-[var(--transport-accent)] px-4 py-3.5 text-[13px] font-black text-[var(--transport-accent-foreground)] disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{submitting ? 'Recherche du chauffeur…' : quote ? 'Confirmer la demande' : 'Demander un chauffeur'}<ArrowRight size={16} /></button></div>}
   </section>;
 }
 

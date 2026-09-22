@@ -1,0 +1,40 @@
+S C:\Users\FIS-TS\Desktop\L3 pc ucad\MEDIA PLUS\spark 7\AUTRUIS\INTERNET\Music\Downloads\MAXIMUS\Maximus-main> cd C:\Users\FIS-TS\maximus-local-propre
+PS C:\Users\FIS-TS\maximus-local-propre>
+PS C:\Users\FIS-TS\maximus-local-propre> powershell -NoProfile -ExecutionPolicy Bypass `
+>>   -File .\scripts\register-maximus-sync.ps1 `
+>>   -WorkspaceDir (Get-Location).Path `
+>>   -IntervalMinutes 5
+Scheduler MAXIMUS activÃ© : MAXIMUS central scheduler
+DÃ©clenchement toutes les 5 minute(s), sans fenÃªtre visible.
+PS C:\Users\FIS-TS\maximus-local-propre> Start-ScheduledTask -TaskName "MAXIMUS central scheduler"
+PS C:\Users\FIS-TS\maximus-local-propre>
+PS C:\Users\FIS-TS\maximus-local-propre> Start-Sleep -Seconds 15
+PS C:\Users\FIS-TS\maximus-local-propre>
+PS C:\Users\FIS-TS\maximus-local-propre> Get-ScheduledTaskInfo -TaskName "MAXIMUS central scheduler"
+
+
+LastRunTime        : 9/22/2026 2:59:30 PM
+LastTaskResult     : 0
+NextRunTime        : 9/22/2026 2:59:49 PM
+NumberOfMissedRuns : 0
+TaskName           : MAXIMUS central scheduler
+TaskPath           :
+PSComputerName     :
+
+
+
+PS C:\Users\FIS-TS\maximus-local-propre>
+PS C:\Users\FIS-TS\maximus-local-propre> Get-Content `
+>>   .\artifacts\api-server\laravel\storage\logs\installation-scheduler.log `
+>>   -Tail 80
+Get-Content : Impossible de trouver le chemin d'accès «
+C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel\storage\logs\installation-scheduler.log», car il n'existe pas.
+Au caractère Ligne:1 : 1
++ Get-Content `
++ ~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\FIS-TS...n-scheduler.log:String) [Get-Content], ItemNotFoundException
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+
+PS C:\Users\FIS-TS\maximus-local-propre> cd C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel>
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> php artisan maximus:sync-central-installation --no-ansi
