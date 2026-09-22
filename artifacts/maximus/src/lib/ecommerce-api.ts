@@ -330,6 +330,8 @@ export interface PublicShopBootstrap {
       phone: string;
       photoUrl: string;
     };
+    transportPrimaryColor?: string;
+    transportAccentColor?: string;
     enabledFeatures: PublicShopFeatures;
     locationSettings?: {
       whatsapp: string;

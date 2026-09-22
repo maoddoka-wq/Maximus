@@ -897,7 +897,10 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
   const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
-  const [transportColors, setTransportColors] = useState<{ primaryColor?: string; accentColor?: string } | null>(null);
+  const [transportColors, setTransportColors] = useState<{ primaryColor?: string; accentColor?: string } | null>(() => ({
+    primaryColor: store.transportPrimaryColor,
+    accentColor: store.transportAccentColor,
+  }));
   const theme = publicTransportTheme(transportColors);
   const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
   const [form, setForm] = useState({ pickup: 'Ma position GPS', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });

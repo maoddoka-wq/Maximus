@@ -1383,6 +1383,8 @@ class EcommerceController extends Controller
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
             'heroImages' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'store', (string) ($row->id ?? ''), 'hero'),
+            'transportPrimaryColor' => $this->publicTransportColor((string) $row->company_id, 'primaryColor'),
+            'transportAccentColor' => $this->publicTransportColor((string) $row->company_id, 'accentColor'),
             'seller' => [
                 'name' => (string) ($company->name ?? $row->name ?? ''),
                 'email' => (string) ($company->email ?? ''),
@@ -1392,6 +1394,24 @@ class EcommerceController extends Controller
             'enabledFeatures' => $features,
             'locationSettings' => $this->publicLocationSettings((string) $row->company_id),
         ];
+    }
+
+    private function publicTransportColor(string $company, string $key): string
+    {
+        $configuration = DB::table('maximus_company_modules')
+            ->where('company_id', $company)
+            ->where('module_id', 'transport')
+            ->value('configuration');
+        $configuration = json_decode($configuration ?? '{}', true);
+        $settings = is_array($configuration) && is_array($configuration['transport'] ?? null)
+            ? $configuration['transport']
+            : [];
+        $value = strtoupper(trim((string) ($settings[$key] ?? '')));
+        if (preg_match('/^#[0-9A-F]{6}$/', $value) === 1 && $value !== '#000000') {
+            return $value;
+        }
+
+        return $key === 'primaryColor' ? '#161D27' : '#F2B705';
     }
 
     private function publicLocationSettings(string $company): array

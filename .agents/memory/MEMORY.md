@@ -86,3 +86,4 @@
 - [Fréquence du scheduler Windows](windows-sync-scheduler.md) — appeler le scheduler toutes les cinq minutes et réenregistrer la tâche pour supprimer les lancements fréquents visibles.
 - [Isolation des thèmes publics](public-theme-isolation.md) — les couleurs de la boutique et du module Transport public restent distinctes, avec des variables CSS propres au module.
 - [Galerie photo Transport](transport-gallery-upload.md) — borner les uploads JSON multi-images pour rester sous la limite de requête PHP.
+- [Couleurs Transport publiques](public-transport-colors.md) — fournir les couleurs du module dans le bootstrap public, pas uniquement via une requête secondaire silencieuse.
