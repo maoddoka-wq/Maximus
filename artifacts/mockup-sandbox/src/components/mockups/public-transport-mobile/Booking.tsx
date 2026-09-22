@@ -157,7 +157,7 @@ export function Booking() {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-[420px] flex-col">
         <header className="flex items-center justify-between border-b border-[#d9dcd6] bg-[#f2f3ef] px-4 py-3.5">
           <button type="button" aria-label="Retour à la boutique" className="inline-flex items-center gap-2 text-[12px] font-bold text-[#172235]">
-            <ArrowLeft size={16} /> Transport
+            <ArrowLeft size={16} /> Taxi Urbain
           </button>
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#697173]">
             <span className="h-2 w-2 bg-[#f5b719]" /> Dakar
