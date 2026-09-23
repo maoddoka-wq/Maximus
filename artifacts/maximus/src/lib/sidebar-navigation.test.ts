@@ -5,7 +5,7 @@ import { getConfiguredModules } from './store';
 
 const configuredModules = getConfiguredModules({});
 
-test('les fonctionnalités Immobilier Biens et Annonces gardent des routes distinctes', () => {
+test('toutes les fonctionnalités Immobilier gardent leur route distincte', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['immobilier'],
     configuredModules,
@@ -15,8 +15,18 @@ test('les fonctionnalités Immobilier Biens et Annonces gardent des routes disti
   });
 
   const items = groups[0]?.items ?? [];
-  assert.ok(items.some(item => item.label === 'Biens' && item.href === '/entreprise/immobilier?feature=biens'));
-  assert.ok(items.some(item => item.label === 'Annonces' && item.href === '/entreprise/immobilier?feature=annonces'));
+  assert.deepEqual(items.map(item => item.href), [
+    '/entreprise/immobilier?feature=dashboard',
+    '/entreprise/immobilier?feature=biens',
+    '/entreprise/immobilier?feature=annonces',
+    '/entreprise/immobilier?feature=prospects',
+    '/entreprise/immobilier?feature=visites',
+    '/entreprise/immobilier?feature=mandats',
+    '/entreprise/immobilier?feature=agents',
+    '/entreprise/immobilier?feature=rapports',
+    '/entreprise/immobilier?feature=parametres',
+    '/entreprise/immobilier?feature=vitrine-publique',
+  ]);
 });
 
 test('le menu latéral générique respecte les fonctionnalités sélectionnées', () => {
