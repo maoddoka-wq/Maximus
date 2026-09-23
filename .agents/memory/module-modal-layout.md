@@ -1,10 +1,10 @@
 ---
-name: Fenêtres des modules
-description: Règle d’affichage commune des fenêtres de saisie et de leurs tableaux.
+name: Fenêtre Immobilier
+description: Règle d’affichage dédiée aux fenêtres Ajouter/Modifier du module Immobilier.
 ---
 
-Les fenêtres de saisie des modules doivent s’ouvrir en haut de la zone visible plutôt qu’être centrées ou ancrées en bas. Leur en-tête et leur bouton de fermeture restent visibles pendant que le contenu défile lorsque la fenêtre dépasse la hauteur disponible.
+Les fenêtres Ajouter/Modifier du module Immobilier utilisent un overlay dédié qui couvre entièrement l’application. Le formulaire s’ouvre en haut, tandis que le menu et la page sous-jacente restent masqués. Le contenu du formulaire défile si nécessaire.
 
-**Why:** Les formulaires longs doivent laisser le contexte et la fermeture accessibles immédiatement, surtout sur les petits écrans, sans cacher le haut de la fenêtre après l’ouverture.
+**Why:** L’overlay Immobilier ne partage pas la structure des autres modales : appliquer une règle générique ne modifiait donc pas son rendu réel.
 
-**How to apply:** Utiliser les classes communes de fenêtre (`modal-backdrop`, `modal-panel`, `modal-header`) et ne réintroduire un centrage ou un ancrage bas que pour un cas explicitement différent.
+**How to apply:** Modifier le conteneur `immobilier-modal-backdrop` et son panneau enfant, sans changer le comportement global des autres modules.
