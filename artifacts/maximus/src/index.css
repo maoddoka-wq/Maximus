@@ -218,7 +218,15 @@ body { min-width: 320px; }
 .data-table tbody tr:hover { background: hsl(var(--primary) / .055); }
 .table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; border-top: 1px solid hsl(var(--border)); }
 .overflow-x-auto { max-width: 100%; overscroll-behavior-inline: contain; }
-.table-scroll table { min-width: 680px; }
+.table-scroll table { min-width: 680px; background: hsl(var(--muted) / .18); }
+.table-scroll thead { background: hsl(var(--muted) / .72); }
+.table-scroll tbody tr:nth-child(odd) { background: hsl(var(--card) / .72); }
+.table-scroll tbody tr:nth-child(even) { background: hsl(var(--muted) / .32); }
+.table-scroll tbody tr:hover { background: hsl(var(--primary) / .09); }
+.page-pad .card-surface table { background: hsl(var(--muted) / .16); }
+.page-pad .card-surface table tbody tr:nth-child(odd) { background: hsl(var(--card) / .72); }
+.page-pad .card-surface table tbody tr:nth-child(even) { background: hsl(var(--muted) / .32); }
+.page-pad .card-surface table tbody tr:hover { background: hsl(var(--primary) / .09); }
 .transport-table-scroll table { min-width: 620px; }
 .overflow-x-auto > table { min-width: 680px; }
 .table-scroll th { white-space: nowrap; }
