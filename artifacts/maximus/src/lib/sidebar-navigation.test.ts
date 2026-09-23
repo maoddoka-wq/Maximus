@@ -5,6 +5,20 @@ import { getConfiguredModules } from './store';
 
 const configuredModules = getConfiguredModules({});
 
+test('les fonctionnalités Immobilier Biens et Annonces gardent des routes distinctes', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['immobilier'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+  });
+
+  const items = groups[0]?.items ?? [];
+  assert.ok(items.some(item => item.label === 'Biens' && item.href === '/entreprise/immobilier?feature=biens'));
+  assert.ok(items.some(item => item.label === 'Annonces' && item.href === '/entreprise/immobilier?feature=annonces'));
+});
+
 test('le menu latéral générique respecte les fonctionnalités sélectionnées', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['commerce'],
