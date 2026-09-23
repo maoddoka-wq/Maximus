@@ -428,8 +428,8 @@ const mediaAccept = 'image/jpeg,image/png,image/webp,video/mp4,video/webm,video/
 
 function MediaUploadField({ files, setFiles }: { files: File[]; setFiles: (files: File[]) => void }) {
   return <label className="block rounded-xl border border-dashed border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.04)] p-4 text-sm font-bold sm:col-span-2">
-    <span className="flex items-center gap-2"><ImagePlus size={16} className="text-[hsl(var(--primary))]" />Galerie du bien</span>
-    <span className="mt-1 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">Ajoutez plusieurs photos ou vidéos (JPG, PNG, WebP, MP4, WebM, MOV, OGG). Elles seront enregistrées avec la fiche.</span>
+    <span className="flex items-center gap-2"><ImagePlus size={16} className="text-[hsl(var(--primary))]" />Photo profil et galerie</span>
+    <span className="mt-1 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">Le premier fichier sélectionné devient la photo profil. Les suivants alimentent la galerie (JPG, PNG, WebP, MP4, WebM, MOV, OGG).</span>
     <input type="file" accept={mediaAccept} multiple onChange={event => setFiles(Array.from(event.target.files ?? []))} className="mt-3 block w-full text-xs font-semibold file:mr-3 file:rounded-lg file:border-0 file:bg-[hsl(var(--primary))] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[hsl(var(--primary-foreground))]" />
     {files.length > 0 && <span className="mt-2 block text-xs font-semibold text-[hsl(var(--primary))]">{files.length} média{files.length > 1 ? 's' : ''} prêt{files.length > 1 ? 's' : ''} à envoyer · {files.map(file => file.name).join(', ')}</span>}
   </label>;
@@ -439,10 +439,19 @@ function MediaStrip({ media }: { media: ImmobilierMedia[] }) {
   if (media.length === 0) {
     return <div className="flex h-36 items-center justify-center bg-[hsl(var(--muted)/.45)] text-xs font-semibold text-[hsl(var(--muted-foreground))]"><ImagePlus size={18} className="mr-2" />Aucun média</div>;
   }
-  return <div className="grid h-36 grid-cols-3 gap-1 overflow-hidden bg-[hsl(var(--muted)/.35)]">
-    {media.slice(0, 3).map(item => item.type === 'video'
-      ? <video key={item.id} src={item.url} muted playsInline className="h-full w-full object-cover" />
-      : <img key={item.id} src={item.url} alt="" className="h-full w-full object-cover" />)}
+  const [profile, ...gallery] = media;
+  return <div className="grid h-40 grid-cols-[1.7fr_1fr] gap-1 overflow-hidden bg-[hsl(var(--muted)/.35)]">
+    <div className="relative min-w-0">
+      {profile.type === 'video' ? <video src={profile.url} muted playsInline className="h-full w-full object-cover" /> : <img src={profile.url} alt="Photo profil du bien" className="h-full w-full object-cover" />}
+      <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-2 py-1 text-[10px] font-bold text-white">Photo profil</span>
+    </div>
+    <div className="grid min-w-0 grid-cols-2 gap-1">
+      {gallery.slice(0, 4).map(item => item.type === 'video'
+        ? <video key={item.id} src={item.url} muted playsInline className="h-full min-h-0 w-full object-cover" />
+        : <img key={item.id} src={item.url} alt="Photo de la galerie" className="h-full min-h-0 w-full object-cover" />)}
+      {gallery.length === 0 && <div className="col-span-2 flex items-center justify-center p-2 text-center text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">Galerie vide</div>}
+      {gallery.length > 4 && <span className="absolute" aria-hidden="true" />}
+    </div>
   </div>;
 }
 

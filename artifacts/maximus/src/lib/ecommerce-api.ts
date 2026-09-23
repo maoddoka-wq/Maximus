@@ -387,6 +387,12 @@ export interface PublicShopBootstrap {
     bathrooms: number | null;
     furnished: boolean;
     featured: boolean;
+    profileMedia: {
+      id: string;
+      url: string;
+      mime: string;
+      type: 'image' | 'video';
+    } | null;
     gallery: Array<{
       id: string;
       url: string;

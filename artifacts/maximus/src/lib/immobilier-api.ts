@@ -28,6 +28,7 @@ export interface ImmobilierProperty {
   bathrooms: number | null;
   furnished: boolean;
   internalNotes: string;
+  profileMedia: ImmobilierMedia | null;
   gallery: ImmobilierMedia[];
   createdAt: string;
   updatedAt: string;
@@ -60,6 +61,7 @@ export interface ImmobilierListing {
   bathrooms: number | null;
   furnished: boolean;
   featured: boolean;
+  profileMedia: ImmobilierMedia | null;
   gallery: ImmobilierMedia[];
   createdAt: string;
   updatedAt: string;

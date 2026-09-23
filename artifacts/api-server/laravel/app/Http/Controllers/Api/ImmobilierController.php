@@ -371,6 +371,8 @@ class ImmobilierController extends Controller
 
     private function property(object $row): array
     {
+        $gallery = $this->gallery((string) $row->company_id, 'immobilier_property', (string) $row->id);
+
         return [
             'id' => $row->id,
             'companyId' => $row->company_id,
@@ -387,7 +389,8 @@ class ImmobilierController extends Controller
             'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
             'furnished' => (bool) $row->furnished,
             'internalNotes' => $row->internal_notes ?? '',
-            'gallery' => $this->gallery((string) $row->company_id, 'immobilier_property', (string) $row->id),
+            'profileMedia' => $gallery[0] ?? null,
+            'gallery' => $gallery,
             'createdAt' => (string) $row->created_at,
             'updatedAt' => (string) $row->updated_at,
         ];
@@ -395,6 +398,8 @@ class ImmobilierController extends Controller
 
     private function listing(object $row): array
     {
+        $gallery = $this->gallery((string) $row->company_id, 'immobilier_listing', (string) $row->id);
+
         return [
             'id' => $row->id,
             'companyId' => $row->company_id,
@@ -414,7 +419,8 @@ class ImmobilierController extends Controller
             'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
             'furnished' => (bool) $row->furnished,
             'featured' => (bool) $row->featured,
-            'gallery' => $this->gallery((string) $row->company_id, 'immobilier_listing', (string) $row->id),
+            'profileMedia' => $gallery[0] ?? null,
+            'gallery' => $gallery,
             'createdAt' => (string) $row->created_at,
             'updatedAt' => (string) $row->updated_at,
         ];
