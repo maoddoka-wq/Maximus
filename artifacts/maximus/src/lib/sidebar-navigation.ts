@@ -1,6 +1,7 @@
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  Building2,
   CarFront,
   CalendarDays,
   ClipboardCheck,
@@ -217,6 +218,18 @@ export function buildSidebarFeatureGroups({
                 label: feature.label,
                 icon: CarFront,
               }))
+            : moduleId === 'immobilier'
+              ? getModuleFeatureOptions(module)
+                .filter(feature =>
+                  selectedFeatureIds.has(feature.id)
+                  && (companyAdmin && !employeeRole
+                    ? true
+                    : roleHasFeaturePermission(employeeRole, employeeNode, module.id, feature.id, 'voir')))
+                .map(feature => ({
+                  href: `/entreprise/immobilier?feature=${encodeURIComponent(feature.id)}`,
+                  label: feature.label,
+                  icon: feature.id === 'biens' ? Building2 : feature.id === 'annonces' ? FileText : LayoutGrid,
+                }))
           : module.features
             .filter(feature => selectedFeatureIds.has(featureSlug(feature)))
             .map(feature => featureSlug(feature))

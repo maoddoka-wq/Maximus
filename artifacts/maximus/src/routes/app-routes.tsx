@@ -399,6 +399,7 @@ export function CompanyRouter({
       canCreate: hasPermission('immobilier', 'créer'),
       canModify: hasPermission('immobilier', 'modifier'),
       featurePermissions: moduleFeaturePermissions?.immobilier,
+      activeFeatureId: query.get('feature') ?? 'dashboard',
     });
   }
   if (routePath === '/entreprise/finance') {
