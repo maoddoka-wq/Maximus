@@ -431,14 +431,35 @@ class ImmobilierController extends Controller
         $input = Validator::make($request->all(), [
             'media' => ['required', 'array', 'min:1', 'max:20'],
             'media.*' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,mp4,webm,mov,ogg', 'max:51200'],
+            'slot' => ['nullable', 'in:PROFILE,GALLERY'],
         ])->validate();
 
-        $nextOrder = (int) DB::table('ecommerce_gallery_images')
+        $slot = $input['slot'] ?? 'GALLERY';
+        $media = DB::table('ecommerce_gallery_images')
             ->where('company_id', $company)
             ->where('owner_type', $ownerType)
             ->where('owner_id', $ownerId)
-            ->where('collection', 'gallery')
-            ->max('sort_order') + 1;
+            ->where('collection', 'gallery');
+
+        if ($slot === 'PROFILE') {
+            // The first ordered media is the profile image. Replace it while
+            // preserving all existing gallery items after it.
+            $profile = (clone $media)->orderBy('sort_order')->first();
+            if ($profile) {
+                DB::table('ecommerce_gallery_images')
+                    ->where('id', $profile->id)
+                    ->delete();
+            }
+            DB::table('ecommerce_gallery_images')
+                ->where('company_id', $company)
+                ->where('owner_type', $ownerType)
+                ->where('owner_id', $ownerId)
+                ->where('collection', 'gallery')
+                ->update(['sort_order' => DB::raw('sort_order + 1')]);
+            $nextOrder = 0;
+        } else {
+            $nextOrder = (int) $media->max('sort_order') + 1;
+        }
 
         foreach ($input['media'] as $file) {
             $contents = $file->get();
@@ -457,6 +478,9 @@ class ImmobilierController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            if ($slot === 'PROFILE') {
+                break;
+            }
         }
     }
 

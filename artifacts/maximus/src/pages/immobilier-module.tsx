@@ -108,8 +108,10 @@ export default function ImmobilierModulePage({
   const [leads, setLeads] = useState<ImmobilierLead[]>([]);
   const [propertyForm, setPropertyForm] = useState<ImmobilierPropertyInput>(emptyProperty);
   const [listingForm, setListingForm] = useState<ImmobilierListingInput>(emptyListing);
-  const [propertyFiles, setPropertyFiles] = useState<File[]>([]);
-  const [listingFiles, setListingFiles] = useState<File[]>([]);
+  const [propertyProfileFile, setPropertyProfileFile] = useState<File | null>(null);
+  const [propertyGalleryFiles, setPropertyGalleryFiles] = useState<File[]>([]);
+  const [listingProfileFile, setListingProfileFile] = useState<File | null>(null);
+  const [listingGalleryFiles, setListingGalleryFiles] = useState<File[]>([]);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,8 +153,10 @@ export default function ImmobilierModulePage({
     setEditingId(null);
     setPropertyForm(emptyProperty);
     setListingForm(emptyListing);
-    setPropertyFiles([]);
-    setListingFiles([]);
+    setPropertyProfileFile(null);
+    setPropertyGalleryFiles([]);
+    setListingProfileFile(null);
+    setListingGalleryFiles([]);
   };
 
   useEffect(() => {
@@ -201,8 +205,12 @@ export default function ImmobilierModulePage({
         savedProperty = result.property;
         showAppToast('Bien créé.', 'success');
       }
-      if (propertyFiles.length > 0) {
-        const result = await api.uploadPropertyMedia(savedProperty.id, propertyFiles);
+      if (propertyProfileFile) {
+        const result = await api.uploadPropertyProfileMedia(savedProperty.id, propertyProfileFile);
+        savedProperty = result.property;
+      }
+      if (propertyGalleryFiles.length > 0) {
+        const result = await api.uploadPropertyGalleryMedia(savedProperty.id, propertyGalleryFiles);
         savedProperty = result.property;
       }
       setProperties(items => editingId
@@ -227,8 +235,12 @@ export default function ImmobilierModulePage({
         savedListing = result.listing;
         showAppToast('Annonce créée.', 'success');
       }
-      if (listingFiles.length > 0) {
-        const result = await api.uploadListingMedia(savedListing.id, listingFiles);
+      if (listingProfileFile) {
+        const result = await api.uploadListingProfileMedia(savedListing.id, listingProfileFile);
+        savedListing = result.listing;
+      }
+      if (listingGalleryFiles.length > 0) {
+        const result = await api.uploadListingGalleryMedia(savedListing.id, listingGalleryFiles);
         savedListing = result.listing;
       }
       setListings(items => editingId
@@ -324,8 +336,8 @@ export default function ImmobilierModulePage({
       {formMode && createPortal(
         <div className="immobilier-modal-backdrop fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-[hsl(var(--foreground)/.45)] p-3 backdrop-blur-sm sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
           {formMode === 'create-property' || formMode === 'edit-property'
-            ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} files={propertyFiles} setFiles={setPropertyFiles} onSubmit={saveProperty} onClose={closeForm} />
-            : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} files={listingFiles} setFiles={setListingFiles} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
+            ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} profileFile={propertyProfileFile} setProfileFile={setPropertyProfileFile} galleryFiles={propertyGalleryFiles} setGalleryFiles={setPropertyGalleryFiles} onSubmit={saveProperty} onClose={closeForm} />
+            : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} profileFile={listingProfileFile} setProfileFile={setListingProfileFile} galleryFiles={listingGalleryFiles} setGalleryFiles={setListingGalleryFiles} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
         </div>,
         document.body,
       )}
@@ -349,7 +361,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   return <div className="rounded-2xl border border-dashed p-10 text-center"><p className="font-bold">{title}</p><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{text}</p></div>;
 }
 
-function PropertyForm({ mode, form, setForm, files, setFiles, onSubmit, onClose }: { mode: 'create-property' | 'edit-property'; form: ImmobilierPropertyInput; setForm: (form: ImmobilierPropertyInput) => void; files: File[]; setFiles: (files: File[]) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+function PropertyForm({ mode, form, setForm, profileFile, setProfileFile, galleryFiles, setGalleryFiles, onSubmit, onClose }: { mode: 'create-property' | 'edit-property'; form: ImmobilierPropertyInput; setForm: (form: ImmobilierPropertyInput) => void; profileFile: File | null; setProfileFile: (file: File | null) => void; galleryFiles: File[]; setGalleryFiles: (files: File[]) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
   return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-property-form-title" className="modal-panel mt-1 max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:mt-2 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
     <FormHeader id="immobilier-property-form-title" title={mode === 'edit-property' ? 'Modifier le bien' : 'Ajouter un bien'} text="Le bien est votre fiche interne. Il pourra ensuite recevoir une ou plusieurs annonces." onClose={onClose} />
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -366,13 +378,13 @@ function PropertyForm({ mode, form, setForm, files, setFiles, onSubmit, onClose 
       <Field label="Salles de bain" type="number" value={String(form.bathrooms ?? '')} onChange={bathrooms => setForm({ ...form, bathrooms: bathrooms ? Number(bathrooms) : null })} />
       <label className="flex items-center gap-2 self-end pb-2 text-sm font-bold"><input type="checkbox" checked={Boolean(form.furnished)} onChange={event => setForm({ ...form, furnished: event.target.checked })} />Bien meublé</label>
       <label className="block text-sm font-bold sm:col-span-2">Notes internes<textarea rows={3} value={String(form.internalNotes ?? '')} onChange={event => setForm({ ...form, internalNotes: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Informations réservées à l’équipe…" /></label>
-       <MediaUploadField files={files} setFiles={setFiles} />
+       <MediaUploadFields profileFile={profileFile} setProfileFile={setProfileFile} galleryFiles={galleryFiles} setGalleryFiles={setGalleryFiles} />
     </div>
     <FormActions onClose={onClose} submitLabel={mode === 'edit-property' ? 'Enregistrer le bien' : 'Créer le bien'} />
   </form>;
 }
 
-function ListingForm({ mode, form, setForm, files, setFiles, properties, onSubmit, onClose }: { mode: 'create-listing' | 'edit-listing'; form: ImmobilierListingInput; setForm: (form: ImmobilierListingInput) => void; files: File[]; setFiles: (files: File[]) => void; properties: ImmobilierProperty[]; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+function ListingForm({ mode, form, setForm, profileFile, setProfileFile, galleryFiles, setGalleryFiles, properties, onSubmit, onClose }: { mode: 'create-listing' | 'edit-listing'; form: ImmobilierListingInput; setForm: (form: ImmobilierListingInput) => void; profileFile: File | null; setProfileFile: (file: File | null) => void; galleryFiles: File[]; setGalleryFiles: (files: File[]) => void; properties: ImmobilierProperty[]; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
   return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-listing-form-title" className="modal-panel mt-1 max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:mt-2 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
     <FormHeader id="immobilier-listing-form-title" title={mode === 'edit-listing' ? 'Modifier l’annonce' : 'Ajouter une annonce'} text="L’annonce est une publication commerciale liée à un bien existant." onClose={onClose} />
     <div className="mt-5 space-y-4">
@@ -381,7 +393,7 @@ function ListingForm({ mode, form, setForm, files, setFiles, properties, onSubmi
       <SelectField label="Statut de diffusion" value={form.status} onChange={status => setForm({ ...form, status: status as ImmobilierListingInput['status'] })} options={['DRAFT', 'PUBLISHED']} labels={statusLabel} />
       <label className="block text-sm font-bold">Description commerciale<textarea rows={5} value={String(form.description ?? '')} onChange={event => setForm({ ...form, description: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Présentez le bien aux visiteurs…" /></label>
       <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={Boolean(form.featured)} onChange={event => setForm({ ...form, featured: event.target.checked })} />Mettre l’annonce à la une</label>
-       <MediaUploadField files={files} setFiles={setFiles} />
+        <MediaUploadFields profileFile={profileFile} setProfileFile={setProfileFile} galleryFiles={galleryFiles} setGalleryFiles={setGalleryFiles} />
       {properties.length === 0 && <p className="rounded-xl bg-amber-500/10 p-3 text-sm font-semibold text-amber-800">Créez d’abord un bien dans la fonctionnalité Biens.</p>}
     </div>
     <FormActions onClose={onClose} submitLabel={mode === 'edit-listing' ? 'Enregistrer l’annonce' : 'Publier l’annonce'} disabled={!properties.length} />
@@ -405,17 +417,29 @@ function SelectField({ label, value, onChange, options, labels = {} }: { label: 
 }
 
 const mediaAccept = 'image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,video/ogg';
+const profileMediaAccept = 'image/jpeg,image/png,image/webp';
 
-function MediaUploadField({ files, setFiles }: { files: File[]; setFiles: (files: File[]) => void }) {
-  return <label className="block rounded-xl border border-dashed border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.04)] p-4 text-sm font-bold sm:col-span-2">
-    <span className="flex items-center gap-2"><ImagePlus size={16} className="text-[hsl(var(--primary))]" />Photo profil et galerie</span>
-    <span className="mt-1 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">Le premier fichier sélectionné devient la photo profil. Les suivants alimentent la galerie (JPG, PNG, WebP, MP4, WebM, MOV, OGG).</span>
-    <input type="file" accept={mediaAccept} multiple onChange={event => setFiles(Array.from(event.target.files ?? []))} className="mt-3 block w-full text-xs font-semibold file:mr-3 file:rounded-lg file:border-0 file:bg-[hsl(var(--primary))] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[hsl(var(--primary-foreground))]" />
-    {files.length > 0 && <span className="mt-2 block text-xs font-semibold text-[hsl(var(--primary))]">{files.length} média{files.length > 1 ? 's' : ''} prêt{files.length > 1 ? 's' : ''} à envoyer · {files.map(file => file.name).join(', ')}</span>}
-  </label>;
+function MediaUploadFields({ profileFile, setProfileFile, galleryFiles, setGalleryFiles }: { profileFile: File | null; setProfileFile: (file: File | null) => void; galleryFiles: File[]; setGalleryFiles: (files: File[]) => void }) {
+  return <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+    <label className="block rounded-xl border border-dashed border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.04)] p-4 text-sm font-bold">
+      <span className="flex items-center gap-2"><ImagePlus size={16} className="text-[hsl(var(--primary))]" />Photo profil</span>
+      <span className="mt-1 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">Une seule image ou vidéo utilisée comme visuel principal.</span>
+      <input type="file" accept={profileMediaAccept} onChange={event => setProfileFile(event.target.files?.[0] ?? null)} className="mt-3 block w-full text-xs font-semibold file:mr-3 file:rounded-lg file:border-0 file:bg-[hsl(var(--primary))] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[hsl(var(--primary-foreground))]" />
+      {profileFile && <span className="mt-2 block truncate text-xs font-semibold text-[hsl(var(--primary))]">{profileFile.name}</span>}
+    </label>
+    <label className="block rounded-xl border border-dashed border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.04)] p-4 text-sm font-bold">
+      <span className="flex items-center gap-2"><ImagePlus size={16} className="text-[hsl(var(--primary))]" />Galerie</span>
+      <span className="mt-1 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">Ajoutez plusieurs images ou vidéos pour la galerie du bien.</span>
+      <input type="file" accept={mediaAccept} multiple onChange={event => setGalleryFiles(Array.from(event.target.files ?? []))} className="mt-3 block w-full text-xs font-semibold file:mr-3 file:rounded-lg file:border-0 file:bg-[hsl(var(--primary))] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[hsl(var(--primary-foreground))]" />
+      {galleryFiles.length > 0 && <span className="mt-2 block truncate text-xs font-semibold text-[hsl(var(--primary))]">{galleryFiles.length} fichier{galleryFiles.length > 1 ? 's' : ''} · {galleryFiles.map(file => file.name).join(', ')}</span>}
+    </label>
+  </div>;
 }
 
 function MediaStrip({ media, profileMedia, compact = false }: { media: ImmobilierMedia[]; profileMedia?: ImmobilierMedia | null; compact?: boolean }) {
+  if (compact) {
+    return <span className="inline-flex min-w-[76px] shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--secondary))] px-2 py-2 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{media.length} média{media.length > 1 ? 's' : ''}</span>;
+  }
   const profile = profileMedia ?? media[0] ?? null;
   const gallery = media.filter(item => item.id !== profile?.id);
   const size = compact ? 'h-16 w-36' : 'h-40 w-full';

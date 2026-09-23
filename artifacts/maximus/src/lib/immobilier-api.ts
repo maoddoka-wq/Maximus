@@ -4,6 +4,7 @@ export type ImmobilierListingStatus = 'DRAFT' | 'PUBLISHED' | 'RESERVED' | 'SOLD
 export type ImmobilierPropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'RENTED' | 'ARCHIVED';
 export type ImmobilierLeadStatus = 'NEW' | 'CONTACTED' | 'CLOSED';
 export type ImmobilierRequestType = 'CONTACT' | 'VISIT';
+export type ImmobilierMediaSlot = 'PROFILE' | 'GALLERY';
 
 export interface ImmobilierMedia {
   id: string;
@@ -97,16 +98,42 @@ export const createImmobilierApi = (companyId: string) => {
     bootstrap: () => request<{ properties: ImmobilierProperty[]; listings: ImmobilierListing[]; leads: ImmobilierLead[] }>(withCompany('/immobilier/bootstrap')),
     createProperty: (body: ImmobilierPropertyInput) => request<{ property: ImmobilierProperty }>(withCompany('/immobilier/properties'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     updateProperty: (id: string, body: Partial<ImmobilierPropertyInput>) => request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-    uploadPropertyMedia: (id: string, files: File[]) => {
+    uploadPropertyMedia: (id: string, files: File[], slot: ImmobilierMediaSlot = 'GALLERY') => {
       const body = new FormData();
+      body.append('slot', slot);
+      files.forEach(file => body.append('media[]', file));
+      return request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}/media`), { method: 'POST', body });
+    },
+    uploadPropertyProfileMedia: (id: string, file: File) => {
+      const body = new FormData();
+      body.append('slot', 'PROFILE');
+      body.append('media[]', file);
+      return request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}/media`), { method: 'POST', body });
+    },
+    uploadPropertyGalleryMedia: (id: string, files: File[]) => {
+      const body = new FormData();
+      body.append('slot', 'GALLERY');
       files.forEach(file => body.append('media[]', file));
       return request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}/media`), { method: 'POST', body });
     },
     archiveProperty: (id: string) => request<{ ok: true }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createListing: (body: ImmobilierListingInput) => request<{ listing: ImmobilierListing }>(withCompany('/immobilier/listings'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     updateListing: (id: string, body: Partial<ImmobilierListingInput>) => request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-    uploadListingMedia: (id: string, files: File[]) => {
+    uploadListingMedia: (id: string, files: File[], slot: ImmobilierMediaSlot = 'GALLERY') => {
       const body = new FormData();
+      body.append('slot', slot);
+      files.forEach(file => body.append('media[]', file));
+      return request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}/media`), { method: 'POST', body });
+    },
+    uploadListingProfileMedia: (id: string, file: File) => {
+      const body = new FormData();
+      body.append('slot', 'PROFILE');
+      body.append('media[]', file);
+      return request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}/media`), { method: 'POST', body });
+    },
+    uploadListingGalleryMedia: (id: string, files: File[]) => {
+      const body = new FormData();
+      body.append('slot', 'GALLERY');
       files.forEach(file => body.append('media[]', file));
       return request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}/media`), { method: 'POST', body });
     },
