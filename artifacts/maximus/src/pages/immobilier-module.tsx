@@ -344,7 +344,7 @@ export default function ImmobilierModulePage({
 
       {isAuxiliaryFeatureId(currentFeatureId) && <AuxiliaryFeature featureId={currentFeatureId} properties={properties} listings={listings} leads={leads} />}
 
-      {formMode && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[hsl(var(--foreground)/.45)] p-4 backdrop-blur-sm" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
+      {formMode && <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-[hsl(var(--foreground)/.45)] p-3 backdrop-blur-sm sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
         {formMode === 'create-property' || formMode === 'edit-property'
           ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} files={propertyFiles} setFiles={setPropertyFiles} onSubmit={saveProperty} onClose={closeForm} />
           : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} files={listingFiles} setFiles={setListingFiles} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
@@ -366,7 +366,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 }
 
 function PropertyForm({ mode, form, setForm, files, setFiles, onSubmit, onClose }: { mode: 'create-property' | 'edit-property'; form: ImmobilierPropertyInput; setForm: (form: ImmobilierPropertyInput) => void; files: File[]; setFiles: (files: File[]) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
-  return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-property-form-title" className="modal-panel max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
+  return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-property-form-title" className="modal-panel mt-1 max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:mt-2 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
     <FormHeader id="immobilier-property-form-title" title={mode === 'edit-property' ? 'Modifier le bien' : 'Ajouter un bien'} text="Le bien est votre fiche interne. Il pourra ensuite recevoir une ou plusieurs annonces." onClose={onClose} />
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
       <Field label="Référence interne" value={String(form.reference ?? '')} onChange={reference => setForm({ ...form, reference })} placeholder="BIEN-2026-001" />
@@ -389,7 +389,7 @@ function PropertyForm({ mode, form, setForm, files, setFiles, onSubmit, onClose 
 }
 
 function ListingForm({ mode, form, setForm, files, setFiles, properties, onSubmit, onClose }: { mode: 'create-listing' | 'edit-listing'; form: ImmobilierListingInput; setForm: (form: ImmobilierListingInput) => void; files: File[]; setFiles: (files: File[]) => void; properties: ImmobilierProperty[]; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
-  return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-listing-form-title" className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
+  return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-listing-form-title" className="modal-panel mt-1 max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:mt-2 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
     <FormHeader id="immobilier-listing-form-title" title={mode === 'edit-listing' ? 'Modifier l’annonce' : 'Ajouter une annonce'} text="L’annonce est une publication commerciale liée à un bien existant." onClose={onClose} />
     <div className="mt-5 space-y-4">
       <label className="block text-sm font-bold">Bien à publier<select required disabled={mode === 'edit-listing'} value={form.propertyId} onChange={event => setForm({ ...form, propertyId: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sélectionner un bien…</option>{properties.map(property => <option key={property.id} value={property.id}>{property.reference} · {property.propertyType} · {property.city}</option>)}</select></label>
@@ -405,7 +405,7 @@ function ListingForm({ mode, form, setForm, files, setFiles, properties, onSubmi
 }
 
 function FormHeader({ id, title, text, onClose }: { id: string; title: string; text: string; onClose: () => void }) {
-  return <div className="flex items-start justify-between gap-4"><div><h2 id={id} className="font-bold">{title}</h2><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p></div><button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div>;
+  return <div className="sticky top-0 z-10 -mx-5 -mt-5 flex items-start justify-between gap-4 border-b border-black/5 bg-[hsl(var(--background)/.97)] px-5 pb-3 pt-5 backdrop-blur sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6"><div><h2 id={id} className="font-bold">{title}</h2><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p></div><button type="button" onClick={onClose} aria-label="Fermer" className="shrink-0 rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div>;
 }
 
 function FormActions({ onClose, submitLabel, disabled = false }: { onClose: () => void; submitLabel: string; disabled?: boolean }) {
