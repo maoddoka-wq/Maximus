@@ -9,9 +9,11 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:immobilier
         Route::get('/bootstrap', [ImmobilierController::class, 'bootstrap']);
         Route::post('/properties', [ImmobilierController::class, 'storeProperty']);
         Route::patch('/properties/{id}', [ImmobilierController::class, 'updateProperty']);
+        Route::post('/properties/{id}/media', [ImmobilierController::class, 'uploadPropertyMedia']);
         Route::delete('/properties/{id}', [ImmobilierController::class, 'archiveProperty']);
         Route::post('/listings', [ImmobilierController::class, 'storeListing']);
         Route::patch('/listings/{id}', [ImmobilierController::class, 'updateListing']);
+        Route::post('/listings/{id}/media', [ImmobilierController::class, 'uploadListingMedia']);
         Route::delete('/listings/{id}', [ImmobilierController::class, 'archiveListing']);
         Route::patch('/leads/{id}', [ImmobilierController::class, 'updateLead']);
     });

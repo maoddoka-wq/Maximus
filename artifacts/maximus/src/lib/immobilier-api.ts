@@ -5,6 +5,13 @@ export type ImmobilierPropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'RENT
 export type ImmobilierLeadStatus = 'NEW' | 'CONTACTED' | 'CLOSED';
 export type ImmobilierRequestType = 'CONTACT' | 'VISIT';
 
+export interface ImmobilierMedia {
+  id: string;
+  url: string;
+  mime: string;
+  type: 'image' | 'video';
+}
+
 export interface ImmobilierProperty {
   id: string;
   companyId: string;
@@ -21,6 +28,7 @@ export interface ImmobilierProperty {
   bathrooms: number | null;
   furnished: boolean;
   internalNotes: string;
+  gallery: ImmobilierMedia[];
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +60,7 @@ export interface ImmobilierListing {
   bathrooms: number | null;
   furnished: boolean;
   featured: boolean;
+  gallery: ImmobilierMedia[];
   createdAt: string;
   updatedAt: string;
 }
@@ -86,9 +95,19 @@ export const createImmobilierApi = (companyId: string) => {
     bootstrap: () => request<{ properties: ImmobilierProperty[]; listings: ImmobilierListing[]; leads: ImmobilierLead[] }>(withCompany('/immobilier/bootstrap')),
     createProperty: (body: ImmobilierPropertyInput) => request<{ property: ImmobilierProperty }>(withCompany('/immobilier/properties'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     updateProperty: (id: string, body: Partial<ImmobilierPropertyInput>) => request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    uploadPropertyMedia: (id: string, files: File[]) => {
+      const body = new FormData();
+      files.forEach(file => body.append('media[]', file));
+      return request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}/media`), { method: 'POST', body });
+    },
     archiveProperty: (id: string) => request<{ ok: true }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createListing: (body: ImmobilierListingInput) => request<{ listing: ImmobilierListing }>(withCompany('/immobilier/listings'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     updateListing: (id: string, body: Partial<ImmobilierListingInput>) => request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    uploadListingMedia: (id: string, files: File[]) => {
+      const body = new FormData();
+      files.forEach(file => body.append('media[]', file));
+      return request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}/media`), { method: 'POST', body });
+    },
     archiveListing: (id: string) => request<{ ok: true }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     updateLead: (id: string, status: ImmobilierLeadStatus) => request<{ ok: true }>(withCompany(`/immobilier/leads/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }),
   };

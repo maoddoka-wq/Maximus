@@ -6,6 +6,7 @@ import {
   Check,
   FileSignature,
   Globe2,
+  ImagePlus,
   Pencil,
   Plus,
   Settings2,
@@ -18,6 +19,7 @@ import {
   type ImmobilierLead,
   type ImmobilierListing,
   type ImmobilierListingInput,
+  type ImmobilierMedia,
   type ImmobilierProperty,
   type ImmobilierPropertyInput,
 } from '@/lib/immobilier-api';
@@ -105,6 +107,8 @@ export default function ImmobilierModulePage({
   const [leads, setLeads] = useState<ImmobilierLead[]>([]);
   const [propertyForm, setPropertyForm] = useState<ImmobilierPropertyInput>(emptyProperty);
   const [listingForm, setListingForm] = useState<ImmobilierListingInput>(emptyListing);
+  const [propertyFiles, setPropertyFiles] = useState<File[]>([]);
+  const [listingFiles, setListingFiles] = useState<File[]>([]);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,6 +150,8 @@ export default function ImmobilierModulePage({
     setEditingId(null);
     setPropertyForm(emptyProperty);
     setListingForm(emptyListing);
+    setPropertyFiles([]);
+    setListingFiles([]);
   };
 
   useEffect(() => {
@@ -184,15 +190,23 @@ export default function ImmobilierModulePage({
   const saveProperty = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      let savedProperty: ImmobilierProperty;
       if (editingId) {
         const result = await api.updateProperty(editingId, propertyForm);
-        setProperties(items => items.map(item => item.id === editingId ? result.property : item));
+        savedProperty = result.property;
         showAppToast('Bien mis à jour.', 'success');
       } else {
         const result = await api.createProperty(propertyForm);
-        setProperties(items => [result.property, ...items]);
+        savedProperty = result.property;
         showAppToast('Bien créé.', 'success');
       }
+      if (propertyFiles.length > 0) {
+        const result = await api.uploadPropertyMedia(savedProperty.id, propertyFiles);
+        savedProperty = result.property;
+      }
+      setProperties(items => editingId
+        ? items.map(item => item.id === savedProperty.id ? savedProperty : item)
+        : [savedProperty, ...items]);
       closeForm();
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'Le bien n’a pas pu être enregistré.', 'error');
@@ -202,15 +216,23 @@ export default function ImmobilierModulePage({
   const saveListing = async (event: FormEvent) => {
     event.preventDefault();
     try {
+      let savedListing: ImmobilierListing;
       if (editingId) {
         const result = await api.updateListing(editingId, listingForm);
-        setListings(items => items.map(item => item.id === editingId ? result.listing : item));
+        savedListing = result.listing;
         showAppToast('Annonce mise à jour.', 'success');
       } else {
         const result = await api.createListing(listingForm);
-        setListings(items => [result.listing, ...items]);
+        savedListing = result.listing;
         showAppToast('Annonce créée.', 'success');
       }
+      if (listingFiles.length > 0) {
+        const result = await api.uploadListingMedia(savedListing.id, listingFiles);
+        savedListing = result.listing;
+      }
+      setListings(items => editingId
+        ? items.map(item => item.id === savedListing.id ? savedListing : item)
+        : [savedListing, ...items]);
       closeForm();
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'L’annonce n’a pas pu être enregistrée.', 'error');
@@ -280,9 +302,11 @@ export default function ImmobilierModulePage({
         <SummaryCard icon={<CalendarDays size={22} />} label="Visites demandées" value={leads.filter(item => item.requestType === 'VISIT').length} detail={`${leads.filter(item => item.status === 'NEW').length} demandes nouvelles`} />
       </section>}
 
-      {propertyView && <section className="space-y-3">
+      {propertyView && <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {loading ? <LoadingState label="biens" /> : properties.length === 0 ? <EmptyState title="Aucun bien enregistré" text="Créez une fiche bien avant de pouvoir lui associer une annonce." /> : properties.map(property => (
-          <article key={property.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5">
+          <article key={property.id} className="flex flex-col overflow-hidden rounded-2xl border bg-[hsl(var(--card))]">
+            <MediaStrip media={property.gallery} />
+            <div className="flex flex-1 flex-col p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{property.reference}</span><span className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[10px] font-bold">{statusLabel[property.status]}</span></div>
@@ -293,19 +317,23 @@ export default function ImmobilierModulePage({
             </div>
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bedrooms} chambre(s)</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bathrooms} salle(s) de bain</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">Meublé</span>}</div>
             {property.internalNotes && <p className="mt-4 rounded-xl bg-[hsl(var(--muted))] p-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]"><strong>Note interne :</strong> {property.internalNotes}</p>}
+            </div>
           </article>
         ))}
       </section>}
 
-      {listingView && <section className="space-y-3">
+      {listingView && <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {loading ? <LoadingState label="annonces" /> : listings.length === 0 ? <EmptyState title="Aucune annonce créée" text="Créez d’abord un bien, puis publiez-le avec une annonce commerciale." /> : listings.map(listing => {
           const property = propertyForListing(listing);
-          return <article key={listing.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5">
+          return <article key={listing.id} className="flex flex-col overflow-hidden rounded-2xl border bg-[hsl(var(--card))]">
+            <MediaStrip media={listing.gallery} />
+            <div className="flex flex-1 flex-col p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{statusLabel[listing.status]}</span>{listing.featured && <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold text-amber-700">À la une</span>}</div><h2 className="mt-3 text-lg font-bold">{listing.title}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Bien {property?.reference ?? listing.propertyId} · {property?.city ?? listing.city} · {property ? money(property.price) : money(listing.price)}</p></div>
               <div className="flex gap-2">{canModifyListings && <button type="button" onClick={() => editListing(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button>}{canModifyListings && <button type="button" onClick={() => void archiveListing(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><X size={13} className="mr-1 inline" />Archiver</button>}</div>
             </div>
             <p className="mt-4 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{listing.description || 'Aucune description commerciale renseignée.'}</p>
+            </div>
           </article>;
         })}
       </section>}
@@ -318,8 +346,8 @@ export default function ImmobilierModulePage({
 
       {formMode && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[hsl(var(--foreground)/.45)] p-4 backdrop-blur-sm" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
         {formMode === 'create-property' || formMode === 'edit-property'
-          ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} onSubmit={saveProperty} onClose={closeForm} />
-          : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
+          ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} files={propertyFiles} setFiles={setPropertyFiles} onSubmit={saveProperty} onClose={closeForm} />
+          : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} files={listingFiles} setFiles={setListingFiles} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
       </div>}
     </div>
   );
@@ -337,7 +365,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   return <div className="rounded-2xl border border-dashed p-10 text-center"><p className="font-bold">{title}</p><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{text}</p></div>;
 }
 
-function PropertyForm({ mode, form, setForm, onSubmit, onClose }: { mode: 'create-property' | 'edit-property'; form: ImmobilierPropertyInput; setForm: (form: ImmobilierPropertyInput) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+function PropertyForm({ mode, form, setForm, files, setFiles, onSubmit, onClose }: { mode: 'create-property' | 'edit-property'; form: ImmobilierPropertyInput; setForm: (form: ImmobilierPropertyInput) => void; files: File[]; setFiles: (files: File[]) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
   return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-property-form-title" className="modal-panel max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
     <FormHeader id="immobilier-property-form-title" title={mode === 'edit-property' ? 'Modifier le bien' : 'Ajouter un bien'} text="Le bien est votre fiche interne. Il pourra ensuite recevoir une ou plusieurs annonces." onClose={onClose} />
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -354,12 +382,13 @@ function PropertyForm({ mode, form, setForm, onSubmit, onClose }: { mode: 'creat
       <Field label="Salles de bain" type="number" value={String(form.bathrooms ?? '')} onChange={bathrooms => setForm({ ...form, bathrooms: bathrooms ? Number(bathrooms) : null })} />
       <label className="flex items-center gap-2 self-end pb-2 text-sm font-bold"><input type="checkbox" checked={Boolean(form.furnished)} onChange={event => setForm({ ...form, furnished: event.target.checked })} />Bien meublé</label>
       <label className="block text-sm font-bold sm:col-span-2">Notes internes<textarea rows={3} value={String(form.internalNotes ?? '')} onChange={event => setForm({ ...form, internalNotes: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Informations réservées à l’équipe…" /></label>
+       <MediaUploadField files={files} setFiles={setFiles} />
     </div>
     <FormActions onClose={onClose} submitLabel={mode === 'edit-property' ? 'Enregistrer le bien' : 'Créer le bien'} />
   </form>;
 }
 
-function ListingForm({ mode, form, setForm, properties, onSubmit, onClose }: { mode: 'create-listing' | 'edit-listing'; form: ImmobilierListingInput; setForm: (form: ImmobilierListingInput) => void; properties: ImmobilierProperty[]; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+function ListingForm({ mode, form, setForm, files, setFiles, properties, onSubmit, onClose }: { mode: 'create-listing' | 'edit-listing'; form: ImmobilierListingInput; setForm: (form: ImmobilierListingInput) => void; files: File[]; setFiles: (files: File[]) => void; properties: ImmobilierProperty[]; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
   return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-listing-form-title" className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
     <FormHeader id="immobilier-listing-form-title" title={mode === 'edit-listing' ? 'Modifier l’annonce' : 'Ajouter une annonce'} text="L’annonce est une publication commerciale liée à un bien existant." onClose={onClose} />
     <div className="mt-5 space-y-4">
@@ -368,6 +397,7 @@ function ListingForm({ mode, form, setForm, properties, onSubmit, onClose }: { m
       <SelectField label="Statut de diffusion" value={form.status} onChange={status => setForm({ ...form, status: status as ImmobilierListingInput['status'] })} options={['DRAFT', 'PUBLISHED']} labels={statusLabel} />
       <label className="block text-sm font-bold">Description commerciale<textarea rows={5} value={String(form.description ?? '')} onChange={event => setForm({ ...form, description: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Présentez le bien aux visiteurs…" /></label>
       <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={Boolean(form.featured)} onChange={event => setForm({ ...form, featured: event.target.checked })} />Mettre l’annonce à la une</label>
+       <MediaUploadField files={files} setFiles={setFiles} />
       {properties.length === 0 && <p className="rounded-xl bg-amber-500/10 p-3 text-sm font-semibold text-amber-800">Créez d’abord un bien dans la fonctionnalité Biens.</p>}
     </div>
     <FormActions onClose={onClose} submitLabel={mode === 'edit-listing' ? 'Enregistrer l’annonce' : 'Publier l’annonce'} disabled={!properties.length} />
@@ -388,6 +418,28 @@ function Field({ label, value, onChange, type = 'text', placeholder, required = 
 
 function SelectField({ label, value, onChange, options, labels = {} }: { label: string; value: string; onChange: (value: string) => void; options: string[]; labels?: Record<string, string> }) {
   return <label className="block text-sm font-bold">{label}<select value={value} onChange={event => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">{options.map(option => <option key={option} value={option}>{labels[option] ?? option}</option>)}</select></label>;
+}
+
+const mediaAccept = 'image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,video/ogg';
+
+function MediaUploadField({ files, setFiles }: { files: File[]; setFiles: (files: File[]) => void }) {
+  return <label className="block rounded-xl border border-dashed border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.04)] p-4 text-sm font-bold sm:col-span-2">
+    <span className="flex items-center gap-2"><ImagePlus size={16} className="text-[hsl(var(--primary))]" />Galerie du bien</span>
+    <span className="mt-1 block text-xs font-normal leading-5 text-[hsl(var(--muted-foreground))]">Ajoutez plusieurs photos ou vidéos (JPG, PNG, WebP, MP4, WebM, MOV, OGG). Elles seront enregistrées avec la fiche.</span>
+    <input type="file" accept={mediaAccept} multiple onChange={event => setFiles(Array.from(event.target.files ?? []))} className="mt-3 block w-full text-xs font-semibold file:mr-3 file:rounded-lg file:border-0 file:bg-[hsl(var(--primary))] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[hsl(var(--primary-foreground))]" />
+    {files.length > 0 && <span className="mt-2 block text-xs font-semibold text-[hsl(var(--primary))]">{files.length} média{files.length > 1 ? 's' : ''} prêt{files.length > 1 ? 's' : ''} à envoyer · {files.map(file => file.name).join(', ')}</span>}
+  </label>;
+}
+
+function MediaStrip({ media }: { media: ImmobilierMedia[] }) {
+  if (media.length === 0) {
+    return <div className="flex h-36 items-center justify-center bg-[hsl(var(--muted)/.45)] text-xs font-semibold text-[hsl(var(--muted-foreground))]"><ImagePlus size={18} className="mr-2" />Aucun média</div>;
+  }
+  return <div className="grid h-36 grid-cols-3 gap-1 overflow-hidden bg-[hsl(var(--muted)/.35)]">
+    {media.slice(0, 3).map(item => item.type === 'video'
+      ? <video key={item.id} src={item.url} muted playsInline className="h-full w-full object-cover" />
+      : <img key={item.id} src={item.url} alt="" className="h-full w-full object-cover" />)}
+  </div>;
 }
 
 function AuxiliaryFeature({ featureId, properties, listings, leads }: { featureId: AuxiliaryFeatureId; properties: ImmobilierProperty[]; listings: ImmobilierListing[]; leads: ImmobilierLead[] }) {

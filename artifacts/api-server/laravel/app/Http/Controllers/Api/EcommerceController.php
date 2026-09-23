@@ -1370,13 +1370,13 @@ class EcommerceController extends Controller
                     ->values()
                 : collect(),
             'immobilierListings' => $publishedImmobilierListings
-                ->map(fn ($row) => $this->publicImmobilierListing($row))
+                ->map(fn ($row) => $this->publicImmobilierListing($row, $company))
                 ->values(),
             'deliveryZones' => $this->publicDeliveryZones($company, $features),
         ])->getData(true);
     }
 
-    private function publicImmobilierListing(object $row): array
+    private function publicImmobilierListing(object $row, string $company): array
     {
         return [
             'id' => $row->id,
@@ -1393,6 +1393,22 @@ class EcommerceController extends Controller
             'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
             'furnished' => (bool) $row->furnished,
             'featured' => (bool) $row->featured,
+            'gallery' => DB::table('ecommerce_gallery_images')
+                ->where('company_id', $company)
+                ->where('owner_type', 'immobilier_listing')
+                ->where('owner_id', (string) $row->id)
+                ->where('collection', 'gallery')
+                ->orderBy('sort_order')
+                ->orderBy('created_at')
+                ->get(['id', 'image_mime'])
+                ->map(fn (object $media): array => [
+                    'id' => (string) $media->id,
+                    'url' => '/api/gallery-images/'.rawurlencode($company).'/'.rawurlencode((string) $media->id),
+                    'mime' => (string) ($media->image_mime ?? 'application/octet-stream'),
+                    'type' => str_starts_with((string) ($media->image_mime ?? ''), 'video/') ? 'video' : 'image',
+                ])
+                ->values()
+                ->all(),
         ];
     }
 

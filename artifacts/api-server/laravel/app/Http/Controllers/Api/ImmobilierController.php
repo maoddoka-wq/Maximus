@@ -108,6 +108,29 @@ class ImmobilierController extends Controller
         return response()->json(['property' => $this->property($property)]);
     }
 
+    public function uploadPropertyMedia(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allows($request, 'modify', 'biens')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $property = DB::table('immobilier_properties')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->where('status', '!=', 'ARCHIVED')
+            ->first();
+        if (! $property) {
+            return response()->json(['error' => 'Bien introuvable.'], 404);
+        }
+
+        $this->storeMedia($request, $company, 'immobilier_property', $id);
+
+        return response()->json([
+            'property' => $this->property($property),
+        ]);
+    }
+
     public function archiveProperty(Request $request, string $id): JsonResponse
     {
         if (! $this->allows($request, 'modify', 'biens')) {
@@ -191,6 +214,29 @@ class ImmobilierController extends Controller
         DB::table('immobilier_listings')->where('company_id', $company)->where('id', $id)->update($input);
 
         return response()->json(['listing' => $this->listing(DB::table('immobilier_listings')->where('id', $id)->where('company_id', $company)->first())]);
+    }
+
+    public function uploadListingMedia(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allows($request, 'modify', 'annonces')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $listing = DB::table('immobilier_listings')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->where('status', '!=', 'ARCHIVED')
+            ->first();
+        if (! $listing) {
+            return response()->json(['error' => 'Annonce introuvable.'], 404);
+        }
+
+        $this->storeMedia($request, $company, 'immobilier_listing', $id);
+
+        return response()->json([
+            'listing' => $this->listing($listing),
+        ]);
     }
 
     public function archiveListing(Request $request, string $id): JsonResponse
@@ -341,6 +387,7 @@ class ImmobilierController extends Controller
             'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
             'furnished' => (bool) $row->furnished,
             'internalNotes' => $row->internal_notes ?? '',
+            'gallery' => $this->gallery((string) $row->company_id, 'immobilier_property', (string) $row->id),
             'createdAt' => (string) $row->created_at,
             'updatedAt' => (string) $row->updated_at,
         ];
@@ -367,9 +414,64 @@ class ImmobilierController extends Controller
             'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
             'furnished' => (bool) $row->furnished,
             'featured' => (bool) $row->featured,
+            'gallery' => $this->gallery((string) $row->company_id, 'immobilier_listing', (string) $row->id),
             'createdAt' => (string) $row->created_at,
             'updatedAt' => (string) $row->updated_at,
         ];
+    }
+
+    private function storeMedia(Request $request, string $company, string $ownerType, string $ownerId): void
+    {
+        $input = Validator::make($request->all(), [
+            'media' => ['required', 'array', 'min:1', 'max:20'],
+            'media.*' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,mp4,webm,mov,ogg', 'max:51200'],
+        ])->validate();
+
+        $nextOrder = (int) DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
+            ->where('collection', 'gallery')
+            ->max('sort_order') + 1;
+
+        foreach ($input['media'] as $file) {
+            $contents = $file->get();
+            if (! is_string($contents) || $contents === '') {
+                continue;
+            }
+            DB::table('ecommerce_gallery_images')->insert([
+                'id' => $this->id('gallery'),
+                'company_id' => $company,
+                'owner_type' => $ownerType,
+                'owner_id' => $ownerId,
+                'collection' => 'gallery',
+                'image_data' => base64_encode($contents),
+                'image_mime' => $file->getMimeType() ?: 'application/octet-stream',
+                'sort_order' => $nextOrder++,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function gallery(string $company, string $ownerType, string $ownerId): array
+    {
+        return DB::table('ecommerce_gallery_images')
+            ->where('company_id', $company)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
+            ->where('collection', 'gallery')
+            ->orderBy('sort_order')
+            ->orderBy('created_at')
+            ->get(['id', 'image_mime'])
+            ->map(fn (object $row): array => [
+                'id' => (string) $row->id,
+                'url' => '/api/gallery-images/'.rawurlencode($company).'/'.rawurlencode((string) $row->id),
+                'mime' => (string) ($row->image_mime ?? 'application/octet-stream'),
+                'type' => str_starts_with((string) ($row->image_mime ?? ''), 'video/') ? 'video' : 'image',
+            ])
+            ->values()
+            ->all();
     }
 
     private function lead(object $row): array
