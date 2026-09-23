@@ -269,7 +269,13 @@ export function CompanyRouter({
     });
   }
   if (routePath === '/entreprise/dashboard') {
-    return renderScreen(screens.dashboard, { data, onNavigate, allowed });
+    return renderScreen(screens.dashboard, {
+      data,
+      onNavigate,
+      allowed,
+      companyId,
+      hiddenWorkspaceFeatures,
+    });
   }
   if (routePath === '/entreprise/controle') {
     if (isWorkspaceFeatureHidden('controle')) {

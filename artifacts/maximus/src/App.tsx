@@ -7,6 +7,7 @@ import {
   Boxes,
   Building2,
   CalendarDays,
+  CarFront,
   Check,
   ChevronDown,
   ChevronRight,
@@ -266,8 +267,8 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
   },
   '/entreprise/dashboard': {
     kicker: 'Espace entreprise',
-    title: 'Votre activité, en un regard.',
-    description: 'Pilotez vos opérations depuis un espace unifié.',
+    title: 'Pilotage de l’entreprise',
+    description: 'Comprenez votre activité et agissez depuis un espace unifié.',
   },
   '/entreprise/controle': {
     kicker: 'Espace entreprise',
@@ -1222,8 +1223,8 @@ function AppContent() {
       ? companyRoutePath === '/entreprise/dashboard'
         ? {
             kicker: currentCompany.name,
-            title: `Le rythme de ${currentCompany.name}, en un regard.`,
-            description: `${currentCompany.sector} · ${currentCompany.country}`,
+            title: `Pilotage de ${currentCompany.name}`,
+            description: `${currentCompany.sector} · Une vue claire pour décider plus vite.`,
           }
         : { ...baseMeta, kicker: currentCompany.name }
       : baseMeta;
@@ -2876,26 +2877,114 @@ function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
+  companyId,
+  hiddenWorkspaceFeatures,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
+  companyId: string;
+  hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
 }) {
+  const inCompany = <T extends { companyId?: string }>(item: T) => !item.companyId || item.companyId === companyId;
   const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
   const canStocks = allowed.includes('stocks');
   const canFinance = allowed.includes('finance') || allowed.includes('comptabilite');
-  const canPresences = allowed.includes('presences');
-  const revenue = data.sales
-    .filter((sale) => sale.status === 'VALIDÉ')
-    .reduce((sum, sale) => sum + sale.amount, 0);
-  const low = data.products.filter((product) => product.stock <= product.threshold).length;
-  const cards = [
+  const canTeam = allowed.some((moduleId) => ['rh', 'presences', 'paie'].includes(moduleId));
+  const canPurchases = allowed.includes('achats');
+  const canReports = allowed.includes('rapports');
+  const canControl = !hiddenWorkspaceFeatures?.includes('controle');
+  const commercePath = allowed.includes('commerce') ? '/entreprise/commerce' : '/entreprise/ventes';
+  const financePath = allowed.includes('finance') ? '/entreprise/finance' : '/entreprise/comptabilite';
+  const teamPath = allowed.includes('presences')
+    ? '/entreprise/presences'
+    : allowed.includes('paie')
+      ? '/entreprise/paie'
+      : '/entreprise/rh';
+
+  const sales = data.sales.filter(inCompany);
+  const products = data.products.filter(inCompany);
+  const employees = data.employees.filter(inCompany);
+  const purchaseOrders = data.purchaseOrders.filter(inCompany);
+  const controlTasks = data.controlTasks.filter(inCompany);
+  const activities = data.activities.filter(inCompany);
+  const validSales = sales.filter((sale) => sale.status === 'VALIDÉ');
+  const revenue = validSales.reduce((sum, sale) => sum + sale.amount, 0);
+  const lowStockProducts = products.filter((product) => product.stock <= product.threshold);
+  const activeEmployees = employees.filter((employee) => employee.status === 'ACTIF');
+  const pendingPurchases = purchaseOrders.filter((purchase) => !['VALIDÉ', 'CONFIRMÉ'].includes(purchase.status));
+  const pendingTasks = controlTasks.filter((task) => !['VALIDÉ', 'TERMINÉ'].includes(task.status));
+
+  const quickLinks = [
+    canCommerce && {
+      id: 'commerce',
+      path: commercePath,
+      label: 'Ventes & clients',
+      description: 'Suivez les ventes, les clients et la performance commerciale.',
+      icon: ShoppingCart,
+    },
+    canStocks && {
+      id: 'stocks',
+      path: '/entreprise/stocks',
+      label: 'Stock & achats',
+      description: 'Surveillez les niveaux, mouvements et réapprovisionnements.',
+      icon: Package,
+    },
+    canFinance && {
+      id: 'finance',
+      path: financePath,
+      label: 'Finance',
+      description: 'Consultez les écritures et les mouvements financiers.',
+      icon: WalletCards,
+    },
+    canTeam && {
+      id: 'team',
+      path: teamPath,
+      label: allowed.includes('presences') ? 'Équipe & présences' : allowed.includes('paie') ? 'Paie' : 'Ressources humaines',
+      description: 'Organisez les équipes, les accès et le suivi quotidien.',
+      icon: Users,
+    },
+    allowed.includes('ecommerce') && {
+      id: 'ecommerce',
+      path: '/entreprise/ecommerce?tab=dashboard',
+      label: 'Boutique en ligne',
+      description: 'Pilotez le catalogue, les commandes et les clients publics.',
+      icon: Store,
+    },
+    allowed.includes('transport') && {
+      id: 'transport',
+      path: '/entreprise/transport',
+      label: 'Transport',
+      description: 'Suivez les courses, chauffeurs et véhicules.',
+      icon: CarFront,
+    },
+  ].filter(Boolean) as Array<{
+    id: string;
+    path: string;
+    label: string;
+    description: string;
+    icon: typeof ShoppingCart;
+  }>;
+
+  const primaryLink = quickLinks[0];
+  const metrics = [
+    canCommerce || canFinance ? (
+      <Metric
+        key="revenue"
+        label="Chiffre d’affaires validé"
+        value={shortMoney(revenue)}
+        suffix=" FCFA"
+        detail={`${validSales.length} vente(s) validée(s)`}
+        icon={CircleDollarSign}
+        accent
+      />
+    ) : null,
     canCommerce ? (
       <Metric
         key="sales"
         label="Ventes validées"
-        value={String(data.sales.filter((sale) => sale.status === 'VALIDÉ').length)}
-        detail="sur les 30 derniers jours"
+        value={String(validSales.length)}
+        detail="dans les données disponibles"
         icon={ShoppingCart}
       />
     ) : null,
@@ -2903,52 +2992,61 @@ function RoleAwareCompanyDashboard({
       <Metric
         key="stock"
         label="Produits à surveiller"
-        value={String(low).padStart(2, '0')}
-        detail="seuil de sécurité atteint"
+        value={String(lowStockProducts.length).padStart(2, '0')}
+        detail={lowStockProducts.length ? 'seuil de sécurité atteint' : 'aucune alerte de seuil'}
         icon={Package}
-        warning
+        warning={lowStockProducts.length > 0}
       />
     ) : null,
-    canFinance ? (
+    canTeam ? (
       <Metric
-        key="cash"
-        label="Encaissements du mois"
-        value={shortMoney(revenue)}
-        suffix=" FCFA"
-        detail="ventes validées"
-        icon={TrendingUp}
-        accent
+        key="team"
+        label="Équipe active"
+        value={String(activeEmployees.length)}
+        detail={`${employees.length} compte(s) dans votre périmètre`}
+        icon={Users}
       />
-    ) : null,
-    canPresences ? (
-      <Metric key="presence" label="Présences aujourd’hui" value="18 / 21" detail="85,7% de l’effectif" icon={Users} />
     ) : null,
   ].filter(Boolean);
-  const primaryPath = canStocks
-    ? '/entreprise/stocks'
-    : canCommerce
-      ? '/entreprise/commerce'
-      : canFinance
-        ? '/entreprise/finance'
-        : canPresences
-          ? '/entreprise/presences'
-          : '/entreprise/organisation';
-  const primaryLabel = canStocks
-    ? 'Ouvrir Gestion de stock'
-    : canCommerce
-      ? 'Ouvrir Commerce'
-      : canFinance
-        ? 'Ouvrir Finance'
-        : canPresences
-          ? 'Ouvrir Présences'
-          : 'Voir mon organisation';
+
   return (
     <div className="space-y-6">
-      <div className={`mobile-stat-grid grid gap-4 md:grid-cols-2 ${cards.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
-        {cards.length ? (
-          cards
-        ) : (
-          <section className="card-surface rounded-2xl p-6">
+      <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.09),hsl(var(--card)),hsl(var(--accent)/.1))] p-6 sm:p-7">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Pilotage de l’entreprise</p>
+            <h2 className="mt-3 text-2xl font-bold tracking-[-.04em] sm:text-3xl">Une vue claire pour décider plus vite.</h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              MAXIMUS rassemble ici les indicateurs et les alertes de vos modules autorisés. Les données affichées
+              respectent votre entreprise et votre rôle.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {primaryLink && (
+              <button
+                data-testid="button-dashboard-primary-action"
+                onClick={() => onNavigate(primaryLink.path)}
+                className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-white shadow-sm transition hover:opacity-90"
+              >
+                Ouvrir {primaryLink.label}
+              </button>
+            )}
+            {canReports && (
+              <button
+                data-testid="button-dashboard-reports"
+                onClick={() => onNavigate('/entreprise/rapports')}
+                className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card)/.8)] px-4 py-3 text-xs font-bold transition hover:bg-[hsl(var(--muted))]"
+              >
+                Voir les rapports
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className={`mobile-stat-grid grid gap-4 md:grid-cols-2 ${metrics.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
+        {metrics.length ? metrics : (
+          <section className="card-surface rounded-2xl p-6 md:col-span-2">
             <h2 className="font-bold">Aucun accès opérationnel</h2>
             <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
               Votre rôle n’a pas encore reçu de module ou de sous-autorisation.
@@ -2956,83 +3054,157 @@ function RoleAwareCompanyDashboard({
           </section>
         )}
       </div>
-      <section className="card-surface rounded-2xl p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
-              Mon espace de travail
-            </p>
-            <h2 className="mt-2 text-xl font-bold">
-              {canStocks
-                ? 'Pilotage du magasin'
-                : canCommerce
-                  ? 'Suivi des ventes'
-                  : canFinance
-                    ? 'Suivi financier'
-                    : canPresences
-                      ? 'Suivi des équipes'
-                      : 'Accès à configurer'}
-            </h2>
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Ce tableau de bord est construit à partir des modules et sous-autorisations de votre rôle.
-            </p>
+
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
+        <section className="card-surface rounded-2xl p-5 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Décisions à prendre</p>
+              <h2 className="mt-2 text-xl font-bold">Les signaux du jour</h2>
+            </div>
+            <Bell size={18} className="text-[hsl(var(--muted-foreground))]" />
           </div>
-          <button
-            onClick={() => onNavigate(primaryPath)}
-            className="shrink-0 rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-white"
-          >
-            {primaryLabel}
-          </button>
-        </div>
-      </section>
+          <div className="mt-6 space-y-3">
+            {canStocks && lowStockProducts.length > 0 && (
+              <button
+                data-testid="button-dashboard-low-stock"
+                onClick={() => onNavigate('/entreprise/stocks')}
+                className="flex w-full items-start gap-3 rounded-xl border border-[hsl(var(--accent)/.45)] bg-[hsl(var(--accent)/.1)] p-3 text-left transition hover:bg-[hsl(var(--accent)/.17)]"
+              >
+                <Package size={17} className="mt-0.5 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-sm">{lowStockProducts.length} produit(s) à réapprovisionner</strong>
+                  <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le seuil de sécurité est atteint.</span>
+                </span>
+                <ChevronRight size={16} className="mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+              </button>
+            )}
+            {canPurchases && pendingPurchases.length > 0 && (
+              <button
+                data-testid="button-dashboard-pending-purchases"
+                onClick={() => onNavigate('/entreprise/achats')}
+                className="flex w-full items-start gap-3 rounded-xl border p-3 text-left transition hover:bg-[hsl(var(--muted)/.45)]"
+              >
+                <ClipboardCheck size={17} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-sm">{pendingPurchases.length} achat(s) à suivre</strong>
+                  <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Commandes ou réceptions non finalisées.</span>
+                </span>
+                <ChevronRight size={16} className="mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+              </button>
+            )}
+            {canControl && pendingTasks.length > 0 && (
+              <button
+                data-testid="button-dashboard-pending-tasks"
+                onClick={() => onNavigate('/entreprise/controle')}
+                className="flex w-full items-start gap-3 rounded-xl border p-3 text-left transition hover:bg-[hsl(var(--muted)/.45)]"
+              >
+                <ClipboardCheck size={17} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-sm">{pendingTasks.length} tâche(s) à traiter</strong>
+                  <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Coordination et décisions de votre périmètre.</span>
+                </span>
+                <ChevronRight size={16} className="mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+              </button>
+            )}
+            {(!canStocks || lowStockProducts.length === 0) && (!canPurchases || pendingPurchases.length === 0) && (!canControl || pendingTasks.length === 0) && (
+              <div className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                Aucune alerte opérationnelle dans votre périmètre.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="card-surface rounded-2xl p-5 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Accès rapides</p>
+              <h2 className="mt-2 text-xl font-bold">Vos espaces MAXIMUS</h2>
+            </div>
+            <Gauge size={18} className="text-[hsl(var(--muted-foreground))]" />
+          </div>
+          <div className="mt-5 space-y-2">
+            {quickLinks.slice(0, 4).map((link) => {
+              const Icon = link.icon;
+              return (
+                <button
+                  data-testid={`button-dashboard-link-${link.id}`}
+                  key={link.id}
+                  onClick={() => onNavigate(link.path)}
+                  className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-[hsl(var(--primary)/.35)] hover:bg-[hsl(var(--muted)/.4)]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+                    <Icon size={17} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <strong className="block text-sm">{link.label}</strong>
+                    <span className="mt-0.5 block truncate text-[11px] text-[hsl(var(--muted-foreground))]">{link.description}</span>
+                  </span>
+                  <ChevronRight size={16} className="shrink-0 text-[hsl(var(--muted-foreground))]" />
+                </button>
+              );
+            })}
+            {!quickLinks.length && <p className="text-sm text-[hsl(var(--muted-foreground))]">Aucun espace n’est encore configuré.</p>}
+          </div>
+        </section>
+      </div>
+
       {canCommerce && (
         <section className="card-surface overflow-hidden rounded-2xl">
           <div className="flex items-center justify-between border-b p-5">
             <div>
-              <h2 className="font-bold">Dernières ventes</h2>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                Uniquement les données utiles à votre rôle
-              </p>
+              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Activité commerciale</p>
+              <h2 className="mt-2 font-bold">Dernières ventes</h2>
             </div>
             <button
+              data-testid="button-dashboard-see-sales"
               onClick={() => onNavigate('/entreprise/commerce')}
               className="text-xs font-bold text-[hsl(var(--primary))]"
             >
-              Tout voir
+              Tout voir <ChevronRight className="inline" size={14} />
             </button>
           </div>
-          <DataTable
-            headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
-            rows={data.sales
-              .slice(0, 6)
-              .map((sale) => [
+          {sales.length ? (
+            <DataTable
+              headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
+              rows={sales.slice(0, 5).map((sale) => [
                 sale.reference,
                 sale.client,
                 money(sale.amount),
                 <StatusBadge status={sale.status} />,
                 sale.date,
               ])}
-          />
+            />
+          ) : (
+            <p className="p-5 text-sm text-[hsl(var(--muted-foreground))]">Aucune vente enregistrée pour le moment.</p>
+          )}
         </section>
       )}
-      {canStocks && (
-        <section className="card-surface rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-bold">Alerte magasin</h2>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                {low} produit(s) sous le seuil recommandé.
-              </p>
-            </div>
-            <button
-              onClick={() => onNavigate('/entreprise/stocks')}
-              className="rounded-lg border px-3 py-2 text-xs font-bold"
-            >
-              Voir le stock
-            </button>
+
+      <section className="card-surface overflow-hidden rounded-2xl">
+        <div className="flex items-center justify-between border-b p-5">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Traçabilité</p>
+            <h2 className="mt-2 font-bold">Activité récente</h2>
           </div>
-        </section>
-      )}
+          {canControl && (
+            <button
+              data-testid="button-dashboard-see-control"
+              onClick={() => onNavigate('/entreprise/controle')}
+              className="text-xs font-bold text-[hsl(var(--primary))]"
+            >
+              Voir le contrôle <ChevronRight className="inline" size={14} />
+            </button>
+          )}
+        </div>
+        {activities.length ? (
+          <div className="divide-y">
+            {activities.slice(0, 5).map((activity, index) => <ActivityRow key={activity.id} activity={activity} delay={index} />)}
+          </div>
+        ) : (
+          <p className="p-5 text-sm text-[hsl(var(--muted-foreground))]">Aucune activité récente à afficher.</p>
+        )}
+      </section>
     </div>
   );
 }
