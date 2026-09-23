@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, CarFront, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -18,6 +18,7 @@ import {
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
 import { ApiRequestError } from '@/lib/api-request';
+import { publicImmobilierApi } from '@/lib/immobilier-api';
 import { createPublicTransportApi, type PublicTransportPlace, type PublicTransportQuote, type PublicTransportTrip } from '@/lib/transport-api';
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
@@ -190,6 +191,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('WAVE');
   const [deliveryForm, setDeliveryForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', address: '', deliveryZoneId: '', serviceType: 'STANDARD' as EcommerceDeliveryServiceType, desiredDate: '', note: '' });
   const [deliverySubmitted, setDeliverySubmitted] = useState<EcommerceDeliveryRequest | null>(null);
+  const [immobilierSubmitted, setImmobilierSubmitted] = useState(false);
+  const [immobilierForm, setImmobilierForm] = useState({ listingId: '', requestType: 'CONTACT' as 'CONTACT' | 'VISIT', name: '', email: '', phone: '', preferredDate: '', message: '' });
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [addressForm, setAddressForm] = useState<Omit<EcommerceCustomerAddress, 'id'>>({
@@ -237,6 +240,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const isLocationRoute = routePath.endsWith('/location');
   const isTransportRoute = routePath.endsWith('/transport');
   const isDeliveryRoute = routePath.endsWith('/livraison');
+  const isImmobilierRoute = routePath.endsWith('/immobilier');
   const productDetailSlug = useMemo(() => {
     const match = routePath.match(/\/produit\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -681,7 +685,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const sellerCardImageUrl = store.logoUrl || seller.photoUrl;
   const canOpenSellerCard = Boolean(sellerCardImageUrl || seller.name || seller.email || seller.phone);
   const products = allProducts.filter(product => product.productType === 'SALE');
-  const enabledFeatures = store.enabledFeatures ?? { location: false, transport: false, livraisons: false, ventePhysique: true, venteNumerique: false };
+  const enabledFeatures = store.enabledFeatures ?? { location: false, transport: false, immobilier: false, livraisons: false, ventePhysique: true, venteNumerique: false };
   const requiresShipping = cart.some(line => Boolean(line.product.rentalId) || line.product.fulfillmentType !== 'DIGITAL');
   const selectedDeliveryZone = data.deliveryZones.find(zone => zone.id === checkoutDeliveryZoneId);
   const deliveryFee = requiresShipping ? selectedDeliveryZone?.fee ?? 0 : 0;
@@ -699,6 +703,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
      { label: 'Boutique', path: '/boutique' },
      ...(enabledFeatures.location ? [{ label: 'Location', path: '/location' }] : []),
      ...(enabledFeatures.transport ? [{ label: 'Transport', path: '/transport' }] : []),
+     ...(enabledFeatures.immobilier ? [{ label: 'Immobilier', path: '/immobilier' }] : []),
      ...(enabledFeatures.livraisons ? [{ label: 'Livraison', path: '/livraison' }] : []),
      { label: 'Panier', path: '/panier' },
      { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
@@ -707,6 +712,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       if (path === '/accueil') return isHomeRoute;
       if (path === '/boutique') return isCatalogRoute || Boolean(productDetailSlug);
      if (path === '/transport') return isTransportRoute;
+     if (path === '/immobilier') return isImmobilierRoute;
      if (path === '/compte') return isAccountRoute;
      return routePath === shopPath(path);
    };
@@ -772,7 +778,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
-              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
+             : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
+              : isImmobilierRoute ? enabledFeatures.immobilier ? <PublicImmobilierPage listings={data.immobilierListings ?? []} store={store} slug={slug} domain={domain} form={immobilierForm} setForm={setImmobilierForm} submitted={immobilierSubmitted} onSubmitted={() => setImmobilierSubmitted(true)} /> : <FeatureUnavailable title="Immobilier non activé" text="Cette entreprise n’a pas encore autorisé la vitrine immobilière." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
         : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
@@ -781,6 +788,41 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur sm:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${publicNav.length}, minmax(0, 1fr))` }}>{publicNav.map(item => { const Icon = item.path === '' ? Store : item.path === '/location' ? Home : item.path === '/transport' ? CarFront : item.path === '/livraison' ? Truck : item.path === '/panier' ? ShoppingBag : UserRound; return <button type="button" key={item.path} onClick={() => go(item.path)} className={`relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ${isPublicNavActive(item.path) ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-white">{cartCount}</span>}</button>; })}</div></nav>}
        {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-20 z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl sm:inset-x-auto sm:bottom-4 sm:right-6 sm:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[#20252f]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-white" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
+}
+
+function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, submitted, onSubmitted }: {
+  listings: PublicShopBootstrap['immobilierListings'];
+  store: PublicShopBootstrap['store'];
+  slug?: string;
+  domain: boolean;
+  form: { listingId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string };
+  setForm: (value: { listingId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string }) => void;
+  submitted: boolean;
+  onSubmitted: () => void;
+}) {
+  const selected = listings.find(item => item.id === form.listingId);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      await publicImmobilierApi.createLead(slug, domain, {
+        listingId: form.listingId || undefined,
+        requestType: form.requestType,
+        name: form.name,
+        email: form.email,
+        phone: form.phone || undefined,
+        preferredDate: form.preferredDate || undefined,
+        message: form.message || undefined,
+      });
+      onSubmitted();
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Votre demande n’a pas pu être envoyée.', 'error');
+    }
+  };
+  return <section className="space-y-6">
+    <div className="rounded-3xl bg-[var(--shop-primary)] p-6 text-[var(--shop-primary-foreground)] sm:p-10"><p className="text-xs font-bold uppercase tracking-[.18em] opacity-75">Vitrine immobilière</p><h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-[-.05em] sm:text-5xl">Trouvez un bien qui correspond à votre projet.</h1><p className="mt-4 max-w-2xl text-sm leading-7 opacity-85">Consultez les annonces publiées par {store.name} et échangez directement avec l’agence pour organiser une visite.</p></div>
+    {listings.length === 0 ? <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune annonce immobilière n’est publiée pour le moment.</div> : <div className="grid gap-4 md:grid-cols-2">{listings.map(listing => <article key={listing.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="flex h-32 items-center justify-center bg-[var(--shop-primary)]/10"><Building2 size={36} style={{ color: 'var(--shop-primary)' }} /></div><div className="p-5"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--shop-primary)]">{listing.transactionType === 'SALE' ? 'À vendre' : 'À louer'}</span>{listing.featured && <span className="rounded-full bg-[var(--shop-accent)]/15 px-2 py-1 text-[10px] font-bold">À la une</span>}</div><h2 className="mt-2 text-lg font-bold">{listing.title}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}</p><p className="mt-4 text-xl font-bold" style={{ color: 'var(--shop-accent)' }}>{money(listing.price, store.currency)}</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{listing.areaM2 && <span>{listing.areaM2} m²</span>}{listing.bedrooms !== null && <span>· {listing.bedrooms} ch.</span>}{listing.bathrooms !== null && <span>· {listing.bathrooms} sdb.</span>}</div><p className="mt-4 line-clamp-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{listing.description || 'Contactez l’agence pour recevoir les détails du bien.'}</p><button type="button" onClick={() => setForm({ ...form, listingId: listing.id })} className="mt-5 w-full rounded-xl px-4 py-3 text-sm font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>Demander des informations</button></div></article>)}</div>}
+    <form onSubmit={submit} className="rounded-2xl border bg-white p-5 shadow-sm sm:p-7"><h2 className="text-xl font-bold">Parler à l’agence</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez vos coordonnées pour être recontacté.</p>{submitted ? <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Votre demande a bien été envoyée. L’agence reviendra vers vous prochainement.</div> : <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-xs font-bold">Annonce<select value={form.listingId} onChange={e => setForm({ ...form, listingId: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Demande générale</option>{listings.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label className="text-xs font-bold">Type de demande<select value={form.requestType} onChange={e => setForm({ ...form, requestType: e.target.value as 'CONTACT' | 'VISIT' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="CONTACT">Être rappelé</option><option value="VISIT">Demander une visite</option></select></label><label className="text-xs font-bold">Nom complet<input required minLength={2} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold">Email<input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold">Téléphone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold">Date souhaitée<input type="date" value={form.preferredDate} onChange={e => setForm({ ...form, preferredDate: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold md:col-span-2">Message<textarea rows={3} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder={selected ? `Votre question sur « ${selected.title} »` : 'Votre projet immobilier'} /></label><button type="submit" className="rounded-xl px-4 py-3 text-sm font-bold text-[var(--shop-accent-foreground)] md:col-span-2" style={{ backgroundColor: 'var(--shop-accent)' }}>Envoyer ma demande</button></div>}</form>
+  </section>;
 }
 
 function PaymentResultPanel({ summary, currency, store, orderId, slug, domain, onContinue, onOrders }: { summary: PaymentSummary; currency: PublicShopBootstrap['store']['currency']; store: PublicShopBootstrap['store']; orderId: string; slug?: string; domain?: boolean; onContinue: () => void; onOrders?: () => void }) {

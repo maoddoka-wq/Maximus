@@ -1328,6 +1328,14 @@ class EcommerceController extends Controller
                 ->orderBy('name')
                 ->get()
             : collect();
+        $publishedImmobilierListings = $features['immobilier']
+            ? DB::table('immobilier_listings')
+                ->where('company_id', $company)
+                ->where('status', 'PUBLISHED')
+                ->orderByDesc('featured')
+                ->orderByDesc('updated_at')
+                ->get()
+            : collect();
         $galleryOwners = [
             ['ownerType' => 'store', 'ownerId' => (string) ($store->id ?? ''), 'collection' => 'hero'],
             ...$publishedProducts->map(fn (object $row): array => [
@@ -1361,8 +1369,31 @@ class EcommerceController extends Controller
                     )
                     ->values()
                 : collect(),
+            'immobilierListings' => $publishedImmobilierListings
+                ->map(fn ($row) => $this->publicImmobilierListing($row))
+                ->values(),
             'deliveryZones' => $this->publicDeliveryZones($company, $features),
         ])->getData(true);
+    }
+
+    private function publicImmobilierListing(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'slug' => $row->slug,
+            'title' => $row->title,
+            'propertyType' => $row->property_type,
+            'transactionType' => $row->transaction_type,
+            'description' => $row->description ?? '',
+            'city' => $row->city,
+            'neighborhood' => $row->neighborhood ?? '',
+            'price' => (int) $row->price,
+            'areaM2' => $row->area_m2 === null ? null : (int) $row->area_m2,
+            'bedrooms' => $row->bedrooms === null ? null : (int) $row->bedrooms,
+            'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
+            'furnished' => (bool) $row->furnished,
+            'featured' => (bool) $row->featured,
+        ];
     }
 
     private function publicStorePayload(object $row, ?array $features = null, array $galleryMap = []): array
@@ -1459,6 +1490,7 @@ class EcommerceController extends Controller
         return [
             'location' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'location'),
             'transport' => ModuleCatalog::allowsFeature($companyId, 'transport', 'overview'),
+            'immobilier' => ModuleCatalog::allowsFeature($companyId, 'immobilier', 'vitrine-publique'),
             'livraisons' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'livraisons'),
             'ventePhysique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-physique'),
             'venteNumerique' => ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-numerique'),

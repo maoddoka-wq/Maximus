@@ -164,6 +164,7 @@ export type CompanyRouteScreens = {
   empty: Screen;
   stocks: Screen;
   ecommerce: Screen;
+  immobilier: Screen;
   finance: Screen;
   commerce: Screen;
   operational: Screen;
@@ -390,6 +391,14 @@ export function CompanyRouter({
       canModify: hasPermission('ecommerce', 'modifier'),
       allowedFeatureIds: ecommerceFeatureIds,
       featurePermissions: ecommerceFeaturePermissions,
+    });
+  }
+  if (routePath === '/entreprise/immobilier') {
+    return renderCompanyModule(screens.immobilier, {
+      companyId,
+      canCreate: hasPermission('immobilier', 'créer'),
+      canModify: hasPermission('immobilier', 'modifier'),
+      featurePermissions: moduleFeaturePermissions?.immobilier,
     });
   }
   if (routePath === '/entreprise/finance') {

@@ -77,6 +77,20 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
       { id: 'parametres', label: 'Paramètres' },
     ];
   }
+  if (module.id === 'immobilier') {
+    return [
+      { id: 'dashboard', label: 'Tableau de bord' },
+      { id: 'biens', label: 'Biens' },
+      { id: 'annonces', label: 'Annonces' },
+      { id: 'prospects', label: 'Prospects' },
+      { id: 'visites', label: 'Visites' },
+      { id: 'mandats', label: 'Mandats' },
+      { id: 'agents', label: 'Agents' },
+      { id: 'rapports', label: 'Rapports' },
+      { id: 'parametres', label: 'Paramètres' },
+      { id: 'vitrine-publique', label: 'Vitrine publique' },
+    ];
+  }
   if (module.id === 'presences') {
     return optionsFromDefinitions(
       module.features,

@@ -1,6 +1,7 @@
 import {
   Boxes,
   CarFront,
+  Building2,
   CreditCard,
   FileBarChart,
   FileClock,
@@ -58,6 +59,7 @@ const moduleRouteConfig: Record<
   logistique: { icon: Warehouse, routeKind: 'operational' },
   documents: { icon: FolderKanban, routeKind: 'operational' },
   transport: { icon: CarFront, routeKind: 'transport' },
+  immobilier: { icon: Building2, routeKind: 'operational' },
   rapports: { icon: FileBarChart, routeKind: 'reports' },
 };
 

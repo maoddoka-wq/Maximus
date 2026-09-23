@@ -323,6 +323,64 @@ final class ModuleCatalog
                     ],
                 ],
             ],
+            [
+                'id' => 'immobilier',
+                'name' => 'Immobilier',
+                'description' => 'Gérer les biens, les annonces, les prospects et les visites immobilières.',
+                'features' => ['Tableau de bord', 'Biens', 'Annonces', 'Prospects', 'Visites', 'Mandats', 'Agents', 'Rapports', 'Paramètres', 'Vitrine publique'],
+                'feature_packs' => [
+                    ['id' => 'immobilier-consultation', 'name' => 'Consultation immobilière', 'description' => 'Consulter les biens et les annonces publiées.', 'feature_ids' => ['dashboard', 'biens', 'annonces']],
+                    [
+                        'id' => 'immobilier-agent',
+                        'name' => 'Agent immobilier',
+                        'description' => 'Gérer les annonces, les prospects et les demandes de visite.',
+                        'feature_ids' => ['dashboard', 'biens', 'annonces', 'prospects', 'visites'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'biens' => ['voir', 'créer', 'modifier'],
+                            'annonces' => ['voir', 'créer', 'modifier'],
+                            'prospects' => ['voir', 'créer', 'modifier'],
+                            'visites' => ['voir', 'créer', 'modifier'],
+                        ],
+                    ],
+                    [
+                        'id' => 'immobilier-agence',
+                        'name' => 'Gestion d’agence',
+                        'description' => 'Piloter les annonces, les mandats, les agents, les prospects et la vitrine publique.',
+                        'feature_ids' => ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'biens' => ['voir', 'créer', 'modifier'],
+                            'annonces' => ['voir', 'créer', 'modifier'],
+                            'prospects' => ['voir', 'créer', 'modifier'],
+                            'visites' => ['voir', 'créer', 'modifier'],
+                            'mandats' => ['voir', 'créer', 'modifier'],
+                            'agents' => ['voir', 'créer', 'modifier'],
+                            'rapports' => ['voir'],
+                            'parametres' => ['voir', 'modifier'],
+                            'vitrine-publique' => ['voir', 'modifier'],
+                        ],
+                    ],
+                    [
+                        'id' => 'immobilier-manager',
+                        'name' => 'Manager immobilier',
+                        'description' => 'Superviser l’activité immobilière et les performances de l’équipe.',
+                        'feature_ids' => ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'biens' => ['voir', 'créer', 'modifier'],
+                            'annonces' => ['voir', 'créer', 'modifier'],
+                            'prospects' => ['voir', 'créer', 'modifier'],
+                            'visites' => ['voir', 'créer', 'modifier'],
+                            'mandats' => ['voir', 'créer', 'modifier'],
+                            'agents' => ['voir', 'modifier'],
+                            'rapports' => ['voir'],
+                            'parametres' => ['voir', 'modifier'],
+                            'vitrine-publique' => ['voir', 'modifier'],
+                        ],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -522,6 +580,12 @@ final class ModuleCatalog
             'transport' => [
                 'overview' => 'Vue d’ensemble', 'trips' => 'Courses', 'drivers' => 'Chauffeurs',
                 'vehicles' => 'Véhicules', 'historique' => 'Historique', 'parametres' => 'Paramètres',
+            ],
+            'immobilier' => [
+                'dashboard' => 'Tableau de bord', 'biens' => 'Biens', 'annonces' => 'Annonces',
+                'prospects' => 'Prospects', 'visites' => 'Visites', 'mandats' => 'Mandats',
+                'agents' => 'Agents', 'rapports' => 'Rapports', 'parametres' => 'Paramètres',
+                'vitrine-publique' => 'Vitrine publique',
             ],
         ];
         $options = $fixed[$definition['id']] ?? collect($definition['features'] ?? [])

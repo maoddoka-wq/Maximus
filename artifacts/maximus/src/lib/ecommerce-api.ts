@@ -90,6 +90,7 @@ export interface EcommerceStore {
 export interface PublicShopFeatures {
   location: boolean;
   transport: boolean;
+  immobilier: boolean;
   livraisons: boolean;
   ventePhysique: boolean;
   venteNumerique: boolean;
@@ -370,6 +371,22 @@ export interface PublicShopBootstrap {
     unavailablePeriods?: string | null;
     createdAt: string;
     updatedAt: string;
+  }>;
+  immobilierListings: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    propertyType: string;
+    transactionType: 'SALE' | 'RENT';
+    description: string;
+    city: string;
+    neighborhood: string;
+    price: number;
+    areaM2: number | null;
+    bedrooms: number | null;
+    bathrooms: number | null;
+    furnished: boolean;
+    featured: boolean;
   }>;
 }
 

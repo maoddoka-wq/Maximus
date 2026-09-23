@@ -189,6 +189,19 @@ export const modules: Module[] = [
     { id: 'transport-employe', name: 'Employé Transport', description: 'Suivre les courses et l’activité de la flotte sans administrer les chauffeurs.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique'], featurePermissions: { overview: ['voir'], trips: ['voir', 'modifier'], drivers: ['voir'], vehicles: ['voir'], historique: ['voir'] } },
     { id: 'transport-manager', name: 'Manager Transport', description: 'Piloter les courses, les chauffeurs, les véhicules et l’historique Taxi.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'], historique: ['voir'], parametres: ['voir', 'modifier'] } },
   ], status: 'ACTIF' },
+  {
+    id: 'immobilier',
+    name: 'Immobilier',
+    description: 'Gérer les biens, les annonces, les prospects et les visites immobilières.',
+    features: ['Tableau de bord', 'Biens', 'Annonces', 'Prospects', 'Visites', 'Mandats', 'Agents', 'Rapports', 'Paramètres', 'Vitrine publique'],
+    featurePacks: [
+      { id: 'immobilier-consultation', name: 'Consultation immobilière', description: 'Consulter les biens et les annonces publiées.', featureIds: ['dashboard', 'biens', 'annonces'] },
+      { id: 'immobilier-agent', name: 'Agent immobilier', description: 'Gérer les annonces, les prospects et les demandes de visite.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'] } },
+      { id: 'immobilier-agence', name: 'Gestion d’agence', description: 'Piloter les annonces, les mandats, les agents, les prospects et la vitrine publique.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'], mandats: ['voir', 'créer', 'modifier'], agents: ['voir', 'créer', 'modifier'], rapports: ['voir'], parametres: ['voir', 'modifier'], 'vitrine-publique': ['voir', 'modifier'] } },
+      { id: 'immobilier-manager', name: 'Manager immobilier', description: 'Superviser l’activité immobilière et les performances de l’équipe.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'], mandats: ['voir', 'créer', 'modifier'], agents: ['voir', 'modifier'], rapports: ['voir'], parametres: ['voir', 'modifier'], 'vitrine-publique': ['voir', 'modifier'] } },
+    ],
+    status: 'ACTIF',
+  },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: payrollFeatureDefinitions.map(feature => feature.label), featurePacks: [
     {
@@ -300,6 +313,16 @@ export const sectorPresets: SectorPreset[] = [
       stocks: ['stock-gestion'],
       presences: ['presence-gestion'],
       paie: ['paie-gestion'],
+    },
+  },
+  {
+    id: 'immobilier',
+    name: 'Immobilier',
+    moduleIds: ['immobilier', 'commerce', 'presences'],
+    modulePackIds: {
+      immobilier: ['immobilier-agence'],
+      commerce: ['commerce-consultation'],
+      presences: ['presence-gestion'],
     },
   },
 ];
