@@ -264,7 +264,7 @@ body { min-width: 320px; }
 .modal-footer { flex-shrink: 0; border-top: 1px solid hsl(var(--border)); padding-top: 1rem; }
 .immobilier-modal-backdrop { align-items: flex-start !important; justify-content: center !important; overflow-y: auto; background-color: hsl(var(--foreground) / .35) !important; backdrop-filter: blur(4px) !important; }
 .immobilier-modal-backdrop > .modal-panel { margin: .25rem auto auto !important; max-height: calc(100dvh - .5rem) !important; overflow-y: auto; }
-.ecommerce-modal-backdrop { align-items: flex-start !important; justify-content: center !important; overflow-y: auto; background-color: hsl(var(--background) / .98) !important; backdrop-filter: none !important; }
+.ecommerce-modal-backdrop { align-items: flex-start !important; justify-content: center !important; overflow-y: auto; background-color: hsl(var(--foreground) / .35) !important; backdrop-filter: blur(4px) !important; }
 .ecommerce-modal-backdrop > .modal-panel { margin: .25rem auto auto !important; max-height: calc(100dvh - .5rem) !important; }
 .ecommerce-modal-backdrop .modal-header { position: sticky; top: 0; z-index: 3; background: inherit; }
 .field-help { max-width: 42rem; }
