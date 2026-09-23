@@ -241,6 +241,8 @@ body { min-width: 320px; }
 .modal-header { position: sticky; top: 0; z-index: 3; flex-shrink: 0; background: inherit; }
 .modal-body { min-height: 0; overflow-y: auto; }
 .modal-footer { flex-shrink: 0; border-top: 1px solid hsl(var(--border)); padding-top: 1rem; }
+.immobilier-modal-backdrop { align-items: flex-start !important; justify-content: center !important; overflow-y: auto; background-color: hsl(var(--background) / .98) !important; backdrop-filter: none !important; }
+.immobilier-modal-backdrop > .modal-panel { margin: .25rem auto auto !important; max-height: calc(100dvh - .5rem) !important; overflow-y: auto; }
 .field-help { max-width: 42rem; }
 .metric-accent { position: relative; overflow: hidden; }
 .metric-accent::after { position: absolute; right: -22px; top: -22px; width: 88px; height: 88px; border: 1px solid hsl(var(--primary) / .2); border-radius: 999px; content: ""; }
