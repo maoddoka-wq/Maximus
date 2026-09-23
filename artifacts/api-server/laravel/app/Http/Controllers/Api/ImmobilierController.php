@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 class ImmobilierController extends Controller
 {
     private const LISTING_STATUSES = ['DRAFT', 'PUBLISHED', 'RESERVED', 'SOLD', 'RENTED', 'ARCHIVED'];
+    private const PROPERTY_STATUSES = ['AVAILABLE', 'RESERVED', 'SOLD', 'RENTED', 'ARCHIVED'];
     private const PROPERTY_TYPES = ['APPARTEMENT', 'MAISON', 'VILLA', 'TERRAIN', 'BUREAU', 'LOCAL_COMMERCIAL'];
     private const TRANSACTION_TYPES = ['SALE', 'RENT'];
     private const LEAD_STATUSES = ['NEW', 'CONTACTED', 'CLOSED'];
@@ -34,6 +35,13 @@ class ImmobilierController extends Controller
         $company = $this->company($request);
 
         return response()->json([
+            'properties' => DB::table('immobilier_properties')
+                ->where('company_id', $company)
+                ->where('status', '!=', 'ARCHIVED')
+                ->orderByDesc('updated_at')
+                ->get()
+                ->map(fn (object $row): array => $this->property($row))
+                ->values(),
             'listings' => DB::table('immobilier_listings')
                 ->where('company_id', $company)
                 ->where('status', '!=', 'ARCHIVED')
@@ -55,6 +63,74 @@ class ImmobilierController extends Controller
         ]);
     }
 
+    public function storeProperty(Request $request): JsonResponse
+    {
+        if (! $this->allows($request, 'create', 'biens')) {
+            return $this->forbidden();
+        }
+
+        $input = $this->propertyInput($request);
+        $company = $this->company($request);
+        $row = [
+            'id' => $this->id('property'),
+            'company_id' => $company,
+            'reference' => $this->uniqueReference($company, $input['reference'] ?? null),
+            ...$input,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('immobilier_properties')->insert($row);
+
+        return response()->json(['property' => $this->property((object) $row)], 201);
+    }
+
+    public function updateProperty(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allows($request, 'modify', 'biens')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $existing = DB::table('immobilier_properties')->where('company_id', $company)->where('id', $id)->first();
+        if (! $existing) {
+            return response()->json(['error' => 'Bien introuvable.'], 404);
+        }
+        $input = $this->propertyInput($request, true);
+        if (array_key_exists('reference', $input)) {
+            $input['reference'] = $this->uniqueReference($company, $input['reference'], $id);
+        }
+        $input['updated_at'] = now();
+        DB::table('immobilier_properties')->where('company_id', $company)->where('id', $id)->update($input);
+
+        $property = DB::table('immobilier_properties')->where('company_id', $company)->where('id', $id)->first();
+        $this->syncLegacyListingFields($property);
+
+        return response()->json(['property' => $this->property($property)]);
+    }
+
+    public function archiveProperty(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allows($request, 'modify', 'biens')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $updated = DB::table('immobilier_properties')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->update(['status' => 'ARCHIVED', 'updated_at' => now()]);
+        if ($updated) {
+            DB::table('immobilier_listings')
+                ->where('company_id', $company)
+                ->where('property_id', $id)
+                ->update(['status' => 'ARCHIVED', 'updated_at' => now()]);
+        }
+
+        return $updated
+            ? response()->json(['ok' => true])
+            : response()->json(['error' => 'Bien introuvable.'], 404);
+    }
+
     public function storeListing(Request $request): JsonResponse
     {
         if (! $this->allows($request, 'create', 'annonces')) {
@@ -63,10 +139,29 @@ class ImmobilierController extends Controller
 
         $input = $this->listingInput($request);
         $company = $this->company($request);
+        $property = DB::table('immobilier_properties')
+            ->where('company_id', $company)
+            ->where('id', $input['property_id'])
+            ->where('status', '!=', 'ARCHIVED')
+            ->first();
+        if (! $property) {
+            return response()->json(['error' => 'Sélectionnez un bien actif pour créer cette annonce.'], 422);
+        }
         $slug = $this->uniqueSlug($company, $input['title']);
         $row = [
             'id' => $this->id('listing'),
             'company_id' => $company,
+            'property_id' => $property->id,
+            'property_type' => $property->property_type,
+            'transaction_type' => $property->transaction_type,
+            'city' => $property->city,
+            'neighborhood' => $property->neighborhood,
+            'address' => $property->address,
+            'price' => $property->price,
+            'area_m2' => $property->area_m2,
+            'bedrooms' => $property->bedrooms,
+            'bathrooms' => $property->bathrooms,
+            'furnished' => $property->furnished,
             ...$input,
             'slug' => $slug,
             'created_at' => now(),
@@ -174,14 +269,13 @@ class ImmobilierController extends Controller
         return response()->json(['lead' => ['id' => $row['id'], 'status' => 'NEW']], 201);
     }
 
-    private function listingInput(Request $request, bool $partial = false): array
+    private function propertyInput(Request $request, bool $partial = false): array
     {
         $rules = [
-            'title' => [$partial ? 'sometimes' : 'required', 'string', 'min:3', 'max:160'],
+            'reference' => ['sometimes', 'nullable', 'string', 'max:60'],
             'propertyType' => [$partial ? 'sometimes' : 'required', 'in:'.implode(',', self::PROPERTY_TYPES)],
             'transactionType' => [$partial ? 'sometimes' : 'required', 'in:'.implode(',', self::TRANSACTION_TYPES)],
-            'status' => [$partial ? 'sometimes' : 'required', 'in:'.implode(',', self::LISTING_STATUSES)],
-            'description' => ['nullable', 'string', 'max:5000'],
+            'status' => [$partial ? 'sometimes' : 'required', 'in:'.implode(',', self::PROPERTY_STATUSES)],
             'city' => [$partial ? 'sometimes' : 'required', 'string', 'min:2', 'max:100'],
             'neighborhood' => ['nullable', 'string', 'max:120'],
             'address' => ['nullable', 'string', 'max:240'],
@@ -190,15 +284,14 @@ class ImmobilierController extends Controller
             'bedrooms' => ['nullable', 'integer', 'min:0', 'max:50'],
             'bathrooms' => ['nullable', 'integer', 'min:0', 'max:50'],
             'furnished' => ['sometimes', 'boolean'],
-            'featured' => ['sometimes', 'boolean'],
+            'internalNotes' => ['nullable', 'string', 'max:5000'],
         ];
         $input = Validator::make($request->all(), $rules)->validate();
         return [
-            ...(array_key_exists('title', $input) ? ['title' => trim($input['title'])] : []),
+            ...(array_key_exists('reference', $input) && filled($input['reference']) ? ['reference' => strtoupper(trim($input['reference']))] : []),
             ...(array_key_exists('propertyType', $input) ? ['property_type' => $input['propertyType']] : []),
             ...(array_key_exists('transactionType', $input) ? ['transaction_type' => $input['transactionType']] : []),
             ...(array_key_exists('status', $input) ? ['status' => $input['status']] : []),
-            ...(array_key_exists('description', $input) ? ['description' => trim((string) ($input['description'] ?? ''))] : []),
             ...(array_key_exists('city', $input) ? ['city' => trim($input['city'])] : []),
             ...(array_key_exists('neighborhood', $input) ? ['neighborhood' => trim((string) ($input['neighborhood'] ?? ''))] : []),
             ...(array_key_exists('address', $input) ? ['address' => trim((string) ($input['address'] ?? ''))] : []),
@@ -207,7 +300,49 @@ class ImmobilierController extends Controller
             ...(array_key_exists('bedrooms', $input) ? ['bedrooms' => $input['bedrooms'] === null ? null : (int) $input['bedrooms']] : []),
             ...(array_key_exists('bathrooms', $input) ? ['bathrooms' => $input['bathrooms'] === null ? null : (int) $input['bathrooms']] : []),
             ...(array_key_exists('furnished', $input) ? ['furnished' => (bool) $input['furnished']] : []),
+            ...(array_key_exists('internalNotes', $input) ? ['internal_notes' => trim((string) ($input['internalNotes'] ?? ''))] : []),
+        ];
+    }
+
+    private function listingInput(Request $request, bool $partial = false): array
+    {
+        $input = Validator::make($request->all(), [
+            'propertyId' => [$partial ? 'sometimes' : 'required', 'string', 'max:160'],
+            'title' => [$partial ? 'sometimes' : 'required', 'string', 'min:3', 'max:160'],
+            'status' => [$partial ? 'sometimes' : 'required', 'in:'.implode(',', self::LISTING_STATUSES)],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'featured' => ['sometimes', 'boolean'],
+        ])->validate();
+
+        return [
+            ...(array_key_exists('propertyId', $input) ? ['property_id' => $input['propertyId']] : []),
+            ...(array_key_exists('title', $input) ? ['title' => trim($input['title'])] : []),
+            ...(array_key_exists('status', $input) ? ['status' => $input['status']] : []),
+            ...(array_key_exists('description', $input) ? ['description' => trim((string) ($input['description'] ?? ''))] : []),
             ...(array_key_exists('featured', $input) ? ['featured' => (bool) $input['featured']] : []),
+        ];
+    }
+
+    private function property(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'companyId' => $row->company_id,
+            'reference' => $row->reference,
+            'propertyType' => $row->property_type,
+            'transactionType' => $row->transaction_type,
+            'status' => $row->status,
+            'city' => $row->city,
+            'neighborhood' => $row->neighborhood ?? '',
+            'address' => $row->address ?? '',
+            'price' => (int) $row->price,
+            'areaM2' => $row->area_m2 === null ? null : (int) $row->area_m2,
+            'bedrooms' => $row->bedrooms === null ? null : (int) $row->bedrooms,
+            'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
+            'furnished' => (bool) $row->furnished,
+            'internalNotes' => $row->internal_notes ?? '',
+            'createdAt' => (string) $row->created_at,
+            'updatedAt' => (string) $row->updated_at,
         ];
     }
 
@@ -216,6 +351,7 @@ class ImmobilierController extends Controller
         return [
             'id' => $row->id,
             'companyId' => $row->company_id,
+            'propertyId' => $row->property_id,
             'title' => $row->title,
             'slug' => $row->slug,
             'propertyType' => $row->property_type,
@@ -266,6 +402,44 @@ class ImmobilierController extends Controller
             $action,
             $feature,
         );
+    }
+
+    private function syncLegacyListingFields(object $property): void
+    {
+        DB::table('immobilier_listings')
+            ->where('company_id', $property->company_id)
+            ->where('property_id', $property->id)
+            ->update([
+                'property_type' => $property->property_type,
+                'transaction_type' => $property->transaction_type,
+                'city' => $property->city,
+                'neighborhood' => $property->neighborhood,
+                'address' => $property->address,
+                'price' => $property->price,
+                'area_m2' => $property->area_m2,
+                'bedrooms' => $property->bedrooms,
+                'bathrooms' => $property->bathrooms,
+                'furnished' => $property->furnished,
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function uniqueReference(string $company, ?string $requested = null, ?string $ignore = null): string
+    {
+        $base = strtoupper(trim((string) $requested));
+        if ($base === '') {
+            $base = 'BIEN-'.strtoupper(Str::random(6));
+        }
+        $reference = $base;
+        $index = 2;
+        while (DB::table('immobilier_properties')
+            ->where('company_id', $company)
+            ->where('reference', $reference)
+            ->when($ignore, fn ($query) => $query->where('id', '!=', $ignore))
+            ->exists()) {
+            $reference = $base.'-'.$index++;
+        }
+        return $reference;
     }
 
     private function uniqueSlug(string $company, string $title, ?string $ignore = null): string

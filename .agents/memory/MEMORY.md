@@ -87,3 +87,4 @@
 - [Isolation des thèmes publics](public-theme-isolation.md) — les couleurs de la boutique et du module Transport public restent distinctes, avec des variables CSS propres au module.
 - [Galerie photo Transport](transport-gallery-upload.md) — borner les uploads JSON multi-images pour rester sous la limite de requête PHP.
 - [Couleurs Transport publiques](public-transport-colors.md) — fournir les couleurs du module dans le bootstrap public, pas uniquement via une requête secondaire silencieuse.
+- [Séparation Bien et Annonce Immobilier](immobilier-property-listing-boundary.md) — le patrimoine interne et la publication commerciale ont des cycles, droits et données distincts.

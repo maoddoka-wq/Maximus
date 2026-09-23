@@ -1,12 +1,42 @@
 import { requestJson } from './api-request';
 
 export type ImmobilierListingStatus = 'DRAFT' | 'PUBLISHED' | 'RESERVED' | 'SOLD' | 'RENTED' | 'ARCHIVED';
+export type ImmobilierPropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'RENTED' | 'ARCHIVED';
 export type ImmobilierLeadStatus = 'NEW' | 'CONTACTED' | 'CLOSED';
 export type ImmobilierRequestType = 'CONTACT' | 'VISIT';
+
+export interface ImmobilierProperty {
+  id: string;
+  companyId: string;
+  reference: string;
+  propertyType: string;
+  transactionType: 'SALE' | 'RENT';
+  status: ImmobilierPropertyStatus;
+  city: string;
+  neighborhood: string;
+  address: string;
+  price: number;
+  areaM2: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  furnished: boolean;
+  internalNotes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ImmobilierPropertyInput = Omit<Partial<ImmobilierProperty>, 'id' | 'companyId' | 'createdAt' | 'updatedAt'> & {
+  propertyType: string;
+  transactionType: 'SALE' | 'RENT';
+  status: ImmobilierPropertyStatus;
+  city: string;
+  price: number;
+};
 
 export interface ImmobilierListing {
   id: string;
   companyId: string;
+  propertyId: string;
   title: string;
   slug: string;
   propertyType: string;
@@ -41,12 +71,10 @@ export interface ImmobilierLead {
 }
 
 export type ImmobilierListingInput = Omit<Partial<ImmobilierListing>, 'id' | 'companyId' | 'slug' | 'createdAt' | 'updatedAt'> & {
+  propertyId: string;
   title: string;
-  propertyType: string;
-  transactionType: 'SALE' | 'RENT';
   status: ImmobilierListingStatus;
-  city: string;
-  price: number;
+  description?: string;
 };
 
 const request = <T>(path: string, options?: RequestInit) =>
@@ -55,7 +83,10 @@ const request = <T>(path: string, options?: RequestInit) =>
 export const createImmobilierApi = (companyId: string) => {
   const withCompany = (path: string) => `${path}?companyId=${encodeURIComponent(companyId)}`;
   return {
-    bootstrap: () => request<{ listings: ImmobilierListing[]; leads: ImmobilierLead[] }>(withCompany('/immobilier/bootstrap')),
+    bootstrap: () => request<{ properties: ImmobilierProperty[]; listings: ImmobilierListing[]; leads: ImmobilierLead[] }>(withCompany('/immobilier/bootstrap')),
+    createProperty: (body: ImmobilierPropertyInput) => request<{ property: ImmobilierProperty }>(withCompany('/immobilier/properties'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    updateProperty: (id: string, body: Partial<ImmobilierPropertyInput>) => request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    archiveProperty: (id: string) => request<{ ok: true }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createListing: (body: ImmobilierListingInput) => request<{ listing: ImmobilierListing }>(withCompany('/immobilier/listings'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     updateListing: (id: string, body: Partial<ImmobilierListingInput>) => request<{ listing: ImmobilierListing }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     archiveListing: (id: string) => request<{ ok: true }>(withCompany(`/immobilier/listings/${encodeURIComponent(id)}`), { method: 'DELETE' }),

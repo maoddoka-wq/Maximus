@@ -1,14 +1,33 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { BarChart3, Building2, CalendarDays, Check, Eye, FileSignature, Globe2, Pencil, Settings2, UserRound, UsersRound, X } from 'lucide-react';
-import { createImmobilierApi, type ImmobilierLead, type ImmobilierListing, type ImmobilierListingInput } from '@/lib/immobilier-api';
+import {
+  BarChart3,
+  Building2,
+  CalendarDays,
+  Check,
+  FileSignature,
+  Globe2,
+  Pencil,
+  Plus,
+  Settings2,
+  UserRound,
+  UsersRound,
+  X,
+} from 'lucide-react';
+import {
+  createImmobilierApi,
+  type ImmobilierLead,
+  type ImmobilierListing,
+  type ImmobilierListingInput,
+  type ImmobilierProperty,
+  type ImmobilierPropertyInput,
+} from '@/lib/immobilier-api';
 import { showAppToast } from '@/hooks/use-toast';
 
-const emptyForm: ImmobilierListingInput = {
-  title: '',
+const emptyProperty: ImmobilierPropertyInput = {
+  reference: '',
   propertyType: 'APPARTEMENT',
   transactionType: 'SALE',
-  status: 'DRAFT',
-  description: '',
+  status: 'AVAILABLE',
   city: 'Dakar',
   neighborhood: '',
   address: '',
@@ -17,98 +36,201 @@ const emptyForm: ImmobilierListingInput = {
   bedrooms: null,
   bathrooms: null,
   furnished: false,
+  internalNotes: '',
+};
+
+const emptyListing: ImmobilierListingInput = {
+  propertyId: '',
+  title: '',
+  status: 'DRAFT',
+  description: '',
   featured: false,
 };
 
-const money = (value: number) => new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
-const statusLabel: Record<string, string> = { DRAFT: 'Brouillon', PUBLISHED: 'Publiée', RESERVED: 'Réservée', SOLD: 'Vendue', RENTED: 'Louée', NEW: 'Nouvelle', CONTACTED: 'Contactée', CLOSED: 'Clôturée' };
-const featureDetails = {
-  dashboard: { title: 'Tableau de bord immobilier', description: 'Suivez les biens, la diffusion des annonces et les demandes reçues.', eyebrow: 'Vue d’ensemble' },
-  biens: { title: 'Biens immobiliers', description: 'Gérez les biens disponibles et leurs caractéristiques avant leur publication.', eyebrow: 'Patrimoine' },
-  annonces: { title: 'Annonces immobilières', description: 'Publiez les biens disponibles et suivez leur statut de diffusion sur votre vitrine.', eyebrow: 'Diffusion' },
-  prospects: { title: 'Prospects immobiliers', description: 'Qualifiez les demandes de contact et suivez les prochaines actions commerciales.', eyebrow: 'Relation client' },
-  visites: { title: 'Visites immobilières', description: 'Organisez les demandes de visite et suivez leur traitement.', eyebrow: 'Agenda commercial' },
-  mandats: { title: 'Mandats immobiliers', description: 'Centralisez les mandats confiés à l’agence et leurs échéances.', eyebrow: 'Gestion contractuelle' },
-  agents: { title: 'Agents immobiliers', description: 'Suivez les agents de l’agence et la répartition de leurs responsabilités.', eyebrow: 'Équipe' },
-  rapports: { title: 'Rapports immobiliers', description: 'Analysez la diffusion des annonces, les demandes et la performance commerciale.', eyebrow: 'Pilotage' },
-  parametres: { title: 'Paramètres immobiliers', description: 'Configurez les règles de fonctionnement et de diffusion du module immobilier.', eyebrow: 'Configuration' },
-  'vitrine-publique': { title: 'Vitrine publique', description: 'Contrôlez les biens actuellement visibles par les visiteurs de votre vitrine.', eyebrow: 'Publication' },
-} as const;
-type ImmobilierFeatureId = keyof typeof featureDetails;
-const isImmobilierFeatureId = (value: string): value is ImmobilierFeatureId => Object.prototype.hasOwnProperty.call(featureDetails, value);
+const statusLabel: Record<string, string> = {
+  AVAILABLE: 'Disponible',
+  RESERVED: 'Réservé',
+  SOLD: 'Vendu',
+  RENTED: 'Loué',
+  ARCHIVED: 'Archivé',
+  DRAFT: 'Brouillon',
+  PUBLISHED: 'Publiée',
+  NEW: 'Nouvelle',
+  CONTACTED: 'Contactée',
+  CLOSED: 'Clôturée',
+};
 
-export default function ImmobilierModulePage({ companyId, canCreate = true, canModify = true, featurePermissions, activeFeatureId = 'dashboard', preview = false }: { companyId: string; canCreate?: boolean; canModify?: boolean; featurePermissions?: Partial<Record<string, string[]>>; activeFeatureId?: string; preview?: boolean }) {
+const money = (value: number) => new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
+
+const featureDetails = {
+  dashboard: { title: 'Tableau de bord immobilier', description: 'Suivez les biens, les annonces et les demandes reçues.', eyebrow: 'Vue d’ensemble' },
+  biens: { title: 'Biens immobiliers', description: 'Gérez les biens physiques de votre portefeuille, indépendamment de leur publication.', eyebrow: 'Patrimoine' },
+  annonces: { title: 'Annonces immobilières', description: 'Créez des publications commerciales à partir de biens existants.', eyebrow: 'Diffusion' },
+  prospects: { title: 'Prospects immobiliers', description: 'Qualifiez les demandes de contact reçues depuis la vitrine.', eyebrow: 'Relation client' },
+  visites: { title: 'Visites immobilières', description: 'Traitez les demandes de visite et leurs prochaines actions.', eyebrow: 'Agenda commercial' },
+  mandats: { title: 'Mandats immobiliers', description: 'Centralisez les mandats confiés à l’agence et leurs échéances.', eyebrow: 'Gestion contractuelle' },
+  agents: { title: 'Agents immobiliers', description: 'Suivez les agents et la répartition de leurs responsabilités.', eyebrow: 'Équipe' },
+  rapports: { title: 'Rapports immobiliers', description: 'Analysez le portefeuille, les publications et les demandes.', eyebrow: 'Pilotage' },
+  parametres: { title: 'Paramètres immobiliers', description: 'Consultez les règles d’accès et de publication du module.', eyebrow: 'Configuration' },
+  'vitrine-publique': { title: 'Vitrine publique', description: 'Contrôlez les biens actuellement visibles par les visiteurs.', eyebrow: 'Publication' },
+} as const;
+
+type ImmobilierFeatureId = keyof typeof featureDetails;
+type AuxiliaryFeatureId = 'mandats' | 'agents' | 'rapports' | 'parametres' | 'vitrine-publique';
+type FormMode = 'create-property' | 'edit-property' | 'create-listing' | 'edit-listing';
+
+const isFeatureId = (value: string): value is ImmobilierFeatureId =>
+  Object.prototype.hasOwnProperty.call(featureDetails, value);
+const isAuxiliaryFeatureId = (value: ImmobilierFeatureId): value is AuxiliaryFeatureId =>
+  ['mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'].includes(value);
+
+export default function ImmobilierModulePage({
+  companyId,
+  canCreate = true,
+  canModify = true,
+  featurePermissions,
+  activeFeatureId = 'dashboard',
+  preview = false,
+}: {
+  companyId: string;
+  canCreate?: boolean;
+  canModify?: boolean;
+  featurePermissions?: Partial<Record<string, string[]>>;
+  activeFeatureId?: string;
+  preview?: boolean;
+}) {
   const api = useMemo(() => createImmobilierApi(companyId), [companyId]);
+  const [properties, setProperties] = useState<ImmobilierProperty[]>([]);
   const [listings, setListings] = useState<ImmobilierListing[]>([]);
   const [leads, setLeads] = useState<ImmobilierLead[]>([]);
-  const [form, setForm] = useState<ImmobilierListingInput>(emptyForm);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [tab, setTab] = useState<'listings' | 'leads'>('listings');
+  const [propertyForm, setPropertyForm] = useState<ImmobilierPropertyInput>(emptyProperty);
+  const [listingForm, setListingForm] = useState<ImmobilierListingInput>(emptyListing);
+  const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentFeatureId: ImmobilierFeatureId = isImmobilierFeatureId(activeFeatureId) ? activeFeatureId : 'dashboard';
+
+  const currentFeatureId: ImmobilierFeatureId = isFeatureId(activeFeatureId) ? activeFeatureId : 'dashboard';
   const activeFeature = featureDetails[currentFeatureId];
   const propertyView = currentFeatureId === 'biens';
-  const announcementView = currentFeatureId === 'annonces';
+  const listingView = currentFeatureId === 'annonces';
   const leadView = currentFeatureId === 'prospects' || currentFeatureId === 'visites';
-  const listingView = propertyView || announcementView;
-  const visibleListings = announcementView ? listings.filter(item => item.status === 'PUBLISHED') : listings;
-  const visibleLeads = currentFeatureId === 'visites'
-    ? leads.filter(item => item.requestType === 'VISIT')
-    : currentFeatureId === 'prospects'
-      ? leads.filter(item => item.requestType === 'CONTACT')
-      : leads;
+  const canCreateProperties = featurePermissions?.biens ? featurePermissions.biens.includes('créer') : canCreate;
+  const canModifyProperties = featurePermissions?.biens ? featurePermissions.biens.includes('modifier') : canModify;
   const canCreateListings = featurePermissions?.annonces ? featurePermissions.annonces.includes('créer') : canCreate;
   const canModifyListings = featurePermissions?.annonces ? featurePermissions.annonces.includes('modifier') : canModify;
   const canManageLeads = featurePermissions?.prospects ? featurePermissions.prospects.includes('modifier') : canModify;
+  const visibleLeads = currentFeatureId === 'visites'
+    ? leads.filter(item => item.requestType === 'VISIT')
+    : leads.filter(item => item.requestType === 'CONTACT');
 
   const load = async () => {
     setLoading(true);
     try {
       const result = await api.bootstrap();
-      setListings(result.listings);
-      setLeads(result.leads);
+      setProperties(result.properties ?? []);
+      setListings(result.listings ?? []);
+      setLeads(result.leads ?? []);
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'Les données immobilières ne sont pas disponibles.', 'error');
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { if (!preview) void load(); }, [companyId, preview]);
-  useEffect(() => { setTab(leadView ? 'leads' : 'listings'); }, [currentFeatureId, leadView]);
+
   useEffect(() => {
-    if (!formOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setFormOpen(false); };
+    if (!preview) void load();
+  }, [api, preview]);
+
+  const closeForm = () => {
+    setFormMode(null);
+    setEditingId(null);
+    setPropertyForm(emptyProperty);
+    setListingForm(emptyListing);
+  };
+
+  useEffect(() => {
+    if (!formMode) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeForm();
+    };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [formOpen]);
+  }, [formMode]);
 
-  const reset = () => { setEditing(null); setForm(emptyForm); setFormOpen(false); };
-  const openCreateForm = () => { setEditing(null); setForm(emptyForm); setFormOpen(true); };
-  const save = async (event: FormEvent) => {
+  const openCreateProperty = () => {
+    setEditingId(null);
+    setPropertyForm(emptyProperty);
+    setFormMode('create-property');
+  };
+
+  const openCreateListing = () => {
+    setEditingId(null);
+    setListingForm({ ...emptyListing, propertyId: properties[0]?.id ?? '' });
+    setFormMode('create-listing');
+  };
+
+  const editProperty = (property: ImmobilierProperty) => {
+    setEditingId(property.id);
+    setPropertyForm({ ...property });
+    setFormMode('edit-property');
+  };
+
+  const editListing = (listing: ImmobilierListing) => {
+    setEditingId(listing.id);
+    setListingForm({ ...listing });
+    setFormMode('edit-listing');
+  };
+
+  const saveProperty = async (event: FormEvent) => {
     event.preventDefault();
     try {
-      if (editing) {
-        const result = await api.updateListing(editing, form);
-        setListings(items => items.map(item => item.id === editing ? result.listing : item));
+      if (editingId) {
+        const result = await api.updateProperty(editingId, propertyForm);
+        setProperties(items => items.map(item => item.id === editingId ? result.property : item));
+        showAppToast('Bien mis à jour.', 'success');
+      } else {
+        const result = await api.createProperty(propertyForm);
+        setProperties(items => [result.property, ...items]);
+        showAppToast('Bien créé.', 'success');
+      }
+      closeForm();
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Le bien n’a pas pu être enregistré.', 'error');
+    }
+  };
+
+  const saveListing = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      if (editingId) {
+        const result = await api.updateListing(editingId, listingForm);
+        setListings(items => items.map(item => item.id === editingId ? result.listing : item));
         showAppToast('Annonce mise à jour.', 'success');
       } else {
-        const result = await api.createListing(form);
+        const result = await api.createListing(listingForm);
         setListings(items => [result.listing, ...items]);
         showAppToast('Annonce créée.', 'success');
       }
-      reset();
+      closeForm();
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'L’annonce n’a pas pu être enregistrée.', 'error');
     }
   };
-  const edit = (listing: ImmobilierListing) => {
-    setEditing(listing.id);
-    setForm({ ...listing });
-    setFormOpen(true);
+
+  const archiveProperty = async (property: ImmobilierProperty) => {
+    if (!window.confirm(`Archiver le bien « ${property.reference} » ?`)) return;
+    try {
+      await api.archiveProperty(property.id);
+      setProperties(items => items.filter(item => item.id !== property.id));
+      setListings(items => items.filter(item => item.propertyId !== property.id));
+      showAppToast('Bien archivé.', 'success');
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Le bien n’a pas pu être archivé.', 'error');
+    }
   };
-  const archive = async (listing: ImmobilierListing) => {
-    if (!window.confirm(`Archiver « ${listing.title} » ?`)) return;
+
+  const archiveListing = async (listing: ImmobilierListing) => {
+    if (!window.confirm(`Archiver l’annonce « ${listing.title} » ?`)) return;
     try {
       await api.archiveListing(listing.id);
       setListings(items => items.filter(item => item.id !== listing.id));
@@ -117,6 +239,7 @@ export default function ImmobilierModulePage({ companyId, canCreate = true, canM
       showAppToast(error instanceof Error ? error.message : 'L’annonce n’a pas pu être archivée.', 'error');
     }
   };
+
   const updateLead = async (lead: ImmobilierLead, status: ImmobilierLead['status']) => {
     try {
       await api.updateLead(lead.id, status);
@@ -126,37 +249,162 @@ export default function ImmobilierModulePage({ companyId, canCreate = true, canM
     }
   };
 
-  return <div className="space-y-5 fade-up">
-    <section className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div><p className="text-xs font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">Immobilier · {activeFeature.eyebrow}</p><h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">{activeFeature.title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{activeFeature.description}</p></div>
-        <div className="flex items-center gap-3">
-          <Building2 className="hidden text-[hsl(var(--primary))] sm:block" size={32} />
-          {listingView && canCreateListings && <button type="button" onClick={openCreateForm} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.2)] transition hover:-translate-y-0.5"><Building2 size={16} />Ajouter une annonce</button>}
+  const propertyForListing = (listing: ImmobilierListing) =>
+    properties.find(property => property.id === listing.propertyId);
+
+  return (
+    <div className="space-y-5 fade-up">
+      <section className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.06)] p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">Immobilier · {activeFeature.eyebrow}</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">{activeFeature.title}</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{activeFeature.description}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Building2 className="hidden text-[hsl(var(--primary))] sm:block" size={32} />
+            {propertyView && canCreateProperties && <button type="button" onClick={openCreateProperty} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.2)]"><Plus size={16} />Ajouter un bien</button>}
+            {listingView && canCreateListings && <button type="button" onClick={openCreateListing} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.2)]"><Plus size={16} />Ajouter une annonce</button>}
+          </div>
         </div>
-      </div>
-      <div className="mt-5 flex flex-wrap gap-2"><span className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{listings.filter(item => item.status === 'PUBLISHED').length} annonces publiées</span><span className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{leads.filter(item => item.status === 'NEW').length} demandes nouvelles</span><span className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{listings.length} biens enregistrés</span></div>
-    </section>
-    {currentFeatureId === 'dashboard' && <section className="grid gap-4 md:grid-cols-3">
-      <article className="rounded-2xl border bg-[hsl(var(--card))] p-5"><Building2 className="text-[hsl(var(--primary))]" size={22} /><p className="mt-4 text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Biens enregistrés</p><p className="mt-1 text-3xl font-bold">{listings.length}</p><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{listings.filter(item => item.status === 'PUBLISHED').length} publiés sur la vitrine</p></article>
-      <article className="rounded-2xl border bg-[hsl(var(--card))] p-5"><UsersRound className="text-[hsl(var(--primary))]" size={22} /><p className="mt-4 text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Prospects</p><p className="mt-1 text-3xl font-bold">{leads.filter(item => item.requestType === 'CONTACT').length}</p><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{leads.filter(item => item.status === 'NEW').length} demandes à traiter</p></article>
-      <article className="rounded-2xl border bg-[hsl(var(--card))] p-5"><CalendarDays className="text-[hsl(var(--primary))]" size={22} /><p className="mt-4 text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Visites demandées</p><p className="mt-1 text-3xl font-bold">{leads.filter(item => item.requestType === 'VISIT').length}</p><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Demandes issues de la vitrine publique</p></article>
-    </section>}
-    {['mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'].includes(currentFeatureId) && <section className="rounded-2xl border bg-[hsl(var(--card))] p-6">
-      {currentFeatureId === 'mandats' && <div className="flex items-start gap-4"><FileSignature className="mt-1 text-[hsl(var(--primary))]" size={28} /><div><h2 className="text-lg font-bold">Suivi des mandats</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Cette vue est réservée au suivi des contrats confiés à l’agence. Les mandats pourront être reliés à un bien, un propriétaire, une durée et un statut de diffusion.</p><div className="mt-5 rounded-xl bg-[hsl(var(--muted))] p-4 text-sm font-semibold">Aucun mandat n’est encore enregistré.</div></div></div>}
-      {currentFeatureId === 'agents' && <div className="flex items-start gap-4"><UsersRound className="mt-1 text-[hsl(var(--primary))]" size={28} /><div><h2 className="text-lg font-bold">Équipe des agents</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Préparez la répartition des biens, des prospects et des visites entre les agents de votre agence.</p><div className="mt-5 rounded-xl bg-[hsl(var(--muted))] p-4 text-sm font-semibold">La gestion des agents se configure depuis Organisation.</div></div></div>}
-      {currentFeatureId === 'rapports' && <div><div className="flex items-start gap-4"><BarChart3 className="mt-1 text-[hsl(var(--primary))]" size={28} /><div><h2 className="text-lg font-bold">Performance de l’activité</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Indicateurs calculés à partir des données immobilières de votre entreprise.</p></div></div><div className="mt-6 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-[hsl(var(--muted))] p-4"><p className="text-xs font-bold text-[hsl(var(--muted-foreground))]">Taux de publication</p><p className="mt-2 text-2xl font-bold">{listings.length ? Math.round((listings.filter(item => item.status === 'PUBLISHED').length / listings.length) * 100) : 0}%</p></div><div className="rounded-xl bg-[hsl(var(--muted))] p-4"><p className="text-xs font-bold text-[hsl(var(--muted-foreground))]">Demandes nouvelles</p><p className="mt-2 text-2xl font-bold">{leads.filter(item => item.status === 'NEW').length}</p></div><div className="rounded-xl bg-[hsl(var(--muted))] p-4"><p className="text-xs font-bold text-[hsl(var(--muted-foreground))]">Biens vendus ou loués</p><p className="mt-2 text-2xl font-bold">{listings.filter(item => item.status === 'SOLD' || item.status === 'RENTED').length}</p></div></div></div>}
-      {currentFeatureId === 'parametres' && <div className="flex items-start gap-4"><Settings2 className="mt-1 text-[hsl(var(--primary))]" size={28} /><div><h2 className="text-lg font-bold">Configuration du module</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Les droits détaillés sont pilotés par les packs et les rôles de l’entreprise.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-xl border p-4"><p className="text-xs font-bold text-[hsl(var(--muted-foreground))]">Fonctionnalités actives</p><p className="mt-2 text-sm font-bold">10 fonctionnalités Immobilier</p></div><div className="rounded-xl border p-4"><p className="text-xs font-bold text-[hsl(var(--muted-foreground))]">Données de l’entreprise</p><p className="mt-2 text-sm font-bold">Périmètre isolé par entreprise</p></div></div></div></div>}
-      {currentFeatureId === 'vitrine-publique' && <div className="flex items-start gap-4"><Globe2 className="mt-1 text-[hsl(var(--primary))]" size={28} /><div><h2 className="text-lg font-bold">Aperçu de la vitrine publique</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Seuls les biens publiés sont proposés aux visiteurs et peuvent recevoir des demandes de contact ou de visite.</p><div className="mt-5 rounded-xl bg-[hsl(var(--muted))] p-4 text-sm font-semibold">{listings.filter(item => item.status === 'PUBLISHED').length} bien(s) actuellement visible(s) publiquement.</div></div></div>}
-    </section>}
-    {listingView && <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="space-y-3">{loading ? <div className="rounded-2xl border p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement des {propertyView ? 'biens' : 'annonces'}…</div> : visibleListings.length === 0 ? <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucun {propertyView ? 'bien' : 'annonce'} à afficher.</div> : visibleListings.map(listing => <article key={listing.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{statusLabel[listing.status]}</span><span className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">{listing.transactionType === 'SALE' ? 'Vente' : 'Location'} · {listing.propertyType}</span></div><h2 className="mt-3 text-lg font-bold">{listing.title}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city} · {money(listing.price)}</p></div><Building2 size={20} className="text-[hsl(var(--primary))]" /></div><p className="mt-3 line-clamp-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{listing.description || 'Aucune description renseignée.'}</p><div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{listing.areaM2 && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{listing.areaM2} m²</span>}{listing.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{listing.bedrooms} chambre(s)</span>}{listing.furnished && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">Meublé</span>}</div>{canModifyListings && <div className="mt-4 flex gap-2 border-t pt-3"><button type="button" onClick={() => edit(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button><button type="button" onClick={() => void archive(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><X size={13} className="mr-1 inline" />Archiver</button></div>}</article>)}</section>
-      {formOpen && (canCreateListings || editing) && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[hsl(var(--foreground)/.45)] p-4 backdrop-blur-sm" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) reset(); }}>
-        <form onSubmit={save} role="dialog" aria-modal="true" aria-labelledby="immobilier-listing-form-title" className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
-          <div className="flex items-center justify-between"><div><h2 id="immobilier-listing-form-title" className="font-bold">{editing ? 'Modifier l’annonce' : 'Ajouter une annonce'}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les brouillons restent invisibles sur la vitrine.</p></div><button type="button" onClick={reset} aria-label="Fermer" className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div><div className="mt-5 space-y-3"><label className="block text-xs font-bold">Titre<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Villa moderne à Almadies" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-xs font-bold">Type<select value={form.propertyType} onChange={e => setForm({ ...form, propertyType: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">{['APPARTEMENT', 'MAISON', 'VILLA', 'TERRAIN', 'BUREAU', 'LOCAL_COMMERCIAL'].map(value => <option key={value}>{value}</option>)}</select></label><label className="block text-xs font-bold">Opération<select value={form.transactionType} onChange={e => setForm({ ...form, transactionType: e.target.value as 'SALE' | 'RENT' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="SALE">Vente</option><option value="RENT">Location</option></select></label></div><label className="block text-xs font-bold">Statut<select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as ImmobilierListing['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">{['DRAFT', 'PUBLISHED', 'RESERVED', 'SOLD', 'RENTED'].map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label className="block text-xs font-bold">Prix<input required type="number" min="0" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="block text-xs font-bold">Surface<input type="number" min="0" value={form.areaM2 ?? ''} onChange={e => setForm({ ...form, areaM2: e.target.value ? Number(e.target.value) : null })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label></div><div className="grid grid-cols-2 gap-3"><label className="block text-xs font-bold">Ville<input required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="block text-xs font-bold">Quartier<input value={form.neighborhood ?? ''} onChange={e => setForm({ ...form, neighborhood: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label></div><label className="block text-xs font-bold">Description<textarea rows={4} value={form.description ?? ''} onChange={e => setForm({ ...form, description: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={Boolean(form.featured)} onChange={e => setForm({ ...form, featured: e.target.checked })} />Mettre en avant</label></div><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={reset} className="rounded-lg border px-4 py-2.5 text-sm font-bold">Annuler</button><button type="submit" className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-sm font-bold text-[hsl(var(--primary-foreground))]"><Check size={15} />{editing ? 'Enregistrer les changements' : 'Créer l’annonce'}</button></div>
-        </form>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <span className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{properties.length} biens</span>
+          <span className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{listings.filter(item => item.status === 'PUBLISHED').length} annonces publiées</span>
+          <span className="rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{leads.filter(item => item.status === 'NEW').length} demandes nouvelles</span>
+        </div>
+      </section>
+
+      {currentFeatureId === 'dashboard' && <section className="grid gap-4 md:grid-cols-3">
+        <SummaryCard icon={<Building2 size={22} />} label="Biens disponibles" value={properties.filter(item => item.status === 'AVAILABLE').length} detail={`${properties.length} biens dans le portefeuille`} />
+        <SummaryCard icon={<Globe2 size={22} />} label="Annonces publiées" value={listings.filter(item => item.status === 'PUBLISHED').length} detail={`${listings.length} publications enregistrées`} />
+        <SummaryCard icon={<CalendarDays size={22} />} label="Visites demandées" value={leads.filter(item => item.requestType === 'VISIT').length} detail={`${leads.filter(item => item.status === 'NEW').length} demandes nouvelles`} />
+      </section>}
+
+      {propertyView && <section className="space-y-3">
+        {loading ? <LoadingState label="biens" /> : properties.length === 0 ? <EmptyState title="Aucun bien enregistré" text="Créez une fiche bien avant de pouvoir lui associer une annonce." /> : properties.map(property => (
+          <article key={property.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{property.reference}</span><span className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[10px] font-bold">{statusLabel[property.status]}</span></div>
+                <h2 className="mt-3 text-lg font-bold">{property.propertyType} · {property.city}</h2>
+                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{property.neighborhood || 'Quartier non renseigné'} · {property.transactionType === 'SALE' ? 'Vente' : 'Location'} · {money(property.price)}</p>
+              </div>
+              <div className="flex gap-2">{canModifyProperties && <button type="button" onClick={() => editProperty(property)} className="rounded-lg border px-3 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button>}{canModifyProperties && <button type="button" onClick={() => void archiveProperty(property)} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><X size={13} className="mr-1 inline" />Archiver</button>}</div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bedrooms} chambre(s)</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bathrooms} salle(s) de bain</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">Meublé</span>}</div>
+            {property.internalNotes && <p className="mt-4 rounded-xl bg-[hsl(var(--muted))] p-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]"><strong>Note interne :</strong> {property.internalNotes}</p>}
+          </article>
+        ))}
+      </section>}
+
+      {listingView && <section className="space-y-3">
+        {loading ? <LoadingState label="annonces" /> : listings.length === 0 ? <EmptyState title="Aucune annonce créée" text="Créez d’abord un bien, puis publiez-le avec une annonce commerciale." /> : listings.map(listing => {
+          const property = propertyForListing(listing);
+          return <article key={listing.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{statusLabel[listing.status]}</span>{listing.featured && <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold text-amber-700">À la une</span>}</div><h2 className="mt-3 text-lg font-bold">{listing.title}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Bien {property?.reference ?? listing.propertyId} · {property?.city ?? listing.city} · {property ? money(property.price) : money(listing.price)}</p></div>
+              <div className="flex gap-2">{canModifyListings && <button type="button" onClick={() => editListing(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button>}{canModifyListings && <button type="button" onClick={() => void archiveListing(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><X size={13} className="mr-1 inline" />Archiver</button>}</div>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{listing.description || 'Aucune description commerciale renseignée.'}</p>
+          </article>;
+        })}
+      </section>}
+
+      {leadView && <section className="space-y-3">
+        {loading ? <LoadingState label="demandes" /> : visibleLeads.length === 0 ? <EmptyState title={currentFeatureId === 'visites' ? 'Aucune visite demandée' : 'Aucun prospect'} text="Les demandes reçues depuis la vitrine apparaîtront ici." /> : visibleLeads.map(lead => <article key={lead.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2 text-xs font-bold"><UserRound size={15} className="text-[hsl(var(--primary))]" />{lead.name}<span className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px]">{lead.requestType === 'VISIT' ? 'Demande de visite' : 'Contact'}</span></div><p className="mt-2 text-sm font-semibold">{lead.listingTitle ?? 'Demande générale'}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{lead.email}{lead.phone ? ` · ${lead.phone}` : ''}</p></div><CalendarDays size={18} className="text-[hsl(var(--primary))]" /></div>{lead.message && <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{lead.message}</p>}{canManageLeads && <select value={lead.status} onChange={event => void updateLead(lead, event.target.value as ImmobilierLead['status'])} className="mt-4 rounded-lg border px-3 py-2 text-xs font-bold">{['NEW', 'CONTACTED', 'CLOSED'].map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select>}</article>)}
+      </section>}
+
+      {isAuxiliaryFeatureId(currentFeatureId) && <AuxiliaryFeature featureId={currentFeatureId} properties={properties} listings={listings} leads={leads} />}
+
+      {formMode && <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[hsl(var(--foreground)/.45)] p-4 backdrop-blur-sm" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
+        {formMode === 'create-property' || formMode === 'edit-property'
+          ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} onSubmit={saveProperty} onClose={closeForm} />
+          : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
       </div>}
-    </div>}
-    {leadView && <section className="space-y-3">{loading ? <div className="rounded-2xl border p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement des demandes…</div> : visibleLeads.length === 0 ? <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune {currentFeatureId === 'visites' ? 'demande de visite' : 'demande de contact'} pour le moment.</div> : visibleLeads.map(lead => <article key={lead.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2 text-xs font-bold"><UserRound size={15} className="text-[hsl(var(--primary))]" />{lead.name}<span className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px]">{lead.requestType === 'VISIT' ? 'Demande de visite' : 'Contact'}</span></div><p className="mt-2 text-sm font-semibold">{lead.listingTitle ?? 'Demande générale'}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{lead.email}{lead.phone ? ` · ${lead.phone}` : ''}</p></div><CalendarDays size={18} className="text-[hsl(var(--primary))]" /></div>{lead.message && <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{lead.message}</p>}{canManageLeads && <select value={lead.status} onChange={e => void updateLead(lead, e.target.value as ImmobilierLead['status'])} className="mt-4 rounded-lg border px-3 py-2 text-xs font-bold">{['NEW', 'CONTACTED', 'CLOSED'].map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select>}</article>)}</section>}
-  </div>;
+    </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: number; detail: string }) {
+  return <article className="rounded-2xl border bg-[hsl(var(--card))] p-5">{icon}<p className="mt-4 text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-3xl font-bold">{value}</p><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">{detail}</p></article>;
+}
+
+function LoadingState({ label }: { label: string }) {
+  return <div className="rounded-2xl border p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Chargement des {label}…</div>;
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return <div className="rounded-2xl border border-dashed p-10 text-center"><p className="font-bold">{title}</p><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{text}</p></div>;
+}
+
+function PropertyForm({ mode, form, setForm, onSubmit, onClose }: { mode: 'create-property' | 'edit-property'; form: ImmobilierPropertyInput; setForm: (form: ImmobilierPropertyInput) => void; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+  return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-property-form-title" className="modal-panel max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
+    <FormHeader id="immobilier-property-form-title" title={mode === 'edit-property' ? 'Modifier le bien' : 'Ajouter un bien'} text="Le bien est votre fiche interne. Il pourra ensuite recevoir une ou plusieurs annonces." onClose={onClose} />
+    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <Field label="Référence interne" value={String(form.reference ?? '')} onChange={reference => setForm({ ...form, reference })} placeholder="BIEN-2026-001" />
+      <SelectField label="Statut du bien" value={form.status} onChange={status => setForm({ ...form, status: status as ImmobilierPropertyInput['status'] })} options={['AVAILABLE', 'RESERVED', 'SOLD', 'RENTED']} labels={statusLabel} />
+      <SelectField label="Type de bien" value={form.propertyType} onChange={propertyType => setForm({ ...form, propertyType })} options={['APPARTEMENT', 'MAISON', 'VILLA', 'TERRAIN', 'BUREAU', 'LOCAL_COMMERCIAL']} />
+      <SelectField label="Transaction" value={form.transactionType} onChange={transactionType => setForm({ ...form, transactionType: transactionType as 'SALE' | 'RENT' })} options={['SALE', 'RENT']} labels={{ SALE: 'Vente', RENT: 'Location' }} />
+      <Field label="Ville" required value={form.city} onChange={city => setForm({ ...form, city })} />
+      <Field label="Quartier" value={String(form.neighborhood ?? '')} onChange={neighborhood => setForm({ ...form, neighborhood })} />
+      <Field label="Adresse" value={String(form.address ?? '')} onChange={address => setForm({ ...form, address })} />
+      <Field label="Prix" required type="number" value={String(form.price)} onChange={price => setForm({ ...form, price: Number(price) })} />
+      <Field label="Surface (m²)" type="number" value={String(form.areaM2 ?? '')} onChange={area => setForm({ ...form, areaM2: area ? Number(area) : null })} />
+      <Field label="Chambres" type="number" value={String(form.bedrooms ?? '')} onChange={bedrooms => setForm({ ...form, bedrooms: bedrooms ? Number(bedrooms) : null })} />
+      <Field label="Salles de bain" type="number" value={String(form.bathrooms ?? '')} onChange={bathrooms => setForm({ ...form, bathrooms: bathrooms ? Number(bathrooms) : null })} />
+      <label className="flex items-center gap-2 self-end pb-2 text-sm font-bold"><input type="checkbox" checked={Boolean(form.furnished)} onChange={event => setForm({ ...form, furnished: event.target.checked })} />Bien meublé</label>
+      <label className="block text-sm font-bold sm:col-span-2">Notes internes<textarea rows={3} value={String(form.internalNotes ?? '')} onChange={event => setForm({ ...form, internalNotes: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Informations réservées à l’équipe…" /></label>
+    </div>
+    <FormActions onClose={onClose} submitLabel={mode === 'edit-property' ? 'Enregistrer le bien' : 'Créer le bien'} />
+  </form>;
+}
+
+function ListingForm({ mode, form, setForm, properties, onSubmit, onClose }: { mode: 'create-listing' | 'edit-listing'; form: ImmobilierListingInput; setForm: (form: ImmobilierListingInput) => void; properties: ImmobilierProperty[]; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+  return <form onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="immobilier-listing-form-title" className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:p-6">
+    <FormHeader id="immobilier-listing-form-title" title={mode === 'edit-listing' ? 'Modifier l’annonce' : 'Ajouter une annonce'} text="L’annonce est une publication commerciale liée à un bien existant." onClose={onClose} />
+    <div className="mt-5 space-y-4">
+      <label className="block text-sm font-bold">Bien à publier<select required disabled={mode === 'edit-listing'} value={form.propertyId} onChange={event => setForm({ ...form, propertyId: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Sélectionner un bien…</option>{properties.map(property => <option key={property.id} value={property.id}>{property.reference} · {property.propertyType} · {property.city}</option>)}</select></label>
+      <Field label="Titre commercial" required value={form.title} onChange={title => setForm({ ...form, title })} placeholder="Villa moderne aux Almadies" />
+      <SelectField label="Statut de diffusion" value={form.status} onChange={status => setForm({ ...form, status: status as ImmobilierListingInput['status'] })} options={['DRAFT', 'PUBLISHED']} labels={statusLabel} />
+      <label className="block text-sm font-bold">Description commerciale<textarea rows={5} value={String(form.description ?? '')} onChange={event => setForm({ ...form, description: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder="Présentez le bien aux visiteurs…" /></label>
+      <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={Boolean(form.featured)} onChange={event => setForm({ ...form, featured: event.target.checked })} />Mettre l’annonce à la une</label>
+      {properties.length === 0 && <p className="rounded-xl bg-amber-500/10 p-3 text-sm font-semibold text-amber-800">Créez d’abord un bien dans la fonctionnalité Biens.</p>}
+    </div>
+    <FormActions onClose={onClose} submitLabel={mode === 'edit-listing' ? 'Enregistrer l’annonce' : 'Publier l’annonce'} disabled={!properties.length} />
+  </form>;
+}
+
+function FormHeader({ id, title, text, onClose }: { id: string; title: string; text: string; onClose: () => void }) {
+  return <div className="flex items-start justify-between gap-4"><div><h2 id={id} className="font-bold">{title}</h2><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p></div><button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div>;
+}
+
+function FormActions({ onClose, submitLabel, disabled = false }: { onClose: () => void; submitLabel: string; disabled?: boolean }) {
+  return <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-sm font-bold">Annuler</button><button type="submit" disabled={disabled} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={15} />{submitLabel}</button></div>;
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder, required = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) {
+  return <label className="block text-sm font-bold">{label}<input required={required} type={type} min={type === 'number' ? 0 : undefined} value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>;
+}
+
+function SelectField({ label, value, onChange, options, labels = {} }: { label: string; value: string; onChange: (value: string) => void; options: string[]; labels?: Record<string, string> }) {
+  return <label className="block text-sm font-bold">{label}<select value={value} onChange={event => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">{options.map(option => <option key={option} value={option}>{labels[option] ?? option}</option>)}</select></label>;
+}
+
+function AuxiliaryFeature({ featureId, properties, listings, leads }: { featureId: AuxiliaryFeatureId; properties: ImmobilierProperty[]; listings: ImmobilierListing[]; leads: ImmobilierLead[] }) {
+  if (featureId === 'rapports') {
+    const published = listings.filter(item => item.status === 'PUBLISHED').length;
+    return <section className="rounded-2xl border bg-[hsl(var(--card))] p-6"><div className="flex items-start gap-4"><BarChart3 className="mt-1 text-[hsl(var(--primary))]" size={28} /><div><h2 className="text-lg font-bold">Performance de l’activité</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Indicateurs calculés à partir des données persistées de votre entreprise.</p></div></div><div className="mt-6 grid gap-3 sm:grid-cols-3"><Metric label="Biens" value={properties.length} /><Metric label="Taux de publication" value={`${listings.length ? Math.round((published / listings.length) * 100) : 0}%`} /><Metric label="Demandes nouvelles" value={leads.filter(item => item.status === 'NEW').length} /></div></section>;
+  }
+  if (featureId === 'vitrine-publique') return <section className="rounded-2xl border bg-[hsl(var(--card))] p-6"><Globe2 className="text-[hsl(var(--primary))]" size={28} /><h2 className="mt-4 text-lg font-bold">Biens visibles sur la vitrine</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Une annonce publiée est toujours rattachée à une fiche Bien et reprend ses informations de prix et de localisation.</p><div className="mt-5 rounded-xl bg-[hsl(var(--muted))] p-4 text-sm font-semibold">{listings.filter(item => item.status === 'PUBLISHED').length} annonce(s) actuellement publiée(s).</div></section>;
+  if (featureId === 'parametres') return <section className="rounded-2xl border bg-[hsl(var(--card))] p-6"><Settings2 className="text-[hsl(var(--primary))]" size={28} /><h2 className="mt-4 text-lg font-bold">Règles du module</h2><div className="mt-5 grid gap-3 sm:grid-cols-2"><Setting title="Séparation métier" text="Les biens sont les fiches internes ; les annonces sont les publications liées." /><Setting title="Publication" text="Une annonce doit être liée à un bien actif avant d’être publiée." /><Setting title="Données privées" text="Les notes internes d’un bien ne sont jamais envoyées sur la vitrine." /><Setting title="Accès" text="Les droits Biens et Annonces sont contrôlés séparément." /></div></section>;
+  if (featureId === 'agents') return <section className="rounded-2xl border bg-[hsl(var(--card))] p-6"><UsersRound className="text-[hsl(var(--primary))]" size={28} /><h2 className="mt-4 text-lg font-bold">Équipe immobilière</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Les agents et leurs droits se gèrent dans Organisation. Le module distingue maintenant leurs accès aux Biens, aux Annonces et aux demandes.</p></section>;
+  return <section className="rounded-2xl border bg-[hsl(var(--card))] p-6"><FileSignature className="text-[hsl(var(--primary))]" size={28} /><h2 className="mt-4 text-lg font-bold">Suivi des mandats</h2><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Les mandats seront rattachés aux fiches Bien, tandis que les annonces resteront les publications commerciales.</p><div className="mt-5 rounded-xl bg-[hsl(var(--muted))] p-4 text-sm font-semibold">Aucun mandat enregistré.</div></section>;
+}
+
+function Metric({ label, value }: { label: string; value: number | string }) {
+  return <div className="rounded-xl bg-[hsl(var(--muted))] p-4"><p className="text-xs font-bold text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>;
+}
+
+function Setting({ title, text }: { title: string; text: string }) {
+  return <div className="rounded-xl border p-4"><p className="text-sm font-bold">{title}</p><p className="mt-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p></div>;
 }

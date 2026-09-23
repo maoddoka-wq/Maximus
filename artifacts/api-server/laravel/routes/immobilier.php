@@ -7,6 +7,9 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:immobilier
     ->prefix('immobilier')
     ->group(function (): void {
         Route::get('/bootstrap', [ImmobilierController::class, 'bootstrap']);
+        Route::post('/properties', [ImmobilierController::class, 'storeProperty']);
+        Route::patch('/properties/{id}', [ImmobilierController::class, 'updateProperty']);
+        Route::delete('/properties/{id}', [ImmobilierController::class, 'archiveProperty']);
         Route::post('/listings', [ImmobilierController::class, 'storeListing']);
         Route::patch('/listings/{id}', [ImmobilierController::class, 'updateListing']);
         Route::delete('/listings/{id}', [ImmobilierController::class, 'archiveListing']);
