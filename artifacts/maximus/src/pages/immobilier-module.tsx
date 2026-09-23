@@ -113,6 +113,7 @@ export default function ImmobilierModulePage({
   const [listingProfileFile, setListingProfileFile] = useState<File | null>(null);
   const [listingGalleryFiles, setListingGalleryFiles] = useState<File[]>([]);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [detailProperty, setDetailProperty] = useState<ImmobilierProperty | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -319,7 +320,7 @@ export default function ImmobilierModulePage({
         ? <LoadingState label="biens" />
         : properties.length === 0
           ? <EmptyState title="Aucun bien enregistré" text="Créez une fiche bien avant de pouvoir lui associer une annonce." />
-          : <section className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Bien</th><th className="px-4">Localisation</th><th className="px-4">Caractéristiques</th><th className="px-4">Prix</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{properties.map(property => <tr key={property.id}><td className="px-4 py-3"><div className="flex min-w-[280px] items-center gap-3"><MediaStrip media={property.gallery} profileMedia={property.profileMedia} compact /><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="truncate">{property.reference}</strong><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[9px] font-bold text-[hsl(var(--primary))]">{property.propertyType}</span></span><small className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{property.transactionType === 'SALE' ? 'Vente' : 'Location'}{property.internalNotes ? ' · Note interne disponible' : ''}</small></span></div></td><td className="px-4 py-3"><strong className="block">{property.city}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{property.neighborhood || 'Quartier non renseigné'}</small></td><td className="px-4 py-3"><div className="flex min-w-[220px] flex-wrap gap-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.bedrooms} ch.</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.bathrooms} sdb.</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">Meublé</span>}</div></td><td className="px-4 py-3 font-bold whitespace-nowrap">{money(property.price)}</td><td className="px-4 py-3"><StatusPill value={statusLabel[property.status]} /></td><td className="px-4 py-3"><div className="flex min-w-[170px] flex-wrap justify-end gap-1.5">{canModifyProperties && <button type="button" onClick={() => editProperty(property)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModifyProperties && <button type="button" onClick={() => void archiveProperty(property)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><X size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></section>)}
+          : <section className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Bien</th><th className="px-4">Localisation</th><th className="px-4">Caractéristiques</th><th className="px-4">Prix</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{properties.map(property => <tr key={property.id} role="button" tabIndex={0} aria-label={`Voir le détail du bien ${property.reference}`} onClick={() => setDetailProperty(property)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetailProperty(property); } }} className="cursor-pointer"><td className="px-4 py-3"><div className="flex min-w-[280px] items-center gap-3"><MediaStrip media={property.gallery} profileMedia={property.profileMedia} compact /><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="truncate">{property.reference}</strong><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[9px] font-bold text-[hsl(var(--primary))]">{property.propertyType}</span></span><small className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{property.transactionType === 'SALE' ? 'Vente' : 'Location'}{property.internalNotes ? ' · Note interne disponible' : ''}</small></span></div></td><td className="px-4 py-3"><strong className="block">{property.city}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{property.neighborhood || 'Quartier non renseigné'}</small></td><td className="px-4 py-3"><div className="flex min-w-[220px] flex-wrap gap-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.bedrooms} ch.</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.bathrooms} sdb.</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">Meublé</span>}</div></td><td className="px-4 py-3 font-bold whitespace-nowrap">{money(property.price)}</td><td className="px-4 py-3"><StatusPill value={statusLabel[property.status]} /></td><td className="px-4 py-3"><div className="flex min-w-[170px] flex-wrap justify-end gap-1.5">{canModifyProperties && <button type="button" onClick={event => { event.stopPropagation(); editProperty(property); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModifyProperties && <button type="button" onClick={event => { event.stopPropagation(); void archiveProperty(property); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><X size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></section>)}
 
       {listingView && (loading
         ? <LoadingState label="annonces" />
@@ -341,6 +342,12 @@ export default function ImmobilierModulePage({
         </div>,
         document.body,
       )}
+      {detailProperty && createPortal(
+        <div className="immobilier-modal-backdrop fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-[hsl(var(--foreground)/.45)] p-3 backdrop-blur-sm sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetailProperty(null); }}>
+          <PropertyDetail property={detailProperty} onClose={() => setDetailProperty(null)} />
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -351,6 +358,55 @@ function SummaryCard({ icon, label, value, detail }: { icon: React.ReactNode; la
 
 function StatusPill({ value }: { value: string }) {
   return <span className="inline-flex rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.06em] text-[hsl(var(--muted-foreground))]">{value}</span>;
+}
+
+function PropertyDetail({ property, onClose }: { property: ImmobilierProperty; onClose: () => void }) {
+  const profile = property.profileMedia ?? property.gallery[0] ?? null;
+  const gallery = property.gallery.filter(item => item.id !== profile?.id);
+
+  return <article role="dialog" aria-modal="true" aria-labelledby="immobilier-property-detail-title" className="modal-panel mt-1 max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-2xl bg-[hsl(var(--background))] p-5 shadow-2xl sm:mt-2 sm:max-h-[calc(100dvh-3rem)] sm:p-6">
+    <div className="flex items-start justify-between gap-4 border-b pb-4">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Détail du bien</p>
+        <h2 id="immobilier-property-detail-title" className="mt-1 text-xl font-bold">{property.reference}</h2>
+        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{property.propertyType} · {property.transactionType === 'SALE' ? 'Vente' : 'Location'} · {property.city}</p>
+      </div>
+      <button type="button" onClick={onClose} aria-label="Fermer le détail du bien" className="shrink-0 rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button>
+    </div>
+    <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
+      <div>
+        {profile ? <MediaPreview media={profile} className="h-64 w-full rounded-xl sm:h-80" label="Photo profil" /> : <div className="flex h-64 items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-sm font-semibold text-[hsl(var(--muted-foreground))] sm:h-80"><ImagePlus size={18} className="mr-2" />Aucune photo profil</div>}
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {gallery.map(media => <MediaPreview key={media.id} media={media} className="h-28 w-full rounded-lg" />)}
+          {gallery.length === 0 && <p className="col-span-full rounded-lg bg-[hsl(var(--muted))] p-4 text-center text-xs font-semibold text-[hsl(var(--muted-foreground))]">Aucune photo de galerie.</p>}
+        </div>
+      </div>
+      <div className="space-y-4">
+        <div className="rounded-xl bg-[hsl(var(--muted))] p-4"><p className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Prix</p><p className="mt-1 text-2xl font-bold">{money(property.price)}</p></div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <DetailValue label="Localisation" value={`${property.city}${property.neighborhood ? ` · ${property.neighborhood}` : ''}`} />
+          <DetailValue label="Statut" value={statusLabel[property.status]} />
+          {property.areaM2 !== null && <DetailValue label="Surface" value={`${property.areaM2} m²`} />}
+          {property.bedrooms !== null && <DetailValue label="Chambres" value={String(property.bedrooms)} />}
+          {property.bathrooms !== null && <DetailValue label="Salles de bain" value={String(property.bathrooms)} />}
+          <DetailValue label="Meublé" value={property.furnished ? 'Oui' : 'Non'} />
+        </div>
+        {property.address && <div><p className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Adresse</p><p className="mt-1 text-sm">{property.address}</p></div>}
+        {property.internalNotes && <div><p className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">Notes internes</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6">{property.internalNotes}</p></div>}
+      </div>
+    </div>
+  </article>;
+}
+
+function DetailValue({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border bg-[hsl(var(--secondary))] p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></div>;
+}
+
+function MediaPreview({ media, className, label }: { media: ImmobilierMedia; className: string; label?: string }) {
+  return <div className={`relative overflow-hidden bg-[hsl(var(--muted))] ${className}`}>
+    {media.type === 'video' ? <video src={media.url} muted playsInline controls className="h-full w-full object-cover" /> : <img src={media.url} alt={label ?? 'Photo de la galerie'} className="h-full w-full object-cover" />}
+    {label && <span className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-[10px] font-bold text-white">{label}</span>}
+  </div>;
 }
 
 function LoadingState({ label }: { label: string }) {
@@ -438,7 +494,10 @@ function MediaUploadFields({ profileFile, setProfileFile, galleryFiles, setGalle
 
 function MediaStrip({ media, profileMedia, compact = false }: { media: ImmobilierMedia[]; profileMedia?: ImmobilierMedia | null; compact?: boolean }) {
   if (compact) {
-    return <span className="inline-flex min-w-[76px] shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--secondary))] px-2 py-2 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{media.length} média{media.length > 1 ? 's' : ''}</span>;
+    const profile = profileMedia ?? media[0] ?? null;
+    return profile
+      ? <MediaPreview media={profile} className="h-16 w-24 shrink-0 rounded-lg" label="Profil" />
+      : <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--secondary))] text-[10px] font-semibold text-[hsl(var(--muted-foreground))]"><ImagePlus size={15} /></div>;
   }
   const profile = profileMedia ?? media[0] ?? null;
   const gallery = media.filter(item => item.id !== profile?.id);
