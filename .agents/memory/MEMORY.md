@@ -90,3 +90,4 @@
 - [Séparation Bien et Annonce Immobilier](immobilier-property-listing-boundary.md) — le patrimoine interne et la publication commerciale ont des cycles, droits et données distincts.
 - [Galeries Immobilier multimédias](immobilier-media-gallery.md) — les biens et annonces réutilisent la galerie persistante e-commerce, avec le MIME pour distinguer photos et vidéos.
 - [Fenêtres Immobilier et e-commerce](module-modal-layout.md) — leurs overlays sont portés au niveau du document pour flotter au-dessus du menu et de toute la page.
+- [Surfaces de tableaux](ui-surface-theme.md) — les tableaux doivent utiliser des fonds opaques `muted`/`secondary`, car les cartes et transparences rendent le blanc visuellement dominant.

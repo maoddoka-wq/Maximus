@@ -185,6 +185,13 @@ body { min-width: 320px; }
 .mono { font-family: var(--app-font-mono); }
 .app-shell { min-height: 100dvh; background-color: hsl(var(--background)); background-image: linear-gradient(135deg, hsl(var(--primary) / .025), transparent 32%); }
 .dark .app-shell { background: hsl(var(--background)); }
+.public-shop-shell [class~="bg-white"],
+.public-shop-shell [class~="bg-white/95"],
+.public-shop-shell [class~="bg-white/70"] { background-color: hsl(var(--muted)) !important; }
+.public-shop-shell img[class~="bg-white"] { background-color: #fff !important; }
+@media (min-width: 640px) {
+  .public-shop-shell nav[class~="bg-white/95"] { background-color: transparent !important; }
+}
 .app-shell button[class*="bg-[hsl(var(--primary))]"],
 .app-shell a[class*="bg-[hsl(var(--primary))]"],
 .app-shell button[class*="bg-[hsl(var(--accent))]"],
@@ -213,22 +220,27 @@ body { min-width: 320px; }
 .module-tabs { scrollbar-width: thin; scrollbar-color: hsl(var(--primary) / .55) transparent; }
 .module-tabs button { border: 1px solid transparent; min-height: 40px; }
 .module-tabs button:not(.active):hover { border-color: hsl(var(--border)); }
-.data-table thead { background: hsl(var(--muted) / .72); }
-.data-table tbody tr:nth-child(even) { background: hsl(var(--muted) / .14); }
+.data-table thead { background: hsl(var(--muted)); }
+.data-table tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
 .data-table tbody tr:hover { background: hsl(var(--primary) / .055); }
 .table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; border-top: 1px solid hsl(var(--border)); }
 .overflow-x-auto { max-width: 100%; overscroll-behavior-inline: contain; }
-.table-scroll table { min-width: 680px; background: hsl(var(--muted) / .18); }
-.table-scroll thead { background: hsl(var(--muted) / .72); }
-.table-scroll tbody tr:nth-child(odd) { background: hsl(var(--card) / .72); }
-.table-scroll tbody tr:nth-child(even) { background: hsl(var(--muted) / .32); }
+.table-scroll table { min-width: 680px; background: hsl(var(--muted)); }
+.table-scroll thead { background: hsl(var(--muted)); }
+.table-scroll tbody tr:nth-child(odd) { background: hsl(var(--background)); }
+.table-scroll tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
 .table-scroll tbody tr:hover { background: hsl(var(--primary) / .09); }
-.page-pad .card-surface table { background: hsl(var(--muted) / .16); }
-.page-pad .card-surface table tbody tr:nth-child(odd) { background: hsl(var(--card) / .72); }
-.page-pad .card-surface table tbody tr:nth-child(even) { background: hsl(var(--muted) / .32); }
+.page-pad .card-surface table { background: hsl(var(--muted)); }
+.page-pad .card-surface table thead { background: hsl(var(--muted)); }
+.page-pad .card-surface table tbody tr:nth-child(odd) { background: hsl(var(--background)); }
+.page-pad .card-surface table tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
 .page-pad .card-surface table tbody tr:hover { background: hsl(var(--primary) / .09); }
 .transport-table-scroll table { min-width: 620px; }
-.overflow-x-auto > table { min-width: 680px; }
+.overflow-x-auto > table { min-width: 680px; background: hsl(var(--muted)); }
+.overflow-x-auto > table thead { background: hsl(var(--muted)); }
+.overflow-x-auto > table tbody tr:nth-child(odd) { background: hsl(var(--background)); }
+.overflow-x-auto > table tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
+.overflow-x-auto > table tbody tr:hover { background: hsl(var(--primary) / .09); }
 .table-scroll th { white-space: nowrap; }
 .table-scroll td, .table-scroll th { vertical-align: middle; }
 .table-scroll td:last-child, .table-scroll th:last-child { text-align: right; }
