@@ -713,3 +713,36 @@ body {
     margin-top: .25rem;
   }
 }
+
+/* Table surfaces: keep the data area visibly distinct from the card surface. */
+.table-scroll table,
+.page-pad .table-scroll table,
+.overflow-x-auto > table {
+  background-color: hsl(var(--muted)) !important;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table-scroll thead,
+.page-pad .table-scroll thead,
+.overflow-x-auto > table thead {
+  background-color: hsl(var(--secondary)) !important;
+}
+
+.table-scroll tbody tr,
+.page-pad .table-scroll tbody tr,
+.overflow-x-auto > table tbody tr {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.table-scroll tbody tr:nth-child(even),
+.page-pad .table-scroll tbody tr:nth-child(even),
+.overflow-x-auto > table tbody tr:nth-child(even) {
+  background-color: hsl(var(--secondary)) !important;
+}
+
+.table-scroll tbody tr:hover,
+.page-pad .table-scroll tbody tr:hover,
+.overflow-x-auto > table tbody tr:hover {
+  background-color: hsl(var(--primary) / .16) !important;
+}
