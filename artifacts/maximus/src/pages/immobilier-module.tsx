@@ -303,41 +303,17 @@ export default function ImmobilierModulePage({
         <SummaryCard icon={<CalendarDays size={22} />} label="Visites demandées" value={leads.filter(item => item.requestType === 'VISIT').length} detail={`${leads.filter(item => item.status === 'NEW').length} demandes nouvelles`} />
       </section>}
 
-      {propertyView && <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {loading ? <LoadingState label="biens" /> : properties.length === 0 ? <EmptyState title="Aucun bien enregistré" text="Créez une fiche bien avant de pouvoir lui associer une annonce." /> : properties.map(property => (
-          <article key={property.id} className="flex flex-col overflow-hidden rounded-2xl border bg-[hsl(var(--card))]">
-            <MediaStrip media={property.gallery} />
-            <div className="flex flex-1 flex-col p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{property.reference}</span><span className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-[10px] font-bold">{statusLabel[property.status]}</span></div>
-                <h2 className="mt-3 text-lg font-bold">{property.propertyType} · {property.city}</h2>
-                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{property.neighborhood || 'Quartier non renseigné'} · {property.transactionType === 'SALE' ? 'Vente' : 'Location'} · {money(property.price)}</p>
-              </div>
-              <div className="flex gap-2">{canModifyProperties && <button type="button" onClick={() => editProperty(property)} className="rounded-lg border px-3 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button>}{canModifyProperties && <button type="button" onClick={() => void archiveProperty(property)} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><X size={13} className="mr-1 inline" />Archiver</button>}</div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bedrooms} chambre(s)</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bathrooms} salle(s) de bain</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">Meublé</span>}</div>
-            {property.internalNotes && <p className="mt-4 rounded-xl bg-[hsl(var(--muted))] p-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]"><strong>Note interne :</strong> {property.internalNotes}</p>}
-            </div>
-          </article>
-        ))}
-      </section>}
+      {propertyView && (loading
+        ? <LoadingState label="biens" />
+        : properties.length === 0
+          ? <EmptyState title="Aucun bien enregistré" text="Créez une fiche bien avant de pouvoir lui associer une annonce." />
+          : <section className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Bien</th><th className="px-4">Localisation</th><th className="px-4">Caractéristiques</th><th className="px-4">Prix</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{properties.map(property => <tr key={property.id}><td className="px-4 py-3"><div className="flex min-w-[280px] items-center gap-3"><MediaStrip media={property.gallery} profileMedia={property.profileMedia} compact /><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="truncate">{property.reference}</strong><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[9px] font-bold text-[hsl(var(--primary))]">{property.propertyType}</span></span><small className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{property.transactionType === 'SALE' ? 'Vente' : 'Location'}{property.internalNotes ? ' · Note interne disponible' : ''}</small></span></div></td><td className="px-4 py-3"><strong className="block">{property.city}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{property.neighborhood || 'Quartier non renseigné'}</small></td><td className="px-4 py-3"><div className="flex min-w-[220px] flex-wrap gap-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.bedrooms} ch.</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">{property.bathrooms} sdb.</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--secondary))] px-2 py-1.5">Meublé</span>}</div></td><td className="px-4 py-3 font-bold whitespace-nowrap">{money(property.price)}</td><td className="px-4 py-3"><StatusPill value={statusLabel[property.status]} /></td><td className="px-4 py-3"><div className="flex min-w-[170px] flex-wrap justify-end gap-1.5">{canModifyProperties && <button type="button" onClick={() => editProperty(property)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModifyProperties && <button type="button" onClick={() => void archiveProperty(property)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><X size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></section>)}
 
-      {listingView && <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {loading ? <LoadingState label="annonces" /> : listings.length === 0 ? <EmptyState title="Aucune annonce créée" text="Créez d’abord un bien, puis publiez-le avec une annonce commerciale." /> : listings.map(listing => {
-          const property = propertyForListing(listing);
-          return <article key={listing.id} className="flex flex-col overflow-hidden rounded-2xl border bg-[hsl(var(--card))]">
-            <MediaStrip media={listing.gallery} />
-            <div className="flex flex-1 flex-col p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2.5 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{statusLabel[listing.status]}</span>{listing.featured && <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold text-amber-700">À la une</span>}</div><h2 className="mt-3 text-lg font-bold">{listing.title}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Bien {property?.reference ?? listing.propertyId} · {property?.city ?? listing.city} · {property ? money(property.price) : money(listing.price)}</p></div>
-              <div className="flex gap-2">{canModifyListings && <button type="button" onClick={() => editListing(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold"><Pencil size={13} className="mr-1 inline" />Modifier</button>}{canModifyListings && <button type="button" onClick={() => void archiveListing(listing)} className="rounded-lg border px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))]"><X size={13} className="mr-1 inline" />Archiver</button>}</div>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{listing.description || 'Aucune description commerciale renseignée.'}</p>
-            </div>
-          </article>;
-        })}
-      </section>}
+      {listingView && (loading
+        ? <LoadingState label="annonces" />
+        : listings.length === 0
+          ? <EmptyState title="Aucune annonce créée" text="Créez d’abord un bien, puis publiez-le avec une annonce commerciale." />
+          : <section className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Annonce</th><th className="px-4">Bien associé</th><th className="px-4">Localisation</th><th className="px-4">Prix</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{listings.map(listing => { const property = propertyForListing(listing); return <tr key={listing.id}><td className="px-4 py-3"><div className="flex min-w-[300px] items-center gap-3"><MediaStrip media={listing.gallery} profileMedia={listing.profileMedia} compact /><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="truncate">{listing.title}</strong>{listing.featured && <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[9px] font-bold text-amber-700">À la une</span>}</span><small className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{listing.description || 'Aucune description commerciale renseignée.'}</small></span></div></td><td className="px-4 py-3"><strong className="block">{property?.reference ?? listing.propertyId}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{property?.propertyType ?? listing.propertyType}</small></td><td className="px-4 py-3"><strong className="block">{property?.city ?? listing.city}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{property?.neighborhood ?? listing.neighborhood || 'Quartier non renseigné'}</small></td><td className="px-4 py-3 font-bold whitespace-nowrap">{money(property?.price ?? listing.price)}</td><td className="px-4 py-3"><StatusPill value={statusLabel[listing.status]} /></td><td className="px-4 py-3"><div className="flex min-w-[170px] flex-wrap justify-end gap-1.5">{canModifyListings && <button type="button" onClick={() => editListing(listing)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Pencil size={13} />Modifier</button>}{canModifyListings && <button type="button" onClick={() => void archiveListing(listing)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))]"><X size={13} />Archiver</button>}</div></td></tr>; })}</tbody></table></section>)}
 
       {leadView && <section className="space-y-3">
         {loading ? <LoadingState label="demandes" /> : visibleLeads.length === 0 ? <EmptyState title={currentFeatureId === 'visites' ? 'Aucune visite demandée' : 'Aucun prospect'} text="Les demandes reçues depuis la vitrine apparaîtront ici." /> : visibleLeads.map(lead => <article key={lead.id} className="rounded-2xl border bg-[hsl(var(--card))] p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2 text-xs font-bold"><UserRound size={15} className="text-[hsl(var(--primary))]" />{lead.name}<span className="rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px]">{lead.requestType === 'VISIT' ? 'Demande de visite' : 'Contact'}</span></div><p className="mt-2 text-sm font-semibold">{lead.listingTitle ?? 'Demande générale'}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{lead.email}{lead.phone ? ` · ${lead.phone}` : ''}</p></div><CalendarDays size={18} className="text-[hsl(var(--primary))]" /></div>{lead.message && <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{lead.message}</p>}{canManageLeads && <select value={lead.status} onChange={event => void updateLead(lead, event.target.value as ImmobilierLead['status'])} className="mt-4 rounded-lg border px-3 py-2 text-xs font-bold">{['NEW', 'CONTACTED', 'CLOSED'].map(value => <option key={value} value={value}>{statusLabel[value]}</option>)}</select>}</article>)}
@@ -435,22 +411,24 @@ function MediaUploadField({ files, setFiles }: { files: File[]; setFiles: (files
   </label>;
 }
 
-function MediaStrip({ media }: { media: ImmobilierMedia[] }) {
-  if (media.length === 0) {
-    return <div className="flex h-36 items-center justify-center bg-[hsl(var(--muted)/.45)] text-xs font-semibold text-[hsl(var(--muted-foreground))]"><ImagePlus size={18} className="mr-2" />Aucun média</div>;
+function MediaStrip({ media, profileMedia, compact = false }: { media: ImmobilierMedia[]; profileMedia?: ImmobilierMedia | null; compact?: boolean }) {
+  const profile = profileMedia ?? media[0] ?? null;
+  const gallery = media.filter(item => item.id !== profile?.id);
+  const size = compact ? 'h-16 w-36' : 'h-40 w-full';
+  if (!profile && gallery.length === 0) {
+    return <div className={`flex ${size} shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[10px] font-semibold text-[hsl(var(--muted-foreground))]`}><ImagePlus size={15} className="mr-1.5" />Aucun média</div>;
   }
-  const [profile, ...gallery] = media;
-  return <div className="grid h-40 grid-cols-[1.7fr_1fr] gap-1 overflow-hidden bg-[hsl(var(--muted)/.35)]">
-    <div className="relative min-w-0">
-      {profile.type === 'video' ? <video src={profile.url} muted playsInline className="h-full w-full object-cover" /> : <img src={profile.url} alt="Photo profil du bien" className="h-full w-full object-cover" />}
-      <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-2 py-1 text-[10px] font-bold text-white">Photo profil</span>
+  return <div className={`grid ${size} shrink-0 grid-cols-[1.7fr_1fr] gap-1 overflow-hidden rounded-lg bg-[hsl(var(--muted))]`}>
+    <div className="relative min-w-0 overflow-hidden">
+      {profile && (profile.type === 'video' ? <video src={profile.url} muted playsInline autoPlay loop className="h-full w-full object-cover" /> : <img src={profile.url} alt="Photo profil du bien" className="h-full w-full object-cover" />)}
+      <span className={`absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-bold text-white ${compact ? 'hidden sm:block' : ''}`}>Profil</span>
     </div>
     <div className="grid min-w-0 grid-cols-2 gap-1">
       {gallery.slice(0, 4).map(item => item.type === 'video'
-        ? <video key={item.id} src={item.url} muted playsInline className="h-full min-h-0 w-full object-cover" />
+        ? <video key={item.id} src={item.url} muted playsInline autoPlay loop className="h-full min-h-0 w-full object-cover" />
         : <img key={item.id} src={item.url} alt="Photo de la galerie" className="h-full min-h-0 w-full object-cover" />)}
-      {gallery.length === 0 && <div className="col-span-2 flex items-center justify-center p-2 text-center text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">Galerie vide</div>}
-      {gallery.length > 4 && <span className="absolute" aria-hidden="true" />}
+      {gallery.length === 0 && <div className="col-span-2 flex items-center justify-center p-1 text-center text-[8px] font-semibold text-[hsl(var(--muted-foreground))]">Galerie vide</div>}
+      {gallery.length > 4 && <span className="absolute bottom-1 right-1 rounded bg-black/65 px-1.5 py-0.5 text-[8px] font-bold text-white">+{gallery.length - 4}</span>}
     </div>
   </div>;
 }
