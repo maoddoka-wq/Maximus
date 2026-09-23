@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BarChart3,
   Building2,
@@ -344,11 +345,14 @@ export default function ImmobilierModulePage({
 
       {isAuxiliaryFeatureId(currentFeatureId) && <AuxiliaryFeature featureId={currentFeatureId} properties={properties} listings={listings} leads={leads} />}
 
-      {formMode && <div className="immobilier-modal-backdrop fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-[hsl(var(--foreground)/.45)] p-3 backdrop-blur-sm sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
-        {formMode === 'create-property' || formMode === 'edit-property'
-          ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} files={propertyFiles} setFiles={setPropertyFiles} onSubmit={saveProperty} onClose={closeForm} />
-          : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} files={listingFiles} setFiles={setListingFiles} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
-      </div>}
+      {formMode && createPortal(
+        <div className="immobilier-modal-backdrop fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-[hsl(var(--foreground)/.45)] p-3 backdrop-blur-sm sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeForm(); }}>
+          {formMode === 'create-property' || formMode === 'edit-property'
+            ? <PropertyForm mode={formMode} form={propertyForm} setForm={setPropertyForm} files={propertyFiles} setFiles={setPropertyFiles} onSubmit={saveProperty} onClose={closeForm} />
+            : <ListingForm mode={formMode} form={listingForm} setForm={setListingForm} files={listingFiles} setFiles={setListingFiles} properties={properties} onSubmit={saveListing} onClose={closeForm} />}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

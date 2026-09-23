@@ -1,10 +1,10 @@
 ---
-name: Fenêtre Immobilier
-description: Règle d’affichage dédiée aux fenêtres Ajouter/Modifier du module Immobilier.
+name: Fenêtres Immobilier et e-commerce
+description: Règle d’affichage dédiée aux fenêtres de saisie de ces deux modules.
 ---
 
-Les fenêtres Ajouter/Modifier du module Immobilier utilisent un overlay dédié qui couvre entièrement l’application. Le formulaire s’ouvre en haut, tandis que le menu et la page sous-jacente restent masqués. Le contenu du formulaire défile si nécessaire.
+Les fenêtres de saisie des modules Immobilier et e-commerce utilisent un overlay dédié rendu au niveau du document. Le formulaire s’ouvre en haut, tandis que le menu et la page sous-jacente restent masqués. Le contenu du formulaire défile si nécessaire.
 
-**Why:** L’overlay Immobilier ne partage pas la structure des autres modales : appliquer une règle générique ne modifiait donc pas son rendu réel.
+**Why:** Ces modules sont rendus dans la zone de contenu défilante ; un overlay local pouvait rester sous le menu ou dans le mauvais contexte d’empilement, contrairement à Stock.
 
-**How to apply:** Modifier le conteneur `immobilier-modal-backdrop` et son panneau enfant, sans changer le comportement global des autres modules.
+**How to apply:** Porter les overlays dédiés au document et conserver leur z-index, leur position haute et leur défilement interne sans changer le comportement global des autres modules.
