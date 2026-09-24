@@ -14,18 +14,18 @@
 }
 
 :root {
-  --slide-primary: #162742;
-  --slide-accent: #d8ad66;
-  --slide-bg: #0b1424;
-  --slide-text: #f5f0e7;
-  --slide-muted: #a6b4c4;
-  --slide-surface: #122138;
-  --slide-surface-strong: #1b2f4a;
-  --slide-teal: #76b8b0;
-  --slide-line: rgba(216, 173, 102, 0.28);
-  --font-display-family: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+  --slide-primary: #19334a;
+  --slide-accent: #b87942;
+  --slide-bg: #f4f0e8;
+  --slide-text: #1d2933;
+  --slide-muted: #586873;
+  --slide-surface: #fffdf8;
+  --slide-surface-strong: #e9e1d4;
+  --slide-teal: #3c756b;
+  --slide-line: rgba(25, 51, 74, 0.16);
+  --font-display-family: 'DM Serif Display', Georgia, serif;
   --font-body-family: 'Manrope', 'Segoe UI', sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -56,8 +56,8 @@ body {
 
 .deck-grid {
   background-image:
-    linear-gradient(rgba(166, 180, 196, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(166, 180, 196, 0.055) 1px, transparent 1px);
+    linear-gradient(rgba(25, 51, 74, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(25, 51, 74, 0.045) 1px, transparent 1px);
   background-size: 5vw 5vw;
 }
 

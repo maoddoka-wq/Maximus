@@ -1,49 +1,26 @@
 export default function NSGStock() {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-bg font-body text-text">
-      <div className="absolute left-[8vw] top-[9vh] text-[1.5vw] font-semibold uppercase tracking-[0.2em] text-accent">
-        05 — MODULE À CONFIRMER
-      </div>
+      <div className="absolute left-[8vw] top-[7vh] text-[1.5vw] font-bold uppercase tracking-[0.16em] text-accent">08 — GESTION DE STOCK · 1/3</div>
       <div className="relative flex h-full w-full flex-col px-[8vw] pt-[15vh] pb-[7vh]">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-[1.5vw] font-semibold uppercase tracking-[0.18em] text-accent">02 / GESTION DE STOCK</p>
-            <h2 className="mt-[1vh] font-display text-[3.8vw] font-semibold leading-[1.02] tracking-[-0.055em]">
-              Suivre les articles et les mouvements
-            </h2>
+        <p className="text-[1.6vw] font-bold uppercase tracking-[0.16em] text-accent">MODULE À CONFIRMER</p>
+        <h2 className="mt-[1.2vh] max-w-[76vw] font-display text-[4vw] font-semibold leading-[1.02]">Suivre les articles physiques détenus par NSG</h2>
+        <p className="mt-[1.7vh] max-w-[72vw] text-[2.05vw] leading-[1.32] text-muted">La pertinence dépend de l’existence de fournitures, d’équipements ou de marchandises que NSG veut compter et contrôler.</p>
+        <div className="mt-[4vh] grid flex-1 grid-cols-[1.05fr_0.95fr] gap-[3vw]">
+          <div className="flex flex-col justify-center border-y border-primary/15 py-[2vh]">
+            <h3 className="font-display text-[2.8vw] font-semibold">Exemples à valider</h3>
+            <p className="mt-[1.8vh] text-[2.05vw] leading-[1.45] text-muted">Fournitures et consommables</p>
+            <p className="text-[2.05vw] leading-[1.45] text-muted">Matériel et équipements d’activité</p>
+            <p className="text-[2.05vw] leading-[1.45] text-muted">Emballages ou articles de manutention</p>
+            <p className="text-[2.05vw] leading-[1.45] text-muted">Produits agricoles réellement stockés</p>
           </div>
-          <p className="font-display text-[7vw] font-semibold leading-none tracking-[-0.08em] text-accent/90">02</p>
-        </div>
-        <div className="mt-[2vh] flex items-center gap-[1vw] border border-accent/35 bg-accent/10 px-[1.6vw] py-[1.3vh]">
-          <span className="text-[1.5vw] font-semibold uppercase tracking-[0.15em] text-accent">À valider avec NSG</span>
-          <span className="text-[1.8vw] text-muted">Le module est utile si l’entreprise tient des stocks physiques à suivre.</span>
-        </div>
-        <div className="mt-[3vh] grid flex-1 grid-cols-2 gap-[1.2vw]">
-          <div className="border border-white/10 bg-surface/80 p-[1.7vw]">
-            <h3 className="font-display text-[2.35vw] font-semibold">Articles possibles</h3>
-            <ul className="mt-[1.4vh] space-y-[0.8vh] text-[1.85vw] leading-[1.23] text-muted">
-              <li>Consommables et fournitures</li>
-              <li>Équipements ou matériel d’activité</li>
-              <li>Emballages et articles de manutention</li>
-              <li>Produits agricoles, si NSG les stocke</li>
-            </ul>
-          </div>
-          <div className="border border-white/10 bg-surface/80 p-[1.7vw]">
-            <h3 className="font-display text-[2.35vw] font-semibold">Opérations disponibles</h3>
-            <ul className="mt-[1.4vh] space-y-[0.8vh] text-[1.85vw] leading-[1.23] text-muted">
-              <li>Fiches articles et références</li>
-              <li>Entrées, sorties et demandes</li>
-              <li>Inventaires et rapports</li>
-              <li>Alertes liées aux seuils de stock</li>
-            </ul>
+          <div className="flex flex-col justify-center bg-primary px-[2.2vw] py-[3vh] text-white">
+            <p className="text-[1.5vw] font-bold uppercase tracking-[0.15em] text-[#edc894]">QUESTION DE DÉCISION</p>
+            <p className="mt-[2vh] font-display text-[3vw] leading-[1.16]">Quels articles NSG doit-elle compter, dans quels lieux, et avec quels responsables ?</p>
+            <p className="mt-[2vh] text-[1.8vw] leading-[1.35] text-white/80">Sans stock physique à gérer, ne pas activer ce périmètre par défaut.</p>
           </div>
         </div>
-        <p className="pt-[1.5vh] text-[1.55vw] leading-[1.2] text-muted">
-          Ces exemples sont à confirmer ; le module porte sur les stocks d’articles, pas sur les dossiers douaniers ou de transit.
-        </p>
-        <div className="flex justify-end pt-[1vh] text-[1.4vw] uppercase tracking-[0.16em] text-muted">
-          <span>05 / 12</span>
-        </div>
+        <div className="flex justify-end pt-[1.5vh] text-[1.5vw] text-muted"><span>08 / 25</span></div>
       </div>
     </div>
   );
