@@ -160,7 +160,9 @@ if (-not $SkipBuild) {
     Write-Host "`n==> Construction du frontend MAXIMUS"
     Push-Location $WorkspaceDir
     try {
-        Invoke-CommandChecked $corepack @("pnpm", "install", "--frozen-lockfile")
+        # Vite is a devDependency, so explicitly keep workspace build tools even
+        # when the Windows host inherits NODE_ENV=production or production=true.
+        Invoke-CommandChecked $corepack @("pnpm", "install", "--frozen-lockfile", "--prod=false")
         $env:PORT = "10000"
         $env:BASE_PATH = "/"
         $env:NODE_ENV = "production"

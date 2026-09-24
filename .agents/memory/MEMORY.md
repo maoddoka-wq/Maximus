@@ -80,6 +80,7 @@
 - [Installations isolées](isolated-installations.md) — le mode central reste le défaut ; une installation dédiée est bornée par une entreprise configurée côté serveur et ne crée jamais d’admin global.
 - [Cache Composer Windows](composer-windows-cache.md) — si un fichier Laravel manque malgré Composer, vider le cache Composer puis réinstaller le paquet framework.
 - [Chemin Vite sous Windows](windows-vite-base-path.md) — construire depuis PowerShell natif pour éviter que Git Bash transforme BASE_PATH=/ en chemin Program Files/Git.
+- [Dépendances du build Windows](windows-vite-update-dependencies.md) — garder les outils dev comme Vite installés même si l’environnement hérite du mode production.
 - [Version des installations dédiées](dedicated-installation-versioning.md) — premier enrôlement à commit identique ; échanges ultérieurs bornés par identité et protocole compatible.
 - [Chemins PowerShell](powershell-script-root.md) — résoudre le dossier du script après le bloc param, car PSScriptRoot peut être vide pendant l’évaluation Windows.
 - [DNS Render depuis PHP Windows](windows-php-render-dns.md) — PHP cURL peut expirer sur la résolution Render alors que curl.exe fonctionne ; préférer IPv4 et réessayer les connexions.
