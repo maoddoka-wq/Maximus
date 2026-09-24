@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/maximus-nsg-presentation/"
+title = "MAXIMUS pour NSG — Présentation"
+description = "Présentation professionnelle de MAXIMUS pour Némadi Services Group, centrée sur les modules actuellement disponibles : gestion commerciale, stock, organisation, présences, paie et Transport dans son périmètre Taxi."
+version = "1.0.0"
+id = "artifacts/maximus-nsg-presentation"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-nsg-presentation/" ]
+localPort = 23301
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-nsg-presentation run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/maximus-nsg-presentation", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/maximus-nsg-presentation/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23301"
+BASE_PATH = "/maximus-nsg-presentation/"
