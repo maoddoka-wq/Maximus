@@ -2,73 +2,97 @@
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870001",
     "position": 1,
-    "filepath": "src/pages/slides/Cover.tsx",
-    "title": "MAXIMUS",
-    "description": "Présentation générale de la plateforme MAXIMUS ERP.",
+    "filepath": "src/pages/slides/NSGCover.tsx",
+    "title": "MAXIMUS pour NSG",
+    "description": "Proposition détaillée de modules MAXIMUS adaptés à Némadi Services Group.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870002",
     "position": 2,
-    "filepath": "src/pages/slides/Overview.tsx",
-    "title": "MAXIMUS en bref",
-    "description": "Présentation de l’approche modulaire et de la gestion des accès.",
+    "filepath": "src/pages/slides/NSGProfile.tsx",
+    "title": "Activités de NSG",
+    "description": "Synthèse du profil d’activité fourni pour Némadi Services Group.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870003",
     "position": 3,
-    "filepath": "src/pages/slides/Catalog.tsx",
-    "title": "Modules disponibles",
-    "description": "Vue d’ensemble des six modules MAXIMUS présentés.",
+    "filepath": "src/pages/slides/NSGRecommendation.tsx",
+    "title": "Modules recommandés pour NSG",
+    "description": "Modules prioritaires, conditionnels et optionnels pour l’entreprise.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870004",
     "position": 4,
-    "filepath": "src/pages/slides/Commerce.tsx",
+    "filepath": "src/pages/slides/NSGCommercial.tsx",
     "title": "Gestion commerciale",
-    "description": "Fonctions commerciales déjà disponibles dans MAXIMUS.",
+    "description": "Clients, devis, ventes, factures et suivi commercial pour NSG.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870005",
     "position": 5,
-    "filepath": "src/pages/slides/Ecommerce.tsx",
-    "title": "E-commerce",
-    "description": "Boutique en ligne, catalogue public et commandes clients.",
+    "filepath": "src/pages/slides/NSGStock.tsx",
+    "title": "Gestion de stock",
+    "description": "Usage du stock pour les articles et marchandises éventuellement suivis par NSG.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870006",
     "position": 6,
-    "filepath": "src/pages/slides/Stock.tsx",
-    "title": "Gestion de stock",
-    "description": "Articles, mouvements, inventaires et seuils de stock.",
+    "filepath": "src/pages/slides/NSGOrganization.tsx",
+    "title": "Organisation des accès",
+    "description": "Exemple de répartition des rôles et des responsabilités dans MAXIMUS.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870007",
     "position": 7,
-    "filepath": "src/pages/slides/RealEstate.tsx",
-    "title": "Gestion immobilière",
-    "description": "Biens, annonces, prospects et visites immobilières.",
+    "filepath": "src/pages/slides/NSGPresence.tsx",
+    "title": "Suivi des présences",
+    "description": "Pointage, horaires, absences et suivi quotidien des équipes.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870008",
     "position": 8,
-    "filepath": "src/pages/slides/Presence.tsx",
-    "title": "Présences",
-    "description": "Pointage, absences, horaires et suivi quotidien des équipes.",
+    "filepath": "src/pages/slides/NSGPayroll.tsx",
+    "title": "Gestion de la paie",
+    "description": "Bénéficiaires, préparation, validation et suivi des opérations de paie.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870009",
     "position": 9,
-    "filepath": "src/pages/slides/Payroll.tsx",
-    "title": "Paie",
-    "description": "Bénéficiaires, préparation et suivi des opérations de paie.",
+    "filepath": "src/pages/slides/NSGEcommerce.tsx",
+    "title": "Option e-commerce",
+    "description": "Vitrine et commandes en ligne, uniquement si la vente directe est retenue.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870010",
+    "position": 10,
+    "filepath": "src/pages/slides/NSGDemoFlow.tsx",
+    "title": "Exemple de parcours commercial",
+    "description": "Parcours de démonstration proposé à partir d’opérations test.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870011",
+    "position": 11,
+    "filepath": "src/pages/slides/NSGScope.tsx",
+    "title": "Périmètre fonctionnel",
+    "description": "Capacités MAXIMUS couvertes et limites à ne pas confondre avec un outil spécialisé.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870012",
+    "position": 12,
+    "filepath": "src/pages/slides/NSGRollout.tsx",
+    "title": "Démarrage recommandé",
+    "description": "Étapes de cadrage, configuration et validation du périmètre pour NSG.",
     "speakerNotes": ""
   }
 ]
