@@ -81,6 +81,7 @@
     <li>Checklist de mise en service</li>
   </ol>
   <div class="note"><b>Résumé :</b> l’entreprise est créée, validée et équipée depuis MAXIMUS principal. Le VPS dédié s’enrôle avec un fichier JSON contenant un secret conservé jusqu’à révocation, récupère la configuration autorisée et se resynchronise ensuite par HTTPS. Le compte local créé est <code>company_admin</code> ; aucun <code>maximus_admin</code> global n’est provisionné.</div>
+  <div class="danger"><b>Compatibilité non universelle :</b> les installateurs fournis ciblent Debian/Ubuntu avec Nginx et PHP-FPM 8.2, ou Windows Server 2019+ 64 bits avec IIS et PHP 8.2 NTS. Windows 10/11, les autres distributions, Apache, l’hébergement mutualisé et les conteneurs ne sont pas couverts par ces scripts. Les scripts LAN ne rendent pas une instance accessible publiquement sur Internet. Un serveur hors de cette matrice exige une adaptation et des tests dédiés avant mise en service.</div>
 
   <h2>1. Règle de lecture : qui fait quoi et quand</h2>
   <div class="danger"><b>Ne pas mélanger les deux serveurs.</b> Les actions marquées <b>MAXIMUS PRINCIPAL</b> se font dans l’interface et la base du MAXIMUS central. Les actions marquées <b>SERVEUR DÉDIÉ</b> se font dans le terminal du VPS de l’entreprise. Une commande destinée au serveur dédié ne doit jamais être exécutée dans le terminal du serveur central, et inversement.</div>
@@ -162,10 +163,18 @@
   <p>Le pare-feu du VPS doit donc autoriser les connexions HTTPS sortantes vers le domaine central. Le pare-feu central doit autoriser les connexions HTTPS entrantes des administrateurs et des utilisateurs, mais il n’a pas besoin d’ouvrir un port PostgreSQL au VPS.</p>
 
   <h2>5. Prérequis serveur</h2>
+  <h3>5.1 Plates-formes prises en charge par les installateurs</h3>
   <table>
-    <tr><th>Prérequis</th><th>Vérification</th><th>Utilisation</th></tr>
-    <tr><td>Linux</td><td>Utilisateur de service et permissions séparées</td><td>Exécution reproductible et réduction des privilèges.</td></tr>
-    <tr><td>PHP 8.2+</td><td><code>php -v</code></td><td>Laravel, migrations et serveur HTTP de test.</td></tr>
+    <tr><th>Cible</th><th>Configuration requise</th><th>Limite connue</th></tr>
+    <tr><td>Debian ou Ubuntu</td><td>Nginx, PHP-FPM 8.2, PHP CLI, PostgreSQL, Composer, Node.js/Corepack, curl et OpenSSL déjà installés.</td><td><code>install-maximus-lan-linux.sh</code> vérifie Debian/Ubuntu et les chemins de PHP-FPM 8.2. Il configure le service web; il n’installe pas les paquets.</td></tr>
+    <tr><td>Windows Server 2019 ou plus récent, 64 bits</td><td>IIS avec CGI et URL Rewrite, PHP 8.2 NTS, extensions PDO PostgreSQL/mbstring/fileinfo/OpenSSL, Composer, Node.js/Corepack et PostgreSQL déjà installés.</td><td><code>install-maximus-lan-windows-iis.ps1</code> refuse les éditions Windows client et ne télécharge ni n’installe les composants.</td></tr>
+    <tr><td>Autres serveurs</td><td>À définir après examen du système, du serveur web et du runtime PHP.</td><td>Non validés par les scripts actuels : ne pas lancer l’installation en production sans adaptation et essais préalables.</td></tr>
+  </table>
+  <div class="warning"><b>Avant de déclarer le serveur prêt :</b> exécuter l’installation sur la machine cible, vérifier la santé, l’identité de l’entreprise, la connexion administrateur et la synchronisation, puis tester la restauration d’une sauvegarde. Le contrôle de capacité ne remplace pas un test de charge réel.</div>
+  <table>
+    <tr><th>Prérequis applicatif</th><th>Vérification</th><th>Utilisation</th></tr>
+    <tr><td>Compte de service non privilégié</td><td>Utilisateur d’application et permissions séparées</td><td>Exécution reproductible et réduction des privilèges.</td></tr>
+    <tr><td>PHP CLI 8.2 compatible</td><td><code>php -v</code></td><td>Laravel, migrations et serveur HTTP de test.</td></tr>
     <tr><td>Extensions PHP</td><td>PDO PostgreSQL, mbstring, XML, curl, zip</td><td>Connexion DB, framework, HTTP et dépendances Composer.</td></tr>
     <tr><td>Composer</td><td><code>composer --version</code></td><td>Dépendances Laravel.</td></tr>
     <tr><td>Node.js 24 + Corepack</td><td><code>node --version</code>, <code>corepack --version</code></td><td>Construction React/Vite.</td></tr>
@@ -492,6 +501,9 @@ php artisan migrate --force --no-interaction</pre>
 
   <h2>16. Checklist de mise en service</h2>
   <ul class="checklist">
+    <li>La version exacte du système correspond à la matrice prise en charge de la section 5.1.</li>
+    <li>L’installation a été exécutée sur le serveur cible; une réussite sur le PC de test ou dans l’environnement de développement ne suffit pas.</li>
+    <li>Le nombre de workers et les limites PostgreSQL ont été choisis après mesure de la mémoire, des connexions et de la charge attendue.</li>
     <li>Le serveur est dédié à l’entreprise ou séparé par une frontière réseau claire.</li>
     <li><code>MAXIMUS_DEPLOYMENT_MODE</code> vaut <code>dedicated</code> ou <code>on_premise</code>.</li>
     <li>Le fichier bootstrap a été généré par MAXIMUS principal et supprimé ou protégé après installation.</li>
@@ -512,6 +524,7 @@ php artisan migrate --force --no-interaction</pre>
     <li>Les boutiques, images et parcours Transport d’autres entreprises sont refusés.</li>
     <li>Une modification de module ou de domaine dans MAXIMUS est visible après synchronisation.</li>
     <li>Une sauvegarde PostgreSQL et une restauration de test ont été réalisées.</li>
+    <li>Le scheduler a fonctionné après redémarrage du serveur; sous Windows, son compte et son fonctionnement sans session utilisateur ont été vérifiés.</li>
     <li>La procédure de mise à jour et de retour arrière est connue de l’exploitant.</li>
   </ul>
   <div class="success"><b>Installation dédiée conforme :</b> l’entreprise configurée peut administrer ses modules et ses données ; les autres tenants, l’administration globale et les ressources publiques étrangères restent inaccessibles côté serveur.</div>

@@ -201,14 +201,14 @@ content_type = "application/pdf"
 id = "qaMEIydqJo_4aPZz1yCSQ"
 uri = "file://docs/guides/maximus-dedicated-installation-guide.pdf"
 type = "pdf"
-title = "MAXIMUS — Manuel opératoire complet : principal et serveur dédié"
-description = "Version détaillée en 19 pages : responsabilités séparées entre MAXIMUS principal et le VPS dédié, chronologie, prérequis, transfert sécurisé du bootstrap, commandes exactes, systemd, Nginx, cron, synchronisation, révocation, sauvegardes, mises à jour, validation et dépannage."
+title = "Guide MAXIMUS — Installation dédiée"
+description = "Guide PDF à jour : plateformes prises en charge, prérequis et checklist de mise en service."
 logical_id = "bc327e84-9b93-444e-be32-7d7c364d1503"
-content_hash = "sha256:169a52169371bf815fd88df7008eaacd83d957f9725df2e334921c2e8f1796ab"
-size = 422233
-mtime_ms = 1789574401847
-storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bc327e84-9b93-444e-be32-7d7c364d1503/68f4cd2c-aa7f-407d-be8c-16400ad2767d"
-storage_version_token = "1789574408688017"
+content_hash = "sha256:b32b99c020df225ca95335e2129e978da8e8aa66c4b9a011043224c8080dd398"
+size = 425603
+mtime_ms = 1790260624363
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bc327e84-9b93-444e-be32-7d7c364d1503/c8755ae5-a256-48de-908e-fdda31882b33"
+storage_version_token = "1790260636396466"
 content_type = "application/pdf"
 
 [[outputs]]
