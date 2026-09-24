@@ -1,5 +1,17 @@
 <?php
 
+use App\Http\Middleware\AuthenticateDiagnosticToken;
+use App\Http\Middleware\AuthenticateInstallationToken;
+use App\Http\Middleware\AuthenticateMaximus;
+use App\Http\Middleware\EnsureModuleEnabled;
+use App\Http\Middleware\NoStoreApiResponses;
+use App\Http\Middleware\RequireCentralInstallation;
+use App\Http\Middleware\RequireInstallationHost;
+use App\Http\Middleware\RequireInstallationPublicCompany;
+use App\Http\Middleware\ResolveCompanyContext;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\VerifyCookieRequestOrigin;
+use App\Support\MaximusAuth;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,25 +24,26 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
 
         $middleware->appendToGroup('api', [
-            \App\Http\Middleware\NoStoreApiResponses::class,
-            \App\Http\Middleware\RequireInstallationHost::class,
+            NoStoreApiResponses::class,
+            RequireInstallationHost::class,
+            VerifyCookieRequestOrigin::class,
         ]);
 
         $middleware->encryptCookies([
-            \App\Support\MaximusAuth::COOKIE,
+            MaximusAuth::COOKIE,
         ]);
 
         $middleware->alias([
-            'maximus.auth' => \App\Http\Middleware\AuthenticateMaximus::class,
-            'maximus.diagnostic' => \App\Http\Middleware\AuthenticateDiagnosticToken::class,
-            'maximus.company' => \App\Http\Middleware\ResolveCompanyContext::class,
-            'maximus.module' => \App\Http\Middleware\EnsureModuleEnabled::class,
-            'maximus.central' => \App\Http\Middleware\RequireCentralInstallation::class,
-             'maximus.installation.token' => \App\Http\Middleware\AuthenticateInstallationToken::class,
-             'maximus.installation.public' => \App\Http\Middleware\RequireInstallationPublicCompany::class,
+            'maximus.auth' => AuthenticateMaximus::class,
+            'maximus.diagnostic' => AuthenticateDiagnosticToken::class,
+            'maximus.company' => ResolveCompanyContext::class,
+            'maximus.module' => EnsureModuleEnabled::class,
+            'maximus.central' => RequireCentralInstallation::class,
+            'maximus.installation.token' => AuthenticateInstallationToken::class,
+            'maximus.installation.public' => RequireInstallationPublicCompany::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

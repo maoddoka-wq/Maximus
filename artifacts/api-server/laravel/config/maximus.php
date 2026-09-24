@@ -21,4 +21,8 @@ return [
     'installation_token' => env('MAXIMUS_INSTALLATION_TOKEN'),
     'application_version' => env('MAXIMUS_APPLICATION_VERSION', env('RENDER_GIT_COMMIT', 'unknown')),
     'expected_application_version' => env('MAXIMUS_EXPECTED_APPLICATION_VERSION'),
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MAXIMUS_ALLOWED_ORIGINS', '')),
+    ))),
 ];
