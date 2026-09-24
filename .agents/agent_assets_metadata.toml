@@ -350,3 +350,17 @@ mtime_ms = 1790283887892
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bbdbbf12-005f-4114-9505-1cad629a167e/06b65d04-8471-4709-8cb4-64a46c410c60"
 storage_version_token = "1790283888572030"
 content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "j-7EPTJFA3Gqx6rHC8QfE"
+uri = "file://.local/outputs/MAXIMUS-ERP---Presentation-generale.pdf"
+type = "pdf"
+title = "MAXIMUS ERP — Présentation générale (PDF)"
+description = "Version PDF de la présentation générale en 30 diapositives."
+logical_id = "ec30d21f-f0db-4d95-8266-8ac9f84895a9"
+content_hash = "sha256:3870bb835fe847e2d377141b833f27e754ed03cb1ab6616193b43dbd68db6776"
+size = 740662
+mtime_ms = 1790285011916
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/ec30d21f-f0db-4d95-8266-8ac9f84895a9/d6f5f966-16cc-4283-8f5c-4b2f751c3854"
+storage_version_token = "1790285012488564"
+content_type = "application/pdf"
