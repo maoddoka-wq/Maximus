@@ -294,3 +294,17 @@ mtime_ms = 1790108198064
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/489adac3-6ddd-49fa-8221-a89302e33303/c6595920-78d3-4462-b08e-a4920ac81bcc"
 storage_version_token = "1790108206734898"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "QtMKL7NjNcmn9h8WrcEKs"
+uri = "file://.local/outputs/MAXIMUS-pour-NSG.pptx"
+type = "slides"
+title = "MAXIMUS pour NSG (PPTX)"
+description = "Présentation PowerPoint des modules MAXIMUS actuellement disponibles pour Némadi Services Group."
+logical_id = "4549ea61-d66a-4b62-aa72-9685a92c8a8b"
+content_hash = "sha256:f7bca8805cf31c4c2d728af8eca7f62b7cb81375b8be669e91ba8100540747e5"
+size = 6498949
+mtime_ms = 1790272547260
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/4549ea61-d66a-4b62-aa72-9685a92c8a8b/526ff683-7684-4323-8e31-bd9f43fbfab6"
+storage_version_token = "1790272547975111"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"

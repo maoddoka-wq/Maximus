@@ -93,3 +93,4 @@
 - [Fenêtres Immobilier et e-commerce](module-modal-layout.md) — leurs overlays sont portés au niveau du document pour flotter au-dessus du menu et de toute la page.
 - [Surfaces de tableaux](ui-surface-theme.md) — les tableaux doivent utiliser des fonds opaques `muted`/`secondary`, car les cartes et transparences rendent le blanc visuellement dominant.
 - [Origine des mutations avec cookie](cookie-request-origin.md) — exiger Origin/Referer pour les sessions navigateur, sans bloquer les appels machine Bearer dépourvus de cookie.
+- [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.

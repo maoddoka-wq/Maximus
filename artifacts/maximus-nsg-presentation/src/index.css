@@ -6,20 +6,26 @@
   --color-bg: var(--slide-bg);
   --color-text: var(--slide-text);
   --color-muted: var(--slide-muted);
+  --color-surface: var(--slide-surface);
+  --color-surface-strong: var(--slide-surface-strong);
+  --color-teal: var(--slide-teal);
   --font-display: var(--font-display-family);
   --font-body: var(--font-body-family);
 }
 
 :root {
-  /* Replace these with brand colors */
-  --slide-primary: #4f46e5;
-  --slide-accent: #06b6d4;
-  --slide-bg: #f8fafc;
-  --slide-text: #0f172a;
-  --slide-muted: #64748b;
-  --font-display-family: 'Inter', system-ui, sans-serif;
-  --font-body-family: 'Inter', system-ui, sans-serif;
-  color-scheme: light;
+  --slide-primary: #162742;
+  --slide-accent: #d8ad66;
+  --slide-bg: #0b1424;
+  --slide-text: #f5f0e7;
+  --slide-muted: #a6b4c4;
+  --slide-surface: #122138;
+  --slide-surface-strong: #1b2f4a;
+  --slide-teal: #76b8b0;
+  --slide-line: rgba(216, 173, 102, 0.28);
+  --font-display-family: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+  --font-body-family: 'Manrope', 'Segoe UI', sans-serif;
+  color-scheme: dark;
 }
 
 html,
@@ -33,6 +39,7 @@ body,
 body {
   background: var(--slide-bg);
   color: var(--slide-text);
+  font-family: var(--font-body-family);
 }
 
 .slide {
@@ -45,4 +52,16 @@ body {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.deck-grid {
+  background-image:
+    linear-gradient(rgba(166, 180, 196, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(166, 180, 196, 0.055) 1px, transparent 1px);
+  background-size: 5vw 5vw;
+}
+
+.deck-rule {
+  height: 0.15vw;
+  background: var(--slide-accent);
 }
