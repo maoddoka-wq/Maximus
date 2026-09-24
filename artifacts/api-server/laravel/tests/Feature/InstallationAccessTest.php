@@ -356,6 +356,30 @@ class InstallationAccessTest extends TestCase
             ->assertJsonPath('company.primaryColor', '#F2B705');
     }
 
+    public function test_sync_configuration_includes_only_the_company_workspace_feature_visibility(): void
+    {
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'companies' => [
+                    ['id' => 'access-company', 'hiddenWorkspaceFeatures' => ['organisation', 'guide-configuration']],
+                    ['id' => 'other-company', 'hiddenWorkspaceFeatures' => ['controle']],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer token-install-a')
+            ->getJson('/api/installation-sync/configuration')
+            ->assertOk()
+            ->assertJsonPath('company.hiddenWorkspaceFeatures.0', 'organisation')
+            ->assertJsonPath('company.hiddenWorkspaceFeatures.1', 'guide-configuration')
+            ->assertJsonMissingPath('companies');
+    }
+
     public function test_sync_configuration_includes_an_active_module_added_after_registration(): void
     {
         Company::query()->whereKey('access-company')->update(['requested_modules' => []]);

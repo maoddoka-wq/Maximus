@@ -134,7 +134,7 @@ class CompanyRequestTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('installation.companyId', $companyId)
             ->assertJsonPath('installation.mode', 'dedicated')
-            ->assertJsonPath('bootstrap.syncProtocolVersion', 2)
+            ->assertJsonPath('bootstrap.syncProtocolVersion', 3)
             ->assertJsonPath('bootstrap.centralUrl', 'https://maximus-erp.onrender.com');
 
         $bootstrapToken = (string) $response->json('bootstrap.token');

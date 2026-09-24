@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
 use App\Support\CompanyPaymentAccess;
+use App\Support\CompanyWorkspaceVisibility;
 
 final class InstallationController extends Controller
 {
@@ -124,6 +125,7 @@ final class InstallationController extends Controller
         ]);
         $moduleIds = $this->synchronizedModuleIds($company);
         $paymentAccess = CompanyPaymentAccess::payload((string) $company->id);
+        $hiddenWorkspaceFeatures = $this->hiddenWorkspaceFeatures((string) $company->id);
 
         return response()->json([
             'configurationVersion' => (int) $installation->configuration_version,
@@ -147,6 +149,7 @@ final class InstallationController extends Controller
                 'primaryColor' => $company->primary_color ?: '#F2B705',
                 'accentColor' => $company->accent_color ?: ($company->primary_color ?: '#F2B705'),
                 'sidebarColor' => $company->sidebar_color ?: '#161D27',
+                'hiddenWorkspaceFeatures' => $hiddenWorkspaceFeatures,
             ],
             'modules' => [
                 'ids' => $moduleIds,
@@ -159,6 +162,28 @@ final class InstallationController extends Controller
             'paymentAccess' => $paymentAccess,
             'erpAccess' => $this->erpAccess((string) $installation->id),
         ]);
+    }
+
+    /** @return list<string> */
+    private function hiddenWorkspaceFeatures(string $companyId): array
+    {
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $storedPayload = $row?->payload;
+        $state = is_string($storedPayload)
+            ? json_decode($storedPayload, true)
+            : ($storedPayload ?? []);
+
+        if (! is_array($state) || ! is_array($state['companies'] ?? null)) {
+            return [];
+        }
+
+        foreach ($state['companies'] as $companyState) {
+            if (is_array($companyState) && (string) ($companyState['id'] ?? '') === $companyId) {
+                return CompanyWorkspaceVisibility::normalizeHidden($companyState['hiddenWorkspaceFeatures'] ?? []);
+            }
+        }
+
+        return [];
     }
 
     /** @return list<string> */

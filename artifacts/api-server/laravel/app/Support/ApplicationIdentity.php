@@ -4,7 +4,7 @@ namespace App\Support;
 
 final class ApplicationIdentity
 {
-    public const SYNC_PROTOCOL_VERSION = 2;
+    public const SYNC_PROTOCOL_VERSION = 3;
 
     public static function deployedVersion(): string
     {

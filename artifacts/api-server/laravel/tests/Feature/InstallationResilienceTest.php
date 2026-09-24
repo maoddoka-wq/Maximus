@@ -111,6 +111,52 @@ class InstallationResilienceTest extends TestCase
         ]);
     }
 
+    public function test_sync_applies_workspace_feature_visibility_without_replacing_other_state(): void
+    {
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'companies' => [
+                    ['id' => 'sync-company', 'name' => 'Sync Company', 'hiddenWorkspaceFeatures' => ['controle']],
+                    ['id' => 'other-company', 'hiddenWorkspaceFeatures' => ['guide-configuration']],
+                ],
+                'orgNodes' => [['id' => 'preserve-node']],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 4,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $payload = $this->payload();
+        $payload['company']['hiddenWorkspaceFeatures'] = ['organisation', 'guide-configuration'];
+
+        $sync = app(InstallationSyncService::class);
+        $sync->apply($payload, true);
+
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $state = json_decode((string) $row->payload, true, 512, JSON_THROW_ON_ERROR);
+        $companies = collect($state['companies'])->keyBy('id');
+        $this->assertSame(
+            ['organisation', 'guide-configuration'],
+            $companies->get('sync-company')['hiddenWorkspaceFeatures'],
+        );
+        $this->assertSame(['guide-configuration'], $companies->get('other-company')['hiddenWorkspaceFeatures']);
+        $this->assertSame([['id' => 'preserve-node']], $state['orgNodes']);
+        $this->assertSame(5, (int) $row->version);
+
+        $sync->apply($payload);
+        $this->assertSame(5, (int) DB::table('maximus_app_states')->where('scope', 'workspace')->value('version'));
+    }
+
+    public function test_sync_rejects_unknown_workspace_feature_visibility_ids(): void
+    {
+        $payload = $this->payload();
+        $payload['company']['hiddenWorkspaceFeatures'] = ['administration'];
+
+        $this->expectException(\InvalidArgumentException::class);
+        app(InstallationSyncService::class)->apply($payload, true);
+    }
+
     public function test_sync_imports_published_immobilier_dashboard_feature_before_validating_selection(): void
     {
         $payload = $this->payload();

@@ -204,7 +204,7 @@
   "companyId": "&lt;company-id&gt;",
   "mode": "dedicated",
   "applicationVersion": "&lt;commit-deploye&gt;",
-  "syncProtocolVersion": 2,
+  "syncProtocolVersion": 3,
   "token": "mxinstall_&lt;valeur-secrete&gt;"
 }</pre>
 <div class="warning"><strong>Le bootstrap est un secret d’enrôlement.</strong> Il doit être transmis par un canal protégé, ne pas être ajouté à Git, ne pas être copié dans un ticket public et ne pas être affiché dans les logs. Le script d’installation le recopie dans <code>.env</code> avec des permissions restreintes.</div>
@@ -260,7 +260,7 @@ Accept: application/json</pre>
 <pre>{
   "configurationVersion": 12,
   "applicationVersion": "&lt;commit-deploye&gt;",
-  "syncProtocolVersion": 2,
+  "syncProtocolVersion": 3,
   "installation": {
     "id": "installation-&lt;uuid&gt;",
     "companyId": "&lt;company-id&gt;",
@@ -278,7 +278,8 @@ Accept: application/json</pre>
     "profilePhoto": null,
     "primaryColor": "#F2B705",
     "accentColor": "#F2B705",
-    "sidebarColor": "#161D27"
+    "sidebarColor": "#161D27",
+    "hiddenWorkspaceFeatures": ["organisation", "guide-configuration"]
   },
   "modules": {
     "ids": ["commerce", "payroll"],
@@ -438,7 +439,7 @@ Content-Type: application/json
 <p>Deux notions sont distinctes :</p>
 <table>
   <tr><th>Version</th><th>Usage</th></tr>
-  <tr><td><code>syncProtocolVersion</code></td><td>Version du contrat de synchronisation. Elle vaut actuellement <code>2</code>. Un écart est bloquant.</td></tr>
+  <tr><td><code>syncProtocolVersion</code></td><td>Version du contrat de synchronisation. Elle vaut actuellement <code>3</code>. Un écart est bloquant.</td></tr>
   <tr><td><code>applicationVersion</code></td><td>Identifiant du code déployé au central, généralement le commit Git.</td></tr>
   <tr><td><code>MAXIMUS_BUILD_VERSION</code></td><td>Identifiant du package logiciel local.</td></tr>
   <tr><td><code>configurationVersion</code></td><td>Compteur de configuration d’installation côté central. Il est renvoyé et mémorisé localement.</td></tr>

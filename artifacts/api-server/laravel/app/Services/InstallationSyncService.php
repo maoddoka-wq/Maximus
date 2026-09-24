@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Company;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
+use App\Support\CompanyWorkspaceVisibility;
 use App\Support\InstallationContext;
 use App\Support\InstallationSyncState;
 use Illuminate\Http\Client\ConnectionException;
@@ -116,9 +117,13 @@ final class InstallationSyncService
             $paymentAccess = array_key_exists('paymentAccess', $payload)
                 ? $this->validatePaymentAccess($payload['paymentAccess'])
                 : null;
+            $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
+            $hiddenWorkspaceFeatures = array_key_exists('hiddenWorkspaceFeatures', $companyData)
+                ? CompanyWorkspaceVisibility::validateHidden($companyData['hiddenWorkspaceFeatures'])
+                : null;
             $access = array_key_exists('erpAccess', $payload)
                 ? $this->validateErpAccess($payload['erpAccess']) : InstallationSyncState::erpAccess();
-            $company = $this->applyValidated($payload, $paymentAccess);
+            $company = $this->applyValidated($payload, $paymentAccess, $hiddenWorkspaceFeatures);
             // Publish the entire access snapshot only after the database transaction succeeds.
             InstallationSyncState::record([
                 'lastSuccessAt' => now()->toIso8601String(), 'state' => 'synced', 'lastError' => null,
@@ -185,7 +190,11 @@ final class InstallationSyncService
         ];
     }
 
-    private function applyValidated(array $payload, ?array $paymentAccess = null): Company
+    private function applyValidated(
+        array $payload,
+        ?array $paymentAccess = null,
+        ?array $hiddenWorkspaceFeatures = null,
+    ): Company
     {
         $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
         $companyId = trim((string) ($companyData['id'] ?? ''));
@@ -209,7 +218,8 @@ final class InstallationSyncService
             $featureIds,
             $permissions,
             $payload,
-                $paymentAccess,
+            $paymentAccess,
+            $hiddenWorkspaceFeatures,
         ): Company {
             ModuleCatalog::importPublishedCatalog($catalog);
             ModuleCatalog::ensureCatalog();
@@ -345,10 +355,68 @@ final class InstallationSyncService
                 }
             }
 
+            if ($hiddenWorkspaceFeatures !== null) {
+                $this->applyWorkspaceFeatureVisibility($companyId, $hiddenWorkspaceFeatures);
+            }
+
             return $company->fresh();
         });
 
         return $company;
+    }
+
+    /** @param list<string> $hiddenWorkspaceFeatures */
+    private function applyWorkspaceFeatureVisibility(string $companyId, array $hiddenWorkspaceFeatures): void
+    {
+        if (! Schema::hasTable('maximus_app_states')) {
+            throw new RuntimeException('La table locale de configuration de l’espace entreprise est absente.');
+        }
+
+        $row = DB::table('maximus_app_states')
+            ->where('scope', 'workspace')
+            ->lockForUpdate()
+            ->first();
+        $storedPayload = $row?->payload;
+        $state = is_string($storedPayload)
+            ? json_decode($storedPayload, true, 512, JSON_THROW_ON_ERROR)
+            : ($storedPayload ?? []);
+        if (! is_array($state)) {
+            throw new RuntimeException('L’état local de l’espace entreprise est invalide.');
+        }
+
+        $companies = is_array($state['companies'] ?? null) ? $state['companies'] : [];
+        $found = false;
+        $changed = false;
+        foreach ($companies as $index => $companyState) {
+            if (is_array($companyState) && (string) ($companyState['id'] ?? '') === $companyId) {
+                $found = true;
+                if (CompanyWorkspaceVisibility::normalizeHidden($companyState['hiddenWorkspaceFeatures'] ?? [])
+                    !== $hiddenWorkspaceFeatures) {
+                    $companies[$index]['hiddenWorkspaceFeatures'] = $hiddenWorkspaceFeatures;
+                    $changed = true;
+                }
+            }
+        }
+        if (! $found && $hiddenWorkspaceFeatures !== []) {
+            $companies[] = ['id' => $companyId, 'hiddenWorkspaceFeatures' => $hiddenWorkspaceFeatures];
+            $changed = true;
+        }
+        if (! $changed) {
+            return;
+        }
+        $state['companies'] = array_values($companies);
+
+        $now = now();
+        DB::table('maximus_app_states')->updateOrInsert(
+            ['scope' => 'workspace'],
+            [
+                'company_id' => null,
+                'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'version' => ((int) ($row?->version ?? 0)) + 1,
+                'updated_at' => $now,
+                'created_at' => $row?->created_at ?? $now,
+            ],
+        );
     }
 
     public function heartbeat(): void

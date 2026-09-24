@@ -7,4 +7,4 @@ La visibilité des fonctionnalités transverses de l’espace entreprise est une
 
 **Why:** Ces fonctionnalités ne sont pas des modules métier et ne doivent pas être déduites des modules autorisés. Une entreprise peut avoir besoin de ses modules opérationnels sans exposer ses outils de coordination ou de paramétrage.
 
-**How to apply:** Modifier la configuration depuis la fiche administrative de l’entreprise, enregistrer la visibilité, puis conserver le même état pour tous les utilisateurs de cette entreprise.
+**How to apply:** La configuration centrale est la source de vérité. La synchronisation dédiée transmet uniquement `hiddenWorkspaceFeatures` à l’entreprise correspondante et met à jour l’état local sans remplacer le reste de l’app-state. Ne pas confondre ces réglages avec les comptes, rôles, employés ou unités d’organisation.
