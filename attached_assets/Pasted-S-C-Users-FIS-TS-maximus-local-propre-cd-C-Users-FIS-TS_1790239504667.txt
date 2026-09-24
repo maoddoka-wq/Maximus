@@ -1,0 +1,41 @@
+S C:\Users\FIS-TS\maximus-local-propre> cd C:\Users\FIS-TS\maximus-local-propre
+PS C:\Users\FIS-TS\maximus-local-propre> Copy-Item .\artifacts\api-server\laravel\public\robots.txt "$env:TEMP\robots.txt-local-backup"
+PS C:\Users\FIS-TS\maximus-local-propre> git restore --worktree -- .\artifacts\api-server\laravel\public\robots.txt
+PS C:\Users\FIS-TS\maximus-local-propre> git status --short --untracked-files=all
+?? artifacts/api-server/laravel/public/admin-logo.png
+?? artifacts/api-server/laravel/public/assets/commerce-module-B_hq25rx.js
+?? artifacts/api-server/laravel/public/assets/company-login-D0rHvxQj.js
+?? artifacts/api-server/laravel/public/assets/company-organization-B3YfKhPU.js
+?? artifacts/api-server/laravel/public/assets/company-setup-guide-D7JBx0Fu.js
+?? artifacts/api-server/laravel/public/assets/control-api-C5tbg4oK.js
+?? artifacts/api-server/laravel/public/assets/control-center-C5Eopgg2.js
+?? artifacts/api-server/laravel/public/assets/ecommerce-module-BeSyuGAr.js
+?? artifacts/api-server/laravel/public/assets/index-Bed7G6fu.js
+?? artifacts/api-server/laravel/public/assets/index-BjMkI3qS.css
+?? artifacts/api-server/laravel/public/assets/intelligent-onboarding-CthKei0h.js
+?? artifacts/api-server/laravel/public/assets/maximus-assistant-G8QLBtxd.js
+?? artifacts/api-server/laravel/public/assets/operational-modules-Dp-1VlmW.js
+?? artifacts/api-server/laravel/public/assets/payroll-module--1clyB57.js
+?? artifacts/api-server/laravel/public/assets/platform-settings-FdNmo-20.js
+?? artifacts/api-server/laravel/public/assets/presence-module-COazNIX-.js
+?? artifacts/api-server/laravel/public/assets/public-shop-lN_otY83.js
+?? artifacts/api-server/laravel/public/assets/qr-scanner-worker.min-D85Z9gVD.js
+?? artifacts/api-server/laravel/public/assets/query-tab-DtE_6SMv.js
+?? artifacts/api-server/laravel/public/assets/stock-module-B-Hg0f6H.js
+?? artifacts/api-server/laravel/public/assets/system-health-BgOJa0qw.js
+?? artifacts/api-server/laravel/public/assets/taxi-route-map-CIGW-MKW.css
+?? artifacts/api-server/laravel/public/assets/taxi-route-map-KWNsvWIW.js
+?? artifacts/api-server/laravel/public/assets/transport-module-C4MKz0aG.js
+?? artifacts/api-server/laravel/public/assets/vendor-icons-DV-kvZSb.js
+?? artifacts/api-server/laravel/public/assets/vendor-radix-DbFX9I2X.js
+?? artifacts/api-server/laravel/public/assets/vendor-react-clQjQM8u.js
+?? artifacts/api-server/laravel/public/assets/workspace-tabs-CUAiqsab.js
+?? artifacts/api-server/laravel/public/client-app/sw.js
+?? artifacts/api-server/laravel/public/family-lunch-hero.jpg
+?? artifacts/api-server/laravel/public/favicon.svg
+?? artifacts/api-server/laravel/public/index.html
+?? artifacts/api-server/laravel/public/manifest.webmanifest
+?? artifacts/api-server/laravel/public/maximus-mark.svg
+?? artifacts/api-server/laravel/public/taxi-car.svg
+?? artifacts/api-server/laravel/public/taxi-transport-hero.jpg
+PS C:\Users\FIS-TS\maximus-local-propre>
