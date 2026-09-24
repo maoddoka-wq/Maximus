@@ -3,80 +3,240 @@
     "id": "4f0b8a31-3d79-4f76-9a3b-2e6b5b2f1011",
     "position": 1,
     "filepath": "src/pages/slides/Slide1.tsx",
-    "title": "MAXIMUS ERP",
-    "description": "Présentation de préparation de MAXIMUS ERP.",
+    "title": "MAXIMUS ERP — Présentation générale",
+    "description": "Présentation générale de la plateforme modulaire MAXIMUS.",
     "speakerNotes": ""
   },
   {
     "id": "c20a0f24-ff1e-46f4-b2d4-50e1d8182c12",
     "position": 2,
     "filepath": "src/pages/slides/Slide2.tsx",
-    "title": "Le besoin : reprendre le contrôle de l’activité",
-    "description": "Les enjeux opérationnels auxquels MAXIMUS répond.",
+    "title": "Un socle commun, configuré selon chaque entreprise",
+    "description": "Une plateforme multi-entreprises et une configuration adaptée aux besoins.",
     "speakerNotes": ""
   },
   {
     "id": "f0a1d8bd-8e8e-41d1-a7d4-4ef6a2dd3313",
     "position": 3,
     "filepath": "src/pages/slides/Slide3.tsx",
-    "title": "La réponse MAXIMUS",
-    "description": "La proposition de valeur de la plateforme.",
+    "title": "Les sept modules disponibles",
+    "description": "Les modules standards présents dans le catalogue MAXIMUS.",
     "speakerNotes": ""
   },
   {
     "id": "7a4a8db8-4b20-4a11-9e07-6ad6a8c44214",
     "position": 4,
     "filepath": "src/pages/slides/Slide4.tsx",
-    "title": "Une organisation maîtrisée par entreprise",
-    "description": "Structure, rôles, permissions et traçabilité.",
+    "title": "Chaque entreprise choisit ses propres fonctionnalités",
+    "description": "Choix des modules, packs, fonctionnalités et droits.",
     "speakerNotes": ""
   },
   {
     "id": "9b8c2f1d-7a60-4d41-9f2f-0d7b5a6b5515",
     "position": 5,
     "filepath": "src/pages/slides/Slide5.tsx",
-    "title": "Les modules au cœur de l’activité",
-    "description": "Les modules opérationnels de MAXIMUS.",
+    "title": "Les bons écrans pour les bonnes responsabilités",
+    "description": "Structure, rôles, permissions et cloisonnement par entreprise.",
     "speakerNotes": ""
   },
   {
     "id": "d2f7a8c3-5b44-43cc-a28c-9e1f6b7d6616",
     "position": 6,
     "filepath": "src/pages/slides/Slide6.tsx",
-    "title": "Une expérience e-commerce complète",
-    "description": "Boutiques publiques, clients, produits et livraisons.",
+    "title": "De la demande client à la pièce commerciale",
+    "description": "Le parcours client, devis, vente et documents.",
     "speakerNotes": ""
   },
   {
     "id": "e3a6b9d4-6c55-44dd-b39d-af2a7c8e7717",
     "position": 7,
     "filepath": "src/pages/slides/Slide7.tsx",
-    "title": "Du paiement au règlement",
-    "description": "Paiements, stock, commissions et portefeuilles.",
+    "title": "Ventes, achats et suivi des encaissements",
+    "description": "Les opérations commerciales et d’approvisionnement.",
     "speakerNotes": ""
   },
   {
     "id": "b4c7d0e5-7d66-45ee-c4ae-b03b8d9f8818",
     "position": 8,
     "filepath": "src/pages/slides/Slide8.tsx",
-    "title": "MAXIMUS accompagne la décision",
-    "description": "Assistant MAXI et gouvernance du catalogue métier.",
+    "title": "Une gestion qui garde les responsabilités lisibles",
+    "description": "Les profils commerciaux et les règles à configurer.",
     "speakerNotes": ""
   },
   {
     "id": "a5d8e1f6-8e77-46ff-d5bf-c14c9e0a9919",
     "position": 9,
     "filepath": "src/pages/slides/Slide9.tsx",
-    "title": "Une base technique prête pour la production",
-    "description": "Architecture, données, fichiers et déploiement.",
+    "title": "Un référentiel clair avant de déplacer les articles",
+    "description": "Articles, références, seuils et utilisateurs du module Stock.",
     "speakerNotes": ""
   },
   {
     "id": "f6e9a2b7-9f88-4700-e6c0-d25d0fab1020",
     "position": 10,
     "filepath": "src/pages/slides/Slide10.tsx",
-    "title": "Préparer la démonstration",
-    "description": "Parcours de démonstration et conclusion.",
+    "title": "Tracer chaque entrée, sortie et demande",
+    "description": "Les mouvements et les rôles du module Stock.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000011",
+    "position": 11,
+    "filepath": "src/pages/slides/Slide11.tsx",
+    "title": "Inventorier, comparer et agir sur les écarts",
+    "description": "Inventaires, alertes et rapports de stock.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000012",
+    "position": 12,
+    "filepath": "src/pages/slides/Slide12.tsx",
+    "title": "Construire un catalogue prêt pour la vente",
+    "description": "Les produits physiques et numériques de la boutique.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000013",
+    "position": 13,
+    "filepath": "src/pages/slides/Slide13.tsx",
+    "title": "Offrir au client un parcours d’achat complet",
+    "description": "Vitrine, panier, compte client et expérience mobile.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000014",
+    "position": 14,
+    "filepath": "src/pages/slides/Slide14.tsx",
+    "title": "Suivre la commande de sa création à sa livraison",
+    "description": "Statuts et traitement des commandes E-commerce.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000015",
+    "position": 15,
+    "filepath": "src/pages/slides/Slide15.tsx",
+    "title": "Configurer les ventes, livraisons et options",
+    "description": "Paiements, livraison, location et produits numériques.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000016",
+    "position": 16,
+    "filepath": "src/pages/slides/Slide16.tsx",
+    "title": "Enregistrer les arrivées et les départs",
+    "description": "Le pointage quotidien par QR code et compte employé.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000017",
+    "position": 17,
+    "filepath": "src/pages/slides/Slide17.tsx",
+    "title": "Relier le pointage à la vie de l’équipe",
+    "description": "Horaires, absences, congés et historique.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000018",
+    "position": 18,
+    "filepath": "src/pages/slides/Slide18.tsx",
+    "title": "Suivre l’activité et adapter les responsabilités",
+    "description": "Rapports et profils du module Présences.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000019",
+    "position": 19,
+    "filepath": "src/pages/slides/Slide19.tsx",
+    "title": "Constituer une liste de bénéficiaires maîtrisée",
+    "description": "Gérer les bénéficiaires avant les campagnes de paiement.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000020",
+    "position": 20,
+    "filepath": "src/pages/slides/Slide20.tsx",
+    "title": "Préparer une campagne de paiement avant exécution",
+    "description": "Sélection, préparation, vérification et validation.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000021",
+    "position": 21,
+    "filepath": "src/pages/slides/Slide21.tsx",
+    "title": "Confirmer les virements et garder une trace",
+    "description": "Confirmation, solde, réservation des fonds et historique.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000022",
+    "position": 22,
+    "filepath": "src/pages/slides/Slide22.tsx",
+    "title": "Structurer les chauffeurs et la flotte",
+    "description": "Chauffeurs actifs, véhicules et paramètres Transport.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000023",
+    "position": 23,
+    "filepath": "src/pages/slides/Slide23.tsx",
+    "title": "Faire avancer chaque course avec un statut clair",
+    "description": "Cycle de course du Transport jusqu’à la clôture.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000024",
+    "position": 24,
+    "filepath": "src/pages/slides/Slide24.tsx",
+    "title": "Piloter l’activité et proposer un parcours public",
+    "description": "Tableau de bord Transport et demandes de course en ligne.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000025",
+    "position": 25,
+    "filepath": "src/pages/slides/Slide25.tsx",
+    "title": "Créer un portefeuille de biens fiable",
+    "description": "Fiches internes, caractéristiques et médias.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000026",
+    "position": 26,
+    "filepath": "src/pages/slides/Slide26.tsx",
+    "title": "Transformer un bien en annonce publiée",
+    "description": "Cycle brouillon et publication des annonces.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000027",
+    "position": 27,
+    "filepath": "src/pages/slides/Slide27.tsx",
+    "title": "Recevoir des prospects et organiser les visites",
+    "description": "Vitrine publique, demandes de contact et suivi des prospects.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000028",
+    "position": 28,
+    "filepath": "src/pages/slides/Slide28.tsx",
+    "title": "Des données séparées, des accès sous contrôle",
+    "description": "Les garanties de périmètre et d’autorisations.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000029",
+    "position": 29,
+    "filepath": "src/pages/slides/Slide29.tsx",
+    "title": "Déployer par étapes plutôt que tout activer d’un coup",
+    "description": "Cadrage, configuration, pilote et extension progressive.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "60000000-0000-4000-8000-000000000030",
+    "position": 30,
+    "filepath": "src/pages/slides/Slide30.tsx",
+    "title": "MAXIMUS s’adapte à votre activité",
+    "description": "Prochaine étape pour choisir les priorités métier.",
     "speakerNotes": ""
   }
 ]

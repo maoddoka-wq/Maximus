@@ -1,25 +1,14 @@
+import { DeckPage } from '../SlideLayout';
+
 export default function Slide6() {
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-bg text-text font-body deck-grid">
-      <div className="absolute right-[8vw] top-[11vh] text-[1.5vw] font-semibold uppercase tracking-[0.22em] text-accent">05 — E-commerce</div>
-      <div className="relative flex h-full w-full flex-col px-[8vw] py-[10vh]">
-        <h2 className="max-w-[76vw] font-display text-[3.8vw] font-semibold leading-[1.02] tracking-[-0.055em] text-balance">Une expérience e-commerce complète</h2>
-        <div className="mt-[5vh] grid flex-1 grid-cols-[0.9fr_1.8fr] gap-[5vw]">
-          <div className="relative overflow-hidden border border-accent/45 bg-accent/10 p-[2.5vw]">
-            <div className="absolute right-[-4vw] top-[-4vw] h-[18vw] w-[18vw] rounded-full border-[0.08vw] border-accent/35" />
-            <div className="relative"><div className="text-[1.5vw] uppercase tracking-[0.2em] text-accent">Parcours public</div><div className="mt-[4vh] font-display text-[4.4vw] font-semibold leading-[0.95] tracking-[-0.07em]">Boutique</div><div className="mt-[1vh] font-display text-[4.4vw] font-semibold leading-[0.95] tracking-[-0.07em] text-accent">isolée</div><div className="mt-[5vh] h-[0.16vw] w-[10vw] bg-accent" /><p className="mt-[2vh] text-[1.8vw] leading-[1.25] text-muted">Une vitrine, un panier et des commandes séparés pour chaque boutique.</p></div>
-          </div>
-          <div className="grid grid-cols-2 gap-x-[4vw] gap-y-[2.4vh] pt-[1vh]">
-            <div className="border-t-[0.08vw] border-accent/55 pt-[1.8vh] text-[2.05vw] leading-[1.2] text-pretty">Boutique publique par slug ou domaine personnalisé</div>
-            <div className="border-t-[0.08vw] border-white/15 pt-[1.8vh] text-[2.05vw] leading-[1.2] text-pretty">PWA isolée pour chaque boutique</div>
-            <div className="border-t-[0.08vw] border-white/15 pt-[1.8vh] text-[2.05vw] leading-[1.2] text-pretty">Comptes clients, adresses, favoris et paniers séparés</div>
-            <div className="border-t-[0.08vw] border-white/15 pt-[1.8vh] text-[2.05vw] leading-[1.2] text-pretty">Produits physiques, numériques, locations et livraisons</div>
-            <div className="border-t-[0.08vw] border-white/15 pt-[1.8vh] text-[2.05vw] leading-[1.2] text-pretty">Téléchargement numérique uniquement après paiement confirmé</div>
-            <div className="border-t-[0.08vw] border-accent/55 pt-[1.8vh] text-[2.05vw] leading-[1.2] text-pretty">Zones de livraison et tarifs conservés dans les commandes</div>
-          </div>
-        </div>
-        <div className="flex justify-between text-[1.5vw] uppercase tracking-[0.18em] text-muted"><span>MAXIMUS ERP</span><span>06 / 10</span></div>
+    <DeckPage section="05 — GESTION COMMERCIALE · 1/3" title="De la demande client à la pièce commerciale" subtitle="Un parcours structuré pour suivre les échanges, les ventes et les documents associés." page="06">
+      <div className="grid h-full grid-cols-4 gap-[1.2vw]">
+        <div className="flex flex-col justify-between border border-white/12 bg-surface/80 p-[1.8vw]"><span className="font-display text-[3vw] font-semibold text-accent">01</span><div><h3 className="font-display text-[2.25vw] font-semibold">Client</h3><p className="mt-[1.2vh] text-[2vw] leading-[1.28] text-muted">Créer et retrouver la fiche client, ses coordonnées et son historique commercial.</p></div></div>
+        <div className="flex flex-col justify-between border border-white/12 bg-surface/80 p-[1.8vw]"><span className="font-display text-[3vw] font-semibold text-accent">02</span><div><h3 className="font-display text-[2.25vw] font-semibold">Devis</h3><p className="mt-[1.2vh] text-[2vw] leading-[1.28] text-muted">Préparer une proposition et garder une trace des articles et montants proposés.</p></div></div>
+        <div className="flex flex-col justify-between border border-white/12 bg-surface/80 p-[1.8vw]"><span className="font-display text-[3vw] font-semibold text-accent">03</span><div><h3 className="font-display text-[2.25vw] font-semibold">Vente</h3><p className="mt-[1.2vh] text-[2vw] leading-[1.28] text-muted">Enregistrer la vente, son statut et son mode d’encaissement.</p></div></div>
+        <div className="flex flex-col justify-between border border-accent/35 bg-accent/10 p-[1.8vw]"><span className="font-display text-[3vw] font-semibold text-accent">04</span><div><h3 className="font-display text-[2.25vw] font-semibold">Facture et suivi</h3><p className="mt-[1.2vh] text-[2vw] leading-[1.28] text-muted">Produire les pièces prévues et consulter l’historique ou les rapports.</p></div></div>
       </div>
-    </div>
+    </DeckPage>
   );
 }

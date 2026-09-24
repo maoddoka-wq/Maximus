@@ -336,3 +336,17 @@ mtime_ms = 1790273877968
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/372d358d-8812-41f5-9208-706bd6e82331/153722c4-b058-4366-bc17-bb16e168582e"
 storage_version_token = "1790273878438411"
 content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "3of8gg4SoJpIKDEmO6NA4"
+uri = "file://.local/outputs/MAXIMUS-ERP---Presentation-generale.pptx"
+type = "slides"
+title = "MAXIMUS ERP — Présentation générale (PPTX)"
+description = "Export PowerPoint de la présentation générale en 30 diapositives."
+logical_id = "bbdbbf12-005f-4114-9505-1cad629a167e"
+content_hash = "sha256:3abdff46d29ac9c5bcb6dab31e34653b686c1eb827f25897f20201be3d75116e"
+size = 6897630
+mtime_ms = 1790283887892
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bbdbbf12-005f-4114-9505-1cad629a167e/06b65d04-8471-4709-8cb4-64a46c410c60"
+storage_version_token = "1790283888572030"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
