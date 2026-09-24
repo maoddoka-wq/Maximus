@@ -39,18 +39,27 @@ final class CompanyPaymentController extends Controller
             'providers.*' => ['string', 'in:DIAMANOPAY'],
         ])->validate();
         $providers = array_values(array_unique($input['providers'] ?? [CompanyPaymentAccess::PROVIDER_DIAMANOPAY]));
+        $updatedBy = (string) ($request->attributes->get('authActor')['id'] ?? 'maximus');
 
-        DB::table('company_payment_settings')->updateOrInsert(
-            ['company_id' => $companyId],
-            [
-                'id' => 'company-payment-'.\Illuminate\Support\Str::slug($companyId),
-                'status' => $input['enabled'] ? 'ACTIF' : 'INACTIF',
-                'providers' => json_encode($providers, JSON_UNESCAPED_UNICODE),
-                'updated_by' => (string) ($request->attributes->get('authActor')['id'] ?? 'maximus'),
-                'updated_at' => now(),
-                'created_at' => now(),
-            ],
-        );
+        DB::transaction(function () use ($companyId, $input, $providers, $updatedBy): void {
+            DB::table('company_payment_settings')->updateOrInsert(
+                ['company_id' => $companyId],
+                [
+                    'id' => 'company-payment-'.\Illuminate\Support\Str::slug($companyId),
+                    'status' => $input['enabled'] ? 'ACTIF' : 'INACTIF',
+                    'providers' => json_encode($providers, JSON_UNESCAPED_UNICODE),
+                    'updated_by' => $updatedBy,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ],
+            );
+
+            DB::table('maximus_installations')
+                ->where('company_id', $companyId)
+                ->where('status', '!=', 'REVOKED')
+                ->whereNull('revoked_at')
+                ->increment('configuration_version', 1, ['updated_at' => now()]);
+        });
 
         return response()->json(CompanyPaymentAccess::payload($companyId));
     }

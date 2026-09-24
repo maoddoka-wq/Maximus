@@ -8,3 +8,9 @@ Company payment access must be stored and checked independently from module acti
 **Why:** A company may keep its business modules open while payment collection or payouts are temporarily disabled for compliance, configuration, or operational reasons.
 
 **How to apply:** Protect every operation that creates a provider charge or payout with the company payment setting. Keep read-only history and reconciliation views available, and leave subscription billing separate because it pays for the platform rather than the company’s own payment capability.
+
+For dedicated installations, central payment settings must be part of the signed configuration snapshot, applied locally as one transaction, and advance each non-revoked installation’s configuration version when changed.
+
+**Why:** Central and isolated installations have separate databases; changing the administrative value centrally does not update local payment guards unless the sync contract carries it.
+
+**How to apply:** When changing a company payment setting, keep its central write, installation-version increment, sync export, and tenant-checked local import together. Preserve the last valid local setting if the incoming identity or values are invalid.

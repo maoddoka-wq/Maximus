@@ -83,6 +83,61 @@ class InstallationResilienceTest extends TestCase
         $this->assertStringNotContainsString('test-only-not-a-secret', implode('', array_map('file_get_contents', glob($this->isolatedStorage.'/app/installation-sync/*.json'))));
     }
 
+    public function test_sync_applies_and_updates_central_payment_authorization(): void
+    {
+        $sync = app(InstallationSyncService::class);
+        $payload = $this->payload();
+        $payload['paymentAccess'] = [
+            'companyId' => 'sync-company',
+            'enabled' => false,
+            'providers' => ['DIAMANOPAY'],
+        ];
+
+        $sync->apply($payload, true);
+        $this->assertDatabaseHas('company_payment_settings', [
+            'company_id' => 'sync-company',
+            'status' => 'INACTIF',
+            'providers' => json_encode(['DIAMANOPAY'], JSON_UNESCAPED_UNICODE),
+        ]);
+
+        $payload['paymentAccess']['enabled'] = true;
+        $payload['paymentAccess']['providers'] = [];
+        $sync->apply($payload);
+        $this->assertDatabaseHas('company_payment_settings', [
+            'company_id' => 'sync-company',
+            'status' => 'ACTIF',
+            'providers' => '[]',
+        ]);
+    }
+
+    public function test_sync_rejects_payment_authorization_for_another_company(): void
+    {
+        $sync = app(InstallationSyncService::class);
+        $payload = $this->payload();
+        $payload['paymentAccess'] = [
+            'companyId' => 'sync-company',
+            'enabled' => false,
+            'providers' => ['DIAMANOPAY'],
+        ];
+        $company = $sync->apply($payload, true);
+
+        $payload['company']['name'] = 'Should not be applied';
+        $payload['paymentAccess']['companyId'] = 'another-company';
+        try {
+            $sync->apply($payload);
+            $this->fail('Payment authorization for another company must be rejected.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('autorisations de paiement', $exception->getMessage());
+        }
+
+        $this->assertSame('Sync Company', $company->fresh()->name);
+        $this->assertDatabaseHas('company_payment_settings', [
+            'company_id' => 'sync-company',
+            'status' => 'INACTIF',
+        ]);
+        $this->assertDatabaseMissing('company_payment_settings', ['company_id' => 'another-company']);
+    }
+
     public function test_company_and_installation_identity_are_checked_before_any_write(): void
     {
         $sync = app(InstallationSyncService::class);

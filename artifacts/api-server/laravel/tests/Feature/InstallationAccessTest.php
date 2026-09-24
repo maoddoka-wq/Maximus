@@ -377,6 +377,28 @@ class InstallationAccessTest extends TestCase
             ->assertJsonPath('modules.ids.0', 'paie');
     }
 
+    public function test_payment_authorization_changes_are_versioned_and_included_in_sync_configuration(): void
+    {
+        $this->patchJson('/api/companies/access-company/payment-settings', [
+            'enabled' => false,
+            'providers' => ['DIAMANOPAY'],
+        ])->assertOk()
+            ->assertJsonPath('enabled', false)
+            ->assertJsonPath('providers.0', 'DIAMANOPAY');
+
+        $this->assertDatabaseHas('maximus_installations', ['id' => 'install-a', 'configuration_version' => 2]);
+        $this->assertDatabaseHas('maximus_installations', ['id' => 'install-b', 'configuration_version' => 2]);
+        $this->assertDatabaseHas('maximus_installations', ['id' => 'install-other', 'configuration_version' => 1]);
+
+        $this->withHeader('Authorization', 'Bearer token-install-a')
+            ->getJson('/api/installation-sync/configuration')
+            ->assertOk()
+            ->assertJsonPath('paymentAccess.companyId', 'access-company')
+            ->assertJsonPath('paymentAccess.status', 'INACTIF')
+            ->assertJsonPath('paymentAccess.enabled', false)
+            ->assertJsonPath('paymentAccess.providers.0', 'DIAMANOPAY');
+    }
+
     public function test_known_revoked_token_has_explicit_code_but_unknown_token_does_not(): void
     {
         DB::table('maximus_installations')->where('id', 'install-a')->update(['revoked_at' => now()]);

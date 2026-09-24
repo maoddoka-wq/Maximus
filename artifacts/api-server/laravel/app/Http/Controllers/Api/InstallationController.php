@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
+use App\Support\CompanyPaymentAccess;
 
 final class InstallationController extends Controller
 {
@@ -122,6 +123,7 @@ final class InstallationController extends Controller
             'updated_at' => now(),
         ]);
         $moduleIds = $this->synchronizedModuleIds($company);
+        $paymentAccess = CompanyPaymentAccess::payload((string) $company->id);
 
         return response()->json([
             'configurationVersion' => (int) $installation->configuration_version,
@@ -154,6 +156,7 @@ final class InstallationController extends Controller
             ],
             'catalog' => ModuleCatalog::publishedCatalog($moduleIds),
             'domains' => $domains,
+            'paymentAccess' => $paymentAccess,
             'erpAccess' => $this->erpAccess((string) $installation->id),
         ]);
     }

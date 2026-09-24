@@ -113,9 +113,12 @@ final class InstallationSyncService
     {
         try {
             $warning = $this->validatePayload($payload, $initial);
+            $paymentAccess = array_key_exists('paymentAccess', $payload)
+                ? $this->validatePaymentAccess($payload['paymentAccess'])
+                : null;
             $access = array_key_exists('erpAccess', $payload)
                 ? $this->validateErpAccess($payload['erpAccess']) : InstallationSyncState::erpAccess();
-            $company = $this->applyValidated($payload);
+            $company = $this->applyValidated($payload, $paymentAccess);
             // Publish the entire access snapshot only after the database transaction succeeds.
             InstallationSyncState::record([
                 'lastSuccessAt' => now()->toIso8601String(), 'state' => 'synced', 'lastError' => null,
@@ -156,7 +159,33 @@ final class InstallationSyncService
         return ['canonicalUrl' => $url, 'allowedHosts' => array_values(array_unique($hosts))];
     }
 
-    private function applyValidated(array $payload): Company
+    /** @return array{enabled: bool, providers: list<string>} */
+    private function validatePaymentAccess(mixed $access): array
+    {
+        $companyId = InstallationContext::companyId();
+        if (! is_array($access)
+            || $companyId === null
+            || ($access['companyId'] ?? null) !== $companyId
+            || ! is_bool($access['enabled'] ?? null)
+            || ! is_array($access['providers'] ?? null)) {
+            throw new RuntimeException('Configuration des autorisations de paiement invalide.');
+        }
+
+        $providers = [];
+        foreach ($access['providers'] as $provider) {
+            if (! is_string($provider) || $provider !== \App\Support\CompanyPaymentAccess::PROVIDER_DIAMANOPAY) {
+                throw new RuntimeException('Fournisseur de paiement non pris en charge par la configuration centrale.');
+            }
+            $providers[] = $provider;
+        }
+
+        return [
+            'enabled' => $access['enabled'],
+            'providers' => array_values(array_unique($providers)),
+        ];
+    }
+
+    private function applyValidated(array $payload, ?array $paymentAccess = null): Company
     {
         $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
         $companyId = trim((string) ($companyData['id'] ?? ''));
@@ -180,6 +209,7 @@ final class InstallationSyncService
             $featureIds,
             $permissions,
             $payload,
+                $paymentAccess,
         ): Company {
             ModuleCatalog::importPublishedCatalog($catalog);
             ModuleCatalog::ensureCatalog();
@@ -242,6 +272,43 @@ final class InstallationSyncService
                     'updated_at' => now(),
                 ] + $branding,
             );
+
+            if ($paymentAccess !== null) {
+                if (! Schema::hasTable('company_payment_settings')) {
+                    throw new RuntimeException('La table locale des autorisations de paiement est absente.');
+                }
+
+                $status = $paymentAccess['enabled'] ? 'ACTIF' : 'INACTIF';
+                $encodedProviders = json_encode($paymentAccess['providers'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+                $existingPaymentSettings = DB::table('company_payment_settings')
+                    ->where('company_id', $companyId)
+                    ->first();
+
+                if (! $existingPaymentSettings) {
+                    DB::table('company_payment_settings')->insert([
+                        'id' => 'company-payment-'.Str::slug($companyId),
+                        'company_id' => $companyId,
+                        'status' => $status,
+                        'providers' => $encodedProviders,
+                        'updated_by' => 'maximus-sync',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    $existingProviders = json_decode($existingPaymentSettings->providers ?? '[]', true);
+                    $existingProviders = is_array($existingProviders) ? array_values(array_unique($existingProviders)) : [];
+                    if ($existingPaymentSettings->status !== $status || $existingProviders !== $paymentAccess['providers']) {
+                        DB::table('company_payment_settings')
+                            ->where('company_id', $companyId)
+                            ->update([
+                                'status' => $status,
+                                'providers' => $encodedProviders,
+                                'updated_by' => 'maximus-sync',
+                                'updated_at' => now(),
+                            ]);
+                    }
+                }
+            }
 
             DB::table('maximus_company_modules')->where('company_id', $companyId)->delete();
             foreach ($moduleIds as $moduleId) {
