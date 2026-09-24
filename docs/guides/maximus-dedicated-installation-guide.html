@@ -256,11 +256,13 @@ sudo install -m 600 -o maximus -g maximus /tmp/maximus-bootstrap.json \
   /opt/maximus-secrets/bootstrap.json
 rm -f /tmp/maximus-bootstrap.json</pre>
   <p>Si le compte <code>maximus</code> n’existe pas encore, exécuter d’abord les commandes de la section 6.2. Le fichier final doit être lisible par l’utilisateur qui exécute l’installateur, puis supprimé dès que la valeur a été conservée dans le gestionnaire de secrets.</p>
+  <p>Sur Windows, déposer le bootstrap dans un dossier protégé par les permissions NTFS, par exemple <code>C:\ProgramData\MAXIMUS\bootstrap.json</code>. Ne pas le placer dans le dépôt Git, un dossier partagé avec les employés ou un répertoire web. Dans Git Bash, son chemin s’écrit par exemple <code>/c/ProgramData/MAXIMUS/bootstrap.json</code>.</p>
   <h3>8.1 Récupérer le code</h3>
   <pre>git clone &lt;depot-prive&gt; /opt/maximus
 cd /opt/maximus
 chmod +x scripts/install-maximus-instance.sh
 ./scripts/install-maximus-instance.sh --help</pre>
+  <p>Sur Windows, faire cette étape dans <b>Git Bash</b>, pas dans PowerShell : le fichier <code>install-maximus-instance.sh</code> est le premier installateur à lancer sur les deux systèmes. PowerShell servira ensuite à configurer IIS avec le script <code>.ps1</code>.</p>
   <h3>8.2 Installer le JSON d’enrôlement</h3>
   <p>Copier le fichier téléchargé depuis MAXIMUS principal sur le VPS, avec des permissions privées :</p>
   <pre>chmod 600 /opt/maximus-secrets/bootstrap.json
@@ -366,6 +368,7 @@ sudo bash scripts/install-maximus-lan-linux.sh \
   <p>Si UFW est déjà actif, une autorisation limitée au CIDR est ajoutée pour HTTPS vers l’IP LAN. Vérifier aussi les règles antérieures et le pare-feu réseau de l’entreprise.</p>
 
   <h3>10.4 Installer sur Windows Server (IIS et PHP FastCGI)</h3>
+  <p>Avant cette étape, terminer les sections 5 à 8 dans Git Bash sur le serveur Windows : cela installe les dépendances, construit le frontend, prépare PostgreSQL et crée le compte <code>company_admin</code>. Lancer ensuite le script ci-dessous dans une fenêtre <b>PowerShell 64 bits ouverte comme administrateur</b>. Ne pas lancer le serveur de test <code>php -S</code> pour servir les employés.</p>
   <p>Le script cible Windows Server 2019 ou plus récent, IIS avec CGI et URL Rewrite, et PHP 8.2 NTS déjà installé. <code>php-cgi.exe</code> et <code>php.exe</code> doivent provenir du même dossier et charger leur <code>php.ini</code> réel; les extensions PDO PostgreSQL, mbstring, fileinfo et OpenSSL sont requises. Importer le certificat avec clé privée dans <code>Cert:\LocalMachine\My</code> et noter son empreinte.</p>
   <pre>.\scripts\install-maximus-lan-windows-iis.ps1 `
   -WorkspaceDir '&lt;racine-du-dépôt-MAXIMUS&gt;' `
@@ -385,15 +388,20 @@ sudo bash scripts/install-maximus-lan-linux.sh \
   <p>Dans les deux systèmes, l’adresse doit rester joignable uniquement depuis le réseau d’entreprise. Les routes React profondes servent <code>index.html</code>; <code>/api</code> et <code>/up</code> passent par Laravel; un fichier statique manquant reste une 404.</p>
 
   <h3>10.5 Programmer la synchronisation</h3>
-  <p>La synchronisation ne doit pas être lancée à chaque ouverture de page. Elle est déclenchée par une tâche du serveur dédié. L’exemple ci-dessous l’exécute toutes les 15 minutes ; un déclenchement manuel reste possible après une modification urgente.</p>
-  <pre>sudo -u maximus crontab -e</pre>
-  <pre>*/15 * * * * cd /opt/maximus/artifacts/api-server/laravel &amp;&amp; /usr/bin/php artisan maximus:sync-central-installation &gt;&gt; /opt/maximus/artifacts/api-server/laravel/storage/logs/installation-sync.log 2&gt;&amp;1</pre>
-  <p>Après l’enregistrement, vérifier la configuration et lancer un premier passage :</p>
-  <pre>sudo -u maximus crontab -l
-cd /opt/maximus/artifacts/api-server/laravel
+  <p>L’installateur principal enregistre automatiquement le scheduler, sauf si <code>--skip-scheduler</code> est utilisé. Il lance la vérification Laravel toutes les cinq minutes; c’est ce qui récupère les modules, permissions et domaines publiés par MAXIMUS principal. Sous Linux, le déclencheur utilise cron. Sous Windows, Git Bash délègue au Planificateur de tâches Windows; la tâche est cachée et son journal se trouve dans <code>storage/logs/installation-scheduler.log</code>.</p>
+  <p>Si le scheduler a été sauté ou doit être recréé, utiliser la commande correspondant au serveur :</p>
+  <pre>sudo -u maximus /opt/maximus/scripts/register-maximus-sync.sh \
+  --workspace-dir /opt/maximus --interval-minutes 5</pre>
+  <pre>.\scripts\register-maximus-sync.ps1 `
+  -WorkspaceDir 'C:\MAXIMUS' -IntervalMinutes 5</pre>
+  <p>Vérifier le scheduler Linux avec <code>sudo -u maximus crontab -l</code>, ou la tâche Windows dans le Planificateur de tâches sous le nom <code>MAXIMUS central scheduler</code>. Après une publication urgente, lancer une synchronisation manuelle :</p>
+  <pre>cd /opt/maximus/artifacts/api-server/laravel
 sudo -u maximus php artisan maximus:sync-central-installation
-tail -50 storage/logs/installation-sync.log</pre>
-  <div class="when"><b>Quand synchroniser :</b> immédiatement après une publication de module, de pack, de fonctionnalité, de permission ou de domaine dans MAXIMUS principal ; sinon au prochain passage automatique, au maximum 15 minutes après l’exemple ci-dessus.</div>
+tail -50 storage/logs/installation-scheduler.log</pre>
+  <pre>Set-Location C:\MAXIMUS\artifacts\api-server\laravel
+php artisan maximus:sync-central-installation</pre>
+  <p>Une synchronisation réussie ne redémarre pas le serveur web. Si elle échoue, garder le journal et corriger la connexion sortante HTTPS vers MAXIMUS principal.</p>
+  <div class="when"><b>Quand synchroniser :</b> immédiatement après une publication de module, pack, fonctionnalité, permission ou domaine si le changement ne peut pas attendre; sinon au prochain passage automatique, dans un délai maximal de cinq minutes.</div>
 
   <h2>11. Accès administrateur entreprise</h2>
   <ol><li>Ouvrir l’URL configurée dans <code>APP_URL</code>.</li><li>Utiliser l’email <code>MAXIMUS_ADMIN_USER</code>.</li><li>Se connecter avec le mot de passe fourni à l’installateur.</li><li>Vérifier que le compte affiche le rôle <code>company_admin</code> et la bonne entreprise.</li><li>Créer ensuite les employés et les rôles depuis Organisation.</li></ol>
@@ -419,6 +427,10 @@ php artisan maximus:install-company --no-interaction</pre>
 sudo -u maximus php artisan config:clear --no-interaction
 sudo -u maximus php artisan maximus:sync-central-installation
 curl -fsS https://erp.example.test/api/installation</pre>
+  <pre>Set-Location C:\MAXIMUS\artifacts\api-server\laravel
+php artisan config:clear --no-interaction
+php artisan maximus:sync-central-installation
+curl.exe -fsS https://erp.example.test/api/installation</pre>
   <p>La commande doit afficher une ligne de succès indiquant que la configuration centrale a été synchronisée. Une synchronisation normale ne nécessite pas de redémarrer Nginx, PHP-FPM ou IIS. Si la commande échoue, conserver le message d’erreur, ne pas supprimer la base locale et suivre la section 15.</p>
 
   <h2>13. Validation complète de l’isolation</h2>
