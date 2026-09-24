@@ -308,3 +308,17 @@ mtime_ms = 1790272547260
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/4549ea61-d66a-4b62-aa72-9685a92c8a8b/526ff683-7684-4323-8e31-bd9f43fbfab6"
 storage_version_token = "1790272547975111"
 content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "o2k_2D702vsh_rbR6Xjfs"
+uri = "file://.local/outputs/MAXIMUS-ERP---Presentation-des-modules.pptx"
+type = "slides"
+title = "MAXIMUS ERP — Présentation des modules (PPTX)"
+description = "Présentation générale de MAXIMUS et de ses modules Gestion commerciale, E-commerce, Gestion de stock, Immobilier, Présences et Paie."
+logical_id = "0c9fa376-7c3c-4966-a4d3-28be0095d0be"
+content_hash = "sha256:44716cc574dde52d44f70c7e76125e21d537ebe83efb8ff20fb63c835f5312ed"
+size = 6386722
+mtime_ms = 1790273235408
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/0c9fa376-7c3c-4966-a4d3-28be0095d0be/e47e3d72-df19-4609-9398-e839109aff56"
+storage_version_token = "1790273235933151"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"

@@ -2,31 +2,31 @@
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870001",
     "position": 1,
-    "filepath": "src/pages/slides/Slide1.tsx",
-    "title": "MAXIMUS pour NSG",
-    "description": "Présentation client de MAXIMUS pour Némadi Services Group.",
+    "filepath": "src/pages/slides/Cover.tsx",
+    "title": "MAXIMUS",
+    "description": "Présentation générale de la plateforme MAXIMUS ERP.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870002",
     "position": 2,
-    "filepath": "src/pages/slides/Slide2.tsx",
-    "title": "Activités de NSG",
-    "description": "Synthèse des activités fournies dans le profil de l’entreprise.",
+    "filepath": "src/pages/slides/Overview.tsx",
+    "title": "MAXIMUS en bref",
+    "description": "Présentation de l’approche modulaire et de la gestion des accès.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870003",
     "position": 3,
-    "filepath": "src/pages/slides/Slide3.tsx",
-    "title": "Modules MAXIMUS disponibles",
-    "description": "Vue d’ensemble des modules existants pertinents pour NSG.",
+    "filepath": "src/pages/slides/Catalog.tsx",
+    "title": "Modules disponibles",
+    "description": "Vue d’ensemble des six modules MAXIMUS présentés.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870004",
     "position": 4,
-    "filepath": "src/pages/slides/Slide4.tsx",
+    "filepath": "src/pages/slides/Commerce.tsx",
     "title": "Gestion commerciale",
     "description": "Fonctions commerciales déjà disponibles dans MAXIMUS.",
     "speakerNotes": ""
@@ -34,33 +34,41 @@
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870005",
     "position": 5,
-    "filepath": "src/pages/slides/Slide5.tsx",
-    "title": "Gestion de stock",
-    "description": "Articles, mouvements, inventaires et seuils de stock.",
+    "filepath": "src/pages/slides/Ecommerce.tsx",
+    "title": "E-commerce",
+    "description": "Boutique en ligne, catalogue public et commandes clients.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870006",
     "position": 6,
-    "filepath": "src/pages/slides/Slide6.tsx",
-    "title": "Gestion des équipes",
-    "description": "Organisation, présences et paie.",
+    "filepath": "src/pages/slides/Stock.tsx",
+    "title": "Gestion de stock",
+    "description": "Articles, mouvements, inventaires et seuils de stock.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870007",
     "position": 7,
-    "filepath": "src/pages/slides/Slide7.tsx",
-    "title": "Transport — périmètre Taxi",
-    "description": "Chauffeurs, véhicules, courses et historique Taxi.",
+    "filepath": "src/pages/slides/RealEstate.tsx",
+    "title": "Gestion immobilière",
+    "description": "Biens, annonces, prospects et visites immobilières.",
     "speakerNotes": ""
   },
   {
     "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870008",
     "position": 8,
-    "filepath": "src/pages/slides/Slide8.tsx",
-    "title": "Démonstration pour NSG",
-    "description": "Parcours de présentation construit autour des modules disponibles.",
+    "filepath": "src/pages/slides/Presence.tsx",
+    "title": "Présences",
+    "description": "Pointage, absences, horaires et suivi quotidien des équipes.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9f184e09-7cb7-4abc-8a5a-2f22cc870009",
+    "position": 9,
+    "filepath": "src/pages/slides/Payroll.tsx",
+    "title": "Paie",
+    "description": "Bénéficiaires, préparation et suivi des opérations de paie.",
     "speakerNotes": ""
   }
 ]
