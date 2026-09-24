@@ -341,14 +341,14 @@ content_type = "application/vnd.openxmlformats-officedocument.presentationml.pre
 id = "3of8gg4SoJpIKDEmO6NA4"
 uri = "file://.local/outputs/MAXIMUS-ERP---Presentation-generale.pptx"
 type = "slides"
-title = "MAXIMUS ERP — Présentation générale (PPTX)"
-description = "Export PowerPoint de la présentation générale en 30 diapositives."
+title = "MAXIMUS ERP — Présentation générale mise à jour (PPTX)"
+description = "Présentation complète en 30 diapositives avec les blocs de texte corrigés."
 logical_id = "bbdbbf12-005f-4114-9505-1cad629a167e"
-content_hash = "sha256:3abdff46d29ac9c5bcb6dab31e34653b686c1eb827f25897f20201be3d75116e"
-size = 6897630
-mtime_ms = 1790283887892
-storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bbdbbf12-005f-4114-9505-1cad629a167e/06b65d04-8471-4709-8cb4-64a46c410c60"
-storage_version_token = "1790283888572030"
+content_hash = "sha256:37cc0dfd06b448c5f4fd7f6bf96e0ca1976e2d3a87a8ba1303b6e60343bd805a"
+size = 6880597
+mtime_ms = 1790287729283
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/bbdbbf12-005f-4114-9505-1cad629a167e/0f35ba95-1356-4d65-9512-18cb00f89556"
+storage_version_token = "1790287732768170"
 content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 [[outputs]]
@@ -377,4 +377,18 @@ size = 1902648
 mtime_ms = 1790285857311
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/d1c0c825-961b-4d28-bfe1-35a2f89ce1f6/9b846b01-53aa-4b28-9bbf-a64cc8bc9f4f"
 storage_version_token = "1790285914731887"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "zwHYwSb0p-zQaTvN2HMbf"
+uri = "file://.local/outputs/MAXIMUS-ERP-12-diapos-synthese-corrige.pdf"
+type = "pdf"
+title = "MAXIMUS ERP — Synthèse corrigée en 12 diapositives (PDF)"
+description = "PDF corrigé après contrôle visuel des blocs de texte. La sélection conserve 12 pages; le PPTX complet mis à jour contient toujours 30 diapositives."
+logical_id = "381abeed-d511-4903-81f4-40c9d85643dd"
+content_hash = "sha256:305cea782ab7f8739c37f511a92ec9438c45a67e5079271f3a54bf0dadaac50e"
+size = 1897651
+mtime_ms = 1790287747803
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/381abeed-d511-4903-81f4-40c9d85643dd/221699e2-683d-4970-a2f7-32d7478465da"
+storage_version_token = "1790287766351526"
 content_type = "application/pdf"

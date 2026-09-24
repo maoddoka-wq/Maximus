@@ -94,3 +94,4 @@
 - [Surfaces de tableaux](ui-surface-theme.md) — les tableaux doivent utiliser des fonds opaques `muted`/`secondary`, car les cartes et transparences rendent le blanc visuellement dominant.
 - [Origine des mutations avec cookie](cookie-request-origin.md) — exiger Origin/Referer pour les sessions navigateur, sans bloquer les appels machine Bearer dépourvus de cookie.
 - [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.
+- [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
