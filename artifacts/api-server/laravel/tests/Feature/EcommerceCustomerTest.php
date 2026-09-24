@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Support\EcommerceCustomerAuth;
 use App\Support\MaximusPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -60,6 +62,74 @@ class EcommerceCustomerTest extends TestCase
             'customer_id' => $customer->id,
         ]);
         $this->assertDatabaseHas('ecommerce_products', ['id' => $productId, 'stock' => 2]);
+    }
+
+    public function test_order_attachments_are_private_and_limited_to_the_owning_customer(): void
+    {
+        Storage::fake('digital');
+        $this->createStore('kora', 'kora-attachments');
+        DB::table('ecommerce_stores')
+            ->where('company_id', 'kora')
+            ->update(['allow_order_attachments' => true]);
+        $this->createProduct('kora', 'attachment-product', 2500, 3);
+
+        $customer = $this->createCustomer('attachment-customer', 'kora', 'attachment@example.test');
+        $otherCustomer = $this->createCustomer('other-attachment-customer', 'kora', 'other-attachment@example.test');
+        $token = EcommerceCustomerAuth::issueSession($customer);
+        $otherToken = EcommerceCustomerAuth::issueSession($otherCustomer);
+
+        $created = $this->withCredentials()
+            ->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->post('/api/shop/kora-attachments/orders', [
+                'customerName' => $customer->name,
+                'customerEmail' => $customer->email,
+                'shippingAddress' => 'Dakar, Sénégal',
+                'items' => [['productSlug' => 'attachment-product', 'quantity' => '1']],
+                'attachments' => [UploadedFile::fake()->create('justificatif.pdf', 100, 'application/pdf')],
+            ])
+            ->assertCreated();
+
+        $orderId = $created->json('id');
+        $attachment = DB::table('ecommerce_order_attachments')
+            ->where('order_id', $orderId)
+            ->first();
+
+        $this->assertNotNull($attachment);
+        $this->assertSame('attachment-customer', $attachment->customer_id);
+        Storage::disk('digital')->assertExists($attachment->file_path);
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->getJson('/api/shop/kora-attachments/customer/orders')
+            ->assertOk()
+            ->assertJsonPath('orders.0.attachments.0.name', 'justificatif.pdf');
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->get('/api/shop/kora-attachments/customer/orders/'.$orderId.'/attachments/'.$attachment->id)
+            ->assertOk();
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $otherToken)
+            ->getJson('/api/shop/kora-attachments/customer/orders/'.$orderId.'/attachments/'.$attachment->id)
+            ->assertNotFound();
+    }
+
+    public function test_order_attachments_are_rejected_when_the_shop_setting_is_disabled(): void
+    {
+        Storage::fake('digital');
+        $this->createStore('kora', 'kora-no-attachments');
+        $this->createProduct('kora', 'no-attachment-product', 2500, 3);
+
+        $this->withHeader('Accept', 'application/json')
+            ->post('/api/shop/kora-no-attachments/orders', [
+                'customerName' => 'Client sans compte',
+                'customerEmail' => 'no-attachment@example.test',
+                'shippingAddress' => 'Dakar',
+                'items' => [['productSlug' => 'no-attachment-product', 'quantity' => '1']],
+                'attachments' => [UploadedFile::fake()->create('refuse.pdf', 100, 'application/pdf')],
+            ])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseCount('ecommerce_orders', 0);
+        $this->assertDatabaseCount('ecommerce_order_attachments', 0);
     }
 
     public function test_customer_session_cannot_cross_store_or_customer_boundaries(): void

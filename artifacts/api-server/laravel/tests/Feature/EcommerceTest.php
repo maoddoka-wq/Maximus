@@ -78,6 +78,27 @@ class EcommerceTest extends TestCase
         ]);
     }
 
+    public function test_order_attachment_setting_is_saved_and_published_in_the_public_shop(): void
+    {
+        $this->asActor()
+            ->patchJson('/api/ecommerce/store?companyId=kora', [
+                'name' => 'Boutique KORA',
+                'slug' => 'kora-documents',
+                'description' => 'Boutique de test',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primaryColor' => '#D69E2E',
+                'accentColor' => '#172033',
+                'allowOrderAttachments' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('allowOrderAttachments', true);
+
+        $this->getJson('/api/shop/kora-documents')
+            ->assertOk()
+            ->assertJsonPath('store.allowOrderAttachments', true);
+    }
+
     public function test_categories_are_persistent_and_products_are_linked_to_them(): void
     {
         $request = $this->asActor();

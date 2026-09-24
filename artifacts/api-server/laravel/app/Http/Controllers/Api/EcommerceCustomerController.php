@@ -359,6 +359,40 @@ class EcommerceCustomerController extends Controller
         });
     }
 
+    public function downloadOrderAttachment(Request $request, ?string $slug = null)
+    {
+        $orderId = (string) $request->route('id');
+        $attachmentId = (string) $request->route('attachmentId');
+        $slug = $request->route('slug');
+
+        return $this->withCustomer($request, is_string($slug) ? $slug : null, function (object $store, object $customer) use ($orderId, $attachmentId) {
+            $order = DB::table('ecommerce_orders')
+                ->where('id', $orderId)
+                ->where('company_id', $store->company_id)
+                ->where('customer_id', $customer->id)
+                ->first(['id']);
+            if (! $order) {
+                return response()->json(['error' => 'Commande introuvable.'], 404);
+            }
+
+            $attachment = DB::table('ecommerce_order_attachments')
+                ->where('id', $attachmentId)
+                ->where('order_id', $orderId)
+                ->where('company_id', $store->company_id)
+                ->where('customer_id', $customer->id)
+                ->first();
+            if (! $attachment || ! Storage::disk('digital')->exists($attachment->file_path)) {
+                return response()->json(['error' => 'Pièce jointe introuvable.'], 404);
+            }
+
+            return Storage::disk('digital')->download($attachment->file_path, $attachment->original_name, [
+                'Content-Type' => $attachment->mime_type,
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        });
+    }
+
     public function order(Request $request, string $id, ?string $slug = null): JsonResponse
     {
         return $this->withCustomer($request, $slug, function (object $store, object $customer) use ($id): JsonResponse {
@@ -377,7 +411,15 @@ class EcommerceCustomerController extends Controller
                 ->where('customer_id', $customer->id)
                 ->first() ?? $order;
 
-            return response()->json($this->orderPayload($order));
+            $attachments = DB::table('ecommerce_order_attachments')
+                ->where('company_id', $store->company_id)
+                ->where('customer_id', $customer->id)
+                ->where('order_id', $order->id)
+                ->orderBy('created_at')
+                ->get()
+                ->all();
+
+            return response()->json($this->orderPayload($order, $attachments));
         });
     }
 
@@ -632,8 +674,18 @@ class EcommerceCustomerController extends Controller
             ->orderByDesc('created_at')
             ->limit(100)
             ->get();
+        $attachments = DB::table('ecommerce_order_attachments')
+            ->where('company_id', $customer->company_id)
+            ->whereIn('order_id', $rows->pluck('id')->all())
+            ->where('customer_id', $customer->id)
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('order_id');
 
-        return $rows->map(fn (object $row): array => $this->orderPayload($row))->values()->all();
+        return $rows->map(fn (object $row): array => $this->orderPayload(
+            $row,
+            $attachments->get($row->id, collect())->values()->all(),
+        ))->values()->all();
     }
 
     private function refreshCustomerDigitalPayments(object $customer): void
@@ -681,7 +733,7 @@ class EcommerceCustomerController extends Controller
             ->all();
     }
 
-    private function orderPayload(object $row): array
+    private function orderPayload(object $row, array $attachments = []): array
     {
         $items = DB::table('ecommerce_order_items')
             ->leftJoin('ecommerce_products as product', function ($join) use ($row): void {
@@ -711,6 +763,12 @@ class EcommerceCustomerController extends Controller
             'paymentStatus' => $row->payment_status ?? 'UNPAID',
             'paymentFailureReason' => $row->payment_failure_reason ?? '',
             'createdAt' => $row->created_at,
+            'attachments' => array_map(fn (object $attachment): array => [
+                'id' => $attachment->id,
+                'name' => $attachment->original_name,
+                'mimeType' => $attachment->mime_type,
+                'size' => (int) $attachment->file_size,
+            ], $attachments),
             'items' => $items->map(fn (object $item): array => [
                 'id' => $item->id,
                 'productId' => $item->product_id,

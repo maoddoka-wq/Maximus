@@ -85,6 +85,14 @@ export interface EcommerceStore {
   accentColor: string;
   logoUrl: string;
   heroImages: string[];
+  allowOrderAttachments: boolean;
+}
+
+export interface EcommerceOrderAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
 }
 
 export interface PublicShopFeatures {
@@ -244,6 +252,7 @@ export interface EcommerceOrder {
   paymentFailureReason: string;
   createdAt: string;
   items: EcommerceOrderItem[];
+  attachments?: EcommerceOrderAttachment[];
 }
 
 export interface EcommerceBootstrap {
@@ -465,6 +474,7 @@ export interface EcommerceCustomerOrder {
   paymentFailureReason: string;
   createdAt: string;
   items: EcommerceOrderItem[];
+  attachments?: EcommerceOrderAttachment[];
 }
 
 export interface EcommerceCustomerBootstrap {
@@ -579,6 +589,37 @@ export const createEcommerceApi = (companyId: string) => {
   };
 };
 
+type PublicOrderCreateBody = {
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  shippingAddress: string;
+  deliveryZoneId?: string;
+  note?: string;
+  idempotencyKey?: string;
+  items: { productSlug?: string; rentalId?: string; quantity: number }[];
+  attachments?: File[];
+};
+
+function publicOrderRequestBody(body: PublicOrderCreateBody): BodyInit {
+  const { attachments = [], items, ...fields } = body;
+  if (attachments.length === 0) return JSON.stringify({ ...fields, items });
+
+  const formData = new FormData();
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, String(value));
+  });
+  items.forEach((item, index) => {
+    Object.entries(item).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(`items[${index}][${key}]`, String(value));
+      }
+    });
+  });
+  attachments.forEach(file => formData.append('attachments[]', file, file.name));
+  return formData;
+}
+
 export const publicEcommerceApi = {
   bootstrap: (slug: string) => request<PublicShopBootstrap>(`/shop/${encodeURIComponent(slug)}`, undefined, { cacheTtlMs: 10_000 }),
   bootstrapDomain: () => request<PublicDomainBootstrap>('/shop-domain', undefined, { cacheTtlMs: 10_000 }),
@@ -586,8 +627,8 @@ export const publicEcommerceApi = {
   quoteDomainLocation: (id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<EcommerceCarQuote>(`/shop-domain/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
   reserveLocation: (slug: string, body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>(`/shop/${encodeURIComponent(slug)}/location/reservations`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
   reserveDomainLocation: (body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>('/shop-domain/location/reservations', { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
-  createOrder: (slug: string, body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; deliveryZoneId?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  createDomainOrder: (body: { customerName: string; customerEmail: string; customerPhone?: string; shippingAddress: string; deliveryZoneId?: string; note?: string; idempotencyKey?: string; items: { productSlug?: string; rentalId?: string; quantity: number }[] }) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: JSON.stringify(body) }),
+  createOrder: (slug: string, body: PublicOrderCreateBody) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: publicOrderRequestBody(body) }),
+  createDomainOrder: (body: PublicOrderCreateBody) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: publicOrderRequestBody(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
   createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>
@@ -627,6 +668,26 @@ export const createCustomerApi = (slug?: string) => {
         const anchor = document.createElement('a');
         anchor.href = url;
         anchor.download = decodeURIComponent(match?.[1] ?? match?.[2] ?? 'produit-numerique');
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }),
+    downloadOrderAttachment: (orderId: string, attachmentId: string) =>
+      fetch(`/api${endpoint(`/orders/${encodeURIComponent(orderId)}/attachments/${encodeURIComponent(attachmentId)}`)}`, {
+        credentials: 'include',
+      }).then(async response => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error ?? 'La pièce jointe n’est pas disponible.');
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') ?? '';
+        const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = decodeURIComponent(match?.[1] ?? match?.[2] ?? 'piece-jointe');
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();

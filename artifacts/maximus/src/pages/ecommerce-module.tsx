@@ -120,6 +120,7 @@ function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: strin
       currency: 'XOF',
       ...maximusShopColors,
       logoUrl: '',
+      allowOrderAttachments: false,
       heroImages: [],
     },
     domains: Array.isArray(payload.domains) ? payload.domains : [],
@@ -294,6 +295,7 @@ export default function EcommerceModulePage({
           currency: 'XOF',
           ...maximusShopColors,
           logoUrl: '',
+          allowOrderAttachments: false,
           heroImages: [],
         },
         domains: [],
@@ -415,7 +417,7 @@ export default function EcommerceModulePage({
       {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
-      {tab === 'commandes' && <Orders data={data} canModify={currentCanModify} run={run} />}
+      {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}
       {tab === 'clients' && <Clients data={data} />}
       {tab === 'promotions' && <Promotions />}
        {tab === 'location' && <RentalPanel data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
@@ -1028,6 +1030,33 @@ function Orders({ data, canModify, run }: { data: EcommerceBootstrap; canModify:
   return <div className="space-y-5 fade-up"><Panel title="Commandes" description="Suivez chaque vente, du premier clic à la livraison."><div className="mb-5 flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par référence, nom ou e-mail" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label><select value={filter} onChange={event => setFilter(event.target.value as typeof filter)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option>{orderStatuses.map(item => <option key={item} value={item}>{item}</option>)}</select></div>{orders.length === 0 ? <Empty icon={ClipboardList} title={allOrders.length ? 'Aucune commande trouvée' : 'Aucune commande pour le moment'} text={allOrders.length ? 'Modifiez votre recherche ou le filtre de statut.' : 'Les ventes de votre boutique apparaîtront ici dès la première vente.'} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Commande</th><th className="px-4">Client</th><th className="px-4">Articles</th><th className="px-4">Total</th><th className="px-4">Statut</th><th className="px-4">Mise à jour</th></tr></thead><tbody className="divide-y">{orders.map(order => { const items = Array.isArray(order.items) ? order.items : []; return <tr key={order.id}><td className="px-4 py-4"><strong className="block">{order.reference}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{dateLabel(order.createdAt)}</small></td><td className="px-4 py-4"><strong className="block">{order.customerName}</strong><small className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">{order.customerEmail}</small></td><td className="px-4 py-4 text-xs">{items.reduce((sum, item) => sum + item.quantity, 0)} article{items.length > 1 ? 's' : ''}</td><td className="px-4 py-4 font-bold">{money(order.total, data.store.currency)}</td><td className="px-4 py-4"><StatusPill value={order.status} /></td><td className="px-4 py-4">{canModify ? <select aria-label={`Changer le statut de ${order.reference}`} value={order.status} onChange={event => void changeStatus(order, event.target.value as EcommerceOrderStatus)} className="rounded-lg border bg-[hsl(var(--card))] px-2 py-2 text-xs font-bold">{allowedNextStatuses(order.status).map(item => <option key={item} value={item}>{item}</option>)}</select> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Lecture seule</span>}</td></tr>; })}</tbody></table></div>}</Panel></div>;
 }
 
+function OrderAttachments({ data }: { data: EcommerceBootstrap }) {
+  const orders = data.orders.filter(order => Array.isArray(order.attachments) && order.attachments.length > 0);
+  if (orders.length === 0) return null;
+
+  return <Panel title="Pièces jointes des commandes" description="Fichiers transmis par les clients au moment de la commande.">
+    <div className="grid gap-3 md:grid-cols-2">
+      {orders.map(order => <section key={order.id} className="rounded-xl border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div><p className="mono text-[10px] font-bold uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))]">{order.reference}</p><p className="mt-1 text-sm font-bold">{order.customerName}</p></div>
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">{order.attachments?.length} fichier(s)</span>
+        </div>
+        <ul className="mt-3 space-y-2 border-t pt-3">
+          {order.attachments?.map(attachment => <li key={attachment.id} className="flex items-center justify-between gap-3 text-xs">
+            <span className="min-w-0 truncate" title={attachment.name}>{attachment.name} · {Math.max(1, Math.round(attachment.size / 1024))} Ko</span>
+            <a
+              href={`/api/ecommerce/orders/${encodeURIComponent(order.id)}/attachments/${encodeURIComponent(attachment.id)}?companyId=${encodeURIComponent(data.store.companyId)}`}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 font-bold text-[hsl(var(--primary))]"
+            >
+              <ArrowDownToLine size={13} />Télécharger
+            </a>
+          </li>)}
+        </ul>
+      </section>)}
+    </div>
+  </Panel>;
+}
+
 function Clients({ data }: { data: EcommerceBootstrap }) {
   const clients = useMemo(() => {
     const map = new Map<string, { name: string; email: string; phone: string; orders: number; total: number; lastOrder: string }>();
@@ -1152,6 +1181,7 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     currency: store.currency,
     primaryColor: store.primaryColor,
     accentColor: store.accentColor,
+    allowOrderAttachments: store.allowOrderAttachments,
   });
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1171,6 +1201,7 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
       currency: store.currency,
       primaryColor: store.primaryColor,
        accentColor: store.accentColor,
+      allowOrderAttachments: store.allowOrderAttachments,
     });
     setSlugManuallyEdited(false);
     setLogoFile(null);
@@ -1219,6 +1250,19 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
          <div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value, ...(slugManuallyEdited ? {} : { slug: slugify(value) }) })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} disabled={!canModify} /><label className="block text-xs font-bold">Logo de la boutique<div className="mt-1.5 flex items-center gap-3 rounded-lg border px-3 py-2.5"><span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <Store size={16} className="text-[hsl(var(--muted-foreground))]" />}</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!canModify} onChange={event => setLogoFile(event.target.files?.[0] ?? null)} className="min-w-0 flex-1 text-xs" /></div>{logoFile && <span className="mt-1 block truncate text-[11px] font-normal text-[hsl(var(--muted-foreground))]">{logoFile.name}</span>}</label><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div>
         <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-xs font-bold">Lien public de la boutique<input readOnly value={publicUrl} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))]" /></label><div className="flex gap-2"><button type="button" onClick={() => void copyPublicUrl()} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><Copy size={14} />{copied ? 'Copié' : 'Copier'}</button><a href={publicUrl} target="_blank" rel="noreferrer" className="btn inline-flex items-center rounded-lg border px-3 py-2.5 text-xs font-bold">Ouvrir</a></div></div><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Ce lien se met à jour avec le nom ou le slug de la boutique. La vitrine sera accessible publiquement lorsqu’elle sera publiée.</p></div>
         <label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+         <label className="flex items-start gap-3 rounded-xl border p-4">
+           <input
+             type="checkbox"
+             checked={form.allowOrderAttachments}
+             onChange={event => patch({ allowOrderAttachments: event.target.checked })}
+             disabled={!canModify}
+             className="mt-0.5"
+           />
+           <span>
+             <span className="block text-sm font-bold">Autoriser les pièces jointes aux commandes</span>
+             <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les clients pourront joindre jusqu’à 3 fichiers PDF ou images de 2 Mo maximum pendant le paiement. Les fichiers restent privés.</span>
+           </span>
+         </label>
          <div className="rounded-xl border p-4">
            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold">Images de la bannière d’accueil</p><p className="mt-1 text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Choisissez plusieurs images : elles défileront horizontalement dans l’accueil public.</p></div><span className="text-[10px] font-bold text-[hsl(var(--muted-foreground))]">{store.heroImages.length}/12</span></div>
            <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || store.heroImages.length >= 12} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, Math.max(0, 12 - store.heroImages.length)))} className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" />

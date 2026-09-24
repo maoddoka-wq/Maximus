@@ -9,7 +9,7 @@
 - [Frontière des données Commerce](commerce-data-boundary.md) — les workflows Commerce doivent synchroniser explicitement l’état local entreprise et le StoreData partagé lorsqu’ils touchent au stock.
 - [Routage avec paramètres](query-routing.md) — les routeurs d’espace doivent comparer le chemin sans query string, car les onglets internes modifient l’URL courante.
 - [Thème du menu entreprise](company-menu-theme.md) — le fond du menu reste distinct, mais les états actif et survol reprennent la couleur principale de l’entreprise.
-- [Migration Laravel progressive](laravel-migration-boundary.md) — conserver Laravel en parallèle et réversible jusqu’à preuve de parité avec Express et PostgreSQL.
+- [Migration Laravel progressive](laravel-migration-boundary.md) — garder Laravel réversible et inspecter toutes les migrations en attente avant leur exécution.
 - [Runtime Laravel PostgreSQL](laravel-runtime.md) — le serveur HTTP doit conserver DB_CONNECTION=pgsql dans le même processus, via le routeur PHP intégré.
 - [Isolation multi-entreprise](tenant-isolation.md) — l’entreprise vient de la session serveur ; un companyId client ne peut jamais changer le périmètre.
 - [Développement des modules](module-development.md) — chaque module possède ses packs métiers, que les secteurs composent sans recréer les fonctionnalités.

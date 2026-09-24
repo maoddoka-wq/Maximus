@@ -82,6 +82,7 @@ class EcommerceController extends Controller
             'primaryColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'accentColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'logoUrl' => ['nullable', 'string', 'max:500'],
+            'allowOrderAttachments' => ['sometimes', 'boolean'],
         ])->validate();
         $company = $this->company($request);
         $row = $this->ensureStore($company);
@@ -95,6 +96,7 @@ class EcommerceController extends Controller
             'primary_color' => $input['primaryColor'],
             'accent_color' => $input['accentColor'],
             'logo_url' => array_key_exists('logoUrl', $input) ? ($input['logoUrl'] ?? '') : ($row->logo_url ?? ''),
+            'allow_order_attachments' => (bool) ($input['allowOrderAttachments'] ?? $row->allow_order_attachments ?? false),
             'updated_at' => now(),
         ];
         if (DB::table('ecommerce_stores')->where('id', $row->id)->where('company_id', $company)->exists()) {
@@ -1026,6 +1028,28 @@ class EcommerceController extends Controller
         return response()->json($this->order(DB::table('ecommerce_orders')->where('id', $id)->first()));
     }
 
+    public function downloadOrderAttachment(Request $request, string $id, string $attachmentId)
+    {
+        if (! $this->allowed($request, 'view', 'commandes')) {
+            return $this->forbidden();
+        }
+
+        $attachment = DB::table('ecommerce_order_attachments')
+            ->where('id', $attachmentId)
+            ->where('order_id', $id)
+            ->where('company_id', $this->company($request))
+            ->first();
+        if (! $attachment || ! Storage::disk('digital')->exists($attachment->file_path)) {
+            return response()->json(['error' => 'Pièce jointe introuvable.'], 404);
+        }
+
+        return Storage::disk('digital')->download($attachment->file_path, $attachment->original_name, [
+            'Content-Type' => $attachment->mime_type,
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function deliveryRequests(Request $request): JsonResponse
     {
         if (! $this->allowed($request, 'view', 'livraisons')) {
@@ -1432,6 +1456,7 @@ class EcommerceController extends Controller
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
+            'allowOrderAttachments' => (bool) ($row->allow_order_attachments ?? false),
             'heroImages' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'store', (string) ($row->id ?? ''), 'hero'),
             'transportPrimaryColor' => $this->publicTransportColor((string) $row->company_id, 'primaryColor'),
             'transportAccentColor' => $this->publicTransportColor((string) $row->company_id, 'accentColor'),
@@ -1754,6 +1779,7 @@ class EcommerceController extends Controller
 
     private function createOrderForStore(Request $request, object $store): JsonResponse
     {
+        $attachmentsEnabled = (bool) ($store->allow_order_attachments ?? false);
         $input = Validator::make($request->all(), [
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
             'customerEmail' => ['required', 'email', 'max:160'],
@@ -1765,7 +1791,13 @@ class EcommerceController extends Controller
             'items.*.productSlug' => ['nullable', 'string', 'min:2', 'max:160'],
             'items.*.rentalId' => ['nullable', 'string', 'min:2', 'max:160'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
+            'attachments' => $attachmentsEnabled ? ['sometimes', 'array', 'max:3'] : ['prohibited'],
+            'attachments.*' => $attachmentsEnabled
+                ? ['file', 'mimetypes:application/pdf,image/jpeg,image/png,image/webp', 'max:2048']
+                : ['prohibited'],
         ])->validate();
+        $attachments = $input['attachments'] ?? [];
+        unset($input['attachments']);
 
         $customer = EcommerceCustomerAuth::customerFromRequest($request, (string) $store->company_id);
         $idempotencyKey = trim((string) ($request->header('Idempotency-Key') ?: $request->input('idempotencyKey', '')));
@@ -1824,8 +1856,9 @@ class EcommerceController extends Controller
                 return response()->json(['error' => 'La zone de livraison sélectionnée est indisponible.'], 422);
             }
         }
+        $uploadedAttachmentPaths = [];
         try {
-            $order = DB::transaction(function () use ($input, $store, $customer, $idempotencyKey, $activeDeliveryZones, $deliveryZone): array {
+            $order = DB::transaction(function () use ($input, $attachments, $store, $customer, $idempotencyKey, $activeDeliveryZones, $deliveryZone, &$uploadedAttachmentPaths): array {
                 $lines = [];
                 $total = 0;
                 $hasPhysicalProduct = false;
@@ -1944,6 +1977,41 @@ class EcommerceController extends Controller
                 foreach ($lines as $line) {
                     DB::table('ecommerce_order_items')->insert(array_merge($line, ['order_id' => $id]));
                 }
+                foreach ($attachments as $file) {
+                    $mimeType = (string) $file->getMimeType();
+                    $extension = match ($mimeType) {
+                        'application/pdf' => 'pdf',
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                        'image/webp' => 'webp',
+                        default => throw new \RuntimeException('ATTACHMENT_STORAGE_FAILED'),
+                    };
+                    $attachmentId = (string) Str::uuid();
+                    $path = $file->storeAs('order-attachments/'.$id, $attachmentId.'.'.$extension, 'digital');
+                    if (! is_string($path) || $path === '') {
+                        throw new \RuntimeException('ATTACHMENT_STORAGE_FAILED');
+                    }
+                    $uploadedAttachmentPaths[] = $path;
+                    $originalName = basename(str_replace('\\', '/', $file->getClientOriginalName()));
+                    $originalName = trim((string) preg_replace('/[\x00-\x1F\x7F]/u', '', $originalName));
+                    if ($originalName === '') {
+                        $originalName = 'piece-jointe.'.$extension;
+                    }
+                    $originalName = Str::limit($originalName, 255, '');
+
+                    DB::table('ecommerce_order_attachments')->insert([
+                        'id' => $attachmentId,
+                        'company_id' => $store->company_id,
+                        'order_id' => $id,
+                        'customer_id' => $customer?->id,
+                        'file_path' => $path,
+                        'original_name' => $originalName,
+                        'mime_type' => $mimeType,
+                        'file_size' => (int) ($file->getSize() ?: 0),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
                 if ($customer) {
                     DB::table('ecommerce_customer_cart_items')
                         ->where('customer_id', $customer->id)
@@ -1964,18 +2032,24 @@ class EcommerceController extends Controller
 
             return response()->json($order, 201);
         } catch (Throwable $error) {
+            foreach ($uploadedAttachmentPaths as $path) {
+                Storage::disk('digital')->delete($path);
+            }
             $message = match ($error->getMessage()) {
                 'STOCK_INSUFFICIENT' => 'Un article n’est plus disponible dans la quantité demandée.',
                 'RENTAL_UNAVAILABLE' => 'Cette location n’est plus disponible dans la quantité demandée.',
                 'PRODUCT_TYPE_NOT_AUTHORIZED' => 'Ce type de produit n’est pas activé pour cette boutique.',
                 'SHIPPING_ADDRESS_REQUIRED' => 'Une adresse est nécessaire pour une commande physique.',
                 'DELIVERY_ZONE_REQUIRED' => 'Veuillez sélectionner une zone de livraison.',
+                'ATTACHMENT_STORAGE_FAILED' => 'Une pièce jointe n’a pas pu être enregistrée.',
                 default => 'La commande n’a pas pu être enregistrée.',
             };
 
             return response()->json([
                 'error' => $message,
-            ], in_array($error->getMessage(), ['STOCK_INSUFFICIENT', 'RENTAL_UNAVAILABLE'], true) ? 409 : 400);
+            ], in_array($error->getMessage(), ['STOCK_INSUFFICIENT', 'RENTAL_UNAVAILABLE'], true)
+                ? 409
+                : ($error->getMessage() === 'ATTACHMENT_STORAGE_FAILED' ? 500 : 400));
         }
     }
 
@@ -2228,8 +2302,18 @@ class EcommerceController extends Controller
     {
         $rows = DB::table('ecommerce_orders')->where('company_id', $company)->orderByDesc('created_at')->limit(250)->get();
         $items = DB::table('ecommerce_order_items')->whereIn('order_id', $rows->pluck('id')->all())->get()->groupBy('order_id');
+        $attachments = DB::table('ecommerce_order_attachments')
+            ->where('company_id', $company)
+            ->whereIn('order_id', $rows->pluck('id')->all())
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('order_id');
 
-        return $rows->map(fn ($row) => $this->order($row, $items->get($row->id, collect())->values()->all()))->values()->all();
+        return $rows->map(fn ($row) => $this->order(
+            $row,
+            $items->get($row->id, collect())->values()->all(),
+            $attachments->get($row->id, collect())->values()->all(),
+        ))->values()->all();
     }
 
     private function store(object $row): array
@@ -2245,6 +2329,7 @@ class EcommerceController extends Controller
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
             'logoUrl' => $row->logo_url ?? '',
+            'allowOrderAttachments' => (bool) ($row->allow_order_attachments ?? false),
             'heroImages' => $this->galleryUrls((string) $row->company_id, 'store', (string) $row->id, 'hero'),
         ];
     }
@@ -2280,7 +2365,7 @@ class EcommerceController extends Controller
         ];
     }
 
-    private function order(object $row, array $items = []): array
+    private function order(object $row, array $items = [], array $attachments = []): array
     {
         return [
             'id' => $row->id,
@@ -2300,6 +2385,12 @@ class EcommerceController extends Controller
             'paymentCheckoutUrl' => $row->payment_checkout_url ?? null,
             'paymentFailureReason' => $row->payment_failure_reason ?? '',
             'createdAt' => $row->created_at,
+            'attachments' => array_map(fn (object $attachment): array => [
+                'id' => $attachment->id,
+                'name' => $attachment->original_name,
+                'mimeType' => $attachment->mime_type,
+                'size' => (int) $attachment->file_size,
+            ], $attachments),
             'items' => array_map(fn ($item) => [
                 'id' => $item->id,
                 'productId' => $item->product_id,

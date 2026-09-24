@@ -47,6 +47,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
           Route::patch('/location/reservations/{id}/status', [CarRentalController::class, 'transition']);
          Route::get('/location/reservations/{id}/invoice', [CarRentalController::class, 'invoice']);
         Route::patch('/orders/{id}/status', [EcommerceController::class, 'updateOrderStatus']);
+         Route::get('/orders/{id}/attachments/{attachmentId}', [EcommerceController::class, 'downloadOrderAttachment']);
         Route::get('/delivery-requests', [EcommerceController::class, 'deliveryRequests']);
         Route::patch('/delivery-requests/{id}/status', [EcommerceController::class, 'updateDeliveryRequestStatus']);
          Route::post('/delivery-zones', [EcommerceController::class, 'createDeliveryZone']);
@@ -99,6 +100,7 @@ Route::prefix('shop/{slug}')->group(function (): void {
     Route::delete('/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
     Route::get('/customer/orders', [EcommerceCustomerController::class, 'orders']);
     Route::get('/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+    Route::get('/customer/orders/{id}/attachments/{attachmentId}', [EcommerceCustomerController::class, 'downloadOrderAttachment']);
      Route::get('/customer/orders/{id}/items/{itemId}/download', [EcommerceCustomerController::class, 'downloadDigitalProduct']);
     Route::get('/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 });
@@ -120,6 +122,7 @@ Route::put('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'p
 Route::delete('/shop-domain/customer/cart', [EcommerceCustomerController::class, 'clearCart']);
 Route::get('/shop-domain/customer/orders', [EcommerceCustomerController::class, 'orders']);
 Route::get('/shop-domain/customer/orders/{id}', [EcommerceCustomerController::class, 'order']);
+Route::get('/shop-domain/customer/orders/{id}/attachments/{attachmentId}', [EcommerceCustomerController::class, 'downloadOrderAttachment']);
  Route::get('/shop-domain/customer/orders/{id}/items/{itemId}/download', [EcommerceCustomerController::class, 'downloadDigitalProduct']);
 Route::get('/shop-domain/customer/delivery-requests', [EcommerceCustomerController::class, 'deliveryRequests']);
 Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
