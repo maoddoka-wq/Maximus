@@ -322,3 +322,17 @@ mtime_ms = 1790273235408
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/0c9fa376-7c3c-4966-a4d3-28be0095d0be/e47e3d72-df19-4609-9398-e839109aff56"
 storage_version_token = "1790273235933151"
 content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "9XXsdqXs96LXo_hWnseec"
+uri = "file://.local/outputs/MAXIMUS-pour-NSG---Presentation-detaillee.pptx"
+type = "slides"
+title = "MAXIMUS pour NSG — Présentation détaillée (PPTX)"
+description = "Présentation de 12 diapositives avec une recommandation des modules MAXIMUS pour Némadi Services Group, leurs cas d’usage, les options conditionnelles et les limites de périmètre."
+logical_id = "372d358d-8812-41f5-9208-706bd6e82331"
+content_hash = "sha256:d09071af774448840e25b659b0c9f148784d5f0f7714c03d4a75a3d453e431e9"
+size = 6733280
+mtime_ms = 1790273877968
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/372d358d-8812-41f5-9208-706bd6e82331/153722c4-b058-4366-bc17-bb16e168582e"
+storage_version_token = "1790273878438411"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"

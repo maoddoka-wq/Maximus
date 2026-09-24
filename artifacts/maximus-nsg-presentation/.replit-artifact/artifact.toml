@@ -1,14 +1,14 @@
 kind = "slides"
-previewPath = "/maximus-presentation/"
-title = "MAXIMUS ERP — Présentation des modules"
-description = "Vue d’ensemble générale des modules actuellement disponibles dans MAXIMUS ERP : gestion commerciale, e-commerce, stock, immobilier, présences et paie."
+previewPath = "/maximus-nsg-presentation/"
+title = "MAXIMUS pour NSG — Présentation détaillée"
+description = "Proposition de configuration MAXIMUS pour Némadi Services Group : Gestion commerciale, Présences, Paie, Stock sous condition et E-commerce optionnel."
 version = "1.0.0"
 id = "artifacts/maximus-nsg-presentation"
 router = "path"
 
 [[services]]
 name = "web"
-paths = [ "/maximus-presentation/" ]
+paths = [ "/maximus-nsg-presentation/" ]
 localPort = 23301
 
 [services.development]
@@ -25,4 +25,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "23301"
-BASE_PATH = "/maximus-presentation/"
+BASE_PATH = "/maximus-nsg-presentation/"
