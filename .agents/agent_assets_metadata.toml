@@ -364,3 +364,17 @@ mtime_ms = 1790285011916
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/ec30d21f-f0db-4d95-8266-8ac9f84895a9/d6f5f966-16cc-4283-8f5c-4b2f751c3854"
 storage_version_token = "1790285012488564"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "bwxx0W4IL9b5N72aEJwJV"
+uri = "file://.local/outputs/MAXIMUS-ERP-12-diapos-synthese.pdf"
+type = "pdf"
+title = "MAXIMUS ERP — Synthèse en 12 diapositives (PDF)"
+description = "Sélection de 12 pages du deck général : catalogue et choix des accès, une page représentative par module, déploiement progressif et conclusion. La numérotation d’origine est conservée pour retrouver les pages dans le PPTX complet."
+logical_id = "d1c0c825-961b-4d28-bfe1-35a2f89ce1f6"
+content_hash = "sha256:c5fba00008acdd6e70099d00ebf3d3a6fbb6bf35a4e59ef4ba5cd914a5fd138a"
+size = 1902648
+mtime_ms = 1790285857311
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/d1c0c825-961b-4d28-bfe1-35a2f89ce1f6/9b846b01-53aa-4b28-9bbf-a64cc8bc9f4f"
+storage_version_token = "1790285914731887"
+content_type = "application/pdf"
