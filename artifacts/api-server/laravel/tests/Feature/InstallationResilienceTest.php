@@ -8,6 +8,7 @@ use App\Models\AuthSession;
 use App\Services\InstallationSyncService;
 use App\Support\ApplicationIdentity;
 use App\Support\InstallationSyncState;
+use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\DB;
@@ -107,6 +108,30 @@ class InstallationResilienceTest extends TestCase
             'company_id' => 'sync-company',
             'status' => 'ACTIF',
             'providers' => '[]',
+        ]);
+    }
+
+    public function test_sync_imports_published_immobilier_dashboard_feature_before_validating_selection(): void
+    {
+        $payload = $this->payload();
+        $payload['modules'] = [
+            'ids' => ['immobilier'],
+            'packIds' => ['immobilier' => ['immobilier-consultation']],
+            'featureIds' => ['immobilier' => ['dashboard', 'biens', 'annonces']],
+            'permissions' => [],
+        ];
+        $payload['catalog'] = ModuleCatalog::publishedCatalog(['immobilier']);
+
+        $company = app(InstallationSyncService::class)->apply($payload, true);
+
+        $this->assertSame(
+            ['dashboard', 'biens', 'annonces'],
+            $company->requested_module_features['immobilier'],
+        );
+        $this->assertDatabaseHas('maximus_company_modules', [
+            'company_id' => 'sync-company',
+            'module_id' => 'immobilier',
+            'status' => 'ACTIF',
         ]);
     }
 
