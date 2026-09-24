@@ -1,0 +1,108 @@
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel> $env:NODE_ENV='development'; $env:npm_config_production='false'; & "C:\Users\FIS-TS\maximus-local-propre\scripts\update-maximus-instance.ps1"
+
+==> VÃ©rification de la version GitHub et de la version Render
+From https://github.com/maoddoka-wq/Maximus
+ * branch            main       -> FETCH_HEAD
+Le code local est dÃ©jÃ  sur le commit Render.
+
+==> Mise Ã  jour des dÃ©pendances Laravel
+Installing dependencies from lock file
+Verifying lock file contents can be installed on current platform.
+Nothing to install, update or remove
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+   INFO  Discovering packages.
+
+  laravel/tinker ........................................................................................................................... DONE
+  nesbot/carbon ............................................................................................................................ DONE
+  nunomaduro/termwind ...................................................................................................................... DONE
+
+54 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+
+==> Construction du frontend MAXIMUS
+(node:13800) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Scope: all 10 workspace projects
+√ The modules directories will be removed and reinstalled from scratch. Proceed? (Y/n) · true
+Lockfile is up to date, resolution step is skipped
+Packages: +396
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 396, reused 393, downloaded 0, added 4, done
+
+devDependencies:
++ prettier 3.9.6
++ typescript 5.9.3
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; es…
+└─ Done in 405ms
+Done in 1m 24.4s using pnpm v9.15.9
+(node:5280) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+> @workspace/maximus@0.0.0 build C:\Users\FIS-TS\maximus-local-propre\artifacts\maximus
+> vite build --config vite.config.ts
+
+vite v7.3.6 building client environment for production...
+✓ 1954 modules transformed.
+dist/public/index.html                                   1.70 kB │ gzip:   0.64 kB
+dist/public/assets/taxi-route-map-CIGW-MKW.css          15.61 kB │ gzip:   6.46 kB
+dist/public/assets/index-DChBXeEd.css                  189.04 kB │ gzip:  30.45 kB
+dist/public/assets/workspace-tabs-CUAiqsab.js            0.78 kB │ gzip:   0.49 kB
+dist/public/assets/query-tab-DtE_6SMv.js                 1.00 kB │ gzip:   0.51 kB
+dist/public/assets/control-api-BkZ-B8YG.js               1.17 kB │ gzip:   0.64 kB
+dist/public/assets/immobilier-api-CVRZV6-T.js            2.61 kB │ gzip:   0.62 kB
+dist/public/assets/system-health-DgP9HRPY.js             3.97 kB │ gzip:   1.61 kB
+dist/public/assets/company-login-fC54X1K_.js             7.03 kB │ gzip:   2.82 kB
+dist/public/assets/operational-modules-CFDvTrJ7.js      16.79 kB │ gzip:   5.37 kB
+dist/public/assets/control-center-D2ztK9HC.js           16.85 kB │ gzip:   5.07 kB
+dist/public/assets/intelligent-onboarding-CKL74qo6.js   19.77 kB │ gzip:   4.45 kB
+dist/public/assets/platform-settings-BRS3u45i.js        19.98 kB │ gzip:   5.37 kB
+dist/public/assets/company-setup-guide-COAvxKNt.js      21.70 kB │ gzip:   7.07 kB
+dist/public/assets/payroll-module-Bp3qLRRy.js           25.93 kB │ gzip:   7.87 kB
+dist/public/assets/maximus-assistant-DsDhUhZZ.js        28.66 kB │ gzip:   7.79 kB
+dist/public/assets/vendor-icons-CsMLJLZI.js             32.00 kB │ gzip:  10.48 kB
+dist/public/assets/immobilier-module-C3w09mwB.js        36.44 kB │ gzip:   8.81 kB
+dist/public/assets/qr-scanner-worker.min-D85Z9gVD.js    43.95 kB │ gzip:  10.46 kB
+dist/public/assets/vendor-react-clQjQM8u.js             48.46 kB │ gzip:  15.40 kB
+dist/public/assets/vendor-radix-DbFX9I2X.js             52.75 kB │ gzip:  18.80 kB
+dist/public/assets/commerce-module-CvKv_xLK.js          60.51 kB │ gzip:  15.11 kB
+dist/public/assets/company-organization-DotJHXPZ.js     61.24 kB │ gzip:  14.48 kB
+dist/public/assets/stock-module-c0wX5SDX.js             62.84 kB │ gzip:  14.46 kB
+dist/public/assets/transport-module-Cr_at_sk.js         66.97 kB │ gzip:  17.11 kB
+dist/public/assets/presence-module-BCiXVNeu.js          81.94 kB │ gzip:  27.34 kB
+dist/public/assets/ecommerce-module-C2oU5SMa.js        101.97 kB │ gzip:  22.80 kB
+dist/public/assets/public-shop-Cn6fxZfZ.js             135.34 kB │ gzip:  32.67 kB
+dist/public/assets/taxi-route-map-DcHBKqaA.js          158.58 kB │ gzip:  46.20 kB
+dist/public/assets/index-eCvs4sh2.js                   613.14 kB │ gzip: 171.41 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 50.67s
+
+==> Migration et synchronisation de lâ€™entreprise
+
+   INFO  Configuration cache cleared successfully.
+
+
+   INFO  Nothing to migrate.
+
+Installation déjà initialisée ; configuration et administrateur locaux conservés, sans appel central.
+La synchronisation périodique reste indépendante du démarrage.
+
+==> Activation du scheduler de synchronisation centrale
+Scheduler MAXIMUS activÃ© : MAXIMUS central scheduler
+DÃ©clenchement toutes les 5 minute(s), sans fenÃªtre visible.
+Journal : C:\Users\FIS-TS\maximus-local-propre\artifacts\api-server\laravel\storage\logs\installation-scheduler.log
+Prochaine exÃ©cution : 09/24/2026 11:45:00
+DerniÃ¨re exÃ©cution : 09/24/2026 11:40:02 (code 0)
+
+==> VÃ©rification locale
+
+Mise Ã  jour MAXIMUS terminÃ©e.
+Version locale : c3ed7d1a1bdddfa30fe171a5b751e4a7506d93a6
+PS C:\Users\FIS-TS\maximus-local-propre\artifacts\api-
