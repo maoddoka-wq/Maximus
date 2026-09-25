@@ -192,14 +192,14 @@ function BatchSummary({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-xl border p-4">
-      <div className="min-w-[160px] flex-1">
+    <div className="payroll-batch-summary flex flex-wrap items-center gap-4 rounded-xl border p-4">
+      <div className="payroll-batch-summary__period min-w-0">
         <div className="font-bold">{batch.period}</div>
         <div className="text-xs text-[hsl(var(--muted-foreground))]">
           {batch.itemCount} bénéficiaire(s) · paiement le {dateLabel(batch.paymentDate)}
         </div>
       </div>
-      <div className="font-semibold">{money(batch.totalAmount)}</div>
+      <div className="payroll-batch-summary__amount font-semibold">{money(batch.totalAmount)}</div>
       <Badge>{statusLabel[batch.status] ?? batch.status}</Badge>
       {action}
     </div>

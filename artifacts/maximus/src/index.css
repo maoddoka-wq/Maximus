@@ -150,7 +150,25 @@ body { min-width: 320px; }
 .organization-modal-panel { width: min(96vw, 1200px); max-width: 1200px; max-height: calc(100dvh - 2rem); overflow-x: hidden; }
 .app-dialog-backdrop { align-items: center !important; justify-content: center !important; }
 .app-dialog-panel { max-height: min(90dvh, 860px); overflow: auto; }
-.modal-header { flex-shrink: 0; }
+.modal-header {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.modal-header > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.modal-header h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.modal-header > :last-child {
+  flex: 0 0 auto;
+}
 .modal-body { min-height: 0; overflow-y: auto; }
 .modal-footer { flex-shrink: 0; border-top: 1px solid hsl(var(--border)); padding-top: 1rem; }
 .immobilier-modal-backdrop { align-items: flex-start !important; justify-content: center !important; overflow-y: auto; background-color: hsl(var(--foreground) / .35) !important; backdrop-filter: blur(4px) !important; }
@@ -158,6 +176,12 @@ body { min-width: 320px; }
 .ecommerce-modal-backdrop { align-items: flex-start !important; justify-content: center !important; overflow-y: auto; background-color: hsl(var(--foreground) / .35) !important; backdrop-filter: blur(4px) !important; }
 .ecommerce-modal-backdrop > .modal-panel { margin: .25rem auto auto !important; max-height: calc(100dvh - .5rem) !important; }
 .ecommerce-modal-backdrop .modal-header { position: sticky; top: 0; z-index: 3; background: inherit; }
+.presence-toolbar { min-width: 0; }
+.presence-toolbar__search { min-width: 0; flex: 1 1 14rem; }
+.payroll-batch-summary { min-width: 0; }
+.payroll-batch-summary > * { min-width: 0; }
+.payroll-batch-summary__period { flex: 1 1 12rem; }
+.payroll-batch-summary__amount { overflow-wrap: anywhere; }
 .field-help { max-width: 42rem; }
 .metric-accent { position: relative; overflow: hidden; }
 .metric-accent::after { position: absolute; right: -22px; top: -22px; width: 88px; height: 88px; border: 1px solid hsl(var(--primary) / .2); border-radius: 999px; content: ""; }
@@ -195,6 +219,10 @@ body { min-width: 320px; }
   .organization-modal-panel { width: 100%; max-height: calc(100dvh - 1.5rem); }
   .modal-footer { display: flex; flex-direction: column-reverse; gap: .5rem; }
   .modal-footer > button { width: 100%; justify-content: center; }
+  .presence-toolbar__search { flex-basis: 100%; }
+  .payroll-batch-summary { align-items: flex-start; gap: .6rem; }
+  .payroll-batch-summary__period { flex-basis: calc(100% - 2.5rem); }
+  .payroll-batch-summary__amount { flex: 1 1 auto; }
   .table-scroll { margin-inline: -1px; }
   .table-scroll table { min-width: 760px; }
   .transport-table-scroll table { min-width: 620px; }

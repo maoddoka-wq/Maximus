@@ -3167,16 +3167,41 @@ function RoleAwareCompanyDashboard({
             </button>
           </div>
           {sales.length ? (
-            <DataTable
-              headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
-              rows={sales.slice(0, 5).map((sale) => [
-                sale.reference,
-                sale.client,
-                money(sale.amount),
-                <StatusBadge status={sale.status} />,
-                sale.date,
-              ])}
-            />
+            <>
+              <div className="hidden xl:block">
+                <DataTable
+                  headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
+                  rows={sales.slice(0, 5).map((sale) => [
+                    sale.reference,
+                    sale.client,
+                    money(sale.amount),
+                    <StatusBadge status={sale.status} />,
+                    sale.date,
+                  ])}
+                />
+              </div>
+              <div className="grid gap-3 p-4 xl:hidden">
+                {sales.slice(0, 5).map((sale) => (
+                  <article
+                    key={sale.id}
+                    data-testid={`card-dashboard-sale-${sale.id}`}
+                    className="rounded-xl border bg-[hsl(var(--muted))] p-4"
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold">{sale.reference}</p>
+                        <p className="mt-1 break-words text-xs text-[hsl(var(--muted-foreground))]">{sale.client}</p>
+                      </div>
+                      <StatusBadge status={sale.status} />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t pt-3 text-xs">
+                      <span className="font-bold">{money(sale.amount)}</span>
+                      <span className="text-[hsl(var(--muted-foreground))]">{sale.date}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="p-5 text-sm text-[hsl(var(--muted-foreground))]">Aucune vente enregistrée pour le moment.</p>
           )}
