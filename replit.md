@@ -103,6 +103,16 @@ Le périmètre le plus restrictif gagne toujours. Une permission de rôle ne peu
 - La configuration des secteurs affiche les fonctionnalités réelles du module, et non seulement son intitulé : onglets Commerce, sous-rubriques Stocks et fonctionnalités des autres modules.
 - Lorsqu’une fonctionnalité est sélectionnée dans un profil de secteur, ses prérequis sont également sélectionnés en visibilité afin de ne pas créer de périmètre incohérent.
 
+### Interfaces selon le rôle
+
+Pour chaque nouveau module, définir avant l’implémentation les parcours et actions pertinents pour l’administration, les managers et les employés, selon les rôles réellement configurés :
+
+- **Administration** : configuration et gouvernance du module dans le périmètre administratif autorisé, global MAXIMUS ou entreprise selon la responsabilité.
+- **Managers** : pilotage opérationnel et suivi de leur entreprise, unité ou équipe, sans accès aux autres périmètres.
+- **Employés** : parcours métier quotidien limité aux fonctionnalités, données et actions qui leur sont attribuées.
+
+La navigation, les écrans et les commandes doivent refléter les permissions effectives de chaque rôle. Ne pas présenter la même interface complète à tous les rôles en comptant uniquement sur des contrôles côté navigateur : les routes et mutations API doivent également appliquer les permissions, le périmètre entreprise et le périmètre organisationnel.
+
 ### Dépendances entre modules
 
 Une dépendance signifie qu’un module requiert un autre module pour être cohérent ou fonctionner. Elle doit être traitée comme une contrainte métier, pas comme une simple information affichée.
@@ -151,6 +161,7 @@ Les fonctionnalités d’un même module peuvent aussi avoir des prérequis. Ell
 12. Ajouter ou mettre à jour les tests de permissions, de dépendances de fonctionnalités et de routage.
 13. Vérifier les états vide, chargement, accès refusé et module retiré.
 14. Vérifier qu’un rôle existant et un employé existant ne gagnent pas de droits par défaut après l’ajout.
+15. Vérifier les interfaces et actions pertinentes pour l’administration, les managers et les employés, avec des tests d’accès autorisé et refusé pour chaque parcours applicable.
 
 ### Cas particuliers déjà normalisés
 
@@ -170,6 +181,7 @@ Les fonctionnalités d’un même module peuvent aussi avoir des prérequis. Ell
 - test d’un rôle avec action autorisée sur une seule sous-fonctionnalité ;
 - test d’un module refusé par l’unité ;
 - test d’accès direct à une route non autorisée ;
+- test des parcours d’interface et des actions par rôle : administration, manager et employé, selon les responsabilités du module ;
 - test d’une dépendance absente ou circulaire si le module en déclare une.
 
 ## Product
