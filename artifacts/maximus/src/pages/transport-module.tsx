@@ -45,7 +45,7 @@ import {
   type Vehicle,
   type VehicleStatus,
 } from '@/lib/transport-api';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';

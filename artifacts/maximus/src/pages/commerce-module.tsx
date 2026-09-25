@@ -37,7 +37,7 @@ import { addNotification, money, recordControlEvent, uid } from '@/lib/store';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 
 type Icon = ComponentType<{ size?: number; className?: string }>;

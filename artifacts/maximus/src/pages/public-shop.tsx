@@ -23,7 +23,7 @@ import { createPublicTransportApi, type PublicTransportPlace, type PublicTranspo
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type PublicProduct = PublicShopBootstrap['products'][number];

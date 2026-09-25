@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { installationAccessApi, ErpAddress, Installation } from '@/lib/installation-access-api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/maximus-design-system/components/ui/card';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { Input } from '@workspace/maximus-design-system/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@workspace/maximus-design-system/components/ui/dialog';
+import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
+import { useToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { Loader2, Plus, Copy, ExternalLink, Trash2, CheckCircle2, AlertCircle, Clock, Server, HardDrive, RefreshCw } from 'lucide-react';
 import {
   AlertDialog,
@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+} from '@workspace/maximus-design-system/components/ui/alert-dialog';
 
 interface CompanyInstallationAccessProps {
   companyId: string;

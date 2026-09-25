@@ -46,10 +46,10 @@ import {
   UserRoundCog,
 } from 'lucide-react';
 import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
-import { Toaster } from '@/components/ui/toaster';
-import { showAppToast } from '@/hooks/use-toast';
+import { Toaster } from '@workspace/maximus-design-system/components/ui/toaster';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@workspace/maximus-design-system/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';

@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { createPayrollApi, type PayrollBatch, type PayrollBeneficiary, type PayrollBootstrap } from '@/lib/payroll-api';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { payrollFeatureDefinitions, normalizePayrollFeatureId, normalizePayrollFeatureIds, type PayrollFeatureId } from '@/lib/payroll-features';
 import { WorkspaceTabs } from '@/components/workspace-tabs';

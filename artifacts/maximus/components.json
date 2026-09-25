@@ -12,8 +12,8 @@
     },
     "aliases": {
       "components": "@/components",
-      "utils": "@/lib/utils",
-      "ui": "@/components/ui",
+      "utils": "@workspace/maximus-design-system/lib/utils",
+      "ui": "@workspace/maximus-design-system/components/ui",
       "lib": "@/lib",
       "hooks": "@/hooks"
     }

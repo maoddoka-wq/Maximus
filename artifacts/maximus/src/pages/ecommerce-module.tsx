@@ -58,7 +58,7 @@ import {
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';

@@ -4,7 +4,7 @@ import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrap
 import { useQueryTab } from '@/lib/query-tab';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { useAppDialog } from '@/components/confirm-dialog';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const money = (value: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value) + ' FCFA';

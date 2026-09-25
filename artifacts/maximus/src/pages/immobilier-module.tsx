@@ -24,7 +24,7 @@ import {
   type ImmobilierProperty,
   type ImmobilierPropertyInput,
 } from '@/lib/immobilier-api';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 
 const emptyProperty: ImmobilierPropertyInput = {
   reference: '',

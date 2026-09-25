@@ -1,5 +1,5 @@
-@import "@workspace/maximus-design-system/styles.css";
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import "@workspace/maximus-design-system/styles.css";
 
 [data-stock-can-create="false"] [data-stock-write="true"],
 [data-stock-can-modify="false"] button[title*="Modifier"],
@@ -199,12 +199,6 @@ body { min-width: 320px; }
   .table-scroll table { min-width: 760px; }
   .transport-table-scroll table { min-width: 620px; }
   .sidebar-section-label { padding-top: .9rem; }
-}
-
-/* MAXIMUS visual system refresh */
-:root {
-  --radius: 0.8rem;
-  --shadow-soft: 0 1px 2px rgba(42, 45, 38, .03), 0 10px 28px rgba(42, 45, 38, .055);
 }
 
 body {

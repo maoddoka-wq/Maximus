@@ -9,7 +9,7 @@ import { useQueryTab } from '@/lib/query-tab';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';

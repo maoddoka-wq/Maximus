@@ -9,7 +9,7 @@ import {
   type SellerWalletWithdrawalFeePolicy,
   type PublicRegistrationPolicy,
 } from '@/lib/platform-settings-api';
-import { showAppToast } from '@/hooks/use-toast';
+import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 
 const modeOptions: Array<{
   value: SellerWalletMaturityMode;
