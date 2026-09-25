@@ -66,6 +66,67 @@ class LaboTest extends TestCase
         $this->assertNotNull($create->json('record.id'));
     }
 
+    public function test_one_catalog_feature_has_independent_records_in_each_module(): void
+    {
+        $workspace = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = json_decode((string) $workspace->payload, true);
+        $payload['moduleOverrides']['commerce'] = [
+            'features' => [self::FEATURE],
+            'laboFeatureIds' => [self::FEATURE],
+        ];
+        DB::table('maximus_app_states')->where('scope', 'workspace')->update([
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
+
+        $commerceAccess = DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'commerce')
+            ->first();
+        $commerceValues = [
+            'status' => 'ACTIF',
+            'feature_ids' => json_encode([self::FEATURE]),
+            'configuration' => json_encode(['featureScope' => 'explicit']),
+            'updated_at' => now(),
+        ];
+        if ($commerceAccess) {
+            DB::table('maximus_company_modules')
+                ->where('company_id', 'kora')
+                ->where('module_id', 'commerce')
+                ->update($commerceValues);
+        } else {
+            DB::table('maximus_company_modules')->insert([
+                'id' => 'kora-commerce-labo',
+                'company_id' => 'kora',
+                'module_id' => 'commerce',
+                ...$commerceValues,
+                'created_at' => now(),
+            ]);
+        }
+
+        $this->asActor()->postJson($this->endpoint('records'), [
+            'data' => ['title' => 'Dossier stock'],
+        ])->assertCreated();
+
+        $commerceEndpoint = '/api/labo/modules/commerce/features/'.self::FEATURE;
+        $this->asActor()->getJson($commerceEndpoint.'/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('count', 0);
+
+        $this->asActor()->postJson($commerceEndpoint.'/records', [
+            'data' => ['title' => 'Dossier commerce'],
+        ])->assertCreated();
+
+        $this->asActor()->getJson($this->endpoint('bootstrap'))
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('records.0.data.title', 'Dossier stock');
+        $this->asActor()->getJson($commerceEndpoint.'/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('records.0.data.title', 'Dossier commerce');
+    }
+
     public function test_field_validation_rejects_required_select_and_wrong_type_values(): void
     {
         foreach ([
@@ -200,15 +261,17 @@ class LaboTest extends TestCase
                 'company_id' => null,
                 'payload' => json_encode([
                     'moduleOverrides' => [
-                        self::MODULE => ['laboFeatures' => [$feature]],
+                        self::MODULE => [
+                            'features' => [$feature['id']],
+                            'laboFeatureIds' => [$feature['id']],
+                        ],
                     ],
+                    'laboFeatureCatalog' => [$feature],
                     'catalogDraft' => [
                         'moduleOverrides' => [
-                            self::MODULE => ['laboFeatures' => [[
-                                ...$feature,
-                                'label' => 'Dossiers en brouillon',
-                            ]]],
+                            self::MODULE => ['laboFeatureIds' => [$feature['id']]],
                         ],
+                        'laboFeatureCatalog' => [[...$feature, 'label' => 'Dossiers en brouillon']],
                     ],
                     'customModules' => [],
                     'updatedAt' => now()->toISOString(),

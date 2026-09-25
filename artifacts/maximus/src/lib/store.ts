@@ -78,10 +78,12 @@ export interface Module {
   featureDependencies?: Partial<Record<string, string[]>>;
   featurePacks?: ModuleFeaturePack[];
   status: 'ACTIF' | 'BETA';
+  laboFeatureIds?: string[];
+  /** Runtime-resolved definitions; legacy persisted copies are normalized into the shared catalog. */
   laboFeatures?: LaboFeatureDefinition[];
 }
 
-export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks' | 'laboFeatures'>>>>;
+export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks' | 'laboFeatureIds' | 'laboFeatures'>>>>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
@@ -135,6 +137,7 @@ export interface StoreData {
   moduleStatuses?: ModuleStatusMap;
   moduleOverrides?: ModuleOverrides;
   customModules?: Module[];
+  laboFeatureCatalog?: LaboFeatureDefinition[];
   removedModules?: ModuleId[];
   catalogDraft?: CatalogDraft;
   catalogVersion?: number;
@@ -339,6 +342,7 @@ const isRetiredSectorPreset = (preset: Pick<SectorPreset, 'id'>) =>
 export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | 'removedModules'> & {
   catalogDraft?: StoreData['catalogDraft'];
   customModules?: StoreData['customModules'];
+  laboFeatureCatalog?: StoreData['laboFeatureCatalog'];
 }): Module[] {
   const draftModules = data.catalogDraft?.customModules ?? [];
   const publishedModules = data.customModules ?? [];
@@ -346,11 +350,12 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
     (module, index, all) => all.findIndex(candidate => candidate.id === module.id) === index,
   );
   const catalogModules = [...modules, ...customModules];
+  const laboFeatureCatalog = data.catalogDraft?.laboFeatureCatalog ?? data.laboFeatureCatalog ?? [];
+  const catalogById = new Map(laboFeatureCatalog.map(feature => [feature.id, feature]));
   return catalogModules
     .filter(module => !data.removedModules?.includes(module.id))
     .map(module => {
-      const override = data.moduleOverrides?.[module.id];
-      if (!override || typeof override !== 'object') return module;
+      const override = data.moduleOverrides?.[module.id] ?? {};
 
       let featurePacks = Array.isArray(override.featurePacks)
         ? override.featurePacks
@@ -386,6 +391,21 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
         }));
       }
 
+      const legacyFeatureDefinitions = Array.isArray(override.laboFeatures)
+        ? override.laboFeatures
+        : Array.isArray(module.laboFeatures)
+          ? module.laboFeatures
+          : [];
+      const legacyById = new Map(legacyFeatureDefinitions.map(feature => [feature.id, feature]));
+      const laboFeatureIds = Array.isArray(override.laboFeatureIds)
+        ? override.laboFeatureIds
+        : Array.isArray(module.laboFeatureIds)
+          ? module.laboFeatureIds
+          : legacyFeatureDefinitions.map(feature => feature.id);
+      const resolvedLaboFeatures = [...new Set(laboFeatureIds)]
+        .map(featureId => catalogById.get(featureId) ?? legacyById.get(featureId))
+        .filter((feature): feature is LaboFeatureDefinition => Boolean(feature));
+
       return {
         ...module,
         ...override,
@@ -403,9 +423,8 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
               ? override.featureDependencies
               : module.featureDependencies,
         featurePacks,
-        laboFeatures: Array.isArray(override.laboFeatures)
-          ? override.laboFeatures
-          : module.laboFeatures,
+        laboFeatureIds: [...new Set(laboFeatureIds)],
+        laboFeatures: resolvedLaboFeatures,
       };
     });
 }
@@ -432,7 +451,7 @@ export function emptyStoreData(): StoreData {
     deliveries: [], businessDocuments: [], subscriptions: [], commerceStates: {},
     sectorPresets: structuredClone(sectorPresets.filter((preset) => !isRetiredSectorPreset(preset))),
      moduleStatuses: Object.fromEntries(modules.map(module => [module.id, module.status])) as ModuleStatusMap,
-     moduleOverrides: {}, customModules: [], removedModules: [], catalogVersion: 1, organizationVersion: 1,
+     moduleOverrides: {}, customModules: [], laboFeatureCatalog: [], removedModules: [], catalogVersion: 1, organizationVersion: 1,
   };
 }
 

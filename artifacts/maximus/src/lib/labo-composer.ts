@@ -34,6 +34,10 @@ export interface LaboRecordFeatureDefinition {
   kind: 'records';
   fields: LaboFieldDefinition[];
   workflow?: LaboWorkflowDefinition;
+  origin?: {
+    moduleId: string;
+    featureId: string;
+  };
 }
 
 export type LaboFeatureDefinition =

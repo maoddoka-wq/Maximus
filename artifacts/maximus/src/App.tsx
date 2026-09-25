@@ -544,6 +544,7 @@ function AppContent() {
             moduleOverrides: catalog.moduleOverrides ?? previous.moduleOverrides,
             moduleStatuses: catalog.moduleStatuses ?? previous.moduleStatuses,
             customModules: catalog.customModules ?? previous.customModules,
+            laboFeatureCatalog: catalog.laboFeatureCatalog ?? previous.laboFeatureCatalog,
             removedModules: catalog.removedModules ?? previous.removedModules,
             catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
           }),

@@ -3,7 +3,7 @@ import type { StoreData } from './store';
 
 type RegistrationCatalog = Pick<
   StoreData,
-  'sectorPresets' | 'moduleOverrides' | 'moduleStatuses' | 'customModules' | 'removedModules' | 'catalogVersion'
+  'sectorPresets' | 'moduleOverrides' | 'moduleStatuses' | 'customModules' | 'laboFeatureCatalog' | 'removedModules' | 'catalogVersion'
 >;
 
 type RegistrationCatalogResponse = {

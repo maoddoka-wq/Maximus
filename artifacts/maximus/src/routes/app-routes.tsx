@@ -9,7 +9,7 @@ import type { AdminAssistantScope } from '@/lib/local-assistant';
 import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
 import { getAdminControlRoute } from '@/lib/control-routing';
-import { publishCatalogDraft } from '@/lib/catalog-workflow';
+import { getCatalogSnapshot, publishCatalogDraft } from '@/lib/catalog-workflow';
 import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 
 /**
@@ -136,19 +136,27 @@ export function AdminRouter({
     return renderScreen(screens.modules, { data, mutate, notify });
   }
   if (routePath === '/maximus/labo') {
+    const catalog = getCatalogSnapshot(data);
+    const catalogData = { ...data, ...catalog };
     return renderScreen(screens.labo, {
-      modules: getConfiguredModules(data),
+      modules: getConfiguredModules(catalogData),
       draft: {
-        customModules: data.catalogDraft?.customModules ?? data.customModules ?? [],
-        moduleOverrides: data.catalogDraft?.moduleOverrides ?? data.moduleOverrides ?? {},
+        customModules: catalog.customModules ?? [],
+        moduleOverrides: catalog.moduleOverrides,
+        laboFeatureCatalog: catalog.laboFeatureCatalog,
       },
-      onDraftChange: (nextDraft: { customModules: StoreData['customModules']; moduleOverrides: StoreData['moduleOverrides'] }) => {
+      onDraftChange: (nextDraft: {
+        customModules: StoreData['customModules'];
+        moduleOverrides: StoreData['moduleOverrides'];
+        laboFeatureCatalog: NonNullable<StoreData['laboFeatureCatalog']>;
+      }) => {
         mutate(current => {
           const draft = current.catalogDraft ?? {
             moduleOverrides: current.moduleOverrides ?? {},
             moduleStatuses: current.moduleStatuses ?? {},
             removedModules: current.removedModules ?? [],
             customModules: current.customModules ?? [],
+            laboFeatureCatalog: current.laboFeatureCatalog ?? [],
             sectorPresets: current.sectorPresets ?? [],
             updatedAt: new Date().toISOString(),
           };
@@ -157,6 +165,7 @@ export function AdminRouter({
             ...nextDraft,
             customModules: nextDraft.customModules ?? draft.customModules ?? [],
             moduleOverrides: nextDraft.moduleOverrides ?? draft.moduleOverrides ?? {},
+            laboFeatureCatalog: nextDraft.laboFeatureCatalog ?? draft.laboFeatureCatalog ?? [],
             updatedAt: new Date().toISOString(),
           };
         });

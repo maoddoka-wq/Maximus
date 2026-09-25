@@ -14,6 +14,7 @@ export interface CatalogDraft {
   moduleStatuses: ModuleStatusMap;
   removedModules: ModuleId[];
   customModules: StoreData['customModules'];
+  laboFeatureCatalog?: LaboFeatureDefinition[];
   sectorPresets: SectorPreset[];
   updatedAt: string;
 }
@@ -23,6 +24,7 @@ export interface CatalogSnapshot {
   moduleStatuses: ModuleStatusMap;
   removedModules: ModuleId[];
   customModules: StoreData['customModules'];
+  laboFeatureCatalog: LaboFeatureDefinition[];
   sectorPresets: SectorPreset[];
 }
 
@@ -39,6 +41,21 @@ export interface CatalogValidation {
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
+
+function migrateLegacyLaboFeature(feature: LaboFeatureDefinition): LaboFeatureDefinition {
+  if (feature.kind !== 'reuse') return feature;
+  return {
+    id: feature.id,
+    label: feature.label,
+    description: feature.description,
+    kind: 'records',
+    fields: [
+      { id: 'title', label: 'Titre', type: 'text', required: true },
+      { id: 'details', label: 'Détails', type: 'text', required: false },
+    ],
+    origin: { moduleId: feature.sourceModuleId, featureId: feature.sourceFeatureId },
+  };
+}
 
 function normalizeSectorFeaturesForSelectedPacks(
   sectors: SectorPreset[],
@@ -70,17 +87,70 @@ function normalizeSectorFeaturesForSelectedPacks(
 
 export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
   const draft = data.catalogDraft;
+  const moduleOverrides = clone(draft?.moduleOverrides ?? data.moduleOverrides ?? {});
+  const customModules = clone(draft?.customModules ?? data.customModules ?? []);
+  const laboFeatureCatalog = clone(draft?.laboFeatureCatalog ?? data.laboFeatureCatalog ?? [])
+    .map(migrateLegacyLaboFeature);
+  const catalogIds = new Set(laboFeatureCatalog.map(feature => feature.id));
+  const addLegacyFeatures = (features: unknown) => {
+    if (!Array.isArray(features)) return [];
+    const valid = features.filter((feature): feature is LaboFeatureDefinition =>
+      Boolean(feature && typeof feature === 'object'
+        && typeof (feature as LaboFeatureDefinition).id === 'string'
+        && typeof (feature as LaboFeatureDefinition).label === 'string'
+        && ['records', 'reuse'].includes((feature as LaboFeatureDefinition).kind)),
+    ).map(migrateLegacyLaboFeature);
+    valid.forEach(feature => {
+      const existingIndex = laboFeatureCatalog.findIndex(item => item.id === feature.id);
+      if (existingIndex === -1 && !catalogIds.has(feature.id)) {
+        laboFeatureCatalog.push(clone(feature));
+        catalogIds.add(feature.id);
+      }
+    });
+    return valid.map(feature => feature.id);
+  };
+
+  modules.forEach(module => {
+    const override = moduleOverrides[module.id];
+    const legacyIds = addLegacyFeatures([
+      ...(Array.isArray(module.laboFeatures) ? module.laboFeatures : []),
+      ...(Array.isArray(override?.laboFeatures) ? override.laboFeatures : []),
+    ]);
+    const hasOverrideIds = Array.isArray(override?.laboFeatureIds);
+    const ids = hasOverrideIds
+      ? override.laboFeatureIds ?? []
+      : Array.isArray(module.laboFeatureIds)
+        ? module.laboFeatureIds
+        : legacyIds;
+    if (ids.length > 0 || hasOverrideIds || legacyIds.length > 0) {
+      moduleOverrides[module.id] = {
+        ...override,
+        laboFeatureIds: [...new Set(ids)],
+      };
+      delete moduleOverrides[module.id]?.laboFeatures;
+    }
+  });
+
+  customModules.forEach(module => {
+    const legacyIds = addLegacyFeatures(module.laboFeatures);
+    const ids = Array.isArray(module.laboFeatureIds) ? module.laboFeatureIds : legacyIds;
+    module.laboFeatureIds = [...new Set(ids)];
+    delete module.laboFeatures;
+  });
+
   const snapshot = {
-    moduleOverrides: clone(draft?.moduleOverrides ?? data.moduleOverrides ?? {}),
+    moduleOverrides,
     moduleStatuses: clone(draft?.moduleStatuses ?? data.moduleStatuses ?? {}),
     removedModules: clone(draft?.removedModules ?? data.removedModules ?? []),
-    customModules: clone(draft?.customModules ?? data.customModules ?? []),
+    customModules,
+    laboFeatureCatalog,
     sectorPresets: clone(draft?.sectorPresets ?? data.sectorPresets ?? []),
   };
   const configuredModules = getConfiguredModules({
     moduleOverrides: snapshot.moduleOverrides,
     removedModules: [],
     customModules: snapshot.customModules,
+    laboFeatureCatalog: snapshot.laboFeatureCatalog,
   });
   return {
     ...snapshot,
@@ -114,10 +184,13 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
   const snapshot = getCatalogSnapshot(data);
   const errors: string[] = [];
   const warnings: string[] = [];
+  validateLaboFeatures(snapshot.laboFeatureCatalog).forEach(error => errors.push(`Catalogue LABO : ${error}`));
+  const catalogFeatureIds = new Set(snapshot.laboFeatureCatalog.map(feature => feature.id));
   const configuredModules = getConfiguredModules({
     moduleOverrides: snapshot.moduleOverrides,
     removedModules: [],
     customModules: snapshot.customModules,
+    laboFeatureCatalog: snapshot.laboFeatureCatalog,
   });
   const moduleById = new Map(configuredModules.map(module => [module.id, module]));
   const moduleIds = new Set(configuredModules.map(module => module.id));
@@ -158,6 +231,15 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
     });
     const laboFeatures = module.laboFeatures ?? [];
     validateLaboFeatures(laboFeatures).forEach(error => errors.push(`LABO — ${moduleName} : ${error}`));
+    const assignedFeatureIds = module.laboFeatureIds ?? [];
+    if (new Set(assignedFeatureIds).size !== assignedFeatureIds.length) {
+      errors.push(`LABO — ${moduleName} associe plusieurs fois la même fonctionnalité.`);
+    }
+    assignedFeatureIds.forEach(featureId => {
+      if (!catalogFeatureIds.has(featureId)) {
+        errors.push(`LABO — ${moduleName} référence une fonctionnalité absente du catalogue.`);
+      }
+    });
     const laboIds = new Set(laboFeatures.map(feature => feature.id));
     laboFeatures.forEach((feature: LaboFeatureDefinition) => {
       if (feature.kind !== 'reuse') return;
@@ -259,6 +341,7 @@ export function getCatalogImpact(data: StoreData): CatalogImpact {
     moduleStatuses: data.moduleStatuses ?? {},
     removedModules: data.removedModules ?? [],
     customModules: data.customModules ?? [],
+    laboFeatureCatalog: data.laboFeatureCatalog ?? [],
     sectorPresets: data.sectorPresets ?? [],
   };
   const changedModules = [...modules, ...(draft.customModules ?? [])].filter(module =>
@@ -308,11 +391,13 @@ export function publishCatalogDraft(data: StoreData) {
   data.moduleStatuses = draft.moduleStatuses;
   data.removedModules = draft.removedModules;
   data.customModules = draft.customModules ?? [];
+  data.laboFeatureCatalog = draft.laboFeatureCatalog ?? [];
   data.sectorPresets = draft.sectorPresets;
   const publishedModules = getConfiguredModules({
     moduleOverrides: draft.moduleOverrides,
     removedModules: [],
     customModules: draft.customModules ?? [],
+    laboFeatureCatalog: draft.laboFeatureCatalog,
   });
   const activeModuleIds = new Set(
     publishedModules
