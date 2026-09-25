@@ -15,6 +15,12 @@ const adapters: readonly NativeMountAdapter[] = [
     sourceModuleId: 'stocks',
     sourceFeatureId: 'references',
   },
+  {
+    id: 'stocks/products',
+    label: 'Articles Stocks',
+    sourceModuleId: 'stocks',
+    sourceFeatureId: 'products',
+  },
 ];
 
 export function getNativeMountAdapter(sourceModuleId: string, sourceFeatureId: string) {

@@ -354,11 +354,12 @@ export function CompanyRouter({
             canCreate: mountedPermissions.includes('créer'),
             canModify: mountedPermissions.includes('modifier'),
             stockPermissions: {
-              references: mountedPermissions,
+              [selectedLaboFeature.sourceFeatureId]: mountedPermissions,
             },
             nativeMount: {
               targetModuleId: dynamicModule.id,
               mountedFeatureId: selectedLaboFeature.id,
+              sourceFeatureId: selectedLaboFeature.sourceFeatureId,
             },
           });
         }

@@ -43,11 +43,17 @@ const useStockApi = () => {
 };
 const useStockAccess = () => useContext(StockAccessContext);
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false, nativeMount }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean; nativeMount?: { targetModuleId: string; mountedFeatureId: string } }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false, nativeMount }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean; nativeMount?: { targetModuleId: string; mountedFeatureId: string; sourceFeatureId: string } }) {
+  const mountedTab = tabs.some(([id]) => id === nativeMount?.sourceFeatureId)
+    ? nativeMount!.sourceFeatureId as Tab
+    : 'references';
+  const mountScopeKey = nativeMount
+    ? `${nativeMount.targetModuleId}:${nativeMount.mountedFeatureId}:${nativeMount.sourceFeatureId}`
+    : 'standard-stock-module';
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useQueryTab({
-    tabs: nativeMount ? ['references'] : tabs.map(([id]) => id),
-    defaultTab: nativeMount ? 'references' : 'dashboard',
+    tabs: nativeMount ? [mountedTab] : tabs.map(([id]) => id),
+    defaultTab: nativeMount ? mountedTab : 'dashboard',
     isAllowed: id => !stockPermissions || stockPermissions[id]?.includes('voir'),
   });
   const [loading, setLoading] = useState(true);
@@ -94,7 +100,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     loadingScopes.current.clear();
     setData(null);
     void load(false, 'core');
-  }, [companyId, preview]);
+  }, [companyId, preview, mountScopeKey]);
   useEffect(() => {
     if (preview || !data) return;
     const scope = scopeForTab(tab);
@@ -118,7 +124,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   useEffect(() => {
     if (!data || !stockPermissions) return;
     if (nativeMount) {
-      if (tab !== 'references') setTab('references');
+      if (tab !== mountedTab) setTab(mountedTab);
     } else if (!tabs.some(([id]) => id === tab && stockPermissions[id]?.includes('voir'))) {
       setTab(tabs.find(([id]) => stockPermissions[id]?.includes('voir'))?.[0] ?? 'dashboard');
     }
@@ -127,7 +133,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
 
   const visibleTabs = nativeMount
-    ? tabs.filter(([id]) => id === 'references')
+    ? tabs.filter(([id]) => id === mountedTab)
     : tabs.filter(([id]) => !stockPermissions || stockPermissions[id]?.includes('voir'));
   const currentTabPermissions = stockPermissions?.[tab];
   const currentCanCreate = canCreate && (!stockPermissions || currentTabPermissions?.includes('créer'));

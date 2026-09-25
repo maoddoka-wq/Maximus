@@ -16,6 +16,7 @@ class LaboTest extends TestCase
     private const MODULE = 'stocks';
     private const FEATURE = 'labo-dossiers';
     private const NATIVE_FEATURE = 'labo-stock-references';
+    private const NATIVE_PRODUCTS_FEATURE = 'labo-stock-products';
 
     protected function setUp(): void
     {
@@ -299,6 +300,82 @@ class LaboTest extends TestCase
         $this->asActor()->getJson($mount.'/bootstrap')->assertOk();
     }
 
+    public function test_native_stock_products_are_empty_and_isolated_from_source_crud(): void
+    {
+        $this->publishStockProductsMount();
+        $source = $this->asActor();
+        $source->postJson('/api/stock/products', ['name' => 'Source', 'sku' => 'SRC-1'])->assertCreated();
+        $mount = '/api/labo/modules/commerce/features/'.self::NATIVE_PRODUCTS_FEATURE.'/native/stock';
+        $this->asActor()->getJson($mount.'/bootstrap')->assertOk()
+            ->assertJsonCount(0, 'products')->assertJsonCount(0, 'warehouses')->assertJsonCount(0, 'movements');
+        $created = $this->asActor()->postJson($mount.'/products', ['name' => 'Cible', 'sku' => 'DST-1'])->assertCreated();
+        $this->assertSame('Cible', $created->json('name'));
+        $this->asActor()->getJson('/api/stock/bootstrap?scope=core')->assertJsonMissing(['name' => 'Cible']);
+    }
+
+    public function test_native_stock_products_support_target_scoped_crud_archive_and_permissions(): void
+    {
+        $this->publishStockProductsMount();
+        $mount = '/api/labo/modules/commerce/features/'.self::NATIVE_PRODUCTS_FEATURE.'/native/stock';
+        $request = $this->asActor();
+        $product = $request->postJson($mount.'/products', ['name' => 'Produit', 'sku' => 'P-1', 'salePrice' => 20])->assertCreated()->json();
+        $request->patchJson($mount.'/products/'.$product['id'], ['name' => 'Produit modifié'])->assertOk()->assertJsonPath('name', 'Produit modifié');
+        $request->deleteJson($mount.'/products/'.$product['id'])->assertOk()->assertJsonPath('archived', true);
+        $this->asActor('employee', ['commerce:menu:'.self::NATIVE_PRODUCTS_FEATURE => ['voir']])
+            ->postJson($mount.'/products', ['name' => 'Interdit', 'sku' => 'P-2'])->assertForbidden();
+        $this->asActor()->postJson($mount.'/products', ['name' => 'Mauvais', 'sku' => 'P-3', 'supplierId' => 'stock-source-id'])->assertNotFound();
+    }
+
+    public function test_native_stock_products_use_only_the_separate_target_references_mount(): void
+    {
+        $this->publishStockReferencesMount();
+        $this->publishStockProductsMount();
+        $references = '/api/labo/modules/commerce/features/'.self::NATIVE_FEATURE.'/native/stock/references';
+        $products = '/api/labo/modules/commerce/features/'.self::NATIVE_PRODUCTS_FEATURE.'/native/stock';
+        $supplier = $this->asActor()->postJson($references.'/suppliers', ['name' => 'Fournisseur cible'])->assertCreated()->json();
+        $this->asActor()->getJson($products.'/bootstrap')->assertOk()
+            ->assertJsonPath('suppliers.0.id', $supplier['id']);
+        $this->asActor()->postJson($products.'/products', [
+            'name' => 'Produit lié', 'sku' => 'P-LINK', 'supplierId' => $supplier['id'],
+        ])->assertCreated();
+        DB::table('labo_stock_suppliers')->insert([
+            'id' => 'supplier-other-scope',
+            'company_id' => 'kora',
+            'target_module_id' => 'commerce',
+            'target_feature_id' => 'other-references',
+            'name' => 'Autre',
+            'contact_name' => '',
+            'email' => '',
+            'phone' => '',
+            'address' => '',
+            'notes' => '',
+            'archived' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->asActor()->postJson($products.'/products', [
+            'name' => 'Produit hors scope', 'sku' => 'P-CROSS', 'supplierId' => 'supplier-other-scope',
+        ])->assertNotFound();
+    }
+
+    public function test_native_stock_products_archive_uses_modify_permission(): void
+    {
+        $this->publishStockProductsMount();
+        $mount = '/api/labo/modules/commerce/features/'.self::NATIVE_PRODUCTS_FEATURE.'/native/stock';
+        $product = $this->asActor()->postJson($mount.'/products', ['name' => 'Produit', 'sku' => 'P-MOD'])->assertCreated()->json();
+        $this->asActor('employee', ['commerce:menu:'.self::NATIVE_PRODUCTS_FEATURE => ['voir', 'modifier']])
+            ->deleteJson($mount.'/products/'.$product['id'])->assertOk()->assertJsonPath('archived', true);
+    }
+
+    public function test_native_stock_products_reject_bad_binding_and_do_not_require_source_module(): void
+    {
+        $this->publishStockProductsMount();
+        DB::table('maximus_company_modules')->where('company_id', 'kora')->where('module_id', 'stocks')->update(['status' => 'INACTIF']);
+        $mount = '/api/labo/modules/commerce/features/'.self::NATIVE_PRODUCTS_FEATURE.'/native/stock';
+        $this->asActor()->getJson($mount.'/bootstrap')->assertOk();
+        $this->asActor()->getJson('/api/labo/modules/commerce/features/not-published/native/stock/bootstrap')->assertForbidden();
+    }
+
     private function publishStockReferencesMount(): void
     {
         $this->publishFeature([
@@ -327,6 +404,54 @@ class LaboTest extends TestCase
         DB::table('maximus_company_modules')->where('company_id', 'kora')->where('module_id', 'commerce')->update([
             'status' => 'ACTIF',
             'feature_ids' => json_encode([self::NATIVE_FEATURE]),
+            'configuration' => json_encode(['featureScope' => 'explicit']),
+        ]);
+    }
+
+    private function publishStockProductsMount(): void
+    {
+        $previousWorkspace = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $previousPayload = json_decode((string) $previousWorkspace->payload, true);
+        $previousCatalog = $previousPayload['laboFeatureCatalog'] ?? [];
+        $this->publishFeature([
+            'id' => self::NATIVE_PRODUCTS_FEATURE,
+            'label' => 'Articles Stock réutilisés',
+            'description' => 'Articles Stock dans un autre module',
+            'kind' => 'reuse',
+            'sourceModuleId' => 'stocks',
+            'sourceFeatureId' => 'products',
+        ]);
+        $workspace = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $payload = json_decode((string) $workspace->payload, true);
+        $previousReference = collect($previousCatalog)->firstWhere('id', self::NATIVE_FEATURE);
+        if (is_array($previousReference)) {
+            $payload['laboFeatureCatalog'][] = $previousReference;
+        }
+        $existing = array_merge(
+            $previousPayload['moduleOverrides']['commerce'] ?? [],
+            $payload['moduleOverrides']['commerce'] ?? [],
+        );
+        $featureIds = array_values(array_unique(array_merge(
+            $existing['laboFeatureIds'] ?? [],
+            [self::NATIVE_PRODUCTS_FEATURE],
+        )));
+        $payload['moduleOverrides']['commerce'] = [
+            ...$existing,
+            'features' => $featureIds,
+            'laboFeatureIds' => $featureIds,
+        ];
+        DB::table('maximus_app_states')->where('scope', 'workspace')->update([
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
+        DB::table('maximus_company_modules')->where('company_id', 'kora')->where('module_id', 'commerce')->update([
+            'status' => 'ACTIF',
+            'feature_ids' => json_encode($featureIds),
+            'configuration' => json_encode(['featureScope' => 'explicit']),
+        ]);
+        DB::table('maximus_company_modules')->where('company_id', 'kora')->where('module_id', 'stocks')->update([
+            'status' => 'ACTIF',
+            'feature_ids' => json_encode(['products', 'references']),
             'configuration' => json_encode(['featureScope' => 'explicit']),
         ]);
     }

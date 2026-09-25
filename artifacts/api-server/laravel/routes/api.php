@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\LaboController;
 use App\Http\Controllers\Api\LaboNativeStockReferencesController;
+use App\Http\Controllers\Api\LaboNativeStockProductsController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
@@ -156,6 +157,13 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('labo/modules/{ta
     Route::post('/warehouses/{warehouseId}/locations', [LaboNativeStockReferencesController::class, 'createLocation']);
     Route::patch('/locations/{id}', [LaboNativeStockReferencesController::class, 'updateLocation']);
     Route::delete('/locations/{id}', [LaboNativeStockReferencesController::class, 'archiveLocation']);
+});
+
+Route::middleware(['maximus.auth', 'maximus.company'])->prefix('labo/modules/{targetModuleId}/features/{targetFeatureId}/native/stock')->group(function (): void {
+    Route::get('/bootstrap', [LaboNativeStockProductsController::class, 'bootstrap']);
+    Route::post('/products', [LaboNativeStockProductsController::class, 'createProduct']);
+    Route::patch('/products/{id}', [LaboNativeStockProductsController::class, 'updateProduct']);
+    Route::delete('/products/{id}', [LaboNativeStockProductsController::class, 'archiveProduct']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {

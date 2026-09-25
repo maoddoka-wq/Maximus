@@ -49,11 +49,19 @@ const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.strin
 
 export type StockApi = ReturnType<typeof createStockApi>;
 
-export const createStockApi = (companyId: string, nativeMount?: { targetModuleId: string; mountedFeatureId: string }) => {
+export const createStockApi = (companyId: string, nativeMount?: { targetModuleId: string; mountedFeatureId: string; sourceFeatureId: string }) => {
   const withCompany = (path: string) => `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
-  const base = nativeMount
-    ? `/labo/modules/${encodeURIComponent(nativeMount.targetModuleId)}/features/${encodeURIComponent(nativeMount.mountedFeatureId)}/native/stock/references`
-    : '/stock';
+  let base = '/stock';
+  if (nativeMount) {
+    const mountPrefix = `/labo/modules/${encodeURIComponent(nativeMount.targetModuleId)}/features/${encodeURIComponent(nativeMount.mountedFeatureId)}/native/stock`;
+    if (nativeMount.sourceFeatureId === 'references') {
+      base = `${mountPrefix}/references`;
+    } else if (nativeMount.sourceFeatureId === 'products') {
+      base = mountPrefix;
+    } else {
+      throw new Error(`Le montage natif Stocks « ${nativeMount.sourceFeatureId} » n’est pas pris en charge.`);
+    }
+  }
   const endpoint = (path: string) => `${base}${path}`;
   return {
     bootstrap: (scope: StockBootstrapScope = 'all') => request<Partial<StockBootstrap>>(withCompany(endpoint(`/bootstrap?scope=${scope}`))),

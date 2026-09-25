@@ -7,6 +7,8 @@ Le montage LABO ne crée pas de fiches de saisie et ne doit pas être un simple 
 
 Les fiches LABO historiques restent lisibles et leurs données ne sont pas supprimées, mais le parcours de composition ne doit pas en créer de nouvelles. Une fonctionnalité montée requiert un adaptateur vers le vrai écran et les opérations métier de la fonction source, tout en utilisant la portée du module cible pour ses opérations et son stockage.
 
+Quand une fonctionnalité montée dépend d’une autre fonctionnalité montée (par exemple un article lié à un fournisseur), résoudre l’identifiant dans l’instance cible de cette dépendance. Si elle n’est pas montée, ne pas retomber sur les données de la source.
+
 **Why:** L’utilisateur veut composer des modules avec des fonctionnalités réelles : l’original conserve son comportement, tandis qu’une instance montée suit le contexte du module cible sans partager les données source.
 
-**How to apply:** Proposer les fonctionnalités natives comme sources et enregistrer le module source, l’identifiant de fonction et le module effectif cible. Faire vérifier chaque opération par les permissions de la cible et filtrer le stockage par entreprise, module effectif et fonctionnalité ; tester qu’une modification dans A ne se voit pas dans B.
+**How to apply:** Proposer les fonctionnalités natives comme sources et enregistrer le module source, l’identifiant de fonction et le module effectif cible. Faire vérifier chaque opération par les permissions de la cible et filtrer le stockage par entreprise, module effectif et fonctionnalité. Les références entre fonctions résolvent uniquement une autre portée montée dans le même module cible ; tester qu’une modification dans A ne se voit pas dans B.
