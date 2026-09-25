@@ -95,3 +95,4 @@
 - [Origine des mutations avec cookie](cookie-request-origin.md) — exiger Origin/Referer pour les sessions navigateur, sans bloquer les appels machine Bearer dépourvus de cookie.
 - [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
+- [Dépendances pnpm des artefacts](pnpm-artifact-dependencies.md) — cibler le workspace applicatif avec `pnpm add --filter`; l’installateur générique peut viser la racine et échouer.

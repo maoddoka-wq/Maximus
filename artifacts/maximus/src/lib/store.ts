@@ -9,6 +9,7 @@ import type { ModuleId } from './module-ids';
 import type { CompanyWorkspaceFeatureId } from './company-workspace-features';
 import { buildSubscriptionForCompany, type CompanySubscription } from './subscription-model';
 import type { CatalogDraft } from './catalog-workflow';
+import type { LaboFeatureDefinition } from './labo-composer';
 
 export type { ModuleId } from './module-ids';
 export type {
@@ -77,9 +78,10 @@ export interface Module {
   featureDependencies?: Partial<Record<string, string[]>>;
   featurePacks?: ModuleFeaturePack[];
   status: 'ACTIF' | 'BETA';
+  laboFeatures?: LaboFeatureDefinition[];
 }
 
-export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks'>>>>;
+export type ModuleOverrides = Partial<Record<ModuleId, Partial<Pick<Module, 'name' | 'description' | 'features' | 'featureDependencies' | 'featurePacks' | 'laboFeatures'>>>>;
 export interface SectorBusinessProfile { id: string; name: string; description?: string; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures: Partial<Record<ModuleId, string[]>>; }
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
@@ -401,6 +403,9 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
               ? override.featureDependencies
               : module.featureDependencies,
         featurePacks,
+        laboFeatures: Array.isArray(override.laboFeatures)
+          ? override.laboFeatures
+          : module.laboFeatures,
       };
     });
 }

@@ -928,6 +928,11 @@ final class ModuleCatalog
         } elseif (is_array($rawOverride['feature_dependencies'] ?? null)) {
             $definition['feature_dependencies'] = $rawOverride['feature_dependencies'];
         }
+        if (is_array($rawOverride['laboFeatures'] ?? null)) {
+            $definition['laboFeatures'] = array_values($rawOverride['laboFeatures']);
+        } elseif (is_array($rawOverride['labo_features'] ?? null)) {
+            $definition['laboFeatures'] = array_values($rawOverride['labo_features']);
+        }
 
         return $definition;
     }
@@ -964,6 +969,7 @@ final class ModuleCatalog
                 'name' => (string) ($module['name'] ?? $module['id']),
                 'description' => (string) ($module['description'] ?? ''),
                 'features' => is_array($module['features'] ?? null) ? $module['features'] : [],
+                'laboFeatures' => is_array($module['laboFeatures'] ?? null) ? array_values($module['laboFeatures']) : [],
                 'feature_packs' => self::normalizeFeaturePacks($module['featurePacks'] ?? $module['feature_packs'] ?? []),
                 'feature_dependencies' => is_array($module['featureDependencies'] ?? null) ? $module['featureDependencies'] : [],
                 'status' => in_array(($module['status'] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
 use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
+use App\Http\Controllers\Api\LaboController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
@@ -133,6 +134,14 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group
 Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);
     Route::put('/', [AppStateController::class, 'save']);
+});
+
+Route::middleware(['maximus.auth', 'maximus.company'])->prefix('labo/modules/{moduleId}/features/{featureId}')->group(function (): void {
+    Route::get('/bootstrap', [LaboController::class, 'bootstrap']);
+    Route::post('/records', [LaboController::class, 'store']);
+    Route::patch('/records/{recordId}', [LaboController::class, 'update']);
+    Route::delete('/records/{recordId}', [LaboController::class, 'destroy']);
+    Route::post('/records/{recordId}/transition', [LaboController::class, 'transition']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {

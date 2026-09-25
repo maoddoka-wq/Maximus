@@ -7,6 +7,7 @@ import type {
 } from './store';
 import { getConfiguredModules, modules, stockSubmoduleDependencies } from './store';
 import { getModuleFeatureOptions } from './module-features';
+import { validateLaboFeatures, type LaboFeatureDefinition } from './labo-composer';
 
 export interface CatalogDraft {
   moduleOverrides: ModuleOverrides;
@@ -153,6 +154,24 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
       const normalizedDependencies = dependencies ?? [];
       if (!featureIds.has(featureId) || normalizedDependencies.some(dependency => !featureIds.has(dependency))) {
         errors.push(`Le module « ${moduleName} » contient une dépendance de fonctionnalité invalide.`);
+      }
+    });
+    const laboFeatures = module.laboFeatures ?? [];
+    validateLaboFeatures(laboFeatures).forEach(error => errors.push(`LABO — ${moduleName} : ${error}`));
+    const laboIds = new Set(laboFeatures.map(feature => feature.id));
+    laboFeatures.forEach((feature: LaboFeatureDefinition) => {
+      if (feature.kind !== 'reuse') return;
+      const source = moduleById.get(feature.sourceModuleId as ModuleId);
+      if (!source) {
+        errors.push(`LABO — ${moduleName} référence un module source inconnu.`);
+        return;
+      }
+      const sourceFeatureIds = new Set(getModuleFeatureOptions(source).map(option => option.id));
+      if (!sourceFeatureIds.has(feature.sourceFeatureId)) {
+        errors.push(`LABO — ${moduleName} référence une fonctionnalité source absente.`);
+      }
+      if (laboIds.has(feature.sourceFeatureId) && feature.sourceModuleId === moduleId) {
+        errors.push(`LABO — ${moduleName} ne peut pas réutiliser sa propre fonctionnalité.`);
       }
     });
   };

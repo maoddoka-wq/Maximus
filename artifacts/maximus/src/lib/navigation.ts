@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Settings,
   Sparkles,
+  FlaskConical,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from './store';
@@ -54,6 +55,7 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/entreprises/organisation', label: 'Organisation & accès', icon: GitBranch },
   { href: '/maximus/demandes', label: 'Demandes', icon: FileClock },
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
+  { href: '/maximus/labo', label: 'LABO', icon: FlaskConical },
   { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
@@ -77,7 +79,7 @@ export const adminNavGroups: SidebarFeatureGroup[] = [
   },
   {
     label: 'Catalogue',
-    items: adminNav.filter(item => item.href === '/maximus/modules' || item.href === '/maximus/secteurs'),
+    items: adminNav.filter(item => ['/maximus/modules', '/maximus/labo', '/maximus/secteurs'].includes(item.href)),
   },
   {
     label: 'Suivi',
