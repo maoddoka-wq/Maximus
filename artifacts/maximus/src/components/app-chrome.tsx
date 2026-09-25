@@ -284,9 +284,6 @@ export function Sidebar({
                         <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
                           {group.label}
                         </span>
-                        <span className="rounded-full bg-[hsl(var(--sidebar-foreground)/.1)] px-1.5 py-0.5 text-[9px] font-bold text-[hsl(var(--sidebar-foreground)/.58)] md:hidden">
-                          {group.items.length}
-                        </span>
                       </span>
                       <span className="text-[hsl(var(--sidebar-foreground)/.5)] md:hidden">
                         {groupIsOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}

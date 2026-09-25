@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import {
   commerceTabDefinitions,
-  commerceTabGroups,
   type CommerceTabId,
 } from './commerce-permissions';
 import { getSelectedFeatureIds, roleHasFeaturePermission } from './employee-permissions';
@@ -169,18 +168,12 @@ export function buildSidebarFeatureGroups({
           ? commerceTabDefinitions.filter(tab => !hasExplicitCompanySelection || selectedFeatureIds.has(tab.id))
           : [];
 
-      return commerceTabGroups.flatMap(section => {
-        const items = visibleCommerceTabs
-          .filter(tab => tab.groupId === section.id)
-          .map(tab => ({
-            href: `/entreprise/commerce?tab=${tab.id}`,
-            label: tab.label,
-            icon: commerceTabIcons[tab.id],
-          }));
-        return items.length
-          ? [{ label: `${module.name} · ${section.label}`, items }]
-          : [];
-      });
+      const items = visibleCommerceTabs.map(tab => ({
+        href: `/entreprise/commerce?tab=${tab.id}`,
+        label: tab.label,
+        icon: commerceTabIcons[tab.id],
+      }));
+      return items.length ? [{ label: module.name, items }] : [];
     }
 
     const items = moduleId === 'stocks'

@@ -238,14 +238,7 @@ test('affiche les modules dans le menu de l’administrateur d’entreprise', ()
 
   assert.deepEqual(access.allowed, ['commerce']);
   assert.equal(access.verticalModuleNavigation, true);
-  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale · Pilotage',
-    'Gestion commerciale · Ventes',
-    'Gestion commerciale · Référentiels',
-    'Gestion commerciale · Approvisionnement',
-    'Gestion commerciale · Trésorerie',
-    'Gestion commerciale · Administration',
-  ]);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
   assert.ok(access.sidebarFeatureGroups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
 });
 
@@ -265,12 +258,7 @@ test('affiche les fonctionnalités de tous les modules autorisés dans le menu e
   });
 
   assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale · Pilotage',
-    'Gestion commerciale · Ventes',
-    'Gestion commerciale · Référentiels',
-    'Gestion commerciale · Approvisionnement',
-    'Gestion commerciale · Trésorerie',
-    'Gestion commerciale · Administration',
+    'Gestion commerciale',
     'Gestion de stock',
     'Présences',
   ]);
@@ -447,14 +435,7 @@ test('affiche le menu des modules pendant un test réel de secteur', () => {
     serverModuleStatuses: null,
   });
 
-  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale · Pilotage',
-    'Gestion commerciale · Ventes',
-    'Gestion commerciale · Référentiels',
-    'Gestion commerciale · Approvisionnement',
-    'Gestion commerciale · Trésorerie',
-    'Gestion commerciale · Administration',
-  ]);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
   assert.equal(access.verticalModuleNavigation, true);
 });
 
@@ -502,12 +483,7 @@ test('affiche immédiatement les modules du test réel sans attendre les accès 
 
   assert.deepEqual(access.allowed, ['commerce', 'stocks']);
   assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale · Pilotage',
-    'Gestion commerciale · Ventes',
-    'Gestion commerciale · Référentiels',
-    'Gestion commerciale · Approvisionnement',
-    'Gestion commerciale · Trésorerie',
-    'Gestion commerciale · Administration',
+    'Gestion commerciale',
     'Gestion de stock',
   ]);
   assert.equal(access.verticalModuleNavigation, true);
@@ -535,12 +511,7 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
   assert.deepEqual(access.selectedEcommerceFeatureIds, ['dashboard', 'catalogue', 'parametres']);
   assert.equal(access.verticalModuleNavigation, true);
   assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale · Pilotage',
-    'Gestion commerciale · Ventes',
-    'Gestion commerciale · Référentiels',
-    'Gestion commerciale · Approvisionnement',
-    'Gestion commerciale · Trésorerie',
-    'Gestion commerciale · Administration',
+    'Gestion commerciale',
     'E-commerce',
   ]);
   assert.deepEqual(

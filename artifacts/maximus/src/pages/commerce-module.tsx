@@ -38,7 +38,7 @@ import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@/hooks/use-toast';
-import { commerceTabDefinitions, commerceTabGroups, type CommerceTabId } from '@/lib/commerce-permissions';
+import { commerceTabDefinitions, type CommerceTabId } from '@/lib/commerce-permissions';
 
 type Icon = ComponentType<{ size?: number; className?: string }>;
 type Tab = CommerceTabId;
@@ -169,14 +169,6 @@ export default function CommerceModulePage({
   const currentTabPermissions = tabPermissions?.[tab];
   const currentCanCreate = Boolean(canCreate && (!tabPermissions || currentTabPermissions?.includes('créer')));
   const currentCanModify = Boolean(canModify && (!tabPermissions || currentTabPermissions?.includes('modifier')));
-  const visibleTabGroups = commerceTabGroups
-    .map(group => ({
-      ...group,
-      items: visibleTabs.filter(item => item.groupId === group.id),
-    }))
-    .filter(group => group.items.length > 0);
-  const activeTabGroup = visibleTabGroups.find(group => group.items.some(item => item.id === tab));
-
   if (allowedTabs && availableTabIds.length === 0) {
     return <div className="card-surface rounded-2xl p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="commerce-module-empty">Aucune fonctionnalité commerciale n’est autorisée pour ce rôle.</div>;
   }
@@ -196,41 +188,15 @@ export default function CommerceModulePage({
         </div>
       </div>
       {!singleModuleNavigation && (
-        <div className="mt-6 space-y-3 border-t pt-4">
-          <nav aria-label="Catégories de Gestion commerciale" className="flex flex-wrap gap-2">
-            {visibleTabGroups.map(group => {
-              const active = activeTabGroup?.id === group.id;
-              return (
-                <button
-                  key={group.id}
-                  type="button"
-                  data-testid={`commerce-group-${group.id}`}
-                  aria-pressed={active}
-                  onClick={() => navigateTab(group.items[0].id)}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${
-                    active
-                      ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]'
-                      : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
-                  }`}
-                >
-                  {group.label}
-                  <span className="rounded-full bg-[hsl(var(--background)/.75)] px-1.5 py-0.5 text-[10px] tabular-nums">
-                    {group.items.length}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-          {activeTabGroup && (
-            <WorkspaceTabs
-              items={activeTabGroup.items}
-              activeId={tab}
-              onChange={id => navigateTab(id as Tab)}
-              ariaLabel={`Fonctionnalités ${activeTabGroup.label}`}
-              testIdPrefix="commerce-tab"
-              className="pt-1"
-            />
-          )}
+        <div className="mt-6 border-t pt-4">
+          <WorkspaceTabs
+            items={visibleTabs}
+            activeId={tab}
+            onChange={id => navigateTab(id as Tab)}
+            ariaLabel="Fonctionnalités de Gestion commerciale"
+            testIdPrefix="commerce-tab"
+            className="pt-1"
+          />
         </div>
       )}
     </section>

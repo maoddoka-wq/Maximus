@@ -82,7 +82,7 @@ test('un employé retrouve les fonctionnalités de plusieurs modules dans le men
   });
 
   assert.deepEqual(groups.map(group => group.label), [
-    'Gestion commerciale · Ventes',
+    'Gestion commerciale',
     'Gestion de stock',
   ]);
   assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
@@ -117,42 +117,27 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   });
 
   assert.deepEqual(groups.map(group => group.label), [
-    'Gestion commerciale · Pilotage',
-    'Gestion commerciale · Ventes',
-    'Gestion commerciale · Référentiels',
-    'Gestion commerciale · Approvisionnement',
-    'Gestion commerciale · Trésorerie',
-    'Gestion commerciale · Administration',
+    'Gestion commerciale',
     'Gestion de stock',
   ]);
-  assert.deepEqual(groups.slice(0, 6).map(group => group.items.map(item => item.href)), [
-    [
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
       '/entreprise/commerce?tab=dashboard',
-      '/entreprise/commerce?tab=reports',
-      '/entreprise/commerce?tab=activity',
-    ],
-    [
       '/entreprise/commerce?tab=sales',
-      '/entreprise/commerce?tab=credit',
-      '/entreprise/commerce?tab=invoices',
-      '/entreprise/commerce?tab=returns',
-    ],
-    [
       '/entreprise/commerce?tab=products',
       '/entreprise/commerce?tab=clients',
       '/entreprise/commerce?tab=suppliers',
-    ],
-    ['/entreprise/commerce?tab=purchases'],
-    [
+      '/entreprise/commerce?tab=purchases',
       '/entreprise/commerce?tab=expenses',
       '/entreprise/commerce?tab=cash',
-    ],
-    [
+      '/entreprise/commerce?tab=credit',
+      '/entreprise/commerce?tab=invoices',
+      '/entreprise/commerce?tab=returns',
+      '/entreprise/commerce?tab=reports',
+      '/entreprise/commerce?tab=activity',
       '/entreprise/commerce?tab=team',
       '/entreprise/commerce?tab=settings',
-    ],
   ]);
-  assert.ok(groups[6]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
+  assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
 });
 
 test('le menu Transport utilise les identifiants canoniques des fonctionnalités', () => {
