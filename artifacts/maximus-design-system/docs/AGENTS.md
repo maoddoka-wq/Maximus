@@ -14,9 +14,9 @@ on it and import its theme and components directly.
 - `src/generated/tokens.tsx` — GENERATED hex token object, the package's `.` and
   `./tokens` entry. Mobile (Expo) and other platforms import this.
 - `public/favicon.svg` — GENERATED app icon from `tokens.json` + the title.
-- `src/components/ui/` — the initial shadcn scaffold, exported as
-  `./components/*`. Generated systems keep and theme it; Figma imports prune and
-  restyle it; code imports replace it with the source component library.
+- `src/components/ui/` — MAXIMUS source components, exported as
+  `./components/*`. This source-backed package adds them in reviewed inventory
+  chunks; it does not retain the template's unrelated stock component library.
 - `src/lib/` (`cn`) and `src/hooks/` — exported as `./lib/*` and `./hooks/*`.
 - `src/App.tsx` — the entry point for the living style guide.
 - `src/preview/DesignSystemBrowser.tsx` — the persistent grouped navigation,
@@ -36,6 +36,12 @@ on it and import its theme and components directly.
   from the source; omit it when the source documents no usage rules.
 - `src/preview/demos/<component>.tsx` — component stories. Keep these stories and
   the registry aligned with the final web component inventory.
+- `docs/references/component-inventory.md` and
+  `docs/references/components/` — the complete source catalog, per-family build
+  contracts, dependency order, and implementation status. Read the relevant
+  family reference before changing or adding its component.
+- `docs/references/logos/` — retained MAXIMUS logo source and preview raster.
+- `docs/references/README.md` — provenance and the theme runtime contract.
 - `docs/consuming-web.md`, `docs/consuming-expo.md`, and
   `docs/consuming-slides.md` — platform-specific usage.
 - `docs/migrating-web.md` and `docs/migrating-expo.md` — replacing scaffolded or
@@ -83,6 +89,17 @@ imported into the web-only Vite preview.
 Keep `DESIGN_SYSTEM.title` and `DESIGN_SYSTEM.description` accurate. Update
 `NAV_GROUPS` whenever the system gains or loses a foundation, content guideline,
 chart, motion rule, or applied example.
+
+This is a source-backed system. Keep the inventory's component family list exact,
+implement only the current approved chunk, and update each family's status,
+story, and registry entry together. Do not migrate MAXIMUS while required source
+families remain pending, deferred, or blocked.
+
+The light and dark tokens are MAXIMUS's global defaults. They do not replace
+company-specific colors: the consuming ERP applies those at runtime through
+`applyCompanyTheme` as inline CSS variables. Import this package's stylesheet
+before the consumer's local stylesheet, then apply the company theme after CSS
+loads; do not hard-code the global palette over those runtime overrides.
 
 ## Keep it template-ready
 

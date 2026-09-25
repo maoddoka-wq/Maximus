@@ -1,6 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Input } from '../components/ui/input';
-import { ScrollArea } from '../components/ui/scroll-area';
+import { Moon, Sun } from 'lucide-react';
 import {
   ALL_ENTRIES,
   DESIGN_SYSTEM,
@@ -17,6 +16,10 @@ function readHashId(): string {
   return ALL_ENTRIES.some((entry) => entry.id === id)
     ? id
     : OVERVIEW_ENTRY.id;
+}
+
+function readInitialTheme(): boolean {
+  return new URLSearchParams(window.location.search).get('theme') === 'dark';
 }
 
 function useSelectedId(): [string, (id: string) => void] {
@@ -50,7 +53,7 @@ function NavigationItems({
   select: (id: string) => void;
 }) {
   return (
-    <nav aria-label="Design system navigation" className="space-y-5 py-2">
+      <nav aria-label="Navigation du système de design" className="space-y-5 py-2">
       {showOverview ? (
         <button
           type="button"
@@ -85,7 +88,7 @@ function NavigationItems({
 
       {!showOverview && groups.length === 0 ? (
         <p className="px-2 py-4 text-sm text-muted-foreground">
-          No sections match “{query}”.
+          Aucune rubrique ne correspond à « {query} ».
         </p>
       ) : null}
     </nav>
@@ -95,9 +98,14 @@ function NavigationItems({
 export function DesignSystemBrowser() {
   const [selectedId, select] = useSelectedId();
   const [query, setQuery] = useState('');
+  const [isDark, setIsDark] = useState(readInitialTheme);
   const mobileNav = useRef<HTMLDetailsElement>(null);
   const mobileNavSummary = useRef<HTMLElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+  }, [isDark]);
 
   const filteredGroups = useMemo(
     () =>
@@ -141,17 +149,18 @@ export function DesignSystemBrowser() {
       <aside className="border-b bg-muted/20 md:sticky md:top-0 md:flex md:h-screen md:flex-col md:border-b-0 md:border-r">
         <div className="border-b px-5 py-5">
           <p className="text-sm font-semibold">{DESIGN_SYSTEM.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Browse the system</p>
+          <p className="mt-1 text-xs text-muted-foreground">Parcourir le système</p>
         </div>
         <div className="p-4 pb-2">
-          <Input
+          <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            aria-label="Search design system"
-            placeholder="Search design system…"
+            aria-label="Rechercher dans le système de design"
+            placeholder="Rechercher dans le système…"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
-        <ScrollArea className="hidden min-h-0 flex-1 px-4 pb-4 md:block">
+        <div className="hidden min-h-0 flex-1 overflow-auto px-4 pb-4 md:block">
           <NavigationItems
             showOverview={showOverview}
             groups={filteredGroups}
@@ -159,16 +168,16 @@ export function DesignSystemBrowser() {
             query={query}
             select={selectPage}
           />
-        </ScrollArea>
+        </div>
         <details ref={mobileNav} className="border-t px-4 py-3 md:hidden">
           <summary
             ref={mobileNavSummary}
             className="cursor-pointer text-sm font-medium"
           >
-            Browse sections:{' '}
+            Parcourir les rubriques :{' '}
             <span className="text-muted-foreground">{active.name}</span>
           </summary>
-          <ScrollArea className="mt-3 h-64 pb-2">
+          <div className="mt-3 h-64 overflow-auto pb-2">
             <NavigationItems
               showOverview={showOverview}
               groups={filteredGroups}
@@ -176,33 +185,52 @@ export function DesignSystemBrowser() {
               query={query}
               select={selectPage}
             />
-          </ScrollArea>
+          </div>
         </details>
       </aside>
 
       <main className="min-w-0 px-6 py-10 sm:px-10 lg:px-14">
         <div className="mx-auto max-w-5xl">
-          <header className="border-b pb-8">
-            {active.id === OVERVIEW_ENTRY.id ? (
-              <>
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  {DESIGN_SYSTEM.title}
-                </h1>
-                <p className="mt-3 max-w-2xl text-muted-foreground">
-                  {DESIGN_SYSTEM.description}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {activeGroup?.name}
-                </p>
-                <h1 className="mt-2 text-2xl font-semibold">{active.name}</h1>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                  {active.description}
-                </p>
-              </>
-            )}
+          <header className="flex items-start justify-between gap-4 border-b pb-8">
+            <div className="flex min-w-0 items-start gap-3">
+              <img
+                src={`${import.meta.env.BASE_URL}maximus-mark.png`}
+                alt=""
+                className="mt-1 h-10 w-10 shrink-0 rounded-lg bg-[hsl(var(--sidebar))] p-1.5"
+              />
+              <div className="min-w-0">
+                {active.id === OVERVIEW_ENTRY.id ? (
+                  <>
+                    <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                      {DESIGN_SYSTEM.title}
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-muted-foreground">
+                      {DESIGN_SYSTEM.description}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {activeGroup?.name}
+                    </p>
+                    <h1 className="mt-2 text-2xl font-semibold">{active.name}</h1>
+                    <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                      {active.description}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsDark((dark) => !dark)}
+              aria-label={isDark ? 'Passer au thème clair' : 'Passer au thème sombre'}
+              title={isDark ? 'Thème clair' : 'Thème sombre'}
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border bg-card px-3 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              {isDark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+              <span className="hidden sm:inline">{isDark ? 'Clair' : 'Sombre'}</span>
+            </button>
           </header>
 
           <div className="pt-8">
@@ -212,7 +240,7 @@ export function DesignSystemBrowser() {
                   role="status"
                   className="rounded-xl border bg-card p-6 text-sm text-muted-foreground"
                 >
-                  Loading preview…
+                  Chargement de l’aperçu…
                 </div>
               }
             >

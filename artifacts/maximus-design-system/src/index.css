@@ -114,43 +114,43 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.9%;
-  --border: 0 0% 89.8%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
-  --sidebar: 0 0% 98%;
-  --sidebar-foreground: 0 0% 25.1%;
-  --sidebar-border: 0 0% 89.8%;
-  --sidebar-primary: 0 0% 9%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 0 0% 96.1%;
-  --sidebar-accent-foreground: 0 0% 9%;
-  --sidebar-ring: 0 0% 9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 0% 96.1%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --input: 0 0% 89.8%;
-  --ring: 0 0% 9%;
-  --chart-1: 14 78.9% 57.3%;
-  --chart-2: 175 58.6% 39.8%;
-  --chart-3: 198 39.5% 25.3%;
-  --chart-4: 40 74% 59.2%;
-  --chart-5: 27 85.7% 58.8%;
+  --background: 43 28% 95.1%;
+  --foreground: 217 27.3% 12.9%;
+  --border: 43 15.2% 82%;
+  --card: 60 20% 99%;
+  --card-foreground: 217 27.3% 12.9%;
+  --sidebar: 219 27.9% 12%;
+  --sidebar-foreground: 45 33.3% 92.9%;
+  --sidebar-border: 217 17.9% 22.9%;
+  --sidebar-primary: 43 91.4% 50%;
+  --sidebar-primary-foreground: 217 27.3% 12.9%;
+  --sidebar-accent: 218 23.5% 20%;
+  --sidebar-accent-foreground: 45 33.3% 92.9%;
+  --sidebar-ring: 43 91.4% 50%;
+  --popover: 45 40% 98%;
+  --popover-foreground: 217 27.3% 12.9%;
+  --primary: 43 91.8% 48%;
+  --primary-foreground: 217 27.3% 12.9%;
+  --secondary: 44 24.6% 88%;
+  --secondary-foreground: 217 27.3% 12.9%;
+  --muted: 46 22.8% 88.8%;
+  --muted-foreground: 217 12.7% 40%;
+  --accent: 43 91.8% 48%;
+  --accent-foreground: 217 27.3% 12.9%;
+  --destructive: 4 66.8% 46.1%;
+  --destructive-foreground: 45 40% 98%;
+  --input: 39 16.4% 76.1%;
+  --ring: 43 91.8% 48%;
+  --chart-1: 43 91.8% 48%;
+  --chart-2: 207 37.6% 33.3%;
+  --chart-3: 162 41.5% 36.9%;
+  --chart-4: 28 60.8% 49%;
+  --chart-5: 357 36.6% 47.6%;
 
-  --app-font-sans: Inter, sans-serif;
+  --app-font-sans: DM Sans, sans-serif;
   --app-font-serif: Georgia, serif;
-  --app-font-mono: Menlo, monospace;
-  --radius: 0.5rem;
+  --app-font-mono: Space Mono, monospace;
+  --radius: 0.8rem;
   --spacing: 0.25rem;
 
   /* Computed contrast borders (fallback then modern color-mix syntax). */
@@ -182,38 +182,38 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 0 0% 3.9%;
-  --foreground: 0 0% 98%;
-  --border: 0 0% 14.9%;
-  --card: 0 0% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --sidebar: 0 0% 9%;
-  --sidebar-foreground: 0 0% 96.1%;
-  --sidebar-border: 0 0% 14.9%;
-  --sidebar-primary: 221 72.7% 55.5%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 14.9%;
-  --sidebar-accent-foreground: 0 0% 96.1%;
-  --sidebar-ring: 0 0% 83.1%;
-  --popover: 0 0% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 0 0% 9%;
-  --secondary: 0 0% 14.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 14.9%;
-  --muted-foreground: 0 0% 63.9%;
-  --accent: 0 0% 14.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --input: 0 0% 14.9%;
-  --ring: 0 0% 83.1%;
-  --chart-1: 221 72.7% 55.5%;
-  --chart-2: 166 63.2% 45.9%;
-  --chart-3: 27 85.7% 58.8%;
-  --chart-4: 279 61.1% 58.6%;
-  --chart-5: 341 70.9% 58.2%;
+  --background: 216 29.4% 10%;
+  --foreground: 45 33.3% 92.9%;
+  --border: 222 20.3% 25.1%;
+  --card: 220 25% 14.1%;
+  --card-foreground: 45 33.3% 92.9%;
+  --sidebar: 218 31.4% 6.9%;
+  --sidebar-foreground: 45 33.3% 92.9%;
+  --sidebar-border: 219 24.4% 16.1%;
+  --sidebar-primary: 37 87.8% 54.9%;
+  --sidebar-primary-foreground: 221 30.9% 15.9%;
+  --sidebar-accent: 219 23.9% 13.9%;
+  --sidebar-accent-foreground: 45 33.3% 92.9%;
+  --sidebar-ring: 37 87.8% 54.9%;
+  --popover: 220 25% 14.1%;
+  --popover-foreground: 45 33.3% 92.9%;
+  --primary: 43 91.4% 50%;
+  --primary-foreground: 217 27.3% 12.9%;
+  --secondary: 218 21.6% 20%;
+  --secondary-foreground: 45 33.3% 92.9%;
+  --muted: 218 21.6% 20%;
+  --muted-foreground: 44 13.9% 69%;
+  --accent: 43 91.4% 50%;
+  --accent-foreground: 217 27.3% 12.9%;
+  --destructive: 4 67.1% 57.1%;
+  --destructive-foreground: 45 33.3% 92.9%;
+  --input: 223 20.3% 30%;
+  --ring: 43 91.4% 50%;
+  --chart-1: 43 91.4% 50%;
+  --chart-2: 206 45% 66.5%;
+  --chart-3: 158 38.1% 55.7%;
+  --chart-4: 30 75.3% 63.5%;
+  --chart-5: 0 63.8% 68.6%;
 
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
@@ -316,4 +316,75 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* MAXIMUS shared runtime styles retained from the source application. */
+:root {
+  --card-border: 40 16% 85%;
+  --shadow-soft: 0 1px 2px rgba(42, 45, 38, .03), 0 10px 28px rgba(42, 45, 38, .055);
+}
+
+.dark {
+  --card-border: 222 20% 25%;
+}
+
+.mono {
+  font-family: var(--app-font-mono);
+}
+
+.card-surface {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--card-border));
+  border-radius: .9rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.card-surface > .border-b {
+  border-color: hsl(var(--border));
+}
+
+.module-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / .55) transparent;
+}
+
+.module-tabs button {
+  min-height: 40px;
+  border: 1px solid transparent;
+}
+
+.module-tabs button:not(.active):hover {
+  border-color: hsl(var(--border));
+}
+
+.btn {
+  transition: transform .15s ease, background-color .2s ease, box-shadow .2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.fade-up {
+  animation: fade-up .45s ease both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+body {
+  letter-spacing: -0.005em;
 }
