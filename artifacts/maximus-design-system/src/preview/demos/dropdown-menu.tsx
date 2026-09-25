@@ -1,0 +1,3 @@
+import { Button } from '#components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '#components/ui/dropdown-menu';
+export function DropdownMenuDemo() { return <div className="p-10"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline">Actions</Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuLabel>Enregistrement</DropdownMenuLabel><DropdownMenuItem>Dupliquer</DropdownMenuItem><DropdownMenuItem>Archiver</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem>Supprimer</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>; }

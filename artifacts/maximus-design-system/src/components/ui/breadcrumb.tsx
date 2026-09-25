@@ -1,0 +1,12 @@
+import * as React from 'react';
+import { Slot } from '@radix-ui/react-slot';
+import { cn } from '#lib/utils';
+import { ChevronRight, MoreHorizontal } from 'lucide-react';
+const Breadcrumb=React.forwardRef<HTMLElement,React.ComponentPropsWithoutRef<'nav'> & {separator?:React.ReactNode}>((p,r)=><nav ref={r} aria-label="breadcrumb" {...p}/>); Breadcrumb.displayName='Breadcrumb';
+const BreadcrumbList=React.forwardRef<HTMLOListElement,React.ComponentPropsWithoutRef<'ol'>>(({className,...p},r)=><ol ref={r} className={cn('flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5',className)} {...p}/>);
+const BreadcrumbItem=React.forwardRef<HTMLLIElement,React.ComponentPropsWithoutRef<'li'>>(({className,...p},r)=><li ref={r} className={cn('inline-flex items-center gap-1.5',className)} {...p}/>);
+const BreadcrumbLink=React.forwardRef<HTMLAnchorElement,React.ComponentPropsWithoutRef<'a'> & {asChild?:boolean}>(({asChild,className,...p},r)=>{const C=asChild?Slot:'a';return <C ref={r} className={cn('transition-colors hover:text-foreground',className)} {...p}/>});
+const BreadcrumbPage=React.forwardRef<HTMLSpanElement,React.ComponentPropsWithoutRef<'span'>>(({className,...p},r)=><span ref={r} role="link" aria-disabled="true" aria-current="page" className={cn('font-normal text-foreground',className)} {...p}/>);
+const BreadcrumbSeparator=({children,className,...p}:React.ComponentProps<'li'>)=><li role="presentation" aria-hidden="true" className={cn('[&>svg]:w-3.5 [&>svg]:h-3.5',className)} {...p}>{children??<ChevronRight/>}</li>;
+const BreadcrumbEllipsis=({className,...p}:React.ComponentProps<'span'>)=><span role="presentation" aria-hidden="true" className={cn('flex h-9 w-9 items-center justify-center',className)} {...p}><MoreHorizontal className="h-4 w-4"/><span className="sr-only">More</span></span>;
+export {Breadcrumb,BreadcrumbList,BreadcrumbItem,BreadcrumbLink,BreadcrumbPage,BreadcrumbSeparator,BreadcrumbEllipsis};

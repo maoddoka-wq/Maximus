@@ -1,6 +1,6 @@
 # ButtonGroup
 - Slug : `button-group`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `ButtonGroup, ButtonGroupSeparator, ButtonGroupText, buttonGroupVariants`
 - Chemin source : `artifacts/maximus/src/components/ui/button-group.tsx`

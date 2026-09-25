@@ -1,6 +1,7 @@
 # Menubar
 - Slug : `menubar`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/menubar.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Menubar family through Shortcut`
 - Chemin source : `artifacts/maximus/src/components/ui/menubar.tsx`

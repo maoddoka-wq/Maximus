@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#components/ui/collapsible';
+export function CollapsibleDemo() { const [open, setOpen] = useState(false); return <Collapsible open={open} onOpenChange={setOpen} className="w-80 p-8"><CollapsibleTrigger className="rounded border px-3 py-2 text-sm">{open ? 'Masquer les détails' : 'Afficher les détails'}</CollapsibleTrigger><CollapsibleContent className="pt-3 text-sm text-muted-foreground">Synchronisation active · dernière mise à jour il y a 2 min.</CollapsibleContent></Collapsible>; }

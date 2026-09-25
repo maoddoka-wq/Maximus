@@ -1,0 +1,2 @@
+import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '#components/ui/input-otp';
+export function InputOTPDemo() { return <div className="space-y-3 p-6"><label className="text-sm font-medium">Code de vérification</label><InputOTP maxLength={6} aria-label="Code de vérification"><InputOTPGroup><InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2} /></InputOTPGroup><InputOTPSeparator /><InputOTPGroup><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} /></InputOTPGroup></InputOTP></div>; }

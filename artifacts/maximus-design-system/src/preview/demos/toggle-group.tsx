@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { ToggleGroup, ToggleGroupItem } from '#components/ui/toggle-group';
+export function ToggleGroupDemo() { const [value, setValue] = useState('liste'); return <div className="space-y-3 p-8"><ToggleGroup type="single" value={value} onValueChange={(next) => next && setValue(next)} variant="outline"><ToggleGroupItem value="liste">Liste</ToggleGroupItem><ToggleGroupItem value="grille">Grille</ToggleGroupItem></ToggleGroup><p className="text-xs text-muted-foreground">Vue : {value}</p></div>; }

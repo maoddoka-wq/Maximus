@@ -1,6 +1,6 @@
 # AspectRatio
 - Slug : `aspect-ratio`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `AspectRatio`
 - Chemin source : `artifacts/maximus/src/components/ui/aspect-ratio.tsx`

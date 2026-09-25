@@ -1,6 +1,7 @@
 # NavigationMenu
 - Slug : `navigation-menu`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/navigation-menu.tsx`
 - Lot : 09 — data and navigation
 - Export source : `navigationMenuTriggerStyle and NavigationMenu family`
 - Chemin source : `artifacts/maximus/src/components/ui/navigation-menu.tsx`

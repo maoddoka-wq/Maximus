@@ -1,6 +1,6 @@
 # Textarea
 - Slug : `textarea`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `Textarea`
 - Chemin source : `artifacts/maximus/src/components/ui/textarea.tsx`

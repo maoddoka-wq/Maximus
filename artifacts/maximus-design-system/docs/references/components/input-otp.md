@@ -1,6 +1,6 @@
 # InputOTP
 - Slug : `input-otp`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator`
 - Chemin source : `artifacts/maximus/src/components/ui/input-otp.tsx`

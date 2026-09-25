@@ -1,6 +1,6 @@
 # Alert
 - Slug : `alert`
-- État : `pending`
+- État : `implemented`
 - Lot : 04 — feedback
 - Export source : `Alert, AlertTitle, AlertDescription`
 - Chemin source : `artifacts/maximus/src/components/ui/alert.tsx`

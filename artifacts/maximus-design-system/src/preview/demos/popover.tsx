@@ -1,0 +1,3 @@
+import { Button } from '#components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '#components/ui/popover';
+export function PopoverDemo() { return <div className="p-10"><Popover><PopoverTrigger asChild><Button variant="outline">Afficher les filtres</Button></PopoverTrigger><PopoverContent><p className="text-sm font-medium">Filtres rapides</p><p className="mt-2 text-sm text-muted-foreground">Popover accessible, fermé avec Échap.</p></PopoverContent></Popover></div>; }

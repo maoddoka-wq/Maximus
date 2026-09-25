@@ -1,6 +1,6 @@
 # Popover
 - Slug : `popover`
-- État : `pending`
+- État : `implemented`
 - Lot : 07 — menus and selectors
 - Export source : `Popover, PopoverTrigger, PopoverContent, PopoverAnchor`
 - Chemin source : `artifacts/maximus/src/components/ui/popover.tsx`

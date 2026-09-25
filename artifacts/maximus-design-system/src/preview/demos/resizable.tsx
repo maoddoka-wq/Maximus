@@ -1,0 +1,2 @@
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '#components/ui/resizable';
+export function ResizableDemo() { return <div className="h-48 max-w-xl p-6"><ResizablePanelGroup direction="horizontal" className="rounded-lg border"><ResizablePanel defaultSize={50}><div className="flex h-full items-center justify-center text-sm">Navigation</div></ResizablePanel><ResizableHandle withHandle /><ResizablePanel defaultSize={50}><div className="flex h-full items-center justify-center text-sm">Contenu</div></ResizablePanel></ResizablePanelGroup></div>; }

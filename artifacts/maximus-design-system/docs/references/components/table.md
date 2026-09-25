@@ -1,6 +1,7 @@
 # Table
 - Slug : `table`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/table.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption`
 - Chemin source : `artifacts/maximus/src/components/ui/table.tsx`

@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { RadioGroup, RadioGroupItem } from '#components/ui/radio-group';
+export function RadioGroupDemo() { const [value, setValue] = useState('auto'); return <div className="space-y-3 p-8"><p className="text-sm font-medium">Mode de synchronisation</p><RadioGroup value={value} onValueChange={setValue}><label className="flex items-center gap-2 text-sm"><RadioGroupItem value="auto" />Automatique</label><label className="flex items-center gap-2 text-sm"><RadioGroupItem value="manual" />Manuel</label></RadioGroup><p className="text-xs text-muted-foreground">Choix : {value}</p></div>; }

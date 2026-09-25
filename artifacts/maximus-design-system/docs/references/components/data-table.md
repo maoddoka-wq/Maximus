@@ -1,6 +1,7 @@
 # DataTable
 - Slug : `data-table`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/data-table.tsx`
 - Lot : 02 — application primitives
 - Export source : `DataTable`
 - Chemin source : `artifacts/maximus/src/components/app-ui.tsx:236-267`

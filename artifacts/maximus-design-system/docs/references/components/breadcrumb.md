@@ -1,6 +1,7 @@
 # Breadcrumb
 - Slug : `breadcrumb`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/breadcrumb.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbEllipsis`
 - Chemin source : `artifacts/maximus/src/components/ui/breadcrumb.tsx`

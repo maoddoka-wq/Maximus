@@ -1,6 +1,6 @@
 # Form
 - Slug : `form`
-- État : `pending`
+- État : `implemented`
 - Lot : 06 — forms and sidebar
 - Export source : `useFormField, Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage, FormField`
 - Chemin source : `artifacts/maximus/src/components/ui/form.tsx`

@@ -1,6 +1,6 @@
 # ContextMenu
 - Slug : `context-menu`
-- État : `pending`
+- État : `implemented`
 - Lot : 07 — menus and selectors
 - Export source : `ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuCheckboxItem, ContextMenuRadioItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuShortcut, ContextMenuGroup, ContextMenuPortal, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuRadioGroup`
 - Chemin source : `artifacts/maximus/src/components/ui/context-menu.tsx`

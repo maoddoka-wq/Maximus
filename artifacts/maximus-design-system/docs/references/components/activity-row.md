@@ -1,6 +1,7 @@
 # ActivityRow
 - Slug : `activity-row`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/activity-row.tsx`
 - Lot : 02 — application primitives
 - Export source : `ActivityRow`
 - Chemin source : `artifacts/maximus/src/components/app-ui.tsx:211-234`

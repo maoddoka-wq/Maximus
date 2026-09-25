@@ -1,6 +1,7 @@
 # Calendar
 - Slug : `calendar`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/calendar.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Calendar, CalendarDayButton`
 - Chemin source : `artifacts/maximus/src/components/ui/calendar.tsx`

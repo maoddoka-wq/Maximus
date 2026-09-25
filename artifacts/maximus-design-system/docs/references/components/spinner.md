@@ -1,6 +1,6 @@
 # Spinner
 - Slug : `spinner`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `Spinner`
 - Chemin source : `artifacts/maximus/src/components/ui/spinner.tsx`

@@ -1,0 +1,2 @@
+import { Spinner } from '#components/ui/spinner';
+export function SpinnerDemo() { return <div className="flex items-center gap-6 p-6"><Spinner aria-label="Chargement des données" /><Spinner className="size-6 text-primary" /><span className="text-sm text-muted-foreground">Chargement…</span></div>; }

@@ -1,6 +1,6 @@
 # Label
 - Slug : `label`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `Label`
 - Chemin source : `artifacts/maximus/src/components/ui/label.tsx`

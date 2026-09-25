@@ -1,6 +1,6 @@
 # Dialog
 - Slug : `dialog`
-- État : `pending`
+- État : `implemented`
 - Lot : 05 — overlays
 - Export source : `Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogClose, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription`
 - Chemin source : `artifacts/maximus/src/components/ui/dialog.tsx`

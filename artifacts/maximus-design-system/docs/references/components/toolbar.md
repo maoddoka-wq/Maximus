@@ -1,6 +1,7 @@
 # Toolbar
 - Slug : `toolbar`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/toolbar.tsx`
 - Lot : 02 — application primitives
 - Export source : `Toolbar`
 - Chemin source : `artifacts/maximus/src/components/app-ui.tsx:269-293`

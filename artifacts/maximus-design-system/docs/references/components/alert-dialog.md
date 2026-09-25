@@ -1,6 +1,6 @@
 # AlertDialog
 - Slug : `alert-dialog`
-- État : `pending`
+- État : `implemented`
 - Lot : 05 — overlays
 - Export source : `AlertDialog, AlertDialogPortal, AlertDialogOverlay, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel`
 - Chemin source : `artifacts/maximus/src/components/ui/alert-dialog.tsx`

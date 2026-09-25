@@ -1,0 +1,2 @@
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '#components/ui/tabs';
+export function TabsDemo() { return <Tabs defaultValue="resume" className="w-96 p-8"><TabsList><TabsTrigger value="resume">Résumé</TabsTrigger><TabsTrigger value="historique">Historique</TabsTrigger></TabsList><TabsContent value="resume" className="text-sm">12 commandes à traiter aujourd’hui.</TabsContent><TabsContent value="historique" className="text-sm">Dernière activité : il y a 5 minutes.</TabsContent></Tabs>; }

@@ -1,6 +1,6 @@
 # Tooltip
 - Slug : `tooltip`
-- État : `pending`
+- État : `implemented`
 - Lot : 04 — feedback
 - Export source : `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider`
 - Chemin source : `artifacts/maximus/src/components/ui/tooltip.tsx`

@@ -1,6 +1,6 @@
 # Chart
 - Slug : `chart`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartStyle`
 - Chemin source : `artifacts/maximus/src/components/ui/chart.tsx`

@@ -1,6 +1,7 @@
 # Step
 - Slug : `step-indicator`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/step-indicator.tsx`
 - Lot : 02 — application primitives
 - Export source : `Step`
 - Chemin source : `artifacts/maximus/src/components/app-ui.tsx:41-62`

@@ -1,6 +1,6 @@
 # Drawer
 - Slug : `drawer`
-- État : `pending`
+- État : `implemented`
 - Lot : 05 — overlays
 - Export source : `Drawer, DrawerPortal, DrawerOverlay, DrawerTrigger, DrawerClose, DrawerContent, DrawerHeader, DrawerFooter, DrawerTitle, DrawerDescription`
 - Chemin source : `artifacts/maximus/src/components/ui/drawer.tsx`

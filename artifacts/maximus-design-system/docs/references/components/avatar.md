@@ -1,6 +1,6 @@
 # Avatar
 - Slug : `avatar`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `Avatar, AvatarImage, AvatarFallback`
 - Chemin source : `artifacts/maximus/src/components/ui/avatar.tsx`

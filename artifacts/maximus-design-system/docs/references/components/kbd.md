@@ -1,6 +1,7 @@
 # Kbd
 - Slug : `kbd`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/kbd.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Kbd, KbdGroup`
 - Chemin source : `artifacts/maximus/src/components/ui/kbd.tsx`

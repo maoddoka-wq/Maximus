@@ -1,6 +1,6 @@
 # Resizable
 - Slug : `resizable`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `ResizablePanelGroup, ResizablePanel, ResizableHandle`
 - Chemin source : `artifacts/maximus/src/components/ui/resizable.tsx`

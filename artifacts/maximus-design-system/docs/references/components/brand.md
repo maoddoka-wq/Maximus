@@ -1,6 +1,7 @@
 # Brand
 - Slug : `brand`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/brand.tsx`
 - Lot : 02 — application primitives
 - Export source : `Brand`
 - Chemin source : `artifacts/maximus/src/components/app-ui.tsx:8-39`

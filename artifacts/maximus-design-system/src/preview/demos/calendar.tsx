@@ -1,0 +1,1 @@
+import {Calendar} from '#components/ui/calendar'; export function CalendarDemo(){return <Calendar mode="single" className="rounded-md border m-8" selected={new Date(2025,0,15)}/>}

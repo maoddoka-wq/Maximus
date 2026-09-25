@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#components/ui/select';
+export function SelectDemo() { const [value, setValue] = useState('stock'); return <div className="w-64 p-10"><Select value={value} onValueChange={setValue}><SelectTrigger><SelectValue placeholder="Choisir un module" /></SelectTrigger><SelectContent><SelectItem value="stock">Stock</SelectItem><SelectItem value="commerce">Commerce</SelectItem><SelectItem value="presence">Présences</SelectItem></SelectContent></Select><p className="mt-2 text-sm text-muted-foreground">Module : {value}</p></div>; }

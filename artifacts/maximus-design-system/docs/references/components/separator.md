@@ -1,6 +1,6 @@
 # Separator
 - Slug : `separator`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `Separator`
 - Chemin source : `artifacts/maximus/src/components/ui/separator.tsx`

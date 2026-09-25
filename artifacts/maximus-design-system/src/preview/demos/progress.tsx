@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { Progress } from '#components/ui/progress';
+export function ProgressDemo() { const [value, setValue] = useState(64); return <div className="w-80 space-y-3 p-8"><Progress value={value} aria-label="Progression de l’import" /><div className="flex justify-between text-sm"><span>Import des données</span><button className="text-primary underline" onClick={() => setValue(value === 100 ? 32 : value + 18)}>Avancer · {value}%</button></div></div>; }

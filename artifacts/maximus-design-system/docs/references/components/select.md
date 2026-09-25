@@ -1,6 +1,6 @@
 # Select
 - Slug : `select`
-- État : `pending`
+- État : `implemented`
 - Lot : 07 — menus and selectors
 - Export source : `Select family through scroll buttons`
 - Chemin source : `artifacts/maximus/src/components/ui/select.tsx`

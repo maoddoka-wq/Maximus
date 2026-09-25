@@ -1,6 +1,6 @@
 # Toggle
 - Slug : `toggle`
-- État : `pending`
+- État : `implemented`
 - Lot : 08 — selection controls
 - Export source : `Toggle, toggleVariants`
 - Chemin source : `artifacts/maximus/src/components/ui/toggle.tsx`
@@ -13,4 +13,4 @@ Appels représentatifs : Internal consumer: ToggleGroup.
 ## Contrat de build
 Référence metadata-first. Avant ce lot, relire l’implémentation complète, ses styles, ses stories/tests et ses consommateurs depuis le chemin source ci-dessus; compléter cette référence avec les variantes, états et détails observés.
 Ne pas substituer une implémentation de scaffold à la source. Garder l’API et le comportement; seules les adaptations d’imports, de types privés et d’intégration au runtime du package sont permises.
-Note source : Internal consumer: ToggleGroup
+Implémentation : Toggle Radix avec variantes CVA default/outline et tailles sm/default/lg; story `toggle`.

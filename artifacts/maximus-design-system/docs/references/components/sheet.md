@@ -1,6 +1,6 @@
 # Sheet
 - Slug : `sheet`
-- État : `pending`
+- État : `implemented`
 - Lot : 05 — overlays
 - Export source : `Sheet family through Description`
 - Chemin source : `artifacts/maximus/src/components/ui/sheet.tsx`

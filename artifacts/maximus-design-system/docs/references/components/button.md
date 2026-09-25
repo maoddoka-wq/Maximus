@@ -1,6 +1,6 @@
 # Button
 - Slug : `button`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `ButtonProps, Button, buttonVariants`
 - Chemin source : `artifacts/maximus/src/components/ui/button.tsx`

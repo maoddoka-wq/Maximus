@@ -1,0 +1,2 @@
+import { AspectRatio } from '#components/ui/aspect-ratio';
+export function AspectRatioDemo() { return <div className="max-w-sm space-y-2 p-6"><p className="text-sm font-medium">Aperçu 16:9</p><AspectRatio ratio={16 / 9} className="overflow-hidden rounded-lg bg-muted"><div className="flex h-full items-center justify-center text-sm text-muted-foreground">Média responsif</div></AspectRatio></div>; }

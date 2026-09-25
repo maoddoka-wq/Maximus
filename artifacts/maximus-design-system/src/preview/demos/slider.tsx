@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { Slider } from '#components/ui/slider';
+export function SliderDemo() { const [value, setValue] = useState([70]); return <div className="w-80 space-y-3 p-8"><div className="flex justify-between text-sm"><span>Seuil d’alerte</span><strong>{value[0]}%</strong></div><Slider value={value} onValueChange={setValue} max={100} step={5} aria-label="Seuil d’alerte" /></div>; }

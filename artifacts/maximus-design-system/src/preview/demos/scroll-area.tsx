@@ -1,0 +1,2 @@
+import { ScrollArea } from '#components/ui/scroll-area';
+export function ScrollAreaDemo() { return <ScrollArea className="h-48 w-72 rounded-md border p-4"><div className="space-y-3">{Array.from({ length: 12 }, (_, i) => <p key={i} className="text-sm">Journal d’activité · événement {i + 1}</p>)}</div></ScrollArea>; }

@@ -1,6 +1,6 @@
 # DropdownMenu
 - Slug : `dropdown-menu`
-- État : `pending`
+- État : `implemented`
 - Lot : 07 — menus and selectors
 - Export source : `DropdownMenu family through RadioGroup`
 - Chemin source : `artifacts/maximus/src/components/ui/dropdown-menu.tsx`

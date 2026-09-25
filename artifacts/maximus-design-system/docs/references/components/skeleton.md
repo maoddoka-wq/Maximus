@@ -1,6 +1,6 @@
 # Skeleton
 - Slug : `skeleton`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `Skeleton`
 - Chemin source : `artifacts/maximus/src/components/ui/skeleton.tsx`

@@ -1,6 +1,6 @@
 # Tabs
 - Slug : `tabs`
-- État : `pending`
+- État : `implemented`
 - Lot : 08 — selection controls
 - Export source : `Tabs, TabsList, TabsTrigger, TabsContent`
 - Chemin source : `artifacts/maximus/src/components/ui/tabs.tsx`
@@ -13,4 +13,4 @@ Appels représentatifs : App uses WorkspaceTabs instead.
 ## Contrat de build
 Référence metadata-first. Avant ce lot, relire l’implémentation complète, ses styles, ses stories/tests et ses consommateurs depuis le chemin source ci-dessus; compléter cette référence avec les variantes, états et détails observés.
 Ne pas substituer une implémentation de scaffold à la source. Garder l’API et le comportement; seules les adaptations d’imports, de types privés et d’intégration au runtime du package sont permises.
-Note source : App uses WorkspaceTabs instead
+Implémentation : onglets Radix distincts de WorkspaceTabs, avec liste, triggers et panneaux; story `tabs`.

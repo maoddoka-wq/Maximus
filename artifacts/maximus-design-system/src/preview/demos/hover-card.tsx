@@ -1,0 +1,2 @@
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '#components/ui/hover-card';
+export function HoverCardDemo() { return <div className="p-10"><HoverCard><HoverCardTrigger className="font-medium underline">Profil de Camille</HoverCardTrigger><HoverCardContent><p className="font-medium">Camille Martin</p><p className="text-sm text-muted-foreground">Responsable des opérations · Paris</p></HoverCardContent></HoverCard></div>; }

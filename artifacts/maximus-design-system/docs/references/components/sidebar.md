@@ -1,6 +1,6 @@
 # Sidebar
 - Slug : `sidebar`
-- État : `pending`
+- État : `implemented`
 - Lot : 06 — forms and sidebar
 - Export source : `Sidebar family through useSidebar`
 - Chemin source : `artifacts/maximus/src/components/ui/sidebar.tsx`

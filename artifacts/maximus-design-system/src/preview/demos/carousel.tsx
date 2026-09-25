@@ -1,0 +1,2 @@
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '#components/ui/carousel';
+export function CarouselDemo() { return <div className="max-w-lg p-8"><Carousel opts={{ loop: true }}><CarouselContent>{['Commerce', 'Stock', 'Présences'].map((label) => <CarouselItem key={label}><div className="flex h-36 items-center justify-center rounded-lg bg-muted text-lg font-medium">{label}</div></CarouselItem>)}</CarouselContent><CarouselPrevious /><CarouselNext /></Carousel></div>; }

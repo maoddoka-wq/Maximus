@@ -1,6 +1,6 @@
 # Badge
 - Slug : `badge`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `BadgeProps, Badge, badgeVariants`
 - Chemin source : `artifacts/maximus/src/components/ui/badge.tsx`

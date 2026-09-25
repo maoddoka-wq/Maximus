@@ -1,6 +1,6 @@
 # Command
 - Slug : `command`
-- État : `pending`
+- État : `implemented`
 - Lot : 07 — menus and selectors
 - Export source : `Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut, CommandSeparator`
 - Chemin source : `artifacts/maximus/src/components/ui/command.tsx`

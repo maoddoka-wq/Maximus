@@ -1,6 +1,6 @@
 # InputGroup
 - Slug : `input-group`
-- État : `pending`
+- État : `implemented`
 - Lot : 06 — forms and sidebar
 - Export source : `InputGroup, InputGroupAddon, InputGroupButton, InputGroupText, InputGroupInput, InputGroupTextarea`
 - Chemin source : `artifacts/maximus/src/components/ui/input-group.tsx`

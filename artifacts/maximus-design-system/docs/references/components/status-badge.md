@@ -1,6 +1,7 @@
 # StatusBadge
 - Slug : `status-badge`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/status-badge.tsx`
 - Lot : 02 — application primitives
 - Export source : `StatusBadge`
 - Chemin source : `artifacts/maximus/src/components/app-ui.tsx:181-209`

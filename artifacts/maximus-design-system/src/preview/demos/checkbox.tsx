@@ -1,0 +1,3 @@
+import { useState } from 'react';
+import { Checkbox } from '#components/ui/checkbox';
+export function CheckboxDemo() { const [checked, setChecked] = useState<boolean | 'indeterminate'>(false); return <div className="flex items-center gap-3 p-8"><Checkbox id="journal" checked={checked} onCheckedChange={setChecked} /><label htmlFor="journal" className="text-sm">Recevoir le journal quotidien ({checked ? 'activé' : 'désactivé'})</label></div>; }

@@ -1,0 +1,4 @@
+import { useState } from 'react';
+import { Button } from '#components/ui/button';
+import { Command, CommandDialog, CommandInput, CommandItem, CommandList, CommandEmpty } from '#components/ui/command';
+export function CommandDemo() { const [open, setOpen] = useState(false); return <div className="p-10"><Button onClick={() => setOpen(true)}>Ouvrir la recherche</Button><CommandDialog open={open} onOpenChange={setOpen}><CommandInput placeholder="Rechercher un module..." /><CommandList><CommandEmpty>Aucun résultat.</CommandEmpty><CommandItem onSelect={() => setOpen(false)}>Commerce</CommandItem><CommandItem onSelect={() => setOpen(false)}>Stock</CommandItem><CommandItem onSelect={() => setOpen(false)}>Présences</CommandItem></CommandList></CommandDialog></div>; }

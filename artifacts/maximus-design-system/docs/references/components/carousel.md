@@ -1,6 +1,6 @@
 # Carousel
 - Slug : `carousel`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `CarouselApi, Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext`
 - Chemin source : `artifacts/maximus/src/components/ui/carousel.tsx`

@@ -1,0 +1,1 @@
+import {Kbd,KbdGroup} from '#components/ui/kbd'; export function KbdDemo(){return <div className="m-8 flex gap-4"><KbdGroup><Kbd>⌘</Kbd><Kbd>K</Kbd></KbdGroup><Kbd>Échap</Kbd></div>}

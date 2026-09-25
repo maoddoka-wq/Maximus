@@ -1,6 +1,7 @@
 # Pagination
 - Slug : `pagination`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/pagination.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Pagination, PaginationContent, PaginationLink, PaginationItem, PaginationPrevious, PaginationNext, PaginationEllipsis`
 - Chemin source : `artifacts/maximus/src/components/ui/pagination.tsx`

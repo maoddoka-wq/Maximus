@@ -1,6 +1,6 @@
 # ScrollArea
 - Slug : `scroll-area`
-- État : `pending`
+- État : `implemented`
 - Lot : 10 — additional primitives
 - Export source : `ScrollArea, ScrollBar`
 - Chemin source : `artifacts/maximus/src/components/ui/scroll-area.tsx`

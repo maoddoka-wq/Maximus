@@ -1,6 +1,7 @@
 # Empty
 - Slug : `empty`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/empty.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia`
 - Chemin source : `artifacts/maximus/src/components/ui/empty.tsx`

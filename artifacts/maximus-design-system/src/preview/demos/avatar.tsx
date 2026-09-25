@@ -1,0 +1,2 @@
+import { Avatar, AvatarFallback, AvatarImage } from '#components/ui/avatar';
+export function AvatarDemo() { return <div className="flex items-center gap-4 p-6"><Avatar><AvatarImage src="https://i.pravatar.cc/80?img=32" alt="Claire Martin" /><AvatarFallback>CM</AvatarFallback></Avatar><Avatar className="h-12 w-12"><AvatarFallback className="bg-primary text-primary-foreground">NS</AvatarFallback></Avatar><span className="text-sm">Utilisateurs actifs</span></div>; }

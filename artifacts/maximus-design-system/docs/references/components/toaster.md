@@ -1,6 +1,6 @@
 # Toaster
 - Slug : `toaster`
-- État : `pending`
+- État : `implemented`
 - Lot : 04 — feedback
 - Export source : `Toaster`
 - Chemin source : `artifacts/maximus/src/components/ui/toaster.tsx`

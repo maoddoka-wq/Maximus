@@ -1,6 +1,6 @@
 # Toast
 - Slug : `toast`
-- État : `pending`
+- État : `implemented`
 - Lot : 04 — feedback
 - Export source : `ToastProps, ToastActionElement, ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction`
 - Chemin source : `artifacts/maximus/src/components/ui/toast.tsx`

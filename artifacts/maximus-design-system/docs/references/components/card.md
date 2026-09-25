@@ -1,6 +1,6 @@
 # Card
 - Slug : `card`
-- État : `pending`
+- État : `implemented`
 - Lot : 03 — UI foundations
 - Export source : `Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent`
 - Chemin source : `artifacts/maximus/src/components/ui/card.tsx`

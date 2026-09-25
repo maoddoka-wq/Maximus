@@ -1,6 +1,7 @@
 # Item
 - Slug : `item`
-- État : `pending`
+- État : `implemented`
+- Story : `src/preview/demos/item.tsx`
 - Lot : 09 — data and navigation
 - Export source : `Item, ItemMedia, ItemContent, ItemActions, ItemGroup, ItemSeparator, ItemTitle, ItemDescription, ItemHeader, ItemFooter`
 - Chemin source : `artifacts/maximus/src/components/ui/item.tsx`

@@ -1,6 +1,6 @@
 # ToggleGroup
 - Slug : `toggle-group`
-- État : `pending`
+- État : `implemented`
 - Lot : 08 — selection controls
 - Export source : `ToggleGroup, ToggleGroupItem`
 - Chemin source : `artifacts/maximus/src/components/ui/toggle-group.tsx`
@@ -13,4 +13,4 @@ Appels représentatifs : Depends on Toggle.
 ## Contrat de build
 Référence metadata-first. Avant ce lot, relire l’implémentation complète, ses styles, ses stories/tests et ses consommateurs depuis le chemin source ci-dessus; compléter cette référence avec les variantes, états et détails observés.
 Ne pas substituer une implémentation de scaffold à la source. Garder l’API et le comportement; seules les adaptations d’imports, de types privés et d’intégration au runtime du package sont permises.
-Note source : Depends on Toggle
+Implémentation : groupe Radix propage les variantes et tailles de Toggle; story `toggle-group`.

@@ -1,6 +1,6 @@
 # Field (UI)
 - Slug : `field`
-- État : `pending`
+- État : `implemented`
 - Lot : 06 — forms and sidebar
 - Export source : `Field, FieldLabel, FieldDescription, FieldError, FieldGroup, FieldLegend, FieldSeparator, FieldSet, FieldContent, FieldTitle`
 - Chemin source : `artifacts/maximus/src/components/ui/field.tsx`

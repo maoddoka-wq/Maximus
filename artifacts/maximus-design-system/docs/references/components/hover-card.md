@@ -1,6 +1,6 @@
 # HoverCard
 - Slug : `hover-card`
-- État : `pending`
+- État : `implemented`
 - Lot : 07 — menus and selectors
 - Export source : `HoverCard, HoverCardTrigger, HoverCardContent`
 - Chemin source : `artifacts/maximus/src/components/ui/hover-card.tsx`
