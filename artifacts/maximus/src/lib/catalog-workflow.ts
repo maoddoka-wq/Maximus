@@ -42,21 +42,6 @@ export interface CatalogValidation {
 
 const clone = <T>(value: T): T => structuredClone(value);
 
-function migrateLegacyLaboFeature(feature: LaboFeatureDefinition): LaboFeatureDefinition {
-  if (feature.kind !== 'reuse') return feature;
-  return {
-    id: feature.id,
-    label: feature.label,
-    description: feature.description,
-    kind: 'records',
-    fields: [
-      { id: 'title', label: 'Titre', type: 'text', required: true },
-      { id: 'details', label: 'Détails', type: 'text', required: false },
-    ],
-    origin: { moduleId: feature.sourceModuleId, featureId: feature.sourceFeatureId },
-  };
-}
-
 function normalizeSectorFeaturesForSelectedPacks(
   sectors: SectorPreset[],
   configuredModules: ReturnType<typeof getConfiguredModules>,
@@ -89,8 +74,7 @@ export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
   const draft = data.catalogDraft;
   const moduleOverrides = clone(draft?.moduleOverrides ?? data.moduleOverrides ?? {});
   const customModules = clone(draft?.customModules ?? data.customModules ?? []);
-  const laboFeatureCatalog = clone(draft?.laboFeatureCatalog ?? data.laboFeatureCatalog ?? [])
-    .map(migrateLegacyLaboFeature);
+  const laboFeatureCatalog = clone(draft?.laboFeatureCatalog ?? data.laboFeatureCatalog ?? []);
   const catalogIds = new Set(laboFeatureCatalog.map(feature => feature.id));
   const addLegacyFeatures = (features: unknown) => {
     if (!Array.isArray(features)) return [];
@@ -99,7 +83,7 @@ export function getCatalogSnapshot(data: StoreData): CatalogSnapshot {
         && typeof (feature as LaboFeatureDefinition).id === 'string'
         && typeof (feature as LaboFeatureDefinition).label === 'string'
         && ['records', 'reuse'].includes((feature as LaboFeatureDefinition).kind)),
-    ).map(migrateLegacyLaboFeature);
+    );
     valid.forEach(feature => {
       const existingIndex = laboFeatureCatalog.findIndex(item => item.id === feature.id);
       if (existingIndex === -1 && !catalogIds.has(feature.id)) {

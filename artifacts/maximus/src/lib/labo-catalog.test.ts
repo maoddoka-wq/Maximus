@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { emptyStoreData, getConfiguredModules } from './store';
+import { getModuleFeatureOptions } from './module-features';
 import { getCatalogSnapshot } from './catalog-workflow';
 import type { LaboRecordFeatureDefinition } from './labo-composer';
 
@@ -49,7 +50,7 @@ test('une définition LABO historique intégrée à un module reste lisible', ()
   );
 });
 
-test('une ancienne réutilisation native devient une fiche LABO indépendante', () => {
+test('une fonctionnalité native montée reste liée à sa source sans devenir une fiche', () => {
   const data = emptyStoreData();
   data.moduleOverrides = {
     stocks: {
@@ -70,12 +71,16 @@ test('une ancienne réutilisation native devient une fiche LABO indépendante', 
     ...data,
     ...snapshot,
   }).find(module => module.id === 'stocks');
+  const commerce = getConfiguredModules({
+    ...data,
+    ...snapshot,
+  }).find(module => module.id === 'commerce');
 
-  assert.equal(feature?.kind, 'records');
-  assert.deepEqual(feature?.fields.map(field => field.id), ['title', 'details']);
-  assert.equal(stocks?.laboFeatures?.[0]?.kind, 'records');
-  assert.deepEqual(stocks?.laboFeatures?.[0]?.origin, {
-    moduleId: 'commerce',
-    featureId: 'sales',
-  });
+  assert.equal(feature?.kind, 'reuse');
+  assert.equal(stocks?.laboFeatures?.[0]?.kind, 'reuse');
+  assert.deepEqual(
+    getModuleFeatureOptions(commerce!).map(item => item.id).includes('sales'),
+    true,
+  );
+  assert.equal(stocks?.laboFeatureIds?.includes('labo-reuse-commerce-sales'), true);
 });

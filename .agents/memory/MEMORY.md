@@ -41,7 +41,7 @@
 - [Surveillance de santé Render](render-health-monitoring.md) — utiliser la sonde `/api/healthz` existante pour détecter et persister les incidents sans worker séparé.
 - [Identité publique des boutiques](public-store-identity.md) — les noms peuvent être identiques entre entreprises, mais chaque slug public doit rester globalement unique.
 - [Catalogue d’inscription](registration-catalog-boundary.md) — l’inscription publique lit uniquement le catalogue publié, jamais l’état workspace ou son brouillon.
-- [Catalogue de fonctionnalités LABO](labo-feature-catalog.md) — une définition LABO globale s’associe à plusieurs modules, avec des fiches indépendantes par entreprise, module et fonctionnalité.
+- [Montage des fonctionnalités LABO](labo-feature-catalog.md) — monter une fonctionnalité native d’un autre module sans créer de fiche ni toucher à sa source ou à ses données.
 - [Autorisation effective des modules](module-access-source.md) — l’accès courant vient des autorisations persistées, pas seulement de la demande initiale d’inscription.
 - [Commission e-commerce](ecommerce-commission-policy.md) — chaque vente est répartie à 3 % DiamanoPay, 2 % MAXIMUS et 95 % vendeur, avec registre MAXIMUS idempotent.
 - [Réconciliation des règlements MAXIMUS](maximus-settlement-reconciliation.md) — une vente `PAID` peut reconstruire séparément les écritures vendeur et MAXIMUS sans double crédit.

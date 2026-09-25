@@ -1,22 +1,12 @@
 import { useState } from 'react';
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CircleAlert,
-  FlaskConical,
-  Plus,
-  Save,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Check, CircleAlert, FlaskConical, Plus } from 'lucide-react';
 import type { Module } from '@/lib/store';
-import { createLaboFeatureId, validateLaboFeatures } from '@/lib/labo-composer';
-import type {
-  LaboFeatureDefinition,
-  LaboFieldDefinition,
-  LaboRecordFeatureDefinition,
-  LaboWorkflowStage,
+import { getModuleFeatureOptions } from '@/lib/module-features';
+import {
+  createLaboFeatureId,
+  createLaboReuseFeatureId,
+  type LaboFeatureDefinition,
+  type LaboReusedFeatureDefinition,
 } from '@/lib/labo-composer';
 
 type LaboModule = Module & { laboFeatures?: LaboFeatureDefinition[] };
@@ -32,6 +22,12 @@ type WorkbenchProps = {
   draft: LaboDraft;
   onDraftChange: (nextDraft: LaboDraft) => void;
   onPublish: () => Promise<void>;
+};
+
+type NativeFeature = {
+  sourceModule: Module;
+  id: string;
+  label: string;
 };
 
 const panelClass = 'rounded-2xl border border-[#dedbd3] bg-[#fbfaf7] shadow-[0_10px_28px_rgba(44,50,56,.05)]';
@@ -69,20 +65,43 @@ function moduleWithFeatures(module: Module, draft: LaboDraft): LaboModule {
   };
 }
 
-function makeField(index: number): LaboFieldDefinition {
-  return {
-    id: `field-${index + 1}`,
-    label: index === 0 ? 'Titre' : `Champ ${index + 1}`,
-    type: 'text',
-    required: index === 0,
-  };
+function nativeFeaturesOf(modules: Module[]): NativeFeature[] {
+  return modules.flatMap(sourceModule => {
+    const module = sourceModule as LaboModule;
+    const laboIds = new Set([
+      ...(module.laboFeatureIds ?? []),
+      ...(module.laboFeatures ?? []).map(feature => feature.id),
+    ]);
+
+    return getModuleFeatureOptions(module)
+      .filter(feature => !laboIds.has(feature.id))
+      .map(feature => ({
+        sourceModule,
+        id: feature.id,
+        label: feature.label,
+      }));
+  });
 }
 
-function makeStage(index: number): LaboWorkflowStage {
+function getReuseDefinition(
+  sourceModule: Module,
+  feature: NativeFeature,
+  catalog: LaboFeatureDefinition[],
+): LaboReusedFeatureDefinition {
+  const existing = catalog.find(item =>
+    item.kind === 'reuse'
+    && item.sourceModuleId === sourceModule.id
+    && item.sourceFeatureId === feature.id,
+  );
+  if (existing?.kind === 'reuse') return existing;
+
   return {
-    id: `stage-${index + 1}`,
-    label: index === 0 ? 'À traiter' : index === 1 ? 'Terminé' : `Étape ${index + 1}`,
-    requiredFieldIds: [],
+    id: createLaboReuseFeatureId(sourceModule.id, feature.id),
+    label: feature.label,
+    description: `Fonctionnalité native de ${sourceModule.name}.`,
+    kind: 'reuse',
+    sourceModuleId: sourceModule.id,
+    sourceFeatureId: feature.id,
   };
 }
 
@@ -90,12 +109,6 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
   const [target, setTarget] = useState(modules[0]?.id ?? 'new');
   const [moduleLabel, setModuleLabel] = useState('');
   const [moduleDescription, setModuleDescription] = useState('');
-  const [featureLabel, setFeatureLabel] = useState('');
-  const [featureDescription, setFeatureDescription] = useState('');
-  const [fields, setFields] = useState<LaboFieldDefinition[]>([makeField(0)]);
-  const [workflowEnabled, setWorkflowEnabled] = useState(false);
-  const [stages, setStages] = useState<LaboWorkflowStage[]>([makeStage(0), makeStage(1)]);
-  const [showFields, setShowFields] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [publishError, setPublishError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
@@ -105,9 +118,11 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
   const selectedModule = target === 'new' ? undefined : modules.find(module => module.id === target);
   const configuredTarget = selectedModule ? moduleWithFeatures(selectedModule, draft) : undefined;
   const associatedIds = configuredTarget?.laboFeatureIds ?? [];
-  const catalogFeatures = catalog.filter(
-    (feature): feature is LaboRecordFeatureDefinition => feature.kind === 'records',
+  const nativeFeatures = nativeFeaturesOf(modules).filter(
+    feature => !selectedModule || feature.sourceModule.id !== selectedModule.id,
   );
+  const nativeAssociationsCount =
+    configuredTarget?.laboFeatures?.filter(feature => feature.kind === 'reuse').length ?? 0;
 
   const selectTarget = (value: string) => {
     setTarget(value);
@@ -124,19 +139,6 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
     setModuleDescription(module?.description ?? '');
   };
 
-  const updateField = (index: number, patch: Partial<LaboFieldDefinition>) => {
-    const previousId = fields[index]?.id;
-    setFields(current => current.map((field, fieldIndex) =>
-      fieldIndex === index ? { ...field, ...patch } : field,
-    ));
-    if (previousId && patch.id && patch.id !== previousId) {
-      setStages(current => current.map(stage => ({
-        ...stage,
-        requiredFieldIds: stage.requiredFieldIds.map(id => id === previousId ? patch.id as string : id),
-      })));
-    }
-  };
-
   const persist = async (nextDraft: LaboDraft, successMessage: string, nextTarget?: string) => {
     setValidationErrors([]);
     setPublishError('');
@@ -147,10 +149,8 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
       await onPublish();
       setSavedMessage(successMessage);
       if (nextTarget) setTarget(nextTarget);
-      return true;
     } catch (error) {
       setPublishError(error instanceof Error ? error.message : 'L’enregistrement a échoué.');
-      return false;
     } finally {
       setPublishing(false);
     }
@@ -172,28 +172,20 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
         return null;
       }
       const moduleId = createLaboFeatureId(moduleLabel, 'module') || `module-${Date.now()}`;
-      const existing = nextDraft.customModules.find(module => module.id === moduleId);
-      const currentIds = existing?.laboFeatureIds ?? [];
-      const nextIds = add
-        ? [...new Set([...currentIds, featureId])]
-        : currentIds.filter(id => id !== featureId);
-      const existingFeatures = existing?.features ?? [];
-      const nextFeatures = add
-        ? [...new Set([...existingFeatures, featureId])]
-        : existingFeatures.filter(id => id !== featureId);
+      const duplicate = modules.find(module => module.id === moduleId);
+      if (duplicate) {
+        setValidationErrors([`« ${moduleLabel.trim()} » correspond déjà au module « ${duplicate.name} ». Sélectionnez-le dans la liste.`]);
+        return null;
+      }
       const nextModule: Module = {
-        ...(existing ?? {}),
         id: moduleId as Module['id'],
         name: moduleLabel.trim(),
         description: moduleDescription.trim(),
-        features: nextFeatures,
-        laboFeatureIds: nextIds,
+        features: [],
+        laboFeatureIds: [featureId],
         status: 'ACTIF',
       };
-      nextDraft.customModules = [
-        ...nextDraft.customModules.filter(module => module.id !== moduleId),
-        nextModule,
-      ];
+      nextDraft.customModules = [...nextDraft.customModules, nextModule];
       return { nextDraft, moduleId };
     }
 
@@ -206,87 +198,43 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
     const nextIds = add
       ? [...new Set([...currentIds, featureId])]
       : currentIds.filter(id => id !== featureId);
-    const currentFeatures = base.features ?? [];
-    const nextFeatures = add
-      ? [...new Set([...currentFeatures, featureId])]
-      : currentFeatures.filter(id => id !== featureId);
+
     nextDraft.moduleOverrides[target] = {
       ...(nextDraft.moduleOverrides[target] ?? {}),
-      features: nextFeatures,
       laboFeatureIds: nextIds,
     } as Partial<Module>;
     return { nextDraft, moduleId: target };
   };
 
-  const associateCatalogFeature = async (feature: LaboRecordFeatureDefinition, add: boolean) => {
-    const isAlreadyAssociated = associatedIds.includes(feature.id);
-    if (add && isAlreadyAssociated) return;
-    if (!add && !isAlreadyAssociated) return;
-    const association = buildModuleAssociation(feature.id, add);
-    if (!association) return;
-    const result = add
-      ? `« ${feature.label} » est associée au module.`
-      : `« ${feature.label} » n’est plus associée au module. Ses fiches existantes sont conservées.`;
-    await persist(association.nextDraft, result, association.moduleId);
-  };
-
-  const createFeature = async () => {
-    const feature: LaboRecordFeatureDefinition = {
-      id: createLaboFeatureId(featureLabel, 'labo') || 'labo-feature',
-      label: featureLabel.trim(),
-      description: featureDescription.trim(),
-      kind: 'records',
-      fields,
-      ...(workflowEnabled ? { workflow: { stages } } : {}),
-    };
-    const errors = [
-      ...(!featureLabel.trim() ? ['Donnez un nom à la fonctionnalité.'] : []),
-      ...validateLaboFeatures([feature]),
-      ...(catalog.some(item => item.id === feature.id)
-        ? [`« ${feature.label} » existe déjà dans le catalogue LABO.`]
-        : []),
-    ];
-    if (errors.length > 0) {
-      setValidationErrors([...new Set(errors)]);
+  const toggleNativeFeature = async (feature: NativeFeature, add: boolean) => {
+    const definition = getReuseDefinition(feature.sourceModule, feature, catalog);
+    const matchingId = catalog.find(item => item.id === definition.id);
+    const sameSource = matchingId?.kind === 'reuse'
+      && matchingId.sourceModuleId === feature.sourceModule.id
+      && matchingId.sourceFeatureId === feature.id;
+    if (add && matchingId && !sameSource) {
+      setValidationErrors([`L’identifiant « ${definition.id} » est déjà utilisé dans le catalogue LABO.`]);
       return;
     }
 
-    const association = buildModuleAssociation(feature.id, true);
+    const association = buildModuleAssociation(definition.id, add);
     if (!association) return;
-    association.nextDraft.laboFeatureCatalog = [...catalog, feature];
-    const wasSaved = await persist(
-      association.nextDraft,
-      `« ${feature.label} » est enregistrée au catalogue et associée au module.`,
-      association.moduleId,
-    );
-    if (!wasSaved) return;
-    setFeatureLabel('');
-    setFeatureDescription('');
-    setFields([makeField(0)]);
-    setWorkflowEnabled(false);
-    setStages([makeStage(0), makeStage(1)]);
+    if (add && !sameSource) {
+      association.nextDraft.laboFeatureCatalog = [...catalog, definition];
+    }
+
+    const message = add
+      ? `« ${feature.label} » est montée depuis ${feature.sourceModule.name}.`
+      : `« ${feature.label} » a été retirée du module cible. La source et ses données sont conservées.`;
+    await persist(association.nextDraft, message, association.moduleId);
   };
 
-  const addField = () => setFields(current => [...current, makeField(current.length)]);
-  const removeField = (index: number) => {
-    const removedId = fields[index]?.id;
-    setFields(current => current.filter((_, fieldIndex) => fieldIndex !== index));
-    if (removedId) {
-      setStages(current => current.map(stage => ({
-        ...stage,
-        requiredFieldIds: stage.requiredFieldIds.filter(id => id !== removedId),
-      })));
-    }
-  };
-  const moveField = (index: number, direction: -1 | 1) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= fields.length) return;
-    setFields(current => {
-      const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
-  };
+  const groupedFeatures = modules
+    .filter(module => nativeFeatures.some(feature => feature.sourceModule.id === module.id))
+    .map(sourceModule => ({
+      sourceModule,
+      features: nativeFeatures.filter(feature => feature.sourceModule.id === sourceModule.id),
+    }));
 
   return (
     <main className="min-h-[100dvh] bg-[#f1efe9] px-4 py-5 text-[#26323a] sm:px-6 lg:px-10 lg:py-8">
@@ -297,10 +245,11 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
             MAXIMUS / LABO
           </div>
           <h1 className="text-3xl font-black tracking-[-.05em] text-[#26323a] sm:text-4xl">
-            Fonctionnalités des modules
+            Composer les fonctionnalités
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687479]">
-            Choisissez un module, associez une fiche existante ou créez-en une nouvelle. Toute nouvelle fiche est ajoutée au catalogue LABO.
+            Choisissez un module cible et montez-y directement des fonctionnalités natives déjà disponibles.
+            Leur module source reste inchangé.
           </p>
         </header>
 
@@ -323,7 +272,7 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
               </label>
               {selectedModule && (
                 <p className="pb-2 text-xs text-[#788286]">
-                  {associatedIds.length} fonctionnalité{associatedIds.length === 1 ? '' : 's'} LABO associée{associatedIds.length === 1 ? '' : 's'}
+                  {nativeAssociationsCount} fonctionnalité{nativeAssociationsCount === 1 ? '' : 's'} montée{nativeAssociationsCount === 1 ? '' : 's'}
                 </p>
               )}
             </div>
@@ -355,290 +304,81 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
 
           <section className={`${panelClass} overflow-hidden`}>
             <div className="border-b border-[#e5e1d8] px-5 py-4 sm:px-6">
-              <h2 className="text-lg font-black tracking-[-.03em]">Catalogue LABO</h2>
+              <h2 className="text-lg font-black tracking-[-.03em]">Fonctionnalités natives</h2>
               <p className="mt-1 text-xs leading-5 text-[#788286]">
-                Comme les fonctionnalités d’un pack, choisissez celles qui appartiennent à ce module.
+                Sélectionnez une fonction d’un autre module pour l’ajouter ici. Elle reste exécutée et administrée à sa source.
               </p>
             </div>
-            <div className="divide-y divide-[#ece9e1]">
-              {catalogFeatures.length === 0 ? (
-                <p className="px-5 py-5 text-sm text-[#788286]">
-                  Le catalogue est vide. Créez une fiche ci-dessous pour la rendre disponible aux autres modules.
-                </p>
-              ) : (
-                catalogFeatures.map(feature => {
-                  const associated = associatedIds.includes(feature.id);
-                  return (
-                    <article key={feature.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold">{feature.label}</h3>
-                        <p className="mt-1 text-xs text-[#788286]">
-                          {feature.fields.length} champ{feature.fields.length === 1 ? '' : 's'}
-                          {feature.workflow ? ` · ${feature.workflow.stages.length} étapes` : ''}
-                          {feature.description ? ` · ${feature.description}` : ''}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        data-testid={`${associated ? 'button-remove' : 'button-associate'}-feature-${feature.id}`}
-                        onClick={() => void associateCatalogFeature(feature, !associated)}
-                        disabled={publishing || (target === 'new' && (!moduleLabel.trim() || !moduleDescription.trim()))}
-                        className={associated ? buttonClass : 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#286c73] px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-[#205b61] disabled:cursor-not-allowed disabled:opacity-50'}
-                      >
-                        {associated ? <><Check size={14} /> Associée · retirer</> : <><Plus size={14} /> Associer au module</>}
-                      </button>
-                    </article>
-                  );
-                })
-              )}
-            </div>
+
+            {groupedFeatures.length === 0 ? (
+              <p className="px-5 py-5 text-sm text-[#788286]">
+                Aucune fonctionnalité d’un autre module n’est disponible pour ce choix.
+              </p>
+            ) : (
+              <div className="divide-y divide-[#ece9e1]">
+                {groupedFeatures.map(({ sourceModule, features }) => (
+                  <section key={sourceModule.id} aria-label={`Fonctionnalités de ${sourceModule.name}`}>
+                    <h3 className="bg-[#f7f5ef] px-5 py-2.5 text-[10px] font-black uppercase tracking-[.15em] text-[#768184] sm:px-6">
+                      {sourceModule.name}
+                    </h3>
+                    <div className="divide-y divide-[#f0eee8]">
+                      {features.map(feature => {
+                        const definition = getReuseDefinition(sourceModule, feature, catalog);
+                        const associated = associatedIds.includes(definition.id);
+                        return (
+                          <article key={`${sourceModule.id}-${feature.id}`} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-bold">{feature.label}</h4>
+                              <p className="mt-1 text-xs text-[#788286]">
+                                Fonctionnalité native · source : {sourceModule.name}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              data-testid={`${associated ? 'button-remove' : 'button-associate'}-native-${sourceModule.id}-${feature.id}`}
+                              aria-pressed={associated}
+                              onClick={() => void toggleNativeFeature(feature, !associated)}
+                              disabled={publishing || (target === 'new' && (!moduleLabel.trim() || !moduleDescription.trim()))}
+                              className={associated
+                                ? buttonClass
+                                : 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#286c73] px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-[#205b61] disabled:cursor-not-allowed disabled:opacity-50'}
+                            >
+                              {associated
+                                ? <><Check size={14} /> Montée · retirer</>
+                                : <><Plus size={14} /> Monter dans le module</>}
+                            </button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+
             <p className="border-t border-[#e5e1d8] bg-[#f7f5ef] px-5 py-3 text-xs leading-5 text-[#788286] sm:px-6">
-              Une association ne déplace pas les données : chaque module garde ses propres fiches.
+              Le montage ajoute un accès à la fonctionnalité native. Il ne copie, ne déplace et ne supprime aucune donnée.
             </p>
           </section>
 
-          <section className={`${panelClass} overflow-hidden`}>
-            <div className="border-b border-[#e5e1d8] px-5 py-4 sm:px-6">
-              <h2 className="text-lg font-black tracking-[-.03em]">Créer une fonctionnalité</h2>
-              <p className="mt-1 text-xs leading-5 text-[#788286]">
-                Elle sera enregistrée dans le catalogue et associée à « {target === 'new' ? moduleLabel || 'votre module' : selectedModule?.name} ».
-              </p>
+          {validationErrors.length > 0 && (
+            <div data-testid="status-validation-errors" className="rounded-xl border border-[#e7c9bf] bg-[#fbefeb] p-3 text-xs leading-5 text-[#9a554b]">
+              <div className="mb-1 flex items-center gap-2 font-bold"><CircleAlert size={14} /> Vérifiez les informations</div>
+              <ul className="list-disc space-y-0.5 pl-5">
+                {validationErrors.map(error => <li key={error}>{error}</li>)}
+              </ul>
             </div>
-
-            <div className="space-y-4 p-5 sm:p-6">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold">
-                  Nom de la fonctionnalité
-                  <input
-                    data-testid="input-feature-name"
-                    value={featureLabel}
-                    onChange={event => setFeatureLabel(event.target.value)}
-                    placeholder="Ex. Visites de contrôle"
-                    className={`${inputClass} mt-2 font-normal`}
-                  />
-                </label>
-                <label className="text-sm font-semibold">
-                  Description <span className="font-normal text-[#899394]">(facultatif)</span>
-                  <input
-                    data-testid="input-feature-description"
-                    value={featureDescription}
-                    onChange={event => setFeatureDescription(event.target.value)}
-                    placeholder="À quoi sert cette fiche ?"
-                    className={`${inputClass} mt-2 font-normal`}
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-xl border border-[#e5e1d8]">
-                <button
-                  type="button"
-                  data-testid="button-toggle-definition"
-                  aria-expanded={showFields}
-                  onClick={() => setShowFields(value => !value)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                >
-                  <span>
-                    <span className="block text-sm font-bold">Champs de la fiche</span>
-                    <span className="mt-0.5 block text-xs text-[#788286]">
-                      {fields.length} champ{fields.length === 1 ? '' : 's'} · le premier champ « Titre » est déjà prêt
-                    </span>
-                  </span>
-                  {showFields ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
-                </button>
-                {showFields && (
-                  <div className="space-y-3 border-t border-[#e5e1d8] bg-[#f8f6f0] p-4">
-                    {fields.map((field, index) => (
-                      <div key={field.id} className="grid gap-2 rounded-xl border border-[#e4e1d9] bg-[#fbfaf7] p-3 sm:grid-cols-[1fr_.8fr_auto_auto] sm:items-center">
-                        <input
-                          data-testid={`input-field-label-${index}`}
-                          value={field.label}
-                          onChange={event => updateField(index, {
-                            label: event.target.value,
-                            id: field.id.startsWith('field-')
-                              ? createLaboFeatureId(event.target.value, 'field') || `field-${index + 1}`
-                              : field.id,
-                          })}
-                          className={inputClass}
-                          placeholder="Nom du champ"
-                        />
-                        <select
-                          data-testid={`select-field-type-${index}`}
-                          value={field.type}
-                          onChange={event => updateField(index, {
-                            type: event.target.value as LaboFieldDefinition['type'],
-                            options: event.target.value === 'select' ? field.options ?? ['Option 1'] : undefined,
-                          })}
-                          className={inputClass}
-                        >
-                          <option value="text">Texte</option>
-                          <option value="number">Nombre</option>
-                          <option value="date">Date</option>
-                          <option value="select">Choix</option>
-                          <option value="boolean">Oui / non</option>
-                        </select>
-                        <label className="flex items-center gap-2 whitespace-nowrap text-xs text-[#687479]">
-                          <input
-                            data-testid={`checkbox-field-required-${index}`}
-                            type="checkbox"
-                            checked={field.required}
-                            onChange={event => updateField(index, { required: event.target.checked })}
-                            className="accent-[#286c73]"
-                          />
-                          Requis
-                        </label>
-                        <button
-                          type="button"
-                          data-testid={`button-remove-field-${index}`}
-                          aria-label="Supprimer le champ"
-                          disabled={fields.length === 1}
-                          onClick={() => removeField(index)}
-                          className="rounded-lg p-2 text-[#a86158] hover:bg-[#f6e9e4] disabled:opacity-30"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                        {field.type === 'select' && (
-                          <input
-                            data-testid={`input-field-options-${index}`}
-                            value={(field.options ?? []).join(', ')}
-                            onChange={event => updateField(index, {
-                              options: event.target.value.split(',').map(value => value.trim()).filter(Boolean),
-                            })}
-                            className={`${inputClass} sm:col-span-3`}
-                            placeholder="Choix séparés par des virgules"
-                          />
-                        )}
-                      </div>
-                    ))}
-                    <button type="button" data-testid="button-add-field" onClick={addField} className={buttonClass}>
-                      <Plus size={14} /> Ajouter un champ
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-[#e5e1d8] px-4 py-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold">Workflow</p>
-                    <p className="mt-0.5 text-xs text-[#788286]">Facultatif · ajoutez des étapes seulement si nécessaire.</p>
-                  </div>
-                  <button
-                    type="button"
-                    data-testid="checkbox-workflow-enabled"
-                    role="switch"
-                    aria-checked={workflowEnabled}
-                    onClick={() => setWorkflowEnabled(value => !value)}
-                    className={`relative h-7 w-12 shrink-0 rounded-full transition ${workflowEnabled ? 'bg-[#286c73]' : 'bg-[#d1d3ca]'}`}
-                  >
-                    <span className={`absolute top-1 h-5 w-5 rounded-full bg-[#fbfaf7] shadow-sm transition-transform ${workflowEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
-                {workflowEnabled && (
-                  <div className="mt-4 space-y-2 border-t border-[#e5e1d8] pt-4">
-                    {stages.map((stage, index) => (
-                      <div key={stage.id} className="rounded-xl border border-[#e1ded6] bg-[#f8f6f0] p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#dcebe5] text-xs font-bold text-[#286c73]">{index + 1}</span>
-                          <input
-                            data-testid={`input-stage-label-${index}`}
-                            value={stage.label}
-                            onChange={event => setStages(current => current.map((item, stageIndex) =>
-                              stageIndex === index
-                                ? {
-                                    ...item,
-                                    label: event.target.value,
-                                    id: item.id.startsWith('stage-')
-                                      ? createLaboFeatureId(event.target.value, 'stage') || `stage-${index + 1}`
-                                      : item.id,
-                                  }
-                                : item,
-                            ))}
-                            className={inputClass}
-                            placeholder="Nom de l’étape"
-                          />
-                          {stages.length > 2 && (
-                            <button
-                              type="button"
-                              data-testid={`button-remove-stage-${index}`}
-                              aria-label="Supprimer l’étape"
-                              onClick={() => setStages(current => current.filter((_, stageIndex) => stageIndex !== index))}
-                              className="rounded-lg p-2 text-[#a86158] hover:bg-[#f6e9e4]"
-                            >
-                              <X size={15} />
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1.5 pl-9">
-                          {fields.map(field => (
-                            <button
-                              type="button"
-                              data-testid={`button-stage-field-${index}-${field.id}`}
-                              key={field.id}
-                              onClick={() => setStages(current => current.map((item, stageIndex) =>
-                                stageIndex === index
-                                  ? {
-                                      ...item,
-                                      requiredFieldIds: item.requiredFieldIds.includes(field.id)
-                                        ? item.requiredFieldIds.filter(id => id !== field.id)
-                                        : [...item.requiredFieldIds, field.id],
-                                    }
-                                  : item,
-                              ))}
-                              className={`rounded-lg border px-2 py-1 text-[11px] font-semibold transition ${stage.requiredFieldIds.includes(field.id) ? 'border-[#286c73] bg-[#e6f1ed] text-[#286c73]' : 'border-[#e2dfd7] text-[#8a9292] hover:border-[#b9c8c4]'}`}
-                            >
-                              {stage.requiredFieldIds.includes(field.id) ? 'Requis · ' : ''}{field.label || 'Champ sans nom'}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      data-testid="button-add-stage"
-                      onClick={() => setStages(current => [
-                        ...current,
-                        { id: `stage-${Date.now()}`, label: `Étape ${current.length + 1}`, requiredFieldIds: [] },
-                      ])}
-                      className={buttonClass}
-                    >
-                      <Plus size={14} /> Ajouter une étape
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {validationErrors.length > 0 && (
-                <div data-testid="status-validation-errors" className="rounded-xl border border-[#e7c9bf] bg-[#fbefeb] p-3 text-xs leading-5 text-[#9a554b]">
-                  <div className="mb-1 flex items-center gap-2 font-bold"><CircleAlert size={14} /> Vérifiez les informations</div>
-                  <ul className="list-disc space-y-0.5 pl-5">
-                    {validationErrors.map(error => <li key={error}>{error}</li>)}
-                  </ul>
-                </div>
-              )}
-              {publishError && (
-                <div data-testid="status-publish-error" className="rounded-xl border border-[#e7c9bf] bg-[#fbefeb] p-3 text-xs leading-5 text-[#9a554b]">
-                  {publishError}
-                </div>
-              )}
-              {savedMessage && (
-                <div data-testid="status-published" className="flex items-center gap-2 rounded-xl border border-[#c4ddd1] bg-[#edf7f1] p-3 text-xs font-semibold text-[#286c73]">
-                  <Check size={15} /> {savedMessage}
-                </div>
-              )}
-              <button
-                type="button"
-                data-testid="button-publish-labo"
-                onClick={() => void createFeature()}
-                disabled={publishing || (target === 'new' && (!moduleLabel.trim() || !moduleDescription.trim()))}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#286c73] px-4 py-3 text-sm font-bold text-[#f8faf5] transition hover:bg-[#205b61] disabled:cursor-wait disabled:opacity-60"
-              >
-                <Save size={16} /> {publishing ? 'Enregistrement…' : 'Créer et ajouter au catalogue'}
-              </button>
-              <p className="text-center text-xs text-[#899394]">
-                Les fonctions natives restent dans leur module. Aucun enregistrement existant n’est déplacé.
-              </p>
+          )}
+          {publishError && (
+            <div data-testid="status-publish-error" className="rounded-xl border border-[#e7c9bf] bg-[#fbefeb] p-3 text-xs leading-5 text-[#9a554b]">
+              {publishError}
             </div>
-          </section>
+          )}
+          {savedMessage && (
+            <div data-testid="status-published" className="flex items-center gap-2 rounded-xl border border-[#c4ddd1] bg-[#edf7f1] p-3 text-xs font-semibold text-[#286c73]">
+              <Check size={15} /> {savedMessage}
+            </div>
+          )}
         </div>
       </div>
     </main>
