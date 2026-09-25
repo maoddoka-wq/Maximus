@@ -43,29 +43,22 @@ const useStockApi = () => {
 };
 const useStockAccess = () => useContext(StockAccessContext);
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false, nativeMount }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean; nativeMount?: { targetModuleId: string; mountedFeatureId: string; sourceFeatureId: string } }) {
-  const mountedTab = tabs.some(([id]) => id === nativeMount?.sourceFeatureId)
-    ? nativeMount!.sourceFeatureId as Tab
-    : 'references';
-  const mountScopeKey = nativeMount
-    ? `${nativeMount.targetModuleId}:${nativeMount.mountedFeatureId}:${nativeMount.sourceFeatureId}`
-    : 'standard-stock-module';
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useQueryTab({
-    tabs: nativeMount ? [mountedTab] : tabs.map(([id]) => id),
-    defaultTab: nativeMount ? mountedTab : 'dashboard',
+    tabs: tabs.map(([id]) => id),
+    defaultTab: 'dashboard',
     isAllowed: id => !stockPermissions || stockPermissions[id]?.includes('voir'),
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pendingAction, setPendingAction] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const api = createStockApi(companyId, nativeMount);
+  const api = createStockApi(companyId);
   const loadedScopes = useRef(new Set<StockBootstrapScope>());
   const loadingScopes = useRef(new Set<StockBootstrapScope>());
 
   const scopeForTab = (currentTab: Tab): StockBootstrapScope => {
-    if (nativeMount) return 'core';
     if (currentTab === 'inventory') return 'inventory';
     if (currentTab === 'entries' || currentTab === 'exits' || currentTab === 'requests' || currentTab === 'reports') return 'operations';
     return 'core';
@@ -100,7 +93,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     loadingScopes.current.clear();
     setData(null);
     void load(false, 'core');
-  }, [companyId, preview, mountScopeKey]);
+  }, [companyId, preview]);
   useEffect(() => {
     if (preview || !data) return;
     const scope = scopeForTab(tab);
@@ -123,18 +116,14 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   };
   useEffect(() => {
     if (!data || !stockPermissions) return;
-    if (nativeMount) {
-      if (tab !== mountedTab) setTab(mountedTab);
-    } else if (!tabs.some(([id]) => id === tab && stockPermissions[id]?.includes('voir'))) {
+    if (!tabs.some(([id]) => id === tab && stockPermissions[id]?.includes('voir'))) {
       setTab(tabs.find(([id]) => stockPermissions[id]?.includes('voir'))?.[0] ?? 'dashboard');
     }
   }, [data, stockPermissions, tab]);
   if (loading) return <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-44 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-3"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-52 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div>;
   if (!data) return <div className="card-surface rounded-2xl p-8"><h2 className="font-bold">La gestion de stock est indisponible</h2><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p><button onClick={() => void load()} className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]">Réessayer</button></div>;
 
-  const visibleTabs = nativeMount
-    ? tabs.filter(([id]) => id === mountedTab)
-    : tabs.filter(([id]) => !stockPermissions || stockPermissions[id]?.includes('voir'));
+  const visibleTabs = tabs.filter(([id]) => !stockPermissions || stockPermissions[id]?.includes('voir'));
   const currentTabPermissions = stockPermissions?.[tab];
   const currentCanCreate = canCreate && (!stockPermissions || currentTabPermissions?.includes('créer'));
   const currentCanModify = canModify && (!stockPermissions || currentTabPermissions?.includes('modifier'));
@@ -144,7 +133,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
        <div className="space-y-5">
         <div className={`flex items-center justify-between gap-3 border-b border-[hsl(var(--border))] pb-2 ${singleModuleNavigation ? 'justify-end' : ''}`}>
-           {!singleModuleNavigation && !nativeMount && <WorkspaceTabs
+          {!singleModuleNavigation && <WorkspaceTabs
             items={tabs
               .filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id))
               .map(([id, label, icon]) => ({ id, label, icon }))}
@@ -154,7 +143,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
             testIdPrefix="stock-tab"
             className="flex-1 pb-1"
           />}
-         <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
+        <button title="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>
       </div>
       <div data-stock-can-create={currentCanCreate} data-stock-can-modify={currentCanModify}>
       {tab === 'dashboard' && <StockDashboard data={data} onTab={setTab} />}

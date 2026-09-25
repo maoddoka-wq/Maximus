@@ -5,7 +5,6 @@ import {
   CircleHelp,
   ChevronDown,
   ChevronRight,
-  LayoutGrid,
   LogIn,
   Menu,
   PanelLeftClose,
@@ -15,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { Link } from 'wouter';
-import type { Module, ModuleId, StoreData } from '@/lib/store';
+import type { ModuleId, StoreData } from '@/lib/store';
 import { companyWorkspaceFeatureForPath, type CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 import {
   adminNav,
@@ -45,7 +44,6 @@ type SidebarProps = {
   onToggleCollapse: () => void;
   activeNavStyle?: CSSProperties;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
-  configuredModules?: Module[];
 };
 
 export function Sidebar({
@@ -66,22 +64,13 @@ export function Sidebar({
   onToggleCollapse,
   activeNavStyle,
   hiddenWorkspaceFeatures = [],
-  configuredModules = [],
 }: SidebarProps) {
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
   const hiddenWorkspaceFeatureSet = new Set(hiddenWorkspaceFeatures);
-  const dynamicCompanyNav: typeof companyNav = configuredModules
-    .filter(module => !companyNav.some(item => item.module === module.id))
-    .map(module => ({
-      href: `/entreprise/${module.id}`,
-      label: module.name,
-      icon: LayoutGrid,
-      module: module.id,
-    }));
   const nav = isAdmin
     ? adminNav
-    : [...companyNav, ...dynamicCompanyNav].filter(
+    : companyNav.filter(
         item =>
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
           (item.module === null || allowed.includes(item.module as ModuleId)) &&

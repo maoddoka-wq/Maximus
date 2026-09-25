@@ -77,7 +77,6 @@ class AppStateController extends Controller
                 'moduleOverrides' => $state['moduleOverrides'] ?? [],
                 'moduleStatuses' => $state['moduleStatuses'] ?? [],
                 'customModules' => $state['customModules'] ?? [],
-                'laboFeatureCatalog' => $state['laboFeatureCatalog'] ?? [],
                 'removedModules' => $state['removedModules'] ?? [],
                 'catalogVersion' => $state['catalogVersion'] ?? null,
             ],

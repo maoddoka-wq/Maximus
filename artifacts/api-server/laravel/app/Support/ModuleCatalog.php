@@ -590,11 +590,6 @@ final class ModuleCatalog
         ];
         $options = $fixed[$definition['id']] ?? collect($definition['features'] ?? [])
             ->mapWithKeys(fn ($label): array => [self::featureSlug((string) $label) => (string) $label])->all();
-        foreach (($definition['laboFeatures'] ?? []) as $feature) {
-            if (is_array($feature) && is_string($feature['id'] ?? null) && is_string($feature['label'] ?? null)) {
-                $options[$feature['id']] = $feature['label'];
-            }
-        }
         $aliases = [];
         foreach ($options as $id => $label) {
             foreach ([$id, self::featureSlug($label), Str::slug($label), Str::slug($id)] as $alias) {
@@ -644,20 +639,6 @@ final class ModuleCatalog
         }
         if (! is_array($configuration)) {
             $configuration = [];
-        }
-        // A published LABO mount becomes a feature of its target module.
-        // The module's active status is already checked above; role-level
-        // access to this feature is checked separately by ModuleAuthorization.
-        $module = collect(self::definitionsWithCustom())->firstWhere('id', $moduleId);
-        $publishedMount = is_array($module)
-            ? collect($module['laboFeatures'] ?? [])->firstWhere('id', $featureId)
-            : null;
-        $isPublishedMount = is_array($publishedMount)
-            && ($publishedMount['kind'] ?? null) === 'reuse'
-            && is_string($publishedMount['sourceModuleId'] ?? null)
-            && is_string($publishedMount['sourceFeatureId'] ?? null);
-        if ($isPublishedMount) {
-            return true;
         }
 
         // Legacy rows with no explicit scope preserve physical sales for existing
@@ -947,55 +928,8 @@ final class ModuleCatalog
         } elseif (is_array($rawOverride['feature_dependencies'] ?? null)) {
             $definition['feature_dependencies'] = $rawOverride['feature_dependencies'];
         }
-        if (is_array($rawOverride['laboFeatures'] ?? null)) {
-            $definition['laboFeatures'] = array_values($rawOverride['laboFeatures']);
-        } elseif (is_array($rawOverride['labo_features'] ?? null)) {
-            $definition['laboFeatures'] = array_values($rawOverride['labo_features']);
-        }
-        if (is_array($rawOverride['laboFeatureIds'] ?? null)) {
-            $definition['laboFeatureIds'] = array_values(array_map('strval', $rawOverride['laboFeatureIds']));
-        } elseif (is_array($rawOverride['labo_feature_ids'] ?? null)) {
-            $definition['laboFeatureIds'] = array_values(array_map('strval', $rawOverride['labo_feature_ids']));
-        }
 
         return $definition;
-    }
-
-    /**
-     * Resolve a module's LABO associations from the shared catalog while
-     * retaining legacy embedded definitions until they are migrated.
-     *
-     * @param array<string, mixed> $definition
-     * @param array<int, mixed> $catalog
-     * @return array<int, array<string, mixed>>
-     */
-    private static function resolveLaboFeatures(array $definition, array $catalog): array
-    {
-        $local = is_array($definition['laboFeatures'] ?? null)
-            ? array_values(array_filter($definition['laboFeatures'], static fn (mixed $item): bool =>
-                is_array($item) && is_string($item['id'] ?? null)))
-            : [];
-        $hasAssociationList = is_array($definition['laboFeatureIds'] ?? null);
-        $ids = $hasAssociationList
-            ? array_values(array_unique(array_map('strval', $definition['laboFeatureIds'])))
-            : array_values(array_unique(array_map(
-                static fn (array $item): string => (string) $item['id'],
-                $local,
-            )));
-        if (! $hasAssociationList) {
-            return $local;
-        }
-
-        $byId = collect($catalog)
-            ->concat($local)
-            ->filter(static fn (mixed $item): bool => is_array($item) && is_string($item['id'] ?? null))
-            ->keyBy('id');
-
-        return collect($ids)
-            ->map(fn (string $id): mixed => $byId->get($id))
-            ->filter(static fn (mixed $item): bool => is_array($item))
-            ->values()
-            ->all();
     }
 
     /**
@@ -1014,14 +948,12 @@ final class ModuleCatalog
         $state = is_array($payload) ? $payload : [];
         $custom = is_array($state['customModules'] ?? null) ? $state['customModules'] : [];
         $overrides = is_array($state['moduleOverrides'] ?? null) ? $state['moduleOverrides'] : [];
-        $laboCatalog = is_array($state['laboFeatureCatalog'] ?? null) ? $state['laboFeatureCatalog'] : [];
 
         $normalizedDefinitions = collect(self::definitions())
-            ->map(function (array $definition) use ($overrides, $laboCatalog): array {
-                $resolved = self::applyPublishedOverride($definition, $overrides[$definition['id']] ?? null);
-                $resolved['laboFeatures'] = self::resolveLaboFeatures($resolved, $laboCatalog);
-                return $resolved;
-            })
+            ->map(fn (array $definition): array => self::applyPublishedOverride(
+                $definition,
+                $overrides[$definition['id']] ?? null,
+            ))
             ->values()
             ->all();
 
@@ -1032,19 +964,16 @@ final class ModuleCatalog
                 'name' => (string) ($module['name'] ?? $module['id']),
                 'description' => (string) ($module['description'] ?? ''),
                 'features' => is_array($module['features'] ?? null) ? $module['features'] : [],
-                'laboFeatureIds' => is_array($module['laboFeatureIds'] ?? null) ? array_values($module['laboFeatureIds']) : [],
-                'laboFeatures' => is_array($module['laboFeatures'] ?? null) ? array_values($module['laboFeatures']) : [],
                 'feature_packs' => self::normalizeFeaturePacks($module['featurePacks'] ?? $module['feature_packs'] ?? []),
                 'feature_dependencies' => is_array($module['featureDependencies'] ?? null) ? $module['featureDependencies'] : [],
                 'status' => in_array(($module['status'] ?? 'ACTIF'), ['ACTIF', 'BETA'], true)
                     ? ($module['status'] ?? 'ACTIF')
                     : 'ACTIF',
             ])
-            ->map(function (array $definition) use ($overrides, $laboCatalog): array {
-                $resolved = self::applyPublishedOverride($definition, $overrides[$definition['id']] ?? null);
-                $resolved['laboFeatures'] = self::resolveLaboFeatures($resolved, $laboCatalog);
-                return $resolved;
-            })
+            ->map(fn (array $definition): array => self::applyPublishedOverride(
+                $definition,
+                $overrides[$definition['id']] ?? null,
+            ))
             ->values()
             ->all();
 

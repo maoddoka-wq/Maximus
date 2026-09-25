@@ -1,5 +1,5 @@
 import type { ComponentType, ReactElement } from 'react';
-import { getConfiguredModules, type ModuleAvailability, type ModuleId, type SectorPreset, type StoreData } from '@/lib/store';
+import type { ModuleAvailability, ModuleId, SectorPreset, StoreData } from '@/lib/store';
 import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
 import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
@@ -9,9 +9,7 @@ import type { AdminAssistantScope } from '@/lib/local-assistant';
 import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
 import { getAdminControlRoute } from '@/lib/control-routing';
-import { getCatalogSnapshot, publishCatalogDraft } from '@/lib/catalog-workflow';
 import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
-import { getNativeMountAdapter } from '@/lib/native-mount-adapters';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -43,7 +41,6 @@ export type AdminRouteScreens = {
   companies: Screen;
   requests: Screen;
   modules: Screen;
-  labo: Screen;
   sectors: Screen;
   subscriptions: Screen;
   notifications: Screen;
@@ -136,46 +133,6 @@ export function AdminRouter({
   if (routePath === '/maximus/modules') {
     return renderScreen(screens.modules, { data, mutate, notify });
   }
-  if (routePath === '/maximus/labo') {
-    const catalog = getCatalogSnapshot(data);
-    const catalogData = { ...data, ...catalog };
-    return renderScreen(screens.labo, {
-      modules: getConfiguredModules(catalogData),
-      draft: {
-        customModules: catalog.customModules ?? [],
-        moduleOverrides: catalog.moduleOverrides,
-        laboFeatureCatalog: catalog.laboFeatureCatalog,
-      },
-      onDraftChange: (nextDraft: {
-        customModules: StoreData['customModules'];
-        moduleOverrides: StoreData['moduleOverrides'];
-        laboFeatureCatalog: NonNullable<StoreData['laboFeatureCatalog']>;
-      }) => {
-        mutate(current => {
-          const draft = current.catalogDraft ?? {
-            moduleOverrides: current.moduleOverrides ?? {},
-            moduleStatuses: current.moduleStatuses ?? {},
-            removedModules: current.removedModules ?? [],
-            customModules: current.customModules ?? [],
-            laboFeatureCatalog: current.laboFeatureCatalog ?? [],
-            sectorPresets: current.sectorPresets ?? [],
-            updatedAt: new Date().toISOString(),
-          };
-          current.catalogDraft = {
-            ...draft,
-            ...nextDraft,
-            customModules: nextDraft.customModules ?? draft.customModules ?? [],
-            moduleOverrides: nextDraft.moduleOverrides ?? draft.moduleOverrides ?? {},
-            laboFeatureCatalog: nextDraft.laboFeatureCatalog ?? draft.laboFeatureCatalog ?? [],
-            updatedAt: new Date().toISOString(),
-          };
-        });
-      },
-      onPublish: async () => {
-        mutate(current => publishCatalogDraft(current), 'Catalogue LABO publié.');
-      },
-    });
-  }
   if (routePath === '/maximus/secteurs') {
     return renderScreen(screens.sectors, { data, mutate, onTestSector });
   }
@@ -216,7 +173,6 @@ export type CompanyRouteScreens = {
   humanResources: Screen;
   presence: Screen;
   reports: Screen;
-  labo: Screen;
 };
 
 export function CompanyRouter({
@@ -297,16 +253,8 @@ export function CompanyRouter({
     '/entreprise/rapports': 'rapports',
   };
   const requiredModule = moduleIdForPath(routePath) ?? routeModuleOverrides[routePath];
-  const configuredModules = getConfiguredModules(data);
-  const dynamicModule = configuredModules.find(module => module.id === routePath.replace('/entreprise/', ''));
-  const selectedLaboFeatureId = query.get('feature') ?? query.get('tab');
-  const selectedLaboFeature = dynamicModule?.laboFeatures?.find(feature => feature.id === selectedLaboFeatureId);
-  const isCustomModule = Boolean(dynamicModule && !moduleDescriptorById[dynamicModule.id]);
-  const shouldRenderLabo = Boolean(
-    dynamicModule?.laboFeatures?.length && (selectedLaboFeature || isCustomModule),
-  );
   const maintenanceModule: ModuleId | 'controle' | undefined =
-    routePath === '/entreprise/controle' ? 'controle' : dynamicModule?.id ?? requiredModule;
+    routePath === '/entreprise/controle' ? 'controle' : requiredModule;
   if (maintenanceModule && (serverModuleAccess?.find((item) => item.id === maintenanceModule)?.status ?? moduleStatuses[maintenanceModule]) === 'MAINTENANCE') {
     return renderScreen(screens.empty, {
       title: 'Module en maintenance',
@@ -319,63 +267,6 @@ export function CompanyRouter({
       title: 'Accès non autorisé',
       text: 'Votre rôle ne possède pas la permission Consulter pour ce module.',
       action: () => onBack('/entreprise/dashboard'),
-    });
-  }
-  if (dynamicModule && shouldRenderLabo) {
-    if (!allowed.includes(dynamicModule.id)) {
-      return renderScreen(screens.empty, {
-        title: 'Accès non autorisé',
-        text: 'Votre rôle ne possède pas la permission Consulter pour ce module.',
-        action: () => onBack('/entreprise/dashboard'),
-      });
-    }
-    if (selectedLaboFeature?.kind === 'reuse') {
-      const adapter = getNativeMountAdapter(
-        selectedLaboFeature.sourceModuleId,
-        selectedLaboFeature.sourceFeatureId,
-      );
-      if (adapter) {
-        const targetFeaturePermissions = moduleFeaturePermissions?.[dynamicModule.id];
-        const hasExplicitFeaturePermissions = Boolean(
-          targetFeaturePermissions
-          && Object.prototype.hasOwnProperty.call(targetFeaturePermissions, selectedLaboFeature.id),
-        );
-        const mountedPermissions = companyAdmin
-          ? ['voir', 'créer', 'modifier']
-          : hasExplicitFeaturePermissions
-            ? targetFeaturePermissions?.[selectedLaboFeature.id] ?? []
-            : (['voir', 'créer', 'modifier'] as const)
-              .filter(permission => hasPermission(dynamicModule.id, permission));
-        if (mountedPermissions.includes('voir')) {
-          return renderCompanyModule(screens.stocks, {
-            companyId,
-            companyUsers: data.employees.filter(item => item.companyId === companyId),
-            companyServices: data.orgNodes.filter(node => node.companyId === companyId),
-            canCreate: mountedPermissions.includes('créer'),
-            canModify: mountedPermissions.includes('modifier'),
-            stockPermissions: {
-              [selectedLaboFeature.sourceFeatureId]: mountedPermissions,
-            },
-            nativeMount: {
-              targetModuleId: dynamicModule.id,
-              mountedFeatureId: selectedLaboFeature.id,
-              sourceFeatureId: selectedLaboFeature.sourceFeatureId,
-            },
-          });
-        }
-      }
-    }
-    return renderCompanyModule(screens.labo, {
-      module: dynamicModule,
-      feature: selectedLaboFeature ?? null,
-      modules: configuredModules,
-      allowedModuleIds: allowed,
-      canViewFeature: (moduleId: ModuleId, selectedFeatureId: string) => {
-        if (!allowed.includes(moduleId) || !hasPermission(moduleId, 'voir')) return false;
-        const permissions = moduleFeaturePermissions?.[moduleId];
-        if (!permissions || !Object.prototype.hasOwnProperty.call(permissions, selectedFeatureId)) return true;
-        return permissions[selectedFeatureId]?.includes('voir') ?? false;
-      },
     });
   }
   if (routePath === '/entreprise/dashboard') {

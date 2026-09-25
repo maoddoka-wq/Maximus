@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
-use App\Models\Company;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -222,16 +221,6 @@ class StockTest extends TestCase
 
     private function asActor(string $role = 'company_admin', array $permissions = []): self
     {
-        Company::query()->updateOrCreate(
-            ['id' => 'kora'],
-            [
-                'name' => 'KORA',
-                'manager' => 'Responsable',
-                'email' => 'kora@demo.test',
-                'status' => 'ACTIF',
-                'requested_modules' => ['stocks'],
-            ],
-        );
         $user = AuthUser::query()->create([
             'id' => 'stock-admin',
             'email' => 'stock-admin@kora.demo',

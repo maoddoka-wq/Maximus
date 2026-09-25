@@ -181,8 +181,6 @@ const CompanyOrganizationAdmin = lazy(() =>
 const CompanySetupGuide = lazy(() => import('@/pages/company-setup-guide'));
 const PresenceModulePage = lazy(() => import('@/pages/presence-module'));
 const PayrollModulePage = lazy(() => import('@/pages/payroll-module'));
-const LaboWorkbenchPage = lazy(() => import('@/pages/labo-workbench').then(module => ({ default: module.LaboWorkbenchPage })));
-const LaboRuntimePage = lazy(() => import('@/pages/labo-runtime').then(module => ({ default: module.LaboRuntimePage })));
 const MaximusAssistantPage = lazy(() => import('@/pages/maximus-assistant'));
 const IntelligentOnboardingPage = lazy(() =>
   import('@/pages/intelligent-onboarding').then((module) => ({ default: module.IntelligentOnboardingPage })),
@@ -242,11 +240,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Configuration',
     title: 'Catalogue des modules',
     description: 'Les briques métier disponibles dans MAXIMUS.',
-  },
-  '/maximus/labo': {
-    kicker: 'Atelier MAXIMUS',
-    title: 'LABO',
-    description: 'Composez et publiez des fonctionnalités métier persistantes.',
   },
   '/maximus/secteurs': {
     kicker: 'Configuration',
@@ -544,7 +537,6 @@ function AppContent() {
             moduleOverrides: catalog.moduleOverrides ?? previous.moduleOverrides,
             moduleStatuses: catalog.moduleStatuses ?? previous.moduleStatuses,
             customModules: catalog.customModules ?? previous.customModules,
-            laboFeatureCatalog: catalog.laboFeatureCatalog ?? previous.laboFeatureCatalog,
             removedModules: catalog.removedModules ?? previous.removedModules,
             catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
           }),
@@ -1271,7 +1263,6 @@ function AppContent() {
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
         hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
-        configuredModules={getConfiguredModules(data)}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
         <Topbar
@@ -1374,7 +1365,6 @@ function AppContent() {
                     companies: CompaniesPage,
                     requests: RequestsPage,
                     modules: InteractiveModulesPage,
-                    labo: LaboWorkbenchPage,
                     sectors: SectorPresetsPage,
                     subscriptions: SubscriptionsPage,
                     notifications: NotificationsPage,
@@ -1434,7 +1424,6 @@ function AppContent() {
                     humanResources: HumanResourcesWorkspace,
                     presence: PresenceModulePage,
                     reports: OperationalReportsPage,
-                    labo: LaboRuntimePage,
                   }}
                 />
               )}

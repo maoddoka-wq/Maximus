@@ -58,35 +58,27 @@ function optionsFromDefinitions(
 }
 
 export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
-  const laboOptions = (module.laboFeatures ?? []).map(feature => ({
-    id: feature.id,
-    label: feature.label,
-  }));
-  const appendLabo = (options: ModuleFeatureOption[]) => [
-    ...options,
-    ...laboOptions.filter(feature => !options.some(option => option.id === feature.id)),
-  ];
   if (module.id === 'commerce') {
-    return appendLabo(commerceTabDefinitions.map(tab => ({ id: tab.id, label: tab.label })));
+    return commerceTabDefinitions.map(tab => ({ id: tab.id, label: tab.label }));
   }
   if (module.id === 'stocks') {
-    return appendLabo(stockSubmodules.map(submodule => ({ id: submodule.id, label: submodule.name })));
+    return stockSubmodules.map(submodule => ({ id: submodule.id, label: submodule.name }));
   }
   if (module.id === 'ecommerce') {
-    return appendLabo(ecommerceFeatureDefinitions.map(feature => ({ id: feature.id, label: feature.label })));
+    return ecommerceFeatureDefinitions.map(feature => ({ id: feature.id, label: feature.label }));
   }
   if (module.id === 'transport') {
-    return appendLabo([
+    return [
       { id: 'overview', label: 'Vue d’ensemble' },
       { id: 'trips', label: 'Courses' },
       { id: 'drivers', label: 'Chauffeurs' },
       { id: 'vehicles', label: 'Véhicules' },
       { id: 'historique', label: 'Historique' },
       { id: 'parametres', label: 'Paramètres' },
-    ]);
+    ];
   }
   if (module.id === 'immobilier') {
-    return appendLabo([
+    return [
       { id: 'dashboard', label: 'Tableau de bord' },
       { id: 'biens', label: 'Biens' },
       { id: 'annonces', label: 'Annonces' },
@@ -97,24 +89,24 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
       { id: 'rapports', label: 'Rapports' },
       { id: 'parametres', label: 'Paramètres' },
       { id: 'vitrine-publique', label: 'Vitrine publique' },
-    ]);
+    ];
   }
   if (module.id === 'presences') {
-    return appendLabo(optionsFromDefinitions(
+    return optionsFromDefinitions(
       module.features,
       presenceFeatureDefinitions.map(feature => ({
         id: featureSlug(feature.label),
         label: feature.label,
       })),
-    ));
+    );
   }
   if (module.id === 'paie') {
     const normalizedPayrollIds = new Set(normalizePayrollFeatureIds(module.features));
-    return appendLabo(payrollFeatureDefinitions
+    return payrollFeatureDefinitions
       .filter(feature => normalizedPayrollIds.has(feature.id) || module.features.some(value => featureSlug(value) === feature.id))
-      .map(feature => ({ id: feature.id, label: feature.label })));
+      .map(feature => ({ id: feature.id, label: feature.label }));
   }
-  return appendLabo((Array.isArray(module.features) ? module.features : []).map(feature => ({ id: featureSlug(feature), label: feature })));
+  return (Array.isArray(module.features) ? module.features : []).map(feature => ({ id: featureSlug(feature), label: feature }));
 }
 
 export function normalizeModuleFeatureIds(module: Module, values: Iterable<string>) {

@@ -41,7 +41,6 @@
 - [Surveillance de santé Render](render-health-monitoring.md) — utiliser la sonde `/api/healthz` existante pour détecter et persister les incidents sans worker séparé.
 - [Identité publique des boutiques](public-store-identity.md) — les noms peuvent être identiques entre entreprises, mais chaque slug public doit rester globalement unique.
 - [Catalogue d’inscription](registration-catalog-boundary.md) — l’inscription publique lit uniquement le catalogue publié, jamais l’état workspace ou son brouillon.
-- [Montage des fonctionnalités LABO](labo-feature-catalog.md) — la fonction source reste intacte ; son montage suit le contexte et les données distinctes du module cible, sans créer de fiches.
 - [Autorisation effective des modules](module-access-source.md) — l’accès courant vient des autorisations persistées, pas seulement de la demande initiale d’inscription.
 - [Commission e-commerce](ecommerce-commission-policy.md) — chaque vente est répartie à 3 % DiamanoPay, 2 % MAXIMUS et 95 % vendeur, avec registre MAXIMUS idempotent.
 - [Réconciliation des règlements MAXIMUS](maximus-settlement-reconciliation.md) — une vente `PAID` peut reconstruire séparément les écritures vendeur et MAXIMUS sans double crédit.
@@ -96,4 +95,3 @@
 - [Origine des mutations avec cookie](cookie-request-origin.md) — exiger Origin/Referer pour les sessions navigateur, sans bloquer les appels machine Bearer dépourvus de cookie.
 - [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
-- [Dépendances pnpm des artefacts](pnpm-artifact-dependencies.md) — cibler le workspace applicatif avec `pnpm add --filter`; l’installateur générique peut viser la racine et échouer.
