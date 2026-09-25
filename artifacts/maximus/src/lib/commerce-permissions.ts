@@ -1,19 +1,30 @@
+export const commerceTabGroups = [
+  { id: 'pilotage', label: 'Pilotage' },
+  { id: 'ventes', label: 'Ventes' },
+  { id: 'referentiels', label: 'Référentiels' },
+  { id: 'approvisionnement', label: 'Approvisionnement' },
+  { id: 'tresorerie', label: 'Trésorerie' },
+  { id: 'administration', label: 'Administration' },
+] as const;
+
+export type CommerceTabGroupId = (typeof commerceTabGroups)[number]['id'];
+
 export const commerceTabDefinitions = [
-  { id: 'dashboard', label: 'Tableau de bord' },
-  { id: 'sales', label: 'Ventes & caisse' },
-  { id: 'products', label: 'Produits & stock' },
-  { id: 'clients', label: 'Clients' },
-  { id: 'suppliers', label: 'Fournisseurs' },
-  { id: 'purchases', label: 'Achats' },
-  { id: 'expenses', label: 'Dépenses' },
-  { id: 'cash', label: 'Comptes de caisse' },
-  { id: 'credit', label: 'Crédit clients' },
-  { id: 'invoices', label: 'Factures & reçus' },
-  { id: 'returns', label: 'Retours & avoirs' },
-  { id: 'reports', label: 'Rapports' },
-  { id: 'activity', label: 'Journal d’activité' },
-  { id: 'team', label: 'Équipe & droits' },
-  { id: 'settings', label: 'Paramètres' },
+  { id: 'dashboard', label: 'Tableau de bord', groupId: 'pilotage' },
+  { id: 'sales', label: 'Ventes', groupId: 'ventes' },
+  { id: 'products', label: 'Catalogue produits', groupId: 'referentiels' },
+  { id: 'clients', label: 'Clients', groupId: 'referentiels' },
+  { id: 'suppliers', label: 'Fournisseurs', groupId: 'referentiels' },
+  { id: 'purchases', label: 'Commandes fournisseurs', groupId: 'approvisionnement' },
+  { id: 'expenses', label: 'Dépenses', groupId: 'tresorerie' },
+  { id: 'cash', label: 'Comptes de caisse', groupId: 'tresorerie' },
+  { id: 'credit', label: 'Créances clients', groupId: 'ventes' },
+  { id: 'invoices', label: 'Factures & reçus', groupId: 'ventes' },
+  { id: 'returns', label: 'Retours & avoirs', groupId: 'ventes' },
+  { id: 'reports', label: 'Rapports', groupId: 'pilotage' },
+  { id: 'activity', label: 'Journal d’activité', groupId: 'pilotage' },
+  { id: 'team', label: 'Équipe & droits', groupId: 'administration' },
+  { id: 'settings', label: 'Paramètres', groupId: 'administration' },
 ] as const;
 
 export type CommerceTabId = (typeof commerceTabDefinitions)[number]['id'];

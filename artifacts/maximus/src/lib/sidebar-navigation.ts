@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import {
   commerceTabDefinitions,
+  commerceTabGroups,
   type CommerceTabId,
 } from './commerce-permissions';
 import { getSelectedFeatureIds, roleHasFeaturePermission } from './employee-permissions';
@@ -161,18 +162,28 @@ export function buildSidebarFeatureGroups({
           employeeNode?.moduleFeatures?.[module.id],
         );
 
-    const items = moduleId === 'commerce'
-      ? (commerceTabIds
+    if (moduleId === 'commerce') {
+      const visibleCommerceTabs = commerceTabIds
         ? commerceTabDefinitions.filter(tab => commerceTabIds.includes(tab.id))
         : companyAdmin
           ? commerceTabDefinitions.filter(tab => !hasExplicitCompanySelection || selectedFeatureIds.has(tab.id))
-          : [])
-        .map(tab => ({
-          href: `/entreprise/commerce?tab=${tab.id}`,
-          label: tab.label,
-          icon: commerceTabIcons[tab.id],
-        }))
-      : moduleId === 'stocks'
+          : [];
+
+      return commerceTabGroups.flatMap(section => {
+        const items = visibleCommerceTabs
+          .filter(tab => tab.groupId === section.id)
+          .map(tab => ({
+            href: `/entreprise/commerce?tab=${tab.id}`,
+            label: tab.label,
+            icon: commerceTabIcons[tab.id],
+          }));
+        return items.length
+          ? [{ label: `${module.name} · ${section.label}`, items }]
+          : [];
+      });
+    }
+
+    const items = moduleId === 'stocks'
         ? (stockPermissions
           ? stockSubmodules.filter(submodule => stockPermissions[submodule.id]?.includes('voir'))
           : companyAdmin
