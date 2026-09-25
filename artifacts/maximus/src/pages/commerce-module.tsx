@@ -4,7 +4,6 @@ import {
   ArrowDownToLine,
   ArrowUpRight,
   BarChart3,
-  Bell,
   Boxes,
   BriefcaseBusiness,
   Building2,
@@ -272,105 +271,6 @@ function Dashboard({ data, state, lowStock, revenue, onTab }: { data: StoreData;
   </div>;
 }
 
-function SalesPageComplete({ data, query, mutate, canCreate, canModify, companyId }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; companyId: string; onToast?: (message: string) => void }) {
-  const { alert, confirm } = useAppDialog();
-  const [modal, setModal] = useState<Sale | 'new' | null>(null);
-  const [client, setClient] = useState('');
-  const [amount, setAmount] = useState('');
-  const [lines, setLines] = useState<CommerceSaleLine[]>([]);
-  const open = (sale?: Sale) => {
-    setModal(sale ?? 'new');
-    setClient(sale?.client ?? '');
-    setAmount(sale ? String(sale.amount) : '');
-    setLines(sale?.items.map(item => ({ productId: item.productId, quantity: String(item.quantity) })) ?? []);
-  };
-  const lineTotal = lines.reduce((sum, line) => {
-    const product = data.products.find(item => item.id === line.productId);
-    return sum + (product?.price ?? 0) * (Number(line.quantity) || 0);
-  }, 0);
-  const save = (event?: FormEvent) => {
-    event?.preventDefault();
-    const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) })).filter(item => item.productId && Number.isFinite(item.quantity) && item.quantity > 0);
-    const total = items.length ? items.reduce((sum, item) => sum + (data.products.find(product => product.id === item.productId)?.price ?? 0) * item.quantity, 0) : Number(amount);
-    if (!client.trim() || !Number.isFinite(total) || total <= 0) return;
-    mutate(draft => {
-      if (modal !== 'new' && modal) {
-        const target = draft.sales.find(item => item.id === modal.id);
-        if (target) Object.assign(target, { client: client.trim(), amount: total, items });
-      } else {
-        draft.sales.unshift({ id: uid('sale'), reference: `VTE-${Date.now().toString().slice(-6)}`, client: client.trim(), amount: total, status: 'BROUILLON', date: 'À l’instant', items, companyId });
-      }
-    }, modal !== 'new' && modal ? 'Vente modifiée.' : 'Vente enregistrée en brouillon.');
-    setModal(null);
-  };
-  const validate = async (sale: Sale) => {
-    if (sale.items.length === 0) {
-      await alert({ title: 'Vente incomplète', description: 'Ajoutez au moins un article avant de valider cette vente afin de garantir la mise à jour du stock.', confirmLabel: 'Compris' });
-      return;
-    }
-    if (!await confirm({ title: 'Valider cette vente ?', description: `La vente ${sale.reference} sera validée et le stock des articles sera déduit.`, confirmLabel: 'Valider' })) return;
-    const requested = new Map<string, number>();
-    sale.items.forEach(item => requested.set(item.productId, (requested.get(item.productId) ?? 0) + item.quantity));
-    const unavailable = [...requested.entries()].find(([productId, quantity]) => (data.products.find(product => product.id === productId)?.stock ?? 0) < quantity);
-    if (unavailable) {
-      const product = data.products.find(item => item.id === unavailable[0]);
-      await alert({ title: 'Stock insuffisant', description: `Stock insuffisant pour ${product?.name ?? 'cet article'}.`, confirmLabel: 'Compris', tone: 'danger' });
-      return;
-    }
-    mutate(draft => {
-      const target = draft.sales.find(item => item.id === sale.id);
-      if (!target || target.status === 'VALIDÉ') return;
-      target.status = 'VALIDÉ';
-      target.items.forEach(item => {
-        const product = draft.products.find(candidate => candidate.id === item.productId);
-        if (product) {
-          product.stock -= item.quantity;
-          draft.movements.unshift({ id: uid('movement'), product: product.name, quantity: item.quantity, type: 'SORTIE', date: 'À l’instant', user: 'Utilisateur actuel', location: 'Boutique principale', companyId });
-          if (product.stock <= product.threshold) {
-            addNotification(draft, { title: 'Stock à surveiller', text: `${product.name} est passé sous son seuil de sécurité.`, audience: 'company', companyId, module: 'stocks', severity: 'warning', href: '/entreprise/stocks?tab=products' });
-          }
-        }
-      });
-      draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente', module: 'Gestion commerciale', object: sale.reference, date: 'À l’instant', status: 'VALIDÉ', companyId });
-      recordControlEvent(draft, {
-        type: 'APPROVAL_GRANTED',
-        label: 'Vente validée',
-        summary: `${sale.reference} a été validée et le stock a été mis à jour.`,
-        actorName: 'Utilisateur actuel',
-        entityType: 'sale',
-        entityId: sale.id,
-        companyId,
-        moduleId: 'commerce',
-        severity: 'success',
-      });
-      addNotification(draft, { title: 'Vente validée', text: `La vente ${sale.reference} a été validée et le stock a été mis à jour.`, audience: 'company', companyId, module: 'commerce', severity: 'success', href: '/entreprise/commerce?tab=sales' });
-    }, 'Vente validée et stock mis à jour.');
-  };
-  const remove = async (sale: Sale) => {
-    if (!await confirm({ title: 'Supprimer ce brouillon ?', description: `Le brouillon ${sale.reference} sera supprimé définitivement.`, confirmLabel: 'Supprimer', tone: 'danger' })) return;
-    mutate(draft => { draft.sales = draft.sales.filter(item => item.id !== sale.id); }, 'Vente supprimée.');
-  };
-  const sales = data.sales.filter(item => `${item.reference} ${item.client} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-5">
-    <Panel title="Ventes & caisse" description="Créez une vente avec ses articles, puis validez-la pour déduire automatiquement le stock." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouvelle vente</Button> : undefined}>
-      <div className="mobile-stat-grid grid gap-3 sm:grid-cols-3"><Metric label="Ventes enregistrées" value={String(data.sales.length)} detail="Brouillons compris" icon={ShoppingCart} /><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Panier moyen" value={money(data.sales.length ? data.sales.reduce((sum, item) => sum + item.amount, 0) / data.sales.length : 0)} detail="Sur les ventes enregistrées" icon={Tags} /></div>
-    </Panel>
-    <Panel title="Journal des ventes"><DataTable headers={['Référence', 'Client', 'Montant', 'Date', 'Statut', 'Actions']} rows={sales.map(sale => [<strong key={sale.id}>{sale.reference}</strong>, sale.client, money(sale.amount), sale.date, <StatusBadge key={`${sale.id}-badge`} status={sale.status} />, sale.status === 'BROUILLON' ? <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => validate(sale)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Valider</button>}{canModify && <button type="button" onClick={() => remove(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div> : <span className="text-xs text-[hsl(var(--muted-foreground))]">Stock déduit</span>])} /></Panel>
-    {modal && <Modal title={modal === 'new' ? 'Nouvelle vente' : `Modifier ${modal.reference}`} onClose={() => setModal(null)}>
-      <form onSubmit={save} className="space-y-4">
-        <Field label="Client" value={client} onChange={setClient} placeholder="Nom du client" help="Le client affiché sur la vente et le reçu." />
-        <div className="rounded-xl border p-4">
-          <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold">Articles vendus</h3><p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Ajoutez des articles pour calculer le total et déduire le stock à la validation.</p></div><button type="button" onClick={() => setLines(current => [...current, { productId: data.products[0]?.id ?? '', quantity: '1' }])} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-2 text-[10px] font-bold"><Plus size={13} />Ajouter</button></div>
-          <div className="mt-3 space-y-2">{lines.map((line, index) => <div key={`${line.productId}-${index}`} className="flex items-center gap-2"><select aria-label={`Article ${index + 1}`} value={line.productId} onChange={event => setLines(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, productId: event.target.value } : item))} className="min-w-0 flex-1 rounded-lg border bg-[hsl(var(--card))] px-2.5 py-2 text-xs">{data.products.map(product => <option key={product.id} value={product.id}>{product.name} · {money(product.price)}</option>)}</select><input aria-label={`Quantité article ${index + 1}`} type="number" min="1" value={line.quantity} onChange={event => setLines(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item))} className="w-20 rounded-lg border bg-transparent px-2.5 py-2 text-xs" /><button type="button" aria-label="Retirer l’article" onClick={() => setLines(current => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg p-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={14} /></button></div>)}</div>
-          {lines.length > 0 && <p className="mt-3 text-right text-sm font-bold">Total calculé : {money(lineTotal)}</p>}
-        </div>
-        {lines.length === 0 && <Field label="Montant TTC" value={amount} onChange={setAmount} type="number" placeholder="0" help="Saisissez un montant libre ou ajoutez des articles pour le calcul automatique." />}
-        <div className="flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={() => save()}><Check size={15} />Enregistrer le brouillon</Button></div>
-      </form>
-    </Modal>}
-  </div>;
-}
-
 function ProductsPageComplete({ data, query, mutate, canCreate, canModify, companyId }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; companyId: string }) {
   const { alert, confirm } = useAppDialog();
   type Product = StoreData['products'][number];
@@ -576,115 +476,9 @@ function SalesPageFunctional({ data, query, mutate, canCreate, canModify, taxRat
   </div>;
 }
 
-function SalesPage({ data, query, mutate, canCreate, canModify, onToast }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean; canModify: boolean; onToast: (message: string) => void }) {
-  const { confirm } = useAppDialog();
-  const [modal, setModal] = useState<Sale | 'new' | null>(null);
-  const [client, setClient] = useState('');
-  const [amount, setAmount] = useState('');
-  const open = (sale?: Sale) => { setModal(sale ?? 'new'); setClient(sale?.client ?? ''); setAmount(sale ? String(sale.amount) : ''); };
-  const save = (event?: FormEvent) => {
-    event?.preventDefault();
-    if (!client.trim() || !amount || Number(amount) <= 0) return;
-    mutate(draft => {
-      if (modal !== 'new' && modal) {
-        const target = draft.sales.find(item => item.id === modal.id);
-        if (target) { target.client = client.trim(); target.amount = Number(amount); }
-      } else draft.sales.unshift({ id: uid('sale'), reference: `VTE-${Date.now().toString().slice(-6)}`, client: client.trim(), amount: Number(amount), status: 'BROUILLON', date: 'À l’instant', items: [] });
-    }, modal !== 'new' && modal ? 'Vente modifiée.' : 'Vente enregistrée en brouillon.');
-    setModal(null);
-  };
-  const validate = async (sale: Sale) => {
-    if (!await confirm({ title: 'Valider cette vente ?', description: `La vente ${sale.reference} sera validée et le stock des articles sera déduit.`, confirmLabel: 'Valider' })) return;
-    mutate(draft => {
-      const target = draft.sales.find(item => item.id === sale.id);
-      if (!target || target.status === 'VALIDÉ') return;
-      target.status = 'VALIDÉ';
-      target.items.forEach(item => { const product = draft.products.find(candidate => candidate.id === item.productId); if (product) product.stock -= item.quantity; });
-      draft.activities.unshift({ id: uid('activity'), user: 'Utilisateur actuel', action: 'a validé une vente', module: 'Gestion commerciale', object: sale.reference, date: 'À l’instant', status: 'VALIDÉ' });
-    }, 'Vente validée et stock mis à jour.');
-  };
-  const remove = async (sale: Sale) => { if (!await confirm({ title: 'Supprimer ce brouillon ?', description: `Le brouillon ${sale.reference} sera supprimé.`, confirmLabel: 'Supprimer', tone: 'danger' })) return; mutate(draft => { draft.sales = draft.sales.filter(item => item.id !== sale.id); }, 'Vente supprimée.'); };
-  const sales = data.sales.filter(item => `${item.reference} ${item.client} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-5"><Panel title="Ventes & caisse" description="Saisissez les ventes, validez-les et gardez une trace des encaissements." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouvelle vente</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Ventes enregistrées" value={String(data.sales.length)} detail="Brouillons compris" icon={ShoppingCart} /><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Panier moyen" value={money(data.sales.length ? data.sales.reduce((sum, item) => sum + item.amount, 0) / data.sales.length : 0)} detail="Sur la période affichée" icon={Tags} /></div></Panel><Panel title="Journal des ventes"><DataTable headers={['Référence', 'Client', 'Montant', 'Date', 'Statut', 'Actions']} rows={sales.map(sale => [<strong key={sale.id}>{sale.reference}</strong>, sale.client, money(sale.amount), sale.date, <StatusBadge key={`${sale.id}-badge`} status={sale.status} />, sale.status === 'BROUILLON' && <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canCreate && <button type="button" onClick={() => validate(sale)} className="rounded-lg bg-[hsl(var(--primary))] px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Valider</button>}{canModify && <button type="button" onClick={() => remove(sale)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div>])} /></Panel>{modal && <Modal title={modal === 'new' ? 'Nouvelle vente' : `Modifier ${modal.reference}`} onClose={() => setModal(null)}><form onSubmit={save} className="space-y-4"><Field label="Client" value={client} onChange={setClient} placeholder="Nom du client" help="Le client affiché sur la vente et le reçu." /><Field label="Montant TTC" value={amount} onChange={setAmount} type="number" placeholder="0" help="Saisissez le montant total de la vente." /><div className="flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={() => save()}><Check size={15} />Enregistrer</Button></div></form></Modal>}</div>;
-}
-
-function ProductsPage({ data, query, mutate, canCreate }: { data: StoreData; query: string; mutate: (fn: (draft: StoreData) => void, message?: string) => void; canCreate: boolean }) {
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', sku: '', category: 'Divers', stock: '0', threshold: '0', price: '0' });
-  const products = data.products.filter(item => `${item.name} ${item.sku} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
-  const save = () => {
-    if (!form.name.trim() || !form.sku.trim()) return;
-    mutate(draft => draft.products.unshift({ id: uid('product'), name: form.name.trim(), sku: form.sku.trim(), category: form.category.trim() || 'Divers', stock: Number(form.stock) || 0, threshold: Number(form.threshold) || 0, price: Number(form.price) || 0 }), 'Produit ajouté au catalogue.');
-    setForm({ name: '', sku: '', category: 'Divers', stock: '0', threshold: '0', price: '0' }); setModal(false);
-  };
-  return <div className="space-y-5"><Panel title="Produits & stock" description="Le catalogue commercial s’appuie sur le stock partagé de l’entreprise." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouveau produit</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Références" value={String(data.products.length)} detail="Catalogue actif" icon={Boxes} /><Metric label="Unités en stock" value={String(data.products.reduce((sum, item) => sum + item.stock, 0))} detail="Toutes catégories" icon={Package} /><Metric label="Sous seuil" value={String(data.products.filter(item => item.stock <= item.threshold).length)} detail="À réapprovisionner" icon={Archive} warning /></div></Panel><Panel title="Catalogue produits"><DataTable headers={['Produit', 'SKU', 'Catégorie', 'Stock', 'Prix de vente', 'État']} rows={products.map(product => [<strong key={product.id}>{product.name}</strong>, product.sku, product.category, <span className={product.stock <= product.threshold ? 'font-bold text-[hsl(var(--destructive))]' : ''}>{product.stock}</span>, money(product.price), <StatusBadge status={product.stock <= product.threshold ? 'EN ATTENTE' : 'ACTIF'} />])} /></Panel>{modal && <Modal title="Ajouter un produit" onClose={() => setModal(false)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du produit" value={form.name} onChange={value => setForm(current => ({ ...current, name: value }))} /><Field label="Référence SKU" value={form.sku} onChange={value => setForm(current => ({ ...current, sku: value }))} /><Field label="Catégorie" value={form.category} onChange={value => setForm(current => ({ ...current, category: value }))} /><Field label="Stock initial" value={form.stock} onChange={value => setForm(current => ({ ...current, stock: value }))} type="number" /><Field label="Seuil d’alerte" value={form.threshold} onChange={value => setForm(current => ({ ...current, threshold: value }))} type="number" /><Field label="Prix de vente" value={form.price} onChange={value => setForm(current => ({ ...current, price: value }))} type="number" /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}><Check size={15} />Ajouter</Button></div></Modal>}</div>;
-}
-
-function ClientsPage({ state, query, canCreate, onUpdate }: { state: CommerceState; query: string; canCreate: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
-  const [modal, setModal] = useState(false); const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' });
-  const clients = state.clients.filter(client => `${client.name} ${client.phone} ${client.email}`.toLowerCase().includes(query.toLowerCase()));
-  const save = () => { if (!form.name.trim()) return; onUpdate(draft => draft.clients.unshift({ id: uid('client'), ...form, name: form.name.trim(), balance: 0 }), 'Client ajouté.'); setForm({ name: '', phone: '', email: '', address: '' }); setModal(false); };
-  return <div className="space-y-5"><Panel title="Clients" description="Retrouvez vos clients, leurs coordonnées et leurs encours." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouveau client</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Clients actifs" value={String(state.clients.length)} detail="Fiches commerciales" icon={Users} /><Metric label="Clients à crédit" value={String(state.credits.filter(item => item.status === 'EN COURS').length)} detail="Suivi des règlements" icon={CreditCard} warning /><Metric label="Encours total" value={money(state.credits.reduce((sum, item) => sum + Math.max(0, item.amount - item.paid), 0))} detail="À recouvrer" icon={CircleDollarSign} /></div></Panel><Panel title="Répertoire clients"><DataTable headers={['Client', 'Téléphone', 'Email', 'Localisation', 'Encours']} rows={clients.map(client => [<strong key={client.id}>{client.name}</strong>, client.phone || '—', client.email || '—', client.address || '—', money(client.balance)])} /></Panel>{modal && <Modal title="Nouveau client" onClose={() => setModal(false)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du client" value={form.name} onChange={value => setForm(current => ({ ...current, name: value }))} /><Field label="Téléphone" value={form.phone} onChange={value => setForm(current => ({ ...current, phone: value }))} /><Field label="Email" value={form.email} onChange={value => setForm(current => ({ ...current, email: value }))} type="email" /><Field label="Adresse" value={form.address} onChange={value => setForm(current => ({ ...current, address: value }))} /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}>Ajouter le client</Button></div></Modal>}</div>;
-}
-
-function SuppliersPage({ data, query, canCreate, mutate }: { data: StoreData; query: string; canCreate: boolean; mutate: (fn: (draft: StoreData) => void, message?: string) => void }) {
-  const suppliers = data.supplierRecords.filter(item => `${item.name} ${item.contact} ${item.category}`.toLowerCase().includes(query.toLowerCase()));
-  const [modal, setModal] = useState(false); const [form, setForm] = useState({ name: '', contact: '', phone: '', category: 'Divers' });
-  const save = () => { if (!form.name.trim()) return; mutate(draft => draft.supplierRecords.unshift({ id: uid('supplier'), name: form.name.trim(), contact: form.contact.trim(), phone: form.phone.trim(), category: form.category.trim() || 'Divers', score: 0, status: 'ACTIF' }), 'Fournisseur ajouté.'); setForm({ name: '', contact: '', phone: '', category: 'Divers' }); setModal(false); };
-  return <div className="space-y-5"><Panel title="Fournisseurs" description="Pilotez le référentiel et la qualité de vos partenaires d’approvisionnement." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Ajouter</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Partenaires actifs" value={String(suppliers.length)} detail="Référentiel entreprise" icon={Store} /><Metric label="Note moyenne" value={`${suppliers.length ? Math.round(suppliers.reduce((sum, item) => sum + item.score, 0) / suppliers.length) : 0}/100`} detail="Évaluation fournisseur" icon={BarChart3} accent /><Metric label="Commandes ouvertes" value={String(data.purchaseOrders.filter(item => item.status !== 'VALIDÉ').length)} detail="À suivre" icon={ClipboardList} /></div></Panel><Panel title="Référentiel fournisseurs"><DataTable headers={['Fournisseur', 'Contact', 'Téléphone', 'Catégorie', 'Score', 'Statut']} rows={suppliers.map(item => [<strong key={item.id}>{item.name}</strong>, item.contact, item.phone, item.category, <span className="font-bold">{item.score}/100</span>, <StatusBadge status={item.status} />])} /></Panel>{modal && <Modal title="Ajouter un fournisseur" onClose={() => setModal(false)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom du fournisseur" value={form.name} onChange={value => setForm(current => ({ ...current, name: value }))} /><Field label="Contact" value={form.contact} onChange={value => setForm(current => ({ ...current, contact: value }))} /><Field label="Téléphone" value={form.phone} onChange={value => setForm(current => ({ ...current, phone: value }))} /><Field label="Catégorie" value={form.category} onChange={value => setForm(current => ({ ...current, category: value }))} /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}>Ajouter le fournisseur</Button></div></Modal>}</div>;
-}
-
-function PurchasesPage({ data, query, canCreate, mutate }: { data: StoreData; query: string; canCreate: boolean; mutate: (fn: (draft: StoreData) => void, message?: string) => void }) {
-  const orders = data.purchaseOrders.filter(item => `${item.reference} ${item.supplier} ${item.subject}`.toLowerCase().includes(query.toLowerCase()));
-  const [modal, setModal] = useState(false); const [form, setForm] = useState({ supplier: '', subject: '', amount: '' });
-  const save = () => { if (!form.supplier.trim() || !form.subject.trim() || !form.amount) return; mutate(draft => draft.purchaseOrders.unshift({ id: uid('purchase'), reference: `BC-${Date.now().toString().slice(-6)}`, supplier: form.supplier.trim(), subject: form.subject.trim(), amount: Number(form.amount), date: 'À l’instant', status: 'BROUILLON' }), 'Commande d’achat enregistrée.'); setForm({ supplier: '', subject: '', amount: '' }); setModal(false); };
-  return <div className="space-y-5"><Panel title="Achats" description="Suivez les commandes fournisseurs et les réassorts reliés au stock." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouvel achat</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Commandes" value={String(data.purchaseOrders.length)} detail="Sur la période" icon={ClipboardList} /><Metric label="Montant engagé" value={money(data.purchaseOrders.reduce((sum, item) => sum + item.amount, 0))} detail="Commandes affichées" icon={CircleDollarSign} accent /><Metric label="En attente" value={String(data.purchaseOrders.filter(item => item.status === 'EN ATTENTE').length)} detail="Nécessitent un suivi" icon={RefreshCw} warning /></div></Panel><Panel title="Commandes fournisseurs"><DataTable headers={['Référence', 'Fournisseur', 'Objet', 'Montant', 'Date', 'Statut']} rows={orders.map(item => [<strong key={item.id}>{item.reference}</strong>, item.supplier, item.subject, money(item.amount), item.date, <StatusBadge key={`${item.id}-status`} status={item.status} />])} /></Panel>{modal && <Modal title="Nouvel achat" onClose={() => setModal(false)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Fournisseur" value={form.supplier} onChange={value => setForm(current => ({ ...current, supplier: value }))} /><Field label="Objet de la commande" value={form.subject} onChange={value => setForm(current => ({ ...current, subject: value }))} /><Field label="Montant estimé" value={form.amount} onChange={value => setForm(current => ({ ...current, amount: value }))} type="number" /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}>Enregistrer la commande</Button></div></Modal>}</div>;
-}
-
-function ExpensesPage({ state, query, canCreate, onUpdate }: { state: CommerceState; query: string; canCreate: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
-  const [modal, setModal] = useState(false); const [form, setForm] = useState({ label: '', category: 'Fonctionnement', amount: '', account: state.settings.defaultCash });
-  const expenses = state.expenses.filter(item => `${item.label} ${item.category} ${item.account}`.toLowerCase().includes(query.toLowerCase()));
-  const save = () => { if (!form.label.trim() || !form.amount || Number(form.amount) <= 0) return; onUpdate(draft => draft.expenses.unshift({ id: uid('expense'), label: form.label.trim(), category: form.category, amount: Number(form.amount), date: 'À l’instant', account: form.account }), 'Dépense enregistrée.'); setModal(false); setForm({ label: '', category: 'Fonctionnement', amount: '', account: state.settings.defaultCash }); };
-  return <div className="space-y-5"><Panel title="Dépenses" description="Enregistrez les sorties de trésorerie et suivez leur répartition." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouvelle dépense</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Total dépenses" value={money(state.expenses.reduce((sum, item) => sum + item.amount, 0))} detail="Dépenses enregistrées" icon={ArrowDownToLine} warning /><Metric label="Opérations" value={String(state.expenses.length)} detail="Lignes comptabilisées" icon={FileText} /><Metric label="Poste principal" value={state.expenses[0]?.category ?? '—'} detail="Dernière catégorie" icon={Tags} /></div></Panel><Panel title="Journal des dépenses"><DataTable headers={['Libellé', 'Catégorie', 'Compte', 'Montant', 'Date']} rows={expenses.map(item => [<strong key={item.id}>{item.label}</strong>, item.category, item.account, money(item.amount), item.date])} /></Panel>{modal && <Modal title="Nouvelle dépense" onClose={() => setModal(false)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Libellé" value={form.label} onChange={value => setForm(current => ({ ...current, label: value }))} /><Field label="Catégorie" value={form.category} onChange={value => setForm(current => ({ ...current, category: value }))} /><Field label="Montant" value={form.amount} onChange={value => setForm(current => ({ ...current, amount: value }))} type="number" /><Field label="Compte de caisse" value={form.account} onChange={value => setForm(current => ({ ...current, account: value }))} /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}>Enregistrer la dépense</Button></div></Modal>}</div>;
-}
-
-function CashPage({ state, query, canCreate, onUpdate }: { state: CommerceState; query: string; canCreate: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
-  const accounts = state.cashAccounts.filter(item => `${item.name} ${item.responsible}`.toLowerCase().includes(query.toLowerCase()));
-  const [modal, setModal] = useState(false); const [name, setName] = useState('');
-  const save = () => { if (!name.trim()) return; onUpdate(draft => draft.cashAccounts.push({ id: uid('cash'), name: name.trim(), balance: 0, responsible: 'À désigner', active: true }), 'Compte de caisse créé.'); setName(''); setModal(false); };
-  return <div className="space-y-5"><Panel title="Comptes de caisse" description="Visualisez les liquidités disponibles par compte et leur responsable." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouveau compte</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Solde total" value={money(state.cashAccounts.reduce((sum, item) => sum + item.balance, 0))} detail="Tous comptes actifs" icon={WalletCards} accent /><Metric label="Comptes actifs" value={String(state.cashAccounts.filter(item => item.active).length)} detail="Trésorerie suivie" icon={Building2} /><Metric label="Dernière caisse" value={state.cashAccounts[0]?.name ?? '—'} detail="Compte par défaut" icon={CircleDollarSign} /></div></Panel><Panel title="Comptes"><DataTable headers={['Compte', 'Responsable', 'Solde', 'État']} rows={accounts.map(item => [<strong key={item.id}>{item.name}</strong>, item.responsible, money(item.balance), <StatusBadge status={item.active ? 'ACTIF' : 'ARCHIVÉ'} />])} /></Panel>{modal && <Modal title="Nouveau compte de caisse" onClose={() => setModal(false)}><Field label="Nom du compte" value={name} onChange={setName} placeholder="Ex. Caisse boutique" /><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(false)}>Annuler</Button><Button primary onClick={save}>Créer le compte</Button></div></Modal>}</div>;
-}
-
-function CreditPage({ state, query, canModify, onUpdate }: { state: CommerceState; query: string; canModify: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
-  const { confirm } = useAppDialog();
-  const credits = state.credits.filter(item => `${item.client} ${item.reference} ${item.status}`.toLowerCase().includes(query.toLowerCase()));
-  const settle = async (credit: Credit) => { if (!await confirm({ title: 'Confirmer ce règlement ?', description: `Le crédit ${credit.reference} sera marqué comme réglé.`, confirmLabel: 'Confirmer' })) return; onUpdate(draft => { const item = draft.credits.find(candidate => candidate.id === credit.id); if (item) { item.paid = item.amount; item.status = 'RÉGLÉ'; } }, 'Règlement client enregistré.'); };
-  return <div className="space-y-5"><Panel title="Crédit clients" description="Suivez les ventes à terme et les règlements reçus." ><div className="grid gap-3 sm:grid-cols-3"><Metric label="Créances ouvertes" value={money(state.credits.filter(item => item.status === 'EN COURS').reduce((sum, item) => sum + item.amount - item.paid, 0))} detail="Reste à encaisser" icon={CreditCard} warning /><Metric label="Dossiers ouverts" value={String(state.credits.filter(item => item.status === 'EN COURS').length)} detail="Clients concernés" icon={Users} /><Metric label="Règlements complets" value={String(state.credits.filter(item => item.status === 'RÉGLÉ').length)} detail="Dossiers soldés" icon={Check} accent /></div></Panel><Panel title="Portefeuille crédit"><DataTable headers={['Référence', 'Client', 'Montant', 'Déjà payé', 'Échéance', 'Statut', 'Action']} rows={credits.map(item => [<strong key={item.id}>{item.reference}</strong>, item.client, money(item.amount), money(item.paid), item.dueDate, <StatusBadge status={item.status === 'RÉGLÉ' ? 'CONFIRMÉ' : 'EN ATTENTE'} />, item.status === 'EN COURS' && canModify ? <button type="button" onClick={() => settle(item)} className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Enregistrer règlement</button> : '—'])} /></Panel></div>;
-}
-
-function InvoicesPage({ data, query, onToast }: { data: StoreData; query: string; onToast: (message: string) => void }) {
-  const invoices = data.sales.filter(item => `${item.reference} ${item.client}`.toLowerCase().includes(query.toLowerCase()));
-  const print = (sale: Sale) => { onToast(`Reçu ${sale.reference} prêt à imprimer.`); window.setTimeout(() => window.print(), 100); };
-  return <div className="space-y-5"><Panel title="Factures & reçus" description="Générez rapidement une pièce pour chaque vente enregistrée." action={<Button onClick={() => onToast('Sélectionnez une vente pour imprimer son reçu.') }><FileDown size={15} />Exporter</Button>}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Pièces commerciales" value={String(invoices.length)} detail="Ventes enregistrées" icon={FileCheck2} /><Metric label="Validées" value={String(invoices.filter(item => item.status === 'VALIDÉ').length)} detail="Prêtes à remettre" icon={Check} accent /><Metric label="En brouillon" value={String(invoices.filter(item => item.status === 'BROUILLON').length)} detail="À finaliser" icon={FileText} /></div></Panel><Panel title="Factures et reçus"><DataTable headers={['Référence', 'Client', 'Montant', 'Date', 'Statut', 'Document']} rows={invoices.map(item => [<strong key={item.id}>{`FAC-${item.reference.replace('VTE-', '')}`}</strong>, item.client, money(item.amount), item.date, <StatusBadge key={`${item.id}-status`} status={item.status} />, <button type="button" onClick={() => print(item)} className="rounded-lg border px-2.5 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]">Imprimer le reçu</button>])} /></Panel></div>;
-}
-
-function ReturnsPage({ state, query, canCreate, canModify, onUpdate }: { state: CommerceState; query: string; canCreate: boolean; canModify: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
-  const { confirm } = useAppDialog();
-  const [modal, setModal] = useState(false); const [form, setForm] = useState({ partner: '', amount: '', type: 'RETOUR CLIENT' as ReturnRecord['type'] });
-  const returns = state.returns.filter(item => `${item.reference} ${item.partner} ${item.type}`.toLowerCase().includes(query.toLowerCase()));
-  const save = () => { if (!form.partner.trim() || !form.amount) return; onUpdate(draft => draft.returns.unshift({ id: uid('return'), reference: `AVR-${Date.now().toString().slice(-6)}`, partner: form.partner.trim(), amount: Number(form.amount), type: form.type, date: 'À l’instant', status: 'BROUILLON' }), 'Retour enregistré en brouillon.'); setModal(false); };
-  const confirmReturn = async (record: ReturnRecord) => { if (!await confirm({ title: 'Confirmer ce retour ?', description: `Le dossier ${record.reference} sera confirmé.`, confirmLabel: 'Confirmer' })) return; onUpdate(draft => { const item = draft.returns.find(candidate => candidate.id === record.id); if (item) item.status = 'CONFIRMÉ'; }, 'Retour confirmé.'); };
-  return <div className="space-y-5"><Panel title="Retours & avoirs" description="Centralisez les retours clients et les avoirs fournisseurs." action={canCreate ? <Button primary onClick={() => setModal(true)}><Plus size={15} />Nouveau retour</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Dossiers" value={String(state.returns.length)} detail="Retours enregistrés" icon={ArrowUpRight} /><Metric label="Montant total" value={money(state.returns.reduce((sum, item) => sum + item.amount, 0))} detail="Avoirs compris" icon={CircleDollarSign} warning /><Metric label="À confirmer" value={String(state.returns.filter(item => item.status === 'BROUILLON').length)} detail="Contrôle requis" icon={ClipboardList} /></div></Panel><Panel title="Historique des retours"><DataTable headers={['Référence', 'Type', 'Partenaire', 'Montant', 'Date', 'Statut', 'Action']} rows={returns.map(item => [<strong key={item.id}>{item.reference}</strong>, item.type, item.partner, money(item.amount), item.date, <StatusBadge key={`${item.id}-status`} status={item.status} />, item.status === 'BROUILLON' && canModify ? <button type="button" onClick={() => confirmReturn(item)} className="rounded-lg bg-[hsl(var(--primary))] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))]">Confirmer</button> : '—'])} /></Panel></div>;
-}
-
 function ReportsPage({ data, state }: { data: StoreData; state: CommerceState }) {
   const exportCsv = () => { const rows = [['Indicateur', 'Valeur'], ['CA validé', String(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))], ['Stock', String(data.products.reduce((sum, item) => sum + item.stock * item.price, 0))], ['Dépenses', String(state.expenses.reduce((sum, item) => sum + item.amount, 0))]]; const csv = rows.map(row => row.map(value => `"${value.replaceAll('"', '""')}"`).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv' })); link.download = 'rapport-gestion-commerciale.csv'; link.click(); URL.revokeObjectURL(link.href); };
   return <div className="space-y-5"><Panel title="Rapports" description="Des indicateurs simples pour décider plus vite." action={<Button primary onClick={exportCsv}><FileDown size={15} />Exporter CSV</Button>}><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="CA validé" value={money(data.sales.filter(item => item.status === 'VALIDÉ').reduce((sum, item) => sum + item.amount, 0))} detail="Ventes confirmées" icon={CircleDollarSign} accent /><Metric label="Stock valorisé" value={money(data.products.reduce((sum, item) => sum + item.stock * item.price, 0))} detail="Au prix de vente" icon={Boxes} /><Metric label="Dépenses" value={money(state.expenses.reduce((sum, item) => sum + item.amount, 0))} detail="Sorties enregistrées" icon={ArrowDownToLine} warning /><Metric label="Commandes" value={String(data.purchaseOrders.length)} detail="Fournisseurs" icon={ClipboardList} /></div></Panel><div className="grid gap-5 lg:grid-cols-2"><Panel title="Ventes par statut"><DataTable headers={['Statut', 'Nombre', 'Montant']} rows={(['VALIDÉ', 'BROUILLON', 'EN ATTENTE'] as Status[]).map(status => [<StatusBadge key={status} status={status} />, String(data.sales.filter(item => item.status === status).length), money(data.sales.filter(item => item.status === status).reduce((sum, item) => sum + item.amount, 0))])} /></Panel><Panel title="Top produits"><DataTable headers={['Produit', 'Stock', 'Valeur']} rows={data.products.slice().sort((a, b) => b.stock * b.price - a.stock * a.price).slice(0, 5).map(item => [<strong key={item.id}>{item.name}</strong>, String(item.stock), money(item.stock * item.price)])} /></Panel></div></div>;
-}
-
-function NotificationsPage({ data, mutate, query, companyId }: { data: StoreData; mutate: (fn: (draft: StoreData) => void, message?: string) => void; query: string; companyId: string }) {
-  const notifications = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(item => `${item.title} ${item.text}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-5"><Panel title="Notifications" description="Les alertes commerciales et opérationnelles de votre entreprise."><div className="space-y-3">{notifications.map(item => <div key={item.id} className={`flex items-start justify-between gap-4 rounded-xl border p-4 ${item.read ? '' : 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]'}`}><div className="flex gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)]"><Bell size={16} /></span><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{item.text}</p><p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">{item.date}</p></div></div>{!item.read && <button type="button" onClick={() => mutate(draft => { const notification = draft.notifications.find(candidate => candidate.id === item.id); if (notification) notification.read = true; }, 'Notification marquée comme lue.')} className="shrink-0 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold">Marquer lue</button>}</div>)}{notifications.length === 0 && <Empty text="Aucune notification trouvée." />}</div></Panel></div>;
 }
 
 function ActivityPage({ data, query }: { data: StoreData; query: string }) {
