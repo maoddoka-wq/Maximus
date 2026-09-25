@@ -33,7 +33,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Sale, Status, StoreData } from '@/lib/store';
-import { addNotification, getVisibleNotifications, money, recordControlEvent, shortMoney, uid } from '@/lib/store';
+import { addNotification, money, recordControlEvent, uid } from '@/lib/store';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
@@ -164,7 +164,6 @@ export default function CommerceModulePage({
   const validatedSales = data.sales.filter(sale => sale.status === 'VALIDÉ');
   const revenue = validatedSales.reduce((sum, sale) => sum + sale.amount, 0);
   const lowStock = data.products.filter(product => product.stock <= product.threshold);
-  const unread = getVisibleNotifications(data.notifications, { isAdmin: false, companyId }).filter(notification => !notification.read).length;
   const visibleTabs = tabs.filter(item => availableTabIds.includes(item.id));
   const currentTabPermissions = tabPermissions?.[tab];
   const currentCanCreate = Boolean(canCreate && (!tabPermissions || currentTabPermissions?.includes('créer')));
@@ -173,34 +172,57 @@ export default function CommerceModulePage({
     return <div className="card-surface rounded-2xl p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="commerce-module-empty">Aucune fonctionnalité commerciale n’est autorisée pour ce rôle.</div>;
   }
 
-  return <div className="space-y-5" data-testid="commerce-module">
-    <section className="mobile-hero card-surface rounded-2xl border border-[hsl(var(--primary)/.18)] p-5 sm:p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Application commerciale</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Votre activité commerciale, en clair.</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">Ventes, catalogue produits, commandes fournisseurs et trésorerie réunis dans un espace opérationnel.</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 rounded-xl bg-[hsl(var(--muted)/.55)] p-1.5 text-center">
-          <div className="rounded-lg bg-[hsl(var(--background))] px-3 py-2"><p className="mono text-[9px] uppercase text-[hsl(var(--muted-foreground))]">CA validé</p><strong className="mt-1 block text-sm">{shortMoney(revenue)}</strong></div>
-          <div className="rounded-lg px-3 py-2"><p className="mono text-[9px] uppercase text-[hsl(var(--muted-foreground))]">À recevoir</p><strong className="mt-1 block text-sm">{shortMoney(state.credits.filter(item => item.status === 'EN COURS').reduce((sum, item) => sum + item.amount - item.paid, 0))}</strong></div>
-          <div className="rounded-lg px-3 py-2"><p className="mono text-[9px] uppercase text-[hsl(var(--muted-foreground))]">Alertes</p><strong className="mt-1 block text-sm">{lowStock.length + unread}</strong></div>
-        </div>
+  return <div className="space-y-4 sm:space-y-5" data-testid="commerce-module">
+    {visibleTabs.length > 1 && (
+      <div className={`space-y-2 ${singleModuleNavigation ? 'md:hidden' : ''}`}>
+        <label htmlFor="commerce-tab-select" className="sr-only">Rubrique de Gestion commerciale</label>
+        <select
+          id="commerce-tab-select"
+          data-testid="commerce-tab-select"
+          value={tab}
+          onChange={event => navigateTab(event.target.value as Tab)}
+          className="w-full rounded-xl border bg-[hsl(var(--card))] px-3 py-2.5 text-sm font-semibold outline-none focus:border-[hsl(var(--primary))] md:hidden"
+        >
+          {visibleTabs.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
+        {!singleModuleNavigation && (
+          <div className="hidden md:block">
+            <WorkspaceTabs
+              items={visibleTabs}
+              activeId={tab}
+              onChange={id => navigateTab(id as Tab)}
+              ariaLabel="Fonctionnalités de Gestion commerciale"
+              testIdPrefix="commerce-tab"
+              className="pt-1"
+            />
+          </div>
+        )}
       </div>
-      {!singleModuleNavigation && (
-        <div className="mt-6 border-t pt-4">
-          <WorkspaceTabs
-            items={visibleTabs}
-            activeId={tab}
-            onChange={id => navigateTab(id as Tab)}
-            ariaLabel="Fonctionnalités de Gestion commerciale"
-            testIdPrefix="commerce-tab"
-            className="pt-1"
+    )}
+    {tab !== 'dashboard' && (
+      <div className="flex items-center gap-2">
+        <label className="relative block min-w-0 max-w-xl flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} />
+          <input
+            data-testid="input-commerce-search"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Rechercher dans cet espace..."
+            className="w-full rounded-xl border bg-transparent py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))] sm:py-3"
           />
-        </div>
-      )}
-    </section>
-    {tab !== 'dashboard' && <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative block max-w-xl flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={16} /><input data-testid="input-commerce-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher dans cet espace..." className="w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-sm outline-none focus:border-[hsl(var(--primary))]" /></label><button type="button" onClick={() => setState(readState(data, companyId))} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold hover:bg-[hsl(var(--muted))]"><RefreshCw size={14} />Actualiser</button></div>}
+        </label>
+        <button
+          type="button"
+          aria-label="Actualiser"
+          title="Actualiser"
+          onClick={() => setState(readState(data, companyId))}
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-xl border text-xs font-bold hover:bg-[hsl(var(--muted))] sm:h-auto sm:w-auto sm:px-3 sm:py-3"
+        >
+          <RefreshCw size={14} />
+          <span className="hidden sm:inline">Actualiser</span>
+        </button>
+      </div>
+    )}
     {tab === 'dashboard' && <Dashboard data={data} state={state} lowStock={lowStock} revenue={revenue} onTab={navigateTab} />}
      {tab === 'sales' && <SalesPageFunctional data={data} query={query} mutate={mutate} canCreate={currentCanCreate} canModify={currentCanModify} taxRate={Number(state.settings.taxRate) || 0} companyId={companyId} />}
      {tab === 'products' && <ProductsPageComplete data={data} query={query} mutate={mutate} canCreate={currentCanCreate} canModify={currentCanModify} companyId={companyId} />}

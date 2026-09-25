@@ -624,21 +624,6 @@ body {
     border-top: 1px solid hsl(var(--border));
   }
 
-  .mobile-hero {
-    padding: 1.1rem !important;
-  }
-
-  .mobile-hero h1,
-  .mobile-hero h2 {
-    font-size: 1.45rem;
-    line-height: 1.12;
-  }
-
-  .mobile-hero .module-tabs {
-    margin-top: 1rem;
-    padding-top: .75rem;
-  }
-
   .page-pad .grid:has(> .metric-card) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .65rem;
