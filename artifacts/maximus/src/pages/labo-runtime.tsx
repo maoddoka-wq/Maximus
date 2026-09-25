@@ -21,12 +21,12 @@ import { Link } from 'wouter';
 import type { Module } from '@/lib/store';
 import { laboApi } from '@/lib/labo-api';
 import {
-  sourceFeatureHref,
   type LaboFeatureDefinition,
   type LaboFieldDefinition,
   type LaboRecord,
   type LaboRecordFeatureDefinition,
 } from '@/lib/labo-composer';
+import { isNativeMountSupported } from '@/lib/native-mount-adapters';
 
 type LaboModule = Module & { laboFeatures?: LaboFeatureDefinition[] };
 
@@ -82,7 +82,7 @@ function FeatureList({ module, features }: { module: Module; features: LaboFeatu
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.kind === 'records' ? 'bg-[#e4f0eb] text-[#286c73]' : 'bg-[#f5ead9] text-[#a07337]'}`}>
               {item.kind === 'records' ? <FilePlus2 size={19} /> : <ExternalLink size={18} />}
             </div>
-            <span className="rounded-full border border-[#e1ded6] px-2 py-1 font-mono text-[9px] uppercase tracking-[.12em] text-[#889291]">{item.kind === 'records' ? 'Fiches' : 'Réutilisée'}</span>
+            <span className="rounded-full border border-[#e1ded6] px-2 py-1 font-mono text-[9px] uppercase tracking-[.12em] text-[#889291]">{item.kind === 'records' ? 'Fiches' : isNativeMountSupported(item.sourceModuleId, item.sourceFeatureId) ? 'Montée' : 'Adaptation à venir'}</span>
           </div>
           <h2 className="mt-5 text-lg font-black tracking-[-.03em]">
             {item.kind === 'records' ? (
@@ -99,7 +99,9 @@ function FeatureList({ module, features }: { module: Module; features: LaboFeatu
           {item.kind === 'records' ? (
             <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-[#5f6b70]"><span className="rounded-lg bg-[#f1f0e9] px-2 py-1">{item.fields.length} champ{item.fields.length > 1 ? 's' : ''}</span>{item.workflow && <span className="rounded-lg bg-[#f1f0e9] px-2 py-1">{item.workflow.stages.length} étapes</span>}</div>
           ) : (
-            <Link href={sourceFeatureHref(item.sourceModuleId, item.sourceFeatureId)} data-testid={`link-source-feature-${item.id}`} className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#286c73] hover:text-[#1d555b]">Ouvrir le module source <ArrowRight size={14} /></Link>
+            isNativeMountSupported(item.sourceModuleId, item.sourceFeatureId)
+              ? <Link href={`/entreprise/${encodeURIComponent(module.id)}?feature=${encodeURIComponent(item.id)}`} data-testid={`link-native-feature-${item.id}`} className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#286c73] hover:text-[#1d555b]">Ouvrir la capacité montée <ArrowRight size={14} /></Link>
+              : <p data-testid={`state-unsupported-native-${item.id}`} className="mt-5 text-xs font-semibold text-[#a07337]">Cette fonctionnalité native n’est pas encore disponible dans ce module cible.</p>
           )}
           <p className="mt-4 border-t border-[#e5e1d8] pt-3 font-mono text-[9px] uppercase tracking-[.12em] text-[#a0a5a2]">{module.name} · {item.id}</p>
         </article>
@@ -261,15 +263,18 @@ export function LaboRuntimePage({ module, feature, modules, allowedModuleIds, ca
   }
 
   if (feature.kind === 'reuse') {
-    const sourceModule = modules.find(item => item.id === feature.sourceModuleId);
-    const sourceEnabled = allowedModuleIds.includes(feature.sourceModuleId) && (canViewFeature?.(feature.sourceModuleId, feature.sourceFeatureId) ?? true);
+    const supported = isNativeMountSupported(feature.sourceModuleId, feature.sourceFeatureId);
     return (
-      <main className="min-h-[100dvh] bg-[#f1efe9] px-4 py-5 text-[#26323a] sm:px-6 lg:px-10 lg:py-8">
+      <main className="min-h-[100dvh] bg-[#f1efe9] px-4 py-8 text-[#26323a]">
         <div className="mx-auto max-w-[920px]">
-          <header className="mb-8 border-b border-[#d8d5cd] pb-6"><div className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[.2em] text-[#a07337]"><FlaskConical size={15} /> {module.name} / CAPACITÉ RÉUTILISÉE</div><h1 className="text-3xl font-black tracking-[-.055em] sm:text-5xl">{feature.label}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#687479]">{feature.description || 'Cette capacité est fournie par un autre module.'}</p></header>
-          <section className={`${panelClass} overflow-hidden`}>
-            <div className="border-b border-[#e6dfd2] bg-[#faf5e9] p-6"><div className="flex items-center gap-2 text-xs font-bold text-[#8f6d3c]"><ExternalLink size={15} /> Référence de source</div><h2 className="mt-3 text-xl font-black">{sourceModule?.name ?? feature.sourceModuleId}</h2><p className="mt-2 max-w-xl text-sm leading-6 text-[#7f755f]">Cette capacité pointe vers la fonctionnalité source. Ses données ne sont pas copiées dans {module.name} et restent administrées par le module d’origine.</p></div>
-            <div className="flex flex-col justify-between gap-4 p-6 sm:flex-row sm:items-center"><div><p className="font-mono text-[10px] uppercase tracking-[.14em] text-[#9aa09e]">Source · {feature.sourceFeatureId}</p><p className={`mt-2 flex items-center gap-2 text-xs font-semibold ${sourceEnabled ? 'text-[#286c73]' : 'text-[#a86158]'}`}><span className={`h-2 w-2 rounded-full ${sourceEnabled ? 'bg-[#4d9587]' : 'bg-[#b86b5e]'}`} />{sourceEnabled ? 'Source active pour cet espace' : 'Source non activée pour cet espace'}</p></div><Link href={sourceFeatureHref(feature.sourceModuleId, feature.sourceFeatureId)} data-testid="link-open-source-feature" className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${sourceEnabled ? 'bg-[#286c73] text-[#f8faf5] hover:bg-[#205b61]' : 'border border-[#dedbd3] bg-[#f7f5ef] text-[#6e7779] hover:border-[#bdc8c4]'}`}>{sourceEnabled ? 'Ouvrir la source' : 'Voir la référence'} <ExternalLink size={15} /></Link></div>
+          <section data-testid={supported ? 'state-native-mount-routing' : 'state-unsupported-native'} className={`${panelClass} p-8 text-center`}>
+            <ShieldAlert size={28} className="mx-auto text-[#a07337]" />
+            <h2 className="mt-3 text-lg font-black">{supported ? 'Cette capacité doit s’ouvrir dans son module cible' : 'Montage natif non disponible'}</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#788286]">
+              {supported
+                ? 'Le moteur natif n’a pas été chargé par cette route. Aucune redirection vers le module source n’est proposée.'
+                : 'Cette fonctionnalité est enregistrée dans le catalogue, mais aucun adaptateur d’exécution n’est disponible pour le moment.'}
+            </p>
           </section>
         </div>
       </main>

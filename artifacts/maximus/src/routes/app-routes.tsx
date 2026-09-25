@@ -11,6 +11,7 @@ import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantR
 import { getAdminControlRoute } from '@/lib/control-routing';
 import { getCatalogSnapshot, publishCatalogDraft } from '@/lib/catalog-workflow';
 import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
+import { getNativeMountAdapter } from '@/lib/native-mount-adapters';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -327,6 +328,41 @@ export function CompanyRouter({
         text: 'Votre rôle ne possède pas la permission Consulter pour ce module.',
         action: () => onBack('/entreprise/dashboard'),
       });
+    }
+    if (selectedLaboFeature?.kind === 'reuse') {
+      const adapter = getNativeMountAdapter(
+        selectedLaboFeature.sourceModuleId,
+        selectedLaboFeature.sourceFeatureId,
+      );
+      if (adapter) {
+        const targetFeaturePermissions = moduleFeaturePermissions?.[dynamicModule.id];
+        const hasExplicitFeaturePermissions = Boolean(
+          targetFeaturePermissions
+          && Object.prototype.hasOwnProperty.call(targetFeaturePermissions, selectedLaboFeature.id),
+        );
+        const mountedPermissions = companyAdmin
+          ? ['voir', 'créer', 'modifier']
+          : hasExplicitFeaturePermissions
+            ? targetFeaturePermissions?.[selectedLaboFeature.id] ?? []
+            : (['voir', 'créer', 'modifier'] as const)
+              .filter(permission => hasPermission(dynamicModule.id, permission));
+        if (mountedPermissions.includes('voir')) {
+          return renderCompanyModule(screens.stocks, {
+            companyId,
+            companyUsers: data.employees.filter(item => item.companyId === companyId),
+            companyServices: data.orgNodes.filter(node => node.companyId === companyId),
+            canCreate: mountedPermissions.includes('créer'),
+            canModify: mountedPermissions.includes('modifier'),
+            stockPermissions: {
+              references: mountedPermissions,
+            },
+            nativeMount: {
+              targetModuleId: dynamicModule.id,
+              mountedFeatureId: selectedLaboFeature.id,
+            },
+          });
+        }
+      }
     }
     return renderCompanyModule(screens.labo, {
       module: dynamicModule,

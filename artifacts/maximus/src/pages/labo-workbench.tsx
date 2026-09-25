@@ -8,6 +8,7 @@ import {
   type LaboFeatureDefinition,
   type LaboReusedFeatureDefinition,
 } from '@/lib/labo-composer';
+import { isNativeMountSupported } from '@/lib/native-mount-adapters';
 
 type LaboModule = Module & { laboFeatures?: LaboFeatureDefinition[] };
 
@@ -248,8 +249,8 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
             Composer les fonctionnalités
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687479]">
-            Choisissez un module cible et montez-y directement des fonctionnalités natives déjà disponibles.
-            Leur module source reste inchangé.
+            Choisissez un module cible et montez-y une fonctionnalité native déjà adaptée.
+            Elle suit les permissions du module cible et utilise ses propres données ; la source reste inchangée.
           </p>
         </header>
 
@@ -325,12 +326,15 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
                       {features.map(feature => {
                         const definition = getReuseDefinition(sourceModule, feature, catalog);
                         const associated = associatedIds.includes(definition.id);
+                        const supported = isNativeMountSupported(feature.sourceModule.id, feature.id);
                         return (
                           <article key={`${sourceModule.id}-${feature.id}`} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div className="min-w-0">
                               <h4 className="text-sm font-bold">{feature.label}</h4>
                               <p className="mt-1 text-xs text-[#788286]">
-                                Fonctionnalité native · source : {sourceModule.name}
+                                 {supported
+                                   ? `Montage natif disponible · source : ${sourceModule.name}`
+                                   : `Montage non disponible pour le moment · source : ${sourceModule.name}`}
                               </p>
                             </div>
                             <button
@@ -338,14 +342,14 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
                               data-testid={`${associated ? 'button-remove' : 'button-associate'}-native-${sourceModule.id}-${feature.id}`}
                               aria-pressed={associated}
                               onClick={() => void toggleNativeFeature(feature, !associated)}
-                              disabled={publishing || (target === 'new' && (!moduleLabel.trim() || !moduleDescription.trim()))}
+                              disabled={(!supported && !associated) || publishing || (target === 'new' && (!moduleLabel.trim() || !moduleDescription.trim()))}
                               className={associated
                                 ? buttonClass
                                 : 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#286c73] px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-[#205b61] disabled:cursor-not-allowed disabled:opacity-50'}
                             >
                               {associated
-                                ? <><Check size={14} /> Montée · retirer</>
-                                : <><Plus size={14} /> Monter dans le module</>}
+                                ? <><Check size={14} /> {supported ? 'Montée · retirer' : 'Montée (non disponible) · retirer'}</>
+                                : supported ? <><Plus size={14} /> Monter dans le module</> : 'Bientôt disponible'}
                             </button>
                           </article>
                         );
@@ -357,7 +361,7 @@ export function LaboWorkbenchPage({ modules, draft, onDraftChange, onPublish }: 
             )}
 
             <p className="border-t border-[#e5e1d8] bg-[#f7f5ef] px-5 py-3 text-xs leading-5 text-[#788286] sm:px-6">
-              Le montage ajoute un accès à la fonctionnalité native. Il ne copie, ne déplace et ne supprime aucune donnée.
+              Chaque montage s’exécute dans le contexte et avec les permissions du module cible. Ses données sont séparées de celles de la source.
             </p>
           </section>
 

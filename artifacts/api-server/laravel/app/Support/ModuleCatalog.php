@@ -645,6 +645,20 @@ final class ModuleCatalog
         if (! is_array($configuration)) {
             $configuration = [];
         }
+        // A published LABO mount becomes a feature of its target module.
+        // The module's active status is already checked above; role-level
+        // access to this feature is checked separately by ModuleAuthorization.
+        $module = collect(self::definitionsWithCustom())->firstWhere('id', $moduleId);
+        $publishedMount = is_array($module)
+            ? collect($module['laboFeatures'] ?? [])->firstWhere('id', $featureId)
+            : null;
+        $isPublishedMount = is_array($publishedMount)
+            && ($publishedMount['kind'] ?? null) === 'reuse'
+            && is_string($publishedMount['sourceModuleId'] ?? null)
+            && is_string($publishedMount['sourceFeatureId'] ?? null);
+        if ($isPublishedMount) {
+            return true;
+        }
 
         // Legacy rows with no explicit scope preserve physical sales for existing
         // catalogues, but digital sales require an explicit grant.

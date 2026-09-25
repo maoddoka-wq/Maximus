@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\MaximusAssistantController;
 use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\LaboController;
+use App\Http\Controllers\Api\LaboNativeStockReferencesController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
@@ -142,6 +143,19 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('labo/modules/{mo
     Route::patch('/records/{recordId}', [LaboController::class, 'update']);
     Route::delete('/records/{recordId}', [LaboController::class, 'destroy']);
     Route::post('/records/{recordId}/transition', [LaboController::class, 'transition']);
+});
+
+Route::middleware(['maximus.auth', 'maximus.company'])->prefix('labo/modules/{targetModuleId}/features/{targetFeatureId}/native/stock/references')->group(function (): void {
+    Route::get('/bootstrap', [LaboNativeStockReferencesController::class, 'bootstrap']);
+    Route::post('/suppliers', [LaboNativeStockReferencesController::class, 'createSupplier']);
+    Route::patch('/suppliers/{id}', [LaboNativeStockReferencesController::class, 'updateSupplier']);
+    Route::delete('/suppliers/{id}', [LaboNativeStockReferencesController::class, 'archiveSupplier']);
+    Route::post('/warehouses', [LaboNativeStockReferencesController::class, 'createWarehouse']);
+    Route::patch('/warehouses/{id}', [LaboNativeStockReferencesController::class, 'updateWarehouse']);
+    Route::delete('/warehouses/{id}', [LaboNativeStockReferencesController::class, 'archiveWarehouse']);
+    Route::post('/warehouses/{warehouseId}/locations', [LaboNativeStockReferencesController::class, 'createLocation']);
+    Route::patch('/locations/{id}', [LaboNativeStockReferencesController::class, 'updateLocation']);
+    Route::delete('/locations/{id}', [LaboNativeStockReferencesController::class, 'archiveLocation']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {
