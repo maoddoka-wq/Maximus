@@ -1,0 +1,19 @@
+kind = "design-system"
+previewPath = "/maximus-design-system/"
+title = "MAXIMUS Design System"
+description = "La référence visuelle et la bibliothèque de composants réutilisables de l’ERP MAXIMUS, conçues à partir de son interface actuelle pour harmoniser ses usages métier et ses futures interfaces mobiles."
+version = "1.0.0"
+id = "artifacts/maximus-design-system"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-design-system/" ]
+localPort = 19399
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-design-system run dev"
+
+[services.env]
+PORT = "19399"
+BASE_PATH = "/maximus-design-system/"
