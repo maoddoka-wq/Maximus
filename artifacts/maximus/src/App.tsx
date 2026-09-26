@@ -90,6 +90,7 @@ import {
 } from '@/lib/store';
 import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
 import { appStateScopeMatchesSession } from '@/lib/app-state-scope';
+import { publicSiteApi } from '@/lib/public-site-api';
 import {
   discardCatalogDraft,
   getCatalogImpact,
@@ -169,6 +170,7 @@ const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
 const ImmobilierModulePage = lazy(() => import('@/pages/immobilier-module'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
+const PublicSitePage = lazy(() => import('@/pages/public-site'));
 const CompanyLoginPage = lazy(() =>
   import('@/pages/company-login').then((module) => ({ default: module.CompanyLoginPage })),
 );
@@ -1116,8 +1118,8 @@ function AppContent() {
     if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
     if (pwaEntry?.domain) return <PublicShopPage domain clientApp />;
   }
-  if (pathname === '/' && installationEntry === 'shop') {
-    return <PublicShopPage domain />;
+  if (installationEntry === 'shop') {
+    return <PublicSitePage domain />;
   }
   if (companyLoginSlug && session && appStateReady) {
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
@@ -1147,7 +1149,7 @@ function AppContent() {
   }
   const publicShopMatch = location.split('?')[0].match(/^\/shop\/([^/]+)(.*)$/);
   if (publicShopMatch) {
-    return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
+    return <PublicSitePage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
   if (session && !appStateReady) {
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
@@ -8189,6 +8191,57 @@ function CompanyModulesDetail({
   const [domainOperation, setDomainOperation] = useState<'create' | 'verify' | 'delete' | null>(null);
   const [domainError, setDomainError] = useState('');
   const [installationRefreshKey, setInstallationRefreshKey] = useState(0);
+  const [publicSiteAuthorized, setPublicSiteAuthorized] = useState<boolean | null>(null);
+  const [publicSiteAccessLoading, setPublicSiteAccessLoading] = useState(true);
+  const [publicSiteAccessSaving, setPublicSiteAccessSaving] = useState(false);
+  const [publicSiteAccessError, setPublicSiteAccessError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setPublicSiteAccessLoading(true);
+    setPublicSiteAccessError('');
+    setPublicSiteAuthorized(null);
+    void publicSiteApi.authorization(company.id)
+      .then(({ authorized }) => {
+        if (!cancelled) setPublicSiteAuthorized(authorized);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPublicSiteAccessError(
+            error instanceof Error ? error.message : 'L’autorisation du site public est indisponible.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPublicSiteAccessLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  const updatePublicSiteAuthorization = async (authorized: boolean) => {
+    setPublicSiteAccessSaving(true);
+    setPublicSiteAccessError('');
+    try {
+      const result = await publicSiteApi.setAuthorization(company.id, authorized);
+      setPublicSiteAuthorized(result.authorized);
+      showAppToast(
+        result.authorized
+          ? 'Accès au site public autorisé pour l’entreprise.'
+          : 'Accès au site public retiré pour l’entreprise.',
+        'success',
+      );
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'L’autorisation du site public n’a pas pu être enregistrée.';
+      setPublicSiteAccessError(message);
+      showAppToast(message, 'error');
+    } finally {
+      setPublicSiteAccessSaving(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -8822,6 +8875,54 @@ function CompanyModulesDetail({
             ) : <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Le lien reste masqué tant que la page personnalisée n’est pas activée.</p>}
           </div>
         </div>
+      </section>
+      <section className="card-surface rounded-2xl p-6" data-testid="card-maximus-public-site-access">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Autorisation MAXIMUS</p>
+            <h2 className="mt-2 font-bold">Site public de l’entreprise</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+              Cette autorisation est distincte des modules et de l’abonnement. L’administrateur de l’entreprise pourra ensuite activer son site dans Organisation & accès, sur le domaine déjà utilisé par sa boutique.
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${publicSiteAuthorized ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}
+            data-testid="status-maximus-public-site-access"
+          >
+            {publicSiteAccessLoading
+              ? 'Chargement…'
+              : publicSiteAccessError && publicSiteAuthorized === null
+                ? 'Indisponible'
+                : publicSiteAuthorized
+                  ? 'Autorisé'
+                  : 'Non autorisé'}
+          </span>
+        </div>
+        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+          <input
+            type="checkbox"
+            data-testid="checkbox-maximus-public-site-access"
+            checked={publicSiteAuthorized === true}
+            disabled={publicSiteAccessLoading || publicSiteAccessSaving || publicSiteAuthorized === null}
+            onChange={(event) => void updatePublicSiteAuthorization(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser le site public</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le blocage est également appliqué par l’API; masquer ce contrôle ne suffit pas à ouvrir l’accès.
+            </span>
+          </span>
+        </label>
+        {publicSiteAccessError && (
+          <p
+            className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
+            role="alert"
+            data-testid="error-maximus-public-site-access"
+          >
+            {publicSiteAccessError}
+          </p>
+        )}
       </section>
       {loginSettings?.customAllowed && (
         <section className="card-surface rounded-2xl p-6">

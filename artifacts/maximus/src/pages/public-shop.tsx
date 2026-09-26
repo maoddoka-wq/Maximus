@@ -365,7 +365,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 
   const shopPath = (suffix = '') => clientApp
     ? clientPwaPath(slug, suffix, domain)
-    : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
+    : slug
+      ? `/shop/${encodeURIComponent(slug)}${suffix || '/accueil'}`
+      : suffix || '/accueil';
   const go = (suffix: string) => {
     setLocation(shopPath(suffix));
   };
@@ -895,9 +897,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   </div>;
 }
 
-function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, submitted, onSubmitted }: {
+export function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, submitted, onSubmitted }: {
   listings: PublicShopBootstrap['immobilierListings'];
-  store: PublicShopBootstrap['store'];
+  store: Pick<PublicShopBootstrap['store'], 'name' | 'currency'>;
   slug?: string;
   domain: boolean;
   form: { listingId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string };
@@ -954,7 +956,7 @@ function ImmobilierGallery({ media, profileMedia, title }: { media: PublicShopBo
   </div>;
 }
 
-function PublicImmobilierDetail({ listing, store, onBack, onRequest }: { listing: PublicShopBootstrap['immobilierListings'][number]; store: PublicShopBootstrap['store']; onBack: () => void; onRequest: () => void }) {
+function PublicImmobilierDetail({ listing, store, onBack, onRequest }: { listing: PublicShopBootstrap['immobilierListings'][number]; store: Pick<PublicShopBootstrap['store'], 'name' | 'currency'>; onBack: () => void; onRequest: () => void }) {
   return <section className="mx-auto max-w-5xl">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour aux annonces</button>
     <div className="mt-6 grid gap-6 rounded-3xl border bg-white p-5 shadow-sm sm:p-8 lg:grid-cols-[1.1fr_.9fr]">
@@ -1151,7 +1153,18 @@ function PublicTransportLocationPreview({
   </div>;
 }
 
-function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void }) {
+export function TransportPublicPage({ store, slug, domain, onBack }: {
+  store: {
+    name: string;
+    currency: PublicShopBootstrap['store']['currency'];
+    seller?: { phone?: string | null };
+    transportPrimaryColor?: string;
+    transportAccentColor?: string;
+  };
+  slug?: string;
+  domain?: boolean;
+  onBack: () => void;
+}) {
   const phone = store.seller?.phone?.trim() ?? '';
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
@@ -2016,7 +2029,7 @@ function SharedTransportTrackingPage({
 }: {
   api: ReturnType<typeof createPublicTransportApi>;
   shareLocation: { tripId: string; shareToken: string };
-  store: PublicShopBootstrap['store'];
+  store: Pick<PublicShopBootstrap['store'], 'currency'>;
   colors: { primaryColor?: string; accentColor?: string } | null;
   onBack: () => void;
 }) {

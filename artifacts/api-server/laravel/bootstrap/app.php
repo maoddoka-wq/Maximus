@@ -4,6 +4,8 @@ use App\Http\Middleware\AuthenticateDiagnosticToken;
 use App\Http\Middleware\AuthenticateInstallationToken;
 use App\Http\Middleware\AuthenticateMaximus;
 use App\Http\Middleware\EnsureModuleEnabled;
+use App\Http\Middleware\EnsurePublicSiteModule;
+use App\Http\Middleware\EnsurePublicSiteGalleryImage;
 use App\Http\Middleware\NoStoreApiResponses;
 use App\Http\Middleware\RequireCentralInstallation;
 use App\Http\Middleware\RequireInstallationHost;
@@ -41,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'maximus.diagnostic' => AuthenticateDiagnosticToken::class,
             'maximus.company' => ResolveCompanyContext::class,
             'maximus.module' => EnsureModuleEnabled::class,
+            'maximus.public-site' => EnsurePublicSiteModule::class,
+            'maximus.public-site-gallery' => EnsurePublicSiteGalleryImage::class,
             'maximus.central' => RequireCentralInstallation::class,
             'maximus.installation.token' => AuthenticateInstallationToken::class,
             'maximus.installation.public' => RequireInstallationPublicCompany::class,

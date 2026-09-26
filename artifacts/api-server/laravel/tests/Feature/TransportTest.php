@@ -14,6 +14,12 @@ class TransportTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->enablePublicSiteForTesting('kora', ['transport']);
+    }
+
     public function test_taxi_cycle_is_persisted_and_vehicle_returns_to_available_after_completion(): void
     {
         $request = $this->asActor();

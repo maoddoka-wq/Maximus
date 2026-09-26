@@ -17,6 +17,15 @@ class EcommerceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        CompanyRegistry::ensureActive('other-company', 'Autre entreprise');
+        ModuleCatalog::ensureCompanyAccess('other-company');
+        $this->enablePublicSiteForTesting('kora', ['ecommerce']);
+        $this->enablePublicSiteForTesting('other-company', ['ecommerce']);
+    }
+
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {
         $this->getJson('/api/ecommerce/bootstrap?companyId=kora')->assertUnauthorized();

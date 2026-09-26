@@ -18,7 +18,9 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:immobilier
         Route::patch('/leads/{id}', [ImmobilierController::class, 'updateLead']);
     });
 
-Route::middleware('maximus.installation.public')->group(function (): void {
+Route::middleware(['maximus.installation.public', 'maximus.public-site:immobilier'])->group(function (): void {
+    Route::get('/shop/{slug}/immobilier/bootstrap', [ImmobilierController::class, 'publicBootstrap']);
+    Route::get('/shop-domain/immobilier/bootstrap', [ImmobilierController::class, 'publicDomainBootstrap']);
     Route::post('/shop/{slug}/immobilier/leads', [ImmobilierController::class, 'publicLead'])->middleware('throttle:orders');
     Route::post('/shop-domain/immobilier/leads', [ImmobilierController::class, 'publicDomainLead'])->middleware('throttle:orders');
 });

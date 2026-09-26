@@ -268,6 +268,30 @@ class ImmobilierController extends Controller
         return $this->createPublicLead($request, $store);
     }
 
+    public function publicBootstrap(string $slug): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['available' => false]);
+        }
+
+        return response()->json($this->publicBootstrapPayload((string) $store->company_id));
+    }
+
+    public function publicDomainBootstrap(Request $request): JsonResponse
+    {
+        $domain = $this->domainVerifier->activeForHost($request->getHost());
+        $companyId = $domain?->company_id;
+        if (! is_string($companyId) || $companyId === '' || ! CompanyRegistry::isActive($companyId)) {
+            return response()->json(['available' => false]);
+        }
+
+        return response()->json($this->publicBootstrapPayload($companyId));
+    }
+
     public function publicDomainLead(Request $request): JsonResponse
     {
         $domain = $this->domainVerifier->activeForHost($request->getHost());
@@ -313,6 +337,55 @@ class ImmobilierController extends Controller
         ];
         DB::table('immobilier_leads')->insert($row);
         return response()->json(['lead' => ['id' => $row['id'], 'status' => 'NEW']], 201);
+    }
+
+    private function publicBootstrapPayload(string $companyId): array
+    {
+        $company = DB::table('companies')
+            ->where('id', $companyId)
+            ->whereNull('deleted_at')
+            ->first(['name']);
+        if (! $company) {
+            return ['available' => false];
+        }
+
+        return [
+            'available' => true,
+            'company' => ['name' => (string) $company->name],
+            'listings' => DB::table('immobilier_listings')
+                ->where('company_id', $companyId)
+                ->where('status', 'PUBLISHED')
+                ->orderByDesc('featured')
+                ->orderByDesc('updated_at')
+                ->get()
+                ->map(fn (object $row): array => $this->publicListing($row, $companyId))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function publicListing(object $row, string $companyId): array
+    {
+        $gallery = $this->gallery($companyId, 'immobilier_listing', (string) $row->id);
+
+        return [
+            'id' => $row->id,
+            'slug' => $row->slug,
+            'title' => $row->title,
+            'propertyType' => $row->property_type,
+            'transactionType' => $row->transaction_type,
+            'description' => $row->description ?? '',
+            'city' => $row->city,
+            'neighborhood' => $row->neighborhood ?? '',
+            'price' => (int) $row->price,
+            'areaM2' => $row->area_m2 === null ? null : (int) $row->area_m2,
+            'bedrooms' => $row->bedrooms === null ? null : (int) $row->bedrooms,
+            'bathrooms' => $row->bathrooms === null ? null : (int) $row->bathrooms,
+            'furnished' => (bool) $row->furnished,
+            'featured' => (bool) $row->featured,
+            'profileMedia' => $gallery[0] ?? null,
+            'gallery' => $gallery,
+        ];
     }
 
     private function propertyInput(Request $request, bool $partial = false): array
