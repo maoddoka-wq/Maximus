@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   ArrowLeft,
   Bell,
@@ -14,6 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import { Link } from 'wouter';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { Input } from '@workspace/maximus-design-system/components/ui/input';
 import type { ModuleId, StoreData } from '@/lib/store';
 import { companyWorkspaceFeatureForPath, type CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 import {
@@ -24,6 +26,7 @@ import {
   type SidebarFeature,
   type SidebarFeatureGroup,
   adminNavGroups,
+  getMostSpecificNavigationHref,
 } from '@/lib/navigation';
 
 type SidebarProps = {
@@ -83,20 +86,51 @@ export function Sidebar({
   );
   const compact = collapsed && !mobileOpen;
   const navigationGroups = isAdmin ? adminNavGroups : (sidebarFeatureGroups ?? []);
-  const active = (href: string) =>
-    location === href || location.startsWith(`${href}?`);
+  const activeHref = getMostSpecificNavigationHref(location, [
+    ...nav.map(item => item.href),
+    ...navigationGroups.flatMap(group => group.items.map(item => item.href)),
+  ]);
+  const active = (href: string) => href === activeHref;
+  const activeCompanyModule = companyModuleItems.some(item => item.href === activeHref);
   const activeFeatureGroupLabel =
     navigationGroups.find(group => group.items.some(item => active(item.href)))?.label ?? '';
   const [expandedMobileGroups, setExpandedMobileGroups] = useState<Record<string, boolean>>({});
+  const [expandedMobileModules, setExpandedMobileModules] = useState(false);
+  const companyModulesOpen = !mobileOpen || activeCompanyModule || expandedMobileModules;
 
   useEffect(() => {
-    if (!mobileOpen || !activeFeatureGroupLabel) return;
+    if (!mobileOpen) {
+      setExpandedMobileGroups(current => (Object.keys(current).length ? {} : current));
+      setExpandedMobileModules(false);
+      return;
+    }
+    if (!activeFeatureGroupLabel) return;
     setExpandedMobileGroups(current => (
       current[activeFeatureGroupLabel]
         ? current
         : { ...current, [activeFeatureGroupLabel]: true }
     ));
   }, [activeFeatureGroupLabel, mobileOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen, onClose]);
+
+  const activeLinkRef = useRef<HTMLAnchorElement | null>(null);
+  const mobileCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    if (activeCompanyModule) setExpandedMobileModules(true);
+    const frame = window.requestAnimationFrame(() => {
+      (activeLinkRef.current ?? mobileCloseButtonRef.current)?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeCompanyModule, activeHref, mobileOpen]);
 
   const link = (item: SidebarFeature) => {
     const isActive = active(item.href);
@@ -113,6 +147,8 @@ export function Sidebar({
       <Link
         data-testid={testId}
         title={compact ? item.label : undefined}
+        aria-current={isActive ? 'page' : undefined}
+        ref={isActive ? activeLinkRef : undefined}
         onClick={event => {
           event.preventDefault();
           onNavigate(item.href);
@@ -143,13 +179,20 @@ export function Sidebar({
 
   return (
     <>
-      <button
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
         aria-label="Fermer le menu"
+        aria-hidden="true"
+        tabIndex={-1}
         data-testid="button-close-mobile-menu"
         onClick={onClose}
-        className={`fixed inset-0 z-40 bg-[hsl(var(--foreground)/.35)] backdrop-blur-sm md:hidden ${mobileOpen ? 'block' : 'hidden'}`}
+        className={`fixed inset-0 z-40 h-auto w-auto rounded-none bg-[hsl(var(--foreground)/.35)] p-0 backdrop-blur-sm md:hidden ${mobileOpen ? 'block' : 'hidden'}`}
       />
       <aside
+        id="maximus-primary-navigation"
+        aria-label={isAdmin ? 'Navigation MAXIMUS' : `Navigation ${companyName ?? 'entreprise'}`}
         data-collapsed={compact ? 'true' : 'false'}
         className={`sidebar shrink-0 flex-col overscroll-contain overflow-y-auto transition-[width] duration-200 md:relative md:flex md:h-[100dvh] ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}
       >
@@ -210,7 +253,10 @@ export function Sidebar({
               )}
             </div>
           )}
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             aria-label={compact ? 'Déployer le menu' : 'Rétracter le menu'}
             title={compact ? 'Déployer le menu' : 'Rétracter le menu'}
             data-testid="button-toggle-sidebar"
@@ -218,17 +264,22 @@ export function Sidebar({
             className={`hidden rounded-lg text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--sidebar-accent))] md:block ${compact ? 'p-1' : 'p-2'}`}
           >
             {compact ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={18} />}
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Fermer le menu"
+            ref={mobileCloseButtonRef}
             data-testid="button-close-mobile-menu-inner"
             onClick={onClose}
             className="rounded-lg p-2 text-[hsl(var(--sidebar-foreground)/.7)] hover:bg-[hsl(var(--muted))] md:hidden"
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
         <nav
+          aria-label="Navigation principale"
           className={`${isAdmin ? 'flex-none' : 'min-h-0 flex-1'} space-y-1 overflow-hidden px-3 pb-4`}
         >
           {verticalModuleMenu || isAdmin ? (
@@ -267,8 +318,9 @@ export function Sidebar({
                       className={`${!compact && (groupIndex > 0 || employeeAdministrationItems.length > 0) ? 'mt-3 border-t border-[hsl(var(--sidebar-border))] pt-3' : ''}`}
                     >
                   {!compact && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       data-testid={`module-section-${group.label}`}
                       aria-expanded={groupIsOpen}
                       onClick={() => {
@@ -288,7 +340,7 @@ export function Sidebar({
                       <span className="text-[hsl(var(--sidebar-foreground)/.5)] md:hidden">
                         {groupIsOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       </span>
-                    </button>
+                    </Button>
                   )}
                       <div className={`${compact || groupIsOpen ? 'block' : 'hidden md:block'} space-y-1`}>
                         {group.items.map(item => link(item))}
@@ -310,14 +362,40 @@ export function Sidebar({
               <div className="space-y-1">{companyCoreItems.map(item => link(item))}</div>
               {companyModuleItems.length > 0 && (
                 <section className={compact ? '' : 'mt-4 border-t border-[hsl(var(--sidebar-border))] pt-3'}>
-                  {!compact && (
+                  {!compact && mobileOpen && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      data-testid="company-modules-section"
+                      aria-expanded={companyModulesOpen}
+                      aria-controls="company-module-navigation"
+                      onClick={() => {
+                        if (!mobileOpen) return;
+                        setExpandedMobileModules(open => !open);
+                      }}
+                      className="mb-2 flex w-full items-center justify-between border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2 text-left md:cursor-default"
+                    >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                        Modules
+                      </span>
+                      <span className="text-[hsl(var(--sidebar-foreground)/.5)] md:hidden">
+                        {companyModulesOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      </span>
+                    </Button>
+                  )}
+                  {!compact && !mobileOpen && (
                     <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
                       <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
                         Modules
                       </span>
                     </div>
                   )}
-                  <div className="space-y-1">{companyModuleItems.map(item => link(item))}</div>
+                  <div
+                    id="company-module-navigation"
+                    className={`${compact || companyModulesOpen ? 'block' : 'hidden md:block'} space-y-1`}
+                  >
+                    {companyModuleItems.map(item => link(item))}
+                  </div>
                 </section>
               )}
             </>
@@ -326,7 +404,9 @@ export function Sidebar({
         <div
           className={`border-t border-[hsl(var(--sidebar-border))] pt-4 ${compact ? 'm-3' : 'm-4'}`}
         >
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             data-testid="button-logout"
             title={compact ? 'Se déconnecter' : undefined}
             onClick={onLogout}
@@ -334,7 +414,7 @@ export function Sidebar({
           >
             <LogIn size={17} className="rotate-180" />
             {!compact && 'Se déconnecter'}
-          </button>
+          </Button>
           {!isAdmin && (
             <div className={`mt-4 flex ${compact ? 'justify-center' : 'justify-start'}`}>
               {compact ? (
@@ -355,7 +435,6 @@ export function Sidebar({
 }
 
 type TopbarProps = {
-  title: string;
   isAdmin: boolean;
   onNavigate: (path: string) => void;
   onToggleMenu: () => void;
@@ -363,10 +442,11 @@ type TopbarProps = {
   unreadCount: number;
   onHelp: () => void;
   onRefresh: () => void | Promise<void>;
+  workspaceName: string;
+  mobileOpen: boolean;
 };
 
 export function Topbar({
-  title,
   isAdmin,
   onNavigate,
   onToggleMenu,
@@ -374,9 +454,18 @@ export function Topbar({
   unreadCount,
   onHelp,
   onRefresh,
+  workspaceName,
+  mobileOpen,
 }: TopbarProps) {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const wasMobileOpen = useRef(false);
+
+  useEffect(() => {
+    if (wasMobileOpen.current && !mobileOpen) mobileMenuTriggerRef.current?.focus();
+    wasMobileOpen.current = mobileOpen;
+  }, [mobileOpen]);
 
   const refresh = async () => {
     if (refreshing) return;
@@ -391,27 +480,31 @@ export function Topbar({
   return (
     <header className="topbar flex min-h-[78px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           data-testid="button-mobile-menu"
           aria-label="Ouvrir le menu"
+          aria-controls="maximus-primary-navigation"
+          aria-expanded={mobileOpen}
+          ref={mobileMenuTriggerRef}
           onClick={onToggleMenu}
           className="topbar-icon rounded-lg p-2 md:hidden"
         >
           <Menu size={19} />
-        </button>
+        </Button>
         <div className="min-w-0 max-w-[calc(100vw-150px)]">
           <p className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))] sm:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" aria-hidden="true" />
             Espace de travail
           </p>
-          <div className="mt-0.5 flex min-w-0 items-center gap-2.5 sm:mt-1">
-            <span className="hidden h-7 w-1 shrink-0 rounded-full bg-[hsl(var(--primary))] sm:block" aria-hidden="true" />
-            <div
-              data-testid="text-topbar-title"
-              className="truncate text-base font-black leading-tight tracking-[-.035em] sm:text-xl"
-            >
-              {title}
-            </div>
+          <div
+            data-testid="text-workspace-name"
+            title={workspaceName}
+            className="truncate text-sm font-black leading-tight tracking-[-.035em] sm:text-base"
+          >
+            {workspaceName}
           </div>
         </div>
       </div>
@@ -422,7 +515,7 @@ export function Topbar({
               size={15}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]"
             />
-            <input
+            <Input
               data-testid="input-global-search"
               value={search}
               onChange={event => setSearch(event.target.value)}
@@ -437,8 +530,9 @@ export function Topbar({
             />
           </div>
         )}
-        <button
+        <Button
           type="button"
+          variant="ghost"
           data-testid="button-global-refresh"
           aria-label="Actualiser les données"
           title="Actualiser les données"
@@ -448,15 +542,23 @@ export function Topbar({
         >
           <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
           <span className="hidden text-xs font-bold sm:inline">Actualiser</span>
-        </button>
-        <button
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           data-testid="button-help"
+          aria-label="Aide MAXIMUS"
+          title="Aide MAXIMUS"
           onClick={onHelp}
           className="topbar-icon rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
         >
           <CircleHelp size={18} />
-        </button>
-        <button
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           data-testid="button-header-notifications"
           aria-label={
             unreadCount
@@ -472,7 +574,7 @@ export function Topbar({
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
-        </button>
+        </Button>
       </div>
     </header>
   );
@@ -511,15 +613,17 @@ export function PageHeader({
       </div>
       <div className="flex shrink-0 items-center gap-3">
         {location !== '/maximus/dashboard' && location !== '/entreprise/dashboard' && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             data-testid="button-page-back"
             onClick={onBack}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--border))] px-3 py-2 text-xs font-bold text-[hsl(var(--muted-foreground))] transition hover:border-[hsl(var(--primary)/.45)] hover:text-[hsl(var(--primary))]"
           >
             <ArrowLeft size={14} />
             Retour
-          </button>
+          </Button>
         )}
         {location !== '/maximus/dashboard' && location !== '/entreprise/dashboard' && (
           <div className="mono hidden text-[9px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))] sm:block">

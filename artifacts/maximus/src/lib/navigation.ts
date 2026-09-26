@@ -45,6 +45,31 @@ export function canonicalAppPath(path: string): string {
   return `${normalizeRoutePath(pathPart)}${suffix}`;
 }
 
+function queryParamsFromPath(path: string): URLSearchParams {
+  const queryIndex = path.indexOf('?');
+  if (queryIndex === -1) return new URLSearchParams();
+  return new URLSearchParams(path.slice(queryIndex + 1).split('#', 1)[0]);
+}
+
+export function getMostSpecificNavigationHref(path: string, hrefs: readonly string[]): string | null {
+  const currentRoute = normalizeRoutePath(path);
+  const currentQuery = queryParamsFromPath(path);
+  return hrefs
+    .map(href => ({
+      href,
+      route: normalizeRoutePath(href),
+      query: queryParamsFromPath(href),
+    }))
+    .filter(({ route, query }) => {
+      const routeMatches = currentRoute === route || currentRoute.startsWith(`${route}/`);
+      const queryMatches = [...query].every(([key, value]) => currentQuery.getAll(key).includes(value));
+      return routeMatches && queryMatches;
+    })
+    .sort((a, b) =>
+      b.route.length - a.route.length || [...b.query].length - [...a.query].length,
+    )[0]?.href ?? null;
+}
+
 export const adminNav: NavigationItem[] = [
   { href: '/maximus/dashboard', label: 'Vue d’ensemble', icon: Gauge },
   { href: '/maximus/assistant', label: 'MAXI', icon: Sparkles },

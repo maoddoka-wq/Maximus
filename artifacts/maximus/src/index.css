@@ -241,10 +241,13 @@ body {
 
 .app-main {
   background: hsl(var(--background) / .84);
+  min-width: 0;
+  overscroll-behavior: contain;
 }
 
 .page-content {
   min-height: calc(100dvh - 68px);
+  width: 100%;
   padding-top: 1.5rem;
   padding-bottom: 3rem;
 }
@@ -310,6 +313,10 @@ body {
 
 .topbar-search {
   height: 2.45rem;
+}
+
+.topbar > div {
+  min-width: 0;
 }
 
 .page-pad > .space-y-5,
@@ -498,6 +505,16 @@ body {
     padding-bottom: 2rem;
   }
 
+  .topbar {
+    min-height: 4.25rem;
+    padding-inline: 1rem;
+  }
+
+  .topbar-icon {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+  }
+
   .mobile-stat-grid,
   .mobile-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -609,6 +626,28 @@ body {
 
   .page-pad .metric-card .mt-1 {
     margin-top: .25rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    padding-inline: .75rem;
+  }
+
+  .page-pad {
+    padding-inline: .75rem;
+  }
+
+  .page-header {
+    gap: .75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.4rem;
+  }
+
+  .sidebar {
+    width: min(19rem, 92vw);
   }
 }
 

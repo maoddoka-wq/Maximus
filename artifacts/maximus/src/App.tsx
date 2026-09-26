@@ -397,6 +397,13 @@ const routesWithModuleHeaders = new Set([
   ...modulePaths,
 ]);
 
+const routesWithOwnedHeadings = new Set([
+  ...routesWithModuleHeaders,
+  '/maximus/assistant',
+  '/maximus/abonnements',
+  '/maximus/parametres/portefeuille',
+]);
+
 function AppContent() {
   const { alert, confirm } = useAppDialog();
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
@@ -1230,7 +1237,7 @@ function AppContent() {
         : { ...baseMeta, kicker: currentCompany.name }
       : baseMeta;
   const currentPath = companyRoutePath;
-  const hidePageHeader = isAdmin || routesWithModuleHeaders.has(currentPath);
+  const hidePageHeader = routesWithOwnedHeadings.has(currentPath);
   const companyInitials =
     currentCompany?.name
       .split(/\s+/)
@@ -1264,9 +1271,10 @@ function AppContent() {
         activeNavStyle={activeNavStyle}
         hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
       />
-      <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
+      <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain" tabIndex={-1}>
         <Topbar
-          title={currentMeta.title}
+          workspaceName={isAdmin ? 'MAXIMUS · Administration' : currentCompany?.name ?? 'Espace entreprise'}
+          mobileOpen={mobileOpen}
           isAdmin={isAdmin}
           onNavigate={navigate}
           onToggleMenu={() => setMobileOpen(true)}
