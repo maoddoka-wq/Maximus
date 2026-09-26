@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/maximus-vtc-transport-location/"
+title = "MAXIMUS Transport & Location — VTC"
+description = "Présentation commerciale MAXIMUS destinée à une grande entreprise VTC. Le deck présente les parcours Transport et Location, l’exploitation de la flotte, les demandes publiques et une approche de déploiement progressif."
+version = "1.0.0"
+id = "artifacts/maximus-vtc-transport-location"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-vtc-transport-location/" ]
+localPort = 23334
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-vtc-transport-location run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/maximus-vtc-transport-location", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/maximus-vtc-transport-location/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23334"
+BASE_PATH = "/maximus-vtc-transport-location/"

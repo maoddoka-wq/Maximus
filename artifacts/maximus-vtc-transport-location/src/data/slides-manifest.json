@@ -1,0 +1,82 @@
+[
+  {
+    "id": "c3cdfcd4-9f9e-467d-8f15-a7c7d315409a",
+    "position": 1,
+    "filepath": "src/pages/slides/VtcCover.tsx",
+    "title": "MAXIMUS · Transport & Location",
+    "description": "Couverture de la proposition commerciale MAXIMUS pour une grande entreprise VTC.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "772a411b-0e06-4a65-af97-235b99816821",
+    "position": 2,
+    "filepath": "src/pages/slides/Modules.tsx",
+    "title": "Deux parcours complémentaires, deux cycles distincts",
+    "description": "Présentation des périmètres Transport et Location.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "ff66a04f-2d1f-469b-a370-7bb97e057f2a",
+    "position": 3,
+    "filepath": "src/pages/slides/Operations.tsx",
+    "title": "Un poste de pilotage pour l’exploitation VTC",
+    "description": "Vue d’ensemble des indicateurs et réglages Transport.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "2c37855e-7cc7-4ee7-aebc-828d6dc85466",
+    "position": 4,
+    "filepath": "src/pages/slides/Fleet.tsx",
+    "title": "Structurer les équipes et la flotte",
+    "description": "Chauffeurs, véhicules et états de disponibilité.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "0705739b-0c4f-47be-afb6-19aa42522af4",
+    "position": 5,
+    "filepath": "src/pages/slides/RideCycle.tsx",
+    "title": "Une course, de la demande à la clôture",
+    "description": "Cycle opérationnel de la demande et de la course.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "f7728ec6-e6d4-4b86-8fe9-eb97ae7520ea",
+    "position": 6,
+    "filepath": "src/pages/slides/PassengerFlow.tsx",
+    "title": "Un parcours public conçu pour le passager",
+    "description": "Devis, affectation et suivi du parcours public.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "1a05cd57-fd98-42cd-b7e3-2c7217c8b404",
+    "position": 7,
+    "filepath": "src/pages/slides/RentalRequests.tsx",
+    "title": "Location : présenter les véhicules et recevoir des demandes",
+    "description": "Catalogue public et demande directe de location.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "72b8586d-0764-45c7-9a49-417dec9fd941",
+    "position": 8,
+    "filepath": "src/pages/slides/Governance.tsx",
+    "title": "Des règles opérationnelles visibles et contrôlées",
+    "description": "Disponibilité, statuts et responsabilités.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "375dcd91-9905-4392-92a7-37c27bcddb08",
+    "position": 9,
+    "filepath": "src/pages/slides/Rollout.tsx",
+    "title": "Un déploiement progressif adapté à votre organisation",
+    "description": "Proposition de démarche de pilote et d’extension.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "040e41bb-7181-4867-9920-25da4158a7ef",
+    "position": 10,
+    "filepath": "src/pages/slides/NextSteps.tsx",
+    "title": "Décisions proposées pour démarrer",
+    "description": "Décisions et prochaines étapes proposées.",
+    "speakerNotes": ""
+  }
+]
