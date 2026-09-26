@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, Clock3, Copy, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, Share2, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, ChevronDown, Clock3, Copy, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, Share2, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -31,6 +31,8 @@ import { Button as TransportButton } from '@workspace/maximus-transport-public/c
 import { Card, CardContent, CardHeader, CardTitle } from '@workspace/maximus-transport-public/components/ui/card';
 import { Input } from '@workspace/maximus-transport-public/components/ui/input';
 import { Label } from '@workspace/maximus-transport-public/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/maximus-design-system/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@workspace/maximus-design-system/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@workspace/maximus-design-system/components/ui/dropdown-menu';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
@@ -867,7 +869,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
         : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />}
     </main>
-       {!isAuthRoute && !submitted && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+      {!isAuthRoute && !submitted && !isTransportRoute && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md grid-cols-4 gap-1">
          {primaryMobileNav.map(item => { const Icon = item.path === '/accueil' ? Store : item.path === '/boutique' ? Package : ShoppingBag; const active = isPublicNavActive(item.path); return <Button variant="ghost" size="sm" type="button" key={item.path} onClick={() => go(item.path)} aria-current={active ? 'page' : undefined} className={`relative h-auto min-w-0 flex-col gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold ${active ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-[var(--shop-accent-foreground)]">{cartCount}</span>}</Button>; })}
          <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" type="button" aria-label={additionalMobileNavActive ? 'Plus, une section est active' : 'Plus, autres fonctionnalités'} className={`relative h-auto min-w-0 flex-col gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold ${additionalMobileNavActive ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Plus size={18} /><span>Plus</span>{additionalMobileNavActive && <span className="absolute right-1/4 top-0 h-2 w-2 translate-x-1/2 rounded-full bg-[var(--shop-accent)]" />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top" sideOffset={8}>{additionalMobileNav.map(item => <DropdownMenuItem key={item.path} onSelect={() => go(item.path)} className={isPublicNavActive(item.path) ? 'font-bold text-[var(--shop-accent)]' : ''}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
        </div></nav>}
@@ -1096,10 +1098,10 @@ function PublicTransportLocationPreview({
       <TaxiRouteMap
         clientStop={{ latitude: position.latitude, longitude: position.longitude }}
         displayMode="location"
-        className="h-48 sm:h-60"
+      className="h-36 sm:h-60"
       />
     ) : (
-      <div className="grid h-48 place-items-center bg-muted px-5 text-center" aria-live="polite">
+      <div className="grid h-36 place-items-center bg-muted px-5 text-center sm:h-48" aria-live="polite">
         <div className="max-w-xs">
           <MapPin size={22} className="mx-auto text-primary" aria-hidden="true" />
           <p className="mt-2 text-sm font-semibold">{locationStatus}</p>
@@ -1148,6 +1150,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [locationState, setLocationState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
   const [locationMessage, setLocationMessage] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [bookingStep, setBookingStep] = useState<'route' | 'passenger'>('route');
+  const [routeMapOpen, setRouteMapOpen] = useState(false);
+  const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [restoringTrip, setRestoringTrip] = useState(false);
   const [restoreError, setRestoreError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1470,6 +1475,10 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (bookingStep === 'route') {
+      advanceToPassenger();
+      return;
+    }
     if (!position) {
       setLocationState('error');
       setLocationMessage('Activez votre localisation avant de demander une course.');
@@ -1534,6 +1543,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   };
 
   const gpsReady = locationState === 'ready' && position !== null;
+  const routeComplete = form.pickup.trim().length >= 3 && isDestinationPlaceCommitted(form.destination, selectedPlace);
+  const showHero = !formOpen && !trip && !restoringTrip && !restoreError && !tripEnded;
   const passengerDetails = <Card className="border-border bg-card shadow-sm" aria-label="Coordonnées passager">
     <CardHeader className="gap-1 p-4 pb-3">
       <div>
@@ -1545,12 +1556,64 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     <CardContent className="grid gap-3 border-t border-border p-4 pt-3 sm:grid-cols-2">
       <div className="grid gap-1.5">
         <Label htmlFor="transport-phone" className="text-xs text-muted-foreground">Téléphone</Label>
-        <Input id="transport-phone" data-testid="input-passenger-phone" aria-required="true" type="tel" value={form.passengerPhone} onChange={event => setForm(current => ({ ...current, passengerPhone: event.target.value }))} placeholder="+221 77 000 00 00" />
+        <Input id="transport-phone" data-testid="input-passenger-phone" aria-required="true" required={bookingStep === 'passenger'} type="tel" value={form.passengerPhone} onChange={event => setForm(current => ({ ...current, passengerPhone: event.target.value }))} placeholder="+221 77 000 00 00" />
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="transport-name" className="text-xs text-muted-foreground">Prénom</Label>
         <Input id="transport-name" data-testid="input-passenger-name" value={form.passengerName === 'Client Taxi' ? '' : form.passengerName} onChange={event => setForm(current => ({ ...current, passengerName: event.target.value || 'Client Taxi' }))} placeholder="Ex. Awa" />
       </div>
+    </CardContent>
+  </Card>;
+  const advanceToPassenger = () => {
+    const pickupInput = document.getElementById('transport-pickup') as HTMLInputElement | null;
+    const destinationInput = document.getElementById('transport-destination') as HTMLInputElement | null;
+    if (!pickupInput || !destinationInput) return;
+    if (!pickupInput.reportValidity() || !destinationInput.reportValidity()) return;
+    if (!routeComplete) {
+      setError('Choisissez une destination dans les résultats avant de continuer.');
+      destinationInput.focus();
+      return;
+    }
+    setError('');
+    setBookingStep('passenger');
+    window.requestAnimationFrame(() => document.getElementById('transport-phone')?.focus());
+  };
+  const estimateCard = <Card className="h-fit border-border bg-card" aria-label="Estimation du trajet">
+    <CardHeader className="border-b border-border p-3 sm:p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle className="text-sm">Estimation</CardTitle>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{form.pickup || 'Point GPS'} → {form.destination || 'destination'}</p>
+        </div>
+        {quoteLoading ? <RefreshCw size={18} className="shrink-0 animate-spin text-muted-foreground" /> : <p className="shrink-0 text-xl font-bold">{quote ? money(quote.fare, store.currency) : '—'}</p>}
+      </div>
+    </CardHeader>
+    <CardContent className="space-y-2 p-3 sm:p-4">
+      {quoteError && !quoteLoading && <Card role="alert" className="border-destructive/30 bg-destructive/5">
+        <CardContent className="p-3 text-sm text-destructive">{quoteError}</CardContent>
+      </Card>}
+      {quote && <>
+        <div className="flex gap-4 border-b border-border pb-2 text-xs font-medium text-muted-foreground">
+          <span><Clock3 size={14} className="mr-1 inline" />{quote.durationMinutes} min</span>
+          <span><CarFront size={14} className="mr-1 inline" />{quote.distanceKm.toFixed(1)} km</span>
+        </div>
+        <Collapsible open={routeMapOpen} onOpenChange={setRouteMapOpen}>
+          <CollapsibleTrigger asChild>
+            <TransportButton type="button" variant="ghost" size="sm" className="w-full justify-between px-1">
+              {routeMapOpen ? 'Masquer la carte' : 'Afficher la carte du trajet'}
+              <ChevronDown size={16} className={`transition-transform ${routeMapOpen ? 'rotate-180' : ''}`} />
+            </TransportButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <TaxiRouteMap
+              clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null}
+              destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }}
+              routeGeometry={quote.geometry}
+              className="h-40 sm:h-56"
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      </>}
     </CardContent>
   </Card>;
 
@@ -1591,8 +1654,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         </span>
       </div>
     </header>
-        <div className="relative overflow-hidden border-b border-border bg-accent">
-       <div className="relative aspect-[16/9] w-full sm:aspect-[16/5]">
+       {showHero && <div className="relative overflow-hidden border-b border-border bg-accent">
+        <div className="relative aspect-[16/7] w-full sm:aspect-[16/5]">
         <img src={heroImageUrls[heroImageIndex] ?? '/taxi-transport-hero.jpg'} alt="Taxi Urbain à Dakar" className="h-full w-full object-cover" />
          <div className="absolute inset-0 bg-gradient-to-r from-sidebar/90 via-sidebar/45 to-transparent" />
          <div className="absolute inset-x-4 bottom-4 max-w-xl text-sidebar-foreground sm:inset-x-8 sm:bottom-6">
@@ -1608,34 +1671,19 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           </div>
         </>}
       </div>
-    </div>
-       <div className="px-4 pb-24 pt-6 sm:px-8">
-         <div className="flex items-start justify-between gap-4">
-          <div>
-             <p className="text-xs font-bold uppercase tracking-wider text-primary">Course à la demande</p>
-             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{trip ? 'Votre course' : 'Où allons-nous ?'}</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{trip ? 'Suivez votre prise en charge et gardez votre code à portée de main.' : 'Votre position GPS apparaît sur la carte. Ajoutez un repère précis, puis choisissez votre destination à Dakar.'}</p>
-          </div>
-           <div className="hidden shrink-0 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground sm:flex">
-             <MapPin size={15} className="text-primary" />
-             <span>Dakar</span>
+     </div>}
+        <div className={`px-4 pt-4 sm:px-8 sm:pt-6 ${formOpen && gpsReady ? 'pb-24 sm:pb-28' : 'pb-5 sm:pb-6'}`}>
+          {!showHero && <div className="flex items-start justify-between gap-4">
+           <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">{trip ? 'Course à la demande' : 'Dakar · Taxi urbain'}</p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-3xl">{trip ? 'Votre course' : tripEnded ? 'Nouvelle course' : restoringTrip ? 'Restauration de votre course' : restoreError ? 'Reprendre votre course' : 'Réserver un taxi'}</h1>
+               <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">{trip ? 'Suivez votre prise en charge et gardez votre code à portée de main.' : formOpen ? bookingStep === 'route' ? 'Indiquez votre repère de départ et votre destination.' : 'Ajoutez le numéro qui permettra au chauffeur de vous joindre.' : ''}</p>
            </div>
-        </div>
-
-        {(formOpen || trip) && <nav aria-label="Progression de la commande" className="mt-5 flex items-center gap-2">
-          {['Départ', 'Destination', 'Confirmation'].map((label, index) => {
-            const step = index + 1;
-            const active = trip ? 3 : form.destination.trim() ? 3 : 2;
-            const complete = step < active;
-            return <div key={label} className="flex min-w-0 flex-1 items-center gap-2">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${complete ? 'border-primary bg-primary text-primary-foreground' : step === active ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground'}`}>
-                {complete ? <Check size={14} /> : step}
-              </span>
-              <span className={`truncate text-xs font-semibold ${step === active ? 'text-primary' : 'text-muted-foreground'}`}>{label}</span>
-              {index < 2 && <span className="ml-auto h-px w-3 bg-border" />}
-            </div>;
-          })}
-        </nav>}
+            <div className="hidden shrink-0 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground sm:flex">
+              <MapPin size={15} className="text-primary" />
+              <span>Dakar</span>
+            </div>
+         </div>}
 
         {tripEnded && <Card className={`mt-5 ${tripEnded.status === 'COMPLETED' ? 'border-primary/30 bg-primary/5' : 'border-destructive/30 bg-destructive/5'}`}>
           <CardContent className="p-4">
@@ -1660,8 +1708,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           </CardContent>
         </Card>}
 
-         {!trip && !restoringTrip && !restoreError && !formOpen && <Card className="transport-entry-card mt-5 border-border bg-card">
-           <CardContent className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(15rem,.85fr)] lg:items-center">
+         {!trip && !restoringTrip && !restoreError && !formOpen && <Card className="transport-entry-card mt-4 border-border bg-card">
+           <CardContent className="grid gap-3 p-3 sm:gap-5 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(15rem,.85fr)] lg:items-center">
              <PublicTransportLocationPreview
                position={position}
                locationState={locationState}
@@ -1669,19 +1717,19 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
                onLocate={locate}
              />
              <div>
-               <p className="text-base font-semibold">Un taxi fiable pour vos trajets quotidiens.</p>
-               <p className="mt-2 text-sm leading-6 text-muted-foreground">Votre position GPS exacte apparaît sur la carte. Ajoutez un repère visible pour faciliter la rencontre avec le chauffeur.</p>
-               <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
-                 <span className="flex items-center gap-2"><MapPin size={14} className="text-primary" /> Prise en charge précise</span>
-                 <span className="flex items-center gap-2"><Clock3 size={14} className="text-primary" /> Estimation avant départ</span>
+                <p className="text-sm font-semibold sm:text-base">Un taxi fiable pour vos trajets quotidiens.</p>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm sm:leading-6">Votre GPS situe le départ ; ajoutez un repère visible pour faciliter la rencontre avec le chauffeur.</p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground sm:mt-4 sm:text-xs">
+                  <span className="flex items-center gap-1.5"><MapPin size={13} className="text-primary" /> GPS précis</span>
+                  <span className="flex items-center gap-1.5"><Clock3 size={13} className="text-primary" /> Devis avant départ</span>
                </div>
                <TransportButton
                  data-testid="button-start-taxi-order"
                  type="button"
-                 onClick={() => setFormOpen(true)}
+                  onClick={() => { setBookingStep('route'); setError(''); setFormOpen(true); }}
                  disabled={!gpsReady}
-                 className="mt-5 w-full"
-                 size="lg"
+                  className="mt-3 w-full sm:mt-5"
+                  size="default"
                >
                  {!gpsReady ? <MapPin /> : <CarFront />}
                  {locationState === 'locating' ? 'Localisation en cours…' : gpsReady ? 'Commander un taxi' : 'Autorisez le GPS pour continuer'}
@@ -1710,102 +1758,116 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           </CardContent>
         </Card>}
 
-        {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <form id="transport-booking-form" onSubmit={submit} className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="space-y-4">
-            {passengerDetails}
-            <Card className="border-border bg-card" aria-label="Détails du trajet">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 border-b border-border p-4">
-                <CardTitle className="text-sm">Votre trajet</CardTitle>
-                <span className="text-xs font-semibold text-primary">GPS précis · {Math.round(position.accuracy)} m</span>
-              </CardHeader>
-              <CardContent className="space-y-4 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"><MapPin size={15} /></div>
-                  <Label htmlFor="transport-pickup" className="min-w-0 flex-1">
-                    <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Repère de prise en charge</span>
-                    <Input
-                      id="transport-pickup"
-                      data-testid="input-transport-pickup"
-                      required
-                      minLength={3}
-                      maxLength={180}
-                      value={form.pickup}
-                      onChange={event => setForm(current => ({ ...current, pickup: event.target.value }))}
-                      className="mt-1"
-                      placeholder="Ex. entrée principale, station-service…"
-                    />
-                    <span className="mt-1 block text-xs font-normal text-muted-foreground">Le GPS indique le point exact ; ce repère aide le chauffeur à vous trouver.</span>
-                  </Label>
-                </div>
-                <div className="ml-4 h-4 border-l border-dashed border-border" />
-                <div className="relative">
-                  <Label htmlFor="transport-destination" className="flex items-start gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><MapPin size={15} /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</span>
-                      <Input
-                        id="transport-destination"
-                        required
-                        autoFocus
-                        value={form.destination}
-                        onChange={event => { setSelectedPlace(null); setForm(current => ({ ...current, destination: event.target.value })); }}
-                        className="mt-1"
-                        placeholder="Quartier, lieu ou adresse"
-                        autoComplete="off"
-                      />
-                    </span>
-                  </Label>
-                  {!isDestinationPlaceCommitted(form.destination, selectedPlace) && (placesLoading || destinationPlaces.length > 0) && <Card className="absolute left-11 right-0 top-[4.5rem] z-10 overflow-hidden border-border bg-popover shadow-lg" role="listbox">
-                    {placesLoading && <p className="px-3 py-3 text-sm text-muted-foreground">Recherche des lieux à Dakar…</p>}
-                    {!placesLoading && destinationPlaces.map(place => <TransportButton
-                      key={`${place.latitude}-${place.longitude}-${place.label}`}
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      role="option"
-                      aria-selected={false}
-                      onClick={() => { setSelectedPlace(place); setForm(current => ({ ...current, destination: place.label })); setDestinationPlaces([]); setPlacesLoading(false); }}
-                      className="h-auto w-full justify-start whitespace-normal rounded-none px-3 py-2 text-left"
-                    >
-                      <span className="grid gap-0.5 text-left">
-                        <span className="text-sm font-semibold">{place.label.split(',')[0]}</span>
-                        <span className="text-xs text-muted-foreground">{place.label}</span>
-                      </span>
-                    </TransportButton>)}
-                  </Card>}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <form id="transport-booking-form" onSubmit={submit} className="mt-3">
+          <Tabs value={bookingStep} onValueChange={value => setBookingStep(value as 'route' | 'passenger')} className="w-full">
+            <TabsList aria-label="Étapes de réservation" className="grid h-auto w-full grid-cols-2">
+              <TabsTrigger value="route" className="gap-2 py-2.5 text-xs">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current text-[10px]">{routeComplete && bookingStep === 'passenger' ? <Check size={12} /> : '1'}</span>
+                Trajet
+              </TabsTrigger>
+              <TabsTrigger value="passenger" disabled={!routeComplete} className="gap-2 py-2.5 text-xs">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current text-[10px]">2</span>
+                Contact
+              </TabsTrigger>
+            </TabsList>
 
-          <Card className="h-fit border-border bg-card">
-            <CardHeader className="border-b border-border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-sm">Estimation</CardTitle>
-                  <p className="mt-1 text-xs text-muted-foreground">{form.pickup || 'Point GPS'} → {form.destination || 'destination'}</p>
-                </div>
-                {quoteLoading ? <RefreshCw size={18} className="animate-spin text-muted-foreground" /> : <p className="text-2xl font-bold">{quote ? money(quote.fare, store.currency) : '—'}</p>}
+            <TabsContent value="route" className="mt-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(16rem,.9fr)]">
+                <Card className="border-border bg-card" aria-label="Détails du trajet">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 border-b border-border p-3 sm:p-4">
+                    <CardTitle className="text-sm">Votre trajet</CardTitle>
+                    <span className="shrink-0 text-xs font-semibold text-primary">GPS · {Math.round(position.accuracy)} m</span>
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-3 sm:space-y-4 sm:p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"><MapPin size={15} /></div>
+                      <Label htmlFor="transport-pickup" className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Repère de prise en charge</span>
+                        <Input
+                          id="transport-pickup"
+                          data-testid="input-transport-pickup"
+                          required
+                          minLength={3}
+                          maxLength={180}
+                          value={form.pickup}
+                          onChange={event => { setError(''); setForm(current => ({ ...current, pickup: event.target.value })); }}
+                          className="mt-1"
+                          placeholder="Ex. entrée principale, station-service…"
+                        />
+                        <span className="mt-1 block text-xs font-normal text-muted-foreground">Le GPS donne le point exact ; ce repère aide le chauffeur à vous trouver.</span>
+                      </Label>
+                    </div>
+                    <div className="ml-4 h-3 border-l border-dashed border-border" />
+                    <div className="relative">
+                      <Label htmlFor="transport-destination" className="flex items-start gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><MapPin size={15} /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</span>
+                          <Input
+                            id="transport-destination"
+                            required
+                            value={form.destination}
+                            onChange={event => { setError(''); setSelectedPlace(null); setForm(current => ({ ...current, destination: event.target.value })); }}
+                            className="mt-1"
+                            placeholder="Quartier, lieu ou adresse"
+                            autoComplete="off"
+                          />
+                        </span>
+                      </Label>
+                      {!isDestinationPlaceCommitted(form.destination, selectedPlace) && (placesLoading || destinationPlaces.length > 0) && <Card className="absolute left-11 right-0 top-[4.5rem] z-10 overflow-hidden border-border bg-popover shadow-lg" role="listbox">
+                        {placesLoading && <p className="px-3 py-3 text-sm text-muted-foreground">Recherche des lieux à Dakar…</p>}
+                        {!placesLoading && destinationPlaces.map(place => <TransportButton
+                          key={`${place.latitude}-${place.longitude}-${place.label}`}
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          role="option"
+                          aria-selected={false}
+                          onClick={() => { setError(''); setSelectedPlace(place); setForm(current => ({ ...current, destination: place.label })); setDestinationPlaces([]); setPlacesLoading(false); }}
+                          className="h-auto w-full justify-start whitespace-normal rounded-none px-3 py-2 text-left"
+                        >
+                          <span className="grid gap-0.5 text-left">
+                            <span className="text-sm font-semibold">{place.label.split(',')[0]}</span>
+                            <span className="text-xs text-muted-foreground">{place.label}</span>
+                          </span>
+                        </TransportButton>)}
+                      </Card>}
+                    </div>
+                  </CardContent>
+                </Card>
+                {estimateCard}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4">
-              {quoteError && !quoteLoading && <Card role="alert" className="border-destructive/30 bg-destructive/5">
-                <CardContent className="p-3 text-sm text-destructive">{quoteError}</CardContent>
-              </Card>}
-              {quote && <>
-                <div className="flex gap-4 border-b border-border pb-3 text-xs font-medium text-muted-foreground">
-                  <span><Clock3 size={14} className="mr-1 inline" />{quote.durationMinutes} min</span>
-                  <span><CarFront size={14} className="mr-1 inline" />{quote.distanceKm.toFixed(1)} km</span>
-                </div>
-                <TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="h-56 sm:h-64" />
-              </>}
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {error && <Card role="alert" className="border-destructive/30 bg-destructive/5 lg:col-span-2">
+            <TabsContent value="passenger" className="mt-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,.85fr)]">
+                {passengerDetails}
+                <Card className="h-fit border-border bg-card" aria-label="Récapitulatif du trajet">
+                  <CardHeader className="border-b border-border p-3 sm:p-4">
+                    <CardTitle className="text-sm">Récapitulatif</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 p-3 sm:p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Départ</p>
+                    <p className="text-sm font-medium">{form.pickup || 'Point GPS'}</p>
+                    <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</p>
+                    <p className="text-sm font-medium">{form.destination}</p>
+                    <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
+                      <span className="text-xs text-muted-foreground">{quote ? `${quote.durationMinutes} min · ${quote.distanceKm.toFixed(1)} km` : 'Tarif indicatif'}</span>
+                      <span className="shrink-0 text-sm font-bold">{quote ? money(quote.fare, store.currency) : quoteLoading ? 'Calcul…' : 'À confirmer'}</span>
+                    </div>
+                    <TransportButton type="button" variant="link" onClick={() => setBookingStep('route')} className="h-auto px-0 text-xs">
+                      Modifier le trajet
+                    </TransportButton>
+                  </CardContent>
+                </Card>
+              </div>
+              <p className="mt-3 text-center text-xs text-muted-foreground">Vos coordonnées sont partagées uniquement avec le chauffeur affecté par {store.name}.</p>
+            </TabsContent>
+          </Tabs>
+
+          {error && <Card role="alert" className="mt-3 border-destructive/30 bg-destructive/5">
             <CardContent className="p-3 text-sm text-destructive">{error}</CardContent>
           </Card>}
-          <p className="text-center text-xs text-muted-foreground lg:col-span-2">Vos coordonnées sont partagées uniquement avec le chauffeur affecté par {store.name}.</p>
         </form>}
 
         {trip && <Card className="mt-5 border-border bg-card">
@@ -1845,26 +1907,36 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
               </TransportButton>
             </div>}
             {['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].includes(trip.status) && cancelToken && <Card className="border-border bg-muted/30">
-              <CardContent className="space-y-3 p-4">
-                <div className="flex items-start gap-3">
-                  <Share2 size={18} className="mt-0.5 shrink-0 text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold">Partager le suivi</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Le lien affiche le statut, les points de départ et d’arrivée et la position du taxi, sans nom, téléphone, code de prise en charge ni possibilité d’annuler.</p>
-                  </div>
-                </div>
-                <TransportButton type="button" variant="outline" onClick={() => void createOrCopyShareLink()} disabled={shareLoading} className="w-full">
-                  {shareLoading ? <RefreshCw className="animate-spin" /> : shareUrl ? <Copy /> : <Share2 />}
-                  {shareLoading ? 'Préparation du lien…' : shareUrl && shareExpiresAt && Date.parse(shareExpiresAt) > Date.now() ? 'Copier le lien de suivi' : 'Créer un lien de suivi'}
-                </TransportButton>
-                {shareUrl && <div className="grid gap-1.5">
-                  <Label htmlFor="transport-share-url" className="text-xs text-muted-foreground">Lien à partager</Label>
-                  <Input id="transport-share-url" data-testid="input-transport-share-url" readOnly value={shareUrl} onFocus={event => event.currentTarget.select()} />
-                  {shareExpiresAt && <p className="text-xs text-muted-foreground">Valide jusqu’au {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(shareExpiresAt))}.</p>}
-                </div>}
-                {shareMessage && <p role="status" className="text-xs text-primary">{shareMessage}</p>}
-                {shareError && <p role="alert" className="text-xs text-destructive">{shareError}</p>}
-              </CardContent>
+              <Collapsible open={sharePanelOpen} onOpenChange={setSharePanelOpen}>
+                <CardContent className="p-3 sm:p-4">
+                  <CollapsibleTrigger asChild>
+                    <TransportButton type="button" variant="ghost" className="h-auto w-full justify-between px-0 py-1 text-left">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Share2 size={17} className="shrink-0 text-primary" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold">Partager le suivi</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">Créer un lien en lecture seule</span>
+                        </span>
+                      </span>
+                      <ChevronDown size={16} className={`shrink-0 transition-transform ${sharePanelOpen ? 'rotate-180' : ''}`} />
+                    </TransportButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 pt-3">
+                    <p className="text-xs leading-5 text-muted-foreground">Le lien affiche le statut, les points de départ et d’arrivée et la position du taxi, sans nom, téléphone, code de prise en charge ni possibilité d’annuler.</p>
+                    <TransportButton type="button" variant="outline" onClick={() => void createOrCopyShareLink()} disabled={shareLoading} className="w-full">
+                      {shareLoading ? <RefreshCw className="animate-spin" /> : shareUrl ? <Copy /> : <Share2 />}
+                      {shareLoading ? 'Préparation du lien…' : shareUrl && shareExpiresAt && Date.parse(shareExpiresAt) > Date.now() ? 'Copier le lien de suivi' : 'Créer un lien de suivi'}
+                    </TransportButton>
+                    {shareUrl && <div className="grid gap-1.5">
+                      <Label htmlFor="transport-share-url" className="text-xs text-muted-foreground">Lien à partager</Label>
+                      <Input id="transport-share-url" data-testid="input-transport-share-url" readOnly value={shareUrl} onFocus={event => event.currentTarget.select()} />
+                      {shareExpiresAt && <p className="text-xs text-muted-foreground">Valide jusqu’au {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(shareExpiresAt))}.</p>}
+                    </div>}
+                    {shareMessage && <p role="status" className="text-xs text-primary">{shareMessage}</p>}
+                    {shareError && <p role="alert" className="text-xs text-destructive">{shareError}</p>}
+                  </CollapsibleContent>
+                </CardContent>
+              </Collapsible>
             </Card>}
             {cancelError && <Card role="alert" className="border-destructive/30 bg-destructive/5">
               <CardContent className="p-3 text-sm text-destructive">{cancelError}</CardContent>
@@ -1883,6 +1955,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
                 setShareExpiresAt(null);
                 setShareUrl('');
                 setTrip(null);
+                setBookingStep('route');
                 setFormOpen(true);
               }}
               className="w-full text-primary"
@@ -1902,12 +1975,16 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           </TransportButton>}
         </div>}
       </div>
-      {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <div className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm sm:px-8">
-        <TransportButton form="transport-booking-form" type="submit" disabled={submitting || locationState !== 'ready'} className="w-full" size="lg">
+      {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <div className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm sm:px-8 sm:py-3">
+        {bookingStep === 'route' ? <TransportButton type="button" onClick={advanceToPassenger} disabled={!routeComplete || locationState !== 'ready'} className="w-full" size="lg">
+          <MapPin />
+          Continuer
+          <ArrowRight />
+        </TransportButton> : <TransportButton form="transport-booking-form" type="submit" disabled={submitting || locationState !== 'ready'} className="w-full" size="lg">
           {submitting ? <RefreshCw className="animate-spin" /> : <CarFront />}
           {submitting ? 'Recherche du chauffeur…' : 'Commander un taxi'}
           <ArrowRight />
-        </TransportButton>
+        </TransportButton>}
       </div>}
   </section>;
 }
@@ -2097,7 +2174,7 @@ function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip | PublicTransp
         <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Tarif</p><p data-testid="text-trip-fare" className="mt-1 text-sm font-bold">{trip.routePending ? 'Calcul en cours' : trip.fare > 0 ? `${new Intl.NumberFormat('fr-FR').format(trip.fare)} XOF` : 'À calculer'}</p></div>
      </div>
       <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Itinéraire complet</p><p className="mt-1 text-sm font-semibold">Position du taxi <span className="mx-1 text-muted-foreground">→</span> arrêt client <span className="mx-1 text-muted-foreground">→</span> destination</p><p className="mt-1 text-xs text-muted-foreground">Le point rouge identifie l’endroit où le client attend le taxi.</p></div>
-      {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-80 sm:h-96" />}
+      {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-52 sm:h-80" />}
       {!trip.pickupRouteDistanceKm && <p className="px-1 text-xs text-muted-foreground">La distance et le temps d’arrivée seront recalculés dès que la position GPS du chauffeur est reçue.</p>}
    </CardContent></Card>;
 }
