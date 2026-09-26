@@ -26,15 +26,9 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);
         Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
-        Route::post('/store/logo', [EcommerceController::class, 'uploadStoreLogo']);
-        Route::post('/store/hero-images', [EcommerceController::class, 'uploadStoreHeroImages']);
-        Route::delete('/store/hero-images/{imageId}', [EcommerceController::class, 'deleteStoreHeroImage']);
         Route::post('/categories', [EcommerceController::class, 'createCategory']);
         Route::patch('/categories/{id}', [EcommerceController::class, 'updateCategory']);
         Route::delete('/categories/{id}', [EcommerceController::class, 'deleteCategory']);
-        Route::post('/domains', [EcommerceController::class, 'createDomain']);
-        Route::post('/domains/{id}/verify', [EcommerceController::class, 'verifyDomain']);
-        Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);
         Route::post('/products', [EcommerceController::class, 'createProduct']);
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
         Route::post('/products/{id}/gallery', [EcommerceController::class, 'uploadProductGallery']);

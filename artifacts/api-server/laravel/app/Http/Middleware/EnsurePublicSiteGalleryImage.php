@@ -49,6 +49,9 @@ final class EnsurePublicSiteGalleryImage
             ->exists();
 
         return match ((string) $image->owner_type) {
+            'company_site' => $collection === 'hero'
+                && $ownerId === $companyId
+                && PublicSiteRegistry::isSiteEnabled($companyId),
             'store' => $collection === 'hero'
                 && PublicSiteRegistry::isSiteEnabled($companyId)
                 && DB::table('ecommerce_stores')

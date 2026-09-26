@@ -104,20 +104,6 @@ export interface PublicShopFeatures {
   venteNumerique: boolean;
 }
 
-export type EcommerceDomainStatus = 'PENDING' | 'ACTIVE';
-
-export interface EcommerceDomain {
-  id: string;
-  companyId: string;
-  domain: string;
-  targetHost: string;
-  verificationName: string;
-  verificationValue: string;
-  status: EcommerceDomainStatus;
-  lastError: string;
-  verifiedAt: string | null;
-}
-
 export interface EcommerceProduct {
   id: string;
   companyId: string;
@@ -257,7 +243,6 @@ export interface EcommerceOrder {
 
 export interface EcommerceBootstrap {
   store: EcommerceStore;
-  domains: EcommerceDomain[];
   categories: EcommerceCategory[];
   products: EcommerceProduct[];
   rentals: EcommerceRental[];
@@ -506,27 +491,10 @@ export const createEcommerceApi = (companyId: string) => {
       request<SellerWallet>(withCompany('/ecommerce/wallet/payout-account'), { method: 'PATCH', body: JSON.stringify(body) }),
     requestWithdrawal: (body: { amount: number; provider?: 'WAVE'; mobile?: string; beneficiaryName?: string; idempotencyKey?: string }) =>
       request<{ withdrawal: SellerWithdrawal }>(withCompany('/ecommerce/wallet/withdrawals'), { method: 'POST', body: JSON.stringify(body), headers: { 'Idempotency-Key': body.idempotencyKey ?? crypto.randomUUID() } }),
-    updateStore: (body: Partial<Omit<EcommerceStore, 'id' | 'companyId'>>) => request<EcommerceStore>(withCompany('/ecommerce/store'), { method: 'PATCH', body: JSON.stringify(body) }),
-    uploadStoreLogo: async (file: File) => {
-      const formData = new FormData();
-      formData.append('image', file);
-      return requestJson<EcommerceStore>(withCompany('/ecommerce/store/logo'), {
-        method: 'POST',
-        body: formData,
-      }, { fallbackMessage: 'Le logo de la boutique n’a pas pu être envoyé.', timeoutMs: 90_000 });
-    },
-    uploadStoreHeroImages: async (files: File[]) => {
-      const formData = new FormData();
-      files.forEach(file => formData.append('images[]', file));
-      return requestJson<EcommerceStore>(withCompany('/ecommerce/store/hero-images'), { method: 'POST', body: formData }, { fallbackMessage: 'Les images de bannière n’ont pas pu être envoyées.', timeoutMs: 120_000 });
-    },
-    deleteStoreHeroImage: (imageId: string) => request<EcommerceStore>(withCompany(`/ecommerce/store/hero-images/${encodeURIComponent(imageId)}`), { method: 'DELETE' }),
+    updateStore: (body: Pick<EcommerceStore, 'status' | 'currency' | 'allowOrderAttachments'>) => request<EcommerceStore>(withCompany('/ecommerce/store'), { method: 'PATCH', body: JSON.stringify(body) }),
     createCategory: (body: { name: string; slug?: string; description?: string; isActive?: boolean; sortOrder?: number }) => request<EcommerceCategory>(withCompany('/ecommerce/categories'), json(body)),
     updateCategory: (id: string, body: Partial<Omit<EcommerceCategory, 'id' | 'companyId'>>) => request<EcommerceCategory>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'PATCH', body: JSON.stringify(body) }),
     deleteCategory: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/categories/${encodeURIComponent(id)}`), { method: 'DELETE' }),
-    createDomain: (domain: string) => request<EcommerceDomain>(withCompany('/ecommerce/domains'), { method: 'POST', body: JSON.stringify({ domain }) }),
-    verifyDomain: (id: string) => request<EcommerceDomain>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}/verify`), { method: 'POST' }),
-    deleteDomain: (id: string) => request<{ ok: true }>(withCompany(`/ecommerce/domains/${encodeURIComponent(id)}`), { method: 'DELETE' }),
     createProduct: (body: Omit<EcommerceProduct, 'id' | 'companyId' | 'slug'> & { slug?: string }) => request<EcommerceProduct>(withCompany('/ecommerce/products'), json(body)),
     updateProduct: (id: string, body: Partial<Omit<EcommerceProduct, 'id' | 'companyId'>>) => request<EcommerceProduct>(withCompany(`/ecommerce/products/${id}`), { method: 'PATCH', body: JSON.stringify(body) }),
     uploadDigitalFile: async (id: string, file: File) => {

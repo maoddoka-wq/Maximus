@@ -10,16 +10,13 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
-  Copy,
   House,
-  ImagePlus,
   LayoutDashboard,
   Megaphone,
   Package,
   Pencil,
   Plus,
   RefreshCw,
-  RotateCcw,
   Search,
   Settings,
   ShoppingBag,
@@ -37,7 +34,6 @@ import {
   type EcommerceDeliveryRequest,
   type EcommerceDeliveryRequestStatus,
   type EcommerceDeliveryZone,
-  type EcommerceDomain,
   type EcommerceOrder,
   type EcommerceOrderStatus,
   type EcommerceProduct,
@@ -61,11 +57,10 @@ import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
+type EcommerceTab = 'dashboard' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-  { id: 'accueil', label: 'Accueil', icon: House },
   { id: 'catalogue', label: 'Catalogue', icon: Package },
   { id: 'categories', label: 'Catégories', icon: Tags },
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
@@ -123,7 +118,6 @@ function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: strin
       allowOrderAttachments: false,
       heroImages: [],
     },
-    domains: Array.isArray(payload.domains) ? payload.domains : [],
     categories: Array.isArray(payload.categories) ? payload.categories : [],
     products: Array.isArray(payload.products) ? payload.products : [],
     rentals: Array.isArray(payload.rentals) ? payload.rentals : [],
@@ -267,7 +261,6 @@ export default function EcommerceModulePage({
   const visibleTabs = allowedFeatureIds
     ? tabs.filter(item =>
         item.id === 'dashboard'
-        || item.id === 'accueil'
         || allowedFeatureIds.includes(item.id)
         || (item.id === 'categories' && allowedFeatureIds.includes('catalogue')),
       )
@@ -298,7 +291,6 @@ export default function EcommerceModulePage({
           allowOrderAttachments: false,
           heroImages: [],
         },
-        domains: [],
         categories: [],
         products: [],
         rentals: [],
@@ -360,8 +352,7 @@ export default function EcommerceModulePage({
   const store = data.store;
   const publicShopUrl = `/shop/${encodeURIComponent(store.slug || slugify(store.name) || 'boutique')}`;
   const navigate = (next: EcommerceTab) => setTab(next);
-  const permissionFeatureId = tab === 'accueil' ? 'parametres' : tab;
-  const currentFeaturePermissions = featurePermissions?.[permissionFeatureId];
+  const currentFeaturePermissions = featurePermissions?.[tab];
   const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
   const currentCanModify = Boolean(canModify && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
 
@@ -414,7 +405,6 @@ export default function EcommerceModulePage({
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
-      {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}
@@ -423,7 +413,7 @@ export default function EcommerceModulePage({
        {tab === 'location' && <RentalPanel data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'livraisons' && <Deliveries data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={currentCanModify} run={run} pendingAction={pendingAction} />}
-      {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={currentCanModify} run={run} />}
+      {tab === 'parametres' && <SettingsPanel store={store} canModify={currentCanModify} run={run} />}
       </>}
     </div>
   );
@@ -459,7 +449,7 @@ function Dashboard({ data, onTab }: { data: EcommerceBootstrap; onTab: (tab: Eco
           {lowStock.length === 0 && <Empty icon={Check} title="Tout est sous contrôle" text="Aucune référence ne se trouve sous le seuil de surveillance." />}
           {lowStock.slice(0, 5).map(product => <div key={product.id} className="flex items-center gap-3 rounded-xl border border-[hsl(var(--accent)/.3)] bg-[hsl(var(--accent)/.08)] p-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]"><Package size={16} /></span><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}</p><p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">{product.stock} unité{product.stock > 1 ? 's' : ''} restante{product.stock > 1 ? 's' : ''}</p></div><span className="mono ml-auto text-xs font-bold">{product.sku}</span></div>)}
         </div>
-         <div className="mt-5 rounded-xl border border-dashed p-4"><p className="mono text-[9px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Vitrine</p><p className="mt-2 text-sm font-bold">Votre boutique est {data.store.status === 'PUBLISHED' ? 'ouverte au public' : 'en préparation'}.</p><button type="button" onClick={() => onTab('accueil')} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Gérer l’accueil <ArrowUpRight size={13} /></button></div>
+         <div className="mt-5 rounded-xl border border-dashed p-4"><p className="mono text-[9px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Vitrine</p><p className="mt-2 text-sm font-bold">Votre boutique est {data.store.status === 'PUBLISHED' ? 'ouverte au public' : 'en préparation'}.</p><a href="/entreprise/organisation" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Gérer le site public de l’entreprise <ArrowUpRight size={13} /></a></div>
       </Panel>
     </div>
     <Panel title="Performance du catalogue" description="Une lecture rapide de la couverture de votre assortiment.">
@@ -1129,137 +1119,32 @@ function DeliveryZoneManager({ data, canCreate, canModify, run }: { data: Ecomme
   </Panel>;
 }
 
-function HomePanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
-  const [heroFiles, setHeroFiles] = useState<File[]>([]);
-  const api = createEcommerceApi(store.companyId);
-  const remainingSlots = Math.max(0, 12 - store.heroImages.length);
-
-  const upload = async () => {
-    if (heroFiles.length === 0 || !canModify) return;
-    const result = await run(() => api.uploadStoreHeroImages(heroFiles), 'Images de l’accueil ajoutées.');
-    if (result) setHeroFiles([]);
-  };
-
-  const remove = (url: string) => {
-    const imageId = url.split('/').pop();
-    if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de l’accueil.');
-  };
-
-  return <div className="space-y-5 fade-up">
-    <Panel title="Accueil de la boutique" description="Ajoutez les images qui s’affichent dans la bannière de votre accueil public.">
-      <div className="max-w-4xl space-y-5">
-        <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.05)] p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-bold"><ImagePlus size={17} className="text-[hsl(var(--primary))]" />Images de la bannière</div>
-              <p className="mt-1.5 max-w-xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Sélectionnez une ou plusieurs images. Elles seront ajoutées à celles déjà présentes et défileront horizontalement sur l’accueil public.</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{store.heroImages.length}/12 images</span>
-          </div>
-          <label className={`mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-8 text-center transition ${!canModify || remainingSlots === 0 ? 'cursor-not-allowed opacity-50' : 'border-[hsl(var(--primary)/.35)] hover:bg-[hsl(var(--primary)/.06)]'}`}>
-            <ImagePlus size={24} className="text-[hsl(var(--primary))]" />
-            <span className="mt-2 text-sm font-bold">{remainingSlots === 0 ? 'Limite de 12 images atteinte' : 'Ajouter des images à l’accueil'}</span>
-            <span className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{remainingSlots > 0 ? `Jusqu’à ${remainingSlots} image(s) supplémentaire(s) · JPG, PNG ou WebP` : 'Supprimez une image pour en ajouter une nouvelle.'}</span>
-            <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || remainingSlots === 0} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, remainingSlots))} className="sr-only" />
-          </label>
-          {heroFiles.length > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5"><p className="text-xs font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p><button type="button" onClick={() => void upload()} disabled={!canModify} className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les images</button></div>}
-        </div>
-        {store.heroImages.length > 0
-          ? <div><p className="text-xs font-bold">Images actuellement affichées</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{store.heroImages.map((url, index) => <div key={url} className="group relative overflow-hidden rounded-xl border bg-[hsl(var(--muted)/.25)]"><img src={url} alt={`Image d’accueil ${index + 1}`} className="aspect-[4/3] w-full object-cover" /><button type="button" disabled={!canModify} onClick={() => remove(url)} className="absolute right-2 top-2 rounded-full bg-[hsl(var(--destructive))] px-2 py-1 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Supprimer l’image d’accueil ${index + 1}`}>×</button></div>)}</div></div>
-          : <div className="rounded-xl border border-dashed px-5 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune image personnalisée. L’accueil public utilise actuellement son visuel par défaut.</div>}
-      </div>
-    </Panel>
-  </div>;
-}
-
-function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [form, setForm] = useState({
-    name: store.name,
-    slug: store.slug,
-    description: store.description,
     status: store.status,
     currency: store.currency,
-    primaryColor: store.primaryColor,
-    accentColor: store.accentColor,
     allowOrderAttachments: store.allowOrderAttachments,
   });
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [domainInput, setDomainInput] = useState('');
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [heroFiles, setHeroFiles] = useState<File[]>([]);
   const initializedCompanyId = useRef<string | null>(null);
   const api = createEcommerceApi(store.companyId);
   useEffect(() => {
     if (initializedCompanyId.current === store.companyId) return;
     initializedCompanyId.current = store.companyId;
     setForm({
-      name: store.name,
-      slug: store.slug,
-      description: store.description,
       status: store.status,
       currency: store.currency,
-      primaryColor: store.primaryColor,
-       accentColor: store.accentColor,
       allowOrderAttachments: store.allowOrderAttachments,
     });
-    setSlugManuallyEdited(false);
-    setLogoFile(null);
-    setHeroFiles([]);
   }, [store]);
   const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
-  const publicBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const publicUrl = `${window.location.origin}${publicBasePath}/shop/${encodeURIComponent(slugify(form.slug || form.name) || 'boutique')}`;
   const save = (event: FormEvent) => {
     event.preventDefault();
-    const selectedLogo = logoFile;
-    const selectedHeroFiles = heroFiles;
-    void run(async () => {
-      await api.updateStore(form);
-      if (selectedLogo) await api.uploadStoreLogo(selectedLogo);
-      if (selectedHeroFiles.length > 0) await api.uploadStoreHeroImages(selectedHeroFiles);
-      setLogoFile(null);
-      setHeroFiles([]);
-    }, selectedLogo || selectedHeroFiles.length > 0 ? 'Identité du site et images d’accueil enregistrées.' : 'Identité du site enregistrée.');
-  };
-  const copyPublicUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-  const addDomain = (event: FormEvent) => {
-    event.preventDefault();
-    const domain = domainInput.trim();
-    if (!domain) return;
-    void run(() => createEcommerceApi(store.companyId).createDomain(domain), 'Domaine ajouté. Configurez le DNS puis lancez la vérification.');
-    setDomainInput('');
-  };
-  const verifyDomain = (domain: EcommerceDomain) => {
-    void run(() => createEcommerceApi(store.companyId).verifyDomain(domain.id), `Domaine ${domain.domain} vérifié.`);
-  };
-  const removeDomain = (domain: EcommerceDomain) => {
-    void run(() => createEcommerceApi(store.companyId).deleteDomain(domain.id), 'Domaine retiré de la boutique.');
+    void run(() => api.updateStore(form), 'Les paramètres E-commerce sont enregistrés.');
   };
   return <div className="space-y-5 fade-up">
-    <Panel title="Identité partagée du site public" description="Le nom, la description, le logo, les couleurs et les visuels de cette boutique définissent aussi l’identité du site commun de l’entreprise. Les données et autorisations des modules restent séparées.">
+    <Panel title="Paramètres E-commerce" description="Ces réglages concernent le fonctionnement du module E-commerce. L’identité, les visuels et les domaines du site commun se règlent dans Organisation, rubrique Site public de l’entreprise.">
       <form onSubmit={save} className="max-w-3xl space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nom affiché sur le site public" required value={form.name} onChange={value => patch({ name: value, ...(slugManuallyEdited ? {} : { slug: slugify(value) }) })} disabled={!canModify} />
-          <Field label="Adresse du site public (slug)" required value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} disabled={!canModify} />
-          <label className="block text-xs font-bold">
-            Logo du site public
-            <div className="mt-1.5 flex items-center gap-3 rounded-lg border px-3 py-2.5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">
-                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <Store size={16} className="text-[hsl(var(--muted-foreground))]" />}
-              </span>
-              <input type="file" accept="image/jpeg,image/png,image/webp" disabled={!canModify} onChange={event => setLogoFile(event.target.files?.[0] ?? null)} className="min-w-0 flex-1 text-xs" />
-            </div>
-            {logoFile && <span className="mt-1 block truncate text-[11px] font-normal text-[hsl(var(--muted-foreground))]">{logoFile.name}</span>}
-          </label>
           <label className="block text-xs font-bold">
             Devise
             <select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
@@ -1277,23 +1162,6 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
             </select>
           </label>
         </div>
-        <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="min-w-0 flex-1 text-xs font-bold">
-              Lien public du site de l’entreprise
-              <input readOnly value={publicUrl} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))]" />
-            </label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => void copyPublicUrl()} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><Copy size={14} />{copied ? 'Copié' : 'Copier'}</button>
-              <a href={publicUrl} target="_blank" rel="noreferrer" className="btn inline-flex items-center rounded-lg border px-3 py-2.5 text-xs font-bold">Ouvrir</a>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Ce lien ouvre l’accueil commun et les pages des modules autorisés sur l’adresse existante.</p>
-        </div>
-        <label className="block text-xs font-bold">
-          Description publique du site
-          <textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" />
-        </label>
          <label className="flex items-start gap-3 rounded-xl border p-4">
            <input
              type="checkbox"
@@ -1307,42 +1175,12 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les clients pourront joindre jusqu’à 3 fichiers PDF ou images de 2 Mo maximum pendant le paiement. Les fichiers restent privés.</span>
            </span>
          </label>
-         <div className="rounded-xl border p-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold">Images d’accueil du site public</p><p className="mt-1 text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Choisissez plusieurs images : elles défileront dans l’accueil commun de l’entreprise.</p></div><span className="text-[10px] font-bold text-[hsl(var(--muted-foreground))]">{store.heroImages.length}/12</span></div>
-           <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || store.heroImages.length >= 12} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, Math.max(0, 12 - store.heroImages.length)))} className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" />
-           {heroFiles.length > 0 && <p className="mt-1 text-[11px] font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p>}
-           {store.heroImages.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{store.heroImages.map(url => <span key={url} className="relative"><img src={url} alt="" className="h-20 w-28 rounded-lg object-cover" /><button type="button" disabled={!canModify} onClick={() => { const imageId = url.split('/').pop(); if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de la bannière.'); }} className="absolute right-1 top-1 rounded-full bg-[hsl(var(--destructive))] px-1.5 py-0.5 text-[10px] font-bold text-white disabled:opacity-50" aria-label="Supprimer cette image">×</button></span>)}</div>}
-         </div>
-          <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale du site public" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent du site public" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] px-4 py-3">
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">Utilisez la palette officielle MAXIMUS pour le site public commun.</p>
-            <button type="button" data-testid="button-reset-maximus-shop-colors" disabled={!canModify} onClick={() => patch(maximusShopColors)} className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)] disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw size={13} />Revenir aux couleurs MAXIMUS</button>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
-            <button type="button" disabled={!canModify || !logoFile} onClick={async () => { if (!logoFile) return; const result = await run(() => createEcommerceApi(store.companyId).uploadStoreLogo(logoFile), 'Logo du site public enregistré.'); if (result) setLogoFile(null); }} className="btn inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><Store size={14} />Enregistrer le logo</button>
+          <div className="flex justify-end border-t pt-5">
             <button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button>
           </div>
       </form>
     </Panel>
-      <Panel title="Domaine du site public" description="Le domaine E-commerce existant ouvre maintenant le site commun de l’entreprise; aucun domaine distinct n’est nécessaire. HTTPS reste géré par Render.">
-      <div className="space-y-5">
-         <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-           <p className="font-bold text-[hsl(var(--foreground))]">Procédure de connexion</p>
-           <p className="mt-1">Ajoutez d’abord le domaine dans la configuration Custom Domains de Render pour que le certificat HTTPS soit provisionné, puis renseignez ici le domaine et appliquez l’enregistrement DNS indiqué ci-dessous.</p>
-           <p className="mt-1">Après propagation DNS et activation du certificat, cliquez sur « Vérifier ». La boutique doit rester publiée pour répondre sur ce domaine.</p>
-         </div>
-        <form onSubmit={addDomain} className="flex flex-col gap-3 sm:flex-row">
-          <Field label="Nom de domaine" value={domainInput} onChange={setDomainInput} placeholder="boutique.exemple.sn" disabled={!canModify} />
-          <button type="submit" disabled={!canModify || !domainInput.trim()} className="self-end rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">Ajouter le domaine</button>
-        </form>
-         {domains.length === 0 ? <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">Aucun domaine personnalisé n’est encore connecté.</p> : <div className="space-y-3">{domains.map(domain => <div key={domain.id} className="rounded-xl border p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><strong>{domain.domain}</strong><StatusPill value={domain.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING'} /></div><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{domain.status === 'ACTIVE' ? 'La boutique répond sur ce domaine après configuration de l’hébergement.' : 'En attente de la configuration DNS.'}</p></div><div className="flex gap-2"><button type="button" disabled={!canModify} onClick={() => verifyDomain(domain)} className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50">Vérifier</button><button type="button" disabled={!canModify} onClick={() => removeDomain(domain)} className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50">Retirer</button></div></div><div className="mt-4 grid gap-3 rounded-lg bg-[hsl(var(--muted)/.35)] p-3 text-xs sm:grid-cols-2"><div><p className="font-bold">Enregistrement TXT de vérification</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Nom : {domain.verificationName}</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Valeur : {domain.verificationValue}</p></div><div><p className="font-bold">Cible DNS Render</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Cible : {domain.targetHost}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">Pour un sous-domaine, configurez le CNAME demandé par Render vers cette cible. Pour un domaine racine, utilisez les enregistrements A/ANAME indiqués par Render. Ajoutez aussi le TXT ci-dessus si votre registrar le permet, attendez la propagation, puis cliquez sur Vérifier.</p></div></div>{domain.lastError && <p className="mt-3 text-xs text-[hsl(var(--destructive))]">{domain.lastError}</p>}</div>)}</div>}
-      </div>
-    </Panel>
   </div>;
-}
-
-function ColorField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {
-  return <label className="block text-xs font-bold">{label}<div className="mt-1.5 flex gap-2"><input type="color" value={value || '#d8a21b'} onChange={event => onChange(event.target.value)} disabled={disabled} className="h-11 w-12 rounded-lg border p-1" /><input value={value} onChange={event => onChange(event.target.value)} disabled={disabled} className="min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-sm" placeholder="#D8A21B" /></div></label>;
 }
 
 function OrderRow({ order, currency }: { order: EcommerceOrder; currency: EcommerceStore['currency'] }) {

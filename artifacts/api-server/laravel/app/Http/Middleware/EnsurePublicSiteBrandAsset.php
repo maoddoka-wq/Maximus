@@ -25,9 +25,8 @@ final class EnsurePublicSiteBrandAsset
         }
 
         $logoUrl = '/api/store-logos/'.$companyId.'/'.$filename;
-        $isPublishedBrand = DB::table('ecommerce_stores')
+        $isPublishedBrand = DB::table('company_public_sites')
             ->where('company_id', $companyId)
-            ->where('status', 'PUBLISHED')
             ->where('logo_url', $logoUrl)
             ->exists();
 

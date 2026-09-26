@@ -134,6 +134,12 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('company')->group(function (): void {
     Route::get('/public-site', [PublicSiteController::class, 'company']);
     Route::patch('/public-site', [PublicSiteController::class, 'updateCompany']);
+    Route::post('/public-site/logo', [PublicSiteController::class, 'uploadBrandLogo']);
+    Route::post('/public-site/hero-images', [PublicSiteController::class, 'uploadHeroImages']);
+    Route::delete('/public-site/hero-images/{imageId}', [PublicSiteController::class, 'deleteHeroImage']);
+    Route::post('/public-site/domains', [PublicSiteController::class, 'createDomain']);
+    Route::post('/public-site/domains/{id}/verify', [PublicSiteController::class, 'verifyDomain']);
+    Route::delete('/public-site/domains/{id}', [PublicSiteController::class, 'deleteDomain']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {

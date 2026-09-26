@@ -50,7 +50,6 @@ class EcommerceController extends Controller
 
         return response()->json([
             'store' => $this->store($store),
-            'domains' => $this->domains($company),
             'categories' => $this->categories($company),
             'products' => DB::table('ecommerce_products')
                 ->where('company_id', $company)
@@ -74,28 +73,15 @@ class EcommerceController extends Controller
         }
 
         $input = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'min:2', 'max:120'],
-            'slug' => ['required', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
-            'description' => ['nullable', 'string', 'max:500'],
             'status' => ['required', 'in:DRAFT,PUBLISHED,SUSPENDED'],
             'currency' => ['required', 'in:XOF,EUR,USD'],
-            'primaryColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'accentColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'logoUrl' => ['nullable', 'string', 'max:500'],
             'allowOrderAttachments' => ['sometimes', 'boolean'],
         ])->validate();
         $company = $this->company($request);
         $row = $this->ensureStore($company);
-        $slug = $this->uniqueStoreSlug($input['slug'], (string) $row->id);
         $storeValues = [
-            'slug' => $slug,
-            'name' => $input['name'],
-            'description' => $input['description'] ?? '',
             'status' => $input['status'],
             'currency' => $input['currency'],
-            'primary_color' => $input['primaryColor'],
-            'accent_color' => $input['accentColor'],
-            'logo_url' => array_key_exists('logoUrl', $input) ? ($input['logoUrl'] ?? '') : ($row->logo_url ?? ''),
             'allow_order_attachments' => (bool) ($input['allowOrderAttachments'] ?? $row->allow_order_attachments ?? false),
             'updated_at' => now(),
         ];
@@ -668,6 +654,20 @@ class EcommerceController extends Controller
         }
 
         $logoUrl = '/api/store-logos/'.$company.'/'.$filename;
+        $companySite = DB::table('company_public_sites')
+            ->where('company_id', $company)
+            ->where('logo_url', $logoUrl)
+            ->first(['logo_data', 'logo_mime']);
+        if ($companySite && is_string($companySite->logo_data) && $companySite->logo_data !== '') {
+            $contents = base64_decode($companySite->logo_data, true);
+            if ($contents !== false) {
+                return response($contents, 200, [
+                    'Content-Type' => $companySite->logo_mime ?: 'application/octet-stream',
+                    'Cache-Control' => 'public, max-age=31536000, immutable',
+                ]);
+            }
+        }
+
         $store = DB::table('ecommerce_stores')
             ->where('company_id', $company)
             ->where('logo_url', $logoUrl)
@@ -2318,19 +2318,36 @@ class EcommerceController extends Controller
 
     private function store(object $row): array
     {
+        $companyId = (string) $row->company_id;
+        $site = DB::table('company_public_sites')->where('company_id', $companyId)->first();
+        $companyName = trim((string) DB::table('companies')->where('id', $companyId)->value('name'));
+        $publicName = trim((string) ($site?->public_name ?? ''));
+        $publicSlug = trim((string) ($site?->public_slug ?? ''));
+        $publicDescription = trim((string) ($site?->public_description ?? ''));
+        $logoUrl = trim((string) ($site?->logo_url ?? ''));
+        $primaryColor = trim((string) ($site?->primary_color ?? ''));
+        $accentColor = trim((string) ($site?->accent_color ?? ''));
+        $heroImages = $this->galleryUrls($companyId, 'company_site', $companyId, 'hero');
+
+        if ($heroImages === []) {
+            $heroImages = $this->galleryUrls($companyId, 'store', (string) $row->id, 'hero');
+        }
+
         return [
             'id' => $row->id,
-            'companyId' => $row->company_id,
-            'slug' => $row->slug,
-            'name' => $row->name,
-            'description' => $row->description,
+            'companyId' => $companyId,
+            'slug' => $publicSlug !== '' ? $publicSlug : $row->slug,
+            'name' => $publicName !== '' ? $publicName : ($companyName !== '' ? $companyName : $row->name),
+            'description' => $site?->public_description !== null
+                ? (string) $site->public_description
+                : $row->description,
             'status' => $row->status,
             'currency' => $row->currency,
-            'primaryColor' => $row->primary_color,
-            'accentColor' => $row->accent_color,
-            'logoUrl' => $row->logo_url ?? '',
+            'primaryColor' => $primaryColor !== '' ? $primaryColor : $row->primary_color,
+            'accentColor' => $accentColor !== '' ? $accentColor : $row->accent_color,
+            'logoUrl' => $logoUrl !== '' ? $logoUrl : ($row->logo_url ?? ''),
             'allowOrderAttachments' => (bool) ($row->allow_order_attachments ?? false),
-            'heroImages' => $this->galleryUrls((string) $row->company_id, 'store', (string) $row->id, 'hero'),
+            'heroImages' => $heroImages,
         ];
     }
 
