@@ -194,7 +194,7 @@ export function Sidebar({
         id="maximus-primary-navigation"
         aria-label={isAdmin ? 'Navigation MAXIMUS' : `Navigation ${companyName ?? 'entreprise'}`}
         data-collapsed={compact ? 'true' : 'false'}
-        className={`sidebar shrink-0 flex-col overscroll-contain overflow-y-auto transition-[width] duration-200 md:relative md:flex md:h-[100dvh] ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}
+        className={`sidebar min-h-0 shrink-0 flex-col overflow-hidden transition-[width] duration-200 md:relative md:flex md:h-[100dvh] ${compact ? 'md:w-20' : 'md:w-64'} ${mobileOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl' : 'hidden'}`}
       >
         <div
           className={`sticky top-0 z-10 flex items-center border-b border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/.96)] backdrop-blur ${compact ? 'gap-1 px-2' : 'justify-between px-4'} py-4 md:border-b-0 md:bg-transparent md:py-6`}
@@ -478,8 +478,8 @@ export function Topbar({
   };
 
   return (
-    <header className="topbar flex min-h-[78px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-4 backdrop-blur sm:px-6 lg:px-8">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="topbar flex min-h-[68px] w-full min-w-0 items-center justify-between gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-3 backdrop-blur sm:px-6 lg:px-8">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
           type="button"
           variant="ghost"
@@ -490,11 +490,11 @@ export function Topbar({
           aria-expanded={mobileOpen}
           ref={mobileMenuTriggerRef}
           onClick={onToggleMenu}
-          className="topbar-icon rounded-lg p-2 md:hidden"
+          className="topbar-icon shrink-0 rounded-lg p-2 md:hidden"
         >
           <Menu size={19} />
         </Button>
-        <div className="min-w-0 max-w-[calc(100vw-150px)]">
+        <div className="min-w-0 flex-1 sm:max-w-[38rem]">
           <p className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))] sm:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" aria-hidden="true" />
             Espace de travail
@@ -508,7 +508,7 @@ export function Topbar({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 sm:gap-2.5">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2.5">
         {isAdmin && (
           <div className="relative hidden lg:block">
             <Search
@@ -538,7 +538,7 @@ export function Topbar({
           title="Actualiser les données"
           onClick={() => void refresh()}
           disabled={refreshing}
-          className="topbar-icon inline-flex items-center gap-2 rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] disabled:cursor-wait disabled:opacity-60 sm:px-3"
+          className="topbar-icon inline-flex w-10 shrink-0 items-center justify-center gap-2 rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-start sm:px-3"
         >
           <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
           <span className="hidden text-xs font-bold sm:inline">Actualiser</span>
@@ -551,7 +551,7 @@ export function Topbar({
           aria-label="Aide MAXIMUS"
           title="Aide MAXIMUS"
           onClick={onHelp}
-          className="topbar-icon rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+          className="topbar-icon shrink-0 rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
         >
           <CircleHelp size={18} />
         </Button>
@@ -566,7 +566,7 @@ export function Topbar({
               : 'Notifications'
           }
           onClick={() => onNavigate(notificationPath)}
-          className="topbar-icon relative rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+          className="topbar-icon relative shrink-0 rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
         >
           <Bell size={18} />
           {unreadCount > 0 && (
@@ -603,15 +603,15 @@ export function PageHeader({
         </p>
         <h1
           data-testid="text-page-title"
-          className="max-w-4xl text-2xl font-bold tracking-[-.04em] sm:text-3xl"
+          className="max-w-4xl break-words text-2xl font-bold tracking-[-.04em] sm:text-3xl"
         >
           {title}
         </h1>
-        <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+        <p className="mt-1.5 max-w-3xl break-words text-sm leading-6 text-[hsl(var(--muted-foreground))]">
           {description}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3 sm:shrink-0">
         {location !== '/maximus/dashboard' && location !== '/entreprise/dashboard' && (
           <Button
             type="button"

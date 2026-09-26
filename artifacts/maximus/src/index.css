@@ -96,9 +96,15 @@
 }
 
 * { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
 body { min-width: 320px; }
 .mono { font-family: var(--app-font-mono); }
-.app-shell { min-height: 100dvh; background-color: hsl(var(--background)); background-image: linear-gradient(135deg, hsl(var(--primary) / .025), transparent 32%); }
+.app-shell { width: 100%; min-width: 0; max-width: 100%; min-height: 100dvh; background-color: hsl(var(--background)); background-image: linear-gradient(135deg, hsl(var(--primary) / .025), transparent 32%); }
 .dark .app-shell { background: hsl(var(--background)); }
 .public-shop-shell [class~="bg-white"],
 .public-shop-shell [class~="bg-white/95"],
@@ -118,9 +124,9 @@ body { min-width: 320px; }
 .sidebar[data-collapsed="false"] > div:last-child > div:last-child { align-self: flex-start; justify-content: flex-start; padding-left: 1rem; font-size: .75rem; line-height: 1rem; }
 .sidebar-section-label { padding: .75rem .75rem .35rem; color: hsl(var(--sidebar-foreground) / .48); font-family: var(--app-font-mono); font-size: .62rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
 .sidebar-section-label + .nav-item { margin-top: .1rem; }
-.card-surface { background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); border-radius: .9rem; box-shadow: var(--shadow-soft); }
+.card-surface { min-width: 0; max-width: 100%; background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); border-radius: .9rem; box-shadow: var(--shadow-soft); }
 .card-surface > .border-b { border-color: hsl(var(--border)); }
-.page-pad { padding-top: 1.75rem; padding-bottom: 3.5rem; }
+.page-pad { min-width: 0; max-width: 100%; padding-top: 1.75rem; padding-bottom: 3.5rem; }
 .page-pad > .mb-7 { margin-bottom: 1.75rem; padding-bottom: 1.35rem; border-bottom: 1px solid hsl(var(--border)); }
 .page-pad h1 { text-wrap: balance; }
 .page-pad table thead { letter-spacing: .08em; }
@@ -290,10 +296,15 @@ body {
 .app-main {
   background: hsl(var(--background) / .84);
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior: contain;
 }
 
 .page-content {
+  min-width: 0;
+  max-width: 100%;
   min-height: calc(100dvh - 68px);
   width: 100%;
   padding-top: 1.5rem;
@@ -301,11 +312,17 @@ body {
 }
 
 .page-header {
+  min-width: 0;
   min-height: 4.75rem;
 }
 
 .page-header h1 {
   line-height: 1.1;
+}
+
+.page-header h1,
+.page-header p {
+  overflow-wrap: anywhere;
 }
 
 .sidebar {
@@ -373,6 +390,10 @@ body {
 }
 
 .page-pad .grid > * {
+  min-width: 0;
+}
+
+.page-pad .flex > * {
   min-width: 0;
 }
 
@@ -549,13 +570,14 @@ body {
 
 @media (max-width: 767px) {
   .page-content {
-    padding-top: 1rem;
-    padding-bottom: 2rem;
+    padding-top: .75rem;
+    padding-bottom: 1.25rem;
   }
 
   .topbar {
-    min-height: 4.25rem;
-    padding-inline: 1rem;
+    min-height: 68px;
+    padding-inline: .75rem;
+    gap: .5rem;
   }
 
   .topbar-icon {
@@ -609,7 +631,8 @@ body {
 
   .page-header {
     min-height: 0;
-    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: .875rem;
   }
 
   .page-header h1 {
@@ -630,32 +653,65 @@ body {
 
   .page-pad .section-heading {
     align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .page-pad .section-heading > :last-child {
-    width: auto;
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 1;
+    flex-wrap: wrap;
   }
 
   .page-pad .section-heading > :last-child > button,
   .page-pad .section-heading > :last-child > a {
     width: auto;
+    max-width: 100%;
+    white-space: normal;
   }
 
   .page-pad table tbody td {
     min-height: 2.9rem;
   }
 
-  .page-pad .table-scroll table {
-    min-width: 680px;
+  .table-scroll table {
+    min-width: 640px;
+  }
+
+  .page-pad .table-scroll table,
+  .page-pad .overflow-x-auto > table {
+    min-width: 600px;
+  }
+
+  .transport-table-scroll table {
+    min-width: 560px;
+  }
+
+  .page-pad table th,
+  .page-pad table td {
+    padding-inline: .7rem;
+  }
+
+  .public-shop-shell .shop-main > section,
+  .public-shop-shell .shop-main .grid > * {
+    min-width: 0;
+  }
+
+  .public-shop-shell .shop-main h1,
+  .public-shop-shell .shop-main h2,
+  .public-shop-shell .shop-main p {
+    overflow-wrap: anywhere;
   }
 
   .page-pad .metric-card {
-    min-height: 8.5rem;
-    padding: .9rem;
+    min-height: 7.5rem;
+    padding: .75rem;
   }
 
   .page-pad .metric-card .text-2xl {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     line-height: 1.05;
     overflow-wrap: anywhere;
   }
@@ -683,6 +739,10 @@ body {
   }
 
   .page-pad {
+    padding-inline: .75rem;
+  }
+
+  .public-shop-shell .shop-main {
     padding-inline: .75rem;
   }
 

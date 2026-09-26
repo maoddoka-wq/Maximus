@@ -143,7 +143,7 @@ export function Metric({
   warning?: boolean;
 }) {
   return (
-    <div className={`metric-card card-surface fade-up rounded-2xl p-5 ${accent ? 'border-[hsl(var(--primary)/.25)]' : ''}`}>
+    <div className={`metric-card card-surface fade-up min-w-0 rounded-2xl p-5 ${accent ? 'border-[hsl(var(--primary)/.25)]' : ''}`}>
       <div className="flex items-start justify-between">
         <span
           className={`flex h-9 w-9 items-center justify-center rounded-lg ${
@@ -162,13 +162,13 @@ export function Metric({
           </span>
         )}
       </div>
-      <p className="mt-5 text-xs font-medium text-[hsl(var(--muted-foreground))]">{label}</p>
-      <p data-testid={`metric-value-${label}`} className="mt-1 text-2xl font-bold tracking-[-.05em]">
+      <p className="mt-5 min-w-0 break-words text-xs font-medium text-[hsl(var(--muted-foreground))]">{label}</p>
+      <p data-testid={`metric-value-${label}`} className="mt-1 min-w-0 break-words text-2xl font-bold tracking-[-.05em]">
         {value}
         <span className="text-sm font-medium">{suffix}</span>
       </p>
       <p
-        className={`mt-2 text-[11px] ${
+        className={`mt-2 min-w-0 break-words text-[11px] ${
           warning ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--muted-foreground))]'
         }`}
       >

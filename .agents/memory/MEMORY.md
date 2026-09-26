@@ -27,6 +27,7 @@
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
 - [Champs vides du catalogue](catalogue-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel peut les convertir en null.
 - [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
+- [Limites du défilement mobile](mobile-scroll-boundary.md) — confiner le débordement de page sans supprimer le défilement nécessaire aux tableaux et rails de produits.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
 - [Garde de création de paiement](payment-creation-guard.md) — verrouiller la commande pendant la création du checkout et réutiliser toute charge PENDING existante.
