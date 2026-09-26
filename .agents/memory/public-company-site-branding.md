@@ -3,8 +3,8 @@ name: Identité du site public de l’entreprise
 description: Règle d’isolation entre la marque commune du site d’entreprise et les permissions de ses rubriques publiques.
 ---
 
-Le nom, le slug public, la marque, le logo, les images d’accueil et le domaine appartiennent au site public de l’entreprise. `/site/{slug}` ouvre directement l’accueil de marque, sans écran de choix et sans dépendre d’E-commerce. L’accueil du site entreprise et la vitrine E-commerce ont des règles de navigation distinctes : préserver la navigation propre à l’accueil et les entrées de vitrine existantes, notamment Boutique, Location, Transport, Immobilier, Livraison, panier et compte.
+Le nom, le slug public, la marque, le logo, les images d’accueil et le domaine appartiennent au site public de l’entreprise. `/site/{slug}` ouvre directement l’accueil de marque, sans écran de choix et sans dépendre d’E-commerce. Le menu du site entreprise présente Accueil, les modules attribués, puis Panier et Se connecter si E-commerce est actif. Le lien E-commerce mène à Boutique. Les fonctionnalités secondaires ne deviennent pas des entrées séparées du menu du site entreprise; la vitrine d’une boutique autonome conserve sa navigation propre.
 
-**Why:** L’utilisateur a corrigé une confusion entre les règles de l’accueil d’entreprise et celles de la vitrine E-commerce; modifier l’une ne doit pas altérer l’autre.
+**Why:** L’utilisateur a précisé que le client doit arriver directement sur l’accueil de marque et voir ensuite les modules, le panier et la connexion, sans sous-fonctionnalités ajoutées dans la barre principale.
 
-**How to apply:** Avant de changer une navigation publique, identifier la surface visée. Ne pas transférer ou fusionner les règles de l’accueil entreprise et de la vitrine E-commerce sans demande explicite.
+**How to apply:** Garder `/site/{slug}` comme page d’entrée; construire son menu depuis les modules publics actifs. Conserver séparément la navigation détaillée des boutiques autonomes.
