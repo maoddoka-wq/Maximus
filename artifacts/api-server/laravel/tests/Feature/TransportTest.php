@@ -729,6 +729,82 @@ class TransportTest extends TestCase
         ]);
     }
 
+    public function test_public_taxi_share_link_is_read_only_scoped_and_expires(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora-share',
+            'company_id' => 'kora',
+            'slug' => 'kora-share',
+            'name' => 'Kora Share',
+            'description' => 'Taxi',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#111827',
+            'accent_color' => '#f59e0b',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $trip = $this->postJson('/api/shop/kora-share/transport/trips', [
+            'pickup' => 'Entrée principale de l’hôpital',
+            'destination' => 'Fann',
+            'passengerName' => 'Client Suivi',
+            'passengerPhone' => '+221771234567',
+            'pickupLatitude' => 14.7167,
+            'pickupLongitude' => -17.4677,
+        ])->assertCreated()
+            ->assertJsonPath('trip.pickup', 'Entrée principale de l’hôpital')
+            ->assertJsonPath('trip.pickupCode', fn ($value) => is_string($value) && preg_match('/^\d{4}$/', $value) === 1);
+
+        $tripId = $trip->json('trip.id');
+        $share = $this->postJson('/api/shop/kora-share/transport/trips/'.$tripId.'/share', [
+            'cancelToken' => $trip->json('cancelToken'),
+        ])->assertCreated()
+            ->assertJsonPath('shareToken', fn ($value) => is_string($value) && preg_match('/^[a-f0-9]{64}$/', $value) === 1);
+        $shareToken = $share->json('shareToken');
+        $tokenHash = hash('sha256', $shareToken);
+
+        $this->assertNotSame($trip->json('cancelToken'), $shareToken);
+        $this->assertDatabaseHas('transport_trip_shares', [
+            'company_id' => 'kora',
+            'trip_id' => $tripId,
+            'token_hash' => $tokenHash,
+        ]);
+        $this->assertDatabaseMissing('transport_trip_shares', ['token_hash' => $shareToken]);
+
+        $sharePath = '/api/shop/kora-share/transport/trips/'.$tripId.'/share';
+        $sharedTripResponse = $this->getJson($sharePath, ['X-Transport-Share-Token' => $shareToken])
+            ->assertOk()
+            ->assertJsonPath('trip.pickup', 'Entrée principale de l’hôpital');
+        $this->assertStringContainsString(
+            'no-store',
+            $sharedTripResponse->headers->get('Cache-Control') ?? '',
+        );
+        $sharedTrip = $sharedTripResponse->json('trip');
+        $this->assertArrayNotHasKey('companyId', $sharedTrip);
+        $this->assertArrayNotHasKey('passengerName', $sharedTrip);
+        $this->assertArrayNotHasKey('passengerPhone', $sharedTrip);
+        $this->assertArrayNotHasKey('driverPhone', $sharedTrip);
+        $this->assertArrayNotHasKey('pickupCode', $sharedTrip);
+
+        $this->getJson('/api/shop/kora-share/transport/trips/'.$tripId.'/share', [
+            'X-Transport-Share-Token' => str_repeat('0', 64),
+        ])->assertNotFound();
+        $this->getJson('/api/shop/kora-share/transport/trips/another-trip/share', [
+            'X-Transport-Share-Token' => $shareToken,
+        ])->assertNotFound();
+        $this->postJson('/api/shop/kora-share/transport/trips/'.$tripId.'/cancel', [
+            'cancelToken' => $shareToken,
+        ])->assertForbidden();
+
+        DB::table('transport_trip_shares')
+            ->where('token_hash', $tokenHash)
+            ->update(['expires_at' => now()->subSecond()]);
+        $this->getJson($sharePath, ['X-Transport-Share-Token' => $shareToken])->assertNotFound();
+    }
+
     private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string
     {
         AuthUser::query()->create([

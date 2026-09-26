@@ -189,6 +189,36 @@ export interface PublicTransportTrip {
   pricingMode?: DriverPricingMode;
 }
 
+export type PublicTransportTrackingFields = Pick<
+  PublicTransportTrip,
+  | 'pickupLatitude'
+  | 'pickupLongitude'
+  | 'destinationLatitude'
+  | 'destinationLongitude'
+  | 'routeDistanceKm'
+  | 'routeDurationMinutes'
+  | 'routeGeometry'
+  | 'routePending'
+  | 'pickupRouteDistanceKm'
+  | 'pickupEtaMinutes'
+  | 'pickupRouteGeometry'
+  | 'driverLatitude'
+  | 'driverLongitude'
+>;
+
+export interface PublicTransportShareTrip extends PublicTransportTrackingFields {
+  id: string;
+  reference: string;
+  pickup: string;
+  destination: string;
+  fare: number;
+  status: TripStatus;
+  requestedAt: string;
+  vehicleModel: string | null;
+  vehicleType: string | null;
+  vehicleImageUrl: string | null;
+}
+
 export interface PublicTransportQuote {
   quoteToken: string;
   destination: string;
@@ -201,9 +231,14 @@ export interface PublicTransportQuote {
   geometry: GeoJsonLineString;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  options: { dedupe?: boolean } = {},
+): Promise<T> {
   return requestJson<T>(path, init, {
     fallbackMessage: 'Le service transport est momentanément indisponible.',
+    ...options,
   });
 }
 
@@ -297,6 +332,22 @@ export const createPublicTransportApi = (slug?: string, domain = false) => ({
   }) => request<{ trip: PublicTransportTrip; cancelToken: string; matched: boolean; message: string }>(
     domain ? '/shop-domain/transport/trips' : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips`,
     json(body),
+  ),
+  createShareLink: (id: string, cancelToken: string) => request<{ shareToken: string; expiresAt: string }>(
+    domain
+      ? `/shop-domain/transport/trips/${encodeURIComponent(id)}/share`
+      : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}/share`,
+    json({ cancelToken }),
+  ),
+  getSharedTrip: (id: string, shareToken: string) => request<{
+    trip: PublicTransportShareTrip;
+    message: string;
+  }>(
+    domain
+      ? `/shop-domain/transport/trips/${encodeURIComponent(id)}/share`
+      : `/shop/${encodeURIComponent(slug ?? '')}/transport/trips/${encodeURIComponent(id)}/share`,
+    { headers: { 'X-Transport-Share-Token': shareToken } },
+    { dedupe: false },
   ),
   cancelTrip: (id: string, cancelToken: string) => request<{ trip: PublicTransportTrip; matched: boolean; message: string }>(
     domain

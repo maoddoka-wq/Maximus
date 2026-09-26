@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, Clock3, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, Clock3, Copy, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, Share2, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
   createCustomerApi,
@@ -19,8 +19,9 @@ import {
 } from '@/lib/ecommerce-api';
 import { ApiRequestError } from '@/lib/api-request';
 import { publicImmobilierApi } from '@/lib/immobilier-api';
-import { createPublicTransportApi, type PublicTransportPlace, type PublicTransportQuote, type PublicTransportTrip } from '@/lib/transport-api';
+import { createPublicTransportApi, type PublicTransportPlace, type PublicTransportQuote, type PublicTransportShareTrip, type PublicTransportTrip } from '@/lib/transport-api';
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
+import { buildPublicTransportShareUrl, parsePublicTransportShareUrl } from '@/lib/transport-share-link';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { tokens as transportDesignTokens } from '@workspace/maximus-transport-public/tokens';
@@ -1078,13 +1079,14 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
   const api = useMemo(() => createPublicTransportApi(slug, domain), [domain, slug]);
+  const shareLocation = useMemo(() => parsePublicTransportShareUrl(window.location.href), []);
   const [transportColors, setTransportColors] = useState<{ primaryColor?: string; accentColor?: string } | null>(() => ({
     primaryColor: store.transportPrimaryColor,
     accentColor: store.transportAccentColor,
   }));
   const theme = publicTransportTheme(transportColors);
   const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
-  const [form, setForm] = useState({ pickup: 'Ma position GPS', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
+  const [form, setForm] = useState({ pickup: '', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [locationState, setLocationState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
   const [locationMessage, setLocationMessage] = useState('');
@@ -1097,6 +1099,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [cancelError, setCancelError] = useState('');
   const [trip, setTrip] = useState<PublicTransportTrip | null>(null);
   const [cancelToken, setCancelToken] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareError, setShareError] = useState('');
   const [tripEnded, setTripEnded] = useState<PublicTransportTrip | null>(null);
   const [tripMessage, setTripMessage] = useState('');
   const [quote, setQuote] = useState<PublicTransportQuote | null>(null);
@@ -1135,6 +1143,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     if (['COMPLETED', 'CANCELLED'].includes(result.trip.status)) {
       window.localStorage.removeItem(customerStorageKey);
       setCancelToken(null);
+      setShareToken(null);
+      setShareExpiresAt(null);
+      setShareUrl('');
       setTrip(null);
       setTripEnded(result.trip);
       setFormOpen(false);
@@ -1154,7 +1165,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }
   };
 
-  useAutoRefresh(refreshTrip, { enabled: Boolean(trip) });
+  useAutoRefresh(refreshTrip, { enabled: Boolean(trip) && !shareLocation });
 
   useEffect(() => {
     const query = form.destination.trim();
@@ -1291,16 +1302,28 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   }, []);
 
   useEffect(() => {
+    if (shareLocation) return;
     try {
       const saved = window.localStorage.getItem(customerStorageKey);
       if (!saved) return;
-      const customer = JSON.parse(saved) as { tripId?: string; cancelToken?: string; passengerName?: string; passengerPhone?: string };
+      const customer = JSON.parse(saved) as {
+        tripId?: string;
+        cancelToken?: string;
+        shareToken?: string;
+        shareExpiresAt?: string;
+        passengerName?: string;
+        passengerPhone?: string;
+      };
       setForm(current => ({
         ...current,
         passengerName: customer.passengerName?.trim() || current.passengerName,
         passengerPhone: customer.passengerPhone?.trim() || current.passengerPhone,
       }));
       if (customer.cancelToken) setCancelToken(customer.cancelToken);
+      if (customer.shareToken && customer.shareExpiresAt && Date.parse(customer.shareExpiresAt) > Date.now()) {
+        setShareToken(customer.shareToken);
+        setShareExpiresAt(customer.shareExpiresAt);
+      }
       if (customer.tripId) {
         setRestoringTrip(true);
         void api.getTrip(customer.tripId).then(result => {
@@ -1317,7 +1340,57 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     } catch {
       // Ignore an invalid local preference; the order flow remains usable.
     }
-  }, [api, customerStorageKey]);
+  }, [api, customerStorageKey, shareLocation]);
+
+  useEffect(() => {
+    if (!trip || !shareToken || !shareExpiresAt || Date.parse(shareExpiresAt) <= Date.now()) {
+      setShareUrl('');
+      return;
+    }
+    setShareUrl(buildPublicTransportShareUrl(window.location.href, trip.id, shareToken));
+  }, [shareExpiresAt, shareToken, trip?.id]);
+
+  const copyShareUrl = async (url: string) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(url);
+      setShareMessage('Lien copié. Le suivi partagé est en lecture seule.');
+    } catch {
+      setShareMessage('Le lien est prêt ci-dessous. Sélectionnez-le et copiez-le.');
+    }
+  };
+
+  const createOrCopyShareLink = async () => {
+    if (!trip || !cancelToken || shareLoading) return;
+    setShareLoading(true);
+    setShareError('');
+    setShareMessage('');
+    try {
+      if (shareUrl && shareExpiresAt && Date.parse(shareExpiresAt) > Date.now()) {
+        await copyShareUrl(shareUrl);
+        return;
+      }
+
+      const result = await api.createShareLink(trip.id, cancelToken);
+      const url = buildPublicTransportShareUrl(window.location.href, trip.id, result.shareToken);
+      window.localStorage.setItem(customerStorageKey, JSON.stringify({
+        tripId: trip.id,
+        cancelToken,
+        shareToken: result.shareToken,
+        shareExpiresAt: result.expiresAt,
+        passengerName: form.passengerName.trim(),
+        passengerPhone: form.passengerPhone.trim(),
+      }));
+      setShareToken(result.shareToken);
+      setShareExpiresAt(result.expiresAt);
+      setShareUrl(url);
+      await copyShareUrl(url);
+    } catch (cause) {
+      setShareError(cause instanceof Error ? cause.message : 'Le lien de suivi n’a pas pu être créé.');
+    } finally {
+      setShareLoading(false);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -1337,6 +1410,11 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }
     setSubmitting(true);
     setError('');
+    setShareToken(null);
+    setShareExpiresAt(null);
+    setShareUrl('');
+    setShareError('');
+    setShareMessage('');
     setTrip(null);
     setTripEnded(null);
     try {
@@ -1399,6 +1477,16 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       </div>
     </CardContent>
   </Card>;
+
+  if (shareLocation) {
+    return <SharedTransportTrackingPage
+      api={api}
+      shareLocation={shareLocation}
+      store={store}
+      colors={transportColors}
+      onBack={onBack}
+    />;
+  }
 
   return <section
      className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm sm:max-w-5xl"
@@ -1537,10 +1625,21 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
               <CardContent className="space-y-4 p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"><MapPin size={15} /></div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Départ</p>
-                    <p className="mt-1 text-sm font-semibold">Position actuelle · Dakar</p>
-                  </div>
+                  <Label htmlFor="transport-pickup" className="min-w-0 flex-1">
+                    <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Repère de prise en charge</span>
+                    <Input
+                      id="transport-pickup"
+                      data-testid="input-transport-pickup"
+                      required
+                      minLength={3}
+                      maxLength={180}
+                      value={form.pickup}
+                      onChange={event => setForm(current => ({ ...current, pickup: event.target.value }))}
+                      className="mt-1"
+                      placeholder="Ex. entrée principale, station-service…"
+                    />
+                    <span className="mt-1 block text-xs font-normal text-muted-foreground">Le GPS indique le point exact ; ce repère aide le chauffeur à vous trouver.</span>
+                  </Label>
                 </div>
                 <div className="ml-4 h-4 border-l border-dashed border-border" />
                 <div className="relative">
@@ -1588,7 +1687,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-sm">Estimation</CardTitle>
-                  <p className="mt-1 text-xs text-muted-foreground">Position actuelle → {form.destination || 'destination'}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{form.pickup || 'Point GPS'} → {form.destination || 'destination'}</p>
                 </div>
                 {quoteLoading ? <RefreshCw size={18} className="animate-spin text-muted-foreground" /> : <p className="text-2xl font-bold">{quote ? money(quote.fare, store.currency) : '—'}</p>}
               </div>
@@ -1623,6 +1722,15 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           </CardHeader>
           <CardContent className="space-y-4 p-4">
             <p className="text-sm leading-6 text-muted-foreground">{tripMessage}</p>
+            {trip.pickupCode && !['COMPLETED', 'CANCELLED'].includes(trip.status) && <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="flex items-center justify-between gap-4 p-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-primary">Code de prise en charge</p>
+                  <p className="mt-1 text-sm text-muted-foreground">À communiquer au chauffeur lorsqu’il arrive.</p>
+                </div>
+                <p data-testid="text-pickup-code" className="rounded-md border border-primary/20 bg-card px-4 py-2 font-mono text-2xl font-bold tracking-[0.25em] text-primary">{trip.pickupCode}</p>
+              </CardContent>
+            </Card>}
             {(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}
             {trip.vehicleModel && <div className="flex items-center gap-3 border-t border-border pt-4 text-left">
               <img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-14 w-20 rounded-md object-cover" />
@@ -1640,6 +1748,28 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
                 <a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer"><MessageCircle /> WhatsApp</a>
               </TransportButton>
             </div>}
+            {['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].includes(trip.status) && cancelToken && <Card className="border-border bg-muted/30">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-start gap-3">
+                  <Share2 size={18} className="mt-0.5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold">Partager le suivi</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Le lien affiche le statut, les points de départ et d’arrivée et la position du taxi, sans nom, téléphone, code de prise en charge ni possibilité d’annuler.</p>
+                  </div>
+                </div>
+                <TransportButton type="button" variant="outline" onClick={() => void createOrCopyShareLink()} disabled={shareLoading} className="w-full">
+                  {shareLoading ? <RefreshCw className="animate-spin" /> : shareUrl ? <Copy /> : <Share2 />}
+                  {shareLoading ? 'Préparation du lien…' : shareUrl && shareExpiresAt && Date.parse(shareExpiresAt) > Date.now() ? 'Copier le lien de suivi' : 'Créer un lien de suivi'}
+                </TransportButton>
+                {shareUrl && <div className="grid gap-1.5">
+                  <Label htmlFor="transport-share-url" className="text-xs text-muted-foreground">Lien à partager</Label>
+                  <Input id="transport-share-url" data-testid="input-transport-share-url" readOnly value={shareUrl} onFocus={event => event.currentTarget.select()} />
+                  {shareExpiresAt && <p className="text-xs text-muted-foreground">Valide jusqu’au {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(shareExpiresAt))}.</p>}
+                </div>}
+                {shareMessage && <p role="status" className="text-xs text-primary">{shareMessage}</p>}
+                {shareError && <p role="alert" className="text-xs text-destructive">{shareError}</p>}
+              </CardContent>
+            </Card>}
             {cancelError && <Card role="alert" className="border-destructive/30 bg-destructive/5">
               <CardContent className="p-3 text-sm text-destructive">{cancelError}</CardContent>
             </Card>}
@@ -1650,7 +1780,15 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
             <TransportButton
               type="button"
               variant="ghost"
-              onClick={() => { window.localStorage.removeItem(customerStorageKey); setCancelToken(null); setTrip(null); setFormOpen(true); }}
+              onClick={() => {
+                window.localStorage.removeItem(customerStorageKey);
+                setCancelToken(null);
+                setShareToken(null);
+                setShareExpiresAt(null);
+                setShareUrl('');
+                setTrip(null);
+                setFormOpen(true);
+              }}
               className="w-full text-primary"
             >
               Demander une autre course
@@ -1678,7 +1816,160 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   </section>;
 }
 
-function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
+function SharedTransportTrackingPage({
+  api,
+  shareLocation,
+  store,
+  colors,
+  onBack,
+}: {
+  api: ReturnType<typeof createPublicTransportApi>;
+  shareLocation: { tripId: string; shareToken: string };
+  store: PublicShopBootstrap['store'];
+  colors: { primaryColor?: string; accentColor?: string } | null;
+  onBack: () => void;
+}) {
+  const theme = publicTransportTheme(colors);
+  const [trip, setTrip] = useState<PublicTransportShareTrip | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const loadSharedTrip = useCallback(
+    () => api.getSharedTrip(shareLocation.tripId, shareLocation.shareToken),
+    [api, shareLocation.shareToken, shareLocation.tripId],
+  );
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void loadSharedTrip()
+      .then(result => {
+        if (!active) return;
+        setTrip(result.trip);
+        setMessage(result.message);
+        setError('');
+      })
+      .catch(cause => {
+        if (!active) return;
+        setError(cause instanceof ApiRequestError && cause.status === 404
+          ? 'Ce lien de suivi est invalide ou a expiré.'
+          : cause instanceof Error ? cause.message : 'Le suivi est momentanément indisponible.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [loadSharedTrip]);
+
+  const refreshSharedTrip = useCallback(async () => {
+    try {
+      const result = await loadSharedTrip();
+      setTrip(result.trip);
+      setMessage(result.message);
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof ApiRequestError && cause.status === 404
+        ? 'Ce lien de suivi est invalide ou a expiré.'
+        : cause instanceof Error ? cause.message : 'Le suivi est momentanément indisponible.');
+    }
+  }, [loadSharedTrip]);
+
+  useAutoRefresh(refreshSharedTrip, {
+    enabled: Boolean(trip && !['COMPLETED', 'CANCELLED'].includes(trip.status)),
+  });
+
+  const title = trip?.status === 'OFFERED'
+    ? 'Chauffeur trouvé'
+    : trip?.status === 'ASSIGNED' || trip?.status === 'IN_PROGRESS'
+      ? 'Votre chauffeur est en route'
+      : trip?.status === 'COMPLETED'
+        ? 'Course terminée'
+        : trip?.status === 'CANCELLED'
+          ? 'Course annulée'
+          : 'Attribution en cours';
+
+  return <section
+    className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm sm:max-w-5xl"
+    style={{
+      ...transportDesignVariables(theme),
+      fontFamily: transportDesignTokens.fontFamily.sans.join(', '),
+      '--transport-primary': theme.primary,
+      '--transport-accent': theme.accent,
+      '--transport-primary-foreground': theme.primaryForeground,
+      '--transport-accent-foreground': theme.accentForeground,
+    } as React.CSSProperties}
+  >
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
+      <TransportButton type="button" variant="ghost" size="sm" onClick={onBack}>
+        <ArrowLeft size={16} /> Retour à la boutique
+      </TransportButton>
+      <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="h-2 w-2 rounded-full bg-[var(--transport-accent)]" /> Suivi partagé
+      </span>
+    </header>
+    <div className="space-y-5 px-4 pb-8 pt-6 sm:px-8">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taxi Urbain · Dakar</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+        {trip && <p className="mt-2 text-sm text-muted-foreground">Course {trip.reference} · {money(trip.fare, store.currency)}</p>}
+      </div>
+
+      {loading && !trip && <Card className="border-primary/30 bg-primary/5" aria-live="polite">
+        <CardContent className="flex items-center gap-3 p-4 text-sm font-medium">
+          <RefreshCw size={17} className="animate-spin text-primary" />
+          <span>Chargement du suivi partagé…</span>
+        </CardContent>
+      </Card>}
+
+      {error && <Card role="alert" className="border-destructive/30 bg-destructive/5">
+        <CardContent className="p-4">
+          <p className="text-sm font-semibold text-destructive">{error}</p>
+          {!trip && <TransportButton type="button" variant="outline" onClick={() => {
+            setLoading(true);
+            void refreshSharedTrip().finally(() => setLoading(false));
+          }} className="mt-3">
+            Réessayer <RefreshCw />
+          </TransportButton>}
+        </CardContent>
+      </Card>}
+
+      {trip && <Card className="border-border bg-card">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border p-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Suivi en lecture seule</p>
+            <CardTitle className="mt-1 text-lg">{title}</CardTitle>
+          </div>
+          <Check className="text-primary" size={22} />
+        </CardHeader>
+        <CardContent className="space-y-4 p-4">
+          <p className="text-sm leading-6 text-muted-foreground">{message}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Prise en charge</p>
+              <p className="mt-1 text-sm font-semibold">{trip.pickup}</p>
+            </div>
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</p>
+              <p className="mt-1 text-sm font-semibold">{trip.destination}</p>
+            </div>
+          </div>
+          {(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}
+          {trip.vehicleModel && <div className="flex items-center gap-3 border-t border-border pt-4 text-left">
+            <img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-14 w-20 rounded-md object-cover" />
+            <div className="text-sm">
+              <p className="font-semibold">{trip.vehicleModel}</p>
+              <p className="mt-1 text-muted-foreground">{trip.vehicleType || 'Taxi'}</p>
+            </div>
+          </div>}
+          <p className="border-t border-border pt-3 text-xs leading-5 text-muted-foreground">Ce lien affiche le statut, les points de départ et d’arrivée et la position du taxi. Il ne révèle ni nom ni téléphone, n’affiche pas le code de prise en charge et ne permet aucune action sur la course.</p>
+        </CardContent>
+      </Card>}
+    </div>
+  </section>;
+}
+
+function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip | PublicTransportShareTrip }) {
   const pickup = trip.pickupLatitude !== null && trip.pickupLongitude !== null
     ? { latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }
     : null;

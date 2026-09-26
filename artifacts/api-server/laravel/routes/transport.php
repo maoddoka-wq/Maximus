@@ -27,6 +27,8 @@ Route::post('/shop/{slug}/transport/quote', [TransportController::class, 'quoteP
 Route::get('/shop/{slug}/transport/places', [TransportController::class, 'suggestPublicTransportPlaces'])->middleware('throttle:orders');
 Route::get('/shop/{slug}/transport/trips/{id}', [TransportController::class, 'getPublicTrip'])->middleware('throttle:orders');
 Route::post('/shop/{slug}/transport/trips/{id}/cancel', [TransportController::class, 'cancelPublicTrip'])->middleware('throttle:orders');
+Route::post('/shop/{slug}/transport/trips/{id}/share', [TransportController::class, 'createPublicTripShare'])->middleware('throttle:orders');
+Route::get('/shop/{slug}/transport/trips/{id}/share', [TransportController::class, 'getPublicTripShare'])->middleware('throttle:orders');
 Route::get('/shop/{slug}/transport/vehicles/{id}/image', [TransportController::class, 'publicVehicleImage'])->middleware('throttle:orders');
 Route::get('/shop/{slug}/transport/settings', [TransportController::class, 'publicTransportSettings'])->middleware('throttle:orders');
 Route::get('/shop/{slug}/transport/hero-image', [TransportController::class, 'publicTransportHeroImage'])->middleware('throttle:orders');
@@ -36,6 +38,8 @@ Route::post('/shop-domain/transport/quote', [TransportController::class, 'quoteP
 Route::get('/shop-domain/transport/places', [TransportController::class, 'suggestPublicDomainTransportPlaces'])->middleware('throttle:orders');
 Route::get('/shop-domain/transport/trips/{id}', [TransportController::class, 'publicDomainTrip'])->middleware('throttle:orders');
 Route::post('/shop-domain/transport/trips/{id}/cancel', [TransportController::class, 'cancelPublicDomainTrip'])->middleware('throttle:orders');
+Route::post('/shop-domain/transport/trips/{id}/share', [TransportController::class, 'createPublicDomainTripShare'])->middleware('throttle:orders');
+Route::get('/shop-domain/transport/trips/{id}/share', [TransportController::class, 'getPublicDomainTripShare'])->middleware('throttle:orders');
 Route::get('/shop-domain/transport/vehicles/{id}/image', [TransportController::class, 'publicDomainVehicleImage'])->middleware('throttle:orders');
 Route::get('/shop-domain/transport/settings', [TransportController::class, 'publicDomainTransportSettings'])->middleware('throttle:orders');
 Route::get('/shop-domain/transport/hero-image', [TransportController::class, 'publicDomainTransportHeroImage'])->middleware('throttle:orders');

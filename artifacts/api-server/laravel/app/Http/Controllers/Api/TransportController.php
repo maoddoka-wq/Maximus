@@ -790,6 +790,74 @@ class TransportController extends Controller
         return $this->publicTripForStore($store, $id, true);
     }
 
+    public function createPublicTripShare(Request $request, string $slug, string $id): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->createPublicTripShareForStore($request, $store, $id);
+    }
+
+    public function createPublicDomainTripShare(Request $request, string $id): JsonResponse
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->createPublicTripShareForStore($request, $store, $id, true);
+    }
+
+    public function getPublicTripShare(Request $request, string $slug, string $id): JsonResponse
+    {
+        $store = DB::table('ecommerce_stores')
+            ->where('slug', $slug)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->publicTripShareForStore($request, $store, $id);
+    }
+
+    public function getPublicDomainTripShare(Request $request, string $id): JsonResponse
+    {
+        $domain = DB::table('ecommerce_domains')
+            ->where('domain', $request->getHost())
+            ->where('status', 'ACTIVE')
+            ->whereNull('deleted_at')
+            ->first();
+        if (! $domain) {
+            return response()->json(['error' => 'Aucune boutique publiée ne correspond à ce domaine.'], 404);
+        }
+        $store = DB::table('ecommerce_stores')
+            ->where('company_id', $domain->company_id)
+            ->where('status', 'PUBLISHED')
+            ->first();
+        if (! $store || ! CompanyRegistry::isActive((string) $store->company_id)) {
+            return response()->json(['error' => 'Boutique introuvable ou non publiée.'], 404);
+        }
+
+        return $this->publicTripShareForStore($request, $store, $id, true);
+    }
+
     public function cancelPublicTrip(Request $request, string $slug, string $id): JsonResponse
     {
         $store = DB::table('ecommerce_stores')
@@ -1227,6 +1295,140 @@ class TransportController extends Controller
             'vehicleType' => null,
             'vehicleImageUrl' => null,
         ];
+    }
+
+    private function createPublicTripShareForStore(Request $request, object $store, string $id, bool $domain = false): JsonResponse
+    {
+        $company = (string) $store->company_id;
+        if (! ModuleCatalog::allowsFeature($company, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        $input = $this->validated($request, [
+            'cancelToken' => ['required', 'string', 'max:20000'],
+        ]);
+        try {
+            $payload = json_decode(Crypt::decryptString($input['cancelToken']), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return response()->json(['error' => 'Le lien de partage est invalide ou expiré.'], 403);
+        }
+        if (($payload['tripId'] ?? null) !== $id
+            || ($payload['companyId'] ?? null) !== $company
+            || (int) ($payload['expiresAt'] ?? 0) < now()->timestamp) {
+            return response()->json(['error' => 'Le lien de partage est invalide ou expiré.'], 403);
+        }
+
+        $trip = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $trip) {
+            return response()->json(['error' => 'Course introuvable.'], 404);
+        }
+        if (in_array($trip->status, ['COMPLETED', 'CANCELLED'], true)) {
+            return response()->json(['error' => 'Le suivi n’est plus disponible pour cette course.'], 409);
+        }
+
+        $shareToken = bin2hex(random_bytes(32));
+        $expiresAt = now()->addHours(48);
+        DB::table('transport_trip_shares')->insert([
+            'company_id' => $company,
+            'trip_id' => $id,
+            'token_hash' => hash('sha256', $shareToken),
+            'expires_at' => $expiresAt,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'shareToken' => $shareToken,
+            'expiresAt' => $expiresAt->toIso8601String(),
+        ], 201)->header('Cache-Control', 'private, no-store, max-age=0');
+    }
+
+    private function publicTripShareForStore(Request $request, object $store, string $id, bool $domain = false): JsonResponse
+    {
+        $company = (string) $store->company_id;
+        if (! ModuleCatalog::allowsFeature($company, 'transport', 'overview')) {
+            return response()->json(['error' => 'Le service Transport n’est pas activé pour cette boutique.'], 403);
+        }
+
+        $shareToken = $request->header('X-Transport-Share-Token');
+        if (! is_string($shareToken) || preg_match('/^[a-f0-9]{64}$/', $shareToken) !== 1) {
+            return response()->json(['error' => 'Lien de suivi introuvable ou expiré.'], 404)
+                ->header('Cache-Control', 'private, no-store, max-age=0');
+        }
+        $tokenHash = hash('sha256', $shareToken);
+        $share = DB::table('transport_trip_shares')
+            ->where('company_id', $company)
+            ->where('trip_id', $id)
+            ->where('token_hash', $tokenHash)
+            ->where('expires_at', '>', now())
+            ->whereNull('revoked_at')
+            ->first();
+        if (! $share || ! hash_equals((string) $share->token_hash, $tokenHash)) {
+            return response()->json(['error' => 'Lien de suivi introuvable ou expiré.'], 404)
+                ->header('Cache-Control', 'private, no-store, max-age=0');
+        }
+
+        $trip = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('id', $id)
+            ->first();
+        if (! $trip) {
+            return response()->json(['error' => 'Lien de suivi introuvable ou expiré.'], 404)
+                ->header('Cache-Control', 'private, no-store, max-age=0');
+        }
+        $trip = $this->refreshPublicTripRoutes($trip);
+        $driver = $trip->driver_id
+            ? DB::table('transport_drivers')->where('company_id', $company)->where('id', $trip->driver_id)->first()
+            : null;
+        $vehicle = $trip->vehicle_id
+            ? DB::table('transport_vehicles')->where('company_id', $company)->where('id', $trip->vehicle_id)->first()
+            : null;
+        $publicTrip = $this->publicTrip(
+            $trip,
+            $driver,
+            $vehicle,
+            $this->vehicleImageUrl($company, $trip->vehicle_id, $domain),
+        );
+        $sharedTrip = [
+            'id' => $publicTrip['id'],
+            'reference' => $publicTrip['reference'],
+            'pickup' => $publicTrip['pickup'],
+            'destination' => $publicTrip['destination'],
+            'fare' => $publicTrip['fare'],
+            'status' => $publicTrip['status'],
+            'requestedAt' => $publicTrip['requestedAt'],
+            'pickupLatitude' => $publicTrip['pickupLatitude'],
+            'pickupLongitude' => $publicTrip['pickupLongitude'],
+            'destinationLatitude' => $publicTrip['destinationLatitude'],
+            'destinationLongitude' => $publicTrip['destinationLongitude'],
+            'routeDistanceKm' => $publicTrip['routeDistanceKm'],
+            'routeDurationMinutes' => $publicTrip['routeDurationMinutes'],
+            'routeGeometry' => $publicTrip['routeGeometry'],
+            'routePending' => $publicTrip['routePending'],
+            'pickupRouteDistanceKm' => $publicTrip['pickupRouteDistanceKm'],
+            'pickupEtaMinutes' => $publicTrip['pickupEtaMinutes'],
+            'pickupRouteGeometry' => $publicTrip['pickupRouteGeometry'],
+            'driverLatitude' => $publicTrip['driverLatitude'],
+            'driverLongitude' => $publicTrip['driverLongitude'],
+            'vehicleModel' => $publicTrip['vehicleModel'],
+            'vehicleType' => $publicTrip['vehicleType'],
+            'vehicleImageUrl' => $publicTrip['vehicleImageUrl'],
+        ];
+
+        $message = match ($trip->status) {
+            'OFFERED' => 'Un chauffeur a reçu la demande et doit la confirmer.',
+            'ASSIGNED', 'IN_PROGRESS' => 'Le chauffeur est en route.',
+            'COMPLETED' => 'La course est terminée.',
+            'CANCELLED' => 'La demande a été annulée.',
+            default => 'La recherche d’un chauffeur est en cours.',
+        };
+
+        return response()->json(['trip' => $sharedTrip, 'message' => $message])
+            ->header('Cache-Control', 'private, no-store, max-age=0')
+            ->header('Referrer-Policy', 'no-referrer');
     }
 
     private function publicTripForStore(object $store, string $id, bool $domain = false): JsonResponse
