@@ -69,6 +69,69 @@ final class PublicSiteRegistry
         return is_array($selected) ? array_values(array_map('strval', $selected)) : [];
     }
 
+    /** @return list<array{id:string,label:string,path:string}> */
+    public static function publicFeatures(string $companyId): array
+    {
+        $hasPublishedStore = DB::table('ecommerce_stores')
+            ->where('company_id', $companyId)
+            ->where('status', 'PUBLISHED')
+            ->exists();
+        $definitions = [
+            [
+                'id' => 'boutique',
+                'label' => 'Boutique',
+                'path' => '/boutique',
+                'moduleId' => 'ecommerce',
+                'featureId' => 'catalogue',
+                'requiresPublishedStore' => true,
+            ],
+            [
+                'id' => 'location',
+                'label' => 'Location',
+                'path' => '/location',
+                'moduleId' => 'ecommerce',
+                'featureId' => 'location',
+                'requiresPublishedStore' => true,
+            ],
+            [
+                'id' => 'transport',
+                'label' => 'Transport',
+                'path' => '/transport',
+                'moduleId' => 'transport',
+                'featureId' => 'overview',
+            ],
+            [
+                'id' => 'immobilier',
+                'label' => 'Immobilier',
+                'path' => '/immobilier',
+                'moduleId' => 'immobilier',
+                'featureId' => 'vitrine-publique',
+            ],
+            [
+                'id' => 'livraisons',
+                'label' => 'Livraison',
+                'path' => '/livraison',
+                'moduleId' => 'ecommerce',
+                'featureId' => 'livraisons',
+                'requiresPublishedStore' => true,
+            ],
+        ];
+
+        return collect($definitions)
+            ->filter(function (array $feature) use ($companyId, $hasPublishedStore): bool {
+                return self::isEnabled($companyId, $feature['moduleId'])
+                    && ModuleCatalog::allowsFeature($companyId, $feature['moduleId'], $feature['featureId'])
+                    && (! ($feature['requiresPublishedStore'] ?? false) || $hasPublishedStore);
+            })
+            ->map(static fn (array $feature): array => [
+                'id' => $feature['id'],
+                'label' => $feature['label'],
+                'path' => $feature['path'],
+            ])
+            ->values()
+            ->all();
+    }
+
     public static function isSiteEnabled(string $companyId): bool
     {
         $site = self::site($companyId);

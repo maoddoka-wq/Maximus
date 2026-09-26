@@ -7,6 +7,12 @@ export type PublicSiteModule = {
   path: string;
 };
 
+export type PublicSiteFeature = {
+  id: string;
+  label: string;
+  path: string;
+};
+
 export type PublicSiteDomain = {
   id: string;
   domain: string;
@@ -58,6 +64,7 @@ export type PublicSiteBootstrap =
       };
       brand: PublicSiteBrand;
       modules: PublicSiteModule[];
+      features: PublicSiteFeature[];
       domain?: string;
     };
 
