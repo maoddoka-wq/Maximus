@@ -18,13 +18,25 @@ type Props = {
 };
 
 export default function PublicSitePage({ domain = false, slug }: Props) {
-  const [pathname] = useLocation();
+  const [pathname, setLocation] = useLocation();
   const search = useSearch();
-  const basePath = slug ? `/shop/${encodeURIComponent(slug)}` : '';
-  const routePath = normalizeModulePath(pathname, basePath);
+  const basePath = slug ? `/site/${encodeURIComponent(slug)}` : '';
+  const legacyBasePath = slug ? `/shop/${encodeURIComponent(slug)}` : '';
+  const isLegacyPath = Boolean(
+    legacyBasePath
+    && (pathname === legacyBasePath || pathname.startsWith(`${legacyBasePath}/`)),
+  );
+  const routeBasePath = isLegacyPath ? legacyBasePath : basePath;
+  const routePath = normalizeModulePath(pathname, routeBasePath);
   const [bootstrap, setBootstrap] = useState<PublicSiteBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isLegacyPath) return;
+    const suffix = pathname.slice(legacyBasePath.length).replace(/\/+$/, '');
+    setLocation(`${basePath}${suffix}${window.location.search}${window.location.hash}`);
+  }, [basePath, isLegacyPath, legacyBasePath, pathname, setLocation]);
 
   useEffect(() => {
     let cancelled = false;

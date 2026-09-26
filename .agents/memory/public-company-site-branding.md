@@ -3,8 +3,8 @@ name: Identité du site public de l’entreprise
 description: Règle d’isolation entre la marque commune du site d’entreprise et les permissions de ses rubriques publiques.
 ---
 
-Le site public de l’entreprise réutilise l’identité et les médias de la boutique E-commerce existante; il ne crée pas une deuxième vitrine ni un deuxième domaine. La marque, le logo et les images d’accueil sont disponibles à l’échelle du site activé, même si E-commerce n’est pas une rubrique publiée. Les pages catalogue, produits et locations restent soumises aux permissions E-commerce; Transport et Immobilier restent soumis à leurs propres accès.
+Le nom, le slug public, la marque, le logo, les images d’accueil et le domaine appartiennent au site public de l’entreprise. `/site/{slug}` est l’adresse canonique de l’entreprise et de ses modules activés; `/shop/{slug}` reste une compatibilité technique, pas une seconde vitrine. E-commerce ne garde que son statut, sa devise et les pièces jointes aux commandes. Ses données métier restent soumises à l’activation de la rubrique E-commerce; Transport et Immobilier gardent leurs propres accès.
 
-**Why:** E-commerce est la source actuelle des réglages de marque, mais le site commun peut aussi présenter d’autres modules sans que leur visibilité dépende du module E-commerce.
+**Why:** L’utilisateur a précisé que le lien doit représenter toute l’entreprise et ses modules actifs, sans adresse distincte de boutique E-commerce.
 
-**How to apply:** Garder la marque et ses médias dans le périmètre du site d’entreprise; ne pas relâcher les contrôles des données métier pour simplifier leur affichage.
+**How to apply:** Persister les réglages visuels et le domaine via les API du site public; garder `/site/{slug}` canonique, et ne pas relâcher les contrôles des données métier pour simplifier leur affichage.

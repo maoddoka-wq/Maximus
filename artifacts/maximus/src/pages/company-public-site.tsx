@@ -210,7 +210,7 @@ export function CompanyPublicSitePanel({ company }: { company: Company }) {
   };
 
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const publicUrl = `${window.location.origin}${basePath}/shop/${encodeURIComponent(brand.slug || 'site')}`;
+  const publicUrl = `${window.location.origin}${basePath}/site/${encodeURIComponent(brand.slug || 'site')}`;
 
   return (
     <section className="card-surface space-y-6 rounded-2xl p-5 sm:p-7" data-testid="panel-company-public-site">

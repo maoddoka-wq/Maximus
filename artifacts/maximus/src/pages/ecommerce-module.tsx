@@ -350,7 +350,7 @@ export default function EcommerceModulePage({
   if (!data) return <ErrorState message={error} onRetry={() => void load()} />;
 
   const store = data.store;
-  const publicShopUrl = `/shop/${encodeURIComponent(store.slug || slugify(store.name) || 'boutique')}`;
+  const companySiteUrl = `/site/${encodeURIComponent(store.slug || slugify(store.name) || 'entreprise')}`;
   const navigate = (next: EcommerceTab) => setTab(next);
   const currentFeaturePermissions = featurePermissions?.[tab];
   const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
@@ -369,14 +369,14 @@ export default function EcommerceModulePage({
         <div className="grid min-w-0 gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:px-4">
           <div className="order-2 flex min-w-0 items-center gap-2 sm:order-1 sm:col-start-1">
             <a
-              href={publicShopUrl}
+              href={companySiteUrl}
               target="_blank"
               rel="noreferrer"
-              data-testid="button-open-public-shop"
-              title="Ouvrir la boutique publique"
+              data-testid="button-open-company-public-site"
+              title="Ouvrir le site public de l’entreprise"
               className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[hsl(var(--sidebar-border))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--sidebar-foreground)/.9)] hover:bg-[hsl(var(--sidebar-accent))]"
             >
-              <ArrowUpRight size={14} />Ouvrir
+              <ArrowUpRight size={14} />Ouvrir le site
             </a>
           </div>
           <div className="order-1 flex min-w-0 justify-center px-2 sm:order-2 sm:col-start-2">

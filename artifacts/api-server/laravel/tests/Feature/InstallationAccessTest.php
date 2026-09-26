@@ -63,6 +63,27 @@ class InstallationAccessTest extends TestCase
         return '/api/companies/access-company/installation-access/'.$installation.'/addresses';
     }
 
+    private function asCompanyAdmin(string $companyId): self
+    {
+        $user = AuthUser::query()->create([
+            'id' => 'installation-company-admin-'.$companyId,
+            'email' => 'installation-company-admin-'.$companyId.'@example.com',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administrateur entreprise',
+            'phone' => '',
+            'role' => 'company_admin',
+            'company_id' => $companyId,
+            'employee_id' => null,
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        return $this
+            ->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
     public function test_lists_multiple_installations_and_requires_central_admin(): void
     {
         $this->getJson('/api/companies/access-company/installation-access')->assertOk()
@@ -181,7 +202,9 @@ class InstallationAccessTest extends TestCase
         $this->postJson($this->path(), ['url' => 'https://public.example.com'])->assertCreated()
             ->assertJsonPath('address.validationMethod', 'public');
         $this->postJson($otherPath, ['url' => 'https://public.example.com'])->assertUnprocessable();
-        $this->postJson('/api/ecommerce/domains?companyId=kora', ['domain' => 'public.example.com'])->assertUnprocessable();
+        $this->asCompanyAdmin('access-company')
+            ->postJson('/api/company/public-site/domains?companyId=access-company', ['domain' => 'public.example.com'])
+            ->assertUnprocessable();
     }
 
     public function test_loopback_aliases_are_only_trusted_when_app_url_is_loopback(): void
@@ -207,7 +230,10 @@ class InstallationAccessTest extends TestCase
         $id = $this->postJson($this->path('install-b'), ['url' => 'https://ERP.Example.com./'])->assertCreated()
             ->assertJsonPath('address.hostname', 'erp.example.com')->json('address.id');
         $this->postJson($this->path(), ['url' => 'https://erp.example.com'])->assertUnprocessable();
-        $this->postJson('/api/ecommerce/domains?companyId=kora', ['domain' => 'ERP.EXAMPLE.COM.'])->assertUnprocessable();
+        $this->asCompanyAdmin('access-company')
+            ->postJson('/api/company/public-site/domains?companyId=access-company', ['domain' => 'ERP.EXAMPLE.COM.'])
+            ->assertUnprocessable();
+        $this->withCredentials()->withUnencryptedCookie(MaximusAuth::COOKIE, $this->adminToken);
         $this->postJson($this->path('install-other'), ['url' => 'https://other.example.com'])->assertNotFound();
         $this->postJson($this->path().'/'.$id.'/activate')->assertNotFound();
         foreach (['http://erp.example.com', 'https://127.0.0.1', 'https://2130706433', 'https://user:pass@erp.example.com', 'https://erp.example.com/a', 'https://erp.example.com?x=1', 'https://erp.example.com:8443', 'https://central.example.com'] as $url) {

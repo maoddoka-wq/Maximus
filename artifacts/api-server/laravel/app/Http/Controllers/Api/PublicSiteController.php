@@ -79,10 +79,13 @@ final class PublicSiteController extends Controller
                 'created_at' => $site?->created_at ?? now(),
             ],
         );
-        DB::table('ecommerce_stores')->where('company_id', $companyId)->update([
-            'slug' => $slug,
-            'updated_at' => now(),
-        ]);
+        $canonicalStore = $this->canonicalStore($companyId);
+        if ($canonicalStore) {
+            DB::table('ecommerce_stores')->where('id', $canonicalStore->id)->update([
+                'slug' => $slug,
+                'updated_at' => now(),
+            ]);
+        }
 
         return response()->json($this->companyPayload($companyId));
     }
@@ -334,11 +337,7 @@ final class PublicSiteController extends Controller
 
     public function bootstrap(Request $request): JsonResponse
     {
-        $domain = DB::table('ecommerce_domains')
-            ->where('domain', strtolower(rtrim($request->getHost(), '.')))
-            ->where('status', 'ACTIVE')
-            ->whereNull('deleted_at')
-            ->first();
+        $domain = $this->domainVerifier->activeForHost($request->getHost());
         if (! $domain || ! CompanyRegistry::isActive((string) $domain->company_id)) {
             return $this->publicResponse(['available' => false]);
         }
@@ -346,6 +345,8 @@ final class PublicSiteController extends Controller
         $store = DB::table('ecommerce_stores')
             ->where('company_id', $companyId)
             ->where('status', 'PUBLISHED')
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->first();
         $site = PublicSiteRegistry::site($companyId);
         if (! $site || ! $site->maximus_enabled || ! $site->company_enabled) {
@@ -378,6 +379,8 @@ final class PublicSiteController extends Controller
         $store ??= DB::table('ecommerce_stores')
             ->where('company_id', $companyId)
             ->where('status', 'PUBLISHED')
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->first();
         if (! CompanyRegistry::isActive($companyId)) {
             return $this->publicResponse(['available' => false]);
@@ -392,7 +395,6 @@ final class PublicSiteController extends Controller
     private function companyPayload(string $companyId): array
     {
         $site = PublicSiteRegistry::site($companyId);
-        $store = DB::table('ecommerce_stores')->where('company_id', $companyId)->first();
         $domains = DB::table('ecommerce_domains')->where('company_id', $companyId)->whereNull('deleted_at')
             ->orderBy('domain')->get()
             ->map(fn (object $domain): array => $this->domainPayload($domain))
@@ -401,7 +403,7 @@ final class PublicSiteController extends Controller
             'authorized' => (bool) ($site?->maximus_enabled ?? false),
             'enabled' => (bool) ($site?->company_enabled ?? false),
             'moduleIds' => PublicSiteRegistry::selectedModules($companyId),
-            'brand' => $this->brandPayload($companyId, $store),
+            'brand' => $this->brandPayload($companyId),
             'domains' => $domains,
             'availableModules' => PublicSiteRegistry::availableModules($companyId),
         ];
@@ -413,7 +415,7 @@ final class PublicSiteController extends Controller
             ->filter(fn (array $module): bool => PublicSiteRegistry::isEnabled($companyId, $module['id']))
             ->filter(fn (array $module): bool => in_array($module['id'], PublicSiteRegistry::selectedModules($companyId), true))
             ->values()->all();
-        $brand = $this->brandPayload($companyId, $store, $company);
+        $brand = $this->brandPayload($companyId, $company);
         $payload = [
             'available' => true,
             'company' => [
@@ -430,21 +432,15 @@ final class PublicSiteController extends Controller
         return $payload;
     }
 
-    private function brandPayload(string $companyId, ?object $store = null, ?object $company = null): array
+    private function brandPayload(string $companyId, ?object $company = null): array
     {
         $site = PublicSiteRegistry::site($companyId);
-        $store ??= DB::table('ecommerce_stores')->where('company_id', $companyId)->first();
         $company ??= DB::table('companies')->where('id', $companyId)->first();
         $siteName = trim((string) ($site?->public_name ?? ''));
         $companyName = trim((string) ($company?->name ?? ''));
         $primaryColor = trim((string) ($site?->primary_color ?? ''));
         $accentColor = trim((string) ($site?->accent_color ?? ''));
-        $legacyPrimaryColor = trim((string) ($store?->primary_color ?? ''));
-        $legacyAccentColor = trim((string) ($store?->accent_color ?? ''));
         $slug = trim((string) ($site?->public_slug ?? ''));
-        if ($slug === '') {
-            $slug = trim((string) ($store?->slug ?? ''));
-        }
         if ($slug === '') {
             $slug = Str::slug($companyName) ?: $companyId;
         }
@@ -452,48 +448,27 @@ final class PublicSiteController extends Controller
         if ($logoUrl === '') {
             $logoUrl = trim((string) ($company?->profile_photo ?? ''));
         }
-        if ($logoUrl === '') {
-            $logoUrl = trim((string) ($store?->logo_url ?? ''));
-        }
         $description = $site?->public_description !== null
             ? (string) $site->public_description
-            : (string) ($store?->description ?? '');
+            : '';
 
         return [
-            'name' => $siteName !== '' ? $siteName : ($companyName !== '' ? $companyName : (string) ($store?->name ?? '')),
+            'name' => $siteName !== '' ? $siteName : ($companyName !== '' ? $companyName : $companyId),
             'slug' => $slug,
             'description' => $description,
             'logoUrl' => $logoUrl !== '' ? $logoUrl : null,
-            'primaryColor' => $primaryColor !== '' ? $primaryColor : ($legacyPrimaryColor !== '' ? $legacyPrimaryColor : '#2563EB'),
-            'accentColor' => $accentColor !== '' ? $accentColor : ($legacyAccentColor !== '' ? $legacyAccentColor : '#0F172A'),
-            'heroImages' => $this->publicStoreHeroImages($companyId, $store),
+            'primaryColor' => $primaryColor !== '' ? $primaryColor : '#2563EB',
+            'accentColor' => $accentColor !== '' ? $accentColor : '#0F172A',
+            'heroImages' => $this->publicStoreHeroImages($companyId),
         ];
     }
 
-    private function publicStoreHeroImages(string $companyId, ?object $store): array
+    private function publicStoreHeroImages(string $companyId): array
     {
-        $companySiteImages = DB::table('ecommerce_gallery_images')
+        return DB::table('ecommerce_gallery_images')
             ->where('company_id', $companyId)
             ->where('owner_type', 'company_site')
             ->where('owner_id', $companyId)
-            ->where('collection', 'hero')
-            ->orderBy('sort_order')
-            ->get(['id'])
-            ->map(fn (object $image): string => '/api/gallery-images/'
-                .rawurlencode($companyId).'/'.rawurlencode((string) $image->id))
-            ->values()
-            ->all();
-        if ($companySiteImages !== []) {
-            return $companySiteImages;
-        }
-        if (! $store || (string) ($store->status ?? '') !== 'PUBLISHED' || empty($store->id)) {
-            return [];
-        }
-
-        return DB::table('ecommerce_gallery_images')
-            ->where('company_id', $companyId)
-            ->where('owner_type', 'store')
-            ->where('owner_id', (string) $store->id)
             ->where('collection', 'hero')
             ->orderBy('sort_order')
             ->get(['id'])
@@ -519,14 +494,27 @@ final class PublicSiteController extends Controller
 
     private function publicSlugTaken(string $slug, string $companyId): bool
     {
+        $canonicalStore = $this->canonicalStore($companyId);
+        $storeSlugQuery = DB::table('ecommerce_stores')->where('slug', $slug);
+        if ($canonicalStore) {
+            $storeSlugQuery->where('id', '!=', $canonicalStore->id);
+        }
+
         return DB::table('company_public_sites')
             ->where('public_slug', $slug)
             ->where('company_id', '!=', $companyId)
             ->exists()
-            || DB::table('ecommerce_stores')
-                ->where('slug', $slug)
-                ->where('company_id', '!=', $companyId)
-                ->exists();
+            || $storeSlugQuery->exists();
+    }
+
+    private function canonicalStore(string $companyId): ?object
+    {
+        return DB::table('ecommerce_stores')
+            ->where('company_id', $companyId)
+            ->orderByRaw("CASE WHEN status = 'PUBLISHED' THEN 0 ELSE 1 END")
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
     }
 
     private function domainPayload(object $row): array

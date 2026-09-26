@@ -377,13 +377,16 @@ export default function PublicShopPage({
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [logoPreviewOpen]);
 
-  const shopPath = (suffix = '') => companySite && suffix === ''
-    ? companySite.homePath
-    : clientApp
-      ? clientPwaPath(slug, suffix, domain)
-    : slug
+  const shopPath = (suffix = '') => {
+    if (companySite) {
+      const basePath = companySite.homePath.replace(/\/+$/, '');
+      return `${basePath}${suffix}` || '/';
+    }
+    if (clientApp) return clientPwaPath(slug, suffix, domain);
+    return slug
       ? `/shop/${encodeURIComponent(slug)}${suffix || '/accueil'}`
       : suffix || '/accueil';
+  };
   const go = (suffix: string) => {
     setLocation(shopPath(suffix));
   };

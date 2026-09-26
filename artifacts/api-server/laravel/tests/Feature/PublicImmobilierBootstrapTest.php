@@ -127,7 +127,19 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertJson(['available' => false]);
 
         $this->publishedStore('draft-public-site');
-        DB::table('ecommerce_stores')->where('slug', 'draft-public-site')->update(['status' => 'DRAFT']);
+        DB::table('company_public_sites')->updateOrInsert(
+            ['company_id' => 'kora'],
+            [
+                'maximus_enabled' => true,
+                'company_enabled' => false,
+                'module_ids' => json_encode([], JSON_UNESCAPED_UNICODE),
+                'public_name' => 'Site en préparation',
+                'public_slug' => 'draft-public-site',
+                'public_description' => '',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
 
         $this->getJson('/api/public-site/bootstrap/draft-public-site')
             ->assertOk()
@@ -137,18 +149,11 @@ class PublicImmobilierBootstrapTest extends TestCase
     public function test_neutral_slug_and_domain_bootstraps_have_the_same_modules_and_safe_company_fields(): void
     {
         $this->publishedStore('neutral-public-site');
-        DB::table('ecommerce_stores')->where('slug', 'neutral-public-site')->update([
-            'name' => 'Site public KORA',
-            'description' => 'Présentation commune de l’entreprise.',
-            'logo_url' => '/api/store-logos/kora/logo-site-public.png',
-            'primary_color' => '#123456',
-            'accent_color' => '#654321',
-        ]);
         DB::table('ecommerce_gallery_images')->insert([
             'id' => 'gallery-site-public-hero',
             'company_id' => 'kora',
-            'owner_type' => 'store',
-            'owner_id' => 'store-neutral-public-site',
+            'owner_type' => 'company_site',
+            'owner_id' => 'kora',
             'collection' => 'hero',
             'image_data' => base64_encode('bannière'),
             'image_mime' => 'image/png',
@@ -162,6 +167,12 @@ class PublicImmobilierBootstrapTest extends TestCase
                 'maximus_enabled' => true,
                 'company_enabled' => true,
                 'module_ids' => json_encode(['immobilier']),
+                'public_name' => 'Site public KORA',
+                'public_slug' => 'neutral-public-site',
+                'public_description' => 'Présentation commune de l’entreprise.',
+                'logo_url' => '/api/store-logos/kora/logo-site-public.png',
+                'primary_color' => '#123456',
+                'accent_color' => '#654321',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -205,16 +216,11 @@ class PublicImmobilierBootstrapTest extends TestCase
     public function test_site_brand_assets_are_available_when_ecommerce_is_not_a_published_section(): void
     {
         $this->publishedStore('public-brand-assets');
-        DB::table('ecommerce_stores')->where('slug', 'public-brand-assets')->update([
-            'logo_url' => '/api/store-logos/kora/company-logo.png',
-            'logo_data' => base64_encode('logo-entreprise'),
-            'logo_mime' => 'image/png',
-        ]);
         DB::table('ecommerce_gallery_images')->insert([
             'id' => 'gallery-brand-only',
             'company_id' => 'kora',
-            'owner_type' => 'store',
-            'owner_id' => 'store-public-brand-assets',
+            'owner_type' => 'company_site',
+            'owner_id' => 'kora',
             'collection' => 'hero',
             'image_data' => base64_encode('visuel-site'),
             'image_mime' => 'image/png',
@@ -228,6 +234,14 @@ class PublicImmobilierBootstrapTest extends TestCase
                 'maximus_enabled' => true,
                 'company_enabled' => true,
                 'module_ids' => json_encode(['immobilier']),
+                'public_name' => 'Site public KORA',
+                'public_slug' => 'public-brand-assets',
+                'public_description' => '',
+                'logo_url' => '/api/store-logos/kora/company-logo.png',
+                'logo_data' => base64_encode('logo-entreprise'),
+                'logo_mime' => 'image/png',
+                'primary_color' => '#123456',
+                'accent_color' => '#654321',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
