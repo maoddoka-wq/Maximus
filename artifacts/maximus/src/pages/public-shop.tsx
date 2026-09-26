@@ -1074,6 +1074,63 @@ function GalleryCarousel({ mainImage, gallery, alt, icon: Icon }: { mainImage: s
   </div>;
 }
 
+function PublicTransportLocationPreview({
+  position,
+  locationState,
+  locationMessage,
+  onLocate,
+}: {
+  position: { latitude: number; longitude: number; accuracy: number } | null;
+  locationState: 'idle' | 'locating' | 'ready' | 'error';
+  locationMessage: string;
+  onLocate: () => void;
+}) {
+  const locationStatus = locationState === 'locating'
+    ? 'Recherche du signal GPS précis à Dakar…'
+    : locationState === 'error'
+      ? locationMessage
+      : 'Autorisez la localisation pour afficher votre position exacte.';
+
+  return <div data-testid="card-public-transport-location" className="overflow-hidden rounded-lg border border-border bg-background">
+    {position ? (
+      <TaxiRouteMap
+        clientStop={{ latitude: position.latitude, longitude: position.longitude }}
+        displayMode="location"
+        className="h-48 sm:h-60"
+      />
+    ) : (
+      <div className="grid h-48 place-items-center bg-muted px-5 text-center" aria-live="polite">
+        <div className="max-w-xs">
+          <MapPin size={22} className="mx-auto text-primary" aria-hidden="true" />
+          <p className="mt-2 text-sm font-semibold">{locationStatus}</p>
+        </div>
+      </div>
+    )}
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-3 py-3 sm:px-4">
+      <div className="min-w-0">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Position GPS exacte</p>
+        {position ? <>
+          <p data-testid="text-public-transport-coordinates" className="mt-1 break-all font-mono text-xs font-semibold sm:text-sm">
+            {position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Précision GPS · environ {Math.round(position.accuracy)} m</p>
+        </> : <p role="status" className="mt-1 text-xs text-muted-foreground">{locationStatus}</p>}
+      </div>
+      <TransportButton
+        data-testid="button-refresh-public-transport-location"
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onLocate}
+        disabled={locationState === 'locating'}
+      >
+        {locationState === 'locating' ? <RefreshCw className="animate-spin" /> : <MapPin />}
+        {locationState === 'locating' ? 'Recherche…' : locationState === 'ready' ? 'Actualiser' : 'Réessayer'}
+      </TransportButton>
+    </div>
+  </div>;
+}
+
 function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void }) {
   const phone = store.seller?.phone?.trim() ?? '';
   const whatsapp = whatsappNumber(phone);
@@ -1117,6 +1174,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   const [heroImageIndex, setHeroImageIndex] = useState(0);
   const locationWatchRef = useRef<number | null>(null);
   const locationTimeoutRef = useRef<number | null>(null);
+  const homeGpsRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     void api.getSettings().then(result => {
@@ -1249,6 +1307,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   };
 
   const locate = () => {
+    setPosition(null);
     if (!navigator.geolocation) {
       setLocationState('error');
       setLocationMessage('La géolocalisation n’est pas disponible sur cet appareil.');
@@ -1297,6 +1356,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }, 20_000);
   };
 
+  const requestHomeLocation = () => {
+    if (shareLocation || homeGpsRequestRef.current === customerStorageKey) return;
+    homeGpsRequestRef.current = customerStorageKey;
+    locate();
+  };
+
   useEffect(() => {
     return stopLocationTracking;
   }, []);
@@ -1305,7 +1370,10 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     if (shareLocation) return;
     try {
       const saved = window.localStorage.getItem(customerStorageKey);
-      if (!saved) return;
+      if (!saved) {
+        requestHomeLocation();
+        return;
+      }
       const customer = JSON.parse(saved) as {
         tripId?: string;
         cancelToken?: string;
@@ -1328,6 +1396,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         setRestoringTrip(true);
         void api.getTrip(customer.tripId).then(result => {
           applyTripResult(result);
+          if (['COMPLETED', 'CANCELLED'].includes(result.trip.status)) requestHomeLocation();
         }).catch(cause => {
           if (cause instanceof ApiRequestError && cause.status === 404) {
             window.localStorage.removeItem(customerStorageKey);
@@ -1336,10 +1405,12 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
             setRestoreError('Votre demande est conservée. La connexion au suivi est momentanément indisponible.');
           }
         }).finally(() => setRestoringTrip(false));
+        return;
       }
     } catch {
       // Ignore an invalid local preference; the order flow remains usable.
     }
+    requestHomeLocation();
   }, [api, customerStorageKey, shareLocation]);
 
   useEffect(() => {
@@ -1538,7 +1609,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           <div>
              <p className="text-xs font-bold uppercase tracking-wider text-primary">Course à la demande</p>
              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{trip ? 'Votre course' : 'Où allons-nous ?'}</h1>
-             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{trip ? 'Suivez votre prise en charge et gardez votre code à portée de main.' : 'Activez votre position, indiquez votre repère et choisissez votre destination à Dakar.'}</p>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{trip ? 'Suivez votre prise en charge et gardez votre code à portée de main.' : 'Votre position GPS apparaît sur la carte. Ajoutez un repère précis, puis choisissez votre destination à Dakar.'}</p>
           </div>
            <div className="hidden shrink-0 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground sm:flex">
              <MapPin size={15} className="text-primary" />
@@ -1585,29 +1656,33 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         </Card>}
 
          {!trip && !restoringTrip && !restoreError && !formOpen && <Card className="transport-entry-card mt-5 border-border bg-card">
-           <CardContent className="p-4 sm:p-6">
-             <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-               <div>
-                 <p className="text-base font-semibold">Un taxi fiable pour vos trajets quotidiens.</p>
-                 <p className="mt-2 text-sm leading-6 text-muted-foreground">Votre position GPS permet à MAXIMUS de trouver le chauffeur le plus proche. Ajoutez ensuite un repère visible pour faciliter la rencontre.</p>
-               </div>
-               <div className="grid gap-2 text-xs text-muted-foreground sm:min-w-48">
+           <CardContent className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(15rem,.85fr)] lg:items-center">
+             <PublicTransportLocationPreview
+               position={position}
+               locationState={locationState}
+               locationMessage={locationMessage}
+               onLocate={locate}
+             />
+             <div>
+               <p className="text-base font-semibold">Un taxi fiable pour vos trajets quotidiens.</p>
+               <p className="mt-2 text-sm leading-6 text-muted-foreground">Votre position GPS exacte apparaît sur la carte. Ajoutez un repère visible pour faciliter la rencontre avec le chauffeur.</p>
+               <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
                  <span className="flex items-center gap-2"><MapPin size={14} className="text-primary" /> Prise en charge précise</span>
                  <span className="flex items-center gap-2"><Clock3 size={14} className="text-primary" /> Estimation avant départ</span>
                </div>
+               <TransportButton
+                 data-testid="button-start-taxi-order"
+                 type="button"
+                 onClick={() => setFormOpen(true)}
+                 disabled={!gpsReady}
+                 className="mt-5 w-full"
+                 size="lg"
+               >
+                 {!gpsReady ? <MapPin /> : <CarFront />}
+                 {locationState === 'locating' ? 'Localisation en cours…' : gpsReady ? 'Commander un taxi' : 'Autorisez le GPS pour continuer'}
+                 <ArrowRight />
+               </TransportButton>
              </div>
-            <TransportButton
-              data-testid="button-start-taxi-order"
-              type="button"
-              onClick={() => { setFormOpen(true); if (!gpsReady) locate(); }}
-              disabled={locationState === 'locating'}
-               className="mt-5 w-full sm:w-auto"
-              size="lg"
-            >
-              {locationState === 'locating' ? <RefreshCw className="animate-spin" /> : <CarFront />}
-              {locationState === 'locating' ? 'Localisation en cours…' : 'Commander un taxi'}
-              <ArrowRight />
-            </TransportButton>
           </CardContent>
         </Card>}
 

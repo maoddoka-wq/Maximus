@@ -12,6 +12,7 @@ type TaxiRouteMapProps = {
   driver?: Point | null;
   routeGeometry?: GeoJsonLineString | null;
   pickupRouteGeometry?: GeoJsonLineString | null;
+  displayMode?: 'trip' | 'location';
   className?: string;
 };
 
@@ -27,6 +28,13 @@ const clientStopIcon = L.divIcon({
   html: '<span class="taxi-client-stop-marker__body" aria-label="Arrêt du client"><span></span></span>',
   iconSize: [28, 28],
   iconAnchor: [14, 14],
+});
+
+const currentLocationIcon = L.divIcon({
+  className: 'taxi-current-location-marker',
+  html: '<span class="taxi-current-location-marker__body" role="img" aria-label="Position GPS exacte du client"><span></span></span>',
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
 });
 
 const destinationIcon = L.divIcon({
@@ -66,6 +74,7 @@ export function TaxiRouteMap({
   driver,
   routeGeometry,
   pickupRouteGeometry,
+  displayMode = 'trip',
   className = 'h-64',
 }: TaxiRouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -136,16 +145,24 @@ export function TaxiRouteMap({
     if (pickupRouteGeometry) addRoute(layers, bounds, pickupRouteGeometry, '#0284c7');
     if (routeGeometry) addRoute(layers, bounds, routeGeometry, '#f59e0b');
     if (driver) addMarker(layers, bounds, driver, driverIcon, 'Position du taxi');
-    if (clientStop) addMarker(layers, bounds, clientStop, clientStopIcon, 'Arrêt du client');
+    if (clientStop) {
+      addMarker(
+        layers,
+        bounds,
+        clientStop,
+        displayMode === 'location' ? currentLocationIcon : clientStopIcon,
+        displayMode === 'location' ? 'Position GPS exacte du client' : 'Arrêt du client',
+      );
+    }
     if (destination) addMarker(layers, bounds, destination, destinationIcon, 'Destination');
 
-    const viewportKey = JSON.stringify({ clientStop, destination, routeGeometry, pickupRouteGeometry });
+    const viewportKey = JSON.stringify({ clientStop, destination, routeGeometry, pickupRouteGeometry, displayMode });
     if (bounds.isValid() && viewportKeyRef.current !== viewportKey) {
       viewportBoundsRef.current = bounds;
       map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
       viewportKeyRef.current = viewportKey;
     }
-  }, [clientStop, destination, driver, mapReady, pickupRouteGeometry, routeGeometry]);
+  }, [clientStop, destination, displayMode, driver, mapReady, pickupRouteGeometry, routeGeometry]);
 
   const recenter = () => {
     const map = mapRef.current;
@@ -168,15 +185,15 @@ export function TaxiRouteMap({
   }, [expanded]);
 
   return <div className={expanded ? 'fixed inset-0 z-[70] flex flex-col bg-slate-950/80 p-3 sm:p-6' : 'space-y-2'}>
-     {expanded && <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-lg sm:px-4"><div><p className="text-sm font-black text-slate-900">GPS Taxi</p><p className="text-[11px] text-slate-500">Chauffeur → arrêt client → destination</p></div><div className="flex items-center gap-2"><button type="button" onClick={recenter} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100" aria-label="Recentrer la carte"><LocateFixed size={15} />Recentrer</button><button type="button" onClick={() => setExpanded(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-slate-700 hover:bg-slate-100" aria-label="Réduire la carte"><X size={18} /></button></div></div>}
+      {expanded && <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-lg sm:px-4"><div><p className="text-sm font-black text-slate-900">{displayMode === 'location' ? 'Votre position GPS' : 'GPS Taxi'}</p><p className="text-[11px] text-slate-500">{displayMode === 'location' ? 'Position actuelle du client' : 'Chauffeur → arrêt client → destination'}</p></div><div className="flex items-center gap-2"><button type="button" onClick={recenter} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100" aria-label="Recentrer la carte"><LocateFixed size={15} />Recentrer</button><button type="button" onClick={() => setExpanded(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-slate-700 hover:bg-slate-100" aria-label="Réduire la carte"><X size={18} /></button></div></div>}
      <div className={expanded ? 'relative z-0 min-h-0 flex-1' : 'relative z-0'}>
-      <div key={expanded ? 'expanded-map' : 'inline-map'} ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${expanded ? 'h-full min-h-[20rem]' : className}`} aria-label="Carte du trajet Taxi" />
+       <div key={expanded ? 'expanded-map' : 'inline-map'} ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${expanded ? 'h-full min-h-[20rem]' : className}`} aria-label={displayMode === 'location' ? 'Carte montrant votre position GPS exacte' : 'Carte du trajet Taxi'} />
        {!expanded && <div className="absolute right-3 top-3 flex items-center gap-1.5"><button type="button" onClick={recenter} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/95 text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Recentrer la carte"><LocateFixed size={15} /></button><button type="button" onClick={() => setExpanded(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] font-black text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Agrandir la carte"><Maximize2 size={14} />Agrandir</button></div>}
     </div>
-    <div className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600 ${expanded ? 'rounded-xl bg-white px-3 py-2.5 shadow-lg' : ''}`}>
+     {displayMode !== 'location' && <div className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600 ${expanded ? 'rounded-xl bg-white px-3 py-2.5 shadow-lg' : ''}`}>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-600 ring-2 ring-sky-100" />Taxi → arrêt client</span>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-amber-100" />Arrêt → destination</span>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-red-100" />Arrêt client</span>
-    </div>
+     </div>}
   </div>;
 }
