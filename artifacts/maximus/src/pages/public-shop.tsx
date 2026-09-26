@@ -1404,6 +1404,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
      className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm sm:max-w-5xl"
     style={{
       ...transportDesignVariables(theme),
+       fontFamily: transportDesignTokens.fontFamily.sans.join(', '),
       '--transport-primary': theme.primary,
       '--transport-accent': theme.accent,
       '--transport-primary-foreground': theme.primaryForeground,

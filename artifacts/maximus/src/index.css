@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import "@workspace/maximus-transport-public/styles.css";
 @import "@workspace/maximus-design-system/styles.css";
-@source "../../maximus-transport-public/src/components";
 
 [data-stock-can-create="false"] [data-stock-write="true"],
 [data-stock-can-modify="false"] button[title*="Modifier"],
