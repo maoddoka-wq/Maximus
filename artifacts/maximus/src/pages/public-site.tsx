@@ -247,21 +247,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
             </p>
           </div>
 
-          <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="list-public-site-modules">
-            {modules.map(module => (
-              <PublicSiteModuleCard
-                key={module.id}
-                module={module}
-                href={moduleHref(module, basePath)}
-                accentColor={bootstrap.brand.accentColor}
-              />
-            ))}
-            {modules.length === 0 && (
-              <p className="rounded-2xl border border-dashed p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="status-public-site-no-modules">
-                Aucun module ne propose actuellement de page publique pour cette entreprise.
-              </p>
-            )}
-          </div>
         </section>
       </main>
     </PublicCompanySiteShell>
@@ -345,42 +330,6 @@ function PublicCompanySiteShell({
         Site public de {companyName}
       </footer>
     </div>
-  );
-}
-
-function PublicSiteModuleCard({
-  module,
-  href,
-  accentColor,
-}: {
-  module: PublicSiteModule;
-  href: string;
-  accentColor: string;
-}) {
-  const descriptions: Record<string, string> = {
-    ecommerce: 'Parcourir la boutique et les services proposés.',
-    transport: 'Demander une course et suivre les services Transport.',
-    immobilier: 'Consulter les annonces immobilières publiées.',
-  };
-  return (
-    <Link
-      href={href}
-      className="group flex min-h-36 flex-col justify-between rounded-2xl border bg-[hsl(var(--card))] p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--primary)/.45)] hover:shadow-md"
-      data-testid={`link-public-site-module-${module.id}`}
-    >
-      <span>
-        <span className="block text-lg font-bold">{module.label}</span>
-        <span className="mt-2 block text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          {descriptions[module.id] ?? 'Ouvrir la page publique de ce module.'}
-        </span>
-      </span>
-      <span
-        className="mt-5 text-sm font-semibold text-[hsl(var(--primary))]"
-        style={validBrandColor(accentColor) ? { color: accentColor } : undefined}
-      >
-        Ouvrir la page <span aria-hidden="true" className="transition-transform group-hover:translate-x-1">→</span>
-      </span>
-    </Link>
   );
 }
 
