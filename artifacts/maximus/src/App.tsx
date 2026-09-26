@@ -628,6 +628,7 @@ function AppContent() {
     void refreshAppState();
   }, {
     enabled: Boolean(session && !session.startsWith('company:sector-test-')),
+    intervalMs: 30_000,
   });
   useEffect(() => {
     if (session !== 'admin') return;
@@ -688,6 +689,14 @@ function AppContent() {
     options: { featureIds?: string[]; configuration?: Record<string, unknown> } = {},
   ) => {
     await setCompanyModuleAccess(companyId, moduleId, status, options);
+    const successMessage =
+      status === 'MAINTENANCE'
+        ? 'Module placé en maintenance pour cette entreprise.'
+        : status === 'INACTIF'
+          ? 'Module désactivé pour cette entreprise.'
+          : status === 'BETA'
+            ? 'Module passé en mode bêta pour cette entreprise.'
+            : 'Module activé pour cette entreprise.';
     mutate((draft) => {
       const company = draft.companies.find((item) => item.id === companyId);
       if (!company) return;
@@ -723,17 +732,7 @@ function AppContent() {
           ),
         };
       }
-    });
-    notify(
-      status === 'MAINTENANCE'
-        ? 'Module placé en maintenance pour cette entreprise.'
-        : status === 'INACTIF'
-          ? 'Module désactivé pour cette entreprise.'
-          : status === 'BETA'
-            ? 'Module passé en mode bêta pour cette entreprise.'
-            : 'Module activé pour cette entreprise.',
-      'success',
-    );
+    }, successMessage);
   };
   const sessionEmployeeId = session?.startsWith('employee:') ? session.slice('employee:'.length) : null;
   const sessionEmployee = sessionEmployeeId
@@ -3657,6 +3656,7 @@ function CompanyDetail({
   const [domainInput, setDomainInput] = useState('');
   const [domainLoading, setDomainLoading] = useState(true);
   const [domainSaving, setDomainSaving] = useState(false);
+  const [domainOperation, setDomainOperation] = useState<'create' | 'verify' | 'delete' | null>(null);
   const [domainError, setDomainError] = useState('');
   const toggle = (id: ModuleId) =>
     setActive((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -3722,47 +3722,52 @@ function CompanyDetail({
     const domain = domainInput.trim();
     if (!domain) return;
     setDomainSaving(true);
+    setDomainOperation('create');
     setDomainError('');
     try {
-      await createEcommerceApi(company.id).createDomain(domain);
-      await refreshCustomDomains();
+      const created = await createEcommerceApi(company.id).createDomain(domain);
+      setCustomDomains((current) => [...current.filter((item) => item.id !== created.id), created]);
       setDomainInput('');
+      showAppToast('Domaine ajouté.', 'success');
     } catch (error) {
       setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être créé.');
     } finally {
       setDomainSaving(false);
+      setDomainOperation(null);
     }
   };
 
   const verifyCustomDomain = async (domain: EcommerceDomain) => {
     setDomainSaving(true);
+    setDomainOperation('verify');
     setDomainError('');
     try {
-      await createEcommerceApi(company.id).verifyDomain(domain.id);
-      await refreshCustomDomains();
+      const verified = await createEcommerceApi(company.id).verifyDomain(domain.id);
+      setCustomDomains((current) => current.map((item) => item.id === verified.id ? verified : item));
+      showAppToast('Vérification DNS actualisée.', 'success');
     } catch (error) {
       setDomainError(error instanceof Error ? error.message : 'La vérification DNS a échoué.');
-      try {
-        await refreshCustomDomains();
-      } catch {
-        // Keep the verification error visible when the refresh also fails.
-      }
+      void refreshCustomDomains().catch(() => undefined);
     } finally {
       setDomainSaving(false);
+      setDomainOperation(null);
     }
   };
 
   const deleteCustomDomain = async (domain: EcommerceDomain) => {
     if (!window.confirm(`Retirer le domaine « ${domain.domain} » ?`)) return;
     setDomainSaving(true);
+    setDomainOperation('delete');
     setDomainError('');
     try {
       await createEcommerceApi(company.id).deleteDomain(domain.id);
-      await refreshCustomDomains();
+      setCustomDomains((current) => current.filter((item) => item.id !== domain.id));
+      showAppToast('Domaine retiré.', 'success');
     } catch (error) {
       setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être retiré.');
     } finally {
       setDomainSaving(false);
+      setDomainOperation(null);
     }
   };
 
@@ -4086,7 +4091,7 @@ function CompanyDetail({
               disabled={domainSaving || !domainInput.trim()}
               className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {domainSaving ? 'Enregistrement…' : 'Créer le domaine'}
+              {domainSaving && domainOperation === 'create' ? 'Enregistrement…' : 'Créer le domaine'}
             </button>
           </form>
           {domainError && (
@@ -4123,7 +4128,7 @@ function CompanyDetail({
                       onClick={() => void verifyCustomDomain(domain)}
                       className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
                     >
-                      Vérifier
+                      {domainSaving && domainOperation === 'verify' ? 'Vérification…' : 'Vérifier'}
                     </button>
                     <button
                       type="button"
@@ -4132,7 +4137,7 @@ function CompanyDetail({
                       onClick={() => void deleteCustomDomain(domain)}
                       className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
                     >
-                      Retirer
+                      {domainSaving && domainOperation === 'delete' ? 'Retrait…' : 'Retirer'}
                     </button>
                   </div>
                 </div>
@@ -8176,6 +8181,7 @@ function CompanyModulesDetail({
   const [domainInput, setDomainInput] = useState('');
   const [domainLoading, setDomainLoading] = useState(true);
   const [domainSaving, setDomainSaving] = useState(false);
+  const [domainOperation, setDomainOperation] = useState<'create' | 'verify' | 'delete' | null>(null);
   const [domainError, setDomainError] = useState('');
   const [installationRefreshKey, setInstallationRefreshKey] = useState(0);
 
@@ -8368,47 +8374,52 @@ function CompanyModulesDetail({
     const domain = domainInput.trim();
     if (!domain) return;
     setDomainSaving(true);
+    setDomainOperation('create');
     setDomainError('');
     try {
-      await createEcommerceApi(company.id).createDomain(domain);
-      await refreshCustomDomains();
+      const created = await createEcommerceApi(company.id).createDomain(domain);
+      setCustomDomains((current) => [...current.filter((item) => item.id !== created.id), created]);
       setDomainInput('');
+      showAppToast('Domaine ajouté.', 'success');
     } catch (error) {
       setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être créé.');
     } finally {
       setDomainSaving(false);
+      setDomainOperation(null);
     }
   };
 
   const verifyCustomDomain = async (domain: EcommerceDomain) => {
     setDomainSaving(true);
+    setDomainOperation('verify');
     setDomainError('');
     try {
-      await createEcommerceApi(company.id).verifyDomain(domain.id);
-      await refreshCustomDomains();
+      const verified = await createEcommerceApi(company.id).verifyDomain(domain.id);
+      setCustomDomains((current) => current.map((item) => item.id === verified.id ? verified : item));
+      showAppToast('Vérification DNS actualisée.', 'success');
     } catch (error) {
       setDomainError(error instanceof Error ? error.message : 'La vérification DNS a échoué.');
-      try {
-        await refreshCustomDomains();
-      } catch {
-        // Keep the verification error visible when the refresh also fails.
-      }
+      void refreshCustomDomains().catch(() => undefined);
     } finally {
       setDomainSaving(false);
+      setDomainOperation(null);
     }
   };
 
   const deleteCustomDomain = async (domain: EcommerceDomain) => {
     if (!window.confirm(`Retirer le domaine « ${domain.domain} » ?`)) return;
     setDomainSaving(true);
+    setDomainOperation('delete');
     setDomainError('');
     try {
       await createEcommerceApi(company.id).deleteDomain(domain.id);
-      await refreshCustomDomains();
+      setCustomDomains((current) => current.filter((item) => item.id !== domain.id));
+      showAppToast('Domaine retiré.', 'success');
     } catch (error) {
       setDomainError(error instanceof Error ? error.message : 'Le domaine n’a pas pu être retiré.');
     } finally {
       setDomainSaving(false);
+      setDomainOperation(null);
     }
   };
 
@@ -8839,7 +8850,7 @@ function CompanyModulesDetail({
               disabled={domainSaving || !domainInput.trim()}
               className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {domainSaving ? 'Enregistrement…' : 'Connecter le domaine'}
+              {domainSaving && domainOperation === 'create' ? 'Enregistrement…' : 'Connecter le domaine'}
             </button>
           </form>
           {domainError && (
@@ -8876,7 +8887,7 @@ function CompanyModulesDetail({
                       onClick={() => void verifyCustomDomain(domain)}
                       className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"
                     >
-                      Vérifier
+                      {domainSaving && domainOperation === 'verify' ? 'Vérification…' : 'Vérifier'}
                     </button>
                     <button
                       type="button"
@@ -8885,7 +8896,7 @@ function CompanyModulesDetail({
                       onClick={() => void deleteCustomDomain(domain)}
                       className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50"
                     >
-                      Retirer
+                      {domainSaving && domainOperation === 'delete' ? 'Retrait…' : 'Retirer'}
                     </button>
                   </div>
                 </div>

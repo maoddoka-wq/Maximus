@@ -519,21 +519,31 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
 
   const syncCart = async (next: CartLine[]) => {
     setCart(next);
-    if (!customer) return;
+    if (!customer) return true;
     try {
       const previous = customerData?.cart ?? [];
       const productLines = next.filter(line => !line.product.rentalId && line.product.productType !== 'RENTAL');
       const nextSlugs = new Set(productLines.map(line => line.product.slug));
-      for (const line of previous) {
-        if (!nextSlugs.has(line.productSlug)) await api.putCartItem(line.productSlug, 0);
-      }
-      for (const line of productLines) await api.putCartItem(line.product.slug, cartQuantity(line.product, line.quantity));
-      const refreshed = await api.bootstrap();
-      setCustomerData(refreshed);
+      const writes = [
+        ...previous
+          .filter(line => !nextSlugs.has(line.productSlug))
+          .map(line => api.putCartItem(line.productSlug, 0)),
+        ...productLines.map(line => api.putCartItem(line.product.slug, cartQuantity(line.product, line.quantity))),
+      ];
+      await Promise.all(writes);
+      void api.bootstrap()
+        .then(setCustomerData)
+        .catch(() => {
+          const message = 'Le panier est enregistré, mais le compte n’a pas pu être actualisé.';
+          setError(message);
+          showAppToast(message, 'warning');
+        });
+      return true;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Le panier n’a pas pu être synchronisé.';
       setError(message);
       showAppToast(message, 'error');
+      return false;
     }
   };
 
@@ -546,9 +556,13 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     const next = existing
       ? cart.map(line => line.product.slug === product.slug ? { ...line, quantity: cartQuantity(product, line.quantity + 1) } : line)
       : [...cart, { product, quantity: 1 }];
-    setCartNotice(`${product.name} a été ajouté au panier.`);
-    showAppToast(`${product.name} a été ajouté au panier.`, 'success');
-    void syncCart(next);
+    const message = `${product.name} a été ajouté au panier.`;
+    if (customer) setCartNotice('Enregistrement du panier…');
+    void syncCart(next).then((saved) => {
+      if (!saved) return;
+      setCartNotice(message);
+      showAppToast(message, 'success');
+    });
   };
 
   const addRental = (rental: PublicRental) => add(rentalToCartProduct(rental));
@@ -1228,7 +1242,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     }
   };
 
-  useAutoRefresh(refreshTrip, { enabled: Boolean(trip) && !shareLocation });
+  useAutoRefresh(refreshTrip, { enabled: Boolean(trip) && !shareLocation, intervalMs: 5_000 });
 
   useEffect(() => {
     const query = form.destination.trim();
@@ -2050,6 +2064,7 @@ function SharedTransportTrackingPage({
 
   useAutoRefresh(refreshSharedTrip, {
     enabled: Boolean(trip && !['COMPLETED', 'CANCELLED'].includes(trip.status)),
+    intervalMs: 5_000,
   });
 
   const title = trip?.status === 'OFFERED'

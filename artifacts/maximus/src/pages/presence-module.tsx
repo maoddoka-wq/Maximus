@@ -161,7 +161,18 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [error, setError] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState(currentEmployee?.id ?? employees[0]?.id ?? '');
   const [selected, setSelected] = useState<PresenceItem | null>(null);
-  const refresh = async (silent = false) => { if (!silent) setLoading(true); try { const result = await api.bootstrap(); setItems(result.items); setError(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.'); } finally { setLoading(false); } };
+  const refresh = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const result = await api.bootstrap();
+      setItems(result.items);
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger les présences.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
   useEffect(() => {
     if (preview) {
       setItems([]);
@@ -234,7 +245,16 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (!await confirm({ title: 'Supprimer cet enregistrement ?', description: 'Cet enregistrement de présence sera supprimé définitivement.', confirmLabel: 'Supprimer', tone: 'danger' })) return;
     try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); }
   };
-  const scanClock = async (token: string, action: 'arrival' | 'exit') => { try { await api.clockScan({ token, action }); showAppToast(action === 'arrival' ? 'Arrivée enregistrée après scan.' : 'Sortie enregistrée après scan.', 'success'); await refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Scan de pointage impossible.', 'error'); throw cause; } };
+  const scanClock = async (token: string, action: 'arrival' | 'exit') => {
+    try {
+      await api.clockScan({ token, action });
+      showAppToast(action === 'arrival' ? 'Arrivée enregistrée après scan.' : 'Sortie enregistrée après scan.', 'success');
+      void refresh(true);
+    } catch (cause) {
+      showAppToast(cause instanceof Error ? cause.message : 'Scan de pointage impossible.', 'error');
+      throw cause;
+    }
+  };
   const exportRows = (list: ReturnType<typeof dayRow>[], filename: string) => { if (!canExportFeature('Rapports')) return; const csv = [['Employé', 'Secteur', 'Arrivée', 'Sortie', 'Pause', 'Temps travaillé', 'Retard', 'Statut'], ...list.map(row => [personName(row.employee), meta(row.employee).unit, row.payload.arrival ?? '', row.payload.exit ?? '', row.payload.pauseMinutes ?? 0, duration(row.work), `${row.late} min`, row.status])].map(row => row.map(escapeCsv).join(';')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); link.download = filename; link.click(); URL.revokeObjectURL(link.href); };
   const kpis = { active: visibleEmployees.filter(employee => employee.status === 'ACTIF').length, present: rows.filter(row => ['Présent', 'En pause'].includes(row.status)).length, absent: rows.filter(row => row.status === 'Absent' || row.status === 'Non pointé').length, late: rows.filter(row => row.late > 0).length, pause: rows.filter(row => row.status === 'En pause').length, leave: rows.filter(row => row.status === 'En congé').length, mission: rows.filter(row => row.status === 'En mission').length, worked: rows.reduce((sum, row) => sum + row.work, 0), overtime: Math.max(0, rows.reduce((sum, row) => sum + row.work, 0) - rows.length * Number(settings.normalHours ?? 8) * 60) };
   const render = () => {

@@ -269,7 +269,7 @@ export default function TransportModulePage({
   useEffect(() => { void load(); }, [companyId, preview]);
   // Les demandes OFFERED doivent arriver rapidement sur l’écran chauffeur.
   // Le hook relance aussi immédiatement au retour sur l’onglet ou à la reprise du focus.
-  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data) });
+  useAutoRefresh(() => load(true), { enabled: !preview && Boolean(data), intervalMs: 5_000 });
 
   useEffect(() => {
     if (preview || !locationRequested || !currentDriverId || !canModifyDrivers || !navigator.geolocation) {

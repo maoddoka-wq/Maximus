@@ -156,10 +156,9 @@ export default function CommerceModulePage({
       fn(next);
       mutate(draft => {
         draft.commerceStates[companyId] = next;
-      });
+      }, message);
       return next;
     });
-    if (message) showAppToast(message, 'success');
   };
   const validatedSales = data.sales.filter(sale => sale.status === 'VALIDÉ');
   const revenue = validatedSales.reduce((sum, sale) => sum + sale.amount, 0);

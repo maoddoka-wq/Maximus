@@ -313,6 +313,7 @@ function RoleFormModal({
   onSave: (data: { name: string; description: string; sectorId: string; modulePermissions: Record<string, string[]> }) => void | Promise<void>;
 }) {
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     description: initialData?.description || '',
@@ -366,6 +367,7 @@ function RoleFormModal({
   };
 
   const handleSave = async () => {
+    if (saving) return;
     const name = formData.name.trim();
     if (!name || !formData.sectorId) {
       setError('Le nom et le secteur du rôle sont obligatoires.');
@@ -386,10 +388,14 @@ function RoleFormModal({
         .filter(([, permissions]) => permissions.length > 0),
     );
     const boundedRole = restrictRoleToCompany({ id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions }, company);
+    setError('');
+    setSaving(true);
     try {
       await onSave({ ...formData, name, modulePermissions: boundedRole?.modulePermissions ?? {} });
     } catch (error) {
       setError(error instanceof Error ? error.message : 'La synchronisation des permissions a échoué.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -423,7 +429,8 @@ function RoleFormModal({
           {availableModules.length === 0 && <div className="text-sm italic text-[hsl(var(--muted-foreground))]">Aucun module n’est autorisé pour cette unité. Revenez dans Structure & unités pour en sélectionner.</div>}
         </div>
       </div>
-      <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row"><button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button><ActionButton primary onClick={handleSave} disabled={!formData.name || !formData.sectorId}>Enregistrer</ActionButton></div>
+      {saving && <p role="status" aria-live="polite" className="rounded-lg bg-[hsl(var(--muted))] p-3 text-sm font-semibold text-[hsl(var(--muted-foreground))]">Enregistrement du rôle et synchronisation des comptes affectés…</p>}
+      <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:cursor-not-allowed disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.name || !formData.sectorId}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
     </div>
   );
 }

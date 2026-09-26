@@ -95,6 +95,7 @@ export function ControlCenterPage({
   const [targetCompanyId, setTargetCompanyId] = useState(companyId ?? '');
   const [assigneeEmployeeId, setAssigneeEmployeeId] = useState('');
   const [updatingTaskId, setUpdatingTaskId] = useState('');
+  const [creatingTask, setCreatingTask] = useState(false);
   const configuredModules = getConfiguredModules(data);
   const [form, setForm] = useState<CreateTaskForm>(() => initialForm(configuredModules[0]?.id ?? 'commerce'));
 
@@ -192,9 +193,10 @@ export function ControlCenterPage({
   };
 
   const createTask = async () => {
-    if (!targetCompanyId || !assigneeEmployeeId || !form.title.trim() || !form.description.trim()) return;
+    if (creatingTask || !targetCompanyId || !assigneeEmployeeId || !form.title.trim() || !form.description.trim()) return;
     const assignee = assignableEmployees.find(employee => employee.id === assigneeEmployeeId);
     if (!assignee) return;
+    setCreatingTask(true);
     try {
       const created = await controlApi.createTask({
         companyId: targetCompanyId,
@@ -230,6 +232,8 @@ export function ControlCenterPage({
       notify('Tâche créée et tracée.');
     } catch (error) {
       notify(error instanceof Error ? error.message : 'La création de la tâche a échoué.');
+    } finally {
+      setCreatingTask(false);
     }
   };
 
@@ -326,6 +330,7 @@ export function ControlCenterPage({
           form={form}
           setForm={setForm}
           onClose={() => setShowCreateDialog(false)}
+          isPending={creatingTask}
           onSubmit={() => void createTask()}
         />
       )}

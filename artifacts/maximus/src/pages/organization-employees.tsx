@@ -47,15 +47,21 @@ export function EmployeesTab({
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState('');
 
   const deleteEmployee = async (employee: Employee) => {
+    if (deletingEmployeeId) return;
+    setDeletingEmployeeId(employee.id);
     const ok = await confirm({
       title: 'Supprimer ce compte employé ?',
       description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`,
       confirmLabel: 'Supprimer',
       tone: 'danger',
     });
-    if (!ok) return;
+    if (!ok) {
+      setDeletingEmployeeId('');
+      return;
+    }
     try {
       await authApi.revokeAccount(employee.id);
       mutate(draft => {
@@ -68,6 +74,8 @@ export function EmployeesTab({
         confirmLabel: 'Compris',
         tone: 'danger',
       });
+    } finally {
+      setDeletingEmployeeId('');
     }
   };
 
@@ -112,7 +120,7 @@ export function EmployeesTab({
               </dl>
               <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
                 <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
+                <button type="button" disabled={Boolean(deletingEmployeeId)} aria-busy={deletingEmployeeId === employee.id} data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.1)] disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={13} /><span>{deletingEmployeeId === employee.id ? 'Suppression…' : 'Supprimer'}</span></button>
               </div>
             </article>
           );
@@ -135,7 +143,7 @@ export function EmployeesTab({
                   <td className="px-6 py-4 text-xs font-medium">{role?.name || 'Non assigné'}</td>
                   <td className="px-6 py-4 text-right"><div className="flex justify-end gap-2">
                     <button type="button" data-testid={`button-edit-org-employee-${employee.id}`} aria-label={`Modifier le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => { setEditingEmployee(employee); setModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><Settings size={13} /><span>Modifier</span></button>
-                      <button type="button" data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive)/.1)] hover:bg-[hsl(var(--destructive)/.1)]"><Trash2 size={13} /><span>Supprimer</span></button>
+                       <button type="button" disabled={Boolean(deletingEmployeeId)} aria-busy={deletingEmployeeId === employee.id} data-testid={`button-delete-org-employee-${employee.id}`} aria-label={`Supprimer le compte de ${employee.firstName} ${employee.lastName}`} onClick={() => void deleteEmployee(employee)} className="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive)/.1)] hover:bg-[hsl(var(--destructive)/.1)] disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={13} /><span>{deletingEmployeeId === employee.id ? 'Suppression…' : 'Supprimer'}</span></button>
                   </div></td>
                 </tr>
               );
