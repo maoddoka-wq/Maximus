@@ -2,7 +2,7 @@ export default function Modules() {
   return (
     <div className='deck-bg deck-grid relative w-screen h-screen overflow-hidden text-text'>
       <div className='absolute left-[7vw] top-[7vh] h-[0.22vh] w-[4vw] bg-accent' />
-      <span className='absolute right-[7vw] top-[6.8vh] font-body text-[1.45vw] font-semibold tracking-[0.14em] text-muted'>02 / 10</span>
+      <span className='absolute right-[7vw] top-[6.8vh] font-body text-[1.5vw] font-semibold tracking-[0.14em] text-muted'>02 / 10</span>
       <main className='relative z-10 flex h-full flex-col px-[8vw] pb-[8vh] pt-[12vh]'>
         <h1 className='max-w-[76vw] font-display text-[3.7vw] font-semibold leading-[1.03] tracking-[-0.04em] text-balance'>Deux parcours complémentaires, deux cycles distincts</h1>
         <div className='mt-[8vh] grid flex-1 grid-cols-2 gap-[2vw]'>
@@ -17,7 +17,7 @@ export default function Modules() {
             <div className='h-[0.2vh] w-[5vw] bg-teal/80' />
           </section>
         </div>
-        <p className='mt-[3vh] border-t border-white/10 pt-[2.2vh] font-body text-[1.95vw] font-medium leading-[1.3] text-pretty text-muted'>Un même environnement MAXIMUS, sans confondre une course VTC et une demande de location.</p>
+        <p className='mt-[3vh] border-t border-white/10 pt-[2.2vh] font-body text-[2vw] font-medium leading-[1.3] text-pretty text-muted'>Un même environnement MAXIMUS, sans confondre une course VTC et une demande de location.</p>
       </main>
     </div>
   );

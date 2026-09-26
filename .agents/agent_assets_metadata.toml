@@ -392,3 +392,17 @@ mtime_ms = 1790287747803
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/381abeed-d511-4903-81f4-40c9d85643dd/221699e2-683d-4970-a2f7-32d7478465da"
 storage_version_token = "1790287766351526"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "8bAo9Jb0_DAfx3ir1F1IO"
+uri = "file://.local/outputs/MAXIMUS-Transport-Location-VTC.pdf"
+type = "pdf"
+title = "MAXIMUS · Transport & Location — VTC (PDF)"
+description = "Présentation professionnelle de 10 diapositives sur les modules Transport et Location de MAXIMUS."
+logical_id = "cc0208a2-7470-4400-aefc-d0cd9b6ca7da"
+content_hash = "sha256:d4222d2d4646e11ab35bce72a02c8785a5417341464518c714bd062b4c6aa168"
+size = 1017827
+mtime_ms = 1790381615261
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/cc0208a2-7470-4400-aefc-d0cd9b6ca7da/901e9aa3-a04b-4e8c-905c-7237a671418a"
+storage_version_token = "1790381615839400"
+content_type = "application/pdf"

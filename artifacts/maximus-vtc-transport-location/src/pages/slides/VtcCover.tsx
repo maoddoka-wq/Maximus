@@ -11,7 +11,7 @@ export default function VtcCover() {
         <div className='flex items-center gap-[1.4vw]'>
           <span className='font-display text-[1.8vw] font-bold tracking-[0.18em] text-text'>MAXIMUS</span>
           <span className='h-[0.15vh] w-[4vw] bg-accent' />
-          <span className='font-body text-[1.45vw] font-semibold uppercase tracking-[0.18em] text-muted'>Transport &amp; Location</span>
+          <span className='font-body text-[1.5vw] font-semibold uppercase tracking-[0.18em] text-muted'>Transport &amp; Location</span>
         </div>
         <div className='max-w-[67vw] pb-[1vh]'>
           <h1 className='font-display text-[5.7vw] font-bold leading-[0.98] tracking-[-0.055em] text-balance'>
@@ -21,7 +21,7 @@ export default function VtcCover() {
           <p className='mt-[4vh] max-w-[56vw] font-body text-[2.35vw] font-semibold leading-[1.22] text-pretty text-text'>Structurer les courses VTC et capter les demandes de location de véhicules.</p>
           <p className='mt-[3vh] font-body text-[1.75vw] font-semibold uppercase leading-[1.2] tracking-[0.12em] text-muted'>Proposition pour une grande entreprise de VTC.</p>
         </div>
-        <div className='flex items-center gap-[1vw] text-[1.45vw] font-semibold uppercase tracking-[0.17em] text-text/75'>
+        <div className='flex items-center gap-[1vw] text-[1.5vw] font-semibold uppercase tracking-[0.17em] text-text/75'>
           <span className='h-[0.3vh] w-[2.4vw] bg-accent' />
           <span>Présentation commerciale</span>
         </div>
