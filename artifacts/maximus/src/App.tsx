@@ -127,6 +127,7 @@ import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-ap
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
+import { isPublicIntelligentRegistrationEnabled } from '@/lib/registration-policy';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
   loadCompanyModuleAccess,
@@ -408,7 +409,7 @@ function AppContent() {
   const { alert, confirm } = useAppDialog();
   const [data, setData] = useState<StoreData>(() => emptyStoreData());
   const [registrationCatalogVersion, setRegistrationCatalogVersion] = useState(0);
-  const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState(true);
+  const [publicRegistrationEnabled, setPublicRegistrationEnabled] = useState<boolean | null>(null);
   const [installationProfile, setInstallationProfile] = useState<InstallationProfile | null>(null);
   const [installationReady, setInstallationReady] = useState(false);
   const [installationError, setInstallationError] = useState('');
@@ -447,6 +448,10 @@ function AppContent() {
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
   sessionRef.current = session;
+  const intelligentRegistrationEnabled = isPublicIntelligentRegistrationEnabled(
+    publicRegistrationEnabled,
+    installationProfile?.registrationEnabled,
+  );
   useEffect(() => {
     localStorage.setItem('maximus-sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
@@ -461,7 +466,6 @@ function AppContent() {
       .then((profile) => {
         if (cancelled) return;
         setInstallationProfile(profile);
-        setPublicRegistrationEnabled(profile.registrationEnabled);
         if (profile.companyOnly && localStorage.getItem('maximus-session') === 'admin') {
           localStorage.removeItem('maximus-session');
           localStorage.removeItem(companyLoginContextStorageKey);
@@ -548,12 +552,13 @@ function AppContent() {
             catalogVersion: catalog.catalogVersion ?? previous.catalogVersion,
           }),
         );
-        setPublicRegistrationEnabled(catalog.registrationEnabled !== false);
+        setPublicRegistrationEnabled(catalog.registrationEnabled === true);
         setRegistrationCatalogVersion(version);
       })
       .catch(() => {
+        if (cancelled) return;
         // Les secteurs intégrés restent disponibles si le catalogue distant est indisponible.
-        setPublicRegistrationEnabled(true);
+        setPublicRegistrationEnabled(false);
       });
     return () => {
       cancelled = true;
@@ -1076,7 +1081,7 @@ function AppContent() {
       <Signup
         key={`signup-${registrationCatalogVersion}`}
         data={data}
-        intelligentRegistrationEnabled={publicRegistrationEnabled}
+        intelligentRegistrationEnabled={intelligentRegistrationEnabled}
         onIntelligent={() => setLocation('/onboarding')}
         onComplete={() => {
           notify('Votre demande a bien été envoyée.', 'success');
@@ -1088,7 +1093,7 @@ function AppContent() {
     return <InstallationCompanyOnlyNotice onBack={() => setLocation('/')} />;
   }
   if (location === '/onboarding' && !session) {
-    if (!publicRegistrationEnabled) {
+    if (!intelligentRegistrationEnabled) {
       return <PublicRegistrationClosed onBack={() => setLocation('/')} />;
     }
     return (
@@ -1169,7 +1174,7 @@ function AppContent() {
       <Login
         onLogin={login}
         employees={loginEmployees}
-        registrationEnabled={installationProfile?.companyOnly ? false : publicRegistrationEnabled}
+        registrationEnabled={intelligentRegistrationEnabled}
         installationProfile={installationProfile}
       />
     );

@@ -5,6 +5,8 @@ description: Règle produit pour l’ouverture et la fermeture des demandes publ
 
 Le réglage d’inscription automatique contrôle uniquement l’onboarding intelligent et ses brouillons. Le formulaire manuel public et sa création de demande restent disponibles ; la création d’une entreprise par l’administration MAXIMUS reste indépendante de ce réglage.
 
-**Why:** Fermer le parcours automatique ne doit pas supprimer le parcours manuel que les entreprises utilisent pour fournir directement leur identité et leurs modules.
+La valeur globale vient du catalogue d’inscription. `InstallationProfile.registrationEnabled` est une restriction supplémentaire propre au point d’entrée; ne jamais la recopier dans l’état du réglage global. Le profil central indique qu’il autorise l’inscription en général et pourrait réactiver le bouton IA après la réponse `false` du catalogue.
 
-**How to apply:** Vérifier cette politique dans les routes et API d’onboarding uniquement. Les demandes envoyées par le formulaire manuel doivent rester acceptées, et les entreprises existantes ne doivent pas être réinitialisées lorsque le réglage change.
+**Why:** Fermer le parcours automatique ne doit pas supprimer le parcours manuel, et la configuration d’un point d’entrée ne doit pas écraser le réglage global.
+
+**How to apply:** Combiner la valeur explicite du catalogue avec la restriction d’installation sans leur faire partager une source d’état. Si le catalogue est encore inconnu ou indisponible, masquer le parcours IA; conserver le formulaire manuel et ne pas réinitialiser les entreprises existantes.
