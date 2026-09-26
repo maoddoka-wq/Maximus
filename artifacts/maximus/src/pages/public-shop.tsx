@@ -1488,8 +1488,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     />;
   }
 
-  return <section
-     className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm sm:max-w-5xl"
+   return <section
+      className="transport-public-shell mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm sm:max-w-6xl"
     style={{
       ...transportDesignVariables(theme),
        fontFamily: transportDesignTokens.fontFamily.sans.join(', '),
@@ -1498,13 +1498,13 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
       '--transport-primary-foreground': theme.primaryForeground,
       '--transport-accent-foreground': theme.accentForeground,
     } as React.CSSProperties}
-  >
-     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
+     >
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
        <TransportButton data-testid="button-back-to-shop" type="button" variant="ghost" size="sm" onClick={onBack}>
-        <ArrowLeft size={16} /> Taxi Urbain
+         <ArrowLeft size={16} /> MAXIMUS Transport
       </TransportButton>
       <div className="flex items-center gap-2">
-         <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[var(--transport-accent)]" /> Dakar</span>
+          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[var(--transport-accent)]" /> Dakar · Mobilité locale</span>
         <span
           className={`inline-flex items-center gap-1.5 text-xs font-semibold ${locationState === 'ready' ? 'text-primary' : locationState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
           aria-live="polite"
@@ -1515,11 +1515,15 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         </span>
       </div>
     </header>
-       <div className="relative overflow-hidden border-b border-border bg-accent">
-      <div className="relative aspect-[16/9] w-full sm:aspect-[16/6]">
+        <div className="relative overflow-hidden border-b border-border bg-accent">
+       <div className="relative aspect-[16/9] w-full sm:aspect-[16/5]">
         <img src={heroImageUrls[heroImageIndex] ?? '/taxi-transport-hero.jpg'} alt="Taxi Urbain à Dakar" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-sidebar/80 via-transparent to-sidebar/10" />
-        <p className="absolute bottom-3 left-4 text-xs font-bold uppercase tracking-wider text-sidebar-foreground sm:bottom-5 sm:left-6">Taxi Urbain · Dakar</p>
+         <div className="absolute inset-0 bg-gradient-to-r from-sidebar/90 via-sidebar/45 to-transparent" />
+         <div className="absolute inset-x-4 bottom-4 max-w-xl text-sidebar-foreground sm:inset-x-8 sm:bottom-6">
+           <p className="text-xs font-bold uppercase tracking-wider text-sidebar-foreground/75">MAXIMUS Transport · Dakar</p>
+           <p className="mt-1 text-2xl font-bold tracking-tight sm:text-4xl">Votre trajet, simplement.</p>
+           <p className="mt-1 max-w-md text-sm text-sidebar-foreground/80 sm:text-base">Un départ précis, une destination claire, un taxi qui vient à vous.</p>
+         </div>
         {heroImageUrls.length > 1 && <>
             <TransportButton data-testid="button-hero-previous" type="button" variant="secondary" size="icon" aria-label="Photo précédente" onClick={() => setHeroImageIndex(current => (current - 1 + heroImageUrls.length) % heroImageUrls.length)} className="absolute left-3 top-1/2 -translate-y-1/2"><ArrowLeft size={16} /></TransportButton>
             <TransportButton data-testid="button-hero-next" type="button" variant="secondary" size="icon" aria-label="Photo suivante" onClick={() => setHeroImageIndex(current => (current + 1) % heroImageUrls.length)} className="absolute right-3 top-1/2 -translate-y-1/2"><ArrowRight size={16} /></TransportButton>
@@ -1529,13 +1533,17 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         </>}
       </div>
     </div>
-      <div className="px-4 pb-24 pt-6 sm:px-8">
-        <div className="flex items-start justify-between gap-4">
+       <div className="px-4 pb-24 pt-6 sm:px-8">
+         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taxi Urbain · Dakar</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{trip ? 'Votre course' : 'Commander un taxi'}</h1>
+             <p className="text-xs font-bold uppercase tracking-wider text-primary">Course à la demande</p>
+             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{trip ? 'Votre course' : 'Où allons-nous ?'}</h1>
+             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{trip ? 'Suivez votre prise en charge et gardez votre code à portée de main.' : 'Activez votre position, indiquez votre repère et choisissez votre destination à Dakar.'}</p>
           </div>
-          <CarFront size={24} className="mt-1 text-muted-foreground" aria-hidden="true" />
+           <div className="hidden shrink-0 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground sm:flex">
+             <MapPin size={15} className="text-primary" />
+             <span>Dakar</span>
+           </div>
         </div>
 
         {(formOpen || trip) && <nav aria-label="Progression de la commande" className="mt-5 flex items-center gap-2">
@@ -1576,16 +1584,24 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
           </CardContent>
         </Card>}
 
-        {!trip && !restoringTrip && !restoreError && !formOpen && <Card className="mt-5 border-border bg-card">
-          <CardContent className="p-4 sm:p-6">
-            <p className="text-base font-semibold">Déplacez-vous dans Dakar en toute simplicité.</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">Activez votre GPS au moment de commander pour trouver un chauffeur proche de votre position.</p>
+         {!trip && !restoringTrip && !restoreError && !formOpen && <Card className="transport-entry-card mt-5 border-border bg-card">
+           <CardContent className="p-4 sm:p-6">
+             <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+               <div>
+                 <p className="text-base font-semibold">Un taxi fiable pour vos trajets quotidiens.</p>
+                 <p className="mt-2 text-sm leading-6 text-muted-foreground">Votre position GPS permet à MAXIMUS de trouver le chauffeur le plus proche. Ajoutez ensuite un repère visible pour faciliter la rencontre.</p>
+               </div>
+               <div className="grid gap-2 text-xs text-muted-foreground sm:min-w-48">
+                 <span className="flex items-center gap-2"><MapPin size={14} className="text-primary" /> Prise en charge précise</span>
+                 <span className="flex items-center gap-2"><Clock3 size={14} className="text-primary" /> Estimation avant départ</span>
+               </div>
+             </div>
             <TransportButton
               data-testid="button-start-taxi-order"
               type="button"
               onClick={() => { setFormOpen(true); if (!gpsReady) locate(); }}
               disabled={locationState === 'locating'}
-              className="mt-5 w-full"
+               className="mt-5 w-full sm:w-auto"
               size="lg"
             >
               {locationState === 'locating' ? <RefreshCw className="animate-spin" /> : <CarFront />}

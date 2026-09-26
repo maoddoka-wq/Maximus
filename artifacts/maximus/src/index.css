@@ -234,6 +234,30 @@ body {
   letter-spacing: -0.005em;
 }
 
+.transport-public-shell {
+  border-color: hsl(var(--border));
+  background:
+    radial-gradient(circle at 100% 0%, hsl(var(--primary) / .08), transparent 24rem),
+    hsl(var(--background));
+}
+
+.transport-public-shell .transport-entry-card {
+  box-shadow: var(--shadow-soft);
+}
+
+.transport-public-shell [aria-label="Détails du trajet"],
+.transport-public-shell [aria-label="Coordonnées passager"] {
+  box-shadow: var(--shadow-soft);
+}
+
+.transport-public-shell #transport-booking-form input {
+  background-color: hsl(var(--card) / .72);
+}
+
+.transport-public-shell #transport-booking-form input:focus {
+  background-color: hsl(var(--card));
+}
+
 .app-shell {
   background:
     radial-gradient(circle at 82% -8%, hsl(var(--primary) / .07), transparent 25rem),
