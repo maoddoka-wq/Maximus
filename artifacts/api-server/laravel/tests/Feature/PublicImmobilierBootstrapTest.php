@@ -213,56 +213,6 @@ class PublicImmobilierBootstrapTest extends TestCase
         $this->assertSame($slug['brand'], $domain['brand']);
     }
 
-    public function test_public_site_navigation_lists_assigned_features_without_an_ecommerce_store(): void
-    {
-        CompanyRegistry::ensureActive('kora', 'Entreprise KORA');
-        $this->assignModuleFeatures('transport', ['overview', 'trips']);
-        $this->assignModuleFeatures('immobilier', ['annonces', 'vitrine-publique']);
-        DB::table('company_public_sites')->updateOrInsert(
-            ['company_id' => 'kora'],
-            [
-                'maximus_enabled' => true,
-                'company_enabled' => true,
-                'module_ids' => json_encode(['transport', 'immobilier']),
-                'public_slug' => 'public-functions-without-store',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
-
-        $this->getJson('/api/public-site/bootstrap/public-functions-without-store')
-            ->assertOk()
-            ->assertJsonPath('available', true)
-            ->assertJsonPath('features', [
-                ['id' => 'transport', 'label' => 'Transport', 'path' => '/transport'],
-                ['id' => 'immobilier', 'label' => 'Immobilier', 'path' => '/immobilier'],
-            ]);
-    }
-
-    public function test_public_site_navigation_omits_unassigned_ecommerce_features(): void
-    {
-        $this->publishedStore('public-assigned-functions');
-        $this->assignModuleFeatures('ecommerce', ['catalogue', 'location']);
-        DB::table('company_public_sites')->updateOrInsert(
-            ['company_id' => 'kora'],
-            [
-                'maximus_enabled' => true,
-                'company_enabled' => true,
-                'module_ids' => json_encode(['ecommerce']),
-                'public_slug' => 'public-assigned-functions',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
-
-        $this->getJson('/api/public-site/bootstrap/public-assigned-functions')
-            ->assertOk()
-            ->assertJsonPath('features', [
-                ['id' => 'boutique', 'label' => 'Boutique', 'path' => '/boutique'],
-                ['id' => 'location', 'label' => 'Location', 'path' => '/location'],
-            ]);
-    }
-
     public function test_site_brand_assets_are_available_when_ecommerce_is_not_a_published_section(): void
     {
         $this->publishedStore('public-brand-assets');
@@ -324,22 +274,6 @@ class PublicImmobilierBootstrapTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-    }
-
-    /** @param list<string> $featureIds */
-    private function assignModuleFeatures(string $moduleId, array $featureIds): void
-    {
-        DB::table('maximus_company_modules')->updateOrInsert(
-            ['company_id' => 'kora', 'module_id' => $moduleId],
-            [
-                'id' => 'company-module-kora-'.$moduleId,
-                'status' => 'ACTIF',
-                'feature_ids' => json_encode($featureIds, JSON_UNESCAPED_UNICODE),
-                'configuration' => json_encode(['featureScope' => 'explicit'], JSON_UNESCAPED_UNICODE),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
     }
 
     private function publishedListing(string $id, string $companyId, string $title, string $status): void

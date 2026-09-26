@@ -425,7 +425,6 @@ final class PublicSiteController extends Controller
             ],
             'brand' => $brand,
             'modules' => $modules,
-            'features' => PublicSiteRegistry::publicFeatures($companyId),
         ];
         if ($domain !== null) {
             $payload['domain'] = $domain;

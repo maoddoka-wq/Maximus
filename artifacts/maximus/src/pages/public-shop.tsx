@@ -247,7 +247,7 @@ export default function PublicShopPage({
   companySite?: {
     companyName: string;
     homePath: string;
-    features: { id: string; label: string; path: string }[];
+    modules: { id: string; label: string; path: string }[];
   };
 }) {
   const [location, setLocation] = useLocation();
@@ -827,11 +827,14 @@ export default function PublicShopPage({
    const publicNav = companySite
      ? [
        { label: 'Accueil', path: '' },
-        ...companySite.features.map(feature => ({
-          label: feature.label,
-          path: feature.path,
+        ...companySite.modules.map(module => ({
+          label: module.label,
+          path: module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path,
         })),
-        ...commerceNav.filter(item => ['/panier', '/connexion', '/compte'].includes(item.path)),
+        ...commerceNav.filter(item => (
+          ['/location', '/transport', '/immobilier', '/livraison', '/panier', '/connexion', '/compte'].includes(item.path)
+          && !companySite.modules.some(module => module.path === item.path)
+        )),
      ]
      : commerceNav;
     const isPublicNavActive = (path: string) => {

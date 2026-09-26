@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
-import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteFeature, type PublicSiteModule } from '@/lib/public-site-api';
+import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteModule } from '@/lib/public-site-api';
 import type { PublicShopBootstrap } from '@/lib/ecommerce-api';
 
 const PublicShopPage = lazy(() => import('./public-shop'));
@@ -135,7 +135,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   const companySite = {
     companyName: bootstrap.brand.name,
     homePath: basePath || '/',
-    features: bootstrap.features,
+    modules,
   };
 
   if (routePath === '/transport' && transport) {
@@ -143,7 +143,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <PublicCompanySiteShell
         companyName={bootstrap.company.name}
         brand={bootstrap.brand}
-        features={bootstrap.features}
         basePath={basePath}
         activePath={routePath}
       >
@@ -167,7 +166,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <PublicCompanySiteShell
         companyName={bootstrap.company.name}
         brand={bootstrap.brand}
-        features={bootstrap.features}
         basePath={basePath}
         activePath={routePath}
       >
@@ -196,7 +194,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <PublicCompanySiteShell
         companyName={bootstrap.company.name}
         brand={bootstrap.brand}
-        features={bootstrap.features}
         basePath={basePath}
         activePath={routePath}
       >
@@ -213,7 +210,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     <PublicCompanySiteShell
       companyName={bootstrap.company.name}
       brand={bootstrap.brand}
-      features={bootstrap.features}
       basePath={basePath}
       activePath="/"
     >
@@ -256,14 +252,12 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
 function PublicCompanySiteShell({
   companyName,
   brand,
-  features,
   basePath,
   activePath,
   children,
 }: {
   companyName: string;
   brand: Extract<PublicSiteBootstrap, { available: true }>['brand'];
-  features: PublicSiteFeature[];
   basePath: string;
   activePath: string;
   children: ReactNode;
@@ -305,23 +299,6 @@ function PublicCompanySiteShell({
             >
               Accueil
             </Link>
-            {features.map(feature => {
-              const href = `${basePath}${feature.path}` || '/';
-              const active = activePathNormalized === feature.path
-                || activePathNormalized.startsWith(`${feature.path}/`);
-              return (
-                <Link
-                  key={feature.id}
-                  href={href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
-                  style={active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
-                  data-testid={`link-public-site-nav-feature-${feature.id}`}
-                >
-                  {feature.label}
-                </Link>
-              );
-            })}
           </nav>
         </div>
       </header>
