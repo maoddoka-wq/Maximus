@@ -21,6 +21,15 @@ export type CompanyPublicSiteSettings = {
   availableModules: PublicSiteModule[];
 };
 
+export type PublicSiteBrand = {
+  name: string;
+  description: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  accentColor: string;
+  heroImages: string[];
+};
+
 export type PublicSiteBootstrap =
   | { available: false }
   | {
@@ -30,6 +39,7 @@ export type PublicSiteBootstrap =
         logo?: string | null;
         currency?: PublicShopBootstrap['store']['currency'];
       };
+      brand: PublicSiteBrand;
       modules: PublicSiteModule[];
       domain?: string;
     };

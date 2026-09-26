@@ -13,6 +13,10 @@ Route::get('/gallery-images/{company}/{imageId}', [EcommerceController::class, '
     ->middleware(['maximus.installation.public', 'maximus.public-site-gallery'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'imageId' => '[A-Za-z0-9_-]+']);
 
+Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
+    ->middleware(['maximus.installation.public', 'maximus.public-site-brand'])
+    ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'])
     ->prefix('ecommerce')
     ->group(function (): void {
@@ -69,8 +73,6 @@ Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDom
 Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
-    ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
-Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, 'serveRentalImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);

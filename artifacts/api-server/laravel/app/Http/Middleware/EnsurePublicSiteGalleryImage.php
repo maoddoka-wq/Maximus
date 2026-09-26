@@ -50,7 +50,7 @@ final class EnsurePublicSiteGalleryImage
 
         return match ((string) $image->owner_type) {
             'store' => $collection === 'hero'
-                && PublicSiteRegistry::isEnabled($companyId, 'ecommerce')
+                && PublicSiteRegistry::isSiteEnabled($companyId)
                 && DB::table('ecommerce_stores')
                     ->where('id', $ownerId)
                     ->where('company_id', $companyId)

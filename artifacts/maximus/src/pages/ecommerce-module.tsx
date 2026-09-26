@@ -1220,7 +1220,7 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
       if (selectedHeroFiles.length > 0) await api.uploadStoreHeroImages(selectedHeroFiles);
       setLogoFile(null);
       setHeroFiles([]);
-    }, selectedLogo || selectedHeroFiles.length > 0 ? 'Paramètres et images de la boutique enregistrés.' : 'Paramètres de la boutique enregistrés.');
+    }, selectedLogo || selectedHeroFiles.length > 0 ? 'Identité du site et images d’accueil enregistrées.' : 'Identité du site enregistrée.');
   };
   const copyPublicUrl = async () => {
     try {
@@ -1245,11 +1245,55 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     void run(() => createEcommerceApi(store.companyId).deleteDomain(domain.id), 'Domaine retiré de la boutique.');
   };
   return <div className="space-y-5 fade-up">
-    <Panel title="Paramètres de la boutique" description="Ces informations structurent votre vitrine publique et votre expérience d’achat.">
+    <Panel title="Identité partagée du site public" description="Le nom, la description, le logo, les couleurs et les visuels de cette boutique définissent aussi l’identité du site commun de l’entreprise. Les données et autorisations des modules restent séparées.">
       <form onSubmit={save} className="max-w-3xl space-y-5">
-         <div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value, ...(slugManuallyEdited ? {} : { slug: slugify(value) }) })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} disabled={!canModify} /><label className="block text-xs font-bold">Logo de la boutique<div className="mt-1.5 flex items-center gap-3 rounded-lg border px-3 py-2.5"><span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <Store size={16} className="text-[hsl(var(--muted-foreground))]" />}</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!canModify} onChange={event => setLogoFile(event.target.files?.[0] ?? null)} className="min-w-0 flex-1 text-xs" /></div>{logoFile && <span className="mt-1 block truncate text-[11px] font-normal text-[hsl(var(--muted-foreground))]">{logoFile.name}</span>}</label><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div>
-        <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-xs font-bold">Lien public de la boutique<input readOnly value={publicUrl} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))]" /></label><div className="flex gap-2"><button type="button" onClick={() => void copyPublicUrl()} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><Copy size={14} />{copied ? 'Copié' : 'Copier'}</button><a href={publicUrl} target="_blank" rel="noreferrer" className="btn inline-flex items-center rounded-lg border px-3 py-2.5 text-xs font-bold">Ouvrir</a></div></div><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Ce lien se met à jour avec le nom ou le slug de la boutique. La vitrine sera accessible publiquement lorsqu’elle sera publiée.</p></div>
-        <label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nom affiché sur le site public" required value={form.name} onChange={value => patch({ name: value, ...(slugManuallyEdited ? {} : { slug: slugify(value) }) })} disabled={!canModify} />
+          <Field label="Adresse du site public (slug)" required value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} disabled={!canModify} />
+          <label className="block text-xs font-bold">
+            Logo du site public
+            <div className="mt-1.5 flex items-center gap-3 rounded-lg border px-3 py-2.5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">
+                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <Store size={16} className="text-[hsl(var(--muted-foreground))]" />}
+              </span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" disabled={!canModify} onChange={event => setLogoFile(event.target.files?.[0] ?? null)} className="min-w-0 flex-1 text-xs" />
+            </div>
+            {logoFile && <span className="mt-1 block truncate text-[11px] font-normal text-[hsl(var(--muted-foreground))]">{logoFile.name}</span>}
+          </label>
+          <label className="block text-xs font-bold">
+            Devise
+            <select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+              <option value="XOF">XOF — Franc CFA</option>
+              <option value="EUR">EUR — Euro</option>
+              <option value="USD">USD — Dollar américain</option>
+            </select>
+          </label>
+          <label className="block text-xs font-bold">
+            Statut de la boutique
+            <select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm">
+              <option value="DRAFT">Brouillon</option>
+              <option value="PUBLISHED">Publiée</option>
+              <option value="SUSPENDED">Suspendue</option>
+            </select>
+          </label>
+        </div>
+        <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="min-w-0 flex-1 text-xs font-bold">
+              Lien public du site de l’entreprise
+              <input readOnly value={publicUrl} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))]" />
+            </label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => void copyPublicUrl()} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><Copy size={14} />{copied ? 'Copié' : 'Copier'}</button>
+              <a href={publicUrl} target="_blank" rel="noreferrer" className="btn inline-flex items-center rounded-lg border px-3 py-2.5 text-xs font-bold">Ouvrir</a>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Ce lien ouvre l’accueil commun et les pages des modules autorisés sur l’adresse existante.</p>
+        </div>
+        <label className="block text-xs font-bold">
+          Description publique du site
+          <textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" />
+        </label>
          <label className="flex items-start gap-3 rounded-xl border p-4">
            <input
              type="checkbox"
@@ -1264,20 +1308,23 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
            </span>
          </label>
          <div className="rounded-xl border p-4">
-           <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold">Images de la bannière d’accueil</p><p className="mt-1 text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Choisissez plusieurs images : elles défileront horizontalement dans l’accueil public.</p></div><span className="text-[10px] font-bold text-[hsl(var(--muted-foreground))]">{store.heroImages.length}/12</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold">Images d’accueil du site public</p><p className="mt-1 text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Choisissez plusieurs images : elles défileront dans l’accueil commun de l’entreprise.</p></div><span className="text-[10px] font-bold text-[hsl(var(--muted-foreground))]">{store.heroImages.length}/12</span></div>
            <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || store.heroImages.length >= 12} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, Math.max(0, 12 - store.heroImages.length)))} className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" />
            {heroFiles.length > 0 && <p className="mt-1 text-[11px] font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p>}
            {store.heroImages.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{store.heroImages.map(url => <span key={url} className="relative"><img src={url} alt="" className="h-20 w-28 rounded-lg object-cover" /><button type="button" disabled={!canModify} onClick={() => { const imageId = url.split('/').pop(); if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de la bannière.'); }} className="absolute right-1 top-1 rounded-full bg-[hsl(var(--destructive))] px-1.5 py-0.5 text-[10px] font-bold text-white disabled:opacity-50" aria-label="Supprimer cette image">×</button></span>)}</div>}
          </div>
-         <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
+          <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale du site public" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent du site public" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] px-4 py-3">
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">Utilisez la palette officielle MAXIMUS pour cette vitrine.</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Utilisez la palette officielle MAXIMUS pour le site public commun.</p>
             <button type="button" data-testid="button-reset-maximus-shop-colors" disabled={!canModify} onClick={() => patch(maximusShopColors)} className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)] disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw size={13} />Revenir aux couleurs MAXIMUS</button>
           </div>
-         <div className="flex flex-wrap justify-end gap-2 border-t pt-5"><button type="button" disabled={!canModify || !logoFile} onClick={async () => { if (!logoFile) return; const result = await run(() => createEcommerceApi(store.companyId).uploadStoreLogo(logoFile), 'Logo de la boutique enregistré.'); if (result) setLogoFile(null); }} className="btn inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><Store size={14} />Enregistrer le logo</button><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div>
+          <div className="flex flex-wrap justify-end gap-2 border-t pt-5">
+            <button type="button" disabled={!canModify || !logoFile} onClick={async () => { if (!logoFile) return; const result = await run(() => createEcommerceApi(store.companyId).uploadStoreLogo(logoFile), 'Logo du site public enregistré.'); if (result) setLogoFile(null); }} className="btn inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><Store size={14} />Enregistrer le logo</button>
+            <button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button>
+          </div>
       </form>
     </Panel>
-     <Panel title="Domaine personnalisé" description="Connectez le domaine acheté par votre entreprise à cette boutique publique, avec HTTPS géré par Render.">
+      <Panel title="Domaine du site public" description="Le domaine E-commerce existant ouvre maintenant le site commun de l’entreprise; aucun domaine distinct n’est nécessaire. HTTPS reste géré par Render.">
       <div className="space-y-5">
          <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
            <p className="font-bold text-[hsl(var(--foreground))]">Procédure de connexion</p>

@@ -105,8 +105,9 @@ export function CompanyPublicSitePanel({ company }: { company: Company }) {
         </p>
         <h2 className="mt-2 text-lg font-bold">Site public de l’entreprise</h2>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Le site public appartient à l’entreprise, pas à E-commerce ni à un autre module.
-          Il conserve le domaine déjà utilisé par les boutiques; les modules autorisés peuvent y publier leurs pages.
+          Le domaine de la boutique E-commerce existante sert de domaine commun.
+          Son nom, son logo, sa description, ses couleurs et ses visuels définissent l’identité du site.
+          Les modules sélectionnés ajoutent leurs pages ici, sans créer une seconde vitrine.
         </p>
       </div>
 
@@ -134,7 +135,7 @@ export function CompanyPublicSitePanel({ company }: { company: Company }) {
               <h3 className="font-semibold">Activer le site public</h3>
               <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
                 {settings.authorized
-                  ? 'L’activation publie le site sur le domaine de boutique déjà associé.'
+                  ? 'L’activation publie le site commun sur le domaine déjà associé à E-commerce.'
                   : 'Cette option devient disponible après autorisation de MAXIMUS.'}
               </p>
             </div>
@@ -152,7 +153,7 @@ export function CompanyPublicSitePanel({ company }: { company: Company }) {
               <div>
                 <h3 className="font-semibold">Pages publiques des modules</h3>
                 <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                  Seuls les modules actifs pour l’entreprise et enregistrés pour le site public peuvent être sélectionnés.
+                  Choisissez les rubriques à publier sur ce même site. Les accès et fonctionnalités propres à chaque module restent inchangés.
                 </p>
               </div>
               {settings.availableModules.length === 0 ? (

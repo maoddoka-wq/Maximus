@@ -109,7 +109,7 @@ final class PublicSiteController extends Controller
         $store = DB::table('ecommerce_stores')
             ->where('company_id', $companyId)
             ->where('status', 'PUBLISHED')
-            ->first(['currency']);
+            ->first();
         $site = PublicSiteRegistry::site($companyId);
         if (! $site || ! $site->maximus_enabled || ! $site->company_enabled) {
             return $this->publicResponse(['available' => false]);
@@ -173,12 +173,41 @@ final class PublicSiteController extends Controller
                 'logo' => $company?->profile_photo ?: null,
                 'currency' => (($store?->currency ?? '') !== '' ? (string) $store->currency : 'XOF'),
             ],
+            'brand' => [
+                'name' => trim((string) ($store->name ?? '')) !== ''
+                    ? (string) $store->name
+                    : (string) ($company->name ?? ''),
+                'description' => (string) ($store->description ?? ''),
+                'logoUrl' => trim((string) ($store->logo_url ?? '')) !== '' ? (string) $store->logo_url : null,
+                'primaryColor' => (string) ($store->primary_color ?? ''),
+                'accentColor' => (string) ($store->accent_color ?? ''),
+                'heroImages' => $this->publicStoreHeroImages($companyId, $store),
+            ],
             'modules' => $modules,
         ];
         if ($domain !== null) {
             $payload['domain'] = $domain;
         }
         return $payload;
+    }
+
+    private function publicStoreHeroImages(string $companyId, ?object $store): array
+    {
+        if (! $store || (string) ($store->status ?? '') !== 'PUBLISHED' || empty($store->id)) {
+            return [];
+        }
+
+        return DB::table('ecommerce_gallery_images')
+            ->where('company_id', $companyId)
+            ->where('owner_type', 'store')
+            ->where('owner_id', (string) $store->id)
+            ->where('collection', 'hero')
+            ->orderBy('sort_order')
+            ->get(['id'])
+            ->map(fn (object $image): string => '/api/gallery-images/'
+                .rawurlencode($companyId).'/'.rawurlencode((string) $image->id))
+            ->values()
+            ->all();
     }
 
     private function publicResponse(array $payload): JsonResponse

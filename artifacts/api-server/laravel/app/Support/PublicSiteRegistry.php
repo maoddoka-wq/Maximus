@@ -69,12 +69,18 @@ final class PublicSiteRegistry
         return is_array($selected) ? array_values(array_map('strval', $selected)) : [];
     }
 
-    public static function isEnabled(string $companyId, string $moduleId): bool
+    public static function isSiteEnabled(string $companyId): bool
     {
         $site = self::site($companyId);
+
         return $site
             && (bool) $site->maximus_enabled
-            && (bool) $site->company_enabled
+            && (bool) $site->company_enabled;
+    }
+
+    public static function isEnabled(string $companyId, string $moduleId): bool
+    {
+        return self::isSiteEnabled($companyId)
             && in_array($moduleId, self::selectedModules($companyId), true)
             && in_array(ModuleCatalog::statusFor($companyId, $moduleId), ['ACTIF', 'BETA'], true)
             && self::isRegistered($moduleId);

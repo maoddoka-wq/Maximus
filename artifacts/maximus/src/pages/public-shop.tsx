@@ -235,7 +235,21 @@ const isWithinDakar = (latitude: number, longitude: number) =>
   && longitude >= DAKAR_BOUNDS.minLongitude
   && longitude <= DAKAR_BOUNDS.maxLongitude;
 
-export default function PublicShopPage({ slug, domain = false, clientApp = false }: { slug?: string; domain?: boolean; clientApp?: boolean }) {
+export default function PublicShopPage({
+  slug,
+  domain = false,
+  clientApp = false,
+  companySite,
+}: {
+  slug?: string;
+  domain?: boolean;
+  clientApp?: boolean;
+  companySite?: {
+    companyName: string;
+    homePath: string;
+    modules: { id: string; label: string; path: string }[];
+  };
+}) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const routePath = location.split('?')[0];
@@ -363,8 +377,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [logoPreviewOpen]);
 
-  const shopPath = (suffix = '') => clientApp
-    ? clientPwaPath(slug, suffix, domain)
+  const shopPath = (suffix = '') => companySite && suffix === ''
+    ? companySite.homePath
+    : clientApp
+      ? clientPwaPath(slug, suffix, domain)
     : slug
       ? `/shop/${encodeURIComponent(slug)}${suffix || '/accueil'}`
       : suffix || '/accueil';
@@ -795,7 +811,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   });
   const isHomeRoute = routePath === shopPath('') || routePath === shopPath('/accueil');
   const isCatalogRoute = routePath === shopPath('/boutique');
-   const publicNav = [
+   const commerceNav = [
      { label: 'Accueil', path: '/accueil' },
      { label: 'Boutique', path: '/boutique' },
      ...(enabledFeatures.location ? [{ label: 'Location', path: '/location' }] : []),
@@ -805,15 +821,29 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
      { label: 'Panier', path: '/panier' },
      { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
    ];
+   const publicNav = companySite
+     ? [
+       { label: 'Accueil', path: '' },
+       ...companySite.modules.map(module => ({
+         label: module.label,
+         path: module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path,
+       })),
+       ...commerceNav.filter(item => (
+         ['/location', '/transport', '/immobilier', '/livraison', '/panier', '/connexion', '/compte'].includes(item.path)
+         && !companySite.modules.some(module => module.path === item.path)
+       )),
+     ]
+     : commerceNav;
     const isPublicNavActive = (path: string) => {
-      if (path === '/accueil') return isHomeRoute;
+      if (path === '' || path === '/accueil') return isHomeRoute;
       if (path === '/boutique') return isCatalogRoute || Boolean(productDetailSlug);
      if (path === '/transport') return isTransportRoute;
      if (path === '/immobilier') return isImmobilierRoute;
      if (path === '/compte') return isAccountRoute;
      return routePath === shopPath(path);
    };
-    const primaryMobileNav = publicNav.filter(item => ['/accueil', '/boutique', '/panier'].includes(item.path));
+    const primaryPaths = companySite ? ['', '/boutique', '/panier'] : ['/accueil', '/boutique', '/panier'];
+    const primaryMobileNav = publicNav.filter(item => primaryPaths.includes(item.path));
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
      const mobileNavVisible = !isAuthRoute && !submitted && !isTransportRoute;
@@ -826,10 +856,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 max-w-full shrink items-center gap-3 sm:max-w-[calc(100%-3rem)]">
               <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
-                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-[var(--shop-accent-foreground)]" />}
+                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${companySite?.companyName ?? store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-[var(--shop-accent-foreground)]" />}
              </button>
              <button type="button" onClick={() => go('')} className="min-w-0 text-left">
-                <span className="line-clamp-2 break-words text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{store.name}</span>
+                <span className="line-clamp-2 break-words text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{companySite?.companyName ?? store.name}</span>
              </button>
            </div>
            <nav id="public-shop-header-nav" className="hidden items-center gap-1 lg:flex">

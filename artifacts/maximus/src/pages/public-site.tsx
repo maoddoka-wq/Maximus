@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { useLocation, useSearch } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteModule } from '@/lib/public-site-api';
 import type { PublicShopBootstrap } from '@/lib/ecommerce-api';
@@ -56,11 +56,14 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       ? 'Transport'
       : routePath === '/immobilier'
         ? 'Immobilier'
+        : routePath === '/boutique' || routePath === '/location'
+          ? 'E-commerce'
         : routePath !== '/'
           ? 'E-commerce'
           : 'Site public';
-    const title = `${sectionTitle} | ${bootstrap.company.name}`;
-    const description = `Consultez le site public de ${bootstrap.company.name} : services, modules et annonces publiées par l’entreprise.`;
+    const title = `${sectionTitle} | ${bootstrap.brand.name}`;
+    const description = bootstrap.brand.description.trim()
+      || `Consultez le site public de ${bootstrap.company.name} : services, modules et annonces publiées par l’entreprise.`;
     const pagePath = `${basePath}${routePath === '/' ? '' : routePath}` || '/';
     const canonicalUrl = `${window.location.origin}${pagePath}`;
     const previousTitle = document.title;
@@ -75,8 +78,8 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       setMetaContent('name', 'twitter:title', title),
       setMetaContent('name', 'twitter:description', description),
     ];
-    if (bootstrap.company.logo) {
-      const logoUrl = new URL(bootstrap.company.logo, window.location.origin).toString();
+    if (bootstrap.brand.logoUrl) {
+      const logoUrl = new URL(bootstrap.brand.logoUrl, window.location.origin).toString();
       restoreMeta.push(setMetaContent('property', 'og:image', logoUrl));
       restoreMeta.push(setMetaContent('name', 'twitter:image', logoUrl));
     }
@@ -117,109 +120,238 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   const transport = modules.find(module => module.id === 'transport');
   const immobilier = modules.find(module => module.id === 'immobilier');
   const paymentReturn = new URLSearchParams(search).has('payment');
+  const companySite = {
+    companyName: bootstrap.brand.name,
+    homePath: basePath || '/',
+    modules,
+  };
 
   if (routePath === '/transport' && transport) {
     return (
-      <Suspense fallback={<PublicSiteMessage title="Chargement du module Transport…" testId="status-public-transport-loading" />}>
-        <PublicTransportPage
-          store={{
-            name: bootstrap.company.name,
-            currency: bootstrap.company.currency ?? 'XOF',
-          }}
-          slug={slug}
-          domain={domain}
-          onBack={returnToSite}
-        />
-      </Suspense>
+      <PublicCompanySiteShell
+        companyName={bootstrap.company.name}
+        brand={bootstrap.brand}
+        modules={modules}
+        basePath={basePath}
+        activePath={routePath}
+      >
+        <Suspense fallback={<PublicSiteMessage title="Chargement du module Transport…" testId="status-public-transport-loading" />}>
+          <PublicTransportPage
+            store={{
+              name: bootstrap.company.name,
+              currency: bootstrap.company.currency ?? 'XOF',
+            }}
+            slug={slug}
+            domain={domain}
+            onBack={returnToSite}
+          />
+        </Suspense>
+      </PublicCompanySiteShell>
     );
   }
 
   if (routePath === '/immobilier' && immobilier) {
-    return <PublicSiteImmobilier domain={domain} slug={slug} module={immobilier} companyName={bootstrap.company.name} currency={bootstrap.company.currency ?? 'XOF'} onBack={returnToSite} />;
+    return (
+      <PublicCompanySiteShell
+        companyName={bootstrap.company.name}
+        brand={bootstrap.brand}
+        modules={modules}
+        basePath={basePath}
+        activePath={routePath}
+      >
+        <PublicSiteImmobilier
+          domain={domain}
+          slug={slug}
+          module={immobilier}
+          companyName={bootstrap.company.name}
+          currency={bootstrap.company.currency ?? 'XOF'}
+          onBack={returnToSite}
+        />
+      </PublicCompanySiteShell>
+    );
   }
 
   if (ecommerce && (routePath !== '/' || paymentReturn)) {
     return (
       <Suspense fallback={<PublicSiteMessage title="Chargement du module E-commerce…" testId="status-public-ecommerce-loading" />}>
-        <PublicShopPage slug={slug} domain={domain} />
+        <PublicShopPage slug={slug} domain={domain} companySite={companySite} />
       </Suspense>
     );
   }
 
   if (routePath !== '/') {
     return (
-      <PublicSiteMessage
-        title="Cette page n’est pas publiée sur le site de l’entreprise."
-        testId="status-public-site-page-unavailable"
-        action={<Button type="button" variant="outline" onClick={returnToSite}>Retour au site</Button>}
-      />
+      <PublicCompanySiteShell
+        companyName={bootstrap.company.name}
+        brand={bootstrap.brand}
+        modules={modules}
+        basePath={basePath}
+        activePath={routePath}
+      >
+        <PublicSiteMessage
+          title="Cette page n’est pas publiée sur le site de l’entreprise."
+          testId="status-public-site-page-unavailable"
+          action={<Button type="button" variant="outline" onClick={returnToSite}>Retour au site</Button>}
+        />
+      </PublicCompanySiteShell>
     );
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]" data-testid="page-public-site-home">
-      <header className="border-b bg-[hsl(var(--card))]">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-5 sm:px-8">
-          {bootstrap.company.logo && (
-            <img
-              src={bootstrap.company.logo}
-              alt=""
-              className="h-12 w-12 rounded-xl border bg-white object-contain p-1"
-              data-testid="image-public-site-company-logo"
-            />
+    <PublicCompanySiteShell
+      companyName={bootstrap.company.name}
+      brand={bootstrap.brand}
+      modules={modules}
+      basePath={basePath}
+      activePath="/"
+    >
+      <main className="min-h-[calc(100dvh-5rem)] bg-[hsl(var(--background))] px-5 py-8 text-[hsl(var(--foreground))] sm:px-8 sm:py-12" data-testid="page-public-site-home">
+        <section className="mx-auto max-w-6xl">
+          {bootstrap.brand.heroImages.length > 0 && (
+            <div className="mb-8 flex snap-x gap-4 overflow-x-auto rounded-3xl" data-testid="gallery-public-site-hero">
+              {bootstrap.brand.heroImages.map((image, index) => (
+                <img
+                  key={`${image}-${index}`}
+                  src={image}
+                  alt=""
+                  className="aspect-[16/7] max-h-[28rem] min-w-full snap-center rounded-3xl object-cover"
+                  data-testid={`image-public-site-hero-${index}`}
+                />
+              ))}
+            </div>
           )}
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Site officiel</p>
-            <h1 className="mt-1 break-words text-xl font-bold tracking-tight sm:text-2xl" data-testid="title-public-site-company">
-              {bootstrap.company.name}
-            </h1>
-          </div>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-        <div className="max-w-3xl">
-          <p className="mono text-xs font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]">
-            Espace public de l’entreprise
-          </p>
-          <h2 className="mt-3 text-3xl font-bold leading-tight tracking-[-.04em] sm:text-5xl">
-            Découvrez les services de {bootstrap.company.name}.
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[hsl(var(--muted-foreground))]">
-            Les pages publiques disponibles sont regroupées sur ce site et restent gérées par leurs modules respectifs.
-          </p>
-        </div>
-
-        <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="list-public-site-modules">
-          {modules.map(module => (
-            <PublicSiteModuleCard
-              key={module.id}
-              module={module}
-              href={moduleHref(module, basePath)}
-            />
-          ))}
-          {modules.length === 0 && (
-            <p className="rounded-2xl border border-dashed p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="status-public-site-no-modules">
-              Aucun module ne propose actuellement de page publique pour cette entreprise.
+          <div className="max-w-3xl">
+            <p
+              className="mono text-xs font-bold uppercase tracking-[.18em] text-[hsl(var(--primary))]"
+              style={validBrandColor(bootstrap.brand.primaryColor) ? { color: bootstrap.brand.primaryColor } : undefined}
+            >
+              Site officiel de l’entreprise
             </p>
-          )}
-        </div>
-      </section>
-      <footer className="border-t px-5 py-6 text-center text-xs text-[hsl(var(--muted-foreground))] sm:px-8">
-        Site public de {bootstrap.company.name}
-      </footer>
-    </main>
+            <h1 className="mt-3 text-3xl font-bold leading-tight tracking-[-.04em] sm:text-5xl" data-testid="title-public-site-company">
+              {bootstrap.brand.name}
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[hsl(var(--muted-foreground))]" data-testid="text-public-site-description">
+              {bootstrap.brand.description || `Découvrez les activités et services de ${bootstrap.company.name}.`}
+            </p>
+          </div>
+
+          <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="list-public-site-modules">
+            {modules.map(module => (
+              <PublicSiteModuleCard
+                key={module.id}
+                module={module}
+                href={moduleHref(module, basePath)}
+                accentColor={bootstrap.brand.accentColor}
+              />
+            ))}
+            {modules.length === 0 && (
+              <p className="rounded-2xl border border-dashed p-6 text-sm text-[hsl(var(--muted-foreground))]" data-testid="status-public-site-no-modules">
+                Aucun module ne propose actuellement de page publique pour cette entreprise.
+              </p>
+            )}
+          </div>
+        </section>
+      </main>
+    </PublicCompanySiteShell>
   );
 }
 
-function PublicSiteModuleCard({ module, href }: { module: PublicSiteModule; href: string }) {
+function PublicCompanySiteShell({
+  companyName,
+  brand,
+  modules,
+  basePath,
+  activePath,
+  children,
+}: {
+  companyName: string;
+  brand: Extract<PublicSiteBootstrap, { available: true }>['brand'];
+  modules: PublicSiteModule[];
+  basePath: string;
+  activePath: string;
+  children: ReactNode;
+}) {
+  const homeHref = basePath || '/';
+  const primaryColor = validBrandColor(brand.primaryColor) ? brand.primaryColor : undefined;
+  const activePathNormalized = activePath.replace(/\/+$/, '') || '/';
+
+  return (
+    <div className="min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+      <header className="sticky top-0 z-30 border-b bg-[hsl(var(--card))]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <Link href={homeHref} className="flex min-w-0 items-center gap-3" data-testid="link-public-site-home">
+            {brand.logoUrl ? (
+              <img
+                src={brand.logoUrl}
+              alt={`Logo de ${brand.name}`}
+                className="h-11 w-11 shrink-0 rounded-xl border bg-[hsl(var(--background))] object-contain p-1"
+                data-testid="image-public-site-company-logo"
+              />
+            ) : (
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-lg font-bold" aria-hidden="true">
+                {brand.name.slice(0, 1).toLocaleUpperCase('fr')}
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className="block text-[10px] font-semibold uppercase tracking-[.14em] text-[hsl(var(--muted-foreground))]">Site officiel de {companyName}</span>
+              <span className="block truncate text-sm font-bold sm:text-base" data-testid="title-public-site-nav-company">{brand.name}</span>
+            </span>
+          </Link>
+
+          <nav aria-label="Navigation du site de l’entreprise" className="flex max-w-full gap-1 overflow-x-auto pb-1 lg:justify-end lg:pb-0" data-testid="nav-public-site">
+            <Link
+              href={homeHref}
+              aria-current={activePathNormalized === '/' ? 'page' : undefined}
+              className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${activePathNormalized === '/' ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
+              style={activePathNormalized === '/' && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
+              data-testid="link-public-site-nav-home"
+            >
+              Accueil
+            </Link>
+            {modules.map(module => {
+              const href = moduleHref(module, basePath);
+              const active = activePathNormalized === module.path
+                || (module.path !== '/' && activePathNormalized.startsWith(`${module.path}/`));
+              return (
+                <Link
+                  key={module.id}
+                  href={href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
+                  style={active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
+                  data-testid={`link-public-site-nav-module-${module.id}`}
+                >
+                  {module.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </header>
+      {children}
+      <footer className="border-t px-5 py-5 text-center text-xs text-[hsl(var(--muted-foreground))] sm:px-8">
+        Site public de {companyName}
+      </footer>
+    </div>
+  );
+}
+
+function PublicSiteModuleCard({
+  module,
+  href,
+  accentColor,
+}: {
+  module: PublicSiteModule;
+  href: string;
+  accentColor: string;
+}) {
   const descriptions: Record<string, string> = {
     ecommerce: 'Parcourir la boutique et les services proposés.',
     transport: 'Demander une course et suivre les services Transport.',
     immobilier: 'Consulter les annonces immobilières publiées.',
   };
   return (
-    <a
+    <Link
       href={href}
       className="group flex min-h-36 flex-col justify-between rounded-2xl border bg-[hsl(var(--card))] p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--primary)/.45)] hover:shadow-md"
       data-testid={`link-public-site-module-${module.id}`}
@@ -230,10 +362,13 @@ function PublicSiteModuleCard({ module, href }: { module: PublicSiteModule; href
           {descriptions[module.id] ?? 'Ouvrir la page publique de ce module.'}
         </span>
       </span>
-      <span className="mt-5 text-sm font-semibold text-[hsl(var(--primary))]">
+      <span
+        className="mt-5 text-sm font-semibold text-[hsl(var(--primary))]"
+        style={validBrandColor(accentColor) ? { color: accentColor } : undefined}
+      >
         Ouvrir la page <span aria-hidden="true" className="transition-transform group-hover:translate-x-1">→</span>
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -350,6 +485,10 @@ function normalizeModulePath(pathname: string, basePath: string): string {
 function moduleHref(module: PublicSiteModule, basePath: string): string {
   const path = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
   return `${basePath}${path === '/' ? '' : path}` || '/';
+}
+
+function validBrandColor(value: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
 function setMetaContent(

@@ -137,6 +137,25 @@ class PublicImmobilierBootstrapTest extends TestCase
     public function test_neutral_slug_and_domain_bootstraps_have_the_same_modules_and_safe_company_fields(): void
     {
         $this->publishedStore('neutral-public-site');
+        DB::table('ecommerce_stores')->where('slug', 'neutral-public-site')->update([
+            'name' => 'Site public KORA',
+            'description' => 'Présentation commune de l’entreprise.',
+            'logo_url' => '/api/store-logos/kora/logo-site-public.png',
+            'primary_color' => '#123456',
+            'accent_color' => '#654321',
+        ]);
+        DB::table('ecommerce_gallery_images')->insert([
+            'id' => 'gallery-site-public-hero',
+            'company_id' => 'kora',
+            'owner_type' => 'store',
+            'owner_id' => 'store-neutral-public-site',
+            'collection' => 'hero',
+            'image_data' => base64_encode('bannière'),
+            'image_mime' => 'image/png',
+            'sort_order' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         DB::table('company_public_sites')->updateOrInsert(
             ['company_id' => 'kora'],
             [
@@ -165,6 +184,12 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertJsonPath('available', true)
             ->assertJsonPath('company.currency', 'XOF')
             ->assertJsonMissingPath('company.id')
+            ->assertJsonPath('brand.name', 'Site public KORA')
+            ->assertJsonPath('brand.description', 'Présentation commune de l’entreprise.')
+            ->assertJsonPath('brand.logoUrl', '/api/store-logos/kora/logo-site-public.png')
+            ->assertJsonPath('brand.primaryColor', '#123456')
+            ->assertJsonPath('brand.accentColor', '#654321')
+            ->assertJsonPath('brand.heroImages.0', '/api/gallery-images/kora/gallery-site-public-hero')
             ->json();
         $domain = $this->getJson('http://neutral-kora.example.test/api/public-site/bootstrap')
             ->assertOk()
@@ -174,6 +199,48 @@ class PublicImmobilierBootstrapTest extends TestCase
         $this->assertSame($slug['modules'], $domain['modules']);
         $this->assertSame($slug['company']['name'], $domain['company']['name']);
         $this->assertSame($slug['company']['currency'], $domain['company']['currency']);
+        $this->assertSame($slug['brand'], $domain['brand']);
+    }
+
+    public function test_site_brand_assets_are_available_when_ecommerce_is_not_a_published_section(): void
+    {
+        $this->publishedStore('public-brand-assets');
+        DB::table('ecommerce_stores')->where('slug', 'public-brand-assets')->update([
+            'logo_url' => '/api/store-logos/kora/company-logo.png',
+            'logo_data' => base64_encode('logo-entreprise'),
+            'logo_mime' => 'image/png',
+        ]);
+        DB::table('ecommerce_gallery_images')->insert([
+            'id' => 'gallery-brand-only',
+            'company_id' => 'kora',
+            'owner_type' => 'store',
+            'owner_id' => 'store-public-brand-assets',
+            'collection' => 'hero',
+            'image_data' => base64_encode('visuel-site'),
+            'image_mime' => 'image/png',
+            'sort_order' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('company_public_sites')->updateOrInsert(
+            ['company_id' => 'kora'],
+            [
+                'maximus_enabled' => true,
+                'company_enabled' => true,
+                'module_ids' => json_encode(['immobilier']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->get('/api/store-logos/kora/company-logo.png')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png')
+            ->assertContent('logo-entreprise');
+        $this->get('/api/gallery-images/kora/gallery-brand-only')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png')
+            ->assertContent('visuel-site');
     }
 
     private function publishedStore(string $slug): void
