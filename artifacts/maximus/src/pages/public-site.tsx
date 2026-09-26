@@ -143,7 +143,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <PublicCompanySiteShell
         companyName={bootstrap.company.name}
         brand={bootstrap.brand}
-        modules={modules}
         basePath={basePath}
         activePath={routePath}
       >
@@ -167,7 +166,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <PublicCompanySiteShell
         companyName={bootstrap.company.name}
         brand={bootstrap.brand}
-        modules={modules}
         basePath={basePath}
         activePath={routePath}
       >
@@ -196,7 +194,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <PublicCompanySiteShell
         companyName={bootstrap.company.name}
         brand={bootstrap.brand}
-        modules={modules}
         basePath={basePath}
         activePath={routePath}
       >
@@ -213,7 +210,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     <PublicCompanySiteShell
       companyName={bootstrap.company.name}
       brand={bootstrap.brand}
-      modules={modules}
       basePath={basePath}
       activePath="/"
     >
@@ -256,14 +252,12 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
 function PublicCompanySiteShell({
   companyName,
   brand,
-  modules,
   basePath,
   activePath,
   children,
 }: {
   companyName: string;
   brand: Extract<PublicSiteBootstrap, { available: true }>['brand'];
-  modules: PublicSiteModule[];
   basePath: string;
   activePath: string;
   children: ReactNode;
@@ -305,23 +299,6 @@ function PublicCompanySiteShell({
             >
               Accueil
             </Link>
-            {modules.map(module => {
-              const href = moduleHref(module, basePath);
-              const active = activePathNormalized === module.path
-                || (module.path !== '/' && activePathNormalized.startsWith(`${module.path}/`));
-              return (
-                <Link
-                  key={module.id}
-                  href={href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
-                  style={active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
-                  data-testid={`link-public-site-nav-module-${module.id}`}
-                >
-                  {module.label}
-                </Link>
-              );
-            })}
           </nav>
         </div>
       </header>
@@ -441,11 +418,6 @@ function normalizeModulePath(pathname: string, basePath: string): string {
   if (!basePath) return normalized;
   if (normalized === basePath) return '/';
   return normalized.startsWith(`${basePath}/`) ? normalized.slice(basePath.length) : normalized;
-}
-
-function moduleHref(module: PublicSiteModule, basePath: string): string {
-  const path = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
-  return `${basePath}${path === '/' ? '' : path}` || '/';
 }
 
 function validBrandColor(value: string): boolean {
