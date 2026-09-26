@@ -1414,6 +1414,11 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   }, [api, customerStorageKey, shareLocation]);
 
   useEffect(() => {
+    if (trip || !tripEnded || restoringTrip || restoreError || formOpen || shareLocation) return;
+    requestHomeLocation();
+  }, [customerStorageKey, formOpen, restoreError, restoringTrip, shareLocation, trip, tripEnded]);
+
+  useEffect(() => {
     if (!trip || !shareToken || !shareExpiresAt || Date.parse(shareExpiresAt) <= Date.now()) {
       setShareUrl('');
       return;

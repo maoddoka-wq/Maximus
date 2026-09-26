@@ -65,6 +65,29 @@
   background: white;
 }
 
+.transport-public-shell .taxi-current-location-marker {
+  border: 0;
+  background: transparent;
+}
+
+.transport-public-shell .taxi-current-location-marker__body {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 3px solid hsl(var(--background));
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  box-shadow: 0 4px 14px hsl(var(--foreground) / .28);
+}
+
+.transport-public-shell .taxi-current-location-marker__body span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: hsl(var(--primary-foreground));
+}
+
 .taxi-destination-marker__body {
   background: #f59e0b;
   color: #422006;
