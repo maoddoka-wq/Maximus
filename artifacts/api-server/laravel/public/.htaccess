@@ -1,3 +1,15 @@
+<IfModule mod_headers.c>
+    <Files "index.html">
+        Header always set Cache-Control "no-store, no-cache, must-revalidate"
+        Header always set Pragma "no-cache"
+        Header always set Expires "0"
+    </Files>
+
+    <FilesMatch "-[A-Za-z0-9_-]{8}\.(js|css)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
@@ -22,6 +34,11 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_URI} ^/(api|up)(/|$)
     RewriteRule ^ index.php [L]
+
+    # A missing Vite asset must not fall through to index.html as a fake 200 JS response.
+    RewriteCond %{REQUEST_URI} ^/assets/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ - [R=404,L]
 
     # All other unknown paths belong to the React single-page application.
     RewriteCond %{REQUEST_FILENAME} !-d

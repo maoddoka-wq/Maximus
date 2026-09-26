@@ -4,6 +4,7 @@ import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { applyCompanyTheme } from '@/lib/company-theme';
 import { initializePwa } from '@/lib/pwa';
+import { installVitePreloadRecovery } from '@/lib/vite-preload-recovery';
 
 import './index.css';
 
@@ -11,6 +12,7 @@ import './index.css';
 // Nettoyer les variables globales avant le premier rendu garantit que
 // l'accueil MAXIMUS ne démarre jamais avec la couleur d'un tenant.
 applyCompanyTheme(undefined);
+if (import.meta.env.PROD) installVitePreloadRecovery();
 initializePwa();
 
 createRoot(document.getElementById('root')!, {

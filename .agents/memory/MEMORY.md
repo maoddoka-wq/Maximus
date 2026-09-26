@@ -95,3 +95,4 @@
 - [Origine des mutations avec cookie](cookie-request-origin.md) — exiger Origin/Referer pour les sessions navigateur, sans bloquer les appels machine Bearer dépourvus de cookie.
 - [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
+- [Cache des chunks Vite sur Render](render-stale-vite-assets.md) — garder `index.html` hors cache et renvoyer 404 pour les assets Vite absents, sinon le fallback HTML casse les imports.
