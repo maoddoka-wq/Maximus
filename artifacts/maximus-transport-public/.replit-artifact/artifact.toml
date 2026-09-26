@@ -1,0 +1,19 @@
+kind = "design-system"
+previewPath = "/maximus-transport-public/"
+title = "MAXIMUS Transport Public"
+description = "Système de design dédié au parcours public MAXIMUS Transport : demande et suivi de courses Taxi, avec une expérience cohérente sur mobile et ordinateur."
+version = "1.0.0"
+id = "artifacts/maximus-transport-public"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-transport-public/" ]
+localPort = 21136
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-transport-public run dev"
+
+[services.env]
+PORT = "21136"
+BASE_PATH = "/maximus-transport-public/"
