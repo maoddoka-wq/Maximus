@@ -23,8 +23,13 @@ import { createPublicTransportApi, type PublicTransportPlace, type PublicTranspo
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
+import { tokens as transportDesignTokens } from '@workspace/maximus-transport-public/tokens';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { Button as TransportButton } from '@workspace/maximus-transport-public/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@workspace/maximus-transport-public/components/ui/card';
+import { Input } from '@workspace/maximus-transport-public/components/ui/input';
+import { Label } from '@workspace/maximus-transport-public/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@workspace/maximus-design-system/components/ui/dropdown-menu';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
@@ -83,6 +88,68 @@ function publicTransportTheme(transportColors: { primaryColor?: string; accentCo
     primaryForeground: readableOn(primary),
     accentForeground: readableOn(accent),
   };
+}
+
+function hexToHslChannels(hex: string): string {
+  const red = Number.parseInt(hex.slice(1, 3), 16) / 255;
+  const green = Number.parseInt(hex.slice(3, 5), 16) / 255;
+  const blue = Number.parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+
+  let hue = 0;
+  let saturation = 0;
+  if (delta > 0) {
+    saturation = delta / (1 - Math.abs(2 * lightness - 1));
+    if (max === red) hue = ((green - blue) / delta) % 6;
+    else if (max === green) hue = (blue - red) / delta + 2;
+    else hue = (red - green) / delta + 4;
+    hue *= 60;
+    if (hue < 0) hue += 360;
+  }
+
+  return `${Math.round(hue * 10) / 10} ${Math.round(saturation * 1000) / 10}% ${Math.round(lightness * 1000) / 10}%`;
+}
+
+function transportDesignVariables(theme: ReturnType<typeof publicTransportTheme>): React.CSSProperties {
+  const palette = transportDesignTokens.color.light;
+  const fontSans = transportDesignTokens.fontFamily.sans.join(', ');
+  const fontMono = transportDesignTokens.fontFamily.mono.join(', ');
+
+  return {
+    '--background': hexToHslChannels(palette.background),
+    '--foreground': hexToHslChannels(palette.foreground),
+    '--border': hexToHslChannels(palette.border),
+    '--input': hexToHslChannels(palette.input),
+    '--card': hexToHslChannels(palette.card),
+    '--card-foreground': hexToHslChannels(palette.cardForeground),
+    '--card-border': palette.border,
+    '--popover': hexToHslChannels(palette.popover),
+    '--popover-foreground': hexToHslChannels(palette.popoverForeground),
+    '--secondary': hexToHslChannels(palette.secondary),
+    '--secondary-foreground': hexToHslChannels(palette.secondaryForeground),
+    '--secondary-border': palette.secondary,
+    '--muted': hexToHslChannels(palette.muted),
+    '--muted-foreground': hexToHslChannels(palette.mutedForeground),
+    '--destructive': hexToHslChannels(palette.destructive),
+    '--destructive-foreground': hexToHslChannels(palette.destructiveForeground),
+    '--destructive-border': palette.destructive,
+    '--sidebar': hexToHslChannels(palette.sidebar),
+    '--sidebar-foreground': hexToHslChannels(palette.sidebarForeground),
+    '--primary': hexToHslChannels(theme.accent),
+    '--primary-foreground': hexToHslChannels(theme.accentForeground),
+    '--primary-border': theme.accent,
+    '--accent': hexToHslChannels(theme.primary),
+    '--accent-foreground': hexToHslChannels(theme.primaryForeground),
+    '--accent-border': theme.primary,
+    '--ring': hexToHslChannels(theme.accent),
+    '--button-outline': `hsl(${hexToHslChannels(palette.foreground)} / 0.12)`,
+    '--font-sans': fontSans,
+    '--font-mono': fontMono,
+    '--radius': transportDesignTokens.radius,
+  } as React.CSSProperties;
 }
 
 const readableDate = (value: string) =>
@@ -1313,43 +1380,44 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   };
 
   const gpsReady = locationState === 'ready' && position !== null;
-  const passengerDetails = <section className="border border-[#d9dcd6] bg-[#f8f9f5] px-4 py-4" aria-label="Coordonnées passager">
-    <div className="flex items-start justify-between gap-3">
+  const passengerDetails = <Card className="border-border bg-card shadow-sm" aria-label="Coordonnées passager">
+    <CardHeader className="gap-1 p-4 pb-3">
       <div>
-        <p className="text-[12px] font-bold">Coordonnées passager</p>
-        <p className="mt-1 text-[10px] text-[#7b8182]">Le téléphone est nécessaire pour que le chauffeur puisse vous joindre.</p>
+        <CardTitle className="text-sm">Coordonnées passager</CardTitle>
+        <p className="mt-1 text-xs text-muted-foreground">Le téléphone est nécessaire pour que le chauffeur puisse vous joindre.</p>
       </div>
-      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.1em]" style={{ color: theme.primary }}>Requis</span>
-    </div>
-    <div className="mt-3 grid gap-3 border-t border-[#e1e3de] pt-3">
-      <label className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">
-        Téléphone
-        <input aria-required="true" type="tel" value={form.passengerPhone} onChange={event => setForm(current => ({ ...current, passengerPhone: event.target.value }))} className="mt-1.5 w-full border border-[#cfd3cd] bg-[#fffefa] px-3 py-2.5 text-[12px] font-medium normal-case tracking-normal outline-none focus:border-[var(--transport-primary)]" placeholder="+221 77 000 00 00" />
-      </label>
-      <label className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">
-        Prénom
-        <input value={form.passengerName === 'Client Taxi' ? '' : form.passengerName} onChange={event => setForm(current => ({ ...current, passengerName: event.target.value || 'Client Taxi' }))} className="mt-1.5 w-full border border-[#cfd3cd] bg-[#fffefa] px-3 py-2.5 text-[12px] font-medium normal-case tracking-normal outline-none focus:border-[var(--transport-primary)]" placeholder="Ex. Awa" />
-      </label>
-    </div>
-  </section>;
+      <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-primary">Requis</span>
+    </CardHeader>
+    <CardContent className="grid gap-3 border-t border-border p-4 pt-3 sm:grid-cols-2">
+      <div className="grid gap-1.5">
+        <Label htmlFor="transport-phone" className="text-xs text-muted-foreground">Téléphone</Label>
+        <Input id="transport-phone" data-testid="input-passenger-phone" aria-required="true" type="tel" value={form.passengerPhone} onChange={event => setForm(current => ({ ...current, passengerPhone: event.target.value }))} placeholder="+221 77 000 00 00" />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="transport-name" className="text-xs text-muted-foreground">Prénom</Label>
+        <Input id="transport-name" data-testid="input-passenger-name" value={form.passengerName === 'Client Taxi' ? '' : form.passengerName} onChange={event => setForm(current => ({ ...current, passengerName: event.target.value || 'Client Taxi' }))} placeholder="Ex. Awa" />
+      </div>
+    </CardContent>
+  </Card>;
 
   return <section
-    className="mx-auto w-full max-w-3xl overflow-hidden border border-[#d9dcd6] bg-[#f2f3ef] text-[var(--transport-primary)] shadow-sm sm:max-w-5xl"
+     className="mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm sm:max-w-5xl"
     style={{
+      ...transportDesignVariables(theme),
       '--transport-primary': theme.primary,
       '--transport-accent': theme.accent,
       '--transport-primary-foreground': theme.primaryForeground,
       '--transport-accent-foreground': theme.accentForeground,
     } as React.CSSProperties}
   >
-    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#d9dcd6] px-4 py-3.5 sm:px-6">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-[12px] font-bold">
+     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
+       <TransportButton data-testid="button-back-to-shop" type="button" variant="ghost" size="sm" onClick={onBack}>
         <ArrowLeft size={16} /> Taxi Urbain
-      </button>
+      </TransportButton>
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#697173]"><span className="h-2 w-2 bg-[var(--transport-accent)]" /> Dakar</span>
+         <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[var(--transport-accent)]" /> Dakar</span>
         <span
-          className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${locationState === 'ready' ? 'text-emerald-700' : locationState === 'error' ? 'text-rose-700' : locationState === 'locating' ? 'text-amber-700' : 'text-[#697173]'}`}
+          className={`inline-flex items-center gap-1.5 text-xs font-semibold ${locationState === 'ready' ? 'text-primary' : locationState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
           aria-live="polite"
           title={locationState === 'ready' && position ? `GPS actif · précision ${Math.round(position.accuracy)} mètres` : undefined}
         >
@@ -1358,56 +1426,254 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         </span>
       </div>
     </header>
-    <div className="relative overflow-hidden border-b border-[#d9dcd6] bg-[#17202b]">
+       <div className="relative overflow-hidden border-b border-border bg-accent">
       <div className="relative aspect-[16/9] w-full sm:aspect-[16/6]">
         <img src={heroImageUrls[heroImageIndex] ?? '/taxi-transport-hero.jpg'} alt="Taxi Urbain à Dakar" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
-        <p className="absolute bottom-3 left-4 text-[10px] font-black uppercase tracking-[.18em] text-white sm:bottom-5 sm:left-6">Taxi Urbain · Dakar</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-sidebar/80 via-transparent to-sidebar/10" />
+        <p className="absolute bottom-3 left-4 text-xs font-bold uppercase tracking-wider text-sidebar-foreground sm:bottom-5 sm:left-6">Taxi Urbain · Dakar</p>
         {heroImageUrls.length > 1 && <>
-          <button type="button" aria-label="Photo précédente" onClick={() => setHeroImageIndex(current => (current - 1 + heroImageUrls.length) % heroImageUrls.length)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm hover:bg-black/65"><ArrowLeft size={16} /></button>
-          <button type="button" aria-label="Photo suivante" onClick={() => setHeroImageIndex(current => (current + 1) % heroImageUrls.length)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm hover:bg-black/65"><ArrowRight size={16} /></button>
+            <TransportButton data-testid="button-hero-previous" type="button" variant="secondary" size="icon" aria-label="Photo précédente" onClick={() => setHeroImageIndex(current => (current - 1 + heroImageUrls.length) % heroImageUrls.length)} className="absolute left-3 top-1/2 -translate-y-1/2"><ArrowLeft size={16} /></TransportButton>
+            <TransportButton data-testid="button-hero-next" type="button" variant="secondary" size="icon" aria-label="Photo suivante" onClick={() => setHeroImageIndex(current => (current + 1) % heroImageUrls.length)} className="absolute right-3 top-1/2 -translate-y-1/2"><ArrowRight size={16} /></TransportButton>
           <div className="absolute bottom-3 right-4 flex items-center gap-1.5 sm:bottom-5 sm:right-6">
-            {heroImageUrls.map((image, index) => <button type="button" key={`${image}-${index}`} aria-label={`Afficher la photo ${index + 1}`} onClick={() => setHeroImageIndex(index)} className={`h-1.5 rounded-full transition-all ${index === heroImageIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/55'}`} />)}
+              {heroImageUrls.map((image, index) => <TransportButton data-testid={`button-hero-indicator-${index}`} variant="ghost" size="icon" type="button" key={`${image}-${index}`} aria-label={`Afficher la photo ${index + 1}`} onClick={() => setHeroImageIndex(index)} className="h-9 w-9 p-0"><span className={`h-1.5 rounded-full bg-sidebar-foreground transition-all ${index === heroImageIndex ? 'w-5' : 'w-1.5 opacity-55'}`} /></TransportButton>)}
           </div>
         </>}
       </div>
     </div>
-    <div className="px-4 pb-24 pt-5 sm:px-8">
-      <div className="flex items-start justify-between gap-4">
-       <div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#777f80]">Taxi Urbain · Dakar</p><h1 className="mt-1 text-[25px] font-black tracking-[-.05em] sm:text-3xl">{trip ? 'Votre course' : 'Commander un taxi'}</h1></div>
-        <CarFront size={24} className="mt-1 text-[#697173]" aria-hidden="true" />
-      </div>
-       {(formOpen || trip) && <nav aria-label="Progression de la commande" className="mt-5 flex items-center gap-2">
-        {['Départ', 'Destination', 'Confirmation'].map((label, index) => {
-          const step = index + 1;
-          const active = trip ? 3 : form.destination.trim() ? 3 : 2;
-          const complete = step < active;
-          return <div key={label} className="flex min-w-0 flex-1 items-center gap-2"><span className={`flex h-6 w-6 shrink-0 items-center justify-center border text-[10px] font-bold ${complete ? 'border-[var(--transport-primary)] bg-[var(--transport-primary)] text-[var(--transport-primary-foreground)]' : step === active ? 'border-[var(--transport-accent)] bg-[var(--transport-accent)] text-[var(--transport-accent-foreground)]' : 'border-[#cfd2cd] text-[#737b7d]'}`}>{complete ? <Check size={13} /> : step}</span><span className={`truncate text-[10px] font-bold ${step === active ? 'text-[var(--transport-primary)]' : 'text-[#747b7d]'}`}>{label}</span>{index < 2 && <span className="ml-auto h-px w-3 bg-[#d5d7d2]" />}</div>;
-        })}
-       </nav>}
-      {tripEnded && <div className={`mt-5 border px-4 py-3 ${tripEnded.status === 'COMPLETED' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><p className="text-xs font-black uppercase tracking-[.14em]">{tripEnded.status === 'COMPLETED' ? 'Course terminée' : 'Course annulée'}</p><p className="mt-1 text-sm font-semibold">{tripEnded.status === 'COMPLETED' ? 'Le parcours est fini. Vous pouvez demander une nouvelle course.' : 'Cette demande n’est plus active. Vous pouvez recommencer.'}</p></div>}
-       {restoringTrip && <div className="mt-5 flex items-center gap-3 border border-[var(--transport-primary)]/20 bg-[var(--transport-primary)]/5 px-4 py-4 text-sm font-semibold"><RefreshCw size={17} className="animate-spin" style={{ color: 'var(--transport-primary)' }} /><span>Restauration de votre demande de course en cours…</span></div>}
-       {restoreError && !trip && !restoringTrip && <div className="mt-5 border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950"><p className="font-bold">{restoreError}</p><button type="button" onClick={() => window.location.reload()} className="mt-3 inline-flex items-center gap-2 border border-amber-300 px-3 py-2 text-xs font-bold">Réessayer <RefreshCw size={13} /></button></div>}
-       {!trip && !restoringTrip && !restoreError && !formOpen && <div className="mt-5 border border-[#d9dcd6] bg-[#f8f9f5] p-4 sm:p-6"><p className="text-sm font-bold">Déplacez-vous dans Dakar en toute simplicité.</p><p className="mt-2 text-xs leading-5 text-[#657074]">Activez votre GPS au moment de commander pour trouver un chauffeur proche de votre position.</p><button type="button" onClick={() => { setFormOpen(true); if (!gpsReady) locate(); }} disabled={locationState === 'locating'} style={{ backgroundColor: theme.accent, color: theme.accentForeground }} className="mt-5 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black disabled:cursor-wait disabled:opacity-60">{locationState === 'locating' ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{locationState === 'locating' ? 'Localisation en cours…' : 'Commander un taxi'}<ArrowRight size={16} /></button></div>}
-       {formOpen && !gpsReady && !trip && !restoringTrip && !restoreError && <section className="mt-5 border border-[var(--transport-primary)]/20 bg-[var(--transport-primary)]/5 p-5" aria-live="polite"><div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center" style={{ backgroundColor: theme.primary, color: theme.primaryForeground }}><MapPin size={18} /></div><div><p className="text-sm font-black">Activez votre GPS pour commander</p><p className="mt-1 text-xs leading-5 text-[#657074]">{locationState === 'locating' ? 'Recherche de votre position en cours…' : locationMessage || 'Votre position actuelle est obligatoire pour trouver le chauffeur le plus proche.'}</p></div></div><button type="button" onClick={locate} disabled={locationState === 'locating'} style={{ backgroundColor: theme.accent, color: theme.accentForeground }} className="mt-5 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black disabled:cursor-wait disabled:opacity-60">{locationState === 'locating' ? <RefreshCw size={16} className="animate-spin" /> : <MapPin size={16} />}{locationState === 'locating' ? 'Localisation en cours…' : 'Activer mon GPS'}<ArrowRight size={16} /></button></section>}
-         {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <form id="transport-booking-form" onSubmit={submit} className="mt-5 space-y-3">
-         {passengerDetails}
-        <section className="border border-[#d9dcd6] bg-[#f8f9f5] p-4" aria-label="Détails du trajet">
-           <div className="flex items-center justify-between border-b border-[#e1e3de] pb-3"><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#697173]">Votre trajet</p><span className="text-[10px] font-bold text-[#3e805e]">GPS précis · {Math.round(position.accuracy)} m</span></div>
-          <div className="space-y-4 pt-4">
-               <div className="flex items-start gap-3"><div className="flex h-8 w-8 shrink-0 items-center justify-center" style={{ backgroundColor: theme.primary, color: theme.primaryForeground }}><MapPin size={15} /></div><div><p className="text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">Départ</p><p className="mt-1 text-[13px] font-bold">Position actuelle · Dakar</p></div></div>
-            <div className="ml-4 h-3 border-l border-dashed border-[#b8beb9]" />
-              <div className="relative"><label htmlFor="transport-destination" className="flex items-start gap-3"><div className="flex h-8 w-8 shrink-0 items-center justify-center" style={{ backgroundColor: theme.accent, color: theme.accentForeground }}><MapPin size={15} /></div><div className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.1em] text-[#7b8182]">Destination</span><input id="transport-destination" required autoFocus value={form.destination} onChange={event => { setSelectedPlace(null); setForm(current => ({ ...current, destination: event.target.value })); }} className="mt-1 w-full border-b border-[#aeb4b0] bg-transparent pb-1 text-[13px] font-bold outline-none placeholder:font-medium placeholder:text-[#9a9f9e]" placeholder="Quartier, lieu ou adresse" autoComplete="off" /></div></label>{!isDestinationPlaceCommitted(form.destination, selectedPlace) && (placesLoading || destinationPlaces.length > 0) && <div className="absolute left-11 right-0 top-[57px] z-10 overflow-hidden border border-[#cdd1cb] bg-[#fffefa] shadow-lg">{placesLoading && <p className="px-3 py-3 text-xs font-semibold text-[#657074]">Recherche des lieux à Dakar…</p>}{!placesLoading && destinationPlaces.map(place => <button key={`${place.latitude}-${place.longitude}-${place.label}`} type="button" role="option" onClick={() => { setSelectedPlace(place); setForm(current => ({ ...current, destination: place.label })); setDestinationPlaces([]); setPlacesLoading(false); }} className="block w-full border-b border-[#eceee9] px-3 py-3 text-left last:border-0 hover:bg-[#f2f3ef]"><span className="block text-[12px] font-bold">{place.label.split(',')[0]}</span><span className="mt-0.5 block text-[10px] text-[#7b8182]">{place.label}</span></button>)}</div>}</div>
+      <div className="px-4 pb-24 pt-6 sm:px-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taxi Urbain · Dakar</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{trip ? 'Votre course' : 'Commander un taxi'}</h1>
           </div>
-        </section>
-        <section className="border border-[#d9dcd6] bg-[#f8f9f5] p-4"><div className="flex items-center justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#697173]">Estimation</p><p className="mt-1 text-[10px] text-[#7b8182]">Position actuelle → {form.destination || 'destination'}</p></div>{quoteLoading ? <RefreshCw size={16} className="animate-spin text-[#697173]" /> : <p className="text-[20px] font-black">{quote ? money(quote.fare, store.currency) : '—'}</p>}</div>{quoteError && !quoteLoading && <p role="alert" className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{quoteError}</p>}{quote && <><div className="mt-3 flex gap-4 border-t border-[#e1e3de] pt-3 text-[10px] font-semibold text-[#687173]"><span><Clock3 size={13} className="mr-1 inline" />{quote.durationMinutes} min</span><span><CarFront size={13} className="mr-1 inline" />{quote.distanceKm.toFixed(1)} km</span></div><TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="mt-3 h-52" /></>}</section>
-        {error && <p role="alert" className="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p>}
-        <p className="pb-2 text-center text-[11px] text-[#657074]">Vos coordonnées sont partagées uniquement avec le chauffeur affecté par {store.name}.</p>
-      </form>}
-      {trip && <div className="mt-5 border border-[#d9dcd6] bg-[#f8f9f5] p-4"><div className="flex items-center justify-between border-b border-[#e1e3de] pb-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#3e805e]">Demande enregistrée</p><h2 className="mt-1 text-lg font-black">{trip.status === 'OFFERED' ? 'Chauffeur trouvé' : trip.driverName ? 'Votre chauffeur est en route' : 'Attribution en cours'}</h2></div><Check className="text-[#3e805e]" size={22} /></div><p className="mt-3 text-sm leading-6 text-[#657074]">{tripMessage}</p>{(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}{trip.vehicleModel && <div className="mt-4 flex items-center gap-3 border-t border-[#e1e3de] pt-4 text-left"><img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-14 w-20 object-cover" /><div className="text-xs"><p className="font-black">{trip.vehicleModel}</p><p className="mt-1 text-[#657074]">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>{trip.driverName && <p className="mt-1">Chauffeur : <span className="font-bold">{trip.driverName}</span></p>}</div></div>}{trip.driverPhone && <div className="mt-4 grid gap-2 sm:grid-cols-2"><a href={`tel:${trip.driverPhone}`} className="inline-flex items-center justify-center gap-2 border border-[#cfd3cd] px-4 py-3 text-sm font-bold"><Phone size={16} /> Appeler</a><a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 border border-[#b6d9c4] bg-[#edf8f0] px-4 py-3 text-sm font-bold text-[#287047]"><MessageCircle size={16} /> WhatsApp</a></div>}{cancelError && <p role="alert" className="mt-4 border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{cancelError}</p>}{['REQUESTED', 'OFFERED', 'ASSIGNED'].includes(trip.status) && cancelToken && <button type="button" onClick={() => void cancelTrip()} disabled={cancelling} className="mt-4 inline-flex w-full items-center justify-center gap-2 border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 disabled:opacity-60">{cancelling && <RefreshCw size={15} className="animate-spin" />}{cancelling ? 'Annulation…' : 'Annuler la demande'}</button>}<button type="button" onClick={() => { window.localStorage.removeItem(customerStorageKey); setCancelToken(null); setTrip(null); setFormOpen(true); }} className="mt-4 text-xs font-bold underline" style={{ color: 'var(--transport-primary)' }}>Demander une autre course</button></div>}
-       {(phone || whatsappHref) && <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[#d9dcd6] pt-4 text-[11px] text-[#657074]"><span className="mr-auto">Besoin d’aide avec {store.name} ?</span>{phone && <a href={`tel:${phone}`} className="inline-flex items-center gap-1.5 border border-[#cfd3cd] px-2.5 py-2 font-bold text-[#172235]"><Phone size={13} /> Appeler</a>}{whatsappHref && <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 border border-[#b6d9c4] bg-[#edf8f0] px-2.5 py-2 font-bold text-[#287047]"><MessageCircle size={13} /> WhatsApp</a>}</div>}
-    </div>
-      {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <div className="sticky bottom-0 z-20 border-t border-[#d3d6d0] bg-[#f2f3ef]/95 px-4 py-3 backdrop-blur-sm sm:px-8"><button form="transport-booking-form" type="submit" disabled={submitting || locationState !== 'ready'} style={{ backgroundColor: theme.accent, color: theme.accentForeground }} className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw size={16} className="animate-spin" /> : <CarFront size={16} />}{submitting ? 'Recherche du chauffeur…' : 'Commander un taxi'}<ArrowRight size={16} /></button></div>}
+          <CarFront size={24} className="mt-1 text-muted-foreground" aria-hidden="true" />
+        </div>
+
+        {(formOpen || trip) && <nav aria-label="Progression de la commande" className="mt-5 flex items-center gap-2">
+          {['Départ', 'Destination', 'Confirmation'].map((label, index) => {
+            const step = index + 1;
+            const active = trip ? 3 : form.destination.trim() ? 3 : 2;
+            const complete = step < active;
+            return <div key={label} className="flex min-w-0 flex-1 items-center gap-2">
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${complete ? 'border-primary bg-primary text-primary-foreground' : step === active ? 'border-accent bg-accent text-accent-foreground' : 'border-border text-muted-foreground'}`}>
+                {complete ? <Check size={14} /> : step}
+              </span>
+              <span className={`truncate text-xs font-semibold ${step === active ? 'text-primary' : 'text-muted-foreground'}`}>{label}</span>
+              {index < 2 && <span className="ml-auto h-px w-3 bg-border" />}
+            </div>;
+          })}
+        </nav>}
+
+        {tripEnded && <Card className={`mt-5 ${tripEnded.status === 'COMPLETED' ? 'border-primary/30 bg-primary/5' : 'border-destructive/30 bg-destructive/5'}`}>
+          <CardContent className="p-4">
+            <p className={`text-xs font-bold uppercase tracking-wider ${tripEnded.status === 'COMPLETED' ? 'text-primary' : 'text-destructive'}`}>{tripEnded.status === 'COMPLETED' ? 'Course terminée' : 'Course annulée'}</p>
+            <p className="mt-1 text-sm font-medium">{tripEnded.status === 'COMPLETED' ? 'Le parcours est fini. Vous pouvez demander une nouvelle course.' : 'Cette demande n’est plus active. Vous pouvez recommencer.'}</p>
+          </CardContent>
+        </Card>}
+
+        {restoringTrip && <Card className="mt-5 border-primary/30 bg-primary/5" aria-live="polite">
+          <CardContent className="flex items-center gap-3 p-4 text-sm font-medium">
+            <RefreshCw size={17} className="animate-spin text-primary" />
+            <span>Restauration de votre demande de course en cours…</span>
+          </CardContent>
+        </Card>}
+
+        {restoreError && !trip && !restoringTrip && <Card className="mt-5 border-destructive/30 bg-destructive/5">
+          <CardContent className="p-4">
+            <p className="text-sm font-semibold text-destructive">{restoreError}</p>
+            <TransportButton type="button" variant="outline" onClick={() => window.location.reload()} className="mt-3">
+              Réessayer <RefreshCw />
+            </TransportButton>
+          </CardContent>
+        </Card>}
+
+        {!trip && !restoringTrip && !restoreError && !formOpen && <Card className="mt-5 border-border bg-card">
+          <CardContent className="p-4 sm:p-6">
+            <p className="text-base font-semibold">Déplacez-vous dans Dakar en toute simplicité.</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Activez votre GPS au moment de commander pour trouver un chauffeur proche de votre position.</p>
+            <TransportButton
+              data-testid="button-start-taxi-order"
+              type="button"
+              onClick={() => { setFormOpen(true); if (!gpsReady) locate(); }}
+              disabled={locationState === 'locating'}
+              className="mt-5 w-full"
+              size="lg"
+            >
+              {locationState === 'locating' ? <RefreshCw className="animate-spin" /> : <CarFront />}
+              {locationState === 'locating' ? 'Localisation en cours…' : 'Commander un taxi'}
+              <ArrowRight />
+            </TransportButton>
+          </CardContent>
+        </Card>}
+
+        {formOpen && !gpsReady && !trip && !restoringTrip && !restoreError && <Card className="mt-5 border-primary/30 bg-primary/5" aria-live="polite">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                <MapPin size={18} />
+              </div>
+              <div>
+                <p className="text-base font-semibold">Activez votre GPS pour commander</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{locationState === 'locating' ? 'Recherche de votre position en cours…' : locationMessage || 'Votre position actuelle est obligatoire pour trouver le chauffeur le plus proche.'}</p>
+              </div>
+            </div>
+            <TransportButton type="button" onClick={locate} disabled={locationState === 'locating'} className="mt-5 w-full" size="lg">
+              {locationState === 'locating' ? <RefreshCw className="animate-spin" /> : <MapPin />}
+              {locationState === 'locating' ? 'Localisation en cours…' : 'Activer mon GPS'}
+              <ArrowRight />
+            </TransportButton>
+          </CardContent>
+        </Card>}
+
+        {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <form id="transport-booking-form" onSubmit={submit} className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="space-y-4">
+            {passengerDetails}
+            <Card className="border-border bg-card" aria-label="Détails du trajet">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 border-b border-border p-4">
+                <CardTitle className="text-sm">Votre trajet</CardTitle>
+                <span className="text-xs font-semibold text-primary">GPS précis · {Math.round(position.accuracy)} m</span>
+              </CardHeader>
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"><MapPin size={15} /></div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Départ</p>
+                    <p className="mt-1 text-sm font-semibold">Position actuelle · Dakar</p>
+                  </div>
+                </div>
+                <div className="ml-4 h-4 border-l border-dashed border-border" />
+                <div className="relative">
+                  <Label htmlFor="transport-destination" className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><MapPin size={15} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</span>
+                      <Input
+                        id="transport-destination"
+                        required
+                        autoFocus
+                        value={form.destination}
+                        onChange={event => { setSelectedPlace(null); setForm(current => ({ ...current, destination: event.target.value })); }}
+                        className="mt-1"
+                        placeholder="Quartier, lieu ou adresse"
+                        autoComplete="off"
+                      />
+                    </span>
+                  </Label>
+                  {!isDestinationPlaceCommitted(form.destination, selectedPlace) && (placesLoading || destinationPlaces.length > 0) && <Card className="absolute left-11 right-0 top-[4.5rem] z-10 overflow-hidden border-border bg-popover shadow-lg" role="listbox">
+                    {placesLoading && <p className="px-3 py-3 text-sm text-muted-foreground">Recherche des lieux à Dakar…</p>}
+                    {!placesLoading && destinationPlaces.map(place => <TransportButton
+                      key={`${place.latitude}-${place.longitude}-${place.label}`}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      role="option"
+                      aria-selected={false}
+                      onClick={() => { setSelectedPlace(place); setForm(current => ({ ...current, destination: place.label })); setDestinationPlaces([]); setPlacesLoading(false); }}
+                      className="h-auto w-full justify-start whitespace-normal rounded-none px-3 py-2 text-left"
+                    >
+                      <span className="grid gap-0.5 text-left">
+                        <span className="text-sm font-semibold">{place.label.split(',')[0]}</span>
+                        <span className="text-xs text-muted-foreground">{place.label}</span>
+                      </span>
+                    </TransportButton>)}
+                  </Card>}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="h-fit border-border bg-card">
+            <CardHeader className="border-b border-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm">Estimation</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">Position actuelle → {form.destination || 'destination'}</p>
+                </div>
+                {quoteLoading ? <RefreshCw size={18} className="animate-spin text-muted-foreground" /> : <p className="text-2xl font-bold">{quote ? money(quote.fare, store.currency) : '—'}</p>}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4">
+              {quoteError && !quoteLoading && <Card role="alert" className="border-destructive/30 bg-destructive/5">
+                <CardContent className="p-3 text-sm text-destructive">{quoteError}</CardContent>
+              </Card>}
+              {quote && <>
+                <div className="flex gap-4 border-b border-border pb-3 text-xs font-medium text-muted-foreground">
+                  <span><Clock3 size={14} className="mr-1 inline" />{quote.durationMinutes} min</span>
+                  <span><CarFront size={14} className="mr-1 inline" />{quote.distanceKm.toFixed(1)} km</span>
+                </div>
+                <TaxiRouteMap clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null} destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }} routeGeometry={quote.geometry} className="h-56 sm:h-64" />
+              </>}
+            </CardContent>
+          </Card>
+
+          {error && <Card role="alert" className="border-destructive/30 bg-destructive/5 lg:col-span-2">
+            <CardContent className="p-3 text-sm text-destructive">{error}</CardContent>
+          </Card>}
+          <p className="text-center text-xs text-muted-foreground lg:col-span-2">Vos coordonnées sont partagées uniquement avec le chauffeur affecté par {store.name}.</p>
+        </form>}
+
+        {trip && <Card className="mt-5 border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Demande enregistrée</p>
+              <CardTitle className="mt-1 text-lg">{trip.status === 'OFFERED' ? 'Chauffeur trouvé' : trip.driverName ? 'Votre chauffeur est en route' : 'Attribution en cours'}</CardTitle>
+            </div>
+            <Check className="text-primary" size={22} />
+          </CardHeader>
+          <CardContent className="space-y-4 p-4">
+            <p className="text-sm leading-6 text-muted-foreground">{tripMessage}</p>
+            {(trip.status === 'OFFERED' || trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS') && <PublicTaxiTracking trip={trip} />}
+            {trip.vehicleModel && <div className="flex items-center gap-3 border-t border-border pt-4 text-left">
+              <img src={trip.vehicleImageUrl || '/taxi-car.svg'} alt="Véhicule Taxi" className="h-14 w-20 rounded-md object-cover" />
+              <div className="text-sm">
+                <p className="font-semibold">{trip.vehicleModel}</p>
+                <p className="mt-1 text-muted-foreground">{trip.vehicleType || 'Taxi'} · {trip.vehicleRegistration || 'Immatriculation en cours'}</p>
+                {trip.driverName && <p className="mt-1">Chauffeur : <span className="font-semibold">{trip.driverName}</span></p>}
+              </div>
+            </div>}
+            {trip.driverPhone && <div className="grid gap-2 sm:grid-cols-2">
+              <TransportButton asChild variant="outline" className="w-full">
+                <a href={`tel:${trip.driverPhone}`}><Phone /> Appeler</a>
+              </TransportButton>
+              <TransportButton asChild variant="secondary" className="w-full">
+                <a href={`https://wa.me/${whatsappNumber(trip.driverPhone)}`} target="_blank" rel="noreferrer"><MessageCircle /> WhatsApp</a>
+              </TransportButton>
+            </div>}
+            {cancelError && <Card role="alert" className="border-destructive/30 bg-destructive/5">
+              <CardContent className="p-3 text-sm text-destructive">{cancelError}</CardContent>
+            </Card>}
+            {['REQUESTED', 'OFFERED', 'ASSIGNED'].includes(trip.status) && cancelToken && <TransportButton type="button" variant="destructive" onClick={() => void cancelTrip()} disabled={cancelling} className="w-full">
+              {cancelling && <RefreshCw className="animate-spin" />}
+              {cancelling ? 'Annulation…' : 'Annuler la demande'}
+            </TransportButton>}
+            <TransportButton
+              type="button"
+              variant="ghost"
+              onClick={() => { window.localStorage.removeItem(customerStorageKey); setCancelToken(null); setTrip(null); setFormOpen(true); }}
+              className="w-full text-primary"
+            >
+              Demander une autre course
+            </TransportButton>
+          </CardContent>
+        </Card>}
+
+        {(phone || whatsappHref) && <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
+          <span className="mr-auto">Besoin d’aide avec {store.name} ?</span>
+          {phone && <TransportButton asChild variant="outline">
+            <a href={`tel:${phone}`}><Phone /> Appeler</a>
+          </TransportButton>}
+          {whatsappHref && <TransportButton asChild variant="secondary">
+            <a href={whatsappHref} target="_blank" rel="noreferrer"><MessageCircle /> WhatsApp</a>
+          </TransportButton>}
+        </div>}
+      </div>
+      {formOpen && gpsReady && !trip && !restoringTrip && !restoreError && <div className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm sm:px-8">
+        <TransportButton form="transport-booking-form" type="submit" disabled={submitting || locationState !== 'ready'} className="w-full" size="lg">
+          {submitting ? <RefreshCw className="animate-spin" /> : <CarFront />}
+          {submitting ? 'Recherche du chauffeur…' : 'Commander un taxi'}
+          <ArrowRight />
+        </TransportButton>
+      </div>}
   </section>;
 }
 
@@ -1422,18 +1688,30 @@ function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip }) {
     ? { latitude: trip.driverLatitude, longitude: trip.driverLongitude }
     : null;
 
-  return <div className="mt-5 space-y-3 rounded-2xl border bg-[hsl(var(--muted)/.22)] p-3 text-left">
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1"><p className="text-xs font-black">Suivi en direct</p><div className="flex items-center gap-3"><span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Actualisé toutes les 5 s</span><button type="button" onClick={() => window.dispatchEvent(new Event('maximus:refresh'))} className="inline-flex items-center gap-1 rounded-lg border bg-white px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><RefreshCw size={12} />Actualiser</button></div></div>
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Taxi → arrêt client</p><p className="mt-1 text-sm font-black">{trip.pickupRouteDistanceKm !== null && trip.pickupRouteDistanceKm !== undefined ? `${trip.pickupRouteDistanceKm.toFixed(1)} km` : 'Calcul…'}</p></div>
-      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Arrivée estimée</p><p className="mt-1 text-sm font-black">{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined ? `${trip.pickupEtaMinutes} min` : 'GPS en attente'}</p></div>
-      <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Votre trajet</p><p className="mt-1 text-sm font-black">{trip.routeDistanceKm !== null && trip.routeDistanceKm !== undefined ? `${trip.routeDistanceKm.toFixed(1)} km` : '—'}</p></div>
-       <div className="rounded-xl bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">Tarif</p><p className="mt-1 text-sm font-black">{trip.routePending ? 'Calcul en cours' : trip.fare > 0 ? `${new Intl.NumberFormat('fr-FR').format(trip.fare)} XOF` : 'À calculer'}</p></div>
-    </div>
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5"><p className="text-[10px] font-black uppercase tracking-[.14em] text-slate-500">Itinéraire complet</p><p className="mt-1 text-sm font-bold text-slate-900">Position du taxi <span className="mx-1 text-slate-400">→</span> arrêt client <span className="mx-1 text-slate-400">→</span> destination</p><p className="mt-1 text-[11px] text-slate-500">Le point rouge identifie l’endroit où le client attend le taxi.</p></div>
-    {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-[clamp(21rem,78vw,34rem)] sm:h-[30rem]" />}
-    {!trip.pickupRouteDistanceKm && <p className="px-1 text-[11px] text-[hsl(var(--muted-foreground))]">La distance et le temps d’arrivée seront recalculés dès que la position GPS du chauffeur est reçue.</p>}
-  </div>;
+  return <Card className="mt-5 border-border bg-muted/30 text-left">
+      <CardHeader className="flex flex-col gap-2 p-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle className="text-sm">Suivi en direct</CardTitle>
+        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+          <span data-testid="status-tracking-live" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+            Actualisé toutes les 5 s
+          </span>
+          <TransportButton data-testid="button-refresh-tracking" type="button" variant="outline" size="sm" onClick={() => window.dispatchEvent(new Event('maximus:refresh'))}>
+            <RefreshCw /> Actualiser
+          </TransportButton>
+        </div>
+      </CardHeader>
+     <CardContent className="space-y-3 p-4 pt-0">
+     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Taxi → arrêt client</p><p data-testid="text-pickup-distance" className="mt-1 text-sm font-bold">{trip.pickupRouteDistanceKm !== null && trip.pickupRouteDistanceKm !== undefined ? `${trip.pickupRouteDistanceKm.toFixed(1)} km` : 'Calcul…'}</p></div>
+        <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Arrivée estimée</p><p data-testid="text-pickup-eta" className="mt-1 text-sm font-bold">{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined ? `${trip.pickupEtaMinutes} min` : 'GPS en attente'}</p></div>
+        <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Votre trajet</p><p className="mt-1 text-sm font-bold">{trip.routeDistanceKm !== null && trip.routeDistanceKm !== undefined ? `${trip.routeDistanceKm.toFixed(1)} km` : '—'}</p></div>
+        <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Tarif</p><p data-testid="text-trip-fare" className="mt-1 text-sm font-bold">{trip.routePending ? 'Calcul en cours' : trip.fare > 0 ? `${new Intl.NumberFormat('fr-FR').format(trip.fare)} XOF` : 'À calculer'}</p></div>
+     </div>
+      <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Itinéraire complet</p><p className="mt-1 text-sm font-semibold">Position du taxi <span className="mx-1 text-muted-foreground">→</span> arrêt client <span className="mx-1 text-muted-foreground">→</span> destination</p><p className="mt-1 text-xs text-muted-foreground">Le point rouge identifie l’endroit où le client attend le taxi.</p></div>
+      {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-80 sm:h-96" />}
+      {!trip.pickupRouteDistanceKm && <p className="px-1 text-xs text-muted-foreground">La distance et le temps d’arrivée seront recalculés dès que la position GPS du chauffeur est reçue.</p>}
+   </CardContent></Card>;
 }
 
 function ShopHomePage({

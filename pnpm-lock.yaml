@@ -204,6 +204,9 @@ importers:
       '@workspace/maximus-design-system':
         specifier: workspace:*
         version: link:../maximus-design-system
+      '@workspace/maximus-transport-public':
+        specifier: workspace:*
+        version: link:../maximus-transport-public
       lucide-react:
         specifier: 'catalog:'
         version: 0.545.0(react@19.1.0)
@@ -938,6 +941,9 @@ importers:
       '@workspace/maximus-design-system':
         specifier: workspace:*
         version: link:../maximus-design-system
+      '@workspace/maximus-transport-public':
+        specifier: workspace:*
+        version: link:../maximus-transport-public
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
