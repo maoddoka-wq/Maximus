@@ -197,6 +197,7 @@ export const modules: Module[] = [
     featurePacks: [
       { id: 'immobilier-consultation', name: 'Consultation immobilière', description: 'Consulter les biens et les annonces publiées.', featureIds: ['dashboard', 'biens', 'annonces'] },
       { id: 'immobilier-agent', name: 'Agent immobilier', description: 'Gérer les annonces, les prospects et les demandes de visite.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'] } },
+      { id: 'immobilier-employe', name: 'Employé immobilier', description: 'Consulter les biens et accompagner le suivi des annonces, prospects et visites.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites'], featurePermissions: { dashboard: ['voir'], biens: ['voir'], annonces: ['voir'], prospects: ['voir', 'modifier'], visites: ['voir', 'créer', 'modifier'] } },
       { id: 'immobilier-agence', name: 'Gestion d’agence', description: 'Piloter les annonces, les mandats, les agents, les prospects et la vitrine publique.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'], mandats: ['voir', 'créer', 'modifier'], agents: ['voir', 'créer', 'modifier'], rapports: ['voir'], parametres: ['voir', 'modifier'], 'vitrine-publique': ['voir', 'modifier'] } },
       { id: 'immobilier-manager', name: 'Manager immobilier', description: 'Superviser l’activité immobilière et les performances de l’équipe.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'], mandats: ['voir', 'créer', 'modifier'], agents: ['voir', 'modifier'], rapports: ['voir'], parametres: ['voir', 'modifier'], 'vitrine-publique': ['voir', 'modifier'] } },
     ],
@@ -318,11 +319,12 @@ export const sectorPresets: SectorPreset[] = [
   {
     id: 'immobilier',
     name: 'Immobilier',
-    moduleIds: ['immobilier', 'commerce', 'presences'],
+    moduleIds: ['immobilier', 'commerce', 'presences', 'paie'],
     modulePackIds: {
       immobilier: ['immobilier-agence'],
       commerce: ['commerce-consultation'],
       presences: ['presence-gestion'],
+      paie: ['paie-gestion'],
     },
   },
 ];

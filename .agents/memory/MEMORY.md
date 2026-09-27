@@ -62,7 +62,7 @@
 - [Performance réseau frontend](frontend-network-performance.md) — confirmer la mutation puis rafraîchir en arrière-plan, en partageant uniquement les GET simultanés.
 - [Inscription publique](public-registration-policy.md) — le réglage global masque les parcours manuel et intelligent, sans bloquer la création manuelle depuis MAXIMUS.
 - [Routage Apache des PWA](apache-pwa-routing.md) — ne jamais rediriger les routes SPA profondes vers le port Apache interne de Render.
-- [Publication GitHub de secours](github-push-fallback.md) — si le push Git refuse l’authentification, publier via l’intégration GitHub puis resynchroniser la branche locale.
+- [Publication GitHub de secours](github-push-fallback.md) — vérifier que l’intégration peut publier toute la branche; sinon, nettoyer le brouillon distant et garder le commit local.
 - [Liaison PostgreSQL Render](render-database-binding.md) — la production doit utiliser la base Render gérée, pas une ancienne URL Neon fixe.
 - [Routage des domaines](custom-domain-routing.md) — distinguer ERP, boutique autorisée et hôte inconnu côté serveur, sans détection approximative par suffixe.
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
@@ -98,3 +98,4 @@
 - [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
 - [Cache des chunks Vite sur Render](render-stale-vite-assets.md) — garder `index.html` hors cache et renvoyer 404 pour les assets Vite absents, sinon le fallback HTML casse les imports.
+- [Overrides de sécurité pnpm](pnpm-overrides.md) — mettre les correctifs transitifs dans `package.json` pour qu’ils soient réellement pris en compte par le lockfile.
