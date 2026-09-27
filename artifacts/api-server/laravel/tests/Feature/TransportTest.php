@@ -194,6 +194,52 @@ class TransportTest extends TestCase
         ]);
     }
 
+    public function test_employee_driver_cannot_change_trip_status_without_recent_gps(): void
+    {
+        $manager = $this->asActor();
+        $employeeId = $this->createDriverEmployee('gps-required-driver');
+        $driver = $manager->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employeeId,
+            'licenseNumber' => 'SN-GPS-REQUIRED-001',
+        ])->assertCreated();
+        $vehicle = $manager->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-GPS-REQUIRED-01',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
+        $trip = $manager->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Plateau',
+            'destination' => 'Fann',
+            'passengerName' => 'Passager GPS',
+            'passengerPhone' => '+221770000077',
+            'fare' => 2500,
+            'driverId' => $driver->json('id'),
+            'vehicleId' => $vehicle->json('id'),
+        ])->assertCreated();
+
+        $chauffeur = $this->asActor('employee', [
+            'transport:menu:drivers' => ['voir', 'modifier'],
+            'transport:menu:trips' => ['voir', 'modifier'],
+        ], $employeeId);
+
+        $chauffeur->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'COMPLETED',
+        ])->assertStatus(422)
+            ->assertJsonPath('error', 'Une position GPS récente est nécessaire pour continuer la course.');
+
+        $chauffeur->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+        ])->assertOk();
+
+        $chauffeur->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'COMPLETED',
+        ])->assertOk()
+            ->assertJsonPath('status', 'COMPLETED');
+    }
+
     public function test_transport_ignores_client_company_id_for_tenant_scope(): void
     {
         $request = $this->asActor();

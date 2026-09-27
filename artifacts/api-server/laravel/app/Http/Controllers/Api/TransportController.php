@@ -1076,12 +1076,16 @@ class TransportController extends Controller
         }
         $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'employee') {
-            $driverId = DB::table('transport_drivers')
+            $driver = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('employee_id', $actor['employeeId'] ?? null)
-                ->value('id');
-            if (! $driverId || $trip->driver_id !== $driverId) {
+                ->first();
+            if (! $driver || $trip->driver_id !== $driver->id) {
                 return response()->json(['error' => 'Vous ne pouvez modifier que vos propres courses.'], 403);
+            }
+            if (! $driver->location_updated_at || Carbon::parse($driver->location_updated_at)
+                ->lt(Carbon::now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes']))) {
+                return response()->json(['error' => 'Une position GPS récente est nécessaire pour continuer la course.'], 422);
             }
         }
         $failure = null;

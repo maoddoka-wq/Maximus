@@ -26,3 +26,9 @@ Les tuiles standard `tile.openstreetmap.org` peuvent être refusées par leur po
 **Why:** les lignes et marqueurs peuvent être correctement rendus alors que le fond cartographique reste vide si le fournisseur de tuiles bloque les requêtes.
 
 **How to apply:** conserver l’attribution du fournisseur de tuiles, tester le chargement du fond sur mobile et appeler `invalidateSize` après les transitions d’affichage plein écran.
+
+Un employé chauffeur doit disposer d’une position GPS récente pour ouvrir ses opérations et modifier l’état d’une course, quel que soit le client utilisé. Le suivi web doit démarrer dès l’entrée dans l’espace chauffeur ; seule l’application native peut garantir le suivi écran verrouillé.
+
+**Why:** une activation manuelle laissait accessibles les écrans de courses sans GPS et les changements de statut pouvaient continuer avec une position périmée.
+
+**How to apply:** bloquer l’interface chauffeur tant que le serveur n’a pas confirmé une nouvelle position, vérifier aussi sa fraîcheur côté API avant les transitions de course, et ne pas promettre le suivi arrière-plan depuis le navigateur.
