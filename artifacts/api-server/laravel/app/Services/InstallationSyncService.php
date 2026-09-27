@@ -117,13 +117,16 @@ final class InstallationSyncService
             $paymentAccess = array_key_exists('paymentAccess', $payload)
                 ? $this->validatePaymentAccess($payload['paymentAccess'])
                 : null;
+            $publicSiteAccess = array_key_exists('publicSiteAccess', $payload)
+                ? $this->validatePublicSiteAccess($payload['publicSiteAccess'], $payload['company']['id'] ?? null)
+                : null;
             $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
             $hiddenWorkspaceFeatures = array_key_exists('hiddenWorkspaceFeatures', $companyData)
                 ? CompanyWorkspaceVisibility::validateHidden($companyData['hiddenWorkspaceFeatures'])
                 : null;
             $access = array_key_exists('erpAccess', $payload)
                 ? $this->validateErpAccess($payload['erpAccess']) : InstallationSyncState::erpAccess();
-            $company = $this->applyValidated($payload, $paymentAccess, $hiddenWorkspaceFeatures);
+            $company = $this->applyValidated($payload, $paymentAccess, $hiddenWorkspaceFeatures, $publicSiteAccess);
             // Publish the entire access snapshot only after the database transaction succeeds.
             InstallationSyncState::record([
                 'lastSuccessAt' => now()->toIso8601String(), 'state' => 'synced', 'lastError' => null,
@@ -190,10 +193,25 @@ final class InstallationSyncService
         ];
     }
 
+    /** @return array{enabled: bool} */
+    private function validatePublicSiteAccess(mixed $access, mixed $companyId): array
+    {
+        if (! is_array($access)
+            || ! is_string($companyId)
+            || $companyId === ''
+            || ($access['companyId'] ?? null) !== $companyId
+            || ! is_bool($access['enabled'] ?? null)) {
+            throw new RuntimeException('Configuration de l’accès au site public invalide.');
+        }
+
+        return ['enabled' => $access['enabled']];
+    }
+
     private function applyValidated(
         array $payload,
         ?array $paymentAccess = null,
         ?array $hiddenWorkspaceFeatures = null,
+        ?array $publicSiteAccess = null,
     ): Company
     {
         $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
@@ -220,6 +238,7 @@ final class InstallationSyncService
             $payload,
             $paymentAccess,
             $hiddenWorkspaceFeatures,
+            $publicSiteAccess,
         ): Company {
             ModuleCatalog::importPublishedCatalog($catalog);
             ModuleCatalog::ensureCatalog();
@@ -317,6 +336,32 @@ final class InstallationSyncService
                                 'updated_at' => now(),
                             ]);
                     }
+                }
+            }
+
+            if ($publicSiteAccess !== null) {
+                if (! Schema::hasTable('company_public_site_access')) {
+                    throw new RuntimeException('La table locale des autorisations de site public est absente.');
+                }
+
+                $existingPublicSiteAccess = DB::table('company_public_site_access')
+                    ->where('company_id', $companyId)
+                    ->exists();
+                $values = [
+                    'enabled' => $publicSiteAccess['enabled'],
+                    'updated_by' => 'maximus-sync',
+                    'updated_at' => now(),
+                ];
+                if ($existingPublicSiteAccess) {
+                    DB::table('company_public_site_access')
+                        ->where('company_id', $companyId)
+                        ->update($values);
+                } else {
+                    DB::table('company_public_site_access')->insert([
+                        'company_id' => $companyId,
+                        ...$values,
+                        'created_at' => now(),
+                    ]);
                 }
             }
 

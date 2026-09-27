@@ -125,6 +125,12 @@ final class InstallationController extends Controller
         ]);
         $moduleIds = $this->synchronizedModuleIds($company);
         $paymentAccess = CompanyPaymentAccess::payload((string) $company->id);
+        $publicSiteAccess = [
+            'companyId' => (string) $company->id,
+            'enabled' => (bool) DB::table('company_public_site_access')
+                ->where('company_id', $company->id)
+                ->value('enabled'),
+        ];
         $hiddenWorkspaceFeatures = $this->hiddenWorkspaceFeatures((string) $company->id);
 
         return response()->json([
@@ -160,6 +166,7 @@ final class InstallationController extends Controller
             'catalog' => ModuleCatalog::publishedCatalog($moduleIds),
             'domains' => $domains,
             'paymentAccess' => $paymentAccess,
+            'publicSiteAccess' => $publicSiteAccess,
             'erpAccess' => $this->erpAccess((string) $installation->id),
         ]);
     }

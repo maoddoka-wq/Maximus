@@ -42,23 +42,31 @@ final class CompanyPublicSiteAccessController extends Controller
         ])->validate();
         $actorId = (string) ($request->attributes->get('authActor')['id'] ?? 'maximus');
 
-        $exists = DB::table('company_public_site_access')
-            ->where('company_id', $companyId)
-            ->exists();
-        $values = [
-            'enabled' => (bool) $input['enabled'],
-            'updated_by' => $actorId,
-            'updated_at' => now(),
-        ];
-        if ($exists) {
-            DB::table('company_public_site_access')->where('company_id', $companyId)->update($values);
-        } else {
-            DB::table('company_public_site_access')->insert([
-                'company_id' => $companyId,
-                ...$values,
-                'created_at' => now(),
-            ]);
-        }
+        DB::transaction(function () use ($companyId, $input, $actorId): void {
+            $exists = DB::table('company_public_site_access')
+                ->where('company_id', $companyId)
+                ->exists();
+            $values = [
+                'enabled' => (bool) $input['enabled'],
+                'updated_by' => $actorId,
+                'updated_at' => now(),
+            ];
+            if ($exists) {
+                DB::table('company_public_site_access')->where('company_id', $companyId)->update($values);
+            } else {
+                DB::table('company_public_site_access')->insert([
+                    'company_id' => $companyId,
+                    ...$values,
+                    'created_at' => now(),
+                ]);
+            }
+
+            DB::table('maximus_installations')
+                ->where('company_id', $companyId)
+                ->where('status', '!=', 'REVOKED')
+                ->whereNull('revoked_at')
+                ->increment('configuration_version', 1, ['updated_at' => now()]);
+        });
 
         return response()->json([
             'ok' => true,

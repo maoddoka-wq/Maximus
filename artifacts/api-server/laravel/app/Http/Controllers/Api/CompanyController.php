@@ -412,6 +412,12 @@ class CompanyController extends Controller
                 'featureIds' => $company->requested_module_features ?? [],
                 'permissions' => $company->requested_module_permissions ?? [],
             ],
+            'publicSiteAccess' => [
+                'companyId' => (string) $company->id,
+                'enabled' => (bool) DB::table('company_public_site_access')
+                    ->where('company_id', $company->id)
+                    ->value('enabled'),
+            ],
         ]);
     }
 
