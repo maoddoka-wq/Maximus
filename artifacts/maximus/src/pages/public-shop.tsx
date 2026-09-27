@@ -806,27 +806,32 @@ export default function PublicShopPage({
   };
 
   const installClientApp = async () => {
+    if (!isIosDevice() && canInstallPwa()) {
+      try {
+        const installed = await promptPwaInstall();
+        setInstallHelp(installed
+          ? 'La boutique a été installée.'
+          : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
+        if (installed) showAppToast('La boutique est maintenant installée sur votre appareil.', 'success');
+      } catch {
+        setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
+      }
+      return;
+    }
+
     if (isIosDevice()) {
       setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
+      return;
+    }
+    if (manifestError) {
+      setInstallHelp('Le fichier d’installation n’a pas été validé. Rechargez la boutique puis réessayez.');
       return;
     }
     if (!manifestReady) {
       setInstallHelp('La préparation de l’installation n’est pas terminée. Réessayez dans un instant.');
       return;
     }
-    if (!canInstallPwa()) {
-      setInstallHelp('Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».');
-      return;
-    }
-    try {
-      const installed = await promptPwaInstall();
-      setInstallHelp(installed
-        ? 'La boutique a été installée.'
-        : 'L’installation n’a pas été confirmée. Vous pouvez réessayer depuis le menu du navigateur.');
-      if (installed) showAppToast('La boutique est maintenant installée sur votre appareil.', 'success');
-    } catch {
-      setInstallHelp('L’installation directe a échoué. Ouvrez le menu du navigateur et choisissez « Installer l’application ».');
-    }
+    setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
@@ -869,7 +874,7 @@ export default function PublicShopPage({
    const publicNav = companySite
      ? [
        { label: 'Accueil', path: '' },
-        ...companySite.modules.map(module => ({
+        ...companySite.modules.filter(module => module.id !== 'transport').map(module => ({
           label: module.id === 'ecommerce' ? 'Boutique' : module.label,
           path: module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path,
         })),
@@ -947,19 +952,19 @@ export default function PublicShopPage({
             <p className="text-sm font-bold">Installez cette boutique</p>
             <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
                {isIosDevice()
-                 ? 'Dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».'
+                  ? 'Touchez Installer pour afficher les étapes d’ajout à l’écran d’accueil dans Safari.'
                  : installAvailable && manifestReady
-                   ? 'Retrouvez la boutique et vos commandes depuis votre écran d’accueil.'
-                   : 'Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».'}
+                    ? 'Touchez Installer pour ouvrir la fenêtre native du navigateur.'
+                    : 'Touchez Installer pour lancer la demande directement depuis le navigateur.'}
             </p>
              {!manifestReady && !manifestError && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
              {manifestError && <p className="mt-1 text-xs font-medium text-red-700" role="alert">{manifestError} Vous pouvez aussi réessayer depuis le menu du navigateur.</p>}
              {installHelp && <p className="mt-1 text-xs font-medium text-[var(--shop-primary)]" role="status">{installHelp}</p>}
           </div>
         </div>
-          {installAvailable && manifestReady && !isIosDevice() && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
+          <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
           <Download size={15} />Installer l’application
-        </button>}
+          </button>
        </aside>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} store={store} orderId={paymentReturn?.orderId ?? ''} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
@@ -1003,11 +1008,6 @@ export default function PublicShopPage({
                         onBack={() => go('/boutique')}
                        backLabel="Retour aux offres"
                      />
-                   </section>
-                 )}
-                 {companySite?.modules.some(module => module.id === 'transport') && (
-                   <section id="public-site-section-transport" data-public-site-landing-section className="scroll-mt-24" aria-label="Transport">
-                      <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} />
                    </section>
                  )}
                  {companySite?.modules.some(module => module.id === 'immobilier') && (

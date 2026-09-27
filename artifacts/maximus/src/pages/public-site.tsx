@@ -238,30 +238,31 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     window.location.assign(publicSiteHomePath);
   };
   const installPublicSite = async () => {
+    if (!isIosDevice() && canInstallPwa()) {
+      try {
+        const installed = await promptPwaInstall();
+        setInstallHelp(installed
+          ? 'La vitrine a été installée.'
+          : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
+      } catch {
+        setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
+      }
+      return;
+    }
+
     if (isIosDevice()) {
       setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
       return;
     }
     if (manifestError) {
-      setInstallHelp('La préparation de l’installation a échoué. Vérifiez la connexion, puis réessayez depuis le menu du navigateur.');
+      setInstallHelp('Le fichier d’installation n’a pas été validé. Rechargez la vitrine puis réessayez.');
       return;
     }
     if (!manifestReady) {
       setInstallHelp('La préparation de l’installation est en cours. Réessayez dans un instant.');
       return;
     }
-    if (!canInstallPwa()) {
-      setInstallHelp('Ouvrez le menu du navigateur, puis choisissez « Installer l’application ».');
-      return;
-    }
-    try {
-      const installed = await promptPwaInstall();
-      setInstallHelp(installed
-        ? 'La vitrine a été installée.'
-        : 'L’installation n’a pas été confirmée. Vous pouvez réessayer depuis le menu du navigateur.');
-    } catch {
-      setInstallHelp('L’installation directe a échoué. Ouvrez le menu du navigateur et choisissez « Installer l’application ».');
-    }
+    setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
   };
 
   if (loading) {
@@ -521,23 +522,6 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
             </section>
           )}
 
-          {transport && (
-            <section id="public-site-section-transport" className="mt-12 scroll-mt-24" aria-labelledby="title-public-site-transport">
-              <div className="mb-5">
-                <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Service</p>
-                <h2 id="title-public-site-transport" className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl">Transport</h2>
-              </div>
-              <Suspense fallback={<PublicSiteMessage title="Chargement du Transport…" testId="status-public-transport-loading" />}>
-                <PublicTransportPage
-                  store={{ name: bootstrap.company.name, currency: bootstrap.company.currency ?? 'XOF' }}
-                  slug={domain ? undefined : bootstrap.storeSlug ?? slug}
-                  domain={domain}
-                  onBack={() => document.getElementById('public-site-section-home')?.scrollIntoView({ behavior: 'smooth' })}
-                />
-              </Suspense>
-            </section>
-          )}
-
           {immobilier && (
             <section id="public-site-section-immobilier" className="mt-12 scroll-mt-24" aria-labelledby="title-public-site-immobilier">
               <div className="mb-5">
@@ -590,10 +574,10 @@ function PublicSiteInstallPrompt({
           <p className="text-sm font-bold">Installer {brandName}</p>
           <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
             {ios
-              ? 'Dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».'
+              ? 'Touchez Installer pour afficher les étapes d’ajout à l’écran d’accueil dans Safari.'
               : installAvailable && manifestReady
-                ? 'Le navigateur ouvrira sa fenêtre d’installation avec le nom et le logo de ce site.'
-                : 'Si le bouton direct n’est pas proposé, ouvrez le menu du navigateur et choisissez « Installer l’application ».'
+                ? 'Touchez Installer pour ouvrir la fenêtre native du navigateur.'
+                : 'Touchez Installer pour lancer la demande directement depuis le navigateur.'
             }
           </p>
           {!manifestReady && !manifestError && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
@@ -603,7 +587,7 @@ function PublicSiteInstallPrompt({
       </div>
       <Button type="button" variant="outline" className="shrink-0" onClick={onInstall}>
         <Download size={16} className="mr-2" />
-        {installAvailable && manifestReady ? 'Installer l’application' : 'Voir les étapes d’installation'}
+        Installer l’application
       </Button>
     </aside>
   );
@@ -641,7 +625,7 @@ function PublicCompanySiteShell({
       testId: 'link-public-site-nav-home',
       icon: Store,
     },
-    ...modules.map(module => {
+    ...modules.filter(module => module.id !== 'transport').map(module => {
       const modulePath = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
       const active = activePathNormalized === modulePath
         || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
