@@ -71,12 +71,14 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     const hasEcommerce = bootstrap?.available
       && bootstrap.modules.some(module => module.id === 'ecommerce');
     const hasStoreKey = Boolean(bootstrap?.available && bootstrap.storeSlug);
-    if (!bootstrap?.available || routePath !== '/' || paymentReturn || !hasEcommerce || !hasStoreKey) {
+    const needsCompanySiteCapabilities = ['/', '/transport', '/immobilier'].includes(routePath);
+    if (!bootstrap?.available || !hasEcommerce || !hasStoreKey) {
       setStorefront(null);
       setStorefrontLoading(false);
       setStorefrontError('');
       return undefined;
     }
+    if (paymentReturn || !needsCompanySiteCapabilities) return undefined;
 
     let cancelled = false;
     setStorefront(null);
@@ -188,6 +190,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     homePath: basePath || '/',
     modules,
   };
+  const locationEnabled = Boolean(storefront?.store.enabledFeatures.location);
 
   if (routePath === '/transport' && transport) {
     return (
@@ -197,6 +200,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
         modules={modules}
         basePath={basePath}
         activePath={routePath}
+        locationEnabled={locationEnabled}
       >
         <Suspense fallback={<PublicSiteMessage title="Chargement du module Transport…" testId="status-public-transport-loading" />}>
           <PublicTransportPage
@@ -221,6 +225,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
         modules={modules}
         basePath={basePath}
         activePath={routePath}
+        locationEnabled={locationEnabled}
       >
         <PublicSiteImmobilier
           domain={domain}
@@ -243,6 +248,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
           modules={modules}
           basePath={basePath}
           activePath={routePath}
+          locationEnabled={locationEnabled}
         >
           <PublicSiteMessage
             title="La boutique publique n’est pas disponible."
@@ -267,6 +273,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
         modules={modules}
         basePath={basePath}
         activePath={routePath}
+        locationEnabled={locationEnabled}
       >
         <PublicSiteMessage
           title="Cette page n’est pas publiée sur le site de l’entreprise."
@@ -284,6 +291,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       modules={modules}
       basePath={basePath}
       activePath="/"
+      locationEnabled={locationEnabled}
     >
       <main className="min-h-[calc(100dvh-5rem)] bg-[hsl(var(--background))] px-5 py-8 text-[hsl(var(--foreground))] sm:px-8 sm:py-12" data-testid="page-public-site-home">
         <section className="mx-auto max-w-6xl">
@@ -411,6 +419,7 @@ function PublicCompanySiteShell({
   modules,
   basePath,
   activePath,
+  locationEnabled,
   children,
 }: {
   companyName: string;
@@ -418,6 +427,7 @@ function PublicCompanySiteShell({
   modules: PublicSiteModule[];
   basePath: string;
   activePath: string;
+  locationEnabled: boolean;
   children: ReactNode;
 }) {
   const siteBasePath = basePath.replace(/\/+$/, '');
@@ -477,6 +487,17 @@ function PublicCompanySiteShell({
                 </Link>
               );
             })}
+            {hasEcommerce && locationEnabled && (
+              <Link
+                href={`${siteBasePath}/location`}
+                aria-current={activePathNormalized === '/location' || activePathNormalized.startsWith('/location/') ? 'page' : undefined}
+                className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${activePathNormalized === '/location' || activePathNormalized.startsWith('/location/') ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
+                style={(activePathNormalized === '/location' || activePathNormalized.startsWith('/location/')) && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
+                data-testid="link-public-site-nav-location"
+              >
+                Location
+              </Link>
+            )}
             {hasEcommerce && (
               <>
                 <Link

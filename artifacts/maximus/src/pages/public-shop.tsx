@@ -832,7 +832,7 @@ export default function PublicShopPage({
           path: module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path,
         })),
          ...commerceNav.filter(item => (
-          ['/panier', '/connexion', '/compte'].includes(item.path)
+           ['/location', '/panier', '/connexion', '/compte'].includes(item.path)
           && !companySite.modules.some(module => module.path === item.path)
         )),
      ]
