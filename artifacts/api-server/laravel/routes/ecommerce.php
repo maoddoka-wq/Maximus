@@ -56,14 +56,6 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
     });
 
 Route::middleware('maximus.installation.public')->group(function (): void {
-Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
-Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
-Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
-Route::get('/shop-domain/location/reservations/{id}/invoice', [CarRentalController::class, 'publicInvoiceDomain']);
-Route::get('/shop-domain/manifest.webmanifest', [EcommerceController::class, 'publicManifestByDomain']);
-Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
-Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
-Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
@@ -72,6 +64,16 @@ Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, '
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/gallery-images/{company}/{imageId}', [EcommerceController::class, 'serveGalleryImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'imageId' => '[A-Za-z0-9_-]+']);
+
+Route::middleware('maximus.public-site')->group(function (): void {
+Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
+Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
+Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
+Route::get('/shop-domain/location/reservations/{id}/invoice', [CarRentalController::class, 'publicInvoiceDomain']);
+Route::get('/shop-domain/manifest.webmanifest', [EcommerceController::class, 'publicManifestByDomain']);
+Route::post('/shop-domain/orders', [EcommerceController::class, 'createPublicDomainOrder'])->middleware('throttle:orders');
+Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'createPublicDomainDeliveryRequest'])->middleware('throttle:orders');
+Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/manifest.webmanifest', [EcommerceController::class, 'publicManifest']);
@@ -128,4 +130,5 @@ Route::get('/shop-domain/customer/delivery-requests', [EcommerceCustomerControll
 Route::post('/shop-domain/orders/{orderId}/payment', [EcommercePaymentController::class, 'createByDomain'])->middleware('throttle:orders');
 Route::post('/shop-domain/customer/logout', [EcommerceCustomerController::class, 'logout']);
 Route::post('/shop/{slug}/customer/logout', [EcommerceCustomerController::class, 'logout']);
+});
 });
