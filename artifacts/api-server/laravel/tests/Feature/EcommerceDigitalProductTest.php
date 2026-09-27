@@ -173,7 +173,6 @@ class EcommerceDigitalProductTest extends TestCase
 
     private function createStore(string $companyId, string $slug): void
     {
-        $this->enablePublicSiteForTesting($companyId, ['ecommerce']);
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-'.$companyId,
             'company_id' => $companyId,

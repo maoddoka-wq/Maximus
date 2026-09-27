@@ -9,7 +9,6 @@ use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
 use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
-use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
@@ -130,31 +129,6 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
     Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
 });
-
-Route::middleware(['maximus.auth', 'maximus.company'])->prefix('company')->group(function (): void {
-    Route::get('/public-site', [PublicSiteController::class, 'company']);
-    Route::patch('/public-site', [PublicSiteController::class, 'updateCompany']);
-    Route::post('/public-site/logo', [PublicSiteController::class, 'uploadBrandLogo']);
-    Route::post('/public-site/hero-images', [PublicSiteController::class, 'uploadHeroImages']);
-    Route::delete('/public-site/hero-images/{imageId}', [PublicSiteController::class, 'deleteHeroImage']);
-    Route::post('/public-site/domains', [PublicSiteController::class, 'createDomain']);
-    Route::post('/public-site/domains/{id}/verify', [PublicSiteController::class, 'verifyDomain']);
-    Route::delete('/public-site/domains/{id}', [PublicSiteController::class, 'deleteDomain']);
-});
-
-Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {
-    Route::get('/{companyId}/public-site-access', [PublicSiteController::class, 'access']);
-    Route::put('/{companyId}/public-site-access', [PublicSiteController::class, 'updateAccess']);
-});
-
-Route::get('/public-site/bootstrap', [PublicSiteController::class, 'bootstrap'])
-    ->middleware('maximus.installation.public');
-Route::get('/public-site/bootstrap/{slug}', [PublicSiteController::class, 'bootstrapBySlug'])
-    ->middleware('maximus.installation.public');
-Route::get('/public-site/manifest.webmanifest', [PublicSiteController::class, 'manifestByDomain'])
-    ->middleware('maximus.installation.public');
-Route::get('/public-site/manifest.webmanifest/{slug}', [PublicSiteController::class, 'manifestBySlug'])
-    ->middleware('maximus.installation.public');
 
 Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, ChevronDown, Clock3, Copy, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, Share2, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
@@ -235,27 +235,7 @@ const isWithinDakar = (latitude: number, longitude: number) =>
   && longitude >= DAKAR_BOUNDS.minLongitude
   && longitude <= DAKAR_BOUNDS.maxLongitude;
 
-export default function PublicShopPage({
-  slug,
-  domain = false,
-  clientApp = false,
-  companySite,
-  siteInstallPrompt,
-}: {
-  slug?: string;
-  domain?: boolean;
-  clientApp?: boolean;
-  companySite?: {
-    companyName: string;
-    homePath: string;
-    modules: { id: string; label: string; path: string }[];
-    brandLogoUrl?: string | null;
-    description?: string;
-    heroImages?: string[];
-    singlePageLanding?: boolean;
-  };
-  siteInstallPrompt?: ReactNode;
-}) {
+export default function PublicShopPage({ slug, domain = false, clientApp = false }: { slug?: string; domain?: boolean; clientApp?: boolean }) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const routePath = location.split('?')[0];
@@ -302,9 +282,6 @@ export default function PublicShopPage({
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
-  const [manifestError, setManifestError] = useState('');
-  const [installHelp, setInstallHelp] = useState('');
-  const isCompanySite = Boolean(companySite);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
     const result = query.get('payment');
@@ -341,20 +318,11 @@ export default function PublicShopPage({
     return match ? decodeURIComponent(match[1]) : null;
   }, [routePath]);
 
-  useEffect(() => subscribeToPwaInstall(() => {
-    const available = canInstallPwa();
-    setInstallAvailable(available);
-    if (available) setInstallHelp('');
-  }), []);
+  useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [routePath]);
-
-  useEffect(() => {
-    if (isCompanySite || !data?.store.name.trim()) {
+    if (!data?.store.name.trim()) {
       setManifestReady(false);
-      setManifestError('');
       return undefined;
     }
     const manifestUrl = domain
@@ -363,7 +331,6 @@ export default function PublicShopPage({
     let cancelled = false;
     let cleanup: (() => void) | undefined;
     setManifestReady(false);
-    setManifestError('');
     void mountClientManifest(manifestUrl)
       .then(unmount => {
         if (cancelled) {
@@ -374,16 +341,13 @@ export default function PublicShopPage({
         setManifestReady(true);
       })
       .catch(error => {
-        if (!cancelled) {
-          console.warn('Le manifest PWA de la boutique n’a pas pu être validé.', error);
-          setManifestError('Le fichier d’installation de la boutique n’a pas pu être vérifié.');
-        }
+        if (!cancelled) console.warn('Le manifest PWA de la boutique n’a pas pu être validé.', error);
       });
     return () => {
       cancelled = true;
       cleanup?.();
     };
-  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, isCompanySite, slug]);
+  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, slug]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
@@ -399,17 +363,9 @@ export default function PublicShopPage({
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [logoPreviewOpen]);
 
-  const shopPath = (suffix = '') => {
-    if (companySite) {
-      const basePath = companySite.homePath.replace(/\/+$/, '');
-      if (suffix === '') return companySite.homePath.endsWith('/') ? `${basePath}/` : basePath || '/';
-      return `${basePath}${suffix}` || '/';
-    }
-    if (clientApp) return clientPwaPath(slug, suffix, domain);
-    return slug
-      ? `/shop/${encodeURIComponent(slug)}${suffix || '/accueil'}`
-      : suffix || '/accueil';
-  };
+  const shopPath = (suffix = '') => clientApp
+    ? clientPwaPath(slug, suffix, domain)
+    : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
   const go = (suffix: string) => {
     setLocation(shopPath(suffix));
   };
@@ -806,31 +762,9 @@ export default function PublicShopPage({
   };
 
   const installClientApp = async () => {
-    if (isIosDevice()) {
-      setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
-      return;
-    }
-    if (manifestError) {
-      setInstallHelp('Le fichier d’installation n’a pas été validé. Rechargez la boutique puis réessayez.');
-      return;
-    }
-    if (!manifestReady) {
-      setInstallHelp('La préparation de l’installation n’est pas terminée. Réessayez dans un instant.');
-      return;
-    }
-    if (!canInstallPwa()) {
-      setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
-      return;
-    }
-    try {
-      const installed = await promptPwaInstall();
-      setInstallHelp(installed
-        ? 'La boutique a été installée.'
-        : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
-      if (installed) showAppToast('La boutique est maintenant installée sur votre appareil.', 'success');
-    } catch {
-      setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
-    }
+    if (isIosDevice()) return;
+    const installed = await promptPwaInstall();
+    if (installed) showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
@@ -859,8 +793,7 @@ export default function PublicShopPage({
   });
   const isHomeRoute = routePath === shopPath('') || routePath === shopPath('/accueil');
   const isCatalogRoute = routePath === shopPath('/boutique');
-  const isSinglePageLanding = Boolean(companySite?.singlePageLanding && isHomeRoute);
-   const commerceNav = [
+   const publicNav = [
      { label: 'Accueil', path: '/accueil' },
      { label: 'Boutique', path: '/boutique' },
      ...(enabledFeatures.location ? [{ label: 'Location', path: '/location' }] : []),
@@ -870,53 +803,37 @@ export default function PublicShopPage({
      { label: 'Panier', path: '/panier' },
      { label: customer ? 'Mon compte' : 'Se connecter', path: customer ? '/compte' : '/connexion' },
    ];
-   const publicNav = companySite
-     ? [
-       { label: 'Accueil', path: '' },
-        ...companySite.modules.filter(module => module.id !== 'transport').map(module => ({
-          label: module.id === 'ecommerce' ? 'Boutique' : module.label,
-          path: module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path,
-        })),
-         ...commerceNav.filter(item => (
-            ['/location', '/livraison', '/panier', '/connexion', '/compte'].includes(item.path)
-          && !companySite.modules.some(module => module.path === item.path)
-        )),
-     ]
-     : commerceNav;
     const isPublicNavActive = (path: string) => {
-      if (path === '' || path === '/accueil') return isHomeRoute;
+      if (path === '/accueil') return isHomeRoute;
       if (path === '/boutique') return isCatalogRoute || Boolean(productDetailSlug);
      if (path === '/transport') return isTransportRoute;
      if (path === '/immobilier') return isImmobilierRoute;
      if (path === '/compte') return isAccountRoute;
      return routePath === shopPath(path);
    };
-    const primaryPaths = companySite ? ['', '/boutique', '/panier'] : ['/accueil', '/boutique', '/panier'];
-     const primaryMobileNav = publicNav.filter(item => primaryPaths.includes(item.path));
+    const primaryMobileNav = publicNav.filter(item => ['/accueil', '/boutique', '/panier'].includes(item.path));
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
-     const mobileNavItemsClass = 'mx-auto grid max-w-md grid-cols-4 gap-1';
-     const mobileNavVisible = !isAuthRoute && !submitted;
+     const mobileNavVisible = !isAuthRoute && !submitted && !isTransportRoute;
      const mobileNavBottomPadding = mobileNavVisible
        ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
        : 'pb-4 sm:pb-9';
-    const theme = publicShopTheme(store);
-    const publicLogoUrl = companySite?.brandLogoUrl || store.logoUrl;
+   const theme = publicShopTheme(store);
      return <div className="public-shop-shell min-h-[100dvh] w-full min-w-0 overflow-x-clip bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': theme.primary, '--shop-accent': theme.accent, '--shop-primary-foreground': theme.primaryForeground, '--shop-accent-foreground': theme.accentForeground } as React.CSSProperties}>
      <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 max-w-full shrink items-center gap-3 sm:max-w-[calc(100%-3rem)]">
               <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
-                 {publicLogoUrl ? <img src={publicLogoUrl} alt={`Logo de ${companySite?.companyName ?? store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-[var(--shop-accent-foreground)]" />}
+                {store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full rounded-xl bg-white object-contain p-1" /> : <ShoppingBag size={19} className="text-[var(--shop-accent-foreground)]" />}
              </button>
              <button type="button" onClick={() => go('')} className="min-w-0 text-left">
-                <span className="line-clamp-2 break-words text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{companySite?.companyName ?? store.name}</span>
+                <span className="line-clamp-2 break-words text-base font-bold leading-tight tracking-[-.02em] sm:text-lg">{store.name}</span>
              </button>
            </div>
            <nav id="public-shop-header-nav" className="hidden items-center gap-1 lg:flex">
              {publicNav.map(item => {
                const active = isPublicNavActive(item.path);
-                return <button type="button" key={item.path} onClick={() => go(item.path)} style={active ? { backgroundColor: theme.accent, color: theme.accentForeground } : undefined} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${active ? 'shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>;
+               return <button type="button" key={item.path} onClick={() => go(item.path)} style={active ? { backgroundColor: theme.accent, color: theme.accentForeground } : undefined} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${active ? 'shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>;
              })}
          </nav>
        </div>
@@ -943,28 +860,20 @@ export default function PublicShopPage({
        </div>}
         <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-9 lg:px-8 lg:pb-9 ${mobileNavBottomPadding}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-        {!isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && siteInstallPrompt}
-        {!companySite && !isStandalonePwa() && !isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && <aside className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="banner-shop-install">
+       {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
           <div>
             <p className="text-sm font-bold">Installez cette boutique</p>
             <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-               {isIosDevice()
-                  ? 'Touchez Installer pour afficher les étapes d’ajout à l’écran d’accueil dans Safari.'
-                 : installAvailable && manifestReady
-                    ? 'Touchez Installer pour ouvrir la fenêtre native du navigateur.'
-                    : 'Touchez Installer pour lancer la demande directement depuis le navigateur.'}
+              {isIosDevice() ? 'Touchez Partager, puis « Sur l’écran d’accueil » pour retrouver rapidement votre espace client.' : 'Retrouvez la boutique et vos commandes plus rapidement depuis votre écran d’accueil.'}
             </p>
-             {!manifestReady && !manifestError && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
-             {manifestError && <p className="mt-1 text-xs font-medium text-red-700" role="alert">{manifestError} Vous pouvez aussi réessayer depuis le menu du navigateur.</p>}
-             {installHelp && <p className="mt-1 text-xs font-medium text-[var(--shop-primary)]" role="status">{installHelp}</p>}
           </div>
         </div>
-          <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
+         {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
           <Download size={15} />Installer l’application
-          </button>
-       </aside>}
+        </button>}
+      </div>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} store={store} orderId={paymentReturn?.orderId ?? ''} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
               : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} attachments={orderAttachments} setAttachments={setOrderAttachments} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
@@ -974,88 +883,21 @@ export default function PublicShopPage({
              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
               : isImmobilierRoute ? enabledFeatures.immobilier ? <PublicImmobilierPage listings={data.immobilierListings ?? []} store={store} slug={slug} domain={domain} form={immobilierForm} setForm={setImmobilierForm} submitted={immobilierSubmitted} onSubmitted={() => setImmobilierSubmitted(true)} /> : <FeatureUnavailable title="Immobilier non activé" text="Cette entreprise n’a pas encore autorisé la vitrine immobilière." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
-         : isHomeRoute
-           ? isSinglePageLanding
-             ? (
-               <div className="space-y-10">
-                 <section id="public-site-section-home" data-public-site-landing-section className="scroll-mt-24">
-                   <ShopHomePage
-                     products={products}
-                     rentals={rentals}
-                     locationEnabled={enabledFeatures.location}
-                     store={store}
-                     companySite={companySite}
-                     showDiscovery={false}
-                     showShopAction={false}
-                     onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)}
-                     onAdd={add}
-                      onLocation={() => go('/location')}
-                      onShop={() => go('/boutique')}
-                   />
-                 </section>
-                 <section id="public-site-section-ecommerce" data-public-site-landing-section className="scroll-mt-24" aria-label="Boutique">
-                   <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
-                 </section>
-                 {enabledFeatures.location && (
-                   <section id="public-site-section-location" data-public-site-landing-section className="scroll-mt-24" aria-label="Location">
-                     <RentalPage
-                       rentals={rentals.filter(rental => !('productSlug' in rental))}
-                       store={store}
-                       customer={customer}
-                       slug={slug}
-                       domain={domain}
-                        onBack={() => go('/boutique')}
-                       backLabel="Retour aux offres"
-                     />
-                   </section>
-                 )}
-                 {companySite?.modules.some(module => module.id === 'immobilier') && (
-                   <section id="public-site-section-immobilier" data-public-site-landing-section className="scroll-mt-24" aria-label="Immobilier">
-                     <PublicImmobilierPage
-                       listings={data.immobilierListings ?? []}
-                       store={store}
-                       slug={slug}
-                       domain={domain}
-                       form={immobilierForm}
-                       setForm={setImmobilierForm}
-                       submitted={immobilierSubmitted}
-                       onSubmitted={() => setImmobilierSubmitted(true)}
-                     />
-                   </section>
-                 )}
-                 {enabledFeatures.livraisons && (
-                   <section id="public-site-section-livraison" data-public-site-landing-section className="scroll-mt-24" aria-label="Livraison">
-                     <DeliveryPage
-                       store={store}
-                       zones={data.deliveryZones ?? []}
-                       customer={customer}
-                       requests={customerData?.deliveryRequests ?? []}
-                       form={deliveryForm}
-                       setForm={setDeliveryForm}
-                       submitted={deliverySubmitted}
-                       onSubmit={() => void submitDeliveryRequest()}
-                       submitting={submittingDelivery}
-                        onNavigate={go}
-                     />
-                   </section>
-                 )}
-               </div>
-             )
-             : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
+        : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
         : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />}
     </main>
-      {mobileNavVisible && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden" aria-label="Navigation mobile"><div className={mobileNavItemsClass}>
-         {primaryMobileNav.map(item => { const Icon = item.path === '/accueil' || item.path === '' ? Store : item.path === '/boutique' ? Package : item.path === '/location' || item.path === '/transport' ? MapPin : item.path === '/immobilier' ? Building2 : ShoppingBag; const active = isPublicNavActive(item.path); return <Button variant="ghost" size="sm" type="button" key={item.path} onClick={() => go(item.path)} aria-current={active ? 'page' : undefined} className={`relative h-auto min-w-0 shrink-0 flex-col gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold sm:text-xs ${active ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-[var(--shop-accent-foreground)]">{cartCount}</span>}</Button>; })}
-          {additionalMobileNav.length > 0 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" type="button" aria-label={additionalMobileNavActive ? 'Plus, une page est active' : 'Plus, autres pages'} className={`relative h-auto min-w-0 shrink-0 flex-col gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold sm:text-xs ${additionalMobileNavActive ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Plus size={18} /><span>Plus</span>{additionalMobileNavActive && <span className="absolute right-1/4 top-0 h-2 w-2 translate-x-1/2 rounded-full bg-[var(--shop-accent)]" />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top" sideOffset={8}>{additionalMobileNav.map(item => <DropdownMenuItem key={item.path} onSelect={() => go(item.path)} className={isPublicNavActive(item.path) ? 'font-bold text-[var(--shop-accent)]' : ''}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}
+      {mobileNavVisible && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+         {primaryMobileNav.map(item => { const Icon = item.path === '/accueil' ? Store : item.path === '/boutique' ? Package : ShoppingBag; const active = isPublicNavActive(item.path); return <Button variant="ghost" size="sm" type="button" key={item.path} onClick={() => go(item.path)} aria-current={active ? 'page' : undefined} className={`relative h-auto min-w-0 flex-col gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold ${active ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-[var(--shop-accent-foreground)]">{cartCount}</span>}</Button>; })}
+         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" type="button" aria-label={additionalMobileNavActive ? 'Plus, une section est active' : 'Plus, autres fonctionnalités'} className={`relative h-auto min-w-0 flex-col gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold ${additionalMobileNavActive ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Plus size={18} /><span>Plus</span>{additionalMobileNavActive && <span className="absolute right-1/4 top-0 h-2 w-2 translate-x-1/2 rounded-full bg-[var(--shop-accent)]" />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top" sideOffset={8}>{additionalMobileNav.map(item => <DropdownMenuItem key={item.path} onSelect={() => go(item.path)} className={isPublicNavActive(item.path) ? 'font-bold text-[var(--shop-accent)]' : ''}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
        </div></nav>}
         {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl lg:inset-x-auto lg:bottom-4 lg:right-6 lg:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[hsl(var(--foreground))]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
 }
 
-export function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, submitted, onSubmitted }: {
+function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, submitted, onSubmitted }: {
   listings: PublicShopBootstrap['immobilierListings'];
-  store: Pick<PublicShopBootstrap['store'], 'name' | 'currency'>;
+  store: PublicShopBootstrap['store'];
   slug?: string;
   domain: boolean;
   form: { listingId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string };
@@ -1112,7 +954,7 @@ function ImmobilierGallery({ media, profileMedia, title }: { media: PublicShopBo
   </div>;
 }
 
-function PublicImmobilierDetail({ listing, store, onBack, onRequest }: { listing: PublicShopBootstrap['immobilierListings'][number]; store: Pick<PublicShopBootstrap['store'], 'name' | 'currency'>; onBack: () => void; onRequest: () => void }) {
+function PublicImmobilierDetail({ listing, store, onBack, onRequest }: { listing: PublicShopBootstrap['immobilierListings'][number]; store: PublicShopBootstrap['store']; onBack: () => void; onRequest: () => void }) {
   return <section className="mx-auto max-w-5xl">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour aux annonces</button>
     <div className="mt-6 grid gap-6 rounded-3xl border bg-white p-5 shadow-sm sm:p-8 lg:grid-cols-[1.1fr_.9fr]">
@@ -1309,18 +1151,7 @@ function PublicTransportLocationPreview({
   </div>;
 }
 
-export function TransportPublicPage({ store, slug, domain, onBack }: {
-  store: {
-    name: string;
-    currency: PublicShopBootstrap['store']['currency'];
-    seller?: { phone?: string | null };
-    transportPrimaryColor?: string;
-    transportAccentColor?: string;
-  };
-  slug?: string;
-  domain?: boolean;
-  onBack: () => void;
-}) {
+function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void }) {
   const phone = store.seller?.phone?.trim() ?? '';
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
@@ -2185,7 +2016,7 @@ function SharedTransportTrackingPage({
 }: {
   api: ReturnType<typeof createPublicTransportApi>;
   shareLocation: { tripId: string; shareToken: string };
-  store: Pick<PublicShopBootstrap['store'], 'currency'>;
+  store: PublicShopBootstrap['store'];
   colors: { primaryColor?: string; accentColor?: string } | null;
   onBack: () => void;
 }) {
@@ -2372,9 +2203,6 @@ function ShopHomePage({
   rentals,
   locationEnabled,
   store,
-  companySite,
-  showDiscovery = true,
-  showShopAction = true,
   onProduct,
   onAdd,
   onLocation,
@@ -2384,23 +2212,12 @@ function ShopHomePage({
   rentals: PublicRental[];
   locationEnabled: boolean;
   store: PublicShopBootstrap['store'];
-  companySite?: {
-    companyName: string;
-    description?: string;
-    heroImages?: string[];
-  };
-  showDiscovery?: boolean;
-  showShopAction?: boolean;
   onProduct: (product: PublicProduct) => void;
   onAdd: (product: PublicProduct) => void;
   onLocation: () => void;
   onShop: () => void;
 }) {
-  const heroImages = companySite?.heroImages?.length
-    ? companySite.heroImages
-    : store.heroImages.length > 0 ? store.heroImages : ['/family-lunch-hero.jpg'];
-  const brandName = companySite?.companyName ?? store.name;
-  const description = companySite?.description?.trim() || store.description || 'Retrouvez les produits et services publiés par votre boutique.';
+  const heroImages = store.heroImages.length > 0 ? store.heroImages : ['/family-lunch-hero.jpg'];
   const [heroIndex, setHeroIndex] = useState(0);
 
   useEffect(() => {
@@ -2434,18 +2251,18 @@ function ShopHomePage({
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(11,27,43,.58)_0%,rgba(11,27,43,.24)_38%,rgba(11,27,43,.04)_70%,transparent_100%)]" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-[#d69e2e]/12" />
       <div className="relative max-w-2xl">
-         <p className="text-xs font-bold uppercase tracking-[.18em] text-white/70">Bienvenue chez {brandName}</p>
+        <p className="text-xs font-bold uppercase tracking-[.18em] text-white/70">Bienvenue chez {store.name}</p>
          <h1 className="mt-2 text-2xl font-bold tracking-[-.05em] sm:mt-3 sm:text-4xl">Découvrez nos offres</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-white/75 sm:mt-3">{description}</p>
-          {showShopAction && <button type="button" onClick={onShop} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold sm:mt-6" style={{ color: store.accentColor }}>
-           Voir la boutique <ArrowRight size={16} />
-         </button>}
+         <p className="mt-2 max-w-xl text-sm leading-6 text-white/75 sm:mt-3">{store.description || 'Retrouvez les produits et services publiés par votre boutique.'}</p>
+         <button type="button" onClick={onShop} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold sm:mt-6" style={{ color: store.accentColor }}>
+          Voir la boutique <ArrowRight size={16} />
+        </button>
       </div>
     </div>
-     {showDiscovery && <div className="flex flex-col gap-10">
-       <DiscoveryRail title="Tous les produits" items={products} type="product" store={store} onProduct={onProduct} onAdd={onAdd} />
-       {locationEnabled && <DiscoveryRail title="Locations disponibles" items={rentals} type="rental" store={store} onLocation={onLocation} />}
-     </div>}
+    <div className="flex flex-col gap-10">
+      <DiscoveryRail title="Tous les produits" items={products} type="product" store={store} onProduct={onProduct} onAdd={onAdd} />
+      {locationEnabled && <DiscoveryRail title="Locations disponibles" items={rentals} type="rental" store={store} onLocation={onLocation} />}
+    </div>
   </section>;
 }
 
@@ -2697,7 +2514,7 @@ function RentalProductCard({ rental, store, onSelect }: { rental: PublicRental; 
   </article>;
 }
 
-function RentalPage({ rentals, store, customer, slug, domain, onBack, backLabel = 'Retour à la boutique' }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; slug?: string; domain?: boolean; onBack: () => void; backLabel?: string }) {
+function RentalPage({ rentals, store, customer, slug, domain, onBack }: { rentals: PublicRental[]; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; slug?: string; domain?: boolean; onBack: () => void }) {
   const [selectedRental, setSelectedRental] = useState<PublicRental | null>(null);
 
   if (selectedRental) {
@@ -2707,7 +2524,7 @@ function RentalPage({ rentals, store, customer, slug, domain, onBack, backLabel 
   const categories = [...new Set(rentals.map(rental => rental.category || 'Général'))].sort((a, b) => a.localeCompare(b, 'fr'));
 
   return <section className="mx-auto max-w-6xl">
-     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />{backLabel}</button>
+    <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour à la boutique</button>
     <header className="mt-6 flex flex-col justify-between gap-3 border-b pb-5 sm:flex-row sm:items-end">
       <div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: store.primaryColor }}>Flotte automobile</p><h1 className="mt-2 text-2xl font-bold tracking-[-.04em]">Trouvez votre prochaine location</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Échangez directement avec le propriétaire pour vérifier la disponibilité et les conditions.</p></div>
       <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{rentals.length} véhicule{rentals.length > 1 ? 's' : ''}</span>

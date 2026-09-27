@@ -21,7 +21,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::patch('/trips/{id}/status', [TransportController::class, 'updateTripStatus']);
 });
 
-Route::middleware(['maximus.installation.public', 'maximus.public-site:transport'])->group(function (): void {
+Route::middleware('maximus.installation.public')->group(function (): void {
 Route::post('/shop/{slug}/transport/trips', [TransportController::class, 'createPublicTrip'])->middleware('throttle:orders');
 Route::post('/shop/{slug}/transport/quote', [TransportController::class, 'quotePublicTrip'])->middleware('throttle:orders');
 Route::get('/shop/{slug}/transport/places', [TransportController::class, 'suggestPublicTransportPlaces'])->middleware('throttle:orders');

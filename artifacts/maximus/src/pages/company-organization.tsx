@@ -5,10 +5,9 @@ import { EmployeesTab } from './organization-employees';
 import { RolesTab } from './organization-roles';
 import { StructureTab } from './organization-structure';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
-import { CompanyPublicSitePanel } from './company-public-site';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
-type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile' | 'public-site';
+type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile';
 
 export { CompanyProfileSection } from './company-profile-section';
 
@@ -76,7 +75,6 @@ export function CompanyOrganizationAdmin({
     { id: 'roles', label: '2 · Rôles & permissions' },
     { id: 'employees', label: '3 · Comptes & managers' },
     { id: 'profile', label: 'Mon profil' },
-    { id: 'public-site', label: 'Site public' },
   ] as { id: OrganizationTab; label: string }[]).filter(
     item =>
       !sectorManager ||
@@ -110,7 +108,6 @@ export function CompanyOrganizationAdmin({
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
       {tab === 'profile' && !sectorManager && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}
-      {tab === 'public-site' && !sectorManager && <CompanyPublicSitePanel company={company} />}
     </div>
   );
 }

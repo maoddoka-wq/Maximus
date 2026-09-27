@@ -8,7 +8,6 @@ use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Services\EcommerceDomainVerifier;
-use App\Services\PublicPwaIcon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +50,7 @@ class EcommerceController extends Controller
 
         return response()->json([
             'store' => $this->store($store),
+            'domains' => $this->domains($company),
             'categories' => $this->categories($company),
             'products' => DB::table('ecommerce_products')
                 ->where('company_id', $company)
@@ -73,50 +73,38 @@ class EcommerceController extends Controller
             return $this->forbidden();
         }
 
-        foreach ([
-            'name',
-            'slug',
-            'description',
-            'primaryColor',
-            'accentColor',
-            'logoUrl',
-            'logo',
-            'heroImages',
-            'domains',
-        ] as $companySiteField) {
-            if ($request->exists($companySiteField)) {
-                return response()->json([
-                    'error' => 'L’identité, l’adresse et les médias se gèrent dans le site public de l’entreprise.',
-                ], 422);
-            }
-        }
-
         $input = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'min:2', 'max:120'],
+            'slug' => ['required', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'description' => ['nullable', 'string', 'max:500'],
             'status' => ['required', 'in:DRAFT,PUBLISHED,SUSPENDED'],
             'currency' => ['required', 'in:XOF,EUR,USD'],
+            'primaryColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'accentColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'logoUrl' => ['nullable', 'string', 'max:500'],
             'allowOrderAttachments' => ['sometimes', 'boolean'],
         ])->validate();
         $company = $this->company($request);
         $row = $this->ensureStore($company);
+        $slug = $this->uniqueStoreSlug($input['slug'], (string) $row->id);
         $storeValues = [
+            'slug' => $slug,
+            'name' => $input['name'],
+            'description' => $input['description'] ?? '',
             'status' => $input['status'],
             'currency' => $input['currency'],
+            'primary_color' => $input['primaryColor'],
+            'accent_color' => $input['accentColor'],
+            'logo_url' => array_key_exists('logoUrl', $input) ? ($input['logoUrl'] ?? '') : ($row->logo_url ?? ''),
             'allow_order_attachments' => (bool) ($input['allowOrderAttachments'] ?? $row->allow_order_attachments ?? false),
             'updated_at' => now(),
         ];
         if (DB::table('ecommerce_stores')->where('id', $row->id)->where('company_id', $company)->exists()) {
             DB::table('ecommerce_stores')->where('id', $row->id)->where('company_id', $company)->update($storeValues);
         } else {
-            $publicIdentity = $this->store($row);
             DB::table('ecommerce_stores')->insert(array_merge([
                 'id' => $row->id,
                 'company_id' => $company,
-                'slug' => $publicIdentity['slug'],
-                'name' => $publicIdentity['name'],
-                'description' => $publicIdentity['description'],
-                'primary_color' => $publicIdentity['primaryColor'],
-                'accent_color' => $publicIdentity['accentColor'],
-                'logo_url' => $publicIdentity['logoUrl'],
                 'created_at' => now(),
             ], $storeValues));
         }
@@ -127,6 +115,82 @@ class EcommerceController extends Controller
                 ->where('company_id', $company)
                 ->first(),
         ));
+    }
+
+    public function uploadStoreLogo(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $store = $this->ensureStore($company);
+        $input = Validator::make($request->all(), [
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ])->validate();
+
+        $contents = $input['image']->get();
+        if (! is_string($contents) || $contents === '') {
+            return response()->json(['error' => 'Le logo n’a pas pu être lu après son envoi.'], 500);
+        }
+
+        $extension = strtolower($input['image']->getClientOriginalExtension() ?: 'bin');
+        $filename = Str::uuid()->toString().'.'.$extension;
+        $logoUrl = '/api/store-logos/'.rawurlencode($company).'/'.rawurlencode($filename);
+        $logoValues = [
+            'logo_url' => $logoUrl,
+            'logo_data' => base64_encode($contents),
+            'logo_mime' => $input['image']->getMimeType() ?: 'application/octet-stream',
+            'updated_at' => now(),
+        ];
+        if (DB::table('ecommerce_stores')->where('id', $store->id)->exists()) {
+            DB::table('ecommerce_stores')->where('id', $store->id)->update($logoValues);
+        } else {
+            DB::table('ecommerce_stores')->insert(array_merge([
+                'id' => $store->id,
+                'company_id' => $store->company_id,
+                'slug' => $store->slug,
+                'name' => $store->name,
+                'description' => $store->description,
+                'status' => $store->status,
+                'currency' => $store->currency,
+                'primary_color' => $store->primary_color,
+                'accent_color' => $store->accent_color,
+                'created_at' => now(),
+            ], $logoValues));
+        }
+        $this->deleteStoredImage($store->logo_url ?? '', $logoUrl);
+
+        return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $store->id)->first()));
+    }
+
+    public function uploadStoreHeroImages(Request $request): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $store = $this->ensureStore($company);
+        $this->storeGalleryImages($request, $company, 'store', (string) $store->id, 'hero', 12, 10240);
+
+        return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $store->id)->where('company_id', $company)->first()));
+    }
+
+    public function deleteStoreHeroImage(Request $request, string $imageId): JsonResponse
+    {
+        if (! $this->allowed($request, 'modify', 'parametres')) {
+            return $this->forbidden();
+        }
+
+        $company = $this->company($request);
+        $store = $this->ensureStore($company);
+        $deleted = $this->deleteGalleryImage($company, $imageId, 'store', (string) $store->id, 'hero');
+        if (! $deleted) {
+            return response()->json(['error' => 'Image de bannière introuvable.'], 404);
+        }
+
+        return response()->json($this->store(DB::table('ecommerce_stores')->where('id', $store->id)->where('company_id', $company)->first()));
     }
 
     public function createCategory(Request $request): JsonResponse
@@ -576,7 +640,6 @@ class EcommerceController extends Controller
         $product = DB::table('ecommerce_products')
             ->where('company_id', $company)
             ->where('image_url', $imageUrl)
-            ->where('status', 'PUBLISHED')
             ->first(['image_data', 'image_mime']);
         if ($product && is_string($product->image_data) && $product->image_data !== '') {
             $contents = base64_decode($product->image_data, true);
@@ -598,24 +661,13 @@ class EcommerceController extends Controller
         ]);
     }
 
-    public function serveStoreLogo(Request $request, string $company, string $filename)
+    public function serveStoreLogo(string $company, string $filename)
     {
         if (! preg_match('/^[A-Za-z0-9_-]+$/', $company) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
             abort(404);
         }
 
         $logoUrl = '/api/store-logos/'.$company.'/'.$filename;
-        $companySite = DB::table('company_public_sites')
-            ->where('company_id', $company)
-            ->where('logo_url', $logoUrl)
-            ->first(['logo_data', 'logo_mime']);
-        if ($companySite && is_string($companySite->logo_data) && $companySite->logo_data !== '') {
-            $contents = base64_decode($companySite->logo_data, true);
-            if ($contents !== false) {
-                return $this->storeLogoResponse($request, $contents, $companySite->logo_mime ?: 'application/octet-stream');
-            }
-        }
-
         $store = DB::table('ecommerce_stores')
             ->where('company_id', $company)
             ->where('logo_url', $logoUrl)
@@ -623,7 +675,10 @@ class EcommerceController extends Controller
         if ($store && is_string($store->logo_data) && $store->logo_data !== '') {
             $contents = base64_decode($store->logo_data, true);
             if ($contents !== false) {
-                return $this->storeLogoResponse($request, $contents, $store->logo_mime ?: 'application/octet-stream');
+                return response($contents, 200, [
+                    'Content-Type' => $store->logo_mime ?: 'application/octet-stream',
+                    'Cache-Control' => 'public, max-age=31536000, immutable',
+                ]);
             }
         }
 
@@ -632,42 +687,7 @@ class EcommerceController extends Controller
             abort(404);
         }
 
-        if ($request->query->has('pwa_size')) {
-            return $this->storeLogoResponse(
-                $request,
-                Storage::disk('public')->get($path),
-                Storage::disk('public')->mimeType($path) ?: 'application/octet-stream',
-            );
-        }
-
         return response()->file(Storage::disk('public')->path($path), [
-            'Cache-Control' => 'public, max-age=31536000, immutable',
-        ]);
-    }
-
-    private function storeLogoResponse(Request $request, string $contents, string $mime)
-    {
-        if (! $request->query->has('pwa_size')) {
-            return response($contents, 200, [
-                'Content-Type' => $mime,
-                'Cache-Control' => 'public, max-age=31536000, immutable',
-            ]);
-        }
-
-        $size = filter_var($request->query('pwa_size'), FILTER_VALIDATE_INT);
-        if (! in_array($size, [192, 512], true)) {
-            abort(422, 'La taille d’icône PWA demandée est invalide.');
-        }
-
-        try {
-            $png = PublicPwaIcon::renderPng($contents, $size);
-        } catch (Throwable $error) {
-            report($error);
-            abort(503, 'Le logo ne peut pas être préparé pour l’installation.');
-        }
-
-        return response($png, 200, [
-            'Content-Type' => 'image/png',
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
     }
@@ -908,7 +928,6 @@ class EcommerceController extends Controller
         $rental = DB::table('ecommerce_rentals')
             ->where('company_id', $company)
             ->where('image_url', $imageUrl)
-            ->where('status', 'PUBLISHED')
             ->first(['image_data', 'image_mime']);
         if ($rental && is_string($rental->image_data) && $rental->image_data !== '') {
             $contents = base64_decode($rental->image_data, true);
@@ -1423,23 +1442,22 @@ class EcommerceController extends Controller
     private function publicStorePayload(object $row, ?array $features = null, array $galleryMap = []): array
     {
         $features ??= $this->publicEnabledFeatures((string) $row->company_id);
-        $siteStore = $this->store($row);
         $company = DB::table('companies')
             ->where('id', $row->company_id)
             ->whereNull('deleted_at')
             ->first(['name', 'email', 'phone', 'profile_photo']);
 
         return [
-            'slug' => $siteStore['slug'],
-            'name' => $siteStore['name'],
-            'description' => $siteStore['description'],
+            'slug' => $row->slug,
+            'name' => $row->name,
+            'description' => (string) ($row->description ?? ''),
             'status' => $row->status,
             'currency' => $row->currency,
-            'primaryColor' => $siteStore['primaryColor'],
-            'accentColor' => $siteStore['accentColor'],
-            'logoUrl' => $siteStore['logoUrl'],
-            'allowOrderAttachments' => $siteStore['allowOrderAttachments'],
-            'heroImages' => $siteStore['heroImages'],
+            'primaryColor' => $row->primary_color,
+            'accentColor' => $row->accent_color,
+            'logoUrl' => $row->logo_url ?? '',
+            'allowOrderAttachments' => (bool) ($row->allow_order_attachments ?? false),
+            'heroImages' => $this->galleryUrlsFromMap($galleryMap, (string) $row->company_id, 'store', (string) ($row->id ?? ''), 'hero'),
             'transportPrimaryColor' => $this->publicTransportColor((string) $row->company_id, 'primaryColor'),
             'transportAccentColor' => $this->publicTransportColor((string) $row->company_id, 'accentColor'),
             'seller' => [
@@ -1502,7 +1520,11 @@ class EcommerceController extends Controller
             'background_color' => '#f8f5ed',
             'theme_color' => $store->accent_color ?: '#0b1b2b',
             'lang' => 'fr',
-            'icons' => PublicPwaIcon::manifestIcons($logoUrl),
+            'icons' => [[
+                'src' => $logoUrl !== '' ? $logoUrl : '/admin-logo.png',
+                'sizes' => '1024x1024',
+                'purpose' => 'any maskable',
+            ]],
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Vary', 'Host');
     }
@@ -2296,39 +2318,19 @@ class EcommerceController extends Controller
 
     private function store(object $row): array
     {
-        $companyId = (string) $row->company_id;
-        $site = DB::table('company_public_sites')->where('company_id', $companyId)->first();
-        $company = DB::table('companies')->where('id', $companyId)->first();
-        $companyName = trim((string) ($company?->name ?? ''));
-        $publicName = trim((string) ($site?->public_name ?? ''));
-        $publicSlug = trim((string) ($site?->public_slug ?? ''));
-        $publicDescription = $site?->public_description !== null
-            ? (string) $site->public_description
-            : '';
-        $logoUrl = trim((string) ($site?->logo_url ?? ''));
-        $primaryColor = trim((string) ($site?->primary_color ?? ''));
-        $accentColor = trim((string) ($site?->accent_color ?? ''));
-        $heroImages = $this->galleryUrls($companyId, 'company_site', $companyId, 'hero');
-        if ($logoUrl === '') {
-            $logoUrl = trim((string) ($company?->profile_photo ?? ''));
-        }
-        if ($publicSlug === '') {
-            $publicSlug = Str::slug($companyName) ?: $companyId;
-        }
-
         return [
             'id' => $row->id,
-            'companyId' => $companyId,
-            'slug' => $publicSlug,
-            'name' => $publicName !== '' ? $publicName : ($companyName !== '' ? $companyName : $companyId),
-            'description' => $publicDescription,
+            'companyId' => $row->company_id,
+            'slug' => $row->slug,
+            'name' => $row->name,
+            'description' => $row->description,
             'status' => $row->status,
             'currency' => $row->currency,
-            'primaryColor' => $primaryColor !== '' ? $primaryColor : '#2563EB',
-            'accentColor' => $accentColor !== '' ? $accentColor : '#0F172A',
-            'logoUrl' => $logoUrl,
+            'primaryColor' => $row->primary_color,
+            'accentColor' => $row->accent_color,
+            'logoUrl' => $row->logo_url ?? '',
             'allowOrderAttachments' => (bool) ($row->allow_order_attachments ?? false),
-            'heroImages' => $heroImages,
+            'heroImages' => $this->galleryUrls((string) $row->company_id, 'store', (string) $row->id, 'hero'),
         ];
     }
 

@@ -17,15 +17,6 @@ class EcommerceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        CompanyRegistry::ensureActive('other-company', 'Autre entreprise');
-        ModuleCatalog::ensureCompanyAccess('other-company');
-        $this->enablePublicSiteForTesting('kora', ['ecommerce']);
-        $this->enablePublicSiteForTesting('other-company', ['ecommerce']);
-    }
-
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {
         $this->getJson('/api/ecommerce/bootstrap?companyId=kora')->assertUnauthorized();
@@ -68,41 +59,36 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseMissing('ecommerce_products', ['sku' => 'FORBIDDEN-01']);
     }
 
-    public function test_detailed_settings_permission_cannot_change_company_site_branding(): void
+    public function test_detailed_settings_permission_allows_store_logo_upload(): void
     {
         Storage::fake('public');
         $request = $this->asActor('employee', [
             'ecommerce:menu:parametres' => ['voir', 'modifier'],
         ]);
 
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'name' => 'Marque non autorisée',
-            'slug' => 'slug-non-autorise',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-        ])->assertStatus(422)
-            ->assertJsonPath('error', 'L’identité, l’adresse et les médias se gèrent dans le site public de l’entreprise.');
-
-        $request->post('/api/company/public-site/logo?companyId=kora', [
+        $response = $request->post('/api/ecommerce/store/logo?companyId=kora', [
             'image' => UploadedFile::fake()->image('logo-boutique.png'),
-        ])->assertForbidden();
+        ])->assertOk();
 
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'allowOrderAttachments' => true,
-        ])->assertOk()
-            ->assertJsonPath('allowOrderAttachments', true);
+        $logoUrl = $response->json('logoUrl');
+        $this->assertStringStartsWith('/api/store-logos/kora/', $logoUrl);
+        $this->assertDatabaseHas('ecommerce_stores', [
+            'id' => 'ecommerce-store-kora',
+            'logo_url' => $logoUrl,
+        ]);
     }
 
     public function test_order_attachment_setting_is_saved_and_published_in_the_public_shop(): void
     {
-        $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'kora-documents', 'Entreprise KORA', 'Présentation commune.');
-
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+        $this->asActor()
+            ->patchJson('/api/ecommerce/store?companyId=kora', [
+                'name' => 'Boutique KORA',
+                'slug' => 'kora-documents',
+                'description' => 'Boutique de test',
                 'status' => 'PUBLISHED',
                 'currency' => 'XOF',
+                'primaryColor' => '#D69E2E',
+                'accentColor' => '#172033',
                 'allowOrderAttachments' => true,
             ])
             ->assertOk()
@@ -198,20 +184,20 @@ class EcommerceTest extends TestCase
         ])->assertCreated()->assertJsonPath('slug', 'sac-atlas-2');
     }
 
-    public function test_company_public_site_slug_is_unique_and_not_an_ecommerce_setting(): void
+    public function test_same_store_name_keeps_each_company_isolated_with_a_unique_public_slug(): void
     {
-        $firstRequest = $this->asActor();
-        $this->setCompanySiteIdentity(
-            $firstRequest,
-            'kora',
-            'boutique-commune',
-            'Site Entreprise KORA',
-            'Présentation de KORA.',
-        );
-        $first = $firstRequest->patchJson('/api/ecommerce/store?companyId=kora', [
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-        ])->assertOk()->json();
+        $first = $this->asActor()
+            ->patchJson('/api/ecommerce/store?companyId=kora', [
+                'name' => 'Boutique commune',
+                'slug' => 'boutique-commune',
+                'description' => 'Catalogue de la première entreprise',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primaryColor' => '#D69E2E',
+                'accentColor' => '#172033',
+            ])
+            ->assertOk()
+            ->json();
 
         CompanyRegistry::ensureActive('other-company', 'Autre entreprise');
         ModuleCatalog::ensureCompanyAccess('other-company');
@@ -231,65 +217,55 @@ class EcommerceTest extends TestCase
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($otherUser));
 
-        $otherRequest->getJson('/api/ecommerce/bootstrap?companyId=other-company')->assertOk();
-        $duplicate = $otherRequest->patchJson('/api/company/public-site?companyId=other-company', [
-            'enabled' => true,
-            'moduleIds' => ['ecommerce'],
-            'brand' => [
-                'name' => 'Site Autre entreprise',
+        $second = $otherRequest
+            ->patchJson('/api/ecommerce/store?companyId=other-company', [
+                'name' => 'Boutique commune',
                 'slug' => 'boutique-commune',
-                'description' => 'Présentation de la deuxième entreprise.',
+                'description' => 'Catalogue de la deuxième entreprise',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
                 'primaryColor' => '#123456',
                 'accentColor' => '#654321',
-            ],
-        ]);
-        $duplicate->assertStatus(422);
-
-        $otherRequest->patchJson('/api/company/public-site?companyId=other-company', [
-            'enabled' => true,
-            'moduleIds' => ['ecommerce'],
-            'brand' => [
-                'name' => 'Site Autre entreprise',
-                'slug' => 'boutique-commune-2',
-                'description' => 'Présentation de la deuxième entreprise.',
-                'primaryColor' => '#123456',
-                'accentColor' => '#654321',
-            ],
-        ])->assertOk();
-        $second = $otherRequest->patchJson('/api/ecommerce/store?companyId=other-company', [
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-        ])->assertOk()->json();
+            ])
+            ->assertOk()
+            ->assertJsonPath('slug', 'boutique-commune-2')
+            ->json();
 
         $this->assertNotSame($first['id'], $second['id']);
         $this->assertDatabaseHas('ecommerce_stores', [
             'id' => $first['id'],
             'company_id' => 'kora',
+            'name' => 'Boutique commune',
+            'description' => 'Catalogue de la première entreprise',
             'slug' => 'boutique-commune',
         ]);
         $this->assertDatabaseHas('ecommerce_stores', [
             'id' => $second['id'],
             'company_id' => 'other-company',
+            'name' => 'Boutique commune',
+            'description' => 'Catalogue de la deuxième entreprise',
             'slug' => 'boutique-commune-2',
         ]);
 
         $this->getJson('/api/shop/boutique-commune')
             ->assertOk()
-            ->assertJsonPath('store.name', 'Site Entreprise KORA')
-            ->assertJsonPath('store.description', 'Présentation de KORA.');
+            ->assertJsonPath('store.description', 'Catalogue de la première entreprise');
         $this->getJson('/api/shop/boutique-commune-2')
             ->assertOk()
-            ->assertJsonPath('store.name', 'Site Autre entreprise')
-            ->assertJsonPath('store.description', 'Présentation de la deuxième entreprise.');
+            ->assertJsonPath('store.description', 'Catalogue de la deuxième entreprise');
     }
 
     public function test_published_shop_recalculates_total_and_decrements_stock_transactionally(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'kora-boutique-test', 'Entreprise KORA', 'Boutique publique');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique KORA',
+            'slug' => 'kora-boutique-test',
+            'description' => 'Boutique publique',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
@@ -342,10 +318,14 @@ class EcommerceTest extends TestCase
     public function test_public_order_cannot_use_a_product_from_another_company(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'kora-isolation-test', 'Entreprise KORA');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique KORA',
+            'slug' => 'kora-isolation-test',
+            'description' => '',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         DB::table('ecommerce_products')->insert([
@@ -413,10 +393,14 @@ class EcommerceTest extends TestCase
     public function test_public_order_is_idempotent_and_order_status_follows_allowed_transitions(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'commandes-transition-test', 'Entreprise KORA');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique commandes',
+            'slug' => 'commandes-transition-test',
+            'description' => '',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
         $request->postJson('/api/ecommerce/products?companyId=kora', [
             'name' => 'Produit transition',
@@ -460,10 +444,14 @@ class EcommerceTest extends TestCase
     {
         CompanyRegistry::ensureActive('kora', 'Entreprise KORA');
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-inactive-test', 'Entreprise KORA');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique inactive',
+            'slug' => 'boutique-inactive-test',
+            'description' => '',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
         $request->postJson('/api/ecommerce/products?companyId=kora', [
             'name' => 'Produit inactif',
@@ -489,18 +477,12 @@ class EcommerceTest extends TestCase
     {
         Storage::fake('public');
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'photos-produits', 'Entreprise KORA');
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-        ])->assertOk();
         $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
             'name' => 'Produit avec photo',
             'slug' => 'produit-photo',
             'sku' => 'PHOTO-01',
             'price' => 1200,
             'stock' => 4,
-            'status' => 'PUBLISHED',
         ])->assertCreated();
 
         $first = $request->post('/api/ecommerce/products/'.$product->json('id').'/image?companyId=kora', [
@@ -536,39 +518,61 @@ class EcommerceTest extends TestCase
         $this->assertNotEmpty(DB::table('ecommerce_products')->where('id', $product->json('id'))->value('image_data'));
     }
 
-    public function test_company_admin_uploads_the_company_public_site_logo(): void
+    public function test_company_admin_can_upload_a_store_logo_without_using_the_company_logo(): void
     {
         Storage::fake('public');
+        DB::table('companies')->where('id', 'kora')->update(['profile_photo' => '/api/company-images/kora/entreprise.jpg']);
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'site-logo-test', 'Site public KORA');
 
-        $response = $request->post('/api/company/public-site/logo?companyId=kora', [
+        $request->getJson('/api/ecommerce/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('store.logoUrl', '');
+
+        $response = $request->post('/api/ecommerce/store/logo?companyId=kora', [
             'image' => UploadedFile::fake()->image('logo-boutique.png'),
         ])->assertOk();
 
-        $logoUrl = $response->json('brand.logoUrl');
+        $logoUrl = $response->json('logoUrl');
         $this->assertStringStartsWith('/api/store-logos/kora/', $logoUrl);
-        $this->assertDatabaseHas('company_public_sites', [
-            'company_id' => 'kora',
-            'public_slug' => 'site-logo-test',
+        $this->assertDatabaseHas('ecommerce_stores', [
+            'id' => 'ecommerce-store-kora',
             'logo_url' => $logoUrl,
-            'logo_mime' => 'image/png',
         ]);
-        $this->assertNotEmpty(DB::table('company_public_sites')->where('company_id', 'kora')->value('logo_data'));
+        $this->assertNotEmpty(DB::table('ecommerce_stores')->where('id', 'ecommerce-store-kora')->value('logo_data'));
+
+        $logoPath = 'ecommerce/stores/kora/'.basename($logoUrl);
+        Storage::disk('public')->assertMissing($logoPath);
         $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
-        $this->getJson('/api/public-site/bootstrap/site-logo-test')
+
+        $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique Kora',
+            'slug' => 'kora-boutique',
+            'description' => 'Boutique publique',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
+        ])->assertOk();
+        $this->getJson('/api/shop/kora-boutique')
             ->assertOk()
-            ->assertJsonPath('brand.logoUrl', $logoUrl);
+            ->assertJsonPath('store.logoUrl', $logoUrl);
+
+        Storage::disk('public')->delete($logoPath);
+        $this->get($logoUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
     }
 
-    public function test_company_hero_images_are_company_owned_while_product_galleries_remain_ecommerce_owned(): void
+    public function test_company_gallery_images_are_stored_per_owner_and_exposed_to_public_shop(): void
     {
         Storage::fake('public');
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-galerie', 'Entreprise KORA', 'Boutique avec plusieurs visuels.');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique galerie',
+            'slug' => 'boutique-galerie',
+            'description' => 'Boutique avec plusieurs visuels',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
@@ -579,22 +583,16 @@ class EcommerceTest extends TestCase
             'status' => 'PUBLISHED',
         ])->assertCreated();
 
-        $hero = $request->post('/api/company/public-site/hero-images?companyId=kora', [
+        $hero = $request->post('/api/ecommerce/store/hero-images?companyId=kora', [
             'images' => [
                 UploadedFile::fake()->image('hero-une.jpg'),
                 UploadedFile::fake()->image('hero-deux.png'),
             ],
         ])->assertOk();
-        $heroUrls = $hero->json('brand.heroImages');
+        $heroUrls = $hero->json('heroImages');
         $this->assertCount(2, $heroUrls);
         $this->assertStringStartsWith('/api/gallery-images/kora/', $heroUrls[0]);
         $this->get($heroUrls[0])->assertOk();
-        $this->assertDatabaseHas('ecommerce_gallery_images', [
-            'company_id' => 'kora',
-            'owner_type' => 'company_site',
-            'owner_id' => 'kora',
-            'collection' => 'hero',
-        ]);
 
         $productResponse = $request->post('/api/ecommerce/products/'.$product->json('id').'/gallery?companyId=kora', [
             'images' => [
@@ -624,10 +622,14 @@ class EcommerceTest extends TestCase
     public function test_public_shop_exposes_all_published_sale_products_including_out_of_stock_items(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-multi-produits', 'Entreprise KORA');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique multi-produits',
+            'slug' => 'boutique-multi-produits',
+            'description' => 'Plusieurs références publiées',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $request->postJson('/api/ecommerce/products?companyId=kora', [
@@ -676,11 +678,6 @@ class EcommerceTest extends TestCase
     {
         Storage::fake('public');
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'photos-locations', 'Entreprise KORA');
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-        ])->assertOk();
         $category = $request->postJson('/api/ecommerce/categories?companyId=kora', [
             'name' => 'Habitat',
         ])->assertCreated()->json();
@@ -715,7 +712,7 @@ class EcommerceTest extends TestCase
     public function test_company_admin_can_register_verify_and_remove_a_custom_domain(): void
     {
         $request = $this->asActor();
-        $created = $request->postJson('/api/company/public-site/domains?companyId=kora', [
+        $created = $request->postJson('/api/ecommerce/domains?companyId=kora', [
             'domain' => 'https://boutique.kora.test/',
         ])->assertCreated()
             ->assertJsonPath('domain', 'boutique.kora.test')
@@ -723,11 +720,11 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('verificationName', '_maximus-verification.boutique.kora.test');
 
         $domainId = $created->json('id');
-        $request->postJson('/api/company/public-site/domains/'.$domainId.'/verify?companyId=kora')
+        $request->postJson('/api/ecommerce/domains/'.$domainId.'/verify?companyId=kora')
             ->assertStatus(422)
             ->assertJsonPath('domain.status', 'PENDING');
 
-        $request->deleteJson('/api/company/public-site/domains/'.$domainId.'?companyId=kora')
+        $request->deleteJson('/api/ecommerce/domains/'.$domainId.'?companyId=kora')
             ->assertOk()
             ->assertJson(['ok' => true]);
         $this->assertDatabaseHas('ecommerce_domains', [
@@ -740,16 +737,14 @@ class EcommerceTest extends TestCase
     public function test_active_custom_domain_serves_only_its_published_company_store(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity(
-            $request,
-            'kora',
-            'kora-domaine-test',
-            'Site public KORA',
-            'Services de l’entreprise sur un domaine personnalisé.',
-        );
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique domaine KORA',
+            'slug' => 'kora-domaine-test',
+            'description' => 'Boutique publiée sur son domaine.',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
@@ -779,10 +774,6 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('products.0.slug', 'produit-domaine')
             ->assertJsonMissingPath('store.companyId')
             ->assertJsonMissingPath('products.0.id');
-        $this->getJson('http://boutique-active.kora.test/api/public-site/bootstrap')
-            ->assertOk()
-            ->assertJsonPath('brand.name', 'Site public KORA')
-            ->assertJsonPath('modules.0.id', 'ecommerce');
 
         $this->postJson('http://boutique-active.kora.test/api/shop-domain/orders', [
                 'customerName' => 'Client Domaine',
@@ -800,16 +791,21 @@ class EcommerceTest extends TestCase
         ]);
 
         $this->getJson('http://unknown-domain.test/api/shop-domain')
-            ->assertNotFound();
+            ->assertOk()
+            ->assertJson(['available' => false]);
     }
 
     public function test_active_custom_domain_is_disabled_when_dns_proof_disappears_and_can_be_reverified(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'dns-revalidation-test', 'Site public KORA');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique revalidation DNS',
+            'slug' => 'dns-revalidation-test',
+            'description' => 'Boutique de test de propriété DNS.',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $domain = 'dns-revalidation.kora.test';
@@ -832,7 +828,7 @@ class EcommerceTest extends TestCase
             new EcommerceDomainVerifier(static fn (string $name, int $type): array => []),
         );
 
-        $this->getJson('http://'.$domain.'/api/public-site/bootstrap')
+        $this->getJson('http://'.$domain.'/api/shop-domain')
             ->assertOk()
             ->assertJson(['available' => false]);
         $this->assertDatabaseHas('ecommerce_domains', [
@@ -851,13 +847,13 @@ class EcommerceTest extends TestCase
             ),
         );
 
-        $request->postJson('/api/company/public-site/domains/domain-dns-revalidation/verify?companyId=kora')
+        $request->postJson('/api/ecommerce/domains/domain-dns-revalidation/verify?companyId=kora')
             ->assertOk()
             ->assertJsonPath('status', 'ACTIVE');
 
-        $this->getJson('http://'.$domain.'/api/public-site/bootstrap')
+        $this->getJson('http://'.$domain.'/api/shop-domain')
             ->assertOk()
-            ->assertJsonPath('brand.slug', 'dns-revalidation-test');
+            ->assertJsonPath('store.slug', 'dns-revalidation-test');
     }
 
     public function test_public_manifests_have_an_isolated_pwa_start_path_per_store(): void
@@ -899,10 +895,6 @@ class EcommerceTest extends TestCase
         $this->assertSame('/client-app/shop/kora-boutique/', $first['id']);
         $this->assertSame('/client-app/shop/kora-boutique/accueil', $first['start_url']);
         $this->assertSame($first['id'], $first['scope']);
-        $this->assertSame('/pwa-icon-192.png', $first['icons'][0]['src']);
-        $this->assertSame('192x192', $first['icons'][0]['sizes']);
-        $this->assertSame('/pwa-icon-512.png', $first['icons'][1]['src']);
-        $this->assertSame('512x512', $first['icons'][1]['sizes']);
         $this->assertSame('/client-app/shop/autre-boutique/', $second['id']);
         $this->assertSame('/client-app/shop/autre-boutique/accueil', $second['start_url']);
         $this->assertNotSame($first['id'], $second['id']);
@@ -911,10 +903,14 @@ class EcommerceTest extends TestCase
     public function test_sale_and_rental_products_keep_an_explicit_public_distinction(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-types', 'Entreprise KORA', 'Ventes et locations.');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique types',
+            'slug' => 'boutique-types',
+            'description' => 'Ventes et locations',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $sale = $request->postJson('/api/ecommerce/products?companyId=kora', [
@@ -949,10 +945,14 @@ class EcommerceTest extends TestCase
     public function test_delivery_requests_are_scoped_and_status_can_be_managed_by_the_company(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-livraison', 'Entreprise KORA', 'Services de livraison.');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique livraison',
+            'slug' => 'boutique-livraison',
+            'description' => 'Services de livraison',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $created = $this->postJson('/api/shop/boutique-livraison/delivery-requests', [
@@ -1003,10 +1003,14 @@ class EcommerceTest extends TestCase
     public function test_company_can_manage_delivery_zones_and_public_requests_use_an_active_zone(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-zones', 'Entreprise KORA', 'Livraison par secteur.');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique zones',
+            'slug' => 'boutique-zones',
+            'description' => 'Livraison par secteur',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $zone = $request->postJson('/api/ecommerce/delivery-zones?companyId=kora', [
@@ -1110,10 +1114,14 @@ class EcommerceTest extends TestCase
             ->where('module_id', 'ecommerce')
             ->update(['feature_ids' => json_encode(['location'])]);
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-sans-livraison', 'Entreprise KORA');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique sans livraison',
+            'slug' => 'boutique-sans-livraison',
+            'description' => 'Boutique',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $this->getJson('/api/shop/boutique-sans-livraison')
@@ -1142,12 +1150,17 @@ class EcommerceTest extends TestCase
             ],
         );
 
-        $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-transport', 'Entreprise KORA', 'Transport et services.');
-        $request->patchJson('/api/ecommerce/store?companyId=kora', [
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-        ])->assertOk();
+        $this->asActor()
+            ->patchJson('/api/ecommerce/store?companyId=kora', [
+                'name' => 'Boutique Transport',
+                'slug' => 'boutique-transport',
+                'description' => 'Boutique Taxi',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primaryColor' => '#D69E2E',
+                'accentColor' => '#172033',
+            ])
+            ->assertOk();
 
         $this->getJson('/api/shop/boutique-transport')
             ->assertOk()
@@ -1157,10 +1170,14 @@ class EcommerceTest extends TestCase
     public function test_rentals_are_autonomous_persistent_and_exposed_only_when_published(): void
     {
         $request = $this->asActor();
-        $this->setCompanySiteIdentity($request, 'kora', 'boutique-locations', 'Entreprise KORA', 'Locations autonomes.');
         $request->patchJson('/api/ecommerce/store?companyId=kora', [
+            'name' => 'Boutique locations',
+            'slug' => 'boutique-locations',
+            'description' => 'Locations autonomes',
             'status' => 'PUBLISHED',
             'currency' => 'XOF',
+            'primaryColor' => '#D69E2E',
+            'accentColor' => '#172033',
         ])->assertOk();
 
         $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
@@ -1274,26 +1291,5 @@ class EcommerceTest extends TestCase
         return $this
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
-    }
-
-    private function setCompanySiteIdentity(
-        self $request,
-        string $companyId,
-        string $slug,
-        string $name = 'Site public',
-        string $description = '',
-    ): void {
-        $request->getJson('/api/ecommerce/bootstrap?companyId='.rawurlencode($companyId))->assertOk();
-        $request->patchJson('/api/company/public-site?companyId='.rawurlencode($companyId), [
-            'enabled' => true,
-            'moduleIds' => ['ecommerce'],
-            'brand' => [
-                'name' => $name,
-                'slug' => $slug,
-                'description' => $description,
-                'primaryColor' => '#D69E2E',
-                'accentColor' => '#172033',
-            ],
-        ])->assertOk();
     }
 }

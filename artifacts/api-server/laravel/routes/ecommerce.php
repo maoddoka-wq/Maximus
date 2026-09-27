@@ -9,14 +9,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/payments/diamanopay/webhook', [SellerWalletController::class, 'webhook']);
 
-Route::get('/gallery-images/{company}/{imageId}', [EcommerceController::class, 'serveGalleryImage'])
-    ->middleware(['maximus.installation.public', 'maximus.public-site-gallery'])
-    ->where(['company' => '[A-Za-z0-9_-]+', 'imageId' => '[A-Za-z0-9_-]+']);
-
-Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
-    ->middleware(['maximus.installation.public', 'maximus.public-site-brand'])
-    ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
-
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'])
     ->prefix('ecommerce')
     ->group(function (): void {
@@ -26,9 +18,15 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
         Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);
         Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
+        Route::post('/store/logo', [EcommerceController::class, 'uploadStoreLogo']);
+        Route::post('/store/hero-images', [EcommerceController::class, 'uploadStoreHeroImages']);
+        Route::delete('/store/hero-images/{imageId}', [EcommerceController::class, 'deleteStoreHeroImage']);
         Route::post('/categories', [EcommerceController::class, 'createCategory']);
         Route::patch('/categories/{id}', [EcommerceController::class, 'updateCategory']);
         Route::delete('/categories/{id}', [EcommerceController::class, 'deleteCategory']);
+        Route::post('/domains', [EcommerceController::class, 'createDomain']);
+        Route::post('/domains/{id}/verify', [EcommerceController::class, 'verifyDomain']);
+        Route::delete('/domains/{id}', [EcommerceController::class, 'deleteDomain']);
         Route::post('/products', [EcommerceController::class, 'createProduct']);
         Route::post('/products/{id}/image', [EcommerceController::class, 'uploadProductImage']);
         Route::post('/products/{id}/gallery', [EcommerceController::class, 'uploadProductGallery']);
@@ -57,7 +55,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
          Route::delete('/delivery-zones/{id}', [EcommerceController::class, 'deleteDeliveryZone']);
     });
 
-Route::middleware(['maximus.installation.public', 'maximus.public-site:ecommerce'])->group(function (): void {
+Route::middleware('maximus.installation.public')->group(function (): void {
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
 Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
 Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
@@ -68,8 +66,12 @@ Route::post('/shop-domain/delivery-requests', [EcommerceController::class, 'crea
 Route::get('/shop-domain/orders/{orderId}/payment-status', [EcommercePaymentController::class, 'statusByDomain']);
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
+    ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, 'serveRentalImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
+Route::get('/gallery-images/{company}/{imageId}', [EcommerceController::class, 'serveGalleryImage'])
+    ->where(['company' => '[A-Za-z0-9_-]+', 'imageId' => '[A-Za-z0-9_-]+']);
 
 Route::prefix('shop/{slug}')->group(function (): void {
     Route::get('/manifest.webmanifest', [EcommerceController::class, 'publicManifest']);

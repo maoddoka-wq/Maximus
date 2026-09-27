@@ -144,7 +144,7 @@ class EcommerceCustomerTest extends TestCase
 
         $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $customerToken)
             ->getJson('/api/shop/other-client/customer/bootstrap')
-            ->assertNotFound();
+            ->assertUnauthorized();
 
         $orderId = 'order-customer-a';
         DB::table('ecommerce_orders')->insert([
@@ -309,7 +309,6 @@ class EcommerceCustomerTest extends TestCase
 
     private function createStore(string $companyId, string $slug): void
     {
-        $this->enablePublicSiteForTesting($companyId, ['ecommerce']);
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-'.$companyId,
             'company_id' => $companyId,

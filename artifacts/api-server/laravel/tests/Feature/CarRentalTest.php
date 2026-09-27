@@ -203,7 +203,6 @@ class CarRentalTest extends TestCase
             'currency' => 'XOF', 'primary_color' => '#D69E2E', 'accent_color' => '#172033',
             'logo_url' => '', 'created_at' => now(), 'updated_at' => now(),
         ]);
-        $this->enablePublicSiteForTesting($company, ['ecommerce']);
     }
 
     private function asActor(string $role = 'company_admin', array $permissions = [])

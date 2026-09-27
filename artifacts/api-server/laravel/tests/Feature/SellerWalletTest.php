@@ -917,7 +917,6 @@ class SellerWalletTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $this->enablePublicSiteForTesting($companyId, ['ecommerce']);
     }
 
     private function walletRow(string $id, string $companyId, int $available): array
