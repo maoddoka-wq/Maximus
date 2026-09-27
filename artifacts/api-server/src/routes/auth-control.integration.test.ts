@@ -4,9 +4,15 @@ import test from "node:test";
 // @ts-expect-error Node's native TypeScript runner resolves the .ts test import.
 import app from "../app.ts";
 // @ts-expect-error Node's native TypeScript runner resolves the .ts test import.
-import { ensureDemoAuthUsers } from "./auth.ts";
+import {
+  authIntegrationAccounts,
+  cleanupAuthIntegrationFixtures,
+  provisionAuthIntegrationFixtures,
+} from "./auth-control.integration.fixtures.ts";
 
-let server: ReturnType<typeof app.listen>;
+const canRunIntegration = Boolean(process.env.API_TEST_DATABASE_URL);
+let fixturesReady = false;
+let server: ReturnType<typeof app.listen> | undefined;
 let baseUrl = "";
 const provisionedAccount = {
   id: `integration-account-${randomUUID()}`,
@@ -25,32 +31,45 @@ async function login(email: string, password: string) {
 }
 
 test.before(async () => {
-  await ensureDemoAuthUsers();
+  if (!canRunIntegration) return;
+  await provisionAuthIntegrationFixtures();
+  fixturesReady = true;
   server = app.listen(0);
-  await new Promise<void>(resolve => server.once("listening", () => resolve()));
+  await new Promise<void>(resolve => server!.once("listening", () => resolve()));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Le serveur de test n’a pas de port.");
   baseUrl = `http://127.0.0.1:${address.port}`;
 });
 
 test.after(async () => {
-  const admin = await login("admin@kora.demo", "Kora123!");
-  if (admin.cookie) {
-    await fetch(`${baseUrl}/api/auth/accounts/${encodeURIComponent(provisionedAccount.employeeId)}`, {
-      method: "DELETE",
-      headers: { Cookie: admin.cookie },
-    });
+  if (!fixturesReady) return;
+  try {
+    if (server) {
+      const admin = await login(authIntegrationAccounts.companyAdmin.email, authIntegrationAccounts.companyAdmin.password);
+      if (admin.cookie) {
+        await fetch(`${baseUrl}/api/auth/accounts/${encodeURIComponent(provisionedAccount.employeeId)}`, {
+          method: "DELETE",
+          headers: { Cookie: admin.cookie },
+        });
+      }
+    }
+    await cleanupAuthIntegrationFixtures();
+  } finally {
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server!.close(error => error ? reject(error) : resolve());
+      });
+    }
   }
-  server.close();
 });
 
-test("refuse Contrôle sans session", async () => {
+test("refuse Contrôle sans session", { skip: !canRunIntegration }, async () => {
   const response = await fetch(`${baseUrl}/api/control/bootstrap?companyId=kora&scope=all`);
   assert.equal(response.status, 401);
 });
 
-test("connecte un compte PostgreSQL et autorise son périmètre", async () => {
-  const { response: loginResponse, cookie } = await login("admin@kora.demo", "Kora123!");
+test("connecte un compte PostgreSQL et autorise son périmètre", { skip: !canRunIntegration }, async () => {
+  const { response: loginResponse, cookie } = await login(authIntegrationAccounts.companyAdmin.email, authIntegrationAccounts.companyAdmin.password);
   assert.equal(loginResponse.status, 200);
   assert.ok(cookie);
 
@@ -65,7 +84,7 @@ test("connecte un compte PostgreSQL et autorise son périmètre", async () => {
   assert.equal(crossCompany.status, 403);
 });
 
-test("connecte tous les comptes de démonstration", async () => {
+test("connecte tous les comptes de démonstration", { skip: !canRunIntegration }, async () => {
   const demoAccounts = [
     ["admin@maximus.demo", "Admin123!", "maximus_admin"],
     ["admin@kora.demo", "Kora123!", "company_admin"],
@@ -88,7 +107,7 @@ test("connecte tous les comptes de démonstration", async () => {
   }
 });
 
-test("refuse un mauvais mot de passe", async () => {
+test("refuse un mauvais mot de passe", { skip: !canRunIntegration }, async () => {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -97,7 +116,7 @@ test("refuse un mauvais mot de passe", async () => {
   assert.equal(response.status, 401);
 });
 
-test("provisionne, met à jour et révoque le compte d’un employé", async () => {
+test("provisionne, met à jour et révoque le compte d’un employé", { skip: !canRunIntegration }, async () => {
   const admin = await login("admin@kora.demo", "Kora123!");
   assert.equal(admin.response.status, 200);
   assert.ok(admin.cookie);
@@ -166,7 +185,7 @@ test("provisionne, met à jour et révoque le compte d’un employé", async () 
   assert.equal((await login(provisionedAccount.email, "Nouvelle123!")).response.status, 401);
 });
 
-test("refuse à un manager de secteur un compte hors de son périmètre", async () => {
+test("refuse à un manager de secteur un compte hors de son périmètre", { skip: !canRunIntegration }, async () => {
   const manager = await login("mamadou.ba@kora.demo", "MamadouKora2026!");
   assert.equal(manager.response.status, 200);
   assert.ok(manager.cookie);
