@@ -834,8 +834,8 @@ function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driv
         role="status"
       >
         <span className="relative mt-1 flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-          {driverPosition && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/40" />}
-          <span className={`relative h-2.5 w-2.5 rounded-full ${driverPosition ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          {driverPosition && <span className="absolute inset-0 animate-ping rounded-full bg-[hsl(var(--primary)/.4)]" />}
+          <span className={`relative h-2.5 w-2.5 rounded-full ${driverPosition ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--accent))]'}`} />
         </span>
         <div>
           <p className="text-xs font-bold text-[hsl(var(--foreground))]">
