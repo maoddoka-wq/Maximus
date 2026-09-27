@@ -31,7 +31,7 @@
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
 - [Garde de création de paiement](payment-creation-guard.md) — verrouiller la commande pendant la création du checkout et réutiliser toute charge PENDING existante.
-- [Capacités vitrine e-commerce](public-commerce-capabilities.md) — Location et Livraisons ne sont visibles publiquement que si l’accès e-commerce actif les autorise.
+- [Configuration des vitrines publiques](public-commerce-capabilities.md) — réglages sous « Nom du site public » et publication Transport possible sans E-commerce.
 - [Frontière vente/location/livraison](rental-delivery-boundary.md) — les locations sont typées explicitement et les demandes de livraison restent un service séparé et isolé.
 - [Zones de livraison](rental-delivery-boundary.md) — les zones actives sont bornées à l’entreprise et chaque demande conserve un instantané de leur identité et de leur tarif.
 - [Isolation des aperçus de modules](module-preview-isolation.md) — les tests administratifs restent autonomes, sans entreprise réelle ni appel d’écriture en production.

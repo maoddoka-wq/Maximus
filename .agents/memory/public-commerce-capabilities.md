@@ -1,10 +1,10 @@
 ---
-name: Capacités vitrine e-commerce
-description: Règle d’exposition publique des fonctionnalités Location, Transport et Livraisons.
+name: Configuration des vitrines publiques
+description: Emplacement des réglages et autorisations des pages publiques E-commerce et Transport.
 ---
 
-La vitrine publique doit dériver ses capacités de l’accès de l’entreprise : Location et Livraisons viennent d’E-commerce, tandis que Transport vient du module `transport`. Le module concerné doit être actif et la fonctionnalité doit être présente dans `featureIds`. Une liste `featureIds` vide conserve le comportement historique « accès non restreint ».
+Les réglages de vitrine publique sont regroupés dans « Organisation et accès », sous « Nom du site public », et chaque section n’apparaît que si l’entreprise est autorisée à utiliser la fonctionnalité concernée. Location et Livraisons dépendent d’E-commerce ; Transport dépend du module `transport`. Une entreprise doit pouvoir publier sa page Transport sans activer E-commerce : l’identité, l’URL et le bootstrap publics Transport ne doivent donc pas dépendre d’un enregistrement `ecommerce_stores`. Les anciennes URL Transport sous `/shop/{slug}/transport` peuvent être conservées comme compatibilité si une boutique existe.
 
-**Why:** Les menus visibles au client ne doivent pas contourner l’autorisation des modules de l’entreprise, tout en restant compatibles avec les anciennes entreprises dont l’accès était global.
+**Why:** Certaines entreprises ont besoin d’une vitrine Transport sans boutique e-commerce. Déplacer uniquement les champs de configuration ne suffit pas si la résolution publique reste liée à une boutique.
 
-**How to apply:** Faire calculer les capacités côté API depuis l’entreprise du store, puis masquer les routes et entrées de navigation publiques quand la capacité est absente. La page Transport publique utilise les coordonnées de la boutique pour contacter le service Taxi.
+**How to apply:** Regrouper les réglages sous le nom public partagé, filtrer les sections avec les autorisations effectives de l’entreprise et valider ces droits côté API. Pour Transport, résoudre le tenant depuis son identité publique propre, sans exiger E-commerce ; garder les parcours Location/Livraisons liés à leur capacité e-commerce.
