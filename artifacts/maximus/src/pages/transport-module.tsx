@@ -560,25 +560,25 @@ export default function TransportModulePage({
   return (
     <div
       ref={driverSpaceRef}
-      className={`${driverFullscreenFallback ? 'fixed inset-0 z-[80] overflow-y-auto bg-[hsl(var(--background))] p-3 sm:p-6' : 'space-y-5'} space-y-5`}
+      className={`${driverFullscreenFallback ? 'fixed inset-0 z-[80] overflow-y-auto bg-[hsl(var(--background))] p-3 sm:p-6' : 'space-y-4 lg:space-y-5'} space-y-4 lg:space-y-5`}
       data-testid="transport-module"
       aria-busy={Boolean(pendingAction)}
     >
       {pendingAction && <div className="flex items-center gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm font-semibold text-sky-700"><RefreshCw size={15} className="animate-spin" />Enregistrement en cours…</div>}
       {error && <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/25 bg-rose-500/5 px-4 py-3 text-sm text-rose-700"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer le message"><X size={16} /></button></div>}
 
-      <header className="relative overflow-hidden rounded-xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] px-4 py-4 text-[hsl(var(--sidebar-foreground))] shadow-[0_18px_45px_rgba(15,23,42,.16)] sm:rounded-2xl sm:px-7 sm:py-6">
-        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full border border-[hsl(var(--primary)/.25)]" />
-        <div className="absolute right-8 top-8 h-36 w-36 rounded-full border border-[hsl(var(--accent)/.2)]" />
-        <div className="relative flex flex-col justify-between gap-4 sm:gap-5 lg:flex-row lg:items-end">
+      <header className="relative overflow-hidden rounded-none border-0 bg-transparent px-0 py-2 text-[hsl(var(--foreground))] shadow-none lg:rounded-2xl lg:border lg:border-[hsl(var(--sidebar-border))] lg:bg-[hsl(var(--sidebar))] lg:px-7 lg:py-6 lg:text-[hsl(var(--sidebar-foreground))] lg:shadow-[0_18px_45px_rgba(15,23,42,.16)]">
+        <div className="absolute -right-16 -top-20 hidden h-56 w-56 rounded-full border border-[hsl(var(--primary)/.25)] lg:block" />
+        <div className="absolute right-8 top-8 hidden h-36 w-36 rounded-full border border-[hsl(var(--accent)/.2)] lg:block" />
+        <div className="relative flex flex-col justify-between gap-3 lg:flex-row lg:items-end lg:gap-5">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--primary))] sm:mb-3 sm:text-[11px] sm:tracking-[.18em]"><CarFront size={14} />Opérations taxi</div>
-            <h1 className="max-w-2xl text-[1.35rem] font-black leading-[1.12] tracking-[-.04em] sm:text-3xl">La flotte en mouvement, sans angles morts.</h1>
-            <p className="mt-2 max-w-xl text-[13px] leading-5 text-[hsl(var(--sidebar-foreground)/.72)] sm:text-sm sm:leading-6">Suivez les demandes, les équipages et la disponibilité des véhicules depuis un seul poste de pilotage.</p>
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.14em] text-[hsl(var(--primary))] lg:mb-3 lg:text-[11px] lg:tracking-[.18em]"><CarFront size={14} />Opérations taxi</div>
+            <h1 className="max-w-2xl text-[1.35rem] font-black leading-[1.12] tracking-[-.04em] lg:text-3xl">La flotte en mouvement, sans angles morts.</h1>
+            <p className="mt-2 max-w-xl text-[13px] leading-5 text-[hsl(var(--muted-foreground))] lg:text-sm lg:leading-6 lg:text-[hsl(var(--sidebar-foreground)/.72)]">Suivez les demandes, les équipages et la disponibilité des véhicules depuis un seul poste de pilotage.</p>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
-            <button type="button" onClick={() => void load(true)} className="btn inline-flex min-w-0 flex-1 items-center justify-center gap-2 border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent))] px-3 py-2.5 text-xs font-bold text-[hsl(var(--sidebar-foreground))] hover:opacity-90 sm:flex-none" title="Actualiser"><RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser</button>
-            {canCreateTrips && <button type="button" onClick={() => setDialog('trip')} className="btn inline-flex min-w-0 flex-1 items-center justify-center gap-2 bg-[hsl(var(--primary))] px-3 py-2.5 text-xs font-black text-[hsl(var(--primary-foreground))] hover:opacity-90 sm:flex-none sm:px-3.5"><Plus size={15} />Nouvelle course</button>}
+            <button type="button" data-testid="button-refresh-transport" onClick={() => void load(true)} className="btn inline-flex min-w-0 flex-1 items-center justify-center gap-2 border border-[hsl(var(--border))] bg-[hsl(var(--muted))] px-3 py-2 text-xs font-bold text-[hsl(var(--foreground))] hover:opacity-90 lg:flex-none lg:border-[hsl(var(--sidebar-border))] lg:bg-[hsl(var(--sidebar-accent))] lg:py-2.5 lg:text-[hsl(var(--sidebar-foreground))]" title="Actualiser"><RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />Actualiser</button>
+            {canCreateTrips && <button type="button" data-testid="button-create-transport-trip" onClick={() => setDialog('trip')} className="btn inline-flex min-w-0 flex-1 items-center justify-center gap-2 bg-[hsl(var(--primary))] px-3 py-2 text-xs font-black text-[hsl(var(--primary-foreground))] hover:opacity-90 lg:flex-none lg:py-2.5 lg:px-3.5"><Plus size={15} />Nouvelle course</button>}
           </div>
         </div>
       </header>

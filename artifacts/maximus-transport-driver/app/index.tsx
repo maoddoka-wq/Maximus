@@ -311,7 +311,7 @@ function LocationPermissionScreen() {
   const {
     locationPermissionState,
     isTracking,
-    isLoadingSession,
+    isActivatingLocation,
     error,
     activateBackgroundLocation,
     openSettings,
@@ -324,6 +324,7 @@ function LocationPermissionScreen() {
     locationPermissionState === 'settings-required' ||
     locationPermissionState === 'services-disabled';
   const unsupported = locationPermissionState === 'unsupported';
+  const servicesDisabled = locationPermissionState === 'services-disabled';
 
   return (
     <View
@@ -349,12 +350,18 @@ function LocationPermissionScreen() {
         </View>
 
         <Text style={[styles.loginTitle, { color: theme.foreground }]}>
-          {unsupported ? 'Ouvrez l’application sur votre téléphone.' : 'Activez le GPS en arrière-plan.'}
+          {unsupported
+            ? 'Ouvrez l’application sur votre téléphone.'
+            : servicesDisabled
+              ? 'Activez la localisation pour continuer.'
+              : 'Autorisez le GPS en arrière-plan.'}
         </Text>
         <Text style={[styles.bodyText, { color: theme.mutedForeground }]}>
           {unsupported
             ? 'La localisation continue écran verrouillé fonctionne dans l’application native iOS ou Android, pas dans l’aperçu web.'
-            : 'Autorisez la localisation pendant l’utilisation et en arrière-plan. MAXIMUS enverra des positions actualisées pour que les clients proches puissent trouver un chauffeur disponible.'}
+            : servicesDisabled
+              ? 'La localisation du téléphone est désactivée. Activez-la dans les réglages pour continuer et recevoir des demandes de course.'
+              : 'La localisation est obligatoire pour être détectable par les clients. Autorisez-la pendant l’utilisation et en arrière-plan ; une position GPS doit être obtenue avant de continuer.'}
         </Text>
 
         {!unsupported ? (
@@ -382,10 +389,10 @@ function LocationPermissionScreen() {
               <PrimaryButton title="Ouvrir les réglages" onPress={() => void openSettings()} icon="settings-outline" />
             ) : (
               <PrimaryButton
-                title={isTracking ? 'GPS actif' : 'Autoriser et démarrer le GPS'}
+                title={isTracking ? 'GPS actif' : 'Activer ma localisation'}
                 onPress={() => void activateBackgroundLocation()}
                 disabled={isTracking}
-                loading={isLoadingSession}
+                loading={isActivatingLocation || locationPermissionState === 'checking'}
                 icon="navigate"
               />
             )}

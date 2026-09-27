@@ -128,6 +128,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     },
     request: BEARER_REQUEST_OPTIONS,
   });
+  const refetchSession = sessionQuery.refetch;
 
   const driver = sessionQuery.data?.driver ?? null;
   const unauthorized = [401, 403].includes(errorStatus(sessionQuery.error) ?? 0);
@@ -167,6 +168,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const inspectAndResumeLocation = useCallback(async () => {
+    setError(null);
     if (Platform.OS === 'web') {
       setIsTracking(false);
       setLocationPermissionState('unsupported');
@@ -197,7 +199,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
 
       await startDriverLocationUpdates();
       await sendCurrentDriverLocation();
-      await sessionQuery.refetch();
+      await refetchSession();
       setIsTracking(true);
       setLocationPermissionState('ready');
     } catch (locationError) {
@@ -212,7 +214,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
         );
       }
     }
-  }, [sessionQuery]);
+  }, [refetchSession]);
 
   useEffect(() => {
     if (!accessToken || !sessionQuery.data || checkedToken.current === accessToken) return;
@@ -226,13 +228,18 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     if (Platform.OS === 'web' || !accessToken || !hasDriverSession) return;
 
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
+      if (nextState === 'active' && !isActivatingLocation) {
         void inspectAndResumeLocation();
       }
     });
 
     return () => subscription.remove();
-  }, [accessToken, hasDriverSession, inspectAndResumeLocation]);
+  }, [
+    accessToken,
+    hasDriverSession,
+    inspectAndResumeLocation,
+    isActivatingLocation,
+  ]);
 
   useEffect(() => {
     if (!accessToken || !unauthorized) return;
@@ -547,6 +554,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       driver,
       isLoadingSession: sessionQuery.isLoading,
       isRefreshingSession: sessionQuery.isFetching,
+      isActivatingLocation,
       isSigningIn,
       isChangingAvailability,
       isSigningOut,
@@ -572,6 +580,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       error,
       isChangingAvailability,
       isHydrated,
+      isActivatingLocation,
       isSigningIn,
       isSigningOut,
       isTracking,
