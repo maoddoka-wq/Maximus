@@ -81,7 +81,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     if (paymentReturn || !needsCompanySiteCapabilities) return undefined;
 
     let cancelled = false;
-    setStorefront(null);
     setStorefrontError('');
     setStorefrontLoading(true);
     const request = domain
@@ -190,7 +189,8 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     homePath: basePath || '/',
     modules,
   };
-  const locationEnabled = Boolean(storefront?.store.enabledFeatures.location);
+  const storefrontForBrand = storefront?.store.slug === bootstrap.storeSlug ? storefront : null;
+  const locationEnabled = Boolean(storefrontForBrand?.store.enabledFeatures.location);
 
   if (routePath === '/transport' && transport) {
     return (
@@ -361,13 +361,13 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
                 <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
                   Aucune boutique publiée n’est associée à ce site.
                 </p>
-              ) : storefront && storefront.products.length === 0 ? (
+              ) : storefrontForBrand && storefrontForBrand.products.length === 0 ? (
                 <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
                   Aucun produit publié pour le moment.
                 </p>
-              ) : storefront ? (
+              ) : storefrontForBrand ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4" data-testid="grid-public-site-products">
-                  {storefront.products.map(product => (
+                  {storefrontForBrand.products.map(product => (
                     <Link
                       key={product.slug}
                       href={`${basePath}/produit/${encodeURIComponent(product.slug)}`}
@@ -392,9 +392,9 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
                         </h3>
                         <p className="mt-2 text-sm font-bold">
                           {new Intl.NumberFormat('fr-FR', {
-                            maximumFractionDigits: storefront.store.currency === 'XOF' ? 0 : 2,
+                            maximumFractionDigits: storefrontForBrand.store.currency === 'XOF' ? 0 : 2,
                           }).format(product.price)}{' '}
-                          {storefront.store.currency}
+                          {storefrontForBrand.store.currency}
                         </p>
                         {product.stock <= 0 && (
                           <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Indisponible</p>
@@ -435,6 +435,7 @@ function PublicCompanySiteShell({
   const hasEcommerce = modules.some(module => module.id === 'ecommerce');
   const primaryColor = validBrandColor(brand.primaryColor) ? brand.primaryColor : undefined;
   const activePathNormalized = activePath.replace(/\/+$/, '') || '/';
+  const locationActive = activePathNormalized === '/location' || activePathNormalized.startsWith('/location/');
 
   return (
     <div className="min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
@@ -490,9 +491,9 @@ function PublicCompanySiteShell({
             {hasEcommerce && locationEnabled && (
               <Link
                 href={`${siteBasePath}/location`}
-                aria-current={activePathNormalized === '/location' || activePathNormalized.startsWith('/location/') ? 'page' : undefined}
-                className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${activePathNormalized === '/location' || activePathNormalized.startsWith('/location/') ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
-                style={(activePathNormalized === '/location' || activePathNormalized.startsWith('/location/')) && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
+                aria-current={locationActive ? 'page' : undefined}
+                className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${locationActive ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
+                style={locationActive && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
                 data-testid="link-public-site-nav-location"
               >
                 Location
