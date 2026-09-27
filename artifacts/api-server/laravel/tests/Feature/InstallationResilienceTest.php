@@ -111,6 +111,36 @@ class InstallationResilienceTest extends TestCase
         ]);
     }
 
+    public function test_sync_applies_public_site_authorization_and_preserves_it_for_older_payloads(): void
+    {
+        $sync = app(InstallationSyncService::class);
+        $payload = $this->payload();
+        $payload['publicSiteAccess'] = [
+            'companyId' => 'sync-company',
+            'enabled' => false,
+        ];
+
+        $sync->apply($payload, true);
+        $this->assertDatabaseHas('company_public_site_access', [
+            'company_id' => 'sync-company',
+            'enabled' => false,
+        ]);
+
+        $payload['publicSiteAccess']['enabled'] = true;
+        $sync->apply($payload);
+        $this->assertDatabaseHas('company_public_site_access', [
+            'company_id' => 'sync-company',
+            'enabled' => true,
+        ]);
+
+        unset($payload['publicSiteAccess']);
+        $sync->apply($payload);
+        $this->assertDatabaseHas('company_public_site_access', [
+            'company_id' => 'sync-company',
+            'enabled' => true,
+        ]);
+    }
+
     public function test_sync_applies_workspace_feature_visibility_without_replacing_other_state(): void
     {
         DB::table('maximus_app_states')->insert([
