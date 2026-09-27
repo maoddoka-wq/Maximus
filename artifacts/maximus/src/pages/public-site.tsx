@@ -68,6 +68,10 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
   }, [basePath, isLegacyPath, legacyBasePath, pathname, setLocation]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [routePath]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');

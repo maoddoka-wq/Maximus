@@ -22,3 +22,9 @@ Le manifeste de la vitrine doit reprendre le nom public complet dans `name` et `
 **Why:** Certains lanceurs utilisent `short_name` à la place de `name`; une version tronquée peut faire disparaître la distinction entre plusieurs sites.
 
 **How to apply:** Vérifier les deux noms et l’icône dans le manifeste généré pour le slug public et le domaine personnalisé.
+
+L’accueil peut regrouper les offres des modules actifs, mais les liens Boutique, Location, Transport et autres services doivent ouvrir leur route dédiée, sans défilement d’ancre.
+
+**Why:** Les utilisateurs veulent voir une vue commune sur l’accueil tout en conservant des pages complètes et adressables pour chaque service.
+
+**How to apply:** Garder les aperçus regroupés sur la route d’accueil; faire naviguer les menus et les boutons d’action vers les routes propres aux modules.
