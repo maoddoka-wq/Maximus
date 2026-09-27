@@ -9,13 +9,25 @@ const subscribers = new Set<() => void>();
 
 const notify = () => subscribers.forEach((listener) => listener());
 
-export type ClientPwaEntry = { slug?: string; domain?: boolean };
+export type ClientPwaEntry = { slug?: string; domain?: boolean; site?: boolean };
 
 export const clientPwaStorageKey = (slug?: string, domain = false) =>
   domain ? 'domain' : encodeURIComponent(slug ?? '');
 
 export const clientPwaStartPath = (slug: string) =>
   `/client-app/shop/${encodeURIComponent(slug)}/accueil`;
+
+export const clientSitePwaBasePath = (slug?: string, domain = false) =>
+  domain || !slug
+    ? '/client-app/site'
+    : `/client-app/site/${encodeURIComponent(slug)}`;
+
+export const clientSitePwaPath = (slug?: string, suffix = '', domain = false) => {
+  const normalizedSuffix = suffix === ''
+    ? ''
+    : suffix.startsWith('/') ? suffix : `/${suffix}`;
+  return `${clientSitePwaBasePath(slug, domain)}${normalizedSuffix || '/'}`;
+};
 
 export const clientPwaPath = (slug?: string, suffix = '', domain = false) => {
   const normalizedSuffix = suffix === ''
@@ -31,6 +43,19 @@ export const clientPwaPath = (slug?: string, suffix = '', domain = false) => {
 
 export function parseClientPwaPath(pathname: string): ClientPwaEntry | null {
   const normalized = pathname.replace(/\/+$/, '') || '/';
+  const sitePrefix = '/client-app/site/';
+  if (normalized === '/client-app/site') return { site: true, domain: true };
+  if (normalized.startsWith(sitePrefix)) {
+    const encodedSlug = normalized.slice(sitePrefix.length).split('/')[0];
+    if (!encodedSlug) return null;
+    try {
+      const slug = decodeURIComponent(encodedSlug);
+      return slug && !slug.includes('/') ? { site: true, slug } : null;
+    } catch {
+      return null;
+    }
+  }
+
   const shopPrefix = '/client-app/shop/';
   if (normalized.startsWith(shopPrefix)) {
     const encodedSlug = normalized.slice(shopPrefix.length).split('/')[0];
@@ -52,7 +77,11 @@ export const isStandalonePwa = () =>
   window.matchMedia('(display-mode: standalone)').matches
   || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 
-export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+export const isIosDevice = () => {
+  const { userAgent, platform, maxTouchPoints } = window.navigator;
+  return /iphone|ipad|ipod/i.test(userAgent)
+    || (platform === 'MacIntel' && maxTouchPoints > 1);
+};
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
@@ -63,7 +92,7 @@ export async function mountClientManifest(manifestUrl: string): Promise<() => vo
   }
   const manifest = await response.json() as { id?: unknown; start_url?: unknown; scope?: unknown };
   if (typeof manifest.id !== 'string' || typeof manifest.start_url !== 'string' || typeof manifest.scope !== 'string') {
-    throw new Error('Le manifest PWA ne contient pas d’identité de boutique.');
+    throw new Error('Le manifest PWA ne contient pas une identité et des chemins de lancement valides.');
   }
 
   document.querySelectorAll('link[data-maximus-client-manifest="true"]').forEach((link) => link.remove());

@@ -10,3 +10,9 @@ Le slug du site de marque peut différer du slug de la boutique publiée. Pour l
 **Why:** Les endpoints de boutique résolvent leur tenant depuis le slug de magasin, alors que les URLs de marque utilisent un slug public indépendant; la navigation client doit rester sous l’identité de marque.
 
 **How to apply:** Garder `/site/{slug}` comme page d’entrée; construire son menu depuis les modules publics actifs. Utiliser le slug de magasin seulement pour les appels API et conserver la navigation détaillée des boutiques autonomes.
+
+Le PWA de la vitrine est une identité distincte du PWA de la boutique. Ses pages E-commerce intégrées restent sous le périmètre du site public; une boutique installée de façon autonome conserve son propre périmètre. Pour un domaine personnalisé, les appels de bootstrap et de manifeste restent résolus par l’hôte.
+
+**Why:** Le slug de marque peut différer du slug boutique. Installer ou lancer la vitrine avec le manifeste de la boutique ferait sortir l’utilisateur de l’identité et du périmètre de navigation du site.
+
+**How to apply:** Utiliser le slug public pour l’identité PWA de marque, garder le storeSlug uniquement pour les API de boutique et ne pas remplacer le manifeste de la vitrine sur ses pages E-commerce intégrées.

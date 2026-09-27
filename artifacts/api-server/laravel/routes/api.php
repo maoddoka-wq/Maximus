@@ -151,6 +151,10 @@ Route::get('/public-site/bootstrap', [PublicSiteController::class, 'bootstrap'])
     ->middleware('maximus.installation.public');
 Route::get('/public-site/bootstrap/{slug}', [PublicSiteController::class, 'bootstrapBySlug'])
     ->middleware('maximus.installation.public');
+Route::get('/public-site/manifest.webmanifest', [PublicSiteController::class, 'manifestByDomain'])
+    ->middleware('maximus.installation.public');
+Route::get('/public-site/manifest.webmanifest/{slug}', [PublicSiteController::class, 'manifestBySlug'])
+    ->middleware('maximus.installation.public');
 
 Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);

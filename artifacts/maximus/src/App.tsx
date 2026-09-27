@@ -1115,6 +1115,9 @@ function AppContent() {
   }
   if (pathname === '/client-app' || pathname.startsWith('/client-app/')) {
     const pwaEntry = parseClientPwaPath(pathname);
+    if (pwaEntry?.site) {
+      return <PublicSitePage slug={pwaEntry.slug} domain={pwaEntry.domain} clientApp />;
+    }
     if (pwaEntry?.slug) return <PublicShopPage slug={pwaEntry.slug} clientApp />;
     if (pwaEntry?.domain) return <PublicShopPage domain clientApp />;
   }

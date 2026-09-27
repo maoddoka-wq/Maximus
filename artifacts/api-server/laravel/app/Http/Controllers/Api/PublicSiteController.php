@@ -392,6 +392,64 @@ final class PublicSiteController extends Controller
         return $this->publicResponse($this->publicPayload($companyId, null, $company, $store));
     }
 
+    public function manifestByDomain(Request $request): JsonResponse
+    {
+        $payload = $this->bootstrap($request)->getData(true);
+        return $this->publicManifest($payload, true);
+    }
+
+    public function manifestBySlug(string $slug): JsonResponse
+    {
+        $payload = $this->bootstrapBySlug($slug)->getData(true);
+        return $this->publicManifest($payload, false, $slug);
+    }
+
+    private function publicManifest(array $payload, bool $customDomain, ?string $siteSlug = null): JsonResponse
+    {
+        $brand = $payload['brand'] ?? null;
+        if (($payload['available'] ?? false) !== true || ! is_array($brand)) {
+            return response()->json(['available' => false], 404)
+                ->header('Vary', 'Host')
+                ->header('Cache-Control', 'no-store');
+        }
+
+        $name = trim((string) ($brand['name'] ?? '')) ?: 'Site public';
+        $slug = rawurlencode(trim($siteSlug ?? (string) ($brand['slug'] ?? '')));
+        $scope = $customDomain
+            ? '/client-app/site/'
+            : '/client-app/site/'.$slug.'/';
+        $description = trim((string) ($brand['description'] ?? ''));
+        if ($description === '') {
+            $description = 'Site public de '.$name.'.';
+        }
+        $logoUrl = trim((string) ($brand['logoUrl'] ?? '')) ?: '/admin-logo.png';
+
+        return response()->json([
+            'id' => $scope,
+            'name' => $name,
+            'short_name' => Str::substr($name, 0, 12),
+            'description' => $description,
+            'start_url' => $scope,
+            'scope' => $scope,
+            'display' => 'standalone',
+            'background_color' => (string) ($brand['primaryColor'] ?? '#F8F5ED'),
+            'theme_color' => (string) ($brand['accentColor'] ?? '#0F172A'),
+            'icons' => [
+                [
+                    'src' => $logoUrl,
+                    'sizes' => '192x192',
+                ],
+                [
+                    'src' => $logoUrl,
+                    'sizes' => '512x512',
+                ],
+            ],
+        ])
+            ->header('Content-Type', 'application/manifest+json; charset=utf-8')
+            ->header('Vary', 'Host')
+            ->header('Cache-Control', 'no-store');
+    }
+
     private function companyPayload(string $companyId): array
     {
         $site = PublicSiteRegistry::site($companyId);

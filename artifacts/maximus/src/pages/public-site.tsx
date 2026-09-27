@@ -1,8 +1,19 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
+import { Download, Package, Plus, ShoppingBag, Store } from 'lucide-react';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@workspace/maximus-design-system/components/ui/dropdown-menu';
 import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteModule } from '@/lib/public-site-api';
 import { publicEcommerceApi, type PublicShopBootstrap } from '@/lib/ecommerce-api';
+import {
+  canInstallPwa,
+  clientSitePwaBasePath,
+  isIosDevice,
+  isStandalonePwa,
+  mountClientManifest,
+  promptPwaInstall,
+  subscribeToPwaInstall,
+} from '@/lib/pwa';
 
 const PublicShopPage = lazy(() => import('./public-shop'));
 const PublicTransportPage = lazy(() =>
@@ -15,15 +26,19 @@ const PublicImmobilierPage = lazy(() =>
 type Props = {
   domain?: boolean;
   slug?: string;
+  clientApp?: boolean;
 };
 
-export default function PublicSitePage({ domain = false, slug }: Props) {
+export default function PublicSitePage({ domain = false, slug, clientApp = false }: Props) {
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
-  const basePath = slug ? `/site/${encodeURIComponent(slug)}` : '';
+  const basePath = clientApp
+    ? clientSitePwaBasePath(slug, domain)
+    : slug ? `/site/${encodeURIComponent(slug)}` : '';
   const legacyBasePath = slug ? `/shop/${encodeURIComponent(slug)}` : '';
   const isLegacyPath = Boolean(
-    legacyBasePath
+    !clientApp
+    && legacyBasePath
     && (pathname === legacyBasePath || pathname.startsWith(`${legacyBasePath}/`)),
   );
   const routeBasePath = isLegacyPath ? legacyBasePath : basePath;
@@ -36,6 +51,15 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   const [storefrontLoading, setStorefrontLoading] = useState(false);
   const [storefrontError, setStorefrontError] = useState('');
   const [heroIndex, setHeroIndex] = useState(0);
+  const [installAvailable, setInstallAvailable] = useState(false);
+  const [manifestReady, setManifestReady] = useState(false);
+  const [installHelp, setInstallHelp] = useState('');
+
+  const siteManifestUrl = bootstrap?.available
+    ? domain
+      ? '/api/public-site/manifest.webmanifest'
+      : `/api/public-site/manifest.webmanifest/${encodeURIComponent(slug ?? bootstrap.brand.slug)}`
+    : null;
 
   useEffect(() => {
     if (!isLegacyPath) return;
@@ -66,6 +90,36 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       cancelled = true;
     };
   }, [domain, slug]);
+
+  useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
+
+  useEffect(() => {
+    if (!siteManifestUrl) {
+      setManifestReady(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    setManifestReady(false);
+    setInstallHelp('');
+    void mountClientManifest(siteManifestUrl)
+      .then(unmount => {
+        if (cancelled) {
+          unmount();
+          return;
+        }
+        cleanup = unmount;
+        setManifestReady(true);
+      })
+      .catch(cause => {
+        if (!cancelled) console.warn('Le manifeste PWA du site public n’a pas pu être validé.', cause);
+      });
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [siteManifestUrl]);
 
   useEffect(() => {
     const hasEcommerce = bootstrap?.available
@@ -166,8 +220,19 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     };
   }, [bootstrap, basePath, routePath]);
 
+  const publicSiteHomePath = basePath ? `${basePath.replace(/\/+$/, '')}/` : '/';
   const returnToSite = () => {
-    window.location.assign(basePath || '/');
+    window.location.assign(publicSiteHomePath);
+  };
+  const installPublicSite = async () => {
+    if (isIosDevice()) {
+      setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
+      return;
+    }
+    const installed = await promptPwaInstall();
+    setInstallHelp(installed
+      ? 'La vitrine a été ajoutée à vos applications.'
+      : 'Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».');
   };
 
   if (loading) {
@@ -181,16 +246,25 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   }
 
   const modules = bootstrap.modules;
+  const installPrompt = manifestReady && !isStandalonePwa()
+    ? (
+      <PublicSiteInstallPrompt
+        brandName={bootstrap.brand.name}
+        installAvailable={installAvailable}
+        help={installHelp}
+        onInstall={() => void installPublicSite()}
+      />
+    )
+    : null;
   const ecommerce = modules.find(module => module.id === 'ecommerce');
   const transport = modules.find(module => module.id === 'transport');
   const immobilier = modules.find(module => module.id === 'immobilier');
   const companySite = {
     companyName: bootstrap.brand.name,
-    homePath: basePath || '/',
+    homePath: clientApp ? publicSiteHomePath : basePath || '/',
     modules,
   };
   const storefrontForBrand = storefront?.store.slug === bootstrap.storeSlug ? storefront : null;
-  const locationEnabled = Boolean(storefrontForBrand?.store.enabledFeatures.location);
 
   if (routePath === '/transport' && transport) {
     return (
@@ -200,7 +274,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
         modules={modules}
         basePath={basePath}
         activePath={routePath}
-        locationEnabled={locationEnabled}
+        installPrompt={installPrompt}
       >
         <Suspense fallback={<PublicSiteMessage title="Chargement du module Transport…" testId="status-public-transport-loading" />}>
           <PublicTransportPage
@@ -225,7 +299,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
         modules={modules}
         basePath={basePath}
         activePath={routePath}
-        locationEnabled={locationEnabled}
+        installPrompt={installPrompt}
       >
         <PublicSiteImmobilier
           domain={domain}
@@ -248,7 +322,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
           modules={modules}
           basePath={basePath}
           activePath={routePath}
-          locationEnabled={locationEnabled}
+          installPrompt={installPrompt}
         >
           <PublicSiteMessage
             title="La boutique publique n’est pas disponible."
@@ -260,7 +334,12 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     }
     return (
       <Suspense fallback={<PublicSiteMessage title="Chargement de la boutique…" testId="status-public-ecommerce-loading" />}>
-        <PublicShopPage slug={domain ? undefined : bootstrap.storeSlug} domain={domain} companySite={companySite} />
+        <PublicShopPage
+          slug={domain ? undefined : bootstrap.storeSlug}
+          domain={domain}
+          companySite={companySite}
+          siteInstallPrompt={installPrompt}
+        />
       </Suspense>
     );
   }
@@ -273,7 +352,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
         modules={modules}
         basePath={basePath}
         activePath={routePath}
-        locationEnabled={locationEnabled}
+        installPrompt={installPrompt}
       >
         <PublicSiteMessage
           title="Cette page n’est pas publiée sur le site de l’entreprise."
@@ -291,7 +370,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       modules={modules}
       basePath={basePath}
       activePath="/"
-      locationEnabled={locationEnabled}
+      installPrompt={installPrompt}
     >
       <main className="min-h-[calc(100dvh-5rem)] bg-[hsl(var(--background))] px-5 py-8 text-[hsl(var(--foreground))] sm:px-8 sm:py-12" data-testid="page-public-site-home">
         <section className="mx-auto max-w-6xl">
@@ -413,13 +492,51 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   );
 }
 
+function PublicSiteInstallPrompt({
+  brandName,
+  installAvailable,
+  help,
+  onInstall,
+}: {
+  brandName: string;
+  installAvailable: boolean;
+  help: string;
+  onInstall: () => void;
+}) {
+  const ios = isIosDevice();
+  return (
+    <aside
+      className="mb-4 flex flex-col gap-3 rounded-xl border bg-[hsl(var(--card))] p-4 sm:flex-row sm:items-center sm:justify-between"
+      data-testid="banner-public-site-install"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--muted))] text-[hsl(var(--primary))]" aria-hidden="true">
+          <Download size={18} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold">Installer {brandName}</p>
+          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+            {ios
+              ? 'Touchez Partager, puis « Sur l’écran d’accueil » pour retrouver cette vitrine.'
+              : 'Ajoutez cette vitrine à l’écran d’accueil pour la retrouver rapidement.'}
+          </p>
+          {help && <p className="mt-1 text-xs font-medium text-[hsl(var(--primary))]" role="status">{help}</p>}
+        </div>
+      </div>
+      <Button type="button" variant="outline" className="shrink-0" onClick={onInstall}>
+        {ios ? 'Comment installer' : installAvailable ? 'Installer le site' : 'Ajouter à l’accueil'}
+      </Button>
+    </aside>
+  );
+}
+
 function PublicCompanySiteShell({
   companyName,
   brand,
   modules,
   basePath,
   activePath,
-  locationEnabled,
+  installPrompt,
   children,
 }: {
   companyName: string;
@@ -427,15 +544,76 @@ function PublicCompanySiteShell({
   modules: PublicSiteModule[];
   basePath: string;
   activePath: string;
-  locationEnabled: boolean;
+  installPrompt: ReactNode;
   children: ReactNode;
 }) {
+  const [, setLocation] = useLocation();
   const siteBasePath = basePath.replace(/\/+$/, '');
-  const homeHref = siteBasePath || '/';
+  const homeHref = siteBasePath ? `${siteBasePath}/` : '/';
   const hasEcommerce = modules.some(module => module.id === 'ecommerce');
   const primaryColor = validBrandColor(brand.primaryColor) ? brand.primaryColor : undefined;
   const activePathNormalized = activePath.replace(/\/+$/, '') || '/';
-  const locationActive = activePathNormalized === '/location' || activePathNormalized.startsWith('/location/');
+  const navigationItems = [
+    {
+      key: 'home',
+      label: 'Accueil',
+      href: homeHref,
+      active: activePathNormalized === '/',
+      testId: 'link-public-site-nav-home',
+      icon: Store,
+    },
+    ...modules.map(module => {
+      const modulePath = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
+      const active = activePathNormalized === modulePath
+        || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
+      return {
+        key: `module-${module.id}`,
+        label: module.id === 'ecommerce' ? 'Boutique' : module.label,
+        href: `${siteBasePath}${modulePath}` || '/',
+        active,
+        testId: `link-public-site-nav-module-${module.id}`,
+        icon: module.id === 'ecommerce' ? Package : Store,
+      };
+    }),
+    ...(hasEcommerce
+      ? [
+        {
+          key: 'cart',
+          label: 'Panier',
+          href: `${siteBasePath}/panier`,
+          active: activePathNormalized === '/panier' || activePathNormalized.startsWith('/panier/'),
+          testId: 'link-public-site-nav-cart',
+          icon: ShoppingBag,
+        },
+        {
+          key: 'signin',
+          label: 'Se connecter',
+          href: `${siteBasePath}/connexion`,
+          active: activePathNormalized === '/connexion',
+          testId: 'link-public-site-nav-signin',
+          icon: Store,
+        },
+      ]
+      : []),
+  ];
+  const primaryKeys = hasEcommerce
+    ? new Set(['home', 'module-ecommerce', 'cart'])
+    : new Set(['home', ...modules.slice(0, 2).map(module => `module-${module.id}`)]);
+  const primaryMobileItems = navigationItems.filter(item => primaryKeys.has(item.key));
+  const moreMobileItems = navigationItems.filter(item => !primaryKeys.has(item.key));
+  const moreIsActive = moreMobileItems.some(item => item.active);
+  const mobileGridClass = moreMobileItems.length > 0
+    ? 'grid-cols-4'
+    : primaryMobileItems.length === 3
+      ? 'grid-cols-3'
+      : primaryMobileItems.length === 2
+        ? 'grid-cols-2'
+        : 'grid-cols-1';
+  const itemClass = (active: boolean) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold transition sm:text-xs ${
+    active
+      ? 'bg-[hsl(var(--muted)/.5)] text-[hsl(var(--foreground))]'
+      : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'
+  }`;
 
   return (
     <div className="min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
@@ -460,70 +638,85 @@ function PublicCompanySiteShell({
             </span>
           </Link>
 
-          <nav aria-label="Navigation du site de l’entreprise" className="flex max-w-full gap-1 overflow-x-auto pb-1 lg:justify-end lg:pb-0" data-testid="nav-public-site">
-            <Link
-              href={homeHref}
-              aria-current={activePathNormalized === '/' ? 'page' : undefined}
-              className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${activePathNormalized === '/' ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
-              style={activePathNormalized === '/' && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
-              data-testid="link-public-site-nav-home"
-            >
-              Accueil
-            </Link>
-            {modules.map(module => {
-              const modulePath = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
-              const href = `${siteBasePath}${modulePath}` || '/';
-              const active = activePathNormalized === modulePath
-                || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
-              return (
-                <Link
-                  key={module.id}
-                  href={href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
-                  style={active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
-                  data-testid={`link-public-site-nav-module-${module.id}`}
-                >
-                  {module.id === 'ecommerce' ? 'Boutique' : module.label}
-                </Link>
-              );
-            })}
-            {hasEcommerce && locationEnabled && (
+          <nav aria-label="Navigation du site de l’entreprise" className="hidden max-w-full gap-1 overflow-x-auto pb-1 lg:flex lg:justify-end lg:pb-0" data-testid="nav-public-site">
+            {navigationItems.map(item => (
               <Link
-                href={`${siteBasePath}/location`}
-                aria-current={locationActive ? 'page' : undefined}
-                className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${locationActive ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
-                style={locationActive && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
-                data-testid="link-public-site-nav-location"
+                key={item.key}
+                href={item.href}
+                aria-current={item.active ? 'page' : undefined}
+                className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${item.active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
+                style={item.active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
+                data-testid={item.testId}
               >
-                Location
+                {item.label}
               </Link>
-            )}
-            {hasEcommerce && (
-              <>
-                <Link
-                  href={`${siteBasePath}/panier`}
-                  className="shrink-0 rounded-lg border-b-2 border-transparent px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))] sm:text-sm"
-                  data-testid="link-public-site-nav-cart"
-                >
-                  Panier
-                </Link>
-                <Link
-                  href={`${siteBasePath}/connexion`}
-                  className="shrink-0 rounded-lg border-b-2 border-transparent px-3 py-2 text-xs font-semibold text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))] sm:text-sm"
-                  data-testid="link-public-site-nav-signin"
-                >
-                  Se connecter
-                </Link>
-              </>
-            )}
+            ))}
           </nav>
         </div>
       </header>
-      {children}
-      <footer className="border-t px-5 py-5 text-center text-xs text-[hsl(var(--muted-foreground))] sm:px-8">
-        Site public de {companyName}
-      </footer>
+      <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+        {installPrompt && (
+          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+            {installPrompt}
+          </div>
+        )}
+        {children}
+        <footer className="border-t px-5 py-5 text-center text-xs text-[hsl(var(--muted-foreground))] sm:px-8">
+          Site public de {companyName}
+        </footer>
+      </div>
+      <nav
+        aria-label="Navigation mobile du site de l’entreprise"
+        className="fixed inset-x-0 bottom-0 z-40 border-t bg-[hsl(var(--card))] pb-[env(safe-area-inset-bottom)] shadow-md lg:hidden"
+        data-testid="nav-public-site-mobile"
+      >
+        <div className={`mx-auto grid max-w-2xl ${mobileGridClass} gap-1 px-2 pt-1`}>
+          {primaryMobileItems.map(item => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                aria-current={item.active ? 'page' : undefined}
+                className={itemClass(item.active)}
+                style={item.active && primaryColor ? { color: primaryColor } : undefined}
+                data-testid={`${item.testId}-mobile`}
+              >
+                <Icon size={18} strokeWidth={2} aria-hidden="true" />
+                <span className="max-w-full truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+          {moreMobileItems.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={moreIsActive ? 'Plus, une page est sélectionnée' : 'Plus de pages'}
+                  className={itemClass(moreIsActive)}
+                  style={moreIsActive && primaryColor ? { color: primaryColor } : undefined}
+                  data-testid="button-public-site-mobile-more"
+                >
+                  <Plus size={18} strokeWidth={2} aria-hidden="true" />
+                  <span>Plus</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" className="mb-2 min-w-48">
+                {moreMobileItems.map(item => (
+                  <DropdownMenuItem
+                    key={item.key}
+                    onSelect={() => setLocation(item.href)}
+                    style={item.active && primaryColor ? { color: primaryColor } : undefined}
+                    data-testid={`${item.testId}-mobile`}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </nav>
     </div>
   );
 }

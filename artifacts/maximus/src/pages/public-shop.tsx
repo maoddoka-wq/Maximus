@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Building2, CarFront, Check, ChevronDown, Clock3, Copy, Download, Heart, Home, LockKeyhole, LogIn, Mail, MapPin, MessageCircle, Minus, Package, Phone, Plus, RefreshCw, Search, Share2, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, UserRound, X } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
 import {
@@ -240,6 +240,7 @@ export default function PublicShopPage({
   domain = false,
   clientApp = false,
   companySite,
+  siteInstallPrompt,
 }: {
   slug?: string;
   domain?: boolean;
@@ -249,6 +250,7 @@ export default function PublicShopPage({
     homePath: string;
     modules: { id: string; label: string; path: string }[];
   };
+  siteInstallPrompt?: ReactNode;
 }) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
@@ -296,6 +298,7 @@ export default function PublicShopPage({
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
+  const isCompanySite = Boolean(companySite);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
     const result = query.get('payment');
@@ -335,7 +338,7 @@ export default function PublicShopPage({
   useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
 
   useEffect(() => {
-    if (!data?.store.name.trim()) {
+    if (isCompanySite || !data?.store.name.trim()) {
       setManifestReady(false);
       return undefined;
     }
@@ -361,7 +364,7 @@ export default function PublicShopPage({
       cancelled = true;
       cleanup?.();
     };
-  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, slug]);
+  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, isCompanySite, slug]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
@@ -380,6 +383,7 @@ export default function PublicShopPage({
   const shopPath = (suffix = '') => {
     if (companySite) {
       const basePath = companySite.homePath.replace(/\/+$/, '');
+      if (suffix === '') return companySite.homePath.endsWith('/') ? `${basePath}/` : basePath || '/';
       return `${basePath}${suffix}` || '/';
     }
     if (clientApp) return clientPwaPath(slug, suffix, domain);
@@ -895,7 +899,8 @@ export default function PublicShopPage({
        </div>}
         <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-9 lg:px-8 lg:pb-9 ${mobileNavBottomPadding}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-       {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+       {siteInstallPrompt}
+       {!companySite && !isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
           <div>

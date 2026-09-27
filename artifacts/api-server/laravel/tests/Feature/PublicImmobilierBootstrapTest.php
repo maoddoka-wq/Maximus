@@ -213,6 +213,30 @@ class PublicImmobilierBootstrapTest extends TestCase
         $this->assertSame($slug['company']['currency'], $domain['company']['currency']);
         $this->assertSame($slug['brand'], $domain['brand']);
         $this->assertSame($slug['storeSlug'], $domain['storeSlug']);
+
+        $slugManifest = $this->getJson('/api/public-site/manifest.webmanifest/neutral-public-site')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('Vary', 'Host')
+            ->assertJsonPath('name', 'Site public KORA')
+            ->assertJsonPath('description', 'Présentation commune de l’entreprise.')
+            ->assertJsonPath('id', '/client-app/site/neutral-public-site/')
+            ->assertJsonPath('start_url', '/client-app/site/neutral-public-site/')
+            ->assertJsonPath('scope', '/client-app/site/neutral-public-site/')
+            ->assertJsonPath('background_color', '#123456')
+            ->assertJsonPath('theme_color', '#654321')
+            ->assertJsonPath('icons.0.src', '/api/store-logos/kora/logo-site-public.png')
+            ->json();
+        $domainManifest = $this->getJson('http://neutral-kora.example.test/api/public-site/manifest.webmanifest')
+            ->assertOk()
+            ->assertJsonPath('name', 'Site public KORA')
+            ->assertJsonPath('id', '/client-app/site/')
+            ->assertJsonPath('start_url', '/client-app/site/')
+            ->assertJsonPath('scope', '/client-app/site/')
+            ->json();
+
+        $this->assertSame($slugManifest['name'], $domainManifest['name']);
+        $this->assertSame($slugManifest['theme_color'], $domainManifest['theme_color']);
     }
 
     public function test_company_site_bootstrap_keeps_the_public_site_slug_separate_from_the_published_store_slug(): void
@@ -236,6 +260,9 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertJsonPath('available', true)
             ->assertJsonPath('brand.slug', 'company-public-brand')
             ->assertJsonPath('storeSlug', 'actual-public-store');
+        $this->getJson('/api/public-site/manifest.webmanifest/company-public-brand')
+            ->assertOk()
+            ->assertJsonPath('scope', '/client-app/site/company-public-brand/');
     }
 
     public function test_neutral_bootstrap_omits_store_slug_when_no_public_module_is_selected(): void
