@@ -6,6 +6,7 @@ use App\Models\AuthUser;
 use App\Models\Company;
 use App\Support\MaximusAuth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
