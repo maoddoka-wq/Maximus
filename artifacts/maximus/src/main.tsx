@@ -13,8 +13,8 @@ import './index.css';
 // l'accueil MAXIMUS ne démarre jamais avec la couleur d'un tenant.
 applyCompanyTheme(undefined);
 if (import.meta.env.PROD) installVitePreloadRecovery();
-initializePwa();
 primeClientManifestFromPath();
+initializePwa();
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.

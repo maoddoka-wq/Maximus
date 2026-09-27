@@ -808,7 +808,7 @@ export default function PublicShopPage({
   };
 
   const installClientApp = async () => {
-    if (!isIosDevice() && canInstallPwa()) {
+    if (!isIosDevice() && manifestReady && canInstallPwa()) {
       try {
         const installed = await promptPwaInstall();
         setInstallHelp(installed

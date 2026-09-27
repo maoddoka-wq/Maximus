@@ -24,7 +24,7 @@
 - [Publication du catalogue](catalog-workflow.md) — les changements modules, packs et secteurs restent en brouillon jusqu’à validation et publication explicite.
 - [Séparation production et démonstration](production-demo-separation.md) — les fixtures KORA restent locales et le fallback production ne doit contenir aucune donnée fictive.
 - [Espace client e-commerce](ecommerce-customer-space.md) — les sessions, commandes, adresses, favoris et paniers sont toujours bornés par client et entreprise.
-- [Identité du site public de l’entreprise](public-company-site-branding.md) — reprendre les réglages de marque E-commerce à l’échelle du site, sans dépendre de la sélection E-commerce.
+- [Identité du site public de l’entreprise](public-company-site-branding.md) — une seule vitrine/PWA d’entreprise; E-commerce est un module interne, Transport reste hors accueil et menu.
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
 - [Champs vides du catalogue](catalogue-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel peut les convertir en null.
 - [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
@@ -41,7 +41,6 @@
 - [Fichiers e-commerce non enregistrés](ecommerce-unsaved-upload-state.md) — un rafraîchissement automatique ne doit jamais réinitialiser les fichiers sélectionnés avant leur enregistrement.
 - [Overrides de catalogue tolérants](catalogue-override-normalization.md) — nettoyer les modules, packs et permissions persistés avant tout rendu administratif.
 - [Surveillance de santé Render](render-health-monitoring.md) — utiliser la sonde `/api/healthz` existante pour détecter et persister les incidents sans worker séparé.
-- [Identité publique du site entreprise](public-company-site-branding.md) — accueil de marque; menu par modules; PWA séparé de celui de la boutique.
 - [Identité publique des boutiques](public-store-identity.md) — les noms peuvent être identiques entre entreprises, mais chaque slug public doit rester globalement unique.
 - [Catalogue d’inscription](registration-catalog-boundary.md) — l’inscription publique lit uniquement le catalogue publié, jamais l’état workspace ou son brouillon.
 - [Autorisation effective des modules](module-access-source.md) — l’accès courant vient des autorisations persistées, pas seulement de la demande initiale d’inscription.

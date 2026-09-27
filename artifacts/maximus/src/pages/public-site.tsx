@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
-import { Download, Package, Plus, ShoppingBag, Store } from 'lucide-react';
+import { Download, Package, Plus, Store } from 'lucide-react';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@workspace/maximus-design-system/components/ui/dropdown-menu';
 import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteModule } from '@/lib/public-site-api';
@@ -173,12 +173,12 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     void request
       .then(result => {
         if (!('store' in result)) {
-          throw new Error('La boutique publique n’est pas disponible.');
+          throw new Error('Le module E-commerce n’est pas disponible.');
         }
         if (!cancelled) setStorefront(result);
       })
       .catch(() => {
-        if (!cancelled) setStorefrontError('Les produits de la boutique ne sont pas disponibles pour le moment.');
+        if (!cancelled) setStorefrontError('Les produits du module E-commerce ne sont pas disponibles pour le moment.');
       })
       .finally(() => {
         if (!cancelled) setStorefrontLoading(false);
@@ -256,7 +256,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     window.location.assign(publicSiteHomePath);
   };
   const installPublicSite = async () => {
-    if (!isIosDevice() && canInstallPwa()) {
+    if (!isIosDevice() && manifestReady && canInstallPwa()) {
       try {
         const installed = await promptPwaInstall();
         setInstallHelp(installed
@@ -380,7 +380,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
         >
           <PublicSiteMessage
             title={`Le module ${ecommerce.label} n’est pas disponible.`}
-            testId="status-public-site-shop-unavailable"
+            testId="status-public-site-ecommerce-unavailable"
             action={<Button type="button" variant="outline" onClick={returnToSite}>Retour au site</Button>}
           />
         </PublicCompanySiteShell>
@@ -490,7 +490,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
                   </h2>
                 </div>
                 <Button asChild variant="outline">
-                  <Link href={`${basePath}${ecommerce.path === '/' ? '/boutique' : ecommerce.path}`} data-testid="link-public-site-products-shop">
+                  <Link href={`${basePath}${ecommerce.path === '/' ? '/boutique' : ecommerce.path}`} data-testid="link-public-site-products-module">
                     Ouvrir {ecommerce.label}
                   </Link>
                 </Button>
@@ -505,7 +505,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
                 </p>
               ) : !bootstrap.storeSlug ? (
                 <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
-                  Aucune boutique publiée n’est associée à ce site.
+                  Aucun catalogue public n’est associé au module E-commerce.
                 </p>
               ) : storefrontForBrand && storefrontForBrand.products.length === 0 ? (
                 <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">

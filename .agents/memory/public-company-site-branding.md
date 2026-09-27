@@ -1,30 +1,22 @@
 ---
 name: Identité du site public de l’entreprise
-description: Règle d’isolation entre la marque commune du site d’entreprise et les permissions de ses rubriques publiques.
+description: Règles de marque, navigation et installation PWA du site public unique d’une entreprise.
 ---
 
-Le nom, le slug public, la marque, le logo, les images d’accueil et le domaine appartiennent au site public de l’entreprise. `/site/{slug}` ouvre directement l’accueil de marque, sans écran de choix et sans dépendre d’E-commerce. Le menu du site entreprise présente Accueil, les modules attribués, puis Panier et Se connecter si E-commerce est actif. Le lien E-commerce mène à Boutique. Les fonctionnalités secondaires ne deviennent pas des entrées séparées du menu du site entreprise; la vitrine d’une boutique autonome conserve sa navigation propre.
+Le site public de l’entreprise est l’unique vitrine et possède son nom, son slug public, son logo, ses images d’accueil et son domaine. E-commerce est un module dans ce site, pas un shell ou une PWA distincte. Sa navigation interne peut proposer Produits, Panier et Compte; la navigation de l’entreprise reste Accueil et modules publics. Transport conserve sa route dédiée, mais n’apparaît ni sur l’accueil ni dans le menu du site.
 
-Le slug du site de marque peut différer du slug de la boutique publiée. Pour les appels API de modules, utiliser le `storeSlug` public résolu côté serveur tout en gardant les liens navigateur sous le chemin du site de marque. Sur un domaine personnalisé, conserver les appels résolus par hôte plutôt que de les convertir en appels par slug.
+**Why:** Une deuxième coquille de boutique ou une entrée Transport visible crée une vitrine concurrente et détourne l’utilisateur de l’identité de l’entreprise.
 
-**Why:** Les endpoints de boutique résolvent leur tenant depuis le slug de magasin, alors que les URLs de marque utilisent un slug public indépendant; la navigation client doit rester sous l’identité de marque.
+**How to apply:** Garder le shell et l’identité du site autour de chaque module public, y compris E-commerce. Ne pas ajouter le panier ou la connexion au menu global; conserver Transport adressable sans le promouvoir sur l’accueil ou le menu.
 
-**How to apply:** Garder `/site/{slug}` comme page d’entrée; construire son menu depuis les modules publics actifs. Utiliser le slug de magasin seulement pour les appels API et conserver la navigation détaillée des boutiques autonomes.
+Le slug public de marque peut différer du slug de boutique. Les URLs navigateur et l’identité PWA utilisent le slug de marque; les appels d’API E-commerce utilisent le storeSlug public résolu côté serveur. Sur un domaine personnalisé, les appels du site et du manifeste restent résolus par hôte.
 
-Le PWA de la vitrine est une identité distincte du PWA de la boutique. Ses pages E-commerce intégrées restent sous le périmètre du site public; une boutique installée de façon autonome conserve son propre périmètre. Pour un domaine personnalisé, les appels de bootstrap et de manifeste restent résolus par l’hôte.
+**Why:** Les slugs de site et de boutique ont des propriétaires et des usages différents; les confondre peut ouvrir le mauvais tenant ou installer le mauvais site.
 
-**Why:** Le slug de marque peut différer du slug boutique. Installer ou lancer la vitrine avec le manifeste de la boutique ferait sortir l’utilisateur de l’identité et du périmètre de navigation du site.
+**How to apply:** Ne jamais déduire le slug de marque depuis le storeSlug. Conserver les liens sous le chemin du site public et garder le contexte d’hôte pour les domaines personnalisés.
 
-**How to apply:** Utiliser le slug public pour l’identité PWA de marque, garder le storeSlug uniquement pour les API de boutique et ne pas remplacer le manifeste de la vitrine sur ses pages E-commerce intégrées.
+La PWA installée depuis le site doit utiliser le nom et le logo publics de l’entreprise ainsi que le périmètre et l’URL de lancement du site. Lors d’un changement de manifeste dans une navigation SPA, invalider toute demande d’installation différée associée à l’ancien manifeste; proposer l’installation seulement après validation du manifeste courant.
 
-Le manifeste de la vitrine doit reprendre le nom public complet dans `name` et `short_name`, ainsi que le logo public du site (avec le logo de l’entreprise comme repli).
+**Why:** Le navigateur peut conserver un événement d’installation après un changement de route; le réutiliser installe une identité précédente, par exemple MAXIMUS ou une boutique.
 
-**Why:** Certains lanceurs utilisent `short_name` à la place de `name`; une version tronquée peut faire disparaître la distinction entre plusieurs sites.
-
-**How to apply:** Vérifier les deux noms et l’icône dans le manifeste généré pour le slug public et le domaine personnalisé.
-
-L’accueil peut regrouper les offres des modules actifs, mais les liens Boutique, Location, Transport et autres services doivent ouvrir leur route dédiée, sans défilement d’ancre.
-
-**Why:** Les utilisateurs veulent voir une vue commune sur l’accueil tout en conservant des pages complètes et adressables pour chaque service.
-
-**How to apply:** Garder les aperçus regroupés sur la route d’accueil; faire naviguer les menus et les boutons d’action vers les routes propres aux modules.
+**How to apply:** Vérifier le manifeste du site par slug public et par domaine personnalisé. Garder le bouton Installer visible; sur iOS, expliquer l’ajout à l’écran d’accueil. Après une ancienne installation avec la mauvaise identité, demander de supprimer l’ancienne icône avant de réinstaller le site.
