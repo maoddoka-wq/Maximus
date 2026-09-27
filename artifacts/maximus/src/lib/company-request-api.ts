@@ -1,5 +1,6 @@
 import { requestJson } from './api-request';
 import type { Company, ModuleId } from './store';
+import type { EcommerceStore } from './ecommerce-api';
 
 export type CompanyRequest = {
   id: string;
@@ -86,6 +87,35 @@ export const companyRequestApi = {
       method: 'PATCH',
       body: JSON.stringify(input),
     }),
+  publicSiteSettings: (companyId: string) =>
+    request<{ store: EcommerceStore }>(
+      `/company-public-site?companyId=${encodeURIComponent(companyId)}`,
+    ),
+  updatePublicSiteSettings: (
+    companyId: string,
+    input: { name: string; slug: string; status: EcommerceStore['status'] },
+  ) =>
+    request<{ store: EcommerceStore }>(
+      `/company-public-site?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+    ),
+  uploadPublicSiteLogo: (companyId: string, image: File) => {
+    const body = new FormData();
+    body.append('image', image);
+    return request<{ store: EcommerceStore }>(
+      `/company-public-site/logo?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'POST', body },
+    );
+  },
+  publicSiteAccess: (companyId: string) =>
+    request<{ companyId: string; enabled: boolean }>(
+      `/companies/${encodeURIComponent(companyId)}/public-site-access`,
+    ),
+  updatePublicSiteAccess: (companyId: string, enabled: boolean) =>
+    request<{ ok: true; companyId: string; enabled: boolean }>(
+      `/companies/${encodeURIComponent(companyId)}/public-site-access`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+    ),
   installationManifest: (companyId: string) =>
     request<{
       manifestVersion: 1;

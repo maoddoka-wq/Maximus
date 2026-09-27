@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { Company, StoreData } from '@/lib/store';
 import { CompanyProfileSection } from './company-profile-section';
+import { OrganizationPublicSite } from './organization-public-site';
 import { EmployeesTab } from './organization-employees';
 import { RolesTab } from './organization-roles';
 import { StructureTab } from './organization-structure';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
-type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile';
+type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile' | 'publicSite';
 
 export { CompanyProfileSection } from './company-profile-section';
 
@@ -75,6 +76,7 @@ export function CompanyOrganizationAdmin({
     { id: 'roles', label: '2 · Rôles & permissions' },
     { id: 'employees', label: '3 · Comptes & managers' },
     { id: 'profile', label: 'Mon profil' },
+    { id: 'publicSite', label: 'Site public' },
   ] as { id: OrganizationTab; label: string }[]).filter(
     item =>
       !sectorManager ||
@@ -108,6 +110,7 @@ export function CompanyOrganizationAdmin({
       {tab === 'roles' && <RolesTab company={company} data={scopedData} mutate={mutate} />}
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
       {tab === 'profile' && !sectorManager && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}
+      {tab === 'publicSite' && !sectorManager && <OrganizationPublicSite company={company} />}
     </div>
   );
 }
