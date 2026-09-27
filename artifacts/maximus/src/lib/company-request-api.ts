@@ -105,11 +105,32 @@ export const companyRequestApi = {
     ),
   updatePublicSiteSettings: (
     companyId: string,
-    input: { name: string; slug: string; status: EcommerceStore['status'] },
+    input: {
+      name: string;
+      slug: string;
+      status: EcommerceStore['status'];
+      description: string;
+      primaryColor: string;
+      accentColor: string;
+      homepageEnabled: boolean;
+    },
   ) =>
     request<{ store: EcommerceStore }>(
       `/company-public-site?companyId=${encodeURIComponent(companyId)}`,
       { method: 'PATCH', body: JSON.stringify(input) },
+    ),
+  uploadPublicSiteHeroImages: (companyId: string, files: File[]) => {
+    const body = new FormData();
+    files.forEach(file => body.append('images[]', file));
+    return request<{ store: EcommerceStore }>(
+      `/company-public-site/hero-images?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'POST', body },
+    );
+  },
+  deletePublicSiteHeroImage: (companyId: string, imageId: string) =>
+    request<{ store: EcommerceStore }>(
+      `/company-public-site/hero-images/${encodeURIComponent(imageId)}?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'DELETE' },
     ),
   uploadPublicSiteLogo: (companyId: string, image: File) => {
     const body = new FormData();

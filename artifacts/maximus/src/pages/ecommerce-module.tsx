@@ -19,7 +19,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  RotateCcw,
   Search,
   Settings,
   ShoppingBag,
@@ -1173,42 +1172,28 @@ function HomePanel({ store, canModify, run }: { store: EcommerceStore; canModify
 
 function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [form, setForm] = useState({
-    description: store.description,
     currency: store.currency,
-    primaryColor: store.primaryColor,
-    accentColor: store.accentColor,
     allowOrderAttachments: store.allowOrderAttachments,
   });
-  const [heroFiles, setHeroFiles] = useState<File[]>([]);
   const initializedCompanyId = useRef<string | null>(null);
   const api = createEcommerceApi(store.companyId);
   useEffect(() => {
     if (initializedCompanyId.current === store.companyId) return;
     initializedCompanyId.current = store.companyId;
     setForm({
-      description: store.description,
       currency: store.currency,
-      primaryColor: store.primaryColor,
-      accentColor: store.accentColor,
       allowOrderAttachments: store.allowOrderAttachments,
     });
-    setHeroFiles([]);
   }, [store]);
   const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
   const save = (event: FormEvent) => {
     event.preventDefault();
-    const selectedHeroFiles = heroFiles;
-    void run(async () => {
-      await api.updateStore(form);
-      if (selectedHeroFiles.length > 0) await api.uploadStoreHeroImages(selectedHeroFiles);
-      setHeroFiles([]);
-    }, selectedHeroFiles.length > 0 ? 'Paramètres E-commerce et images enregistrés.' : 'Paramètres E-commerce enregistrés.');
+    void run(() => api.updateStore(form), 'Paramètres E-commerce enregistrés.');
   };
   return <div className="space-y-5 fade-up">
-    <Panel title="Paramètres E-commerce" description="Les réglages d’identité et de publication du site se trouvent dans Organisation et accès → Site public.">
+    <Panel title="Paramètres E-commerce" description="Configurez la devise et les options propres aux commandes. Les réglages de la page d’accueil se trouvent dans Organisation et accès → Site public.">
       <form onSubmit={save} className="max-w-3xl space-y-5">
         <div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label></div>
-        <label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
          <label className="flex items-start gap-3 rounded-xl border p-4">
            <input
              type="checkbox"
@@ -1222,25 +1207,10 @@ function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canMo
              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les clients pourront joindre jusqu’à 3 fichiers PDF ou images de 2 Mo maximum pendant le paiement. Les fichiers restent privés.</span>
            </span>
          </label>
-         <div className="rounded-xl border p-4">
-           <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold">Images de la bannière d’accueil</p><p className="mt-1 text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Choisissez plusieurs images : elles défileront horizontalement dans l’accueil public.</p></div><span className="text-[10px] font-bold text-[hsl(var(--muted-foreground))]">{store.heroImages.length}/12</span></div>
-           <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || store.heroImages.length >= 12} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, Math.max(0, 12 - store.heroImages.length)))} className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" />
-           {heroFiles.length > 0 && <p className="mt-1 text-[11px] font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p>}
-           {store.heroImages.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{store.heroImages.map(url => <span key={url} className="relative"><img src={url} alt="" className="h-20 w-28 rounded-lg object-cover" /><button type="button" disabled={!canModify} onClick={() => { const imageId = url.split('/').pop(); if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de la bannière.'); }} className="absolute right-1 top-1 rounded-full bg-[hsl(var(--destructive))] px-1.5 py-0.5 text-[10px] font-bold text-white disabled:opacity-50" aria-label="Supprimer cette image">×</button></span>)}</div>}
-         </div>
-         <div className="grid gap-4 sm:grid-cols-2"><ColorField label="Couleur principale" value={form.primaryColor} onChange={value => patch({ primaryColor: value })} disabled={!canModify} /><ColorField label="Couleur d’accent" value={form.accentColor} onChange={value => patch({ accentColor: value })} disabled={!canModify} /></div>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] px-4 py-3">
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">Utilisez la palette officielle MAXIMUS pour cette vitrine.</p>
-            <button type="button" data-testid="button-reset-maximus-shop-colors" disabled={!canModify} onClick={() => patch(maximusShopColors)} className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)] disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw size={13} />Revenir aux couleurs MAXIMUS</button>
-          </div>
          <div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les réglages E-commerce</button></div>
       </form>
     </Panel>
   </div>;
-}
-
-function ColorField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {
-  return <label className="block text-xs font-bold">{label}<div className="mt-1.5 flex gap-2"><input type="color" value={value || '#d8a21b'} onChange={event => onChange(event.target.value)} disabled={disabled} className="h-11 w-12 rounded-lg border p-1" /><input value={value} onChange={event => onChange(event.target.value)} disabled={disabled} className="min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-sm" placeholder="#D8A21B" /></div></label>;
 }
 
 function OrderRow({ order, currency }: { order: EcommerceOrder; currency: EcommerceStore['currency'] }) {

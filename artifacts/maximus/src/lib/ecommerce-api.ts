@@ -80,6 +80,7 @@ export interface EcommerceStore {
   name: string;
   description: string;
   status: EcommerceStoreStatus;
+  homepageEnabled: boolean;
   currency: 'XOF' | 'EUR' | 'USD';
   primaryColor: string;
   accentColor: string;

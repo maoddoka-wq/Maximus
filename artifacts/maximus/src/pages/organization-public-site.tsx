@@ -7,7 +7,10 @@ import type { EcommerceStore } from '@/lib/ecommerce-api';
 import { companyRequestApi } from '@/lib/company-request-api';
 import { OrganizationPublicSiteDomains } from './organization-public-site-domains';
 
-type PublicSiteForm = Pick<EcommerceStore, 'name' | 'slug' | 'status'>;
+type PublicSiteForm = Pick<
+  EcommerceStore,
+  'name' | 'slug' | 'status' | 'description' | 'primaryColor' | 'accentColor' | 'homepageEnabled'
+>;
 
 function slugify(value: string): string {
   return value
@@ -24,6 +27,7 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
   const [store, setStore] = useState<EcommerceStore | null>(null);
   const [form, setForm] = useState<PublicSiteForm | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [heroFiles, setHeroFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +47,10 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
           name: loadedStore.name,
           slug: loadedStore.slug,
           status: loadedStore.status,
+          description: loadedStore.description,
+          primaryColor: loadedStore.primaryColor,
+          accentColor: loadedStore.accentColor,
+          homepageEnabled: loadedStore.homepageEnabled,
         });
         setSlugEdited(false);
       })
@@ -81,11 +89,52 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
         name: result.store.name,
         slug: result.store.slug,
         status: result.store.status,
+        description: result.store.description,
+        primaryColor: result.store.primaryColor,
+        accentColor: result.store.accentColor,
+        homepageEnabled: result.store.homepageEnabled,
       });
       setLogoFile(null);
       setNotice('Les paramètres du site public ont été enregistrés.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Les paramètres n’ont pas pu être enregistrés.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uploadHeroImages = async () => {
+    if (!store || heroFiles.length === 0) return;
+
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await companyRequestApi.uploadPublicSiteHeroImages(company.id, heroFiles);
+      setStore(result.store);
+      setHeroFiles([]);
+      setNotice('Les images de la bannière ont été ajoutées.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Les images de la bannière n’ont pas pu être envoyées.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteHeroImage = async (url: string) => {
+    if (!store) return;
+    const imageId = url.split('/').pop();
+    if (!imageId) return;
+
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await companyRequestApi.deletePublicSiteHeroImage(company.id, imageId);
+      setStore(result.store);
+      setNotice('L’image a été retirée de la bannière.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'L’image n’a pas pu être supprimée.');
     } finally {
       setSaving(false);
     }
@@ -199,6 +248,125 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
               <option value="SUSPENDED">Suspendu</option>
             </select>
           </label>
+
+          <label className="flex items-start gap-3 rounded-xl border p-4">
+            <input
+              data-testid="checkbox-public-homepage-enabled"
+              type="checkbox"
+              checked={form.homepageEnabled}
+              disabled={saving}
+              onChange={event => setForm(current => current ? {
+                ...current,
+                homepageEnabled: event.target.checked,
+              } : current)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm font-bold">Activer la page d’accueil publique</span>
+              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                Les autres rubriques publiques restent accessibles lorsque cette page est désactivée.
+              </span>
+            </span>
+          </label>
+
+          <label className="block text-xs font-bold">
+            Description de la page d’accueil
+            <textarea
+              data-testid="textarea-public-homepage-description"
+              maxLength={500}
+              rows={4}
+              disabled={saving}
+              value={form.description}
+              onChange={event => setForm(current => current ? { ...current, description: event.target.value } : current)}
+              className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--background))] px-3 py-2.5 text-sm font-normal"
+            />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {([
+              ['primaryColor', 'Couleur principale'],
+              ['accentColor', 'Couleur d’accent'],
+            ] as const).map(([key, label]) => (
+              <label key={key} className="block text-xs font-bold">
+                {label}
+                <div className="mt-1.5 flex gap-2">
+                  <input
+                    type="color"
+                    value={form[key]}
+                    disabled={saving}
+                    onChange={event => setForm(current => current ? { ...current, [key]: event.target.value } : current)}
+                    className="h-11 w-12 rounded-lg border p-1"
+                    aria-label={`${label} — sélecteur`}
+                  />
+                  <Input
+                    value={form[key]}
+                    disabled={saving}
+                    maxLength={7}
+                    pattern="#[0-9a-fA-F]{6}"
+                    onChange={event => setForm(current => current ? { ...current, [key]: event.target.value } : current)}
+                    className="h-11"
+                    aria-label={label}
+                  />
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold">Bannière défilante</p>
+                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Ajoutez jusqu’à 12 images JPG, PNG ou WebP. Plusieurs images défilent automatiquement sur l’accueil public.
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 text-xs font-bold">
+                {store.heroImages.length}/12
+              </span>
+            </div>
+            <input
+              data-testid="input-public-homepage-hero-images"
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              disabled={saving || store.heroImages.length >= 12}
+              onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, 12 - store.heroImages.length))}
+              className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold"
+            />
+            {heroFiles.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-[hsl(var(--primary))]">
+                  {heroFiles.length} image(s) sélectionnée(s)
+                </p>
+                <Button type="button" size="sm" onClick={() => void uploadHeroImages()} disabled={saving}>
+                  <ImagePlus size={14} className="mr-2" />
+                  {saving ? 'Envoi…' : 'Ajouter à la bannière'}
+                </Button>
+              </div>
+            )}
+            {store.heroImages.length > 0 ? (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {store.heroImages.map((url, index) => (
+                  <div key={url} className="group relative overflow-hidden rounded-lg border bg-[hsl(var(--muted)/.25)]">
+                    <img src={url} alt={`Image de la bannière ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void deleteHeroImage(url)}
+                      aria-label={`Retirer l’image ${index + 1} de la bannière`}
+                      className="absolute right-2 top-2 rounded-full bg-[hsl(var(--destructive))] px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-dashed px-3 py-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
+                Aucune image personnalisée. Le visuel par défaut est utilisé.
+              </p>
+            )}
+          </div>
 
           <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4">
             <label className="block text-xs font-bold">

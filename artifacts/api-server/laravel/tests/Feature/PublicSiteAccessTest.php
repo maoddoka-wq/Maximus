@@ -20,17 +20,26 @@ class PublicSiteAccessTest extends TestCase
         $this->authenticate($companyAdmin)
             ->getJson('/api/company-public-site?companyId='.$company->id)
             ->assertOk()
-            ->assertJsonPath('store.status', 'DRAFT');
+            ->assertJsonPath('store.status', 'DRAFT')
+            ->assertJsonPath('store.homepageEnabled', true);
 
         $this->patchJson('/api/company-public-site?companyId='.$company->id, [
             'name' => 'Atelier Acme',
             'slug' => 'atelier-acme-public',
             'status' => 'PUBLISHED',
+            'description' => 'Une présentation indépendante du module E-commerce.',
+            'primaryColor' => '#123456',
+            'accentColor' => '#ABCDEF',
+            'homepageEnabled' => false,
         ])
             ->assertOk()
             ->assertJsonPath('store.name', 'Atelier Acme')
             ->assertJsonPath('store.slug', 'atelier-acme-public')
-            ->assertJsonPath('store.status', 'PUBLISHED');
+            ->assertJsonPath('store.status', 'PUBLISHED')
+            ->assertJsonPath('store.description', 'Une présentation indépendante du module E-commerce.')
+            ->assertJsonPath('store.primaryColor', '#123456')
+            ->assertJsonPath('store.accentColor', '#ABCDEF')
+            ->assertJsonPath('store.homepageEnabled', false);
 
         $this->assertDatabaseMissing('maximus_company_modules', [
             'company_id' => $company->id,
@@ -52,11 +61,39 @@ class PublicSiteAccessTest extends TestCase
             'enabled' => true,
         ]);
         $this->getJson('/api/shop/atelier-acme-public')->assertOk();
+        $this->getJson('/api/shop/atelier-acme-public')
+            ->assertOk()
+            ->assertJsonPath('store.homepageEnabled', false)
+            ->assertJsonPath('store.primaryColor', '#123456');
 
         $this->patchJson('/api/companies/'.$company->id.'/public-site-access', ['enabled' => false])
             ->assertOk()
             ->assertJsonPath('enabled', false);
         $this->getJson('/api/shop/atelier-acme-public')->assertNotFound();
+    }
+
+    public function test_company_admin_can_manage_homepage_banner_without_ecommerce(): void
+    {
+        $company = $this->createCompany('public-site-banner');
+        $companyAdmin = $this->createActor('public-site-banner-admin', 'company_admin', $company->id);
+        $request = $this->authenticate($companyAdmin);
+
+        $uploaded = $request->post('/api/company-public-site/hero-images?companyId='.$company->id, [
+            'images' => [
+                UploadedFile::fake()->image('homepage-banner.jpg'),
+            ],
+        ])->assertOk()
+            ->assertJsonCount(1, 'store.heroImages');
+
+        $imageId = basename($uploaded->json('store.heroImages.0'));
+        $request->deleteJson('/api/company-public-site/hero-images/'.$imageId.'?companyId='.$company->id)
+            ->assertOk()
+            ->assertJsonCount(0, 'store.heroImages');
+
+        $this->assertDatabaseMissing('maximus_company_modules', [
+            'company_id' => $company->id,
+            'module_id' => 'ecommerce',
+        ]);
     }
 
     public function test_company_admin_cannot_grant_maximus_public_site_access(): void

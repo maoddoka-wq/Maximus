@@ -32,6 +32,10 @@ final class CompanyPublicSiteSettingsController extends Controller
             'name' => ['required', 'string', 'min:2', 'max:120'],
             'slug' => ['required', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'status' => ['required', 'in:DRAFT,PUBLISHED,SUSPENDED'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'primaryColor' => ['sometimes', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'accentColor' => ['sometimes', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'homepageEnabled' => ['sometimes', 'boolean'],
         ])->validate();
 
         $store = $this->ensureStore($companyId);
@@ -43,12 +47,102 @@ final class CompanyPublicSiteSettingsController extends Controller
                 'name' => $input['name'],
                 'slug' => $slug,
                 'status' => $input['status'],
+                'description' => array_key_exists('description', $input)
+                    ? (string) ($input['description'] ?? '')
+                    : (string) ($store->description ?? ''),
+                'primary_color' => (string) ($input['primaryColor'] ?? $store->primary_color ?? '#D69E2E'),
+                'accent_color' => (string) ($input['accentColor'] ?? $store->accent_color ?? '#172033'),
+                'homepage_enabled' => (bool) ($input['homepageEnabled'] ?? $store->homepage_enabled ?? true),
                 'updated_at' => now(),
             ]);
 
         return response()->json([
             'store' => $this->storePayload(
                 DB::table('ecommerce_stores')->where('id', $store->id)->first(),
+            ),
+        ]);
+    }
+
+    public function uploadHeroImages(Request $request): JsonResponse
+    {
+        $companyId = $this->companyId($request);
+        if ($companyId instanceof JsonResponse) {
+            return $companyId;
+        }
+
+        $store = $this->ensureStore($companyId);
+        $currentCount = DB::table('ecommerce_gallery_images')
+            ->where('company_id', $companyId)
+            ->where('owner_type', 'store')
+            ->where('owner_id', $store->id)
+            ->where('collection', 'hero')
+            ->count();
+        $remaining = 12 - $currentCount;
+        if ($remaining <= 0) {
+            return response()->json(['error' => 'La bannière contient déjà 12 images.'], 422);
+        }
+
+        $input = Validator::make($request->all(), [
+            'images' => ['required', 'array', 'min:1', 'max:'.$remaining],
+            'images.*' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        ])->validate();
+
+        $nextOrder = (int) DB::table('ecommerce_gallery_images')
+            ->where('company_id', $companyId)
+            ->where('owner_type', 'store')
+            ->where('owner_id', $store->id)
+            ->where('collection', 'hero')
+            ->max('sort_order') + 1;
+
+        foreach ($input['images'] as $file) {
+            $contents = $file->get();
+            if (! is_string($contents) || $contents === '') {
+                continue;
+            }
+
+            DB::table('ecommerce_gallery_images')->insert([
+                'id' => 'gallery-'.Str::uuid()->toString(),
+                'company_id' => $companyId,
+                'owner_type' => 'store',
+                'owner_id' => $store->id,
+                'collection' => 'hero',
+                'image_data' => base64_encode($contents),
+                'image_mime' => $file->getMimeType() ?: 'application/octet-stream',
+                'sort_order' => $nextOrder++,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'store' => $this->storePayload(
+                DB::table('ecommerce_stores')->where('id', $store->id)->where('company_id', $companyId)->first(),
+            ),
+        ]);
+    }
+
+    public function deleteHeroImage(Request $request, string $imageId): JsonResponse
+    {
+        $companyId = $this->companyId($request);
+        if ($companyId instanceof JsonResponse) {
+            return $companyId;
+        }
+
+        $store = $this->ensureStore($companyId);
+        $deleted = DB::table('ecommerce_gallery_images')
+            ->where('id', $imageId)
+            ->where('company_id', $companyId)
+            ->where('owner_type', 'store')
+            ->where('owner_id', $store->id)
+            ->where('collection', 'hero')
+            ->delete();
+        if ($deleted === 0) {
+            return response()->json(['error' => 'Image de bannière introuvable.'], 404);
+        }
+
+        return response()->json([
+            'store' => $this->storePayload(
+                DB::table('ecommerce_stores')->where('id', $store->id)->where('company_id', $companyId)->first(),
             ),
         ]);
     }
@@ -172,12 +266,34 @@ final class CompanyPublicSiteSettingsController extends Controller
             'name' => (string) $store->name,
             'description' => (string) ($store->description ?? ''),
             'status' => (string) $store->status,
+            'homepageEnabled' => (bool) ($store->homepage_enabled ?? true),
             'currency' => (string) ($store->currency ?? 'XOF'),
             'primaryColor' => (string) ($store->primary_color ?? '#D69E2E'),
             'accentColor' => (string) ($store->accent_color ?? '#172033'),
             'logoUrl' => (string) ($store->logo_url ?? ''),
-            'heroImages' => json_decode((string) ($store->hero_images ?? '[]'), true) ?: [],
+            'heroImages' => $this->heroImages($store),
             'allowOrderAttachments' => (bool) ($store->allow_order_attachments ?? false),
         ];
+    }
+
+    private function heroImages(object $store): array
+    {
+        $legacyImages = json_decode((string) ($store->hero_images ?? '[]'), true);
+        $legacyImages = is_array($legacyImages) ? $legacyImages : [];
+        $uploadedImages = DB::table('ecommerce_gallery_images')
+            ->where('company_id', $store->company_id)
+            ->where('owner_type', 'store')
+            ->where('owner_id', $store->id)
+            ->where('collection', 'hero')
+            ->orderBy('sort_order')
+            ->orderBy('created_at')
+            ->pluck('id')
+            ->map(fn ($id) => '/api/gallery-images/'.rawurlencode((string) $store->company_id).'/'.rawurlencode((string) $id))
+            ->all();
+
+        return array_values(array_unique(array_filter(
+            array_merge($legacyImages, $uploadedImages),
+            fn ($url) => is_string($url) && trim($url) !== '',
+        )));
     }
 }

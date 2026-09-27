@@ -130,6 +130,8 @@ Route::middleware(['maximus.auth', 'maximus.company'])
         Route::get('/', [CompanyPublicSiteSettingsController::class, 'show']);
         Route::patch('/', [CompanyPublicSiteSettingsController::class, 'update']);
         Route::post('/logo', [CompanyPublicSiteSettingsController::class, 'uploadLogo']);
+        Route::post('/hero-images', [CompanyPublicSiteSettingsController::class, 'uploadHeroImages']);
+        Route::delete('/hero-images/{imageId}', [CompanyPublicSiteSettingsController::class, 'deleteHeroImage']);
     Route::get('/domains', [CompanyPublicSiteDomainsController::class, 'index']);
     Route::post('/domains', [CompanyPublicSiteDomainsController::class, 'store']);
     Route::post('/domains/{id}/verify', [CompanyPublicSiteDomainsController::class, 'verify']);
