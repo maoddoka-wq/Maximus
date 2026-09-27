@@ -53,6 +53,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
   const [heroIndex, setHeroIndex] = useState(0);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
+  const [manifestError, setManifestError] = useState('');
   const [installHelp, setInstallHelp] = useState('');
 
   const siteManifestUrl = bootstrap?.available
@@ -95,7 +96,11 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     };
   }, [domain, slug]);
 
-  useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
+  useEffect(() => subscribeToPwaInstall(() => {
+    const available = canInstallPwa();
+    setInstallAvailable(available);
+    if (available) setInstallHelp('');
+  }), []);
 
   useEffect(() => {
     if (!siteManifestUrl) {
@@ -106,6 +111,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     let cancelled = false;
     let cleanup: (() => void) | undefined;
     setManifestReady(false);
+    setManifestError('');
     setInstallHelp('');
     void mountClientManifest(siteManifestUrl)
       .then(unmount => {
@@ -117,7 +123,10 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
         setManifestReady(true);
       })
       .catch(cause => {
-        if (!cancelled) console.warn('Le manifeste PWA du site public n’a pas pu être validé.', cause);
+        if (!cancelled) {
+          console.warn('Le manifeste PWA du site public n’a pas pu être validé.', cause);
+          setManifestError('Le fichier d’installation du site n’a pas pu être vérifié.');
+        }
       });
     return () => {
       cancelled = true;
@@ -233,6 +242,10 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
       setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
       return;
     }
+    if (manifestError) {
+      setInstallHelp('La préparation de l’installation a échoué. Vérifiez la connexion, puis réessayez depuis le menu du navigateur.');
+      return;
+    }
     if (!manifestReady) {
       setInstallHelp('La préparation de l’installation est en cours. Réessayez dans un instant.');
       return;
@@ -241,10 +254,14 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
       setInstallHelp('Ouvrez le menu du navigateur, puis choisissez « Installer l’application ».');
       return;
     }
-    const installed = await promptPwaInstall();
-    setInstallHelp(installed
-      ? 'La vitrine a été installée.'
-      : 'L’installation n’a pas été confirmée. Vous pouvez réessayer depuis le menu du navigateur.');
+    try {
+      const installed = await promptPwaInstall();
+      setInstallHelp(installed
+        ? 'La vitrine a été installée.'
+        : 'L’installation n’a pas été confirmée. Vous pouvez réessayer depuis le menu du navigateur.');
+    } catch {
+      setInstallHelp('L’installation directe a échoué. Ouvrez le menu du navigateur et choisissez « Installer l’application ».');
+    }
   };
 
   if (loading) {
@@ -264,6 +281,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
         brandName={bootstrap.brand.name}
         installAvailable={installAvailable}
         manifestReady={manifestReady}
+        manifestError={manifestError}
         help={installHelp}
         onInstall={() => void installPublicSite()}
       />
@@ -547,12 +565,14 @@ function PublicSiteInstallPrompt({
   brandName,
   installAvailable,
   manifestReady,
+  manifestError,
   help,
   onInstall,
 }: {
   brandName: string;
   installAvailable: boolean;
   manifestReady: boolean;
+  manifestError: string;
   help: string;
   onInstall: () => void;
 }) {
@@ -571,17 +591,19 @@ function PublicSiteInstallPrompt({
           <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
             {ios
               ? 'Dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».'
-              : installAvailable
+              : installAvailable && manifestReady
                 ? 'Le navigateur ouvrira sa fenêtre d’installation avec le nom et le logo de ce site.'
-                : 'Le bouton lance l’installation si le navigateur la propose. Sinon, utilisez son menu.'}
+                : 'Si le bouton direct n’est pas proposé, ouvrez le menu du navigateur et choisissez « Installer l’application ».'
+            }
           </p>
-          {!manifestReady && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
+          {!manifestReady && !manifestError && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
+          {manifestError && <p className="mt-1 text-xs font-medium text-red-700" role="alert">{manifestError} Vous pouvez aussi réessayer depuis le menu du navigateur.</p>}
           {help && <p className="mt-1 text-xs font-medium text-[hsl(var(--primary))]" role="status">{help}</p>}
         </div>
       </div>
       <Button type="button" variant="outline" className="shrink-0" onClick={onInstall}>
         <Download size={16} className="mr-2" />
-        Installer l’application
+        {installAvailable && manifestReady ? 'Installer l’application' : 'Voir les étapes d’installation'}
       </Button>
     </aside>
   );
@@ -653,11 +675,9 @@ function PublicCompanySiteShell({
       ]
       : []),
   ];
-  const primaryKeys = activePathNormalized === '/'
-    ? new Set(['home', ...modules.map(module => `module-${module.id}`)])
-    : hasEcommerce
-      ? new Set(['home', 'module-ecommerce', 'cart'])
-      : new Set(['home', ...modules.slice(0, 2).map(module => `module-${module.id}`)]);
+  const primaryKeys = hasEcommerce
+    ? new Set(['home', 'module-ecommerce', 'cart'])
+    : new Set(['home', ...modules.slice(0, 2).map(module => `module-${module.id}`)]);
   const primaryMobileItems = navigationItems.filter(item => primaryKeys.has(item.key));
   const moreMobileItems = navigationItems.filter(item => !primaryKeys.has(item.key));
   const moreIsActive = moreMobileItems.some(item => item.active);
@@ -668,14 +688,12 @@ function PublicCompanySiteShell({
       : primaryMobileItems.length === 2
         ? 'grid-cols-2'
         : 'grid-cols-1';
-  const itemClass = (active: boolean) => `flex ${activePathNormalized === '/' ? 'w-[4.5rem] shrink-0' : 'min-w-0'} flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold transition sm:text-xs ${
+  const itemClass = (active: boolean) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold transition sm:text-xs ${
     active
       ? 'bg-[hsl(var(--muted)/.5)] text-[hsl(var(--foreground))]'
       : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'
   }`;
-  const mobileNavContainerClass = activePathNormalized === '/'
-    ? 'mx-auto flex max-w-full gap-1 overflow-x-auto px-2 pt-1'
-    : `mx-auto grid max-w-2xl ${mobileGridClass} gap-1 px-2 pt-1`;
+  const mobileNavContainerClass = `mx-auto grid max-w-2xl ${mobileGridClass} gap-1 px-2 pt-1`;
 
   return (
     <div className="min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">

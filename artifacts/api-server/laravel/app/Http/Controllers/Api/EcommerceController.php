@@ -8,6 +8,7 @@ use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Services\EcommerceDomainVerifier;
+use App\Services\PublicPwaIcon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -597,7 +598,7 @@ class EcommerceController extends Controller
         ]);
     }
 
-    public function serveStoreLogo(string $company, string $filename)
+    public function serveStoreLogo(Request $request, string $company, string $filename)
     {
         if (! preg_match('/^[A-Za-z0-9_-]+$/', $company) || ! preg_match('/^[A-Za-z0-9_.-]+$/', $filename)) {
             abort(404);
@@ -611,10 +612,7 @@ class EcommerceController extends Controller
         if ($companySite && is_string($companySite->logo_data) && $companySite->logo_data !== '') {
             $contents = base64_decode($companySite->logo_data, true);
             if ($contents !== false) {
-                return response($contents, 200, [
-                    'Content-Type' => $companySite->logo_mime ?: 'application/octet-stream',
-                    'Cache-Control' => 'public, max-age=31536000, immutable',
-                ]);
+                return $this->storeLogoResponse($request, $contents, $companySite->logo_mime ?: 'application/octet-stream');
             }
         }
 
@@ -625,10 +623,7 @@ class EcommerceController extends Controller
         if ($store && is_string($store->logo_data) && $store->logo_data !== '') {
             $contents = base64_decode($store->logo_data, true);
             if ($contents !== false) {
-                return response($contents, 200, [
-                    'Content-Type' => $store->logo_mime ?: 'application/octet-stream',
-                    'Cache-Control' => 'public, max-age=31536000, immutable',
-                ]);
+                return $this->storeLogoResponse($request, $contents, $store->logo_mime ?: 'application/octet-stream');
             }
         }
 
@@ -637,7 +632,42 @@ class EcommerceController extends Controller
             abort(404);
         }
 
+        if ($request->query->has('pwa_size')) {
+            return $this->storeLogoResponse(
+                $request,
+                Storage::disk('public')->get($path),
+                Storage::disk('public')->mimeType($path) ?: 'application/octet-stream',
+            );
+        }
+
         return response()->file(Storage::disk('public')->path($path), [
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ]);
+    }
+
+    private function storeLogoResponse(Request $request, string $contents, string $mime)
+    {
+        if (! $request->query->has('pwa_size')) {
+            return response($contents, 200, [
+                'Content-Type' => $mime,
+                'Cache-Control' => 'public, max-age=31536000, immutable',
+            ]);
+        }
+
+        $size = filter_var($request->query('pwa_size'), FILTER_VALIDATE_INT);
+        if (! in_array($size, [192, 512], true)) {
+            abort(422, 'La taille d’icône PWA demandée est invalide.');
+        }
+
+        try {
+            $png = PublicPwaIcon::renderPng($contents, $size);
+        } catch (Throwable $error) {
+            report($error);
+            abort(503, 'Le logo ne peut pas être préparé pour l’installation.');
+        }
+
+        return response($png, 200, [
+            'Content-Type' => 'image/png',
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
     }
@@ -1472,11 +1502,7 @@ class EcommerceController extends Controller
             'background_color' => '#f8f5ed',
             'theme_color' => $store->accent_color ?: '#0b1b2b',
             'lang' => 'fr',
-            'icons' => [[
-                'src' => $logoUrl !== '' ? $logoUrl : '/admin-logo.png',
-                'sizes' => '1024x1024',
-                'purpose' => 'any maskable',
-            ]],
+            'icons' => PublicPwaIcon::manifestIcons($logoUrl),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Vary', 'Host');
     }

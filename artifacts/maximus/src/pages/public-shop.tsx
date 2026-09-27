@@ -302,6 +302,8 @@ export default function PublicShopPage({
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
+  const [manifestError, setManifestError] = useState('');
+  const [installHelp, setInstallHelp] = useState('');
   const isCompanySite = Boolean(companySite);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
@@ -339,7 +341,11 @@ export default function PublicShopPage({
     return match ? decodeURIComponent(match[1]) : null;
   }, [routePath]);
 
-  useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
+  useEffect(() => subscribeToPwaInstall(() => {
+    const available = canInstallPwa();
+    setInstallAvailable(available);
+    if (available) setInstallHelp('');
+  }), []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -348,6 +354,7 @@ export default function PublicShopPage({
   useEffect(() => {
     if (isCompanySite || !data?.store.name.trim()) {
       setManifestReady(false);
+      setManifestError('');
       return undefined;
     }
     const manifestUrl = domain
@@ -356,6 +363,7 @@ export default function PublicShopPage({
     let cancelled = false;
     let cleanup: (() => void) | undefined;
     setManifestReady(false);
+    setManifestError('');
     void mountClientManifest(manifestUrl)
       .then(unmount => {
         if (cancelled) {
@@ -366,7 +374,10 @@ export default function PublicShopPage({
         setManifestReady(true);
       })
       .catch(error => {
-        if (!cancelled) console.warn('Le manifest PWA de la boutique n’a pas pu être validé.', error);
+        if (!cancelled) {
+          console.warn('Le manifest PWA de la boutique n’a pas pu être validé.', error);
+          setManifestError('Le fichier d’installation de la boutique n’a pas pu être vérifié.');
+        }
       });
     return () => {
       cancelled = true;
@@ -795,9 +806,27 @@ export default function PublicShopPage({
   };
 
   const installClientApp = async () => {
-    if (isIosDevice()) return;
-    const installed = await promptPwaInstall();
-    if (installed) showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
+    if (isIosDevice()) {
+      setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
+      return;
+    }
+    if (!manifestReady) {
+      setInstallHelp('La préparation de l’installation n’est pas terminée. Réessayez dans un instant.');
+      return;
+    }
+    if (!canInstallPwa()) {
+      setInstallHelp('Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».');
+      return;
+    }
+    try {
+      const installed = await promptPwaInstall();
+      setInstallHelp(installed
+        ? 'La boutique a été installée.'
+        : 'L’installation n’a pas été confirmée. Vous pouvez réessayer depuis le menu du navigateur.');
+      if (installed) showAppToast('La boutique est maintenant installée sur votre appareil.', 'success');
+    } catch {
+      setInstallHelp('L’installation directe a échoué. Ouvrez le menu du navigateur et choisissez « Installer l’application ».');
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
@@ -827,7 +856,6 @@ export default function PublicShopPage({
   const isHomeRoute = routePath === shopPath('') || routePath === shopPath('/accueil');
   const isCatalogRoute = routePath === shopPath('/boutique');
   const isSinglePageLanding = Boolean(companySite?.singlePageLanding && isHomeRoute);
-  const landingPagePaths = new Set(['', '/accueil', '/boutique', '/location', '/transport', '/immobilier', '/livraison']);
    const commerceNav = [
      { label: 'Accueil', path: '/accueil' },
      { label: 'Boutique', path: '/boutique' },
@@ -860,15 +888,11 @@ export default function PublicShopPage({
      return routePath === shopPath(path);
    };
     const primaryPaths = companySite ? ['', '/boutique', '/panier'] : ['/accueil', '/boutique', '/panier'];
-    const primaryMobileNav = isSinglePageLanding
-      ? publicNav.filter(item => landingPagePaths.has(item.path))
-      : publicNav.filter(item => primaryPaths.includes(item.path));
+     const primaryMobileNav = publicNav.filter(item => primaryPaths.includes(item.path));
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
-    const mobileNavItemsClass = isSinglePageLanding
-      ? 'mx-auto flex max-w-full gap-1 overflow-x-auto'
-      : 'mx-auto grid max-w-md grid-cols-4 gap-1';
-    const mobileNavVisible = !isAuthRoute && !submitted && !isTransportRoute;
+     const mobileNavItemsClass = 'mx-auto grid max-w-md grid-cols-4 gap-1';
+     const mobileNavVisible = !isAuthRoute && !submitted;
      const mobileNavBottomPadding = mobileNavVisible
        ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
        : 'pb-4 sm:pb-9';
@@ -915,21 +939,28 @@ export default function PublicShopPage({
        </div>}
         <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-9 lg:px-8 lg:pb-9 ${mobileNavBottomPadding}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-       {siteInstallPrompt}
-       {!companySite && !isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+        {!isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && siteInstallPrompt}
+        {!companySite && !isStandalonePwa() && !isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && <aside className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="banner-shop-install">
         <div className="flex items-start gap-3">
            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
           <div>
             <p className="text-sm font-bold">Installez cette boutique</p>
             <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              {isIosDevice() ? 'Touchez Partager, puis « Sur l’écran d’accueil » pour retrouver rapidement votre espace client.' : 'Retrouvez la boutique et vos commandes plus rapidement depuis votre écran d’accueil.'}
+               {isIosDevice()
+                 ? 'Dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».'
+                 : installAvailable && manifestReady
+                   ? 'Retrouvez la boutique et vos commandes depuis votre écran d’accueil.'
+                   : 'Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».'}
             </p>
+             {!manifestReady && !manifestError && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
+             {manifestError && <p className="mt-1 text-xs font-medium text-red-700" role="alert">{manifestError} Vous pouvez aussi réessayer depuis le menu du navigateur.</p>}
+             {installHelp && <p className="mt-1 text-xs font-medium text-[var(--shop-primary)]" role="status">{installHelp}</p>}
           </div>
         </div>
-         {installAvailable && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
+          {installAvailable && manifestReady && !isIosDevice() && <button type="button" onClick={() => void installClientApp()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>
           <Download size={15} />Installer l’application
         </button>}
-      </div>}
+       </aside>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} store={store} orderId={paymentReturn?.orderId ?? ''} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
               : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} attachments={orderAttachments} setAttachments={setOrderAttachments} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
@@ -1016,8 +1047,8 @@ export default function PublicShopPage({
         : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />}
     </main>
       {mobileNavVisible && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden" aria-label="Navigation mobile"><div className={mobileNavItemsClass}>
-         {primaryMobileNav.map(item => { const Icon = item.path === '/accueil' || item.path === '' ? Store : item.path === '/boutique' ? Package : item.path === '/location' || item.path === '/transport' ? MapPin : item.path === '/immobilier' ? Building2 : ShoppingBag; const active = isPublicNavActive(item.path); return <Button variant="ghost" size="sm" type="button" key={item.path} onClick={() => go(item.path)} aria-current={active ? 'page' : undefined} className={`relative h-auto min-w-0 shrink-0 flex-col gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold sm:text-xs ${isSinglePageLanding ? 'w-[4.25rem]' : ''} ${active ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-[var(--shop-accent-foreground)]">{cartCount}</span>}</Button>; })}
-          {additionalMobileNav.length > 0 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" type="button" aria-label={additionalMobileNavActive ? 'Plus, une page est active' : 'Plus, autres pages'} className={`relative h-auto min-w-0 shrink-0 flex-col gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold sm:text-xs ${isSinglePageLanding ? 'w-[4.25rem]' : ''} ${additionalMobileNavActive ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Plus size={18} /><span>Plus</span>{additionalMobileNavActive && <span className="absolute right-1/4 top-0 h-2 w-2 translate-x-1/2 rounded-full bg-[var(--shop-accent)]" />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top" sideOffset={8}>{additionalMobileNav.map(item => <DropdownMenuItem key={item.path} onSelect={() => go(item.path)} className={isPublicNavActive(item.path) ? 'font-bold text-[var(--shop-accent)]' : ''}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}
+         {primaryMobileNav.map(item => { const Icon = item.path === '/accueil' || item.path === '' ? Store : item.path === '/boutique' ? Package : item.path === '/location' || item.path === '/transport' ? MapPin : item.path === '/immobilier' ? Building2 : ShoppingBag; const active = isPublicNavActive(item.path); return <Button variant="ghost" size="sm" type="button" key={item.path} onClick={() => go(item.path)} aria-current={active ? 'page' : undefined} className={`relative h-auto min-w-0 shrink-0 flex-col gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold sm:text-xs ${active ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-[var(--shop-accent-foreground)]">{cartCount}</span>}</Button>; })}
+          {additionalMobileNav.length > 0 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" type="button" aria-label={additionalMobileNavActive ? 'Plus, une page est active' : 'Plus, autres pages'} className={`relative h-auto min-w-0 shrink-0 flex-col gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold sm:text-xs ${additionalMobileNavActive ? 'text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Plus size={18} /><span>Plus</span>{additionalMobileNavActive && <span className="absolute right-1/4 top-0 h-2 w-2 translate-x-1/2 rounded-full bg-[var(--shop-accent)]" />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top" sideOffset={8}>{additionalMobileNav.map(item => <DropdownMenuItem key={item.path} onSelect={() => go(item.path)} className={isPublicNavActive(item.path) ? 'font-bold text-[var(--shop-accent)]' : ''}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}
        </div></nav>}
         {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-3 py-3 shadow-xl lg:inset-x-auto lg:bottom-4 lg:right-6 lg:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[hsl(var(--foreground))]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;

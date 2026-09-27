@@ -899,6 +899,10 @@ class EcommerceTest extends TestCase
         $this->assertSame('/client-app/shop/kora-boutique/', $first['id']);
         $this->assertSame('/client-app/shop/kora-boutique/accueil', $first['start_url']);
         $this->assertSame($first['id'], $first['scope']);
+        $this->assertSame('/pwa-icon-192.png', $first['icons'][0]['src']);
+        $this->assertSame('192x192', $first['icons'][0]['sizes']);
+        $this->assertSame('/pwa-icon-512.png', $first['icons'][1]['src']);
+        $this->assertSame('512x512', $first['icons'][1]['sizes']);
         $this->assertSame('/client-app/shop/autre-boutique/', $second['id']);
         $this->assertSame('/client-app/shop/autre-boutique/accueil', $second['start_url']);
         $this->assertNotSame($first['id'], $second['id']);

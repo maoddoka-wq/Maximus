@@ -29,6 +29,37 @@ export const clientSitePwaPath = (slug?: string, suffix = '', domain = false) =>
   return `${clientSitePwaBasePath(slug, domain)}${normalizedSuffix || '/'}`;
 };
 
+function decodePublicSlug(encodedSlug: string) {
+  try {
+    const slug = decodeURIComponent(encodedSlug);
+    return slug && !slug.includes('/') ? slug : null;
+  } catch {
+    return null;
+  }
+}
+
+export function publicManifestUrlForPath(pathname: string) {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  const clientSitePath = normalized.match(/^\/client-app\/site\/([^/]+)/);
+  if (normalized === '/client-app/site') return '/api/public-site/manifest.webmanifest';
+  if (clientSitePath) {
+    const slug = decodePublicSlug(clientSitePath[1]);
+    return slug ? `/api/public-site/manifest.webmanifest/${encodeURIComponent(slug)}` : null;
+  }
+
+  const clientShopPath = normalized.match(/^\/client-app\/shop\/([^/]+)/);
+  if (clientShopPath) {
+    const slug = decodePublicSlug(clientShopPath[1]);
+    return slug ? `/api/shop/${encodeURIComponent(slug)}/manifest.webmanifest` : null;
+  }
+  if (normalized === '/client-app') return '/api/shop-domain/manifest.webmanifest';
+
+  const publicSitePath = normalized.match(/^\/(?:site|shop)\/([^/]+)/);
+  if (!publicSitePath) return null;
+  const slug = decodePublicSlug(publicSitePath[1]);
+  return slug ? `/api/public-site/manifest.webmanifest/${encodeURIComponent(slug)}` : null;
+}
+
 export const clientPwaPath = (slug?: string, suffix = '', domain = false) => {
   const normalizedSuffix = suffix === ''
     ? ''
@@ -85,25 +116,82 @@ export const isIosDevice = () => {
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
-export async function mountClientManifest(manifestUrl: string): Promise<() => void> {
-  const response = await fetch(manifestUrl, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Le manifest PWA est indisponible (${response.status}).`);
+function setClientManifestLink(manifestUrl: string) {
+  let link = document.querySelector<HTMLLinkElement>('link[data-maximus-client-manifest="true"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'manifest';
+    link.dataset.maximusClientManifest = 'true';
+    document.head.appendChild(link);
   }
-  const manifest = await response.json() as { id?: unknown; start_url?: unknown; scope?: unknown };
-  if (typeof manifest.id !== 'string' || typeof manifest.start_url !== 'string' || typeof manifest.scope !== 'string') {
-    throw new Error('Le manifest PWA ne contient pas une identité et des chemins de lancement valides.');
-  }
-
-  document.querySelectorAll('link[data-maximus-client-manifest="true"]').forEach((link) => link.remove());
-  const link = document.createElement('link');
-  link.rel = 'manifest';
   link.href = manifestUrl;
-  link.dataset.maximusClientManifest = 'true';
-  document.head.appendChild(link);
+  link.dataset.manifestUrl = manifestUrl;
+  return link;
+}
+
+export function primeClientManifestFromPath(pathname = window.location.pathname) {
+  const manifestUrl = publicManifestUrlForPath(pathname);
+  if (manifestUrl) setClientManifestLink(manifestUrl);
+}
+
+export async function mountClientManifest(manifestUrl: string): Promise<() => void> {
+  const link = setClientManifestLink(manifestUrl);
+  try {
+    const response = await fetch(manifestUrl, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Le manifest PWA est indisponible (${response.status}).`);
+    }
+    const manifest = await response.json() as {
+      id?: unknown;
+      start_url?: unknown;
+      scope?: unknown;
+      display?: unknown;
+      icons?: unknown;
+    };
+    const icons = Array.isArray(manifest.icons) ? manifest.icons : [];
+    const hasIconSource = icons.some(icon => Boolean(
+      icon
+      && typeof icon === 'object'
+      && 'src' in icon
+      && typeof icon.src === 'string'
+      && icon.src.trim(),
+    ));
+    const hasRequiredIconSizes = ['192x192', '512x512'].every(size => icons.some(icon => Boolean(
+      icon
+      && typeof icon === 'object'
+      && 'sizes' in icon
+      && typeof icon.sizes === 'string'
+      && icon.sizes.split(/\s+/).includes(size),
+    )));
+    if (
+      typeof manifest.id !== 'string'
+      || typeof manifest.start_url !== 'string'
+      || typeof manifest.scope !== 'string'
+      || manifest.display !== 'standalone'
+      || !hasIconSource
+      || !hasRequiredIconSizes
+    ) {
+      throw new Error('Le manifest PWA ne contient pas une identité, une icône et des chemins de lancement valides.');
+    }
+
+    const identityUrl = new URL(manifest.id, window.location.href);
+    const startUrl = new URL(manifest.start_url, window.location.href);
+    const scopeUrl = new URL(manifest.scope, window.location.href);
+    if (
+      identityUrl.origin !== window.location.origin
+      || startUrl.origin !== window.location.origin
+      || scopeUrl.origin !== window.location.origin
+      || !startUrl.pathname.startsWith(scopeUrl.pathname)
+    ) {
+      throw new Error('Le manifest PWA pointe vers une origine ou une portée de lancement incorrecte.');
+    }
+  } catch (error) {
+    if (link.dataset.manifestUrl === manifestUrl) link.remove();
+    throw error;
+  }
 
   return () => {
-    link.remove();
+    if (link.dataset.manifestUrl === manifestUrl) link.remove();
   };
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clientPwaPath, clientPwaStartPath, clientPwaStorageKey, clientSitePwaBasePath, clientSitePwaPath, parseClientPwaPath } from './pwa';
+import { clientPwaPath, clientPwaStartPath, clientPwaStorageKey, clientSitePwaBasePath, clientSitePwaPath, parseClientPwaPath, publicManifestUrlForPath } from './pwa';
 
 test('génère une URL de lancement et une identité propres à chaque boutique', () => {
   const startPath = clientPwaStartPath('boutique-senegal');
@@ -43,4 +43,23 @@ test('refuse une route PWA boutique incomplète et accepte ses sous-routes', () 
   assert.equal(parseClientPwaPath('/client-app/shop/'), null);
   assert.equal(parseClientPwaPath('/client-app/shop'), null);
   assert.deepEqual(parseClientPwaPath('/client-app/shop/a/b/'), { slug: 'a' });
+});
+
+test('prépare le manifeste public correspondant à la route avant le rendu', () => {
+  assert.equal(
+    publicManifestUrlForPath('/site/mon-site/transport'),
+    '/api/public-site/manifest.webmanifest/mon-site',
+  );
+  assert.equal(
+    publicManifestUrlForPath('/client-app/site/mon-site/transport'),
+    '/api/public-site/manifest.webmanifest/mon-site',
+  );
+  assert.equal(
+    publicManifestUrlForPath('/client-app/shop/ma-boutique/panier'),
+    '/api/shop/ma-boutique/manifest.webmanifest',
+  );
+  assert.equal(publicManifestUrlForPath('/client-app/site/'), '/api/public-site/manifest.webmanifest');
+  assert.equal(publicManifestUrlForPath('/client-app/'), '/api/shop-domain/manifest.webmanifest');
+  assert.equal(publicManifestUrlForPath('/client-app/site/%E0%A4%A'), null);
+  assert.equal(publicManifestUrlForPath('/dashboard'), null);
 });

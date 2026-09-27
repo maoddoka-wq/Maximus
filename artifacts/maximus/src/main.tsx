@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { applyCompanyTheme } from '@/lib/company-theme';
-import { initializePwa } from '@/lib/pwa';
+import { initializePwa, primeClientManifestFromPath } from '@/lib/pwa';
 import { installVitePreloadRecovery } from '@/lib/vite-preload-recovery';
 
 import './index.css';
@@ -14,6 +14,7 @@ import './index.css';
 applyCompanyTheme(undefined);
 if (import.meta.env.PROD) installVitePreloadRecovery();
 initializePwa();
+primeClientManifestFromPath();
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.

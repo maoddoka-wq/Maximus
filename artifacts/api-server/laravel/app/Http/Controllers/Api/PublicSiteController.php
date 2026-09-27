@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\EcommerceDomainVerifier;
+use App\Services\PublicPwaIcon;
 use App\Support\CompanyRegistry;
 use App\Support\InstallationContext;
 use App\Support\ModuleCatalog;
@@ -434,16 +435,7 @@ final class PublicSiteController extends Controller
             'display' => 'standalone',
             'background_color' => (string) ($brand['primaryColor'] ?? '#F8F5ED'),
             'theme_color' => (string) ($brand['accentColor'] ?? '#0F172A'),
-            'icons' => [
-                [
-                    'src' => $logoUrl,
-                    'sizes' => '192x192',
-                ],
-                [
-                    'src' => $logoUrl,
-                    'sizes' => '512x512',
-                ],
-            ],
+            'icons' => PublicPwaIcon::manifestIcons($logoUrl),
         ])
             ->header('Content-Type', 'application/manifest+json; charset=utf-8')
             ->header('Vary', 'Host')

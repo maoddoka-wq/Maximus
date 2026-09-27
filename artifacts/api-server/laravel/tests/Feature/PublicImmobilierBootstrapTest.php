@@ -226,7 +226,11 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertJsonPath('scope', '/client-app/site/neutral-public-site/')
             ->assertJsonPath('background_color', '#123456')
             ->assertJsonPath('theme_color', '#654321')
-            ->assertJsonPath('icons.0.src', '/api/store-logos/kora/logo-site-public.png')
+            ->assertJsonPath('icons.0.src', '/api/store-logos/kora/logo-site-public.png?pwa_size=192')
+            ->assertJsonPath('icons.0.sizes', '192x192')
+            ->assertJsonPath('icons.1.sizes', '512x512')
+            ->assertJsonPath('icons.2.src', '/pwa-icon-192.png')
+            ->assertJsonPath('icons.3.src', '/pwa-icon-512.png')
             ->json();
         $domainManifest = $this->getJson('http://neutral-kora.example.test/api/public-site/manifest.webmanifest')
             ->assertOk()
@@ -235,6 +239,29 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertJsonPath('start_url', '/client-app/site/')
             ->assertJsonPath('scope', '/client-app/site/')
             ->json();
+
+        if (function_exists('imagecreatetruecolor')) {
+            $logo = imagecreatetruecolor(48, 24);
+            $color = imagecolorallocate($logo, 20, 70, 120);
+            imagefill($logo, 0, 0, $color);
+            ob_start();
+            imagepng($logo);
+            $logoBytes = ob_get_clean();
+            imagedestroy($logo);
+            DB::table('company_public_sites')
+                ->where('company_id', 'kora')
+                ->update([
+                    'logo_data' => base64_encode((string) $logoBytes),
+                    'logo_mime' => 'image/png',
+                ]);
+
+            $iconResponse = $this->get('/api/store-logos/kora/logo-site-public.png?pwa_size=192')
+                ->assertOk()
+                ->assertHeader('Content-Type', 'image/png');
+            $iconDimensions = getimagesizefromstring($iconResponse->getContent());
+            $this->assertSame(192, $iconDimensions[0]);
+            $this->assertSame(192, $iconDimensions[1]);
+        }
 
         $this->assertSame($slugManifest['name'], $domainManifest['name']);
         $this->assertSame($slugManifest['theme_color'], $domainManifest['theme_color']);
