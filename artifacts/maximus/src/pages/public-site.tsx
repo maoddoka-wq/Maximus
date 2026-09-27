@@ -611,25 +611,18 @@ function PublicCompanySiteShell({
       key: 'home',
       label: 'Accueil',
       href: homeHref,
-      sectionId: undefined,
       active: activePathNormalized === '/',
       testId: 'link-public-site-nav-home',
       icon: Store,
     },
     ...modules.map(module => {
       const modulePath = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
-      const sectionId = module.id === 'ecommerce'
-        ? 'public-site-section-ecommerce'
-        : module.id === 'transport' || module.id === 'immobilier'
-          ? `public-site-section-${module.id}`
-          : undefined;
       const active = activePathNormalized === modulePath
         || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
       return {
         key: `module-${module.id}`,
         label: module.id === 'ecommerce' ? 'Boutique' : module.label,
-        href: activePathNormalized === '/' && sectionId ? homeHref : `${siteBasePath}${modulePath}` || '/',
-        sectionId,
+        href: `${siteBasePath}${modulePath}` || '/',
         active,
         testId: `link-public-site-nav-module-${module.id}`,
         icon: module.id === 'ecommerce' ? Package : Store,
@@ -641,7 +634,6 @@ function PublicCompanySiteShell({
           key: 'cart',
           label: 'Panier',
           href: `${siteBasePath}/panier`,
-          sectionId: undefined,
           active: activePathNormalized === '/panier' || activePathNormalized.startsWith('/panier/'),
           testId: 'link-public-site-nav-cart',
           icon: ShoppingBag,
@@ -650,7 +642,6 @@ function PublicCompanySiteShell({
           key: 'signin',
           label: 'Se connecter',
           href: `${siteBasePath}/connexion`,
-          sectionId: undefined,
           active: activePathNormalized === '/connexion',
           testId: 'link-public-site-nav-signin',
           icon: Store,
@@ -710,11 +701,6 @@ function PublicCompanySiteShell({
               <Link
                 key={item.key}
                 href={item.href}
-                onClick={event => {
-                  if (!item.sectionId || activePathNormalized !== '/') return;
-                  event.preventDefault();
-                  document.getElementById(item.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
                 aria-current={item.active ? 'page' : undefined}
                 className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${item.active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
                 style={item.active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
@@ -749,11 +735,6 @@ function PublicCompanySiteShell({
               <Link
                 key={item.key}
                 href={item.href}
-                onClick={event => {
-                  if (!item.sectionId || activePathNormalized !== '/') return;
-                  event.preventDefault();
-                  document.getElementById(item.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
                 aria-current={item.active ? 'page' : undefined}
                 className={itemClass(item.active)}
                 style={item.active && primaryColor ? { color: primaryColor } : undefined}

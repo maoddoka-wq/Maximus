@@ -302,7 +302,6 @@ export default function PublicShopPage({
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
-  const [activeLandingPath, setActiveLandingPath] = useState('');
   const isCompanySite = Boolean(companySite);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
@@ -824,24 +823,7 @@ export default function PublicShopPage({
   const isHomeRoute = routePath === shopPath('') || routePath === shopPath('/accueil');
   const isCatalogRoute = routePath === shopPath('/boutique');
   const isSinglePageLanding = Boolean(companySite?.singlePageLanding && isHomeRoute);
-  const landingSectionIds: Record<string, string> = {
-    '': 'public-site-section-home',
-    '/accueil': 'public-site-section-home',
-    '/boutique': 'public-site-section-ecommerce',
-    '/location': 'public-site-section-location',
-    '/transport': 'public-site-section-transport',
-    '/immobilier': 'public-site-section-immobilier',
-    '/livraison': 'public-site-section-livraison',
-  };
-  const navigatePublicPath = (path: string) => {
-    const sectionId = isSinglePageLanding ? landingSectionIds[path] : undefined;
-    if (sectionId) {
-      setActiveLandingPath(path);
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    go(path);
-  };
+  const landingPagePaths = new Set(['', '/accueil', '/boutique', '/location', '/transport', '/immobilier', '/livraison']);
    const commerceNav = [
      { label: 'Accueil', path: '/accueil' },
      { label: 'Boutique', path: '/boutique' },
@@ -866,9 +848,6 @@ export default function PublicShopPage({
      ]
      : commerceNav;
     const isPublicNavActive = (path: string) => {
-      if (isSinglePageLanding && landingSectionIds[path]) {
-        return activeLandingPath === path || (activeLandingPath === '' && path === '');
-      }
       if (path === '' || path === '/accueil') return isHomeRoute;
       if (path === '/boutique') return isCatalogRoute || Boolean(productDetailSlug);
      if (path === '/transport') return isTransportRoute;
@@ -878,7 +857,7 @@ export default function PublicShopPage({
    };
     const primaryPaths = companySite ? ['', '/boutique', '/panier'] : ['/accueil', '/boutique', '/panier'];
     const primaryMobileNav = isSinglePageLanding
-      ? publicNav.filter(item => Boolean(landingSectionIds[item.path]))
+      ? publicNav.filter(item => landingPagePaths.has(item.path))
       : publicNav.filter(item => primaryPaths.includes(item.path));
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
@@ -905,7 +884,7 @@ export default function PublicShopPage({
            <nav id="public-shop-header-nav" className="hidden items-center gap-1 lg:flex">
              {publicNav.map(item => {
                const active = isPublicNavActive(item.path);
-                return <button type="button" key={item.path} onClick={() => navigatePublicPath(item.path)} style={active ? { backgroundColor: theme.accent, color: theme.accentForeground } : undefined} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${active ? 'shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>;
+                return <button type="button" key={item.path} onClick={() => go(item.path)} style={active ? { backgroundColor: theme.accent, color: theme.accentForeground } : undefined} className={`rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition sm:py-2 ${active ? 'shadow-sm' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}>{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</button>;
              })}
          </nav>
        </div>
@@ -971,8 +950,8 @@ export default function PublicShopPage({
                      showShopAction={false}
                      onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)}
                      onAdd={add}
-                     onLocation={() => navigatePublicPath('/location')}
-                     onShop={() => navigatePublicPath('/boutique')}
+                      onLocation={() => go('/location')}
+                      onShop={() => go('/boutique')}
                    />
                  </section>
                  <section id="public-site-section-ecommerce" data-public-site-landing-section className="scroll-mt-24" aria-label="Boutique">
@@ -986,14 +965,14 @@ export default function PublicShopPage({
                        customer={customer}
                        slug={slug}
                        domain={domain}
-                       onBack={() => navigatePublicPath('/boutique')}
+                        onBack={() => go('/boutique')}
                        backLabel="Retour aux offres"
                      />
                    </section>
                  )}
                  {companySite?.modules.some(module => module.id === 'transport') && (
                    <section id="public-site-section-transport" data-public-site-landing-section className="scroll-mt-24" aria-label="Transport">
-                     <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => navigatePublicPath('')} />
+                      <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} />
                    </section>
                  )}
                  {companySite?.modules.some(module => module.id === 'immobilier') && (
@@ -1022,7 +1001,7 @@ export default function PublicShopPage({
                        submitted={deliverySubmitted}
                        onSubmit={() => void submitDeliveryRequest()}
                        submitting={submittingDelivery}
-                       onNavigate={navigatePublicPath}
+                        onNavigate={go}
                      />
                    </section>
                  )}
