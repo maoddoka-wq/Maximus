@@ -23,6 +23,12 @@ Le manifeste de la vitrine doit reprendre le nom public complet dans `name` et `
 
 **How to apply:** Vérifier les deux noms et l’icône dans le manifeste généré pour le slug public et le domaine personnalisé.
 
+L’invite native doit attendre la validation du manifeste actif; tout événement d’installation différé est invalidé lorsque l’identité du manifeste change. Si un logo public existe, le manifeste ne doit pas inclure l’icône générique MAXIMUS.
+
+**Why:** Chrome peut réutiliser une invite attachée à une identité précédente; une icône générique présente dans le même manifeste peut aussi remplacer visuellement la marque.
+
+**How to apply:** À chaque changement de vitrine, boutique ou domaine, remplacer l’unique lien de manifeste et invalider l’invite précédente. Ne déclencher l’installation qu’après validation du manifeste courant.
+
 L’accueil peut regrouper les offres des modules actifs, mais les liens Boutique, Location, Transport et autres services doivent ouvrir leur route dédiée, sans défilement d’ancre.
 
 **Why:** Les utilisateurs veulent voir une vue commune sur l’accueil tout en conservant des pages complètes et adressables pour chaque service.

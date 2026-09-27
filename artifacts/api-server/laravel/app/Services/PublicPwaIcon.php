@@ -12,24 +12,27 @@ final class PublicPwaIcon
         $logoUrl = trim((string) $logoUrl);
         $icons = [];
 
-        if (
-            $logoUrl !== ''
-            && function_exists('imagecreatefromstring')
-            && preg_match('#^/api/store-logos/[^/?]+/[^/?]+$#', $logoUrl)
-        ) {
-            foreach ([192, 512] as $size) {
+        if ($logoUrl !== '' && $logoUrl !== '/admin-logo.png') {
+            if (
+                function_exists('imagecreatefromstring')
+                && preg_match('#^/api/store-logos/[^/?]+/[^/?]+$#', $logoUrl)
+            ) {
+                foreach ([192, 512] as $size) {
+                    $icons[] = [
+                        'src' => $logoUrl.'?pwa_size='.$size,
+                        'sizes' => $size.'x'.$size,
+                        'type' => 'image/png',
+                        'purpose' => 'any',
+                    ];
+                }
+            } else {
                 $icons[] = [
-                    'src' => $logoUrl.'?pwa_size='.$size,
-                    'sizes' => $size.'x'.$size,
-                    'type' => 'image/png',
+                    'src' => $logoUrl,
                     'purpose' => 'any',
                 ];
             }
-        } elseif ($logoUrl !== '' && $logoUrl !== '/admin-logo.png') {
-            $icons[] = [
-                'src' => $logoUrl,
-                'purpose' => 'any',
-            ];
+
+            return $icons;
         }
 
         foreach ([192, 512] as $size) {

@@ -214,7 +214,7 @@ class PublicImmobilierBootstrapTest extends TestCase
         $this->assertSame($slug['brand'], $domain['brand']);
         $this->assertSame($slug['storeSlug'], $domain['storeSlug']);
 
-        $slugManifest = $this->getJson('/api/public-site/manifest.webmanifest/neutral-public-site')
+        $slugManifestResponse = $this->getJson('/api/public-site/manifest.webmanifest/neutral-public-site')
             ->assertOk()
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertHeader('Vary', 'Host')
@@ -225,13 +225,17 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertJsonPath('start_url', '/client-app/site/neutral-public-site/')
             ->assertJsonPath('scope', '/client-app/site/neutral-public-site/')
             ->assertJsonPath('background_color', '#123456')
-            ->assertJsonPath('theme_color', '#654321')
-            ->assertJsonPath('icons.0.src', '/api/store-logos/kora/logo-site-public.png?pwa_size=192')
-            ->assertJsonPath('icons.0.sizes', '192x192')
-            ->assertJsonPath('icons.1.sizes', '512x512')
-            ->assertJsonPath('icons.2.src', '/pwa-icon-192.png')
-            ->assertJsonPath('icons.3.src', '/pwa-icon-512.png')
-            ->json();
+            ->assertJsonPath('theme_color', '#654321');
+        if (function_exists('imagecreatefromstring')) {
+            $slugManifestResponse
+                ->assertJsonPath('icons.0.src', '/api/store-logos/kora/logo-site-public.png?pwa_size=192')
+                ->assertJsonPath('icons.0.sizes', '192x192')
+                ->assertJsonPath('icons.1.sizes', '512x512');
+        } else {
+            $slugManifestResponse->assertJsonPath('icons.0.src', '/api/store-logos/kora/logo-site-public.png');
+        }
+        $slugManifest = $slugManifestResponse->json();
+        $this->assertCount(function_exists('imagecreatefromstring') ? 2 : 1, $slugManifest['icons']);
         $domainManifest = $this->getJson('http://neutral-kora.example.test/api/public-site/manifest.webmanifest')
             ->assertOk()
             ->assertJsonPath('name', 'Site public KORA')

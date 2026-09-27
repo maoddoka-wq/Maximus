@@ -806,19 +806,6 @@ export default function PublicShopPage({
   };
 
   const installClientApp = async () => {
-    if (!isIosDevice() && canInstallPwa()) {
-      try {
-        const installed = await promptPwaInstall();
-        setInstallHelp(installed
-          ? 'La boutique a été installée.'
-          : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
-        if (installed) showAppToast('La boutique est maintenant installée sur votre appareil.', 'success');
-      } catch {
-        setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
-      }
-      return;
-    }
-
     if (isIosDevice()) {
       setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
       return;
@@ -831,7 +818,19 @@ export default function PublicShopPage({
       setInstallHelp('La préparation de l’installation n’est pas terminée. Réessayez dans un instant.');
       return;
     }
-    setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
+    if (!canInstallPwa()) {
+      setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
+      return;
+    }
+    try {
+      const installed = await promptPwaInstall();
+      setInstallHelp(installed
+        ? 'La boutique a été installée.'
+        : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
+      if (installed) showAppToast('La boutique est maintenant installée sur votre appareil.', 'success');
+    } catch {
+      setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;

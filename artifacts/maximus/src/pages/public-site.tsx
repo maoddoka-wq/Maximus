@@ -238,18 +238,6 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     window.location.assign(publicSiteHomePath);
   };
   const installPublicSite = async () => {
-    if (!isIosDevice() && canInstallPwa()) {
-      try {
-        const installed = await promptPwaInstall();
-        setInstallHelp(installed
-          ? 'La vitrine a été installée.'
-          : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
-      } catch {
-        setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
-      }
-      return;
-    }
-
     if (isIosDevice()) {
       setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
       return;
@@ -262,7 +250,18 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
       setInstallHelp('La préparation de l’installation est en cours. Réessayez dans un instant.');
       return;
     }
-    setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
+    if (!canInstallPwa()) {
+      setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
+      return;
+    }
+    try {
+      const installed = await promptPwaInstall();
+      setInstallHelp(installed
+        ? 'La vitrine a été installée.'
+        : 'L’installation n’a pas été confirmée. Touchez à nouveau sur Installer pour réessayer.');
+    } catch {
+      setInstallHelp('Le navigateur n’a pas pu ouvrir l’installation. Réessayez depuis le menu de Chrome.');
+    }
   };
 
   if (loading) {

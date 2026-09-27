@@ -119,14 +119,47 @@ export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalo
 function setClientManifestLink(manifestUrl: string) {
   let link = document.querySelector<HTMLLinkElement>('link[data-maximus-client-manifest="true"]');
   if (!link) {
-    link = document.createElement('link');
-    link.rel = 'manifest';
+    link = document.querySelector<HTMLLinkElement>('link[rel~="manifest"]');
+    if (link) {
+      link.dataset.maximusOriginalManifestHref = link.href;
+    } else {
+      link = document.createElement('link');
+      link.rel = 'manifest';
+      document.head.appendChild(link);
+    }
     link.dataset.maximusClientManifest = 'true';
-    document.head.appendChild(link);
   }
+
+  const nextHref = new URL(manifestUrl, window.location.href).href;
+  if (!link.href || link.href !== nextHref) clearDeferredInstallPrompt();
+  document.querySelectorAll<HTMLLinkElement>('link[rel~="manifest"]').forEach((candidate) => {
+    if (candidate !== link) candidate.remove();
+  });
+  link.rel = 'manifest';
   link.href = manifestUrl;
   link.dataset.manifestUrl = manifestUrl;
   return link;
+}
+
+function clearDeferredInstallPrompt() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt = null;
+  notify();
+}
+
+function restoreClientManifestLink(link: HTMLLinkElement, manifestUrl: string) {
+  if (link.dataset.manifestUrl !== manifestUrl) return;
+  clearDeferredInstallPrompt();
+
+  const originalHref = link.dataset.maximusOriginalManifestHref;
+  if (originalHref) {
+    link.href = originalHref;
+    delete link.dataset.maximusOriginalManifestHref;
+    delete link.dataset.maximusClientManifest;
+    delete link.dataset.manifestUrl;
+    return;
+  }
+  link.remove();
 }
 
 export function primeClientManifestFromPath(pathname = window.location.pathname) {
@@ -163,13 +196,21 @@ export async function mountClientManifest(manifestUrl: string): Promise<() => vo
       && typeof icon.sizes === 'string'
       && icon.sizes.split(/\s+/).includes(size),
     )));
+    const hasUnspecifiedIconSize = icons.some(icon => Boolean(
+      icon
+      && typeof icon === 'object'
+      && 'src' in icon
+      && typeof icon.src === 'string'
+      && icon.src.trim()
+      && !('sizes' in icon),
+    ));
     if (
       typeof manifest.id !== 'string'
       || typeof manifest.start_url !== 'string'
       || typeof manifest.scope !== 'string'
       || manifest.display !== 'standalone'
       || !hasIconSource
-      || !hasRequiredIconSizes
+      || (!hasRequiredIconSizes && !hasUnspecifiedIconSize)
     ) {
       throw new Error('Le manifest PWA ne contient pas une identité, une icône et des chemins de lancement valides.');
     }
@@ -186,12 +227,12 @@ export async function mountClientManifest(manifestUrl: string): Promise<() => vo
       throw new Error('Le manifest PWA pointe vers une origine ou une portée de lancement incorrecte.');
     }
   } catch (error) {
-    if (link.dataset.manifestUrl === manifestUrl) link.remove();
+    restoreClientManifestLink(link, manifestUrl);
     throw error;
   }
 
   return () => {
-    if (link.dataset.manifestUrl === manifestUrl) link.remove();
+    restoreClientManifestLink(link, manifestUrl);
   };
 }
 
