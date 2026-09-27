@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyPaymentController;
+use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
+use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
@@ -96,6 +98,8 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->gro
     Route::delete('/{companyId}/installation-access/{installationId}/addresses/{addressId}', [InstallationAccessController::class, 'destroy']);
     Route::get('/{companyId}/payment-settings', [CompanyPaymentController::class, 'show']);
     Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
+    Route::get('/{companyId}/public-site-access', [CompanyPublicSiteAccessController::class, 'show']);
+    Route::patch('/{companyId}/public-site-access', [CompanyPublicSiteAccessController::class, 'update']);
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
 
@@ -118,6 +122,14 @@ Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): v
     Route::post('/', [AuthController::class, 'createAccount']);
     Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
 });
+
+Route::middleware(['maximus.auth', 'maximus.company'])
+    ->prefix('company-public-site')
+    ->group(function (): void {
+        Route::get('/', [CompanyPublicSiteSettingsController::class, 'show']);
+        Route::patch('/', [CompanyPublicSiteSettingsController::class, 'update']);
+        Route::post('/logo', [CompanyPublicSiteSettingsController::class, 'uploadLogo']);
+    });
 
 Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {
     Route::post('/', [AuthController::class, 'provisionCompanyAdmin']);
