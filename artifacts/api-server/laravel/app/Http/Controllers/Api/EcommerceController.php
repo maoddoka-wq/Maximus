@@ -74,27 +74,28 @@ class EcommerceController extends Controller
         }
 
         $input = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'min:2', 'max:120'],
-            'slug' => ['required', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
-            'description' => ['nullable', 'string', 'max:500'],
-            'status' => ['required', 'in:DRAFT,PUBLISHED,SUSPENDED'],
-            'currency' => ['required', 'in:XOF,EUR,USD'],
-            'primaryColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'accentColor' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'logoUrl' => ['nullable', 'string', 'max:500'],
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:120'],
+            'slug' => ['sometimes', 'required', 'string', 'min:3', 'max:80', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'status' => ['sometimes', 'in:DRAFT,PUBLISHED,SUSPENDED'],
+            'currency' => ['sometimes', 'in:XOF,EUR,USD'],
+            'primaryColor' => ['sometimes', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'accentColor' => ['sometimes', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'logoUrl' => ['sometimes', 'nullable', 'string', 'max:500'],
             'allowOrderAttachments' => ['sometimes', 'boolean'],
         ])->validate();
         $company = $this->company($request);
         $row = $this->ensureStore($company);
-        $slug = $this->uniqueStoreSlug($input['slug'], (string) $row->id);
         $storeValues = [
-            'slug' => $slug,
-            'name' => $input['name'],
-            'description' => $input['description'] ?? '',
-            'status' => $input['status'],
-            'currency' => $input['currency'],
-            'primary_color' => $input['primaryColor'],
-            'accent_color' => $input['accentColor'],
+            'slug' => array_key_exists('slug', $input)
+                ? $this->uniqueStoreSlug($input['slug'], (string) $row->id)
+                : (string) $row->slug,
+            'name' => (string) ($input['name'] ?? $row->name),
+            'description' => (string) ($input['description'] ?? $row->description ?? ''),
+            'status' => (string) ($input['status'] ?? $row->status),
+            'currency' => (string) ($input['currency'] ?? $row->currency ?? 'XOF'),
+            'primary_color' => (string) ($input['primaryColor'] ?? $row->primary_color ?? '#D69E2E'),
+            'accent_color' => (string) ($input['accentColor'] ?? $row->accent_color ?? '#172033'),
             'logo_url' => array_key_exists('logoUrl', $input) ? ($input['logoUrl'] ?? '') : ($row->logo_url ?? ''),
             'allow_order_attachments' => (bool) ($input['allowOrderAttachments'] ?? $row->allow_order_attachments ?? false),
             'updated_at' => now(),

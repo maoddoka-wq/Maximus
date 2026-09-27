@@ -22,9 +22,9 @@ final class CompanyPublicSiteAccessController extends Controller
 
         return response()->json([
             'companyId' => $companyId,
-            'enabled' => DB::table('company_public_site_access')
+            'enabled' => (bool) DB::table('company_public_site_access')
                 ->where('company_id', $companyId)
-                ->value('enabled') === true,
+                ->value('enabled'),
         ]);
     }
 
@@ -42,15 +42,23 @@ final class CompanyPublicSiteAccessController extends Controller
         ])->validate();
         $actorId = (string) ($request->attributes->get('authActor')['id'] ?? 'maximus');
 
-        DB::table('company_public_site_access')->updateOrInsert(
-            ['company_id' => $companyId],
-            [
-                'enabled' => (bool) $input['enabled'],
-                'updated_by' => $actorId,
+        $exists = DB::table('company_public_site_access')
+            ->where('company_id', $companyId)
+            ->exists();
+        $values = [
+            'enabled' => (bool) $input['enabled'],
+            'updated_by' => $actorId,
+            'updated_at' => now(),
+        ];
+        if ($exists) {
+            DB::table('company_public_site_access')->where('company_id', $companyId)->update($values);
+        } else {
+            DB::table('company_public_site_access')->insert([
+                'company_id' => $companyId,
+                ...$values,
                 'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
+            ]);
+        }
 
         return response()->json([
             'ok' => true,
