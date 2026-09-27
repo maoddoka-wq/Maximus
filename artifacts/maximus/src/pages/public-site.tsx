@@ -108,7 +108,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
     if (!bootstrap?.available || routePath !== '/' || paymentReturn || bootstrap.brand.heroImages.length < 2) return undefined;
     const interval = window.setInterval(() => {
       setHeroIndex(current => (current + 1) % bootstrap.brand.heroImages.length);
-    }, 1000);
+    }, 4000);
     return () => window.clearInterval(interval);
   }, [bootstrap, paymentReturn, routePath]);
 
