@@ -759,12 +759,109 @@ function DriverRequestCard({ trip, vehicle, driver, pending, onAccept, onDecline
 
 function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driver: Driver | null; vehicle: Vehicle | null }) {
   if (!trip) return null;
+  const pickup = trip.pickupLatitude !== null
+    && trip.pickupLatitude !== undefined
+    && trip.pickupLongitude !== null
+    && trip.pickupLongitude !== undefined
+    ? { latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }
+    : null;
+  const destination = trip.destinationLatitude !== null
+    && trip.destinationLatitude !== undefined
+    && trip.destinationLongitude !== null
+    && trip.destinationLongitude !== undefined
+    ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude }
+    : null;
+  const driverPosition = driver?.latitude !== null
+    && driver?.latitude !== undefined
+    && driver?.longitude !== null
+    && driver?.longitude !== undefined
+    ? { latitude: driver.latitude, longitude: driver.longitude }
+    : null;
   const remainingDistance = trip.pickupRouteDistanceKm ?? (trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined
     ? distanceInKm(driver.latitude, driver.longitude, trip.pickupLatitude, trip.pickupLongitude)
     : null);
   const visibleDistance = remainingDistance ?? trip.matchedDistanceKm ?? null;
   const routeUrl = buildDriverNavigationUrl(trip, driver);
-  return <section className="card-surface overflow-hidden p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Guidage chauffeur</p><h2 className="mt-1 text-lg font-black">Rejoindre l’arrêt client</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p>{visibleDistance !== null ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p> : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur est actif</p>}{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined && <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>}</div></div><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Lancer le guidage</a></div>{trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && <TaxiRouteMap clientStop={{ latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }} destination={trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude } : null} driver={driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined ? { latitude: driver.latitude, longitude: driver.longitude } : null} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]" />}<p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Itinéraire complet : la voiture rejoint l’arrêt client, puis le trajet continue jusqu’à la destination. GPS, distance et ETA actualisés automatiquement.</p></section>;
+  const isOnTrip = trip.status === 'IN_PROGRESS';
+  const locationUpdated = driver?.locationUpdatedAt
+    ? `Dernière position reçue : ${dateLabel(driver.locationUpdatedAt)}`
+    : 'En attente de la première position GPS.';
+
+  return (
+    <section className="card-surface overflow-hidden p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          {vehicle?.imageUrl && (
+            <img
+              src={vehicle.imageUrl}
+              alt={`Photo de ${vehicle.model}`}
+              className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover"
+            />
+          )}
+          <div>
+            <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">
+              Guidage chauffeur
+            </p>
+            <h2 className="mt-1 text-lg font-black">
+              {isOnTrip ? 'Course en cours' : 'Rejoindre l’arrêt client'}
+            </h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              {trip.pickup} <span className="mx-1">→</span> {trip.destination}
+            </p>
+            {visibleDistance !== null
+              ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p>
+              : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur est actif</p>}
+            {trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined && (
+              <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>
+            )}
+          </div>
+        </div>
+        <a
+          href={routeUrl ?? '#'}
+          onClick={event => { if (!routeUrl) event.preventDefault(); }}
+          target={routeUrl ? '_blank' : undefined}
+          rel="noreferrer"
+          className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}
+        >
+          <Navigation size={16} />
+          Lancer le guidage
+        </a>
+      </div>
+
+      <div
+        className="mt-4 flex items-start gap-3 rounded-xl border border-[hsl(var(--primary)/.18)] bg-[hsl(var(--primary)/.04)] px-3 py-3"
+        data-testid="driver-live-location-status"
+        role="status"
+      >
+        <span className="relative mt-1 flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+          {driverPosition && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/40" />}
+          <span className={`relative h-2.5 w-2.5 rounded-full ${driverPosition ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+        </span>
+        <div>
+          <p className="text-xs font-bold text-[hsl(var(--foreground))]">
+            {driverPosition ? 'Votre position GPS apparaît sur la carte.' : 'Position GPS en attente.'}
+          </p>
+          <p className="mt-0.5 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+            {driverPosition ? `${locationUpdated} · envoi automatique toutes les 10 secondes.` : locationUpdated}
+          </p>
+        </div>
+      </div>
+
+      <TaxiRouteMap
+        clientStop={pickup}
+        destination={destination}
+        driver={driverPosition}
+        driverLabel="Votre position GPS"
+        followDriver
+        routeGeometry={trip.routeGeometry}
+        pickupRouteGeometry={trip.pickupRouteGeometry}
+        className="mt-4 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]"
+      />
+      <p className="mt-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+        La carte reprend le suivi du client : votre position se déplace selon le GPS et se recentre sur vous lorsqu’elle sort de la vue.
+      </p>
+    </section>
+  );
 }
 
 function distanceInKm(latitudeA: number, longitudeA: number, latitudeB: number, longitudeB: number): number {
