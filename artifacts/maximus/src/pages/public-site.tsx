@@ -229,10 +229,18 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
       setInstallHelp('Sur iPhone ou iPad, touchez Partager, puis « Sur l’écran d’accueil ».');
       return;
     }
+    if (!manifestReady) {
+      setInstallHelp('La préparation de l’installation est en cours. Réessayez dans un instant.');
+      return;
+    }
+    if (!canInstallPwa()) {
+      setInstallHelp('Ouvrez le menu du navigateur, puis choisissez « Installer l’application ».');
+      return;
+    }
     const installed = await promptPwaInstall();
     setInstallHelp(installed
-      ? 'La vitrine a été ajoutée à vos applications.'
-      : 'Ouvrez le menu du navigateur, puis choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».');
+      ? 'La vitrine a été installée.'
+      : 'L’installation n’a pas été confirmée. Vous pouvez réessayer depuis le menu du navigateur.');
   };
 
   if (loading) {
@@ -246,11 +254,12 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
   }
 
   const modules = bootstrap.modules;
-  const installPrompt = manifestReady && !isStandalonePwa()
+  const installPrompt = !isStandalonePwa()
     ? (
       <PublicSiteInstallPrompt
         brandName={bootstrap.brand.name}
         installAvailable={installAvailable}
+        manifestReady={manifestReady}
         help={installHelp}
         onInstall={() => void installPublicSite()}
       />
@@ -263,6 +272,10 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     companyName: bootstrap.brand.name,
     homePath: clientApp ? publicSiteHomePath : basePath || '/',
     modules,
+    brandLogoUrl: bootstrap.brand.logoUrl,
+    description: bootstrap.brand.description,
+    heroImages: bootstrap.brand.heroImages,
+    singlePageLanding: routePath === '/' && !paymentReturn,
   };
   const storefrontForBrand = storefront?.store.slug === bootstrap.storeSlug ? storefront : null;
 
@@ -313,7 +326,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     );
   }
 
-  if (ecommerce && (routePath !== '/' || paymentReturn)) {
+  if (ecommerce && (routePath !== '/' || paymentReturn || Boolean(bootstrap.storeSlug))) {
     if (!bootstrap.storeSlug) {
       return (
         <PublicCompanySiteShell
@@ -372,7 +385,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
       activePath="/"
       installPrompt={installPrompt}
     >
-      <main className="min-h-[calc(100dvh-5rem)] bg-[hsl(var(--background))] px-5 py-8 text-[hsl(var(--foreground))] sm:px-8 sm:py-12" data-testid="page-public-site-home">
+      <main id="public-site-section-home" className="min-h-[calc(100dvh-5rem)] scroll-mt-24 bg-[hsl(var(--background))] px-5 py-8 text-[hsl(var(--foreground))] sm:px-8 sm:py-12" data-testid="page-public-site-home">
         <section className="mx-auto max-w-6xl">
           {bootstrap.brand.heroImages.length > 0 && (
             <div
@@ -414,7 +427,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
           </div>
 
           {ecommerce && (
-            <section className="mt-12" aria-labelledby="title-public-site-products" data-testid="section-public-site-products">
+            <section id="public-site-section-ecommerce" className="mt-12 scroll-mt-24" aria-labelledby="title-public-site-products" data-testid="section-public-site-products">
               <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Boutique</p>
@@ -486,6 +499,40 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
             </section>
           )}
 
+          {transport && (
+            <section id="public-site-section-transport" className="mt-12 scroll-mt-24" aria-labelledby="title-public-site-transport">
+              <div className="mb-5">
+                <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Service</p>
+                <h2 id="title-public-site-transport" className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl">Transport</h2>
+              </div>
+              <Suspense fallback={<PublicSiteMessage title="Chargement du Transport…" testId="status-public-transport-loading" />}>
+                <PublicTransportPage
+                  store={{ name: bootstrap.company.name, currency: bootstrap.company.currency ?? 'XOF' }}
+                  slug={domain ? undefined : bootstrap.storeSlug ?? slug}
+                  domain={domain}
+                  onBack={() => document.getElementById('public-site-section-home')?.scrollIntoView({ behavior: 'smooth' })}
+                />
+              </Suspense>
+            </section>
+          )}
+
+          {immobilier && (
+            <section id="public-site-section-immobilier" className="mt-12 scroll-mt-24" aria-labelledby="title-public-site-immobilier">
+              <div className="mb-5">
+                <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Service</p>
+                <h2 id="title-public-site-immobilier" className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl">Immobilier</h2>
+              </div>
+              <PublicSiteImmobilier
+                domain={domain}
+                slug={domain ? undefined : bootstrap.storeSlug ?? slug}
+                module={immobilier}
+                companyName={bootstrap.company.name}
+                currency={bootstrap.company.currency ?? 'XOF'}
+                onBack={() => document.getElementById('public-site-section-home')?.scrollIntoView({ behavior: 'smooth' })}
+              />
+            </section>
+          )}
+
         </section>
       </main>
     </PublicCompanySiteShell>
@@ -495,18 +542,20 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
 function PublicSiteInstallPrompt({
   brandName,
   installAvailable,
+  manifestReady,
   help,
   onInstall,
 }: {
   brandName: string;
   installAvailable: boolean;
+  manifestReady: boolean;
   help: string;
   onInstall: () => void;
 }) {
   const ios = isIosDevice();
   return (
     <aside
-      className="mb-4 flex flex-col gap-3 rounded-xl border bg-[hsl(var(--card))] p-4 sm:flex-row sm:items-center sm:justify-between"
+      className="mb-4 flex flex-col gap-3 rounded-xl border bg-[hsl(var(--card))] p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
       data-testid="banner-public-site-install"
     >
       <div className="flex min-w-0 items-start gap-3">
@@ -517,14 +566,18 @@ function PublicSiteInstallPrompt({
           <p className="text-sm font-bold">Installer {brandName}</p>
           <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
             {ios
-              ? 'Touchez Partager, puis « Sur l’écran d’accueil » pour retrouver cette vitrine.'
-              : 'Ajoutez cette vitrine à l’écran d’accueil pour la retrouver rapidement.'}
+              ? 'Dans Safari, touchez Partager, puis « Sur l’écran d’accueil ».'
+              : installAvailable
+                ? 'Le navigateur ouvrira sa fenêtre d’installation avec le nom et le logo de ce site.'
+                : 'Le bouton lance l’installation si le navigateur la propose. Sinon, utilisez son menu.'}
           </p>
+          {!manifestReady && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]" role="status">Préparation de l’installation…</p>}
           {help && <p className="mt-1 text-xs font-medium text-[hsl(var(--primary))]" role="status">{help}</p>}
         </div>
       </div>
       <Button type="button" variant="outline" className="shrink-0" onClick={onInstall}>
-        {ios ? 'Comment installer' : installAvailable ? 'Installer le site' : 'Ajouter à l’accueil'}
+        <Download size={16} className="mr-2" />
+        Installer l’application
       </Button>
     </aside>
   );
@@ -558,18 +611,25 @@ function PublicCompanySiteShell({
       key: 'home',
       label: 'Accueil',
       href: homeHref,
+      sectionId: undefined,
       active: activePathNormalized === '/',
       testId: 'link-public-site-nav-home',
       icon: Store,
     },
     ...modules.map(module => {
       const modulePath = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
+      const sectionId = module.id === 'ecommerce'
+        ? 'public-site-section-ecommerce'
+        : module.id === 'transport' || module.id === 'immobilier'
+          ? `public-site-section-${module.id}`
+          : undefined;
       const active = activePathNormalized === modulePath
         || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
       return {
         key: `module-${module.id}`,
         label: module.id === 'ecommerce' ? 'Boutique' : module.label,
-        href: `${siteBasePath}${modulePath}` || '/',
+        href: activePathNormalized === '/' && sectionId ? homeHref : `${siteBasePath}${modulePath}` || '/',
+        sectionId,
         active,
         testId: `link-public-site-nav-module-${module.id}`,
         icon: module.id === 'ecommerce' ? Package : Store,
@@ -581,6 +641,7 @@ function PublicCompanySiteShell({
           key: 'cart',
           label: 'Panier',
           href: `${siteBasePath}/panier`,
+          sectionId: undefined,
           active: activePathNormalized === '/panier' || activePathNormalized.startsWith('/panier/'),
           testId: 'link-public-site-nav-cart',
           icon: ShoppingBag,
@@ -589,6 +650,7 @@ function PublicCompanySiteShell({
           key: 'signin',
           label: 'Se connecter',
           href: `${siteBasePath}/connexion`,
+          sectionId: undefined,
           active: activePathNormalized === '/connexion',
           testId: 'link-public-site-nav-signin',
           icon: Store,
@@ -596,9 +658,11 @@ function PublicCompanySiteShell({
       ]
       : []),
   ];
-  const primaryKeys = hasEcommerce
-    ? new Set(['home', 'module-ecommerce', 'cart'])
-    : new Set(['home', ...modules.slice(0, 2).map(module => `module-${module.id}`)]);
+  const primaryKeys = activePathNormalized === '/'
+    ? new Set(['home', ...modules.map(module => `module-${module.id}`)])
+    : hasEcommerce
+      ? new Set(['home', 'module-ecommerce', 'cart'])
+      : new Set(['home', ...modules.slice(0, 2).map(module => `module-${module.id}`)]);
   const primaryMobileItems = navigationItems.filter(item => primaryKeys.has(item.key));
   const moreMobileItems = navigationItems.filter(item => !primaryKeys.has(item.key));
   const moreIsActive = moreMobileItems.some(item => item.active);
@@ -609,11 +673,14 @@ function PublicCompanySiteShell({
       : primaryMobileItems.length === 2
         ? 'grid-cols-2'
         : 'grid-cols-1';
-  const itemClass = (active: boolean) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold transition sm:text-xs ${
+  const itemClass = (active: boolean) => `flex ${activePathNormalized === '/' ? 'w-[4.5rem] shrink-0' : 'min-w-0'} flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold transition sm:text-xs ${
     active
       ? 'bg-[hsl(var(--muted)/.5)] text-[hsl(var(--foreground))]'
       : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'
   }`;
+  const mobileNavContainerClass = activePathNormalized === '/'
+    ? 'mx-auto flex max-w-full gap-1 overflow-x-auto px-2 pt-1'
+    : `mx-auto grid max-w-2xl ${mobileGridClass} gap-1 px-2 pt-1`;
 
   return (
     <div className="min-h-[100dvh] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
@@ -643,6 +710,11 @@ function PublicCompanySiteShell({
               <Link
                 key={item.key}
                 href={item.href}
+                onClick={event => {
+                  if (!item.sectionId || activePathNormalized !== '/') return;
+                  event.preventDefault();
+                  document.getElementById(item.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
                 aria-current={item.active ? 'page' : undefined}
                 className={`shrink-0 rounded-lg border-b-2 px-3 py-2 text-xs font-semibold transition sm:text-sm ${item.active ? 'bg-[hsl(var(--muted)/.5)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted)/.5)] hover:text-[hsl(var(--foreground))]'}`}
                 style={item.active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
@@ -670,13 +742,18 @@ function PublicCompanySiteShell({
         className="fixed inset-x-0 bottom-0 z-40 border-t bg-[hsl(var(--card))] pb-[env(safe-area-inset-bottom)] shadow-md lg:hidden"
         data-testid="nav-public-site-mobile"
       >
-        <div className={`mx-auto grid max-w-2xl ${mobileGridClass} gap-1 px-2 pt-1`}>
+        <div className={mobileNavContainerClass}>
           {primaryMobileItems.map(item => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.key}
                 href={item.href}
+                onClick={event => {
+                  if (!item.sectionId || activePathNormalized !== '/') return;
+                  event.preventDefault();
+                  document.getElementById(item.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
                 aria-current={item.active ? 'page' : undefined}
                 className={itemClass(item.active)}
                 style={item.active && primaryColor ? { color: primaryColor } : undefined}

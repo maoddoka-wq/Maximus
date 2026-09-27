@@ -427,7 +427,7 @@ final class PublicSiteController extends Controller
         return response()->json([
             'id' => $scope,
             'name' => $name,
-            'short_name' => Str::substr($name, 0, 12),
+            'short_name' => $name,
             'description' => $description,
             'start_url' => $scope,
             'scope' => $scope,

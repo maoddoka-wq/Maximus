@@ -219,6 +219,7 @@ class PublicImmobilierBootstrapTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertHeader('Vary', 'Host')
             ->assertJsonPath('name', 'Site public KORA')
+            ->assertJsonPath('short_name', 'Site public KORA')
             ->assertJsonPath('description', 'Présentation commune de l’entreprise.')
             ->assertJsonPath('id', '/client-app/site/neutral-public-site/')
             ->assertJsonPath('start_url', '/client-app/site/neutral-public-site/')

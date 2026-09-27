@@ -16,3 +16,9 @@ Le PWA de la vitrine est une identité distincte du PWA de la boutique. Ses page
 **Why:** Le slug de marque peut différer du slug boutique. Installer ou lancer la vitrine avec le manifeste de la boutique ferait sortir l’utilisateur de l’identité et du périmètre de navigation du site.
 
 **How to apply:** Utiliser le slug public pour l’identité PWA de marque, garder le storeSlug uniquement pour les API de boutique et ne pas remplacer le manifeste de la vitrine sur ses pages E-commerce intégrées.
+
+Le manifeste de la vitrine doit reprendre le nom public complet dans `name` et `short_name`, ainsi que le logo public du site (avec le logo de l’entreprise comme repli).
+
+**Why:** Certains lanceurs utilisent `short_name` à la place de `name`; une version tronquée peut faire disparaître la distinction entre plusieurs sites.
+
+**How to apply:** Vérifier les deux noms et l’icône dans le manifeste généré pour le slug public et le domaine personnalisé.
