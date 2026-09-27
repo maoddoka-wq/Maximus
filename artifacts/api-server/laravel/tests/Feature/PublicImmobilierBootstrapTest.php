@@ -193,6 +193,7 @@ class PublicImmobilierBootstrapTest extends TestCase
         $slug = $this->getJson('/api/public-site/bootstrap/neutral-public-site')
             ->assertOk()
             ->assertJsonPath('available', true)
+            ->assertJsonPath('storeSlug', 'neutral-public-site')
             ->assertJsonPath('company.currency', 'XOF')
             ->assertJsonMissingPath('company.id')
             ->assertJsonPath('brand.name', 'Site public KORA')
@@ -211,6 +212,51 @@ class PublicImmobilierBootstrapTest extends TestCase
         $this->assertSame($slug['company']['name'], $domain['company']['name']);
         $this->assertSame($slug['company']['currency'], $domain['company']['currency']);
         $this->assertSame($slug['brand'], $domain['brand']);
+        $this->assertSame($slug['storeSlug'], $domain['storeSlug']);
+    }
+
+    public function test_company_site_bootstrap_keeps_the_public_site_slug_separate_from_the_published_store_slug(): void
+    {
+        $this->publishedStore('actual-public-store');
+        DB::table('company_public_sites')->updateOrInsert(
+            ['company_id' => 'kora'],
+            [
+                'maximus_enabled' => true,
+                'company_enabled' => true,
+                'module_ids' => json_encode(['ecommerce']),
+                'public_name' => 'Marque KORA',
+                'public_slug' => 'company-public-brand',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->getJson('/api/public-site/bootstrap/company-public-brand')
+            ->assertOk()
+            ->assertJsonPath('available', true)
+            ->assertJsonPath('brand.slug', 'company-public-brand')
+            ->assertJsonPath('storeSlug', 'actual-public-store');
+    }
+
+    public function test_neutral_bootstrap_omits_store_slug_when_no_public_module_is_selected(): void
+    {
+        $this->publishedStore('site-without-public-module');
+        DB::table('company_public_sites')->updateOrInsert(
+            ['company_id' => 'kora'],
+            [
+                'maximus_enabled' => true,
+                'company_enabled' => true,
+                'module_ids' => json_encode([]),
+                'public_slug' => 'site-without-public-module',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->getJson('/api/public-site/bootstrap/site-without-public-module')
+            ->assertOk()
+            ->assertJsonPath('available', true)
+            ->assertJsonMissingPath('storeSlug');
     }
 
     public function test_site_brand_assets_are_available_when_ecommerce_is_not_a_published_section(): void

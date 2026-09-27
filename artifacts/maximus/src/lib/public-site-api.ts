@@ -58,6 +58,7 @@ export type PublicSiteBootstrap =
       };
       brand: PublicSiteBrand;
       modules: PublicSiteModule[];
+      storeSlug?: string | null;
       domain?: string;
     };
 

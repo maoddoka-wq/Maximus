@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState, type CSSProperties, type ReactNode
 import { Link, useLocation, useSearch } from 'wouter';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteModule } from '@/lib/public-site-api';
-import type { PublicShopBootstrap } from '@/lib/ecommerce-api';
+import { publicEcommerceApi, type PublicShopBootstrap } from '@/lib/ecommerce-api';
 
 const PublicShopPage = lazy(() => import('./public-shop'));
 const PublicTransportPage = lazy(() =>
@@ -28,9 +28,14 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   );
   const routeBasePath = isLegacyPath ? legacyBasePath : basePath;
   const routePath = normalizeModulePath(pathname, routeBasePath);
+  const paymentReturn = new URLSearchParams(search).has('payment');
   const [bootstrap, setBootstrap] = useState<PublicSiteBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [storefront, setStorefront] = useState<PublicShopBootstrap | null>(null);
+  const [storefrontLoading, setStorefrontLoading] = useState(false);
+  const [storefrontError, setStorefrontError] = useState('');
+  const [heroIndex, setHeroIndex] = useState(0);
 
   useEffect(() => {
     if (!isLegacyPath) return;
@@ -63,16 +68,63 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   }, [domain, slug]);
 
   useEffect(() => {
+    const hasEcommerce = bootstrap?.available
+      && bootstrap.modules.some(module => module.id === 'ecommerce');
+    const hasStoreKey = Boolean(bootstrap?.available && bootstrap.storeSlug);
+    if (!bootstrap?.available || routePath !== '/' || paymentReturn || !hasEcommerce || !hasStoreKey) {
+      setStorefront(null);
+      setStorefrontLoading(false);
+      setStorefrontError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setStorefront(null);
+    setStorefrontError('');
+    setStorefrontLoading(true);
+    const request = domain
+      ? publicEcommerceApi.bootstrapDomain()
+      : publicEcommerceApi.bootstrap(bootstrap.storeSlug ?? '');
+    void request
+      .then(result => {
+        if (!('store' in result)) {
+          throw new Error('La boutique publique n’est pas disponible.');
+        }
+        if (!cancelled) setStorefront(result);
+      })
+      .catch(() => {
+        if (!cancelled) setStorefrontError('Les produits de la boutique ne sont pas disponibles pour le moment.');
+      })
+      .finally(() => {
+        if (!cancelled) setStorefrontLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrap, domain, paymentReturn, routePath]);
+
+  useEffect(() => {
+    setHeroIndex(0);
+    if (!bootstrap?.available || routePath !== '/' || paymentReturn || bootstrap.brand.heroImages.length < 2) return undefined;
+    const interval = window.setInterval(() => {
+      setHeroIndex(current => (current + 1) % bootstrap.brand.heroImages.length);
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [bootstrap, paymentReturn, routePath]);
+
+  useEffect(() => {
     if (!bootstrap?.available) return;
     const sectionTitle = routePath === '/transport'
       ? 'Transport'
       : routePath === '/immobilier'
         ? 'Immobilier'
-        : routePath === '/boutique' || routePath === '/location'
-          ? 'E-commerce'
-        : routePath !== '/'
-          ? 'E-commerce'
-          : 'Site public';
+        : routePath === '/boutique'
+          ? 'Boutique'
+          : routePath === '/location'
+            ? 'Location'
+            : routePath !== '/'
+              ? 'Boutique'
+              : 'Site public';
     const title = `${sectionTitle} | ${bootstrap.brand.name}`;
     const description = bootstrap.brand.description.trim()
       || `Consultez le site public de ${bootstrap.company.name} : services, modules et annonces publiées par l’entreprise.`;
@@ -131,7 +183,6 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   const ecommerce = modules.find(module => module.id === 'ecommerce');
   const transport = modules.find(module => module.id === 'transport');
   const immobilier = modules.find(module => module.id === 'immobilier');
-  const paymentReturn = new URLSearchParams(search).has('payment');
   const companySite = {
     companyName: bootstrap.brand.name,
     homePath: basePath || '/',
@@ -153,7 +204,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
               name: bootstrap.company.name,
               currency: bootstrap.company.currency ?? 'XOF',
             }}
-            slug={slug}
+            slug={domain ? undefined : bootstrap.storeSlug ?? slug}
             domain={domain}
             onBack={returnToSite}
           />
@@ -173,7 +224,7 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       >
         <PublicSiteImmobilier
           domain={domain}
-          slug={slug}
+          slug={domain ? undefined : bootstrap.storeSlug ?? slug}
           module={immobilier}
           companyName={bootstrap.company.name}
           currency={bootstrap.company.currency ?? 'XOF'}
@@ -184,9 +235,26 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
   }
 
   if (ecommerce && (routePath !== '/' || paymentReturn)) {
+    if (!bootstrap.storeSlug) {
+      return (
+        <PublicCompanySiteShell
+          companyName={bootstrap.company.name}
+          brand={bootstrap.brand}
+          modules={modules}
+          basePath={basePath}
+          activePath={routePath}
+        >
+          <PublicSiteMessage
+            title="La boutique publique n’est pas disponible."
+            testId="status-public-site-shop-unavailable"
+            action={<Button type="button" variant="outline" onClick={returnToSite}>Retour au site</Button>}
+          />
+        </PublicCompanySiteShell>
+      );
+    }
     return (
-      <Suspense fallback={<PublicSiteMessage title="Chargement du module E-commerce…" testId="status-public-ecommerce-loading" />}>
-        <PublicShopPage slug={slug} domain={domain} companySite={companySite} />
+      <Suspense fallback={<PublicSiteMessage title="Chargement de la boutique…" testId="status-public-ecommerce-loading" />}>
+        <PublicShopPage slug={domain ? undefined : bootstrap.storeSlug} domain={domain} companySite={companySite} />
       </Suspense>
     );
   }
@@ -220,16 +288,27 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
       <main className="min-h-[calc(100dvh-5rem)] bg-[hsl(var(--background))] px-5 py-8 text-[hsl(var(--foreground))] sm:px-8 sm:py-12" data-testid="page-public-site-home">
         <section className="mx-auto max-w-6xl">
           {bootstrap.brand.heroImages.length > 0 && (
-            <div className="mb-8 flex snap-x gap-4 overflow-x-auto rounded-3xl" data-testid="gallery-public-site-hero">
-              {bootstrap.brand.heroImages.map((image, index) => (
-                <img
-                  key={`${image}-${index}`}
-                  src={image}
-                  alt=""
-                  className="aspect-[16/7] max-h-[28rem] min-w-full snap-center rounded-3xl object-cover"
-                  data-testid={`image-public-site-hero-${index}`}
-                />
-              ))}
+            <div
+              className="mb-8 overflow-hidden rounded-3xl"
+              role="region"
+              aria-label="Images du site"
+              aria-roledescription="carousel"
+              data-testid="gallery-public-site-hero"
+            >
+              <div
+                className="flex transition-transform duration-500 ease-in-out"
+                style={{ transform: `translateX(-${heroIndex * 100}%)` }}
+              >
+                {bootstrap.brand.heroImages.map((image, index) => (
+                  <img
+                    key={`${image}-${index}`}
+                    src={image}
+                    alt=""
+                    className="aspect-[16/7] max-h-[28rem] w-full shrink-0 object-cover"
+                    data-testid={`image-public-site-hero-${index}`}
+                  />
+                ))}
+              </div>
             </div>
           )}
           <div className="max-w-3xl">
@@ -246,6 +325,79 @@ export default function PublicSitePage({ domain = false, slug }: Props) {
               {bootstrap.brand.description || `Découvrez les activités et services de ${bootstrap.company.name}.`}
             </p>
           </div>
+
+          {ecommerce && (
+            <section className="mt-12" aria-labelledby="title-public-site-products" data-testid="section-public-site-products">
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Boutique</p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl" id="title-public-site-products">
+                    Tous les produits
+                  </h2>
+                </div>
+                <Button asChild variant="outline">
+                  <Link href={`${basePath}/boutique`} data-testid="link-public-site-products-shop">
+                    Voir la boutique
+                  </Link>
+                </Button>
+              </div>
+              {storefrontLoading ? (
+                <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
+                  Chargement des produits…
+                </p>
+              ) : storefrontError ? (
+                <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status" data-testid="status-public-site-products-error">
+                  {storefrontError}
+                </p>
+              ) : !bootstrap.storeSlug ? (
+                <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
+                  Aucune boutique publiée n’est associée à ce site.
+                </p>
+              ) : storefront && storefront.products.length === 0 ? (
+                <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
+                  Aucun produit publié pour le moment.
+                </p>
+              ) : storefront ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4" data-testid="grid-public-site-products">
+                  {storefront.products.map(product => (
+                    <Link
+                      key={product.slug}
+                      href={`${basePath}/produit/${encodeURIComponent(product.slug)}`}
+                      className="group overflow-hidden rounded-2xl border bg-[hsl(var(--card))] transition-shadow hover:shadow-md"
+                      data-testid={`card-public-site-product-${product.slug}`}
+                    >
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          loading="lazy"
+                          className="aspect-[4/3] w-full bg-[hsl(var(--muted))] object-cover"
+                        />
+                      ) : (
+                        <div className="flex aspect-[4/3] w-full items-center justify-center bg-[hsl(var(--muted))] px-3 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                          {product.name}
+                        </div>
+                      )}
+                      <div className="p-3 sm:p-4">
+                        <h3 className="line-clamp-2 min-h-10 text-sm font-semibold group-hover:text-[hsl(var(--primary))] sm:text-base">
+                          {product.name}
+                        </h3>
+                        <p className="mt-2 text-sm font-bold">
+                          {new Intl.NumberFormat('fr-FR', {
+                            maximumFractionDigits: storefront.store.currency === 'XOF' ? 0 : 2,
+                          }).format(product.price)}{' '}
+                          {storefront.store.currency}
+                        </p>
+                        {product.stock <= 0 && (
+                          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Indisponible</p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          )}
 
         </section>
       </main>
@@ -321,7 +473,7 @@ function PublicCompanySiteShell({
                   style={active && primaryColor ? { color: primaryColor, borderColor: primaryColor } : undefined}
                   data-testid={`link-public-site-nav-module-${module.id}`}
                 >
-                  {module.label}
+                  {module.id === 'ecommerce' ? 'Boutique' : module.label}
                 </Link>
               );
             })}

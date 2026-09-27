@@ -828,7 +828,7 @@ export default function PublicShopPage({
      ? [
        { label: 'Accueil', path: '' },
         ...companySite.modules.map(module => ({
-          label: module.label,
+          label: module.id === 'ecommerce' ? 'Boutique' : module.label,
           path: module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path,
         })),
          ...commerceNav.filter(item => (

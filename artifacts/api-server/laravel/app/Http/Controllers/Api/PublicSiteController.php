@@ -426,6 +426,9 @@ final class PublicSiteController extends Controller
             'brand' => $brand,
             'modules' => $modules,
         ];
+        if ($store !== null && $modules !== []) {
+            $payload['storeSlug'] = (string) $store->slug;
+        }
         if ($domain !== null) {
             $payload['domain'] = $domain;
         }
