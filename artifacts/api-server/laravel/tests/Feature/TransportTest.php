@@ -805,6 +805,119 @@ class TransportTest extends TestCase
         $this->getJson($sharePath, ['X-Transport-Share-Token' => $shareToken])->assertNotFound();
     }
 
+    public function test_mobile_session_is_hash_only_single_use_and_revokes_previous_token(): void
+    {
+        $driverId = 'mobile-session-driver';
+        $this->createDriverEmployee($driverId);
+        $this->insertMobileDriver($driverId);
+        $request = $this->asActor('employee', [], $driverId);
+
+        $first = $request->postJson('/api/transport/mobile/session', ['deviceName' => 'Android'])
+            ->assertCreated()->assertJsonStructure(['accessToken', 'expiresAt', 'driver']);
+        $plain = $first->json('accessToken');
+        $this->assertGreaterThanOrEqual(32, strlen($plain));
+        $this->assertDatabaseHas('transport_mobile_tokens', [
+            'driver_id' => $driverId,
+            'token_hash' => hash('sha256', $plain),
+        ]);
+        $this->assertDatabaseMissing('transport_mobile_tokens', ['token_hash' => $plain]);
+
+        $second = $request->postJson('/api/transport/mobile/session', ['deviceName' => 'iPhone'])
+            ->assertCreated()->json('accessToken');
+        $this->getJson('/api/transport/mobile/session', ['Authorization' => 'Bearer '.$plain])->assertUnauthorized();
+        $this->getJson('/api/transport/mobile/session', ['Authorization' => 'Bearer '.$second])->assertOk();
+        $this->assertDatabaseHas('transport_mobile_tokens', [
+            'driver_id' => $driverId, 'revoked_at' => null,
+            'token_hash' => hash('sha256', $second),
+        ]);
+    }
+
+    public function test_mobile_session_rejects_wrong_role_unlinked_employee_and_cross_company_request(): void
+    {
+        $this->asActor()->postJson('/api/transport/mobile/session', [])->assertForbidden();
+        $driverId = 'mobile-cross-company';
+        $this->createDriverEmployee($driverId);
+        $request = $this->asActor('employee', [], $driverId);
+        $request->postJson('/api/transport/mobile/session', [])->assertForbidden();
+        $this->insertMobileDriver($driverId);
+        $request->postJson('/api/transport/mobile/session?companyId=another-company', [])->assertForbidden();
+    }
+
+    public function test_mobile_bearer_rejects_missing_invalid_expired_and_revoked_tokens(): void
+    {
+        $this->getJson('/api/transport/mobile/session')->assertUnauthorized();
+        $this->getJson('/api/transport/mobile/session', ['Authorization' => 'Bearer invalid'])->assertUnauthorized();
+        $driverId = 'mobile-expiry-driver';
+        $this->createDriverEmployee($driverId);
+        $this->insertMobileDriver($driverId);
+        $request = $this->asActor('employee', [], $driverId);
+        $token = $request->postJson('/api/transport/mobile/session', [])->json('accessToken');
+        DB::table('transport_mobile_tokens')->where('driver_id', $driverId)->update(['expires_at' => now()->subSecond()]);
+        $this->getJson('/api/transport/mobile/session', ['Authorization' => 'Bearer '.$token])->assertUnauthorized();
+
+        $token = $request->postJson('/api/transport/mobile/session', [])->json('accessToken');
+        $this->deleteJson('/api/transport/mobile/session', [], ['Authorization' => 'Bearer '.$token])->assertNoContent();
+        $this->getJson('/api/transport/mobile/session', ['Authorization' => 'Bearer '.$token])->assertUnauthorized();
+    }
+
+    public function test_mobile_location_is_bound_to_driver_and_requires_valid_recent_dakar_position(): void
+    {
+        $driverId = 'mobile-location-driver';
+        $otherId = 'mobile-location-other';
+        $this->createDriverEmployee($driverId);
+        $this->createDriverEmployee($otherId);
+        $this->insertMobileDriver($driverId);
+        $this->insertMobileDriver($otherId);
+        $request = $this->asActor('employee', [], $driverId);
+        $token = $request->postJson('/api/transport/mobile/session', [])->json('accessToken');
+        $path = '/api/transport/mobile/location';
+        $base = ['latitude' => 14.7167, 'longitude' => -17.4677, 'accuracy' => 20, 'capturedAt' => now()->toISOString()];
+        foreach ([
+            ['latitude' => 0],
+            ['latitude' => 14.7167, 'longitude' => -17.4677, 'accuracy' => 1001],
+            ['capturedAt' => now()->subMinutes(3)->toISOString()],
+            ['capturedAt' => now()->addSeconds(31)->toISOString()],
+        ] as $invalid) {
+            $this->patchJson($path, array_merge($base, $invalid), ['Authorization' => 'Bearer '.$token])->assertStatus(422);
+        }
+        $this->patchJson($path, array_merge($base, ['driverId' => $otherId]), ['Authorization' => 'Bearer '.$token])
+            ->assertOk()->assertJsonPath('ok', true)->assertJsonStructure(['receivedAt']);
+        $this->assertDatabaseHas('transport_drivers', ['id' => $driverId, 'latitude' => 14.7167, 'longitude' => -17.4677]);
+        $this->assertDatabaseMissing('transport_drivers', ['id' => $otherId, 'latitude' => 14.7167, 'longitude' => -17.4677]);
+    }
+
+    public function test_mobile_availability_requires_fresh_gps_and_refuses_pause_during_active_trip(): void
+    {
+        $driverId = 'mobile-availability-driver';
+        $this->createDriverEmployee($driverId);
+        $this->insertMobileDriver($driverId);
+        $request = $this->asActor('employee', [], $driverId);
+        $token = $request->postJson('/api/transport/mobile/session', [])->json('accessToken');
+        $headers = ['Authorization' => 'Bearer '.$token];
+        $this->patchJson('/api/transport/mobile/availability', ['availability' => 'AVAILABLE'], $headers)->assertStatus(422);
+        $this->patchJson('/api/transport/mobile/location', [
+            'latitude' => 14.7167, 'longitude' => -17.4677, 'accuracy' => 10, 'capturedAt' => now()->toISOString(),
+        ], $headers)->assertOk();
+        $this->patchJson('/api/transport/mobile/availability', ['availability' => 'AVAILABLE'], $headers)
+            ->assertOk()->assertJsonPath('driver.availability', 'AVAILABLE');
+        DB::table('transport_trips')->insert([
+            'id' => 'mobile-active-trip', 'company_id' => 'kora', 'reference' => 'MOBILE-ACTIVE',
+            'pickup' => 'Plateau', 'destination' => 'Fann', 'passenger_name' => 'Test',
+            'passenger_phone' => '+221770000000', 'fare' => 500, 'driver_id' => $driverId,
+            'status' => 'OFFERED', 'requested_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->patchJson('/api/transport/mobile/availability', ['availability' => 'PAUSED'], $headers)->assertStatus(422);
+    }
+
+    private function insertMobileDriver(string $id, string $company = 'kora'): void
+    {
+        DB::table('transport_drivers')->insert([
+            'id' => $id, 'company_id' => $company, 'name' => 'Mobile '.$id, 'phone' => '+221770000000',
+            'license_number' => 'MOBILE-'.$id, 'employee_id' => $id, 'status' => 'ACTIVE',
+            'availability' => 'PAUSED', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
     private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string
     {
         AuthUser::query()->create([

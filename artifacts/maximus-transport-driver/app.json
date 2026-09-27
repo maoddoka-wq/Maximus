@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "MAXIMUS Chauffeur",
+    "slug": "maximus-transport-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "maximus-transport-driver",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f6f4ef"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MAXIMUS utilise votre position pour aider les clients proches à trouver un chauffeur disponible.",
+          "locationAlwaysAndWhenInUsePermission": "Votre position reste partagée en arrière-plan pendant votre session Chauffeur, même lorsque l’écran est verrouillé.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

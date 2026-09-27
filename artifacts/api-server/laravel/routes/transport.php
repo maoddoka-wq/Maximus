@@ -8,6 +8,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::post('/drivers', [TransportController::class, 'createDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
     Route::patch('/drivers/{id}/availability', [TransportController::class, 'updateDriverAvailability']);
+    Route::post('/mobile/session', [TransportController::class, 'createMobileSession']);
     Route::patch('/drivers/{id}/pricing-mode', [TransportController::class, 'updateDriverPricingMode']);
     Route::patch('/settings', [TransportController::class, 'updateSettings']);
     Route::get('/settings/hero-image', [TransportController::class, 'transportHeroImage']);
@@ -19,6 +20,13 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'
     Route::post('/trips', [TransportController::class, 'createTrip']);
     Route::patch('/trips/{id}/assignment', [TransportController::class, 'assignTrip']);
     Route::patch('/trips/{id}/status', [TransportController::class, 'updateTripStatus']);
+});
+
+Route::middleware('transport.mobile')->prefix('transport/mobile')->group(function (): void {
+    Route::get('/session', [TransportController::class, 'getMobileSession']);
+    Route::delete('/session', [TransportController::class, 'deleteMobileSession']);
+    Route::patch('/location', [TransportController::class, 'updateMobileLocation']);
+    Route::patch('/availability', [TransportController::class, 'updateMobileAvailability']);
 });
 
 Route::middleware(['maximus.installation.public', 'maximus.public-site'])->group(function (): void {

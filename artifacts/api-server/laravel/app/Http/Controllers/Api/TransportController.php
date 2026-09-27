@@ -9,6 +9,8 @@ use App\Support\ModuleCatalog;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -254,6 +256,93 @@ class TransportController extends Controller
         return response()->json($this->driver((object) $row), 201);
     }
 
+    public function createMobileSession(Request $request): JsonResponse
+    {
+        $actor = $request->attributes->get('authActor');
+        if (($actor['role'] ?? null) !== 'employee' || empty($actor['employeeId'])) {
+            return response()->json(['error' => 'Seul un employé chauffeur peut ouvrir une session mobile.'], 403);
+        }
+        $company = (string) $request->attributes->get('companyId');
+        $driver = DB::table('transport_drivers')->where('company_id', $company)
+            ->where('employee_id', $actor['employeeId'])->where('status', 'ACTIVE')->first();
+        if (! $driver) {
+            return response()->json(['error' => 'Votre compte n’est pas lié à un chauffeur actif.'], 403);
+        }
+        $input = $this->validated($request, ['deviceName' => ['nullable', 'string', 'max:120']]);
+        $plain = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        $expires = Carbon::now()->addDays(30);
+        DB::transaction(function () use ($company, $driver, $actor, $input, $plain, $expires): void {
+            DB::table('transport_mobile_tokens')->where('company_id', $company)->where('driver_id', $driver->id)
+                ->whereNull('revoked_at')->update(['revoked_at' => Carbon::now()]);
+            DB::table('transport_mobile_tokens')->insert([
+                'id' => $this->id('mobile-token'),
+                'token_hash' => hash('sha256', $plain),
+                'company_id' => $company, 'driver_id' => $driver->id, 'employee_id' => $actor['employeeId'],
+                'device_name' => $input['deviceName'] ?? null, 'expires_at' => $expires,
+                'created_at' => Carbon::now(), 'last_used_at' => null, 'revoked_at' => null,
+            ]);
+        });
+        return response()->json(['accessToken' => $plain, 'expiresAt' => $expires->toISOString(), 'driver' => $this->mobileDriver($driver)], 201);
+    }
+
+    public function getMobileSession(Request $request): JsonResponse
+    {
+        $driver = $request->attributes->get('transportMobileDriver');
+        return response()->json(['driver' => $this->mobileDriver($driver)]);
+    }
+
+    public function deleteMobileSession(Request $request): Response
+    {
+        DB::table('transport_mobile_tokens')->where('id', $request->attributes->get('transportMobileToken')->id)
+            ->update(['revoked_at' => Carbon::now()]);
+        return response()->noContent();
+    }
+
+    public function updateMobileLocation(Request $request): JsonResponse
+    {
+        $driver = $request->attributes->get('transportMobileDriver');
+        $input = $this->validated($request, [
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'capturedAt' => ['required', 'date'],
+        ]);
+        $captured = Carbon::parse($input['capturedAt']);
+        if (! $this->isWithinDakar((float) $input['latitude'], (float) $input['longitude'])
+            || $captured->lt(Carbon::now()->subMinutes(2))
+            || $captured->gt(Carbon::now()->addSeconds(30))) {
+            return response()->json(['error' => 'Position GPS invalide, hors zone ou obsolète.'], 422);
+        }
+        $received = Carbon::now();
+        DB::table('transport_drivers')->where('id', $driver->id)->update([
+            'latitude' => (float) $input['latitude'], 'longitude' => (float) $input['longitude'],
+            'location_updated_at' => $received, 'updated_at' => $received,
+        ]);
+        return response()->json(['ok' => true, 'receivedAt' => $received->toISOString()]);
+    }
+
+    public function updateMobileAvailability(Request $request): JsonResponse
+    {
+        $driver = $request->attributes->get('transportMobileDriver');
+        $input = $this->validated($request, ['availability' => ['required', Rule::in(['AVAILABLE', 'PAUSED'])]]);
+        $company = (string) $driver->company_id;
+        if ($input['availability'] === 'AVAILABLE'
+            && (! $driver->location_updated_at || Carbon::parse($driver->location_updated_at)
+                ->lt(Carbon::now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes'])))) {
+            return response()->json(['error' => 'Une position GPS récente est nécessaire pour être disponible.'], 422);
+        }
+        if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')->where('company_id', $company)
+            ->where('driver_id', $driver->id)->whereIn('status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS'])->exists()) {
+            return response()->json(['error' => 'Terminez la course en cours avant de passer en pause.'], 422);
+        }
+        DB::table('transport_drivers')->where('id', $driver->id)->update([
+            'availability' => $input['availability'], 'availability_updated_at' => Carbon::now(), 'updated_at' => Carbon::now(),
+        ]);
+        return response()->json([
+            'driver' => $this->mobileDriver(DB::table('transport_drivers')->where('id', $driver->id)->first()),
+        ]);
+    }
+
     public function updateDriverLocation(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
@@ -318,6 +407,11 @@ class TransportController extends Controller
         }
         if ($driver->status !== 'ACTIVE') {
             return response()->json(['error' => 'Un chauffeur inactif ne peut pas se rendre disponible.'], 422);
+        }
+        if ($input['availability'] === 'AVAILABLE'
+            && (! $driver->location_updated_at || Carbon::parse($driver->location_updated_at)
+                ->lt(Carbon::now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes'])))) {
+            return response()->json(['error' => 'Une position GPS récente est nécessaire pour être disponible.'], 422);
         }
         if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')
             ->where('company_id', $company)
@@ -1212,6 +1306,22 @@ class TransportController extends Controller
             'pricingModeUpdatedAt' => $row->pricing_mode_updated_at ?? null,
             'latitude' => $latitude === null ? null : (float) $latitude,
             'longitude' => $longitude === null ? null : (float) $longitude,
+            'locationUpdatedAt' => $row->location_updated_at ?? null,
+        ];
+    }
+
+    private function mobileDriver(object $row): array
+    {
+        $onTrip = DB::table('transport_trips')
+            ->where('company_id', $row->company_id)
+            ->where('driver_id', $row->id)
+            ->whereIn('status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS'])
+            ->exists();
+
+        return [
+            'id' => $row->id,
+            'name' => $row->name,
+            'availability' => $onTrip ? 'ON_TRIP' : ($row->availability ?? 'AVAILABLE'),
             'locationUpdatedAt' => $row->location_updated_at ?? null,
         ];
     }

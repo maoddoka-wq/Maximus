@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/maximus-transport-driver/"
+title = "MAXIMUS Chauffeur"
+description = "Application mobile des chauffeurs MAXIMUS : partager leur position GPS pendant la connexion, même en arrière-plan, et gérer leur disponibilité pour aider les clients à trouver un chauffeur proche sans publier de répertoire de positions."
+version = "1.0.0"
+id = "artifacts/maximus-transport-driver"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/maximus-transport-driver/" ]
+localPort = 24762
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-transport-driver run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/maximus-transport-driver", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/maximus-transport-driver", "run", "serve" ]
+
+[services.env]
+PORT = "24762"
+BASE_PATH = "/maximus-transport-driver/"
