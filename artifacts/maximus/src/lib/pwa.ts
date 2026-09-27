@@ -5,7 +5,6 @@ type InstallPromptEvent = Event & {
 
 let deferredInstallPrompt: InstallPromptEvent | null = null;
 let initialized = false;
-let activeClientManifestUrl: string | null = null;
 const subscribers = new Set<() => void>();
 
 const notify = () => subscribers.forEach((listener) => listener());
@@ -118,38 +117,16 @@ export const isIosDevice = () => {
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
 function setClientManifestLink(manifestUrl: string) {
-  const existingLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="manifest"]'));
-  let link = existingLinks.find(candidate => candidate.dataset.maximusClientManifest === 'true')
-    ?? existingLinks[0];
+  let link = document.querySelector<HTMLLinkElement>('link[data-maximus-client-manifest="true"]');
   if (!link) {
     link = document.createElement('link');
+    link.rel = 'manifest';
+    link.dataset.maximusClientManifest = 'true';
     document.head.appendChild(link);
   }
-  const manifestChanged = activeClientManifestUrl !== manifestUrl
-    || link.dataset.manifestUrl !== manifestUrl;
-  if (manifestChanged) {
-    activeClientManifestUrl = manifestUrl;
-    deferredInstallPrompt = null;
-    notify();
-  }
-  link.rel = 'manifest';
-  link.dataset.maximusClientManifest = 'true';
   link.href = manifestUrl;
   link.dataset.manifestUrl = manifestUrl;
-  existingLinks
-    .filter(candidate => candidate !== link)
-    .forEach(candidate => candidate.remove());
   return link;
-}
-
-function removeClientManifestLink(link: HTMLLinkElement, manifestUrl: string) {
-  if (link.dataset.manifestUrl !== manifestUrl) return;
-  link.remove();
-  if (activeClientManifestUrl === manifestUrl) {
-    activeClientManifestUrl = null;
-    deferredInstallPrompt = null;
-    notify();
-  }
 }
 
 export function primeClientManifestFromPath(pathname = window.location.pathname) {
@@ -209,12 +186,12 @@ export async function mountClientManifest(manifestUrl: string): Promise<() => vo
       throw new Error('Le manifest PWA pointe vers une origine ou une portée de lancement incorrecte.');
     }
   } catch (error) {
-    removeClientManifestLink(link, manifestUrl);
+    if (link.dataset.manifestUrl === manifestUrl) link.remove();
     throw error;
   }
 
   return () => {
-    removeClientManifestLink(link, manifestUrl);
+    if (link.dataset.manifestUrl === manifestUrl) link.remove();
   };
 }
 
@@ -224,11 +201,6 @@ export function initializePwa() {
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
-    if (!activeClientManifestUrl) {
-      deferredInstallPrompt = null;
-      notify();
-      return;
-    }
     deferredInstallPrompt = event as InstallPromptEvent;
     notify();
   });

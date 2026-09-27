@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
-import { Download, Package, Plus, Store } from 'lucide-react';
+import { Download, Package, Plus, ShoppingBag, Store } from 'lucide-react';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@workspace/maximus-design-system/components/ui/dropdown-menu';
 import { publicSiteApi, type PublicImmobilierBootstrap, type PublicSiteBootstrap, type PublicSiteModule } from '@/lib/public-site-api';
@@ -22,23 +22,6 @@ const PublicTransportPage = lazy(() =>
 const PublicImmobilierPage = lazy(() =>
   import('./public-shop').then(module => ({ default: module.PublicImmobilierPage })),
 );
-
-function isPublicEcommerceRoute(routePath: string, module?: PublicSiteModule) {
-  if (!module) return false;
-  const modulePath = module.path === '/' ? '/boutique' : module.path.replace(/\/+$/, '') || '/boutique';
-  const routeRoots = [
-    modulePath,
-    '/boutique',
-    '/produit',
-    '/panier',
-    '/connexion',
-    '/inscription-client',
-    '/compte',
-    '/location',
-    '/livraison',
-  ];
-  return routeRoots.some(root => routePath === root || routePath.startsWith(`${root}/`));
-}
 
 type Props = {
   domain?: boolean;
@@ -155,7 +138,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     const hasEcommerce = bootstrap?.available
       && bootstrap.modules.some(module => module.id === 'ecommerce');
     const hasStoreKey = Boolean(bootstrap?.available && bootstrap.storeSlug);
-    const needsCompanySiteCapabilities = routePath === '/';
+    const needsCompanySiteCapabilities = ['/', '/transport', '/immobilier'].includes(routePath);
     if (!bootstrap?.available || !hasEcommerce || !hasStoreKey) {
       setStorefront(null);
       setStorefrontLoading(false);
@@ -173,12 +156,12 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     void request
       .then(result => {
         if (!('store' in result)) {
-          throw new Error('Le module E-commerce n’est pas disponible.');
+          throw new Error('La boutique publique n’est pas disponible.');
         }
         if (!cancelled) setStorefront(result);
       })
       .catch(() => {
-        if (!cancelled) setStorefrontError('Les produits du module E-commerce ne sont pas disponibles pour le moment.');
+        if (!cancelled) setStorefrontError('Les produits de la boutique ne sont pas disponibles pour le moment.');
       })
       .finally(() => {
         if (!cancelled) setStorefrontLoading(false);
@@ -199,17 +182,16 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
 
   useEffect(() => {
     if (!bootstrap?.available) return;
-    const ecommerceModule = bootstrap.modules.find(module => module.id === 'ecommerce');
     const sectionTitle = routePath === '/transport'
       ? 'Transport'
       : routePath === '/immobilier'
         ? 'Immobilier'
-        : routePath === '/location'
-          ? 'Location'
-          : routePath === '/livraison'
-            ? 'Livraison'
-            : isPublicEcommerceRoute(routePath, ecommerceModule)
-              ? (ecommerceModule?.label ?? 'E-commerce')
+        : routePath === '/boutique'
+          ? 'Boutique'
+          : routePath === '/location'
+            ? 'Location'
+            : routePath !== '/'
+              ? 'Boutique'
               : 'Site public';
     const title = `${sectionTitle} | ${bootstrap.brand.name}`;
     const description = bootstrap.brand.description.trim()
@@ -256,7 +238,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     window.location.assign(publicSiteHomePath);
   };
   const installPublicSite = async () => {
-    if (!isIosDevice() && manifestReady && canInstallPwa()) {
+    if (!isIosDevice() && canInstallPwa()) {
       try {
         const installed = await promptPwaInstall();
         setInstallHelp(installed
@@ -316,7 +298,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     brandLogoUrl: bootstrap.brand.logoUrl,
     description: bootstrap.brand.description,
     heroImages: bootstrap.brand.heroImages,
-    singlePageLanding: false,
+    singlePageLanding: routePath === '/' && !paymentReturn,
   };
   const storefrontForBrand = storefront?.store.slug === bootstrap.storeSlug ? storefront : null;
 
@@ -367,7 +349,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
     );
   }
 
-  if (ecommerce && (isPublicEcommerceRoute(routePath, ecommerce) || paymentReturn)) {
+  if (ecommerce && (routePath !== '/' || paymentReturn || Boolean(bootstrap.storeSlug))) {
     if (!bootstrap.storeSlug) {
       return (
         <PublicCompanySiteShell
@@ -379,35 +361,22 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
           installPrompt={installPrompt}
         >
           <PublicSiteMessage
-            title={`Le module ${ecommerce.label} n’est pas disponible.`}
-            testId="status-public-site-ecommerce-unavailable"
+            title="La boutique publique n’est pas disponible."
+            testId="status-public-site-shop-unavailable"
             action={<Button type="button" variant="outline" onClick={returnToSite}>Retour au site</Button>}
           />
         </PublicCompanySiteShell>
       );
     }
     return (
-      <PublicCompanySiteShell
-        companyName={bootstrap.company.name}
-        brand={bootstrap.brand}
-        modules={modules}
-        basePath={basePath}
-        activePath={routePath}
-        installPrompt={installPrompt}
-      >
-        <Suspense fallback={
-          <p className="mx-auto max-w-6xl px-5 py-12 text-sm text-[hsl(var(--muted-foreground))]" role="status" data-testid="status-public-ecommerce-loading">
-            Chargement du module {ecommerce.label}…
-          </p>
-        }>
-          <PublicShopPage
-            slug={domain ? undefined : bootstrap.storeSlug}
-            domain={domain}
-            companySite={companySite}
-            embeddedInCompanySite
-          />
-        </Suspense>
-      </PublicCompanySiteShell>
+      <Suspense fallback={<PublicSiteMessage title="Chargement de la boutique…" testId="status-public-ecommerce-loading" />}>
+        <PublicShopPage
+          slug={domain ? undefined : bootstrap.storeSlug}
+          domain={domain}
+          companySite={companySite}
+          siteInstallPrompt={installPrompt}
+        />
+      </Suspense>
     );
   }
 
@@ -484,14 +453,14 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
             <section id="public-site-section-ecommerce" className="mt-12 scroll-mt-24" aria-labelledby="title-public-site-products" data-testid="section-public-site-products">
               <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">{ecommerce.label}</p>
+                  <p className="mono text-xs font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Boutique</p>
                   <h2 className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl" id="title-public-site-products">
-                    Produits disponibles
+                    Tous les produits
                   </h2>
                 </div>
                 <Button asChild variant="outline">
-                  <Link href={`${basePath}${ecommerce.path === '/' ? '/boutique' : ecommerce.path}`} data-testid="link-public-site-products-module">
-                    Ouvrir {ecommerce.label}
+                  <Link href={`${basePath}/boutique`} data-testid="link-public-site-products-shop">
+                    Voir la boutique
                   </Link>
                 </Button>
               </div>
@@ -505,7 +474,7 @@ export default function PublicSitePage({ domain = false, slug, clientApp = false
                 </p>
               ) : !bootstrap.storeSlug ? (
                 <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
-                  Aucun catalogue public n’est associé au module E-commerce.
+                  Aucune boutique publiée n’est associée à ce site.
                 </p>
               ) : storefrontForBrand && storefrontForBrand.products.length === 0 ? (
                 <p className="rounded-xl border bg-[hsl(var(--card))] px-4 py-5 text-sm text-[hsl(var(--muted-foreground))]" role="status">
@@ -644,7 +613,7 @@ function PublicCompanySiteShell({
   const [, setLocation] = useLocation();
   const siteBasePath = basePath.replace(/\/+$/, '');
   const homeHref = siteBasePath ? `${siteBasePath}/` : '/';
-  const publicModules = modules.filter(module => module.id !== 'transport');
+  const hasEcommerce = modules.some(module => module.id === 'ecommerce');
   const primaryColor = validBrandColor(brand.primaryColor) ? brand.primaryColor : undefined;
   const activePathNormalized = activePath.replace(/\/+$/, '') || '/';
   const navigationItems = [
@@ -656,23 +625,43 @@ function PublicCompanySiteShell({
       testId: 'link-public-site-nav-home',
       icon: Store,
     },
-    ...publicModules.map(module => {
+    ...modules.filter(module => module.id !== 'transport').map(module => {
       const modulePath = module.id === 'ecommerce' && module.path === '/' ? '/boutique' : module.path;
-      const active = module.id === 'ecommerce'
-        ? isPublicEcommerceRoute(activePathNormalized, module)
-        : activePathNormalized === modulePath
-          || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
+      const active = activePathNormalized === modulePath
+        || (modulePath !== '/' && activePathNormalized.startsWith(`${modulePath}/`));
       return {
         key: `module-${module.id}`,
-        label: module.label,
+        label: module.id === 'ecommerce' ? 'Boutique' : module.label,
         href: `${siteBasePath}${modulePath}` || '/',
         active,
         testId: `link-public-site-nav-module-${module.id}`,
         icon: module.id === 'ecommerce' ? Package : Store,
       };
     }),
+    ...(hasEcommerce
+      ? [
+        {
+          key: 'cart',
+          label: 'Panier',
+          href: `${siteBasePath}/panier`,
+          active: activePathNormalized === '/panier' || activePathNormalized.startsWith('/panier/'),
+          testId: 'link-public-site-nav-cart',
+          icon: ShoppingBag,
+        },
+        {
+          key: 'signin',
+          label: 'Se connecter',
+          href: `${siteBasePath}/connexion`,
+          active: activePathNormalized === '/connexion',
+          testId: 'link-public-site-nav-signin',
+          icon: Store,
+        },
+      ]
+      : []),
   ];
-  const primaryKeys = new Set(['home', ...publicModules.slice(0, 2).map(module => `module-${module.id}`)]);
+  const primaryKeys = hasEcommerce
+    ? new Set(['home', 'module-ecommerce', 'cart'])
+    : new Set(['home', ...modules.slice(0, 2).map(module => `module-${module.id}`)]);
   const primaryMobileItems = navigationItems.filter(item => primaryKeys.has(item.key));
   const moreMobileItems = navigationItems.filter(item => !primaryKeys.has(item.key));
   const moreIsActive = moreMobileItems.some(item => item.active);

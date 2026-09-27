@@ -241,7 +241,6 @@ export default function PublicShopPage({
   clientApp = false,
   companySite,
   siteInstallPrompt,
-  embeddedInCompanySite = false,
 }: {
   slug?: string;
   domain?: boolean;
@@ -256,7 +255,6 @@ export default function PublicShopPage({
     singlePageLanding?: boolean;
   };
   siteInstallPrompt?: ReactNode;
-  embeddedInCompanySite?: boolean;
 }) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
@@ -808,7 +806,7 @@ export default function PublicShopPage({
   };
 
   const installClientApp = async () => {
-    if (!isIosDevice() && manifestReady && canInstallPwa()) {
+    if (!isIosDevice() && canInstallPwa()) {
       try {
         const installed = await promptPwaInstall();
         setInstallHelp(installed
@@ -836,15 +834,7 @@ export default function PublicShopPage({
     setInstallHelp('Ce navigateur n’a pas ouvert la fenêtre d’installation. Utilisez le menu de Chrome puis « Installer l’application ».');
   };
 
-  if (loading && embeddedInCompanySite) {
-    const moduleLabel = companySite?.modules.find(module => module.id === 'ecommerce')?.label ?? 'E-commerce';
-    return <p className="mx-auto max-w-6xl px-4 py-10 text-sm text-[hsl(var(--muted-foreground))]" role="status">Chargement du module {moduleLabel}…</p>;
-  }
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
-  if (!data && embeddedInCompanySite) {
-    const moduleLabel = companySite?.modules.find(module => module.id === 'ecommerce')?.label ?? 'E-commerce';
-    return <section className="mx-auto max-w-6xl px-4 py-10 text-[hsl(var(--foreground))]" role="alert"><h1 className="text-lg font-bold">{moduleLabel} indisponible</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{error}</p></section>;
-  }
   if (!data) return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6"><section className="card-surface max-w-md rounded-2xl p-8 text-center"><Store className="mx-auto text-[hsl(var(--primary))]" size={30} /><h1 className="mt-4 text-xl font-bold">{clientApp ? 'Installation PWA à renouveler' : 'Boutique indisponible'}</h1><p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{clientApp ? 'Cette installation ne possède pas une adresse propre à cette boutique. Désinstallez-la, ouvrez la boutique depuis son lien public, puis installez-la à nouveau.' : error}</p></section></div>;
 
   const { store, products: allProducts, rentals } = data;
@@ -907,14 +897,14 @@ export default function PublicShopPage({
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
      const mobileNavItemsClass = 'mx-auto grid max-w-md grid-cols-4 gap-1';
-    const mobileNavVisible = !embeddedInCompanySite && !isAuthRoute && !submitted;
+     const mobileNavVisible = !isAuthRoute && !submitted;
      const mobileNavBottomPadding = mobileNavVisible
        ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
        : 'pb-4 sm:pb-9';
     const theme = publicShopTheme(store);
     const publicLogoUrl = companySite?.brandLogoUrl || store.logoUrl;
-    return <div className={`public-shop-shell min-h-[100dvh] w-full min-w-0 overflow-x-clip ${embeddedInCompanySite ? 'bg-transparent' : 'bg-[hsl(var(--muted)/.22)]'}`} style={{ '--shop-primary': theme.primary, '--shop-accent': theme.accent, '--shop-primary-foreground': theme.primaryForeground, '--shop-accent-foreground': theme.accentForeground } as React.CSSProperties}>
-      <header className={`${embeddedInCompanySite ? 'hidden ' : ''}relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur`}>
+     return <div className="public-shop-shell min-h-[100dvh] w-full min-w-0 overflow-x-clip bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': theme.primary, '--shop-accent': theme.accent, '--shop-primary-foreground': theme.primaryForeground, '--shop-accent-foreground': theme.accentForeground } as React.CSSProperties}>
+     <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 max-w-full shrink items-center gap-3 sm:max-w-[calc(100%-3rem)]">
               <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
@@ -954,20 +944,7 @@ export default function PublicShopPage({
        </div>}
         <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-9 lg:px-8 lg:pb-9 ${mobileNavBottomPadding}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-        {!embeddedInCompanySite && !isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && siteInstallPrompt}
-        {embeddedInCompanySite && !submitted && (
-          <nav className="mb-5 flex flex-wrap gap-2 rounded-xl border bg-[hsl(var(--card))] p-2" aria-label={`Navigation du module ${companySite?.modules.find(module => module.id === 'ecommerce')?.label ?? 'E-commerce'}`} data-testid="nav-public-ecommerce-module">
-            <button type="button" onClick={() => go('/boutique')} aria-current={isCatalogRoute || Boolean(productDetailSlug) ? 'page' : undefined} className="rounded-lg border px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]">
-              Produits
-            </button>
-            <button type="button" onClick={() => go('/panier')} aria-current={isCartRoute ? 'page' : undefined} className="rounded-lg border px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]">
-              Panier{cartCount > 0 ? ` (${cartCount})` : ''}
-            </button>
-            <button type="button" onClick={() => go(customer ? '/compte' : '/connexion')} aria-current={isAccountRoute || isAuthRoute ? 'page' : undefined} className="rounded-lg border px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]">
-              {customer ? 'Mon compte' : 'Se connecter'}
-            </button>
-          </nav>
-        )}
+        {!isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && siteInstallPrompt}
         {!companySite && !isStandalonePwa() && !isAuthRoute && !isCartRoute && !isAccountRoute && !submitted && <aside className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="banner-shop-install">
         <div className="flex items-start gap-3">
            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
