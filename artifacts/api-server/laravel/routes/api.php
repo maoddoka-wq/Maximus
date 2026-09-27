@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
 use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
+use App\Http\Controllers\Api\CompanyPublicSiteDomainsController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
@@ -129,6 +130,10 @@ Route::middleware(['maximus.auth', 'maximus.company'])
         Route::get('/', [CompanyPublicSiteSettingsController::class, 'show']);
         Route::patch('/', [CompanyPublicSiteSettingsController::class, 'update']);
         Route::post('/logo', [CompanyPublicSiteSettingsController::class, 'uploadLogo']);
+    Route::get('/domains', [CompanyPublicSiteDomainsController::class, 'index']);
+    Route::post('/domains', [CompanyPublicSiteDomainsController::class, 'store']);
+    Route::post('/domains/{id}/verify', [CompanyPublicSiteDomainsController::class, 'verify']);
+    Route::delete('/domains/{id}', [CompanyPublicSiteDomainsController::class, 'destroy']);
     });
 
 Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {

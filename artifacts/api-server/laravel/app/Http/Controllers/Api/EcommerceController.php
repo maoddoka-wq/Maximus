@@ -8,6 +8,7 @@ use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Services\EcommerceDomainVerifier;
+use App\Services\PublicSiteDomainService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class EcommerceController extends Controller
 {
     public function __construct(
         private readonly EcommerceDomainVerifier $domainVerifier,
+        private readonly PublicSiteDomainService $publicSiteDomains,
     ) {
     }
 
@@ -289,44 +291,17 @@ class EcommerceController extends Controller
         $input = Validator::make($request->all(), [
             'domain' => ['required', 'string', 'max:253'],
         ])->validate();
-        $domain = $this->domainVerifier->normalize($input['domain']);
+        $domain = $this->publicSiteDomains->normalize($input['domain']);
         if (! $domain) {
             return response()->json(['error' => 'Saisissez un nom de domaine valide, sans http:// ni chemin.'], 422);
         }
 
         $company = $this->company($request);
-        if (DB::table('ecommerce_domains')->where('domain', $domain)->whereNull('deleted_at')->exists()) {
+        if ($this->publicSiteDomains->exists($domain)) {
             return response()->json(['error' => 'Ce domaine est déjà rattaché à une boutique.'], 422);
         }
 
-        $row = [
-            'id' => $this->id('domain'),
-            'company_id' => $company,
-            'domain' => $domain,
-            'target_host' => $this->domainTarget($request),
-            'verification_token' => 'maximus-'.Str::lower(Str::random(40)),
-            'status' => 'PENDING',
-            'last_error' => '',
-            'verified_at' => null,
-            'deleted_at' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ];
-        DB::transaction(function () use ($domain, $row): void {
-            \App\Services\InstallationAddressVerifier::lockHostname($domain);
-            $centralHost = strtolower((string) parse_url((string) config('maximus.central_public_url'), PHP_URL_HOST));
-            if (DB::table('maximus_installation_addresses')->where('hostname', $domain)->where('validation_method', 'public')->exists()
-                || in_array($domain, \App\Support\InstallationContext::trustedHosts(), true)
-                || $domain === $centralHost) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['domain' => 'Ce nom d’hôte est réservé à un accès ERP.']);
-            }
-            if (DB::table('ecommerce_domains')->where('domain', $domain)->whereNull('deleted_at')->exists()) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['domain' => 'Ce domaine est déjà rattaché à une boutique.']);
-            }
-            DB::table('ecommerce_domains')->insert($row);
-        });
-
-        return response()->json($this->domain((object) $row), 201);
+        return response()->json($this->publicSiteDomains->create($request, $company, $domain), 201);
     }
 
     public function verifyDomain(Request $request, string $id): JsonResponse
@@ -335,36 +310,18 @@ class EcommerceController extends Controller
             return $this->forbidden();
         }
 
-        $row = DB::table('ecommerce_domains')
-            ->where('id', $id)
-            ->where('company_id', $this->company($request))
-            ->whereNull('deleted_at')
-            ->first();
-        if (! $row) {
+        $result = $this->publicSiteDomains->verify($this->company($request), $id);
+        if (! $result) {
             return response()->json(['error' => 'Domaine introuvable.'], 404);
         }
-
-        if (! $this->domainVerifier->hasValidDnsProof($row)) {
-            DB::table('ecommerce_domains')->where('id', $row->id)->update([
-                'status' => 'PENDING',
-                'last_error' => 'Aucun enregistrement TXT ou CNAME correspondant n’a été trouvé.',
-                'updated_at' => now(),
-            ]);
-
+        if (! $result['verified']) {
             return response()->json([
                 'error' => 'Le domaine n’est pas encore vérifié. Ajoutez l’enregistrement DNS indiqué puis réessayez.',
-                'domain' => $this->domain(DB::table('ecommerce_domains')->where('id', $row->id)->first()),
+                'domain' => $result['domain'],
             ], 422);
         }
 
-        DB::table('ecommerce_domains')->where('id', $row->id)->update([
-            'status' => 'ACTIVE',
-            'last_error' => '',
-            'verified_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return response()->json($this->domain(DB::table('ecommerce_domains')->where('id', $row->id)->first()));
+        return response()->json($result['domain']);
     }
 
     public function deleteDomain(Request $request, string $id): JsonResponse
@@ -373,16 +330,7 @@ class EcommerceController extends Controller
             return $this->forbidden();
         }
 
-        $deleted = DB::table('ecommerce_domains')
-            ->where('id', $id)
-            ->where('company_id', $this->company($request))
-            ->whereNull('deleted_at')
-            ->update([
-                'status' => 'ARCHIVED',
-                'deleted_at' => now(),
-                'updated_at' => now(),
-            ]);
-        if (! $deleted) {
+        if (! $this->publicSiteDomains->archive($this->company($request), $id)) {
             return response()->json(['error' => 'Domaine introuvable.'], 404);
         }
 
@@ -2070,29 +2018,7 @@ class EcommerceController extends Controller
 
     private function domains(string $company): array
     {
-        return DB::table('ecommerce_domains')
-            ->where('company_id', $company)
-            ->whereNull('deleted_at')
-            ->orderBy('domain')
-            ->get()
-            ->map(fn ($row) => $this->domain($row))
-            ->values()
-            ->all();
-    }
-
-    private function domain(object $row): array
-    {
-        return [
-            'id' => $row->id,
-            'companyId' => $row->company_id,
-            'domain' => $row->domain,
-            'targetHost' => $row->target_host,
-            'verificationName' => '_maximus-verification.'.$row->domain,
-            'verificationValue' => $row->verification_token,
-            'status' => $row->status,
-            'lastError' => $row->last_error,
-            'verifiedAt' => $row->verified_at,
-        ];
+        return $this->publicSiteDomains->forCompany($company);
     }
 
     private function deleteStoredImage(?string $imageUrl, string $replacement): void
@@ -2287,16 +2213,6 @@ class EcommerceController extends Controller
             array_merge($legacy, $galleryMap[$key] ?? []),
             fn ($url) => is_string($url) && trim($url) !== '',
         )));
-    }
-
-    private function domainTarget(Request $request): string
-    {
-        $configured = (string) env('MAXIMUS_CUSTOM_DOMAIN_TARGET', '');
-        if ($configured !== '') {
-            return rtrim(Str::lower($configured), '.');
-        }
-
-        return $this->domainVerifier->normalize($request->getHost()) ?? $request->getHost();
     }
 
     private function orders(string $company): array

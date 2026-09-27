@@ -5,6 +5,7 @@ import { Input } from '@workspace/maximus-design-system/components/ui/input';
 import type { Company } from '@/lib/store';
 import type { EcommerceStore } from '@/lib/ecommerce-api';
 import { companyRequestApi } from '@/lib/company-request-api';
+import { OrganizationPublicSiteDomains } from './organization-public-site-domains';
 
 type PublicSiteForm = Pick<EcommerceStore, 'name' | 'slug' | 'status'>;
 
@@ -246,6 +247,7 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
           </Button>
         </div>
       )}
+      <OrganizationPublicSiteDomains key={company.id} companyId={company.id} />
     </section>
   );
 }

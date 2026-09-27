@@ -69,6 +69,46 @@ class PublicSiteAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_company_admin_can_manage_public_site_domains_without_ecommerce(): void
+    {
+        $company = $this->createCompany('public-site-domain-acme');
+        $companyAdmin = $this->createActor('public-site-domain-admin', 'company_admin', $company->id);
+        $request = $this->authenticate($companyAdmin);
+
+        $request->getJson('/api/company-public-site/domains?companyId='.$company->id)
+            ->assertOk()
+            ->assertJsonCount(0, 'domains');
+
+        $created = $request->postJson('/api/company-public-site/domains?companyId='.$company->id, [
+            'domain' => 'site.public-site-domain.test',
+        ])->assertCreated()
+            ->assertJsonPath('domain', 'site.public-site-domain.test')
+            ->assertJsonPath('status', 'PENDING');
+        $domainId = $created->json('id');
+
+        $request->getJson('/api/company-public-site/domains?companyId='.$company->id)
+            ->assertOk()
+            ->assertJsonCount(1, 'domains')
+            ->assertJsonPath('domains.0.id', $domainId);
+
+        $request->postJson('/api/company-public-site/domains/'.$domainId.'/verify?companyId='.$company->id)
+            ->assertStatus(422)
+            ->assertJsonPath('domain.status', 'PENDING');
+
+        $request->deleteJson('/api/company-public-site/domains/'.$domainId.'?companyId='.$company->id)
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('ecommerce_domains', [
+            'id' => $domainId,
+            'company_id' => $company->id,
+            'status' => 'ARCHIVED',
+        ]);
+        $this->assertDatabaseMissing('maximus_company_modules', [
+            'company_id' => $company->id,
+            'module_id' => 'ecommerce',
+        ]);
+    }
+
     private function createCompany(string $id): Company
     {
         return Company::query()->create([

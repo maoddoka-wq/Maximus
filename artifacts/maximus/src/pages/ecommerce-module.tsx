@@ -37,7 +37,6 @@ import {
   type EcommerceDeliveryRequest,
   type EcommerceDeliveryRequestStatus,
   type EcommerceDeliveryZone,
-  type EcommerceDomain,
   type EcommerceOrder,
   type EcommerceOrderStatus,
   type EcommerceProduct,
@@ -423,7 +422,7 @@ export default function EcommerceModulePage({
        {tab === 'location' && <RentalPanel data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'livraisons' && <Deliveries data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'finances' && walletData && <WalletPanel data={walletData} currency={store.currency} canModify={currentCanModify} run={run} pendingAction={pendingAction} />}
-      {tab === 'parametres' && <SettingsPanel store={store} domains={data.domains} canModify={currentCanModify} run={run} />}
+      {tab === 'parametres' && <SettingsPanel store={store} canModify={currentCanModify} run={run} />}
       </>}
     </div>
   );
@@ -1172,7 +1171,7 @@ function HomePanel({ store, canModify, run }: { store: EcommerceStore; canModify
   </div>;
 }
 
-function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+function SettingsPanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [form, setForm] = useState({
     description: store.description,
     currency: store.currency,
@@ -1180,7 +1179,6 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     accentColor: store.accentColor,
     allowOrderAttachments: store.allowOrderAttachments,
   });
-  const [domainInput, setDomainInput] = useState('');
   const [heroFiles, setHeroFiles] = useState<File[]>([]);
   const initializedCompanyId = useRef<string | null>(null);
   const api = createEcommerceApi(store.companyId);
@@ -1205,19 +1203,6 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
       if (selectedHeroFiles.length > 0) await api.uploadStoreHeroImages(selectedHeroFiles);
       setHeroFiles([]);
     }, selectedHeroFiles.length > 0 ? 'Paramètres E-commerce et images enregistrés.' : 'Paramètres E-commerce enregistrés.');
-  };
-  const addDomain = (event: FormEvent) => {
-    event.preventDefault();
-    const domain = domainInput.trim();
-    if (!domain) return;
-    void run(() => createEcommerceApi(store.companyId).createDomain(domain), 'Domaine ajouté. Configurez le DNS puis lancez la vérification.');
-    setDomainInput('');
-  };
-  const verifyDomain = (domain: EcommerceDomain) => {
-    void run(() => createEcommerceApi(store.companyId).verifyDomain(domain.id), `Domaine ${domain.domain} vérifié.`);
-  };
-  const removeDomain = (domain: EcommerceDomain) => {
-    void run(() => createEcommerceApi(store.companyId).deleteDomain(domain.id), 'Domaine retiré de la boutique.');
   };
   return <div className="space-y-5 fade-up">
     <Panel title="Paramètres E-commerce" description="Les réglages d’identité et de publication du site se trouvent dans Organisation et accès → Site public.">
@@ -1250,20 +1235,6 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
           </div>
          <div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les réglages E-commerce</button></div>
       </form>
-    </Panel>
-     <Panel title="Domaine personnalisé" description="Connectez le domaine acheté par votre entreprise à cette boutique publique, avec HTTPS géré par Render.">
-      <div className="space-y-5">
-         <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-           <p className="font-bold text-[hsl(var(--foreground))]">Procédure de connexion</p>
-           <p className="mt-1">Ajoutez d’abord le domaine dans la configuration Custom Domains de Render pour que le certificat HTTPS soit provisionné, puis renseignez ici le domaine et appliquez l’enregistrement DNS indiqué ci-dessous.</p>
-           <p className="mt-1">Après propagation DNS et activation du certificat, cliquez sur « Vérifier ». La boutique doit rester publiée pour répondre sur ce domaine.</p>
-         </div>
-        <form onSubmit={addDomain} className="flex flex-col gap-3 sm:flex-row">
-          <Field label="Nom de domaine" value={domainInput} onChange={setDomainInput} placeholder="boutique.exemple.sn" disabled={!canModify} />
-          <button type="submit" disabled={!canModify || !domainInput.trim()} className="self-end rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50">Ajouter le domaine</button>
-        </form>
-         {domains.length === 0 ? <p className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">Aucun domaine personnalisé n’est encore connecté.</p> : <div className="space-y-3">{domains.map(domain => <div key={domain.id} className="rounded-xl border p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><strong>{domain.domain}</strong><StatusPill value={domain.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING'} /></div><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{domain.status === 'ACTIVE' ? 'La boutique répond sur ce domaine après configuration de l’hébergement.' : 'En attente de la configuration DNS.'}</p></div><div className="flex gap-2"><button type="button" disabled={!canModify} onClick={() => verifyDomain(domain)} className="rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50">Vérifier</button><button type="button" disabled={!canModify} onClick={() => removeDomain(domain)} className="rounded-lg border border-[hsl(var(--destructive)/.35)] px-3 py-2 text-xs font-bold text-[hsl(var(--destructive))] disabled:opacity-50">Retirer</button></div></div><div className="mt-4 grid gap-3 rounded-lg bg-[hsl(var(--muted)/.35)] p-3 text-xs sm:grid-cols-2"><div><p className="font-bold">Enregistrement TXT de vérification</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Nom : {domain.verificationName}</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Valeur : {domain.verificationValue}</p></div><div><p className="font-bold">Cible DNS Render</p><p className="mt-1 break-all text-[hsl(var(--muted-foreground))]">Cible : {domain.targetHost}</p><p className="mt-1 text-[hsl(var(--muted-foreground))]">Pour un sous-domaine, configurez le CNAME demandé par Render vers cette cible. Pour un domaine racine, utilisez les enregistrements A/ANAME indiqués par Render. Ajoutez aussi le TXT ci-dessus si votre registrar le permet, attendez la propagation, puis cliquez sur Vérifier.</p></div></div>{domain.lastError && <p className="mt-3 text-xs text-[hsl(var(--destructive))]">{domain.lastError}</p>}</div>)}</div>}
-      </div>
     </Panel>
   </div>;
 }

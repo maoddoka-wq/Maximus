@@ -11,6 +11,18 @@ export type CompanyRequest = {
   rejectionReason: string | null;
 };
 
+export type PublicSiteDomain = {
+  id: string;
+  companyId: string;
+  domain: string;
+  targetHost: string;
+  verificationName: string;
+  verificationValue: string;
+  status: 'PENDING' | 'ACTIVE';
+  lastError: string;
+  verifiedAt: string | null;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return requestJson<T>(path, init, { fallbackMessage: 'La demande d’entreprise est indisponible.' });
 }
@@ -107,6 +119,25 @@ export const companyRequestApi = {
       { method: 'POST', body },
     );
   },
+  publicSiteDomains: (companyId: string) =>
+    request<{ domains: PublicSiteDomain[] }>(
+      `/company-public-site/domains?companyId=${encodeURIComponent(companyId)}`,
+    ),
+  createPublicSiteDomain: (companyId: string, domain: string) =>
+    request<PublicSiteDomain>(
+      `/company-public-site/domains?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'POST', body: JSON.stringify({ domain }) },
+    ),
+  verifyPublicSiteDomain: (companyId: string, domainId: string) =>
+    request<PublicSiteDomain>(
+      `/company-public-site/domains/${encodeURIComponent(domainId)}/verify?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'POST' },
+    ),
+  deletePublicSiteDomain: (companyId: string, domainId: string) =>
+    request<{ ok: true }>(
+      `/company-public-site/domains/${encodeURIComponent(domainId)}?companyId=${encodeURIComponent(companyId)}`,
+      { method: 'DELETE' },
+    ),
   publicSiteAccess: (companyId: string) =>
     request<{ companyId: string; enabled: boolean }>(
       `/companies/${encodeURIComponent(companyId)}/public-site-access`,
