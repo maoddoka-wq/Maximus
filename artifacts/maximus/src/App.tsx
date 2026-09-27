@@ -8175,6 +8175,11 @@ function CompanyModulesDetail({
   const [savedPaymentEnabled, setSavedPaymentEnabled] = useState(false);
   const [paymentProviders, setPaymentProviders] = useState<string[]>(['DIAMANOPAY']);
   const [paymentLoading, setPaymentLoading] = useState(true);
+  const [publicSiteEnabled, setPublicSiteEnabled] = useState(false);
+  const [savedPublicSiteEnabled, setSavedPublicSiteEnabled] = useState(false);
+  const [publicSiteLoading, setPublicSiteLoading] = useState(true);
+  const [publicSiteSaving, setPublicSiteSaving] = useState(false);
+  const [publicSiteError, setPublicSiteError] = useState('');
   const [loginSettings, setLoginSettings] = useState<{
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
@@ -8307,6 +8312,31 @@ function CompanyModulesDetail({
       })
       .finally(() => {
         if (!cancelled) setPaymentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPublicSiteLoading(true);
+    setPublicSiteError('');
+    void companyRequestApi.publicSiteAccess(company.id)
+      .then(({ enabled }) => {
+        if (cancelled) return;
+        setPublicSiteEnabled(enabled);
+        setSavedPublicSiteEnabled(enabled);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setPublicSiteEnabled(false);
+          setSavedPublicSiteEnabled(false);
+          setPublicSiteError(error instanceof Error ? error.message : 'Le contrôle du site public est indisponible.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPublicSiteLoading(false);
       });
     return () => {
       cancelled = true;
@@ -8769,6 +8799,60 @@ function CompanyModulesDetail({
         loginUrl={loginSettings?.url}
       />
 
+      <section className="card-surface rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-bold">Accès au site public</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+              Contrôle général, distinct d’E-commerce. La publication de l’entreprise reste séparée et les pages disponibles
+              dépendent toujours des modules et fonctionnalités autorisés.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${publicSiteEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+            {publicSiteLoading ? 'Chargement…' : publicSiteEnabled ? 'Autorisé' : 'Bloqué'}
+          </span>
+        </div>
+        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${publicSiteEnabled ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <input
+            type="checkbox"
+            data-testid="checkbox-company-public-site-access"
+            checked={publicSiteEnabled}
+            disabled={publicSiteLoading || publicSiteSaving}
+            onChange={(event) => setPublicSiteEnabled(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block text-sm">Autoriser le site public de cette entreprise</strong>
+            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Cette autorisation ne publie pas le site à elle seule. L’entreprise doit aussi choisir le statut « Publié » dans Organisation et accès → Site public.
+            </span>
+          </span>
+        </label>
+        {publicSiteError && <p role="alert" className="mt-3 text-sm text-[hsl(var(--destructive))]">{publicSiteError}</p>}
+        <div className="mt-5 flex justify-end">
+          <ActionButton
+            primary
+            testId="button-save-company-public-site-access"
+            disabled={publicSiteLoading || publicSiteSaving || Boolean(publicSiteError) || publicSiteEnabled === savedPublicSiteEnabled}
+            onClick={async () => {
+              setPublicSiteSaving(true);
+              setPublicSiteError('');
+              try {
+                const access = await companyRequestApi.updatePublicSiteAccess(company.id, publicSiteEnabled);
+                setPublicSiteEnabled(access.enabled);
+                setSavedPublicSiteEnabled(access.enabled);
+              } catch (error) {
+                setPublicSiteEnabled(savedPublicSiteEnabled);
+                setPublicSiteError(error instanceof Error ? error.message : 'La configuration du site public n’a pas pu être enregistrée.');
+              } finally {
+                setPublicSiteSaving(false);
+              }
+            }}
+          >
+            {publicSiteSaving ? 'Enregistrement…' : 'Enregistrer l’accès au site'}
+          </ActionButton>
+        </div>
+      </section>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>

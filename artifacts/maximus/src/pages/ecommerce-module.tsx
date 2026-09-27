@@ -1174,19 +1174,13 @@ function HomePanel({ store, canModify, run }: { store: EcommerceStore; canModify
 
 function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceStore; domains: EcommerceDomain[]; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
   const [form, setForm] = useState({
-    name: store.name,
-    slug: store.slug,
     description: store.description,
-    status: store.status,
     currency: store.currency,
     primaryColor: store.primaryColor,
     accentColor: store.accentColor,
     allowOrderAttachments: store.allowOrderAttachments,
   });
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState('');
-  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [heroFiles, setHeroFiles] = useState<File[]>([]);
   const initializedCompanyId = useRef<string | null>(null);
   const api = createEcommerceApi(store.companyId);
@@ -1194,42 +1188,23 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     if (initializedCompanyId.current === store.companyId) return;
     initializedCompanyId.current = store.companyId;
     setForm({
-      name: store.name,
-      slug: store.slug,
       description: store.description,
-      status: store.status,
       currency: store.currency,
       primaryColor: store.primaryColor,
-       accentColor: store.accentColor,
+      accentColor: store.accentColor,
       allowOrderAttachments: store.allowOrderAttachments,
     });
-    setSlugManuallyEdited(false);
-    setLogoFile(null);
     setHeroFiles([]);
   }, [store]);
   const patch = (updates: Partial<typeof form>) => setForm(current => ({ ...current, ...updates }));
-  const publicBasePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const publicUrl = `${window.location.origin}${publicBasePath}/shop/${encodeURIComponent(slugify(form.slug || form.name) || 'boutique')}`;
   const save = (event: FormEvent) => {
     event.preventDefault();
-    const selectedLogo = logoFile;
     const selectedHeroFiles = heroFiles;
     void run(async () => {
       await api.updateStore(form);
-      if (selectedLogo) await api.uploadStoreLogo(selectedLogo);
       if (selectedHeroFiles.length > 0) await api.uploadStoreHeroImages(selectedHeroFiles);
-      setLogoFile(null);
       setHeroFiles([]);
-    }, selectedLogo || selectedHeroFiles.length > 0 ? 'Paramètres et images de la boutique enregistrés.' : 'Paramètres de la boutique enregistrés.');
-  };
-  const copyPublicUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
+    }, selectedHeroFiles.length > 0 ? 'Paramètres E-commerce et images enregistrés.' : 'Paramètres E-commerce enregistrés.');
   };
   const addDomain = (event: FormEvent) => {
     event.preventDefault();
@@ -1245,10 +1220,9 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
     void run(() => createEcommerceApi(store.companyId).deleteDomain(domain.id), 'Domaine retiré de la boutique.');
   };
   return <div className="space-y-5 fade-up">
-    <Panel title="Paramètres de la boutique" description="Ces informations structurent votre vitrine publique et votre expérience d’achat.">
+    <Panel title="Paramètres E-commerce" description="Les réglages d’identité et de publication du site se trouvent dans Organisation et accès → Site public.">
       <form onSubmit={save} className="max-w-3xl space-y-5">
-         <div className="grid gap-4 sm:grid-cols-2"><Field label="Nom de la boutique" required value={form.name} onChange={value => patch({ name: value, ...(slugManuallyEdited ? {} : { slug: slugify(value) }) })} disabled={!canModify} /><Field label="Adresse publique (slug)" required value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} disabled={!canModify} /><label className="block text-xs font-bold">Logo de la boutique<div className="mt-1.5 flex items-center gap-3 rounded-lg border px-3 py-2.5"><span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[hsl(var(--muted))]">{store.logoUrl ? <img src={store.logoUrl} alt={`Logo de ${store.name}`} className="h-full w-full object-contain" /> : <Store size={16} className="text-[hsl(var(--muted-foreground))]" />}</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={!canModify} onChange={event => setLogoFile(event.target.files?.[0] ?? null)} className="min-w-0 flex-1 text-xs" /></div>{logoFile && <span className="mt-1 block truncate text-[11px] font-normal text-[hsl(var(--muted-foreground))]">{logoFile.name}</span>}</label><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label><label className="block text-xs font-bold">Statut de la boutique<select disabled={!canModify} value={form.status} onChange={event => patch({ status: event.target.value as EcommerceStore['status'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="DRAFT">Brouillon</option><option value="PUBLISHED">Publiée</option><option value="SUSPENDED">Suspendue</option></select></label></div>
-        <div className="rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-xs font-bold">Lien public de la boutique<input readOnly value={publicUrl} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm text-[hsl(var(--foreground))]" /></label><div className="flex gap-2"><button type="button" onClick={() => void copyPublicUrl()} className="btn inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-bold"><Copy size={14} />{copied ? 'Copié' : 'Copier'}</button><a href={publicUrl} target="_blank" rel="noreferrer" className="btn inline-flex items-center rounded-lg border px-3 py-2.5 text-xs font-bold">Ouvrir</a></div></div><p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Ce lien se met à jour avec le nom ou le slug de la boutique. La vitrine sera accessible publiquement lorsqu’elle sera publiée.</p></div>
+        <div className="grid gap-4 sm:grid-cols-2"><label className="block text-xs font-bold">Devise<select disabled={!canModify} value={form.currency} onChange={event => patch({ currency: event.target.value as EcommerceStore['currency'] })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="XOF">XOF — Franc CFA</option><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option></select></label></div>
         <label className="block text-xs font-bold">Description publique<textarea disabled={!canModify} value={form.description} onChange={event => patch({ description: event.target.value })} rows={4} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
          <label className="flex items-start gap-3 rounded-xl border p-4">
            <input
@@ -1274,7 +1248,7 @@ function SettingsPanel({ store, domains, canModify, run }: { store: EcommerceSto
             <p className="text-xs text-[hsl(var(--muted-foreground))]">Utilisez la palette officielle MAXIMUS pour cette vitrine.</p>
             <button type="button" data-testid="button-reset-maximus-shop-colors" disabled={!canModify} onClick={() => patch(maximusShopColors)} className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/.08)] disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw size={13} />Revenir aux couleurs MAXIMUS</button>
           </div>
-         <div className="flex flex-wrap justify-end gap-2 border-t pt-5"><button type="button" disabled={!canModify || !logoFile} onClick={async () => { if (!logoFile) return; const result = await run(() => createEcommerceApi(store.companyId).uploadStoreLogo(logoFile), 'Logo de la boutique enregistré.'); if (result) setLogoFile(null); }} className="btn inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"><Store size={14} />Enregistrer le logo</button><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les paramètres</button></div>
+         <div className="flex justify-end border-t pt-5"><button type="submit" disabled={!canModify} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les réglages E-commerce</button></div>
       </form>
     </Panel>
      <Panel title="Domaine personnalisé" description="Connectez le domaine acheté par votre entreprise à cette boutique publique, avec HTTPS géré par Render.">
