@@ -1,69 +1,37 @@
-import { randomBytes, scryptSync } from "node:crypto";
+import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { authSessionsTable, authUsersTable } from "@workspace/db/schema";
 
+const runId = randomUUID();
+
+function createAccount(
+  name: string,
+  role: string,
+  companyId: string | null,
+  employeeName: string | null,
+  sectorIds: string[],
+) {
+  const id = `auth-integration-${name}-${runId}`;
+  return {
+    id,
+    email: `${id}@example.test`,
+    password: `Integration-${randomBytes(18).toString("hex")}-Aa1!`,
+    displayName: `Integration ${name}`,
+    role,
+    companyId,
+    employeeId: employeeName ? `auth-integration-employee-${employeeName}-${runId}` : null,
+    sectorIds,
+  };
+}
+
 export const authIntegrationAccounts = {
-  maximusAdmin: {
-    id: "maximus-admin",
-    email: "admin@maximus.demo",
-    password: "Admin123!",
-    displayName: "Administrateur MAXIMUS de test",
-    role: "maximus_admin",
-    companyId: null,
-    employeeId: null,
-    sectorIds: [],
-  },
-  companyAdmin: {
-    id: "kora-admin",
-    email: "admin@kora.demo",
-    password: "Kora123!",
-    displayName: "Administrateur KORA de test",
-    role: "company_admin",
-    companyId: "kora",
-    employeeId: null,
-    sectorIds: [],
-  },
-  salesEmployee: {
-    id: "demo-emp-awa",
-    email: "awa.ndiaye@kora.demo",
-    password: "AwaKora2026!",
-    displayName: "Employée commerciale de test",
-    role: "employee",
-    companyId: "kora",
-    employeeId: "demo-emp-awa",
-    sectorIds: ["kora-service-vente"],
-  },
-  stockEmployee: {
-    id: "demo-emp-ibrahima",
-    email: "ibrahima.kane@kora.demo",
-    password: "IbrahimaKora2026!",
-    displayName: "Employé stock de test",
-    role: "employee",
-    companyId: "kora",
-    employeeId: "demo-emp-ibrahima",
-    sectorIds: ["kora-service-stock"],
-  },
-  hrEmployee: {
-    id: "demo-emp-ndeye",
-    email: "ndeye.sarr@kora.demo",
-    password: "NdeyeSarr2026!",
-    displayName: "Employée RH de test",
-    role: "employee",
-    companyId: "kora",
-    employeeId: "demo-emp-ndeye",
-    sectorIds: ["kora-service-rh"],
-  },
-  sectorManager: {
-    id: "demo-emp-mamadou",
-    email: "mamadou.ba@kora.demo",
-    password: "MamadouKora2026!",
-    displayName: "Manager de secteur de test",
-    role: "sector_manager",
-    companyId: "kora",
-    employeeId: "demo-emp-mamadou",
-    sectorIds: ["kora-service-finance"],
-  },
+  maximusAdmin: createAccount("maximus-admin", "maximus_admin", null, null, []),
+  companyAdmin: createAccount("company-admin", "company_admin", "kora", null, []),
+  salesEmployee: createAccount("sales-employee", "employee", "kora", "sales", ["kora-service-vente"]),
+  stockEmployee: createAccount("stock-employee", "employee", "kora", "stock", ["kora-service-stock"]),
+  hrEmployee: createAccount("hr-employee", "employee", "kora", "hr", ["kora-service-rh"]),
+  sectorManager: createAccount("sector-manager", "sector_manager", "kora", "manager", ["kora-service-finance"]),
 } as const;
 
 const accounts = Object.values(authIntegrationAccounts);

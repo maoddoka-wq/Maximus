@@ -98,3 +98,4 @@
 - [Installation des decks slides](slides-artifact-install.md) — synchroniser le nouvel importer pnpm avec `CI=true` et `--no-frozen-lockfile` avant les validations.
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
 - [Cache des chunks Vite sur Render](render-stale-vite-assets.md) — garder `index.html` hors cache et renvoyer 404 pour les assets Vite absents, sinon le fallback HTML casse les imports.
+- [Overrides de sécurité pnpm](pnpm-overrides.md) — mettre les correctifs transitifs dans `package.json` pour qu’ils soient réellement pris en compte par le lockfile.

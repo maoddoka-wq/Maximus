@@ -3,12 +3,11 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 // @ts-expect-error Node's native TypeScript runner resolves the .ts test import.
 import app from "../app.ts";
-// @ts-expect-error Node's native TypeScript runner resolves the .ts test import.
 import {
   authIntegrationAccounts,
   cleanupAuthIntegrationFixtures,
   provisionAuthIntegrationFixtures,
-} from "./auth-control.integration.fixtures.ts";
+} from "./auth-control.integration.fixtures";
 
 const canRunIntegration = Boolean(process.env.API_TEST_DATABASE_URL);
 let fixturesReady = false;
@@ -84,17 +83,10 @@ test("connecte un compte PostgreSQL et autorise son périmètre", { skip: !canRu
   assert.equal(crossCompany.status, 403);
 });
 
-test("connecte tous les comptes de démonstration", { skip: !canRunIntegration }, async () => {
-  const demoAccounts = [
-    ["admin@maximus.demo", "Admin123!", "maximus_admin"],
-    ["admin@kora.demo", "Kora123!", "company_admin"],
-    ["awa.ndiaye@kora.demo", "AwaKora2026!", "employee"],
-    ["ibrahima.kane@kora.demo", "IbrahimaKora2026!", "employee"],
-    ["ndeye.sarr@kora.demo", "NdeyeKora2026!", "employee"],
-    ["mamadou.ba@kora.demo", "MamadouKora2026!", "sector_manager"],
-  ] as const;
+test("connecte tous les comptes d’intégration", { skip: !canRunIntegration }, async () => {
+  const demoAccounts = Object.values(authIntegrationAccounts);
 
-  for (const [email, password, role] of demoAccounts) {
+  for (const { email, password, role } of demoAccounts) {
     const { response: loginResponse, cookie } = await login(email, password);
     assert.equal(loginResponse.status, 200, email);
     assert.ok(cookie, email);
@@ -111,13 +103,13 @@ test("refuse un mauvais mot de passe", { skip: !canRunIntegration }, async () =>
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "admin@kora.demo", password: "incorrect" }),
+    body: JSON.stringify({ email: authIntegrationAccounts.companyAdmin.email, password: "incorrect" }),
   });
   assert.equal(response.status, 401);
 });
 
 test("provisionne, met à jour et révoque le compte d’un employé", { skip: !canRunIntegration }, async () => {
-  const admin = await login("admin@kora.demo", "Kora123!");
+  const admin = await login(authIntegrationAccounts.companyAdmin.email, authIntegrationAccounts.companyAdmin.password);
   assert.equal(admin.response.status, 200);
   assert.ok(admin.cookie);
 
@@ -186,7 +178,7 @@ test("provisionne, met à jour et révoque le compte d’un employé", { skip: !
 });
 
 test("refuse à un manager de secteur un compte hors de son périmètre", { skip: !canRunIntegration }, async () => {
-  const manager = await login("mamadou.ba@kora.demo", "MamadouKora2026!");
+  const manager = await login(authIntegrationAccounts.sectorManager.email, authIntegrationAccounts.sectorManager.password);
   assert.equal(manager.response.status, 200);
   assert.ok(manager.cookie);
 
