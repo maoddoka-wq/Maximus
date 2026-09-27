@@ -50,6 +50,10 @@ import { Toaster } from '@workspace/maximus-design-system/components/ui/toaster'
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TooltipProvider } from '@workspace/maximus-design-system/components/ui/tooltip';
+import { ActionButton as DesignSystemActionButton } from '@workspace/maximus-design-system/components/ui/action-button';
+import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
+import { Card } from '@workspace/maximus-design-system/components/ui/card';
+import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
@@ -8180,6 +8184,8 @@ function CompanyModulesDetail({
   const [publicSiteLoading, setPublicSiteLoading] = useState(true);
   const [publicSiteSaving, setPublicSiteSaving] = useState(false);
   const [publicSiteError, setPublicSiteError] = useState('');
+  const publicSiteCompanyIdRef = useRef(company.id);
+  publicSiteCompanyIdRef.current = company.id;
   const [loginSettings, setLoginSettings] = useState<{
     customAllowed: boolean;
     mode: 'MAXIMUS' | 'CUSTOM';
@@ -8322,6 +8328,9 @@ function CompanyModulesDetail({
     let cancelled = false;
     setPublicSiteLoading(true);
     setPublicSiteError('');
+    setPublicSiteEnabled(false);
+    setSavedPublicSiteEnabled(false);
+    setPublicSiteSaving(false);
     void companyRequestApi.publicSiteAccess(company.id)
       .then(({ enabled }) => {
         if (cancelled) return;
@@ -8799,7 +8808,7 @@ function CompanyModulesDetail({
         loginUrl={loginSettings?.url}
       />
 
-      <section className="card-surface rounded-2xl p-6">
+      <Card className="p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="font-bold">Accès au site public</h2>
@@ -8808,18 +8817,21 @@ function CompanyModulesDetail({
               dépendent toujours des modules et fonctionnalités autorisés.
             </p>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${publicSiteEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]'}`}>
+          <Badge variant={publicSiteEnabled ? 'default' : 'secondary'} className="shrink-0">
             {publicSiteLoading ? 'Chargement…' : publicSiteEnabled ? 'Autorisé' : 'Bloqué'}
-          </span>
+          </Badge>
         </div>
-        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${publicSiteEnabled ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
-          <input
-            type="checkbox"
+        <div className={`mt-5 flex items-start gap-3 rounded-xl border p-4 transition ${publicSiteEnabled ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+          <Checkbox
             data-testid="checkbox-company-public-site-access"
+            aria-label="Autoriser le site public de cette entreprise"
             checked={publicSiteEnabled}
             disabled={publicSiteLoading || publicSiteSaving}
-            onChange={(event) => setPublicSiteEnabled(event.target.checked)}
-            className="mt-1"
+            onCheckedChange={(checked) => {
+              setPublicSiteEnabled(checked === true);
+              setPublicSiteError('');
+            }}
+            className="mt-0.5"
           />
           <span>
             <strong className="block text-sm">Autoriser le site public de cette entreprise</strong>
@@ -8827,32 +8839,35 @@ function CompanyModulesDetail({
               Cette autorisation ne publie pas le site à elle seule. L’entreprise doit aussi choisir le statut « Publié » dans Organisation et accès → Site public.
             </span>
           </span>
-        </label>
+        </div>
         {publicSiteError && <p role="alert" className="mt-3 text-sm text-[hsl(var(--destructive))]">{publicSiteError}</p>}
         <div className="mt-5 flex justify-end">
-          <ActionButton
+          <DesignSystemActionButton
             primary
             testId="button-save-company-public-site-access"
-            disabled={publicSiteLoading || publicSiteSaving || Boolean(publicSiteError) || publicSiteEnabled === savedPublicSiteEnabled}
+            disabled={publicSiteLoading || publicSiteSaving || publicSiteEnabled === savedPublicSiteEnabled}
             onClick={async () => {
+              const targetCompanyId = company.id;
               setPublicSiteSaving(true);
               setPublicSiteError('');
               try {
-                const access = await companyRequestApi.updatePublicSiteAccess(company.id, publicSiteEnabled);
+                const access = await companyRequestApi.updatePublicSiteAccess(targetCompanyId, publicSiteEnabled);
+                if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
                 setPublicSiteEnabled(access.enabled);
                 setSavedPublicSiteEnabled(access.enabled);
               } catch (error) {
+                if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
                 setPublicSiteEnabled(savedPublicSiteEnabled);
                 setPublicSiteError(error instanceof Error ? error.message : 'La configuration du site public n’a pas pu être enregistrée.');
               } finally {
-                setPublicSiteSaving(false);
+                if (publicSiteCompanyIdRef.current === targetCompanyId) setPublicSiteSaving(false);
               }
             }}
           >
             {publicSiteSaving ? 'Enregistrement…' : 'Enregistrer l’accès au site'}
-          </ActionButton>
+          </DesignSystemActionButton>
         </div>
-      </section>
+      </Card>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
