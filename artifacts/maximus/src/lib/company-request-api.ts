@@ -122,9 +122,13 @@ export const companyRequestApi = {
   uploadPublicSiteHeroImages: (companyId: string, files: File[]) => {
     const body = new FormData();
     files.forEach(file => body.append('images[]', file));
-    return request<{ store: EcommerceStore }>(
+    return requestJson<{ store: EcommerceStore }>(
       `/company-public-site/hero-images?companyId=${encodeURIComponent(companyId)}`,
       { method: 'POST', body },
+      {
+        fallbackMessage: 'Les images de la bannière n’ont pas pu être envoyées.',
+        timeoutMs: 120_000,
+      },
     );
   },
   deletePublicSiteHeroImage: (companyId: string, imageId: string) =>

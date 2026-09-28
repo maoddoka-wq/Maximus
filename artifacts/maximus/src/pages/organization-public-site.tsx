@@ -110,9 +110,11 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
     setError('');
     setNotice('');
     try {
-      const result = await companyRequestApi.uploadPublicSiteHeroImages(company.id, heroFiles);
-      setStore(result.store);
-      setHeroFiles([]);
+      for (const file of heroFiles) {
+        const result = await companyRequestApi.uploadPublicSiteHeroImages(company.id, [file]);
+        setStore(result.store);
+        setHeroFiles(current => current.slice(1));
+      }
       setNotice('Les images de la bannière ont été ajoutées.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Les images de la bannière n’ont pas pu être envoyées.');

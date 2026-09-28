@@ -17,6 +17,23 @@ class EcommerceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        foreach (['kora', 'other-company'] as $companyId) {
+            DB::table('company_public_site_access')->updateOrInsert(
+                ['company_id' => $companyId],
+                [
+                    'enabled' => true,
+                    'updated_by' => 'ecommerce-test',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            );
+        }
+    }
+
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {
         $this->getJson('/api/ecommerce/bootstrap?companyId=kora')->assertUnauthorized();
