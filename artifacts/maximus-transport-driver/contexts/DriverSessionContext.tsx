@@ -8,7 +8,8 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Linking, Platform } from 'react-native';
+import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,6 +23,7 @@ import {
   useRevokeTransportDriverMobileSession,
   useUpdateTransportDriverMobileAvailability,
   type DriverMobile,
+  type DriverMobileCapabilities,
 } from '@workspace/api-client-react';
 import {
   ACCESS_TOKEN_KEY,
@@ -29,19 +31,31 @@ import {
   BEARER_REQUEST_OPTIONS,
   COOKIE_REQUEST_OPTIONS,
 } from '@/lib/mobile-api';
+import {
+  startDriverLocationTracking,
+  stopDriverLocationTracking,
+  uploadDriverLocation,
+} from '@/lib/driver-location';
 
 type DriverSessionContextValue = {
   accessToken: string | null;
   isHydrated: boolean;
   driver: DriverMobile | null;
+  capabilities: DriverMobileCapabilities | null;
   isLoadingSession: boolean;
   isRefreshingSession: boolean;
   isSigningIn: boolean;
   isChangingAvailability: boolean;
   isSigningOut: boolean;
+  isGpsTracking: boolean;
+  isEnablingGps: boolean;
+  gpsError: string | null;
+  gpsNeedsSettings: boolean;
   error: string | null;
   signIn: (email: string, password: string, companySlug?: string) => Promise<boolean>;
   changeAvailability: (availability: 'AVAILABLE' | 'PAUSED') => Promise<boolean>;
+  enableGpsTracking: () => Promise<boolean>;
+  openLocationSettings: () => Promise<void>;
   signOut: () => Promise<boolean>;
   refreshSession: () => Promise<void>;
   clearError: () => void;
@@ -76,8 +90,12 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isChangingAvailability, setIsChangingAvailability] = useState(false);
+  const [isGpsTracking, setIsGpsTracking] = useState(false);
+  const [isEnablingGps, setIsEnablingGps] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsNeedsSettings, setGpsNeedsSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoPauseInProgress = useRef(false);
+  const gpsStartPromise = useRef<Promise<boolean> | null>(null);
 
   const loginMutation = useLoginMaximus({ request: COOKIE_REQUEST_OPTIONS });
   const companyLoginMutation = useLoginToCompany({ request: COOKIE_REQUEST_OPTIONS });
@@ -100,34 +118,91 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     },
     request: BEARER_REQUEST_OPTIONS,
   });
-  const refetchSession = sessionQuery.refetch;
+  const driver = sessionQuery.data?.driver ?? null;
+  const capabilities = sessionQuery.data?.capabilities ?? null;
+  const unauthorized = [401, 403].includes(errorStatus(sessionQuery.error) ?? 0);
 
-  const pauseAvailableDriver = useCallback(
-    async (reason: string) => {
-      if (
-        sessionQuery.data?.driver.availability !== 'AVAILABLE' ||
-        autoPauseInProgress.current
-      ) {
-        return;
-      }
+  const ensureGpsTracking = useCallback(
+    (requestPermission: boolean): Promise<boolean> => {
+      if (gpsStartPromise.current) return gpsStartPromise.current;
 
-      autoPauseInProgress.current = true;
-      try {
-        await availabilityMutation.mutateAsync({ data: { availability: 'PAUSED' } });
-        await refetchSession();
-      } catch (pauseError) {
-        setError(
-          `${reason} La mise en pause côté serveur n’a pas pu être confirmée : ${errorMessage(pauseError)}`,
-        );
-      } finally {
-        autoPauseInProgress.current = false;
-      }
+      let operation: Promise<boolean>;
+      operation = (async () => {
+        setGpsError(null);
+        setGpsNeedsSettings(false);
+        if (Platform.OS === 'web') {
+          setGpsError('Le suivi GPS en arrière-plan nécessite l’application Android ou iOS.');
+          return false;
+        }
+        if (!capabilities?.canUpdateGps) {
+          setGpsError('Votre rôle ne permet pas la mise à jour de la position Transport.');
+          return false;
+        }
+
+        setIsEnablingGps(true);
+        try {
+          let foregroundPermission = await Location.getForegroundPermissionsAsync();
+          if (!foregroundPermission.granted && requestPermission) {
+            foregroundPermission = await Location.requestForegroundPermissionsAsync();
+          }
+          if (!foregroundPermission.granted) {
+            setGpsNeedsSettings(!foregroundPermission.canAskAgain);
+            setGpsError('Autorisez l’accès à la position pour activer votre suivi GPS.');
+            return false;
+          }
+
+          let backgroundPermission = await Location.getBackgroundPermissionsAsync();
+          if (!backgroundPermission.granted && requestPermission) {
+            backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+          }
+          if (!backgroundPermission.granted) {
+            setGpsNeedsSettings(!backgroundPermission.canAskAgain);
+            setGpsError(
+              'Autorisez la position en arrière-plan pour garder le GPS à jour lorsque l’application est fermée.',
+            );
+            return false;
+          }
+
+          if (!(await Location.hasServicesEnabledAsync())) {
+            setGpsError('Activez le service de localisation de votre téléphone.');
+            return false;
+          }
+
+          const currentLocation = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          await uploadDriverLocation(currentLocation);
+          await startDriverLocationTracking();
+          setIsGpsTracking(true);
+          await sessionQuery.refetch();
+          return true;
+        } catch (locationError) {
+          setIsGpsTracking(false);
+          setGpsError(errorMessage(locationError));
+          return false;
+        } finally {
+          setIsEnablingGps(false);
+        }
+      })().finally(() => {
+        if (gpsStartPromise.current === operation) {
+          gpsStartPromise.current = null;
+        }
+      });
+
+      gpsStartPromise.current = operation;
+      return operation;
     },
-    [availabilityMutation, refetchSession, sessionQuery.data?.driver.availability],
+    [capabilities?.canUpdateGps, sessionQuery.refetch],
   );
 
-  const driver = sessionQuery.data?.driver ?? null;
-  const unauthorized = [401, 403].includes(errorStatus(sessionQuery.error) ?? 0);
+  const enableGpsTracking = useCallback(
+    () => ensureGpsTracking(true),
+    [ensureGpsTracking],
+  );
+
+  const openLocationSettings = useCallback(async () => {
+    await Linking.openSettings();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -161,17 +236,34 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (
-      !accessToken ||
-      sessionQuery.data?.driver.availability !== 'AVAILABLE'
-    ) {
+    const shouldTrack = Boolean(
+      accessToken &&
+        capabilities?.canUpdateGps &&
+        (driver?.availability === 'AVAILABLE' || driver?.availability === 'ON_TRIP'),
+    );
+    if (shouldTrack) {
+      void ensureGpsTracking(false);
       return;
     }
 
-    void pauseAvailableDriver(
-      'Le suivi GPS est désactivé dans MAXIMUS Chauffeur.',
-    );
-  }, [accessToken, pauseAvailableDriver, sessionQuery.data?.driver.availability]);
+    void stopDriverLocationTracking()
+      .then(() => setIsGpsTracking(false))
+      .catch((stopError) => setGpsError(errorMessage(stopError)));
+  }, [accessToken, capabilities?.canUpdateGps, driver?.availability, ensureGpsTracking]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (
+        state === 'active' &&
+        accessToken &&
+        capabilities?.canUpdateGps &&
+        (driver?.availability === 'AVAILABLE' || driver?.availability === 'ON_TRIP')
+      ) {
+        void ensureGpsTracking(false);
+      }
+    });
+    return () => subscription.remove();
+  }, [accessToken, capabilities?.canUpdateGps, driver?.availability, ensureGpsTracking]);
 
   useEffect(() => {
     if (!accessToken || !unauthorized) return;
@@ -181,8 +273,10 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       try {
         await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
       } finally {
+        await stopDriverLocationTracking().catch(() => undefined);
         if (active) {
           setAccessToken(null);
+          setIsGpsTracking(false);
           setError('Votre session chauffeur a expiré ou votre accès Transport a changé. Reconnectez-vous.');
           queryClient.removeQueries({ queryKey: sessionQuery.queryKey });
         }
@@ -297,12 +391,15 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     async (availability: 'AVAILABLE' | 'PAUSED'): Promise<boolean> => {
       setError(null);
       if (availability === 'AVAILABLE') {
-        setError('La disponibilité ne peut pas être activée sans suivi GPS.');
-        return false;
+        if (!(await ensureGpsTracking(true))) return false;
       }
       setIsChangingAvailability(true);
       try {
         await availabilityMutation.mutateAsync({ data: { availability } });
+        if (availability === 'PAUSED') {
+          await stopDriverLocationTracking();
+          setIsGpsTracking(false);
+        }
         await sessionQuery.refetch();
         return true;
       } catch (availabilityError) {
@@ -312,7 +409,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
         setIsChangingAvailability(false);
       }
     },
-    [availabilityMutation, sessionQuery],
+    [availabilityMutation, ensureGpsTracking, sessionQuery],
   );
 
   const signOut = useCallback(async (): Promise<boolean> => {
@@ -323,7 +420,11 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     }
     setIsSigningOut(true);
     try {
-      await availabilityMutation.mutateAsync({ data: { availability: 'PAUSED' } });
+      if (driver?.availability !== 'PAUSED') {
+        await availabilityMutation.mutateAsync({ data: { availability: 'PAUSED' } });
+      }
+      await stopDriverLocationTracking();
+      setIsGpsTracking(false);
       await revokeMobileSessionMutation.mutateAsync();
       await logoutCookieMutation.mutateAsync();
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
@@ -353,28 +454,42 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       accessToken,
       isHydrated,
       driver,
+      capabilities,
       isLoadingSession: sessionQuery.isLoading,
       isRefreshingSession: sessionQuery.isFetching,
       isSigningIn,
       isChangingAvailability,
       isSigningOut,
+      isGpsTracking,
+      isEnablingGps,
+      gpsError,
+      gpsNeedsSettings,
       error,
       signIn,
       changeAvailability,
+      enableGpsTracking,
+      openLocationSettings,
       signOut,
       refreshSession,
       clearError,
     }),
     [
       accessToken,
+      capabilities,
       changeAvailability,
       clearError,
       driver,
+      enableGpsTracking,
       error,
       isChangingAvailability,
+      isEnablingGps,
+      isGpsTracking,
       isHydrated,
       isSigningIn,
       isSigningOut,
+      gpsError,
+      gpsNeedsSettings,
+      openLocationSettings,
       refreshSession,
       sessionQuery.isLoading,
       sessionQuery.isFetching,

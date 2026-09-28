@@ -4,7 +4,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -117,8 +116,7 @@ function TripCard({
   trip,
   mode,
   busy,
-  pickupCode,
-  onPickupCodeChange,
+  canOperate,
   onAccept,
   onDecline,
   onStart,
@@ -127,8 +125,7 @@ function TripCard({
   trip: DriverMobileTrip;
   mode: 'active' | 'available' | 'history';
   busy: boolean;
-  pickupCode: string;
-  onPickupCodeChange: (value: string) => void;
+  canOperate: boolean;
   onAccept: () => void;
   onDecline: () => void;
   onStart: () => void;
@@ -215,7 +212,7 @@ function TripCard({
           title="Accepter cette course"
           icon="checkmark"
           onPress={onAccept}
-          disabled={busy}
+          disabled={busy || !canOperate}
           loading={busy}
         />
       ) : null}
@@ -226,14 +223,14 @@ function TripCard({
             title="Accepter l’offre"
             icon="checkmark"
             onPress={onAccept}
-            disabled={busy}
+            disabled={busy || !canOperate}
             loading={busy}
           />
           <ActionButton
             title="Refuser"
             icon="close"
             onPress={onDecline}
-            disabled={busy}
+            disabled={busy || !canOperate}
             secondary
           />
         </View>
@@ -241,37 +238,11 @@ function TripCard({
 
       {mode === 'active' && trip.status === 'ASSIGNED' ? (
         <View style={styles.actionSection}>
-          {trip.pickupCodeRequired ? (
-            <>
-              <Text style={[styles.fieldLabel, { color: theme.mutedForeground }]}>
-                CODE COMMUNIQUÉ PAR LE PASSAGER
-              </Text>
-              <TextInput
-                accessibilityLabel="Code de prise en charge à quatre chiffres"
-                autoComplete="off"
-                autoCorrect={false}
-                keyboardType="number-pad"
-                maxLength={4}
-                onChangeText={(value) => onPickupCodeChange(value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="••••"
-                placeholderTextColor={theme.mutedForeground}
-                value={pickupCode}
-                style={[
-                  styles.codeInput,
-                  {
-                    backgroundColor: theme.background,
-                    borderColor: theme.border,
-                    color: theme.foreground,
-                  },
-                ]}
-              />
-            </>
-          ) : null}
           <ActionButton
             title="Démarrer la course"
             icon="play"
             onPress={onStart}
-            disabled={busy || (trip.pickupCodeRequired && pickupCode.length !== 4)}
+            disabled={busy || !canOperate}
             loading={busy}
           />
         </View>
@@ -282,7 +253,7 @@ function TripCard({
           title="Terminer la course"
           icon="checkmark-done"
           onPress={onComplete}
-          disabled={busy}
+          disabled={busy || !canOperate}
           loading={busy}
         />
       ) : null}
@@ -290,13 +261,20 @@ function TripCard({
   );
 }
 
-export function DriverTripsPanel({ view }: { view: TripsView }) {
+export function DriverTripsPanel({
+  view,
+  canOperateTrips,
+  gpsIsFresh,
+}: {
+  view: TripsView;
+  canOperateTrips: boolean;
+  gpsIsFresh: boolean;
+}) {
   const theme = useColors();
   const queryClient = useQueryClient();
   const { accessToken, refreshSession } = useDriverSession();
   const [historyPage, setHistoryPage] = useState(1);
   const [historyRows, setHistoryRows] = useState<DriverMobileTrip[]>([]);
-  const [pickupCodes, setPickupCodes] = useState<Record<string, string>>({});
   const [pendingTripId, setPendingTripId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -337,11 +315,6 @@ export function DriverTripsPanel({ view }: { view: TripsView }) {
     setActionNotice(null);
     try {
       await action();
-      setPickupCodes((current) => {
-        const next = { ...current };
-        delete next[tripId];
-        return next;
-      });
       setActionNotice(successMessage);
       if (successMessage === 'Course terminée.') {
         setHistoryPage(1);
@@ -369,10 +342,7 @@ export function DriverTripsPanel({ view }: { view: TripsView }) {
 
   const startTrip = (trip: DriverMobileTrip) =>
     runAction(trip.id, 'Course démarrée.', () =>
-      startMutation.mutateAsync({
-        id: trip.id,
-        data: { pickupCode: pickupCodes[trip.id] || null },
-      }),
+      startMutation.mutateAsync({ id: trip.id }),
     );
 
   const completeTrip = (trip: DriverMobileTrip) =>
@@ -455,6 +425,23 @@ export function DriverTripsPanel({ view }: { view: TripsView }) {
         </View>
       ) : null}
 
+      {view === 'courses' && !canOperateTrips ? (
+        <View style={[styles.notice, { backgroundColor: theme.muted, borderColor: theme.border }]}>
+          <Ionicons name="lock-closed-outline" size={18} color={theme.foreground} />
+          <Text style={[styles.noticeText, { color: theme.foreground }]}>
+            Votre rôle autorise la consultation, mais pas les actions sur les courses.
+          </Text>
+        </View>
+      ) : null}
+      {view === 'courses' && canOperateTrips && !gpsIsFresh ? (
+        <View style={[styles.notice, { backgroundColor: theme.muted, borderColor: theme.border }]}>
+          <Ionicons name="location-outline" size={18} color={theme.foreground} />
+          <Text style={[styles.noticeText, { color: theme.foreground }]}>
+            Une position GPS récente est requise pour accepter, démarrer ou terminer une course.
+          </Text>
+        </View>
+      ) : null}
+
       {view === 'courses' ? (
         <>
           {activeTrips.length > 0 ? (
@@ -468,10 +455,7 @@ export function DriverTripsPanel({ view }: { view: TripsView }) {
                   trip={trip}
                   mode="active"
                   busy={pendingTripId === trip.id}
-                  pickupCode={pickupCodes[trip.id] ?? ''}
-                  onPickupCodeChange={(value) =>
-                    setPickupCodes((current) => ({ ...current, [trip.id]: value }))
-                  }
+                  canOperate={canOperateTrips && gpsIsFresh}
                   onAccept={() => void acceptTrip(trip)}
                   onDecline={() => void declineTrip(trip)}
                   onStart={() => void startTrip(trip)}
@@ -496,8 +480,7 @@ export function DriverTripsPanel({ view }: { view: TripsView }) {
                   trip={trip}
                   mode="available"
                   busy={pendingTripId === trip.id}
-                  pickupCode=""
-                  onPickupCodeChange={() => undefined}
+                  canOperate={canOperateTrips && gpsIsFresh}
                   onAccept={() => void acceptTrip(trip)}
                   onDecline={() => undefined}
                   onStart={() => undefined}
@@ -529,8 +512,7 @@ export function DriverTripsPanel({ view }: { view: TripsView }) {
                   trip={trip}
                   mode="history"
                   busy={false}
-                  pickupCode=""
-                  onPickupCodeChange={() => undefined}
+                  canOperate={false}
                   onAccept={() => undefined}
                   onDecline={() => undefined}
                   onStart={() => undefined}
@@ -616,16 +598,6 @@ const styles = StyleSheet.create({
   },
   detailText: { flex: 1, fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   actionSection: { gap: spacing },
-  codeInput: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: radius * 0.72,
-    paddingHorizontal: spacing * 3,
-    textAlign: 'center',
-    letterSpacing: 7,
-    fontFamily: fonts.bold,
-    fontSize: 19,
-  },
   actions: { gap: spacing },
   actionButton: {
     minHeight: 48,

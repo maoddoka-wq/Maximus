@@ -206,6 +206,8 @@ paths:
                 $ref: "#/components/schemas/DriverMobileTrips"
         "401":
           description: Invalid or expired driver token
+        "403":
+          description: The employee is not authorized to view Transport trips
   /transport/mobile/trips/{id}/accept:
     post:
       operationId: acceptTransportDriverMobileTrip
@@ -266,7 +268,7 @@ paths:
     patch:
       operationId: startTransportDriverMobileTrip
       tags: [transport]
-      summary: Start an assigned trip after validating its pickup code
+      summary: Start an assigned trip owned by the authenticated driver
       security:
         - bearerAuth: []
       parameters:
@@ -275,12 +277,6 @@ paths:
           required: true
           schema:
             type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DriverMobileTripStartInput"
       responses:
         "200":
           description: Trip started
@@ -295,7 +291,7 @@ paths:
         "404":
           description: Trip not found in the driver's company
         "422":
-          description: Pickup code is incorrect or trip cannot be started
+          description: A fresh GPS position is required or trip cannot be started
   /transport/mobile/trips/{id}/complete:
     patch:
       operationId: completeTransportDriverMobileTrip
@@ -501,6 +497,15 @@ components:
           enum: [AVAILABLE, PAUSED, ON_TRIP]
         locationUpdatedAt: { type: ["string", "null"], format: date-time }
       required: [id, name, availability, locationUpdatedAt]
+    DriverMobileCapabilities:
+      type: object
+      additionalProperties: false
+      properties:
+        canViewTrips: { type: boolean }
+        canOperateTrips: { type: boolean }
+        canUpdateGps: { type: boolean }
+        gpsValidityMinutes: { type: integer, minimum: 1 }
+      required: [canViewTrips, canOperateTrips, canUpdateGps, gpsValidityMinutes]
     DriverMobileSessionCreated:
       type: object
       additionalProperties: false
@@ -509,14 +514,18 @@ components:
         expiresAt: { type: string, format: date-time }
         driver:
           $ref: "#/components/schemas/DriverMobile"
-      required: [accessToken, expiresAt, driver]
+        capabilities:
+          $ref: "#/components/schemas/DriverMobileCapabilities"
+      required: [accessToken, expiresAt, driver, capabilities]
     DriverMobileSessionStatus:
       type: object
       additionalProperties: false
       properties:
         driver:
           $ref: "#/components/schemas/DriverMobile"
-      required: [driver]
+        capabilities:
+          $ref: "#/components/schemas/DriverMobileCapabilities"
+      required: [driver, capabilities]
     DriverMobileLocationInput:
       type: object
       additionalProperties: false
@@ -531,8 +540,9 @@ components:
       additionalProperties: false
       properties:
         ok: { type: boolean, const: true }
+        capturedAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }
-      required: [ok, receivedAt]
+      required: [ok, capturedAt, receivedAt]
     DriverMobileAvailabilityInput:
       type: object
       additionalProperties: false
@@ -576,7 +586,6 @@ components:
           enum: [REQUESTED, OFFERED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED]
         requestedAt: { type: string, format: date-time }
         offerExpiresAt: { type: ["string", "null"], format: date-time }
-        pickupCodeRequired: { type: boolean }
         assignedAt: { type: ["string", "null"], format: date-time }
         startedAt: { type: ["string", "null"], format: date-time }
         completedAt: { type: ["string", "null"], format: date-time }
@@ -594,18 +603,12 @@ components:
         - status
         - requestedAt
         - offerExpiresAt
-        - pickupCodeRequired
         - assignedAt
         - startedAt
         - completedAt
         - updatedAt
         - vehicleModel
         - vehicleRegistration
-    DriverMobileTripStartInput:
-      type: object
-      additionalProperties: false
-      properties:
-        pickupCode: { type: ["string", "null"], minLength: 4, maxLength: 4 }
     DriverMobileActionReceipt:
       type: object
       additionalProperties: false

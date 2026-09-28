@@ -70,6 +70,9 @@ export const CreateTransportDriverMobileSessionBody = zod.object({
   "deviceName": zod.string().max(createTransportDriverMobileSessionBodyDeviceNameMax).optional()
 })
 
+
+
+
 export const CreateTransportDriverMobileSessionResponse = zod.object({
   "accessToken": zod.string(),
   "expiresAt": zod.coerce.date(),
@@ -78,6 +81,12 @@ export const CreateTransportDriverMobileSessionResponse = zod.object({
   "name": zod.string(),
   "availability": zod.enum(['AVAILABLE', 'PAUSED', 'ON_TRIP']),
   "locationUpdatedAt": zod.coerce.date().nullable()
+}),
+  "capabilities": zod.object({
+  "canViewTrips": zod.boolean(),
+  "canOperateTrips": zod.boolean(),
+  "canUpdateGps": zod.boolean(),
+  "gpsValidityMinutes": zod.number().int().min(1)
 })
 })
 
@@ -85,12 +94,21 @@ export const CreateTransportDriverMobileSessionResponse = zod.object({
 /**
  * @summary Get the current driver's own mobile session status
  */
+
+
+
 export const GetTransportDriverMobileSessionResponse = zod.object({
   "driver": zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "availability": zod.enum(['AVAILABLE', 'PAUSED', 'ON_TRIP']),
   "locationUpdatedAt": zod.coerce.date().nullable()
+}),
+  "capabilities": zod.object({
+  "canViewTrips": zod.boolean(),
+  "canOperateTrips": zod.boolean(),
+  "canUpdateGps": zod.boolean(),
+  "gpsValidityMinutes": zod.number().int().min(1)
 })
 })
 
@@ -124,6 +142,7 @@ export const UpdateTransportDriverMobileLocationBody = zod.object({
 
 export const UpdateTransportDriverMobileLocationResponse = zod.object({
   "ok": zod.literal(true),
+  "capturedAt": zod.coerce.date(),
   "receivedAt": zod.coerce.date()
 })
 
@@ -135,12 +154,21 @@ export const UpdateTransportDriverMobileAvailabilityBody = zod.object({
   "availability": zod.enum(['AVAILABLE', 'PAUSED'])
 })
 
+
+
+
 export const UpdateTransportDriverMobileAvailabilityResponse = zod.object({
   "driver": zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "availability": zod.enum(['AVAILABLE', 'PAUSED', 'ON_TRIP']),
   "locationUpdatedAt": zod.coerce.date().nullable()
+}),
+  "capabilities": zod.object({
+  "canViewTrips": zod.boolean(),
+  "canOperateTrips": zod.boolean(),
+  "canUpdateGps": zod.boolean(),
+  "gpsValidityMinutes": zod.number().int().min(1)
 })
 })
 
@@ -177,7 +205,6 @@ export const GetTransportDriverMobileTripsResponse = zod.object({
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.coerce.date(),
   "offerExpiresAt": zod.coerce.date().nullable(),
-  "pickupCodeRequired": zod.boolean(),
   "assignedAt": zod.coerce.date().nullable(),
   "startedAt": zod.coerce.date().nullable(),
   "completedAt": zod.coerce.date().nullable(),
@@ -196,7 +223,6 @@ export const GetTransportDriverMobileTripsResponse = zod.object({
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.coerce.date(),
   "offerExpiresAt": zod.coerce.date().nullable(),
-  "pickupCodeRequired": zod.boolean(),
   "assignedAt": zod.coerce.date().nullable(),
   "startedAt": zod.coerce.date().nullable(),
   "completedAt": zod.coerce.date().nullable(),
@@ -215,7 +241,6 @@ export const GetTransportDriverMobileTripsResponse = zod.object({
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.coerce.date(),
   "offerExpiresAt": zod.coerce.date().nullable(),
-  "pickupCodeRequired": zod.boolean(),
   "assignedAt": zod.coerce.date().nullable(),
   "startedAt": zod.coerce.date().nullable(),
   "completedAt": zod.coerce.date().nullable(),
@@ -250,7 +275,6 @@ export const AcceptTransportDriverMobileTripResponse = zod.object({
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.coerce.date(),
   "offerExpiresAt": zod.coerce.date().nullable(),
-  "pickupCodeRequired": zod.boolean(),
   "assignedAt": zod.coerce.date().nullable(),
   "startedAt": zod.coerce.date().nullable(),
   "completedAt": zod.coerce.date().nullable(),
@@ -273,19 +297,10 @@ export const DeclineTransportDriverMobileTripResponse = zod.object({
 
 
 /**
- * @summary Start an assigned trip after validating its pickup code
+ * @summary Start an assigned trip owned by the authenticated driver
  */
 export const StartTransportDriverMobileTripParams = zod.object({
   "id": zod.coerce.string()
-})
-
-export const startTransportDriverMobileTripBodyPickupCodeMin = 4;
-export const startTransportDriverMobileTripBodyPickupCodeMax = 4;
-
-
-
-export const StartTransportDriverMobileTripBody = zod.object({
-  "pickupCode": zod.string().min(startTransportDriverMobileTripBodyPickupCodeMin).max(startTransportDriverMobileTripBodyPickupCodeMax).nullish()
 })
 
 export const startTransportDriverMobileTripResponseFareMin = 0;
@@ -303,7 +318,6 @@ export const StartTransportDriverMobileTripResponse = zod.object({
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.coerce.date(),
   "offerExpiresAt": zod.coerce.date().nullable(),
-  "pickupCodeRequired": zod.boolean(),
   "assignedAt": zod.coerce.date().nullable(),
   "startedAt": zod.coerce.date().nullable(),
   "completedAt": zod.coerce.date().nullable(),
@@ -335,7 +349,6 @@ export const CompleteTransportDriverMobileTripResponse = zod.object({
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.coerce.date(),
   "offerExpiresAt": zod.coerce.date().nullable(),
-  "pickupCodeRequired": zod.boolean(),
   "assignedAt": zod.coerce.date().nullable(),
   "startedAt": zod.coerce.date().nullable(),
   "completedAt": zod.coerce.date().nullable(),

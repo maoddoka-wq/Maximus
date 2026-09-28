@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\AuthUser;
+use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ class AuthenticateTransportMobileToken
             return response()->json(['error' => 'Le compte chauffeur ou son profil n’est plus actif.'], 403);
         }
         DB::table('transport_mobile_tokens')->where('id', $token->id)->update(['last_used_at' => Carbon::now()]);
+        $request->attributes->set('authActor', MaximusAuth::actor($employee));
         $request->attributes->set('transportMobileToken', $token);
         $request->attributes->set('transportMobileDriver', $driver);
         $request->attributes->set('companyId', $token->company_id);

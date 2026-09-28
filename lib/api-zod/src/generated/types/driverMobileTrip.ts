@@ -22,7 +22,6 @@ export interface DriverMobileTrip {
   requestedAt: Date;
   /** @nullable */
   offerExpiresAt: Date | null;
-  pickupCodeRequired: boolean;
   /** @nullable */
   assignedAt: Date | null;
   /** @nullable */

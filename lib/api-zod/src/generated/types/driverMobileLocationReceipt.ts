@@ -8,5 +8,6 @@
 
 export interface DriverMobileLocationReceipt {
   ok: true;
+  capturedAt: Date;
   receivedAt: Date;
 }

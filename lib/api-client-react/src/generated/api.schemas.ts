@@ -44,14 +44,24 @@ export interface DriverMobile {
   locationUpdatedAt: string | null;
 }
 
+export interface DriverMobileCapabilities {
+  canViewTrips: boolean;
+  canOperateTrips: boolean;
+  canUpdateGps: boolean;
+  /** @minimum 1 */
+  gpsValidityMinutes: number;
+}
+
 export interface DriverMobileSessionCreated {
   accessToken: string;
   expiresAt: string;
   driver: DriverMobile;
+  capabilities: DriverMobileCapabilities;
 }
 
 export interface DriverMobileSessionStatus {
   driver: DriverMobile;
+  capabilities: DriverMobileCapabilities;
 }
 
 export interface DriverMobileLocationInput {
@@ -75,6 +85,7 @@ export interface DriverMobileLocationInput {
 
 export interface DriverMobileLocationReceipt {
   ok: true;
+  capturedAt: string;
   receivedAt: string;
 }
 
@@ -117,7 +128,6 @@ export interface DriverMobileTrip {
   requestedAt: string;
   /** @nullable */
   offerExpiresAt: string | null;
-  pickupCodeRequired: boolean;
   /** @nullable */
   assignedAt: string | null;
   /** @nullable */
@@ -139,15 +149,6 @@ export interface DriverMobileTrips {
   /** @minimum 1 */
   historyPage: number;
   historyHasMore: boolean;
-}
-
-export interface DriverMobileTripStartInput {
-  /**
-     * @minLength 4
-     * @maxLength 4
-     * @nullable
-     */
-  pickupCode?: string | null;
 }
 
 export const DriverMobileActionReceiptValue = {

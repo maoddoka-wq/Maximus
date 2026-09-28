@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -29,6 +29,29 @@ const fonts = {
   semibold: 'DMSans_600SemiBold',
   bold: 'DMSans_700Bold',
 };
+
+function getGpsFreshness(
+  locationUpdatedAt: string | null | undefined,
+  validityMinutes: number,
+): { fresh: boolean; label: string } {
+  if (!locationUpdatedAt) {
+    return { fresh: false, label: 'Aucune position GPS reçue.' };
+  }
+
+  const capturedAt = Date.parse(locationUpdatedAt);
+  if (!Number.isFinite(capturedAt)) {
+    return { fresh: false, label: 'La date de la dernière position est invalide.' };
+  }
+
+  const ageMs = Math.max(0, Date.now() - capturedAt);
+  const ageMinutes = Math.floor(ageMs / 60_000);
+  return {
+    fresh: ageMs <= validityMinutes * 60_000,
+    label: ageMinutes < 1
+      ? 'Position reçue à l’instant.'
+      : `Dernière position : il y a ${ageMinutes} min.`,
+  };
+}
 
 function AppMark({ size = 46 }: { size?: number }) {
   return (
@@ -292,11 +315,18 @@ function DriverDashboard() {
   const [activeTab, setActiveTab] = useState<'courses' | 'history' | 'account'>('courses');
   const {
     driver,
+    capabilities,
     isRefreshingSession,
     error,
     isChangingAvailability,
     isSigningOut,
+    isGpsTracking,
+    isEnablingGps,
+    gpsError,
+    gpsNeedsSettings,
     changeAvailability,
+    enableGpsTracking,
+    openLocationSettings,
     signOut,
     refreshSession,
     clearError,
@@ -308,6 +338,23 @@ function DriverDashboard() {
       : driver?.availability === 'ON_TRIP'
         ? 'En course'
         : 'En pause';
+  const canViewTrips = capabilities?.canViewTrips ?? true;
+  const canOperateTrips = capabilities?.canOperateTrips ?? false;
+  const canUpdateGps = capabilities?.canUpdateGps ?? false;
+  const gpsValidityMinutes = capabilities?.gpsValidityMinutes ?? 5;
+  const gpsFreshness = getGpsFreshness(driver?.locationUpdatedAt, gpsValidityMinutes);
+  const tabs = canViewTrips
+    ? ([
+        { id: 'courses', label: 'Courses', icon: 'car-outline' },
+        { id: 'history', label: 'Historique', icon: 'time-outline' },
+        { id: 'account', label: 'Compte', icon: 'person-outline' },
+      ] as const)
+    : ([{ id: 'account', label: 'Compte', icon: 'person-outline' }] as const);
+
+  useEffect(() => {
+    if (!canViewTrips && activeTab !== 'account') setActiveTab('account');
+  }, [activeTab, canViewTrips]);
+
   return (
     <View
       style={[
@@ -340,17 +387,13 @@ function DriverDashboard() {
             Bonjour{driver?.name ? `, ${driver.name}` : ''}
           </Text>
           <Text style={[styles.cardBody, { color: theme.sidebarForeground, opacity: 0.78 }]}>
-            Consultez les courses affectées, acceptez une demande libre et retrouvez votre
-            historique. Cette application n’utilise pas le GPS.
+            Consultez les courses autorisées par votre rôle et partagez votre position GPS pendant
+            le service.
           </Text>
         </View>
 
         <View style={[styles.dashboardTabs, { backgroundColor: theme.muted }]}>
-          {([
-            { id: 'courses', label: 'Courses', icon: 'car-outline' },
-            { id: 'history', label: 'Historique', icon: 'time-outline' },
-            { id: 'account', label: 'Compte', icon: 'person-outline' },
-          ] as const).map((tab) => {
+          {tabs.map((tab) => {
             const selected = activeTab === tab.id;
             return (
               <Pressable
@@ -386,8 +429,12 @@ function DriverDashboard() {
           })}
         </View>
 
-        {activeTab === 'courses' || activeTab === 'history' ? (
-          <DriverTripsPanel view={activeTab} />
+        {canViewTrips && (activeTab === 'courses' || activeTab === 'history') ? (
+          <DriverTripsPanel
+            view={activeTab}
+            canOperateTrips={canOperateTrips}
+            gpsIsFresh={gpsFreshness.fresh}
+          />
         ) : (
           <>
             <View style={[styles.statusCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -426,9 +473,34 @@ function DriverDashboard() {
                 {driver?.availability === 'ON_TRIP'
                   ? 'Une offre ou une course vous est affectée. Acceptez-la, refusez-la ou gérez son avancement dans Courses.'
                   : driver?.availability === 'AVAILABLE'
-                    ? 'Le GPS n’est pas utilisé ici. La mise en pause automatique évite de conserver une disponibilité sans position récente.'
-                    : 'La disponibilité GPS reste désactivée, mais vous pouvez accepter une demande libre depuis Courses si un véhicule est rattaché à votre profil.'}
+                    ? 'Votre position est transmise pendant le service. Le serveur exige une position récente pour les actions de course.'
+                    : 'Activez votre disponibilité pour recevoir des offres. Le suivi GPS sera requis et démarrera avec votre accord.'}
               </Text>
+              <Text style={[styles.cardBody, { color: theme.mutedForeground }]}>
+                Suivi GPS : {isGpsTracking ? 'actif en arrière-plan' : 'inactif'}.
+              </Text>
+              <Text style={[styles.cardBody, { color: theme.mutedForeground }]}>
+                {gpsFreshness.label} Validité serveur : {gpsValidityMinutes} min.
+              </Text>
+              {driver?.availability === 'PAUSED' && canUpdateGps ? (
+                <PrimaryButton
+                  title="Me rendre disponible"
+                  onPress={() => void changeAvailability('AVAILABLE')}
+                  loading={isChangingAvailability || isEnablingGps}
+                  icon="radio-button-on"
+                />
+              ) : null}
+              {(driver?.availability === 'AVAILABLE' || driver?.availability === 'ON_TRIP') &&
+              canUpdateGps &&
+              !isGpsTracking ? (
+                <PrimaryButton
+                  title={driver.availability === 'ON_TRIP' ? 'Reprendre le suivi GPS' : 'Activer le suivi GPS'}
+                  onPress={() => void enableGpsTracking()}
+                  loading={isEnablingGps}
+                  icon="location"
+                  secondary
+                />
+              ) : null}
               {driver?.availability === 'AVAILABLE' ? (
                 <PrimaryButton
                   title="Me mettre en pause"
@@ -439,7 +511,19 @@ function DriverDashboard() {
               ) : null}
             </View>
 
-            <InlineNotice message="Cette version ne demande pas l’accès au GPS et n’envoie aucune position. La disponibilité automatique ne peut pas être activée ici." />
+            {capabilities?.canViewTrips === false ? (
+              <InlineNotice message="Votre rôle ne permet pas de consulter les courses Transport. Les onglets Courses et Historique sont masqués." />
+            ) : null}
+
+            {gpsError ? <InlineNotice message={gpsError} /> : null}
+            {gpsNeedsSettings ? (
+              <PrimaryButton
+                title="Ouvrir les réglages de localisation"
+                onPress={() => void openLocationSettings()}
+                icon="settings-outline"
+                secondary
+              />
+            ) : null}
 
             {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
 

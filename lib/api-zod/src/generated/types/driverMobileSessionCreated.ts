@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DriverMobile } from './driverMobile';
+import type { DriverMobileCapabilities } from './driverMobileCapabilities';
 
 export interface DriverMobileSessionCreated {
   accessToken: string;
   expiresAt: Date;
   driver: DriverMobile;
+  capabilities: DriverMobileCapabilities;
 }
