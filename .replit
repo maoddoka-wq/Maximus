@@ -25,7 +25,7 @@ packages = ["freetype", "glibcLocales"]
 
 [[ports]]
 localPort = 8080
-externalPort = 8080
+externalPort = 80
 
 [[ports]]
 localPort = 8081
@@ -33,8 +33,24 @@ externalPort = 8081
 
 [[ports]]
 localPort = 18546
-externalPort = 3001
+externalPort = 5000
+
+[[ports]]
+localPort = 19399
+externalPort = 3003
 
 [[ports]]
 localPort = 19624
+externalPort = 3002
+
+[[ports]]
+localPort = 21136
+externalPort = 4200
+
+[[ports]]
+localPort = 23301
+externalPort = 3001
+
+[[ports]]
+localPort = 23334
 externalPort = 3000
