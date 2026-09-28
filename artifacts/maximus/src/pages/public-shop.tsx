@@ -23,7 +23,7 @@ import { createPublicTransportApi, type PublicTransportPlace, type PublicTranspo
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
 import { buildPublicTransportShareUrl, parsePublicTransportShareUrl } from '@/lib/transport-share-link';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
-import { canInstallPwa, clientPwaPath, clientPwaStorageKey, driverPwaPath, isIosDevice, isStandalonePwa, mountClientManifest, mountDriverManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
+import { canInstallPwa, clearClientPwaInstalled, clientPwaPath, clientPwaStorageKey, driverPwaPath, hasInstalledClientPwa, isIosDevice, isStandalonePwa, markClientPwaInstalled, mountClientManifest, mountDriverManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { TransportDriverPwaPage } from '@/pages/transport-driver-pwa';
 import { tokens as transportDesignTokens } from '@workspace/maximus-transport-public/tokens';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
@@ -282,6 +282,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
+  const [clientPwaInstalled, setClientPwaInstalled] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
   const [driverManifestReady, setDriverManifestReady] = useState(false);
   const paymentReturn = useMemo(() => {
@@ -322,6 +323,36 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   }, [routePath]);
 
   useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
+
+  useEffect(() => {
+    const currentSlug = data?.store.slug;
+    if (driverApp || isDriverPortalRoute || !currentSlug) {
+      setClientPwaInstalled(false);
+      return undefined;
+    }
+
+    const markInstalled = () => {
+      markClientPwaInstalled(currentSlug, domain);
+      setClientPwaInstalled(true);
+      setInstallAvailable(false);
+    };
+    const clearStaleInstallation = () => {
+      if (!canInstallPwa()) return;
+      clearClientPwaInstalled(currentSlug, domain);
+      setClientPwaInstalled(false);
+    };
+
+    setClientPwaInstalled(hasInstalledClientPwa(currentSlug, domain));
+    if (clientApp && isStandalonePwa()) markInstalled();
+    clearStaleInstallation();
+    window.addEventListener('appinstalled', markInstalled);
+    window.addEventListener('beforeinstallprompt', clearStaleInstallation);
+
+    return () => {
+      window.removeEventListener('appinstalled', markInstalled);
+      window.removeEventListener('beforeinstallprompt', clearStaleInstallation);
+    };
+  }, [clientApp, data?.store.slug, domain, driverApp, isDriverPortalRoute]);
 
   useEffect(() => {
     if (driverApp || isDriverPortalRoute) {
@@ -800,7 +831,14 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const installClientApp = async () => {
     if (isIosDevice()) return;
     const installed = await promptPwaInstall();
-    if (installed) showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
+    if (installed) {
+      if (data?.store.slug) {
+        markClientPwaInstalled(data.store.slug, domain);
+        setClientPwaInstalled(true);
+      }
+      setInstallAvailable(false);
+      showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
@@ -900,7 +938,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        </div>}
         <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-9 lg:px-8 lg:pb-9 ${mobileNavBottomPadding}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-       {!driverApp && !isDriverPortalRoute && !isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+        {!driverApp && !isDriverPortalRoute && !clientPwaInstalled && !hasInstalledClientPwa(store.slug, domain) && !isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
           <div>
@@ -1716,25 +1754,28 @@ function TransportPublicPage({ store, slug, domain, onBack, onDriverAccess }: { 
       '--transport-accent-foreground': theme.accentForeground,
     } as React.CSSProperties}
      >
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
-       <TransportButton data-testid="button-back-to-shop" type="button" variant="ghost" size="sm" onClick={onBack}>
-         <ArrowLeft size={16} /> MAXIMUS Transport
-      </TransportButton>
-      <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[var(--transport-accent)]" /> Dakar · Mobilité locale</span>
-          <TransportButton type="button" variant="outline" size="sm" onClick={onDriverAccess} className="whitespace-nowrap">
+      <header className="grid min-w-0 gap-3 border-b border-border bg-card px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-6">
+        <TransportButton data-testid="button-back-to-shop" type="button" variant="ghost" size="sm" onClick={onBack} className="justify-self-start">
+          <ArrowLeft size={16} /> MAXIMUS Transport
+        </TransportButton>
+        <span className="inline-flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--transport-accent)]" />
+          Dakar · Mobilité locale
+        </span>
+        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <span
+            className={`inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold ${locationState === 'ready' ? 'text-primary' : locationState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+            aria-live="polite"
+            title={locationState === 'ready' && position ? `GPS actif · précision ${Math.round(position.accuracy)} mètres` : undefined}
+          >
+            <MapPin size={13} className="shrink-0" />
+            {locationState === 'ready' && position ? `GPS actif · ${Math.round(position.accuracy)} m` : locationState === 'locating' ? 'GPS en recherche' : locationState === 'error' ? 'GPS indisponible' : 'GPS inactif'}
+          </span>
+          <TransportButton type="button" variant="outline" size="sm" onClick={onDriverAccess} className="w-full justify-center whitespace-nowrap sm:w-auto">
             <UserRound size={15} /> Espace chauffeur
           </TransportButton>
-        <span
-          className={`inline-flex items-center gap-1.5 text-xs font-semibold ${locationState === 'ready' ? 'text-primary' : locationState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
-          aria-live="polite"
-          title={locationState === 'ready' && position ? `GPS actif · précision ${Math.round(position.accuracy)} mètres` : undefined}
-        >
-          <MapPin size={13} />
-          {locationState === 'ready' && position ? `GPS actif · ${Math.round(position.accuracy)} m` : locationState === 'locating' ? 'GPS en recherche' : locationState === 'error' ? 'GPS indisponible' : 'GPS inactif'}
-        </span>
-      </div>
-    </header>
+        </div>
+      </header>
        {showHero && <div className="relative overflow-hidden border-b border-border bg-accent">
         <div className="relative aspect-[16/7] w-full sm:aspect-[16/5]">
         <img src={heroImageUrls[heroImageIndex] ?? '/taxi-transport-hero.jpg'} alt="Taxi Urbain à Dakar" className="h-full w-full object-cover" />

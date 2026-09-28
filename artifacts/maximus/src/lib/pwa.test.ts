@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clientPwaPath, clientPwaStartPath, clientPwaStorageKey, driverPwaPath, parseClientPwaPath, parseDriverPwaPath } from './pwa';
+import { clearClientPwaInstalled, clientPwaPath, clientPwaStartPath, clientPwaStorageKey, driverPwaPath, hasInstalledClientPwa, markClientPwaInstalled, parseClientPwaPath, parseDriverPwaPath } from './pwa';
 
 test('génère une URL de lancement et une identité propres à chaque boutique', () => {
   const startPath = clientPwaStartPath('boutique-senegal');
@@ -40,4 +40,44 @@ test('isole le chemin PWA chauffeur par boutique et refuse un préfixe sans bout
   assert.deepEqual(parseDriverPwaPath(path), { slug: 'boutique-senegal' });
   assert.equal(parseDriverPwaPath('/driver-app/shop/'), null);
   assert.equal(parseDriverPwaPath('/driver-app/shop/%2F'), null);
+});
+
+function withLocalStorage(run: () => void) {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key),
+      },
+    },
+  });
+
+  try {
+    run();
+  } finally {
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
+}
+
+test('mémorise l’installation PWA séparément pour chaque boutique', () => {
+  withLocalStorage(() => {
+    markClientPwaInstalled('maodo-service');
+
+    assert.equal(hasInstalledClientPwa('maodo-service'), true);
+    assert.equal(hasInstalledClientPwa('autre-boutique'), false);
+  });
+});
+
+test('efface le marqueur quand le navigateur propose à nouveau l’installation', () => {
+  withLocalStorage(() => {
+    markClientPwaInstalled('maodo-service');
+    clearClientPwaInstalled('maodo-service');
+
+    assert.equal(hasInstalledClientPwa('maodo-service'), false);
+  });
 });

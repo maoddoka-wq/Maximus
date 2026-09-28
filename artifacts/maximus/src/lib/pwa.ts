@@ -15,6 +15,36 @@ export type DriverPwaEntry = { slug: string };
 export const clientPwaStorageKey = (slug?: string, domain = false) =>
   domain ? 'domain' : encodeURIComponent(slug ?? '');
 
+const clientPwaInstalledStorageKey = (slug?: string, domain = false) =>
+  `maximus:client-pwa-installed:${clientPwaStorageKey(slug, domain)}`;
+
+export const hasInstalledClientPwa = (slug?: string, domain = false) => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(clientPwaInstalledStorageKey(slug, domain)) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const markClientPwaInstalled = (slug?: string, domain = false) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(clientPwaInstalledStorageKey(slug, domain), 'true');
+  } catch {
+    // The current page still hides the prompt in memory if persistent storage is unavailable.
+  }
+};
+
+export const clearClientPwaInstalled = (slug?: string, domain = false) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(clientPwaInstalledStorageKey(slug, domain));
+  } catch {
+    // A fresh install prompt remains usable even when persistent storage is unavailable.
+  }
+};
+
 export const clientPwaStartPath = (slug: string) =>
   `/client-app/shop/${encodeURIComponent(slug)}/accueil`;
 
