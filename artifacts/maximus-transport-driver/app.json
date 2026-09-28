@@ -17,7 +17,13 @@
     },
     "android": {
       "package": "com.maximus.chauffeur",
-      "versionCode": 1
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -25,17 +31,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "./plugins/withAndroidReleaseSigning",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "MAXIMUS utilise votre position pour aider les clients proches à trouver un chauffeur disponible.",
-          "locationAlwaysAndWhenInUsePermission": "Votre position reste partagée en arrière-plan pendant votre session Chauffeur, même lorsque l’écran est verrouillé.",
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
-        }
-      ]
+      "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true,

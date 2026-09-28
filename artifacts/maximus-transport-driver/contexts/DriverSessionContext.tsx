@@ -8,8 +8,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Linking, Platform } from 'react-native';
-import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,24 +28,7 @@ import {
   API_ORIGIN,
   BEARER_REQUEST_OPTIONS,
   COOKIE_REQUEST_OPTIONS,
-  LOCATION_TASK_NAME,
 } from '@/lib/mobile-api';
-import {
-  readLocationSyncStatus,
-  sendCurrentDriverLocation,
-  startDriverLocationUpdates,
-  stopDriverLocationUpdates,
-  type LocationSyncStatus,
-} from '@/lib/driver-location-task';
-
-type LocationPermissionState =
-  | 'checking'
-  | 'needs-permission'
-  | 'settings-required'
-  | 'services-disabled'
-  | 'ready'
-  | 'unsupported';
-type LocationBlockedState = Exclude<LocationPermissionState, 'checking' | 'ready'>;
 
 type DriverSessionContextValue = {
   accessToken: string | null;
@@ -54,20 +36,13 @@ type DriverSessionContextValue = {
   driver: DriverMobile | null;
   isLoadingSession: boolean;
   isRefreshingSession: boolean;
-  isActivatingLocation: boolean;
   isSigningIn: boolean;
   isChangingAvailability: boolean;
   isSigningOut: boolean;
-  locationPermissionState: LocationPermissionState;
-  isTracking: boolean;
-  syncStatus: LocationSyncStatus | null;
   error: string | null;
   signIn: (email: string, password: string, companySlug?: string) => Promise<boolean>;
-  activateBackgroundLocation: () => Promise<boolean>;
-  refreshLocation: () => Promise<boolean>;
   changeAvailability: (availability: 'AVAILABLE' | 'PAUSED') => Promise<boolean>;
   signOut: () => Promise<boolean>;
-  openSettings: () => Promise<void>;
   refreshSession: () => Promise<void>;
   clearError: () => void;
 };
@@ -100,16 +75,9 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isTracking, setIsTracking] = useState(false);
-  const [isActivatingLocation, setIsActivatingLocation] = useState(false);
   const [isChangingAvailability, setIsChangingAvailability] = useState(false);
-  const [locationPermissionState, setLocationPermissionState] =
-    useState<LocationPermissionState>('checking');
-  const [syncStatus, setSyncStatus] = useState<LocationSyncStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const checkedToken = useRef<string | null>(null);
   const autoPauseInProgress = useRef(false);
-  const locationLifecycleInProgress = useRef(false);
 
   const loginMutation = useLoginMaximus({ request: COOKIE_REQUEST_OPTIONS });
   const companyLoginMutation = useLoginToCompany({ request: COOKIE_REQUEST_OPTIONS });
@@ -158,75 +126,6 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     [availabilityMutation, refetchSession, sessionQuery.data?.driver.availability],
   );
 
-  const blockLocation = useCallback(
-    async (state: LocationBlockedState, reason: string) => {
-      setIsTracking(false);
-      setLocationPermissionState(state);
-      let message = reason;
-      setError(message);
-
-      try {
-        await stopDriverLocationUpdates();
-      } catch (stopError) {
-        message = `${message} Le suivi GPS n’a pas pu être arrêté : ${errorMessage(stopError)}`;
-        setError(message);
-      }
-
-      await pauseAvailableDriver(message);
-    },
-    [pauseAvailableDriver],
-  );
-
-  const verifyLocationActivity = useCallback(async (): Promise<boolean> => {
-    if (Platform.OS === 'web') {
-      await blockLocation(
-        'unsupported',
-        'Le suivi GPS en arrière-plan nécessite l’application native iOS ou Android.',
-      );
-      return false;
-    }
-
-    try {
-      const [foreground, background] = await Promise.all([
-        Location.getForegroundPermissionsAsync(),
-        Location.getBackgroundPermissionsAsync(),
-      ]);
-
-      if (!foreground.granted || !background.granted) {
-        const state =
-          !foreground.canAskAgain || !background.canAskAgain
-            ? 'settings-required'
-            : 'needs-permission';
-        await blockLocation(state, 'Les autorisations GPS sont requises pour continuer.');
-        return false;
-      }
-
-      if (!(await Location.hasServicesEnabledAsync())) {
-        await blockLocation(
-          'services-disabled',
-          'Le GPS du téléphone est désactivé. Activez-le pour continuer.',
-        );
-        return false;
-      }
-
-      if (!(await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME))) {
-        await blockLocation(
-          'needs-permission',
-          'Le suivi GPS s’est interrompu. Réactivez-le pour continuer.',
-        );
-        return false;
-      }
-
-      return true;
-    } catch (locationError) {
-      await blockLocation(
-        'needs-permission',
-        `Le GPS n’a pas pu être vérifié. Réactivez la localisation pour continuer. ${errorMessage(locationError)}`,
-      );
-      return false;
-    }
-  }, [blockLocation]);
-
   const driver = sessionQuery.data?.driver ?? null;
   const unauthorized = [401, 403].includes(errorStatus(sessionQuery.error) ?? 0);
 
@@ -248,9 +147,6 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
 
         setAccessToken(storedToken);
         setIsHydrated(true);
-        if (!storedToken) {
-          await stopDriverLocationUpdates();
-        }
       } catch {
         if (!active) return;
         setError('Le stockage sécurisé est indisponible sur cet appareil.');
@@ -264,86 +160,18 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const inspectAndResumeLocation = useCallback(async () => {
-    if (locationLifecycleInProgress.current) return;
-    locationLifecycleInProgress.current = true;
-
-    try {
-      setError(null);
-      if (Platform.OS === 'web') {
-        setIsTracking(false);
-        setLocationPermissionState('unsupported');
-        return;
-      }
-
-      setIsTracking(false);
-      setLocationPermissionState('checking');
-
-      try {
-        const [foreground, background] = await Promise.all([
-          Location.getForegroundPermissionsAsync(),
-          Location.getBackgroundPermissionsAsync(),
-        ]);
-        if (!foreground.granted || !background.granted) {
-          const state =
-            !foreground.canAskAgain || !background.canAskAgain
-              ? 'settings-required'
-              : 'needs-permission';
-          await blockLocation(
-            state,
-            'Autorisez la localisation pendant l’utilisation et en arrière-plan pour continuer.',
-          );
-          return;
-        }
-
-        if (!(await Location.hasServicesEnabledAsync())) {
-          await blockLocation(
-            'services-disabled',
-            'Le GPS du téléphone est désactivé. Activez-le pour continuer.',
-          );
-          return;
-        }
-
-        const wasAlreadyTracking =
-          await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-        await startDriverLocationUpdates();
-        if (!wasAlreadyTracking) await sendCurrentDriverLocation();
-        if (!(await verifyLocationActivity())) return;
-        await refetchSession();
-        setIsTracking(true);
-        setLocationPermissionState('ready');
-      } catch (locationError) {
-        await blockLocation('needs-permission', errorMessage(locationError));
-      }
-    } finally {
-      locationLifecycleInProgress.current = false;
+  useEffect(() => {
+    if (
+      !accessToken ||
+      sessionQuery.data?.driver.availability !== 'AVAILABLE'
+    ) {
+      return;
     }
-  }, [blockLocation, refetchSession, verifyLocationActivity]);
 
-  useEffect(() => {
-    if (!accessToken || !sessionQuery.data || checkedToken.current === accessToken) return;
-    checkedToken.current = accessToken;
-    void inspectAndResumeLocation();
-  }, [accessToken, inspectAndResumeLocation, sessionQuery.data]);
-
-  const hasDriverSession = Boolean(sessionQuery.data);
-
-  useEffect(() => {
-    if (Platform.OS === 'web' || !accessToken || !hasDriverSession) return;
-
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active' && !isActivatingLocation) {
-        void inspectAndResumeLocation();
-      }
-    });
-
-    return () => subscription.remove();
-  }, [
-    accessToken,
-    hasDriverSession,
-    inspectAndResumeLocation,
-    isActivatingLocation,
-  ]);
+    void pauseAvailableDriver(
+      'Le suivi GPS est désactivé dans MAXIMUS Chauffeur.',
+    );
+  }, [accessToken, pauseAvailableDriver, sessionQuery.data?.driver.availability]);
 
   useEffect(() => {
     if (!accessToken || !unauthorized) return;
@@ -351,14 +179,10 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     let active = true;
     const clearExpiredSession = async () => {
       try {
-        await stopDriverLocationUpdates();
         await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
       } finally {
         if (active) {
-          checkedToken.current = null;
           setAccessToken(null);
-          setIsTracking(false);
-          setLocationPermissionState('checking');
           setError('Votre session chauffeur a expiré ou votre accès Transport a changé. Reconnectez-vous.');
           queryClient.removeQueries({ queryKey: sessionQuery.queryKey });
         }
@@ -370,30 +194,6 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, [accessToken, queryClient, sessionQuery.queryKey, unauthorized]);
-
-  useEffect(() => {
-    if (!accessToken) {
-      setSyncStatus(null);
-      return;
-    }
-
-    let active = true;
-    const refreshSyncStatus = async () => {
-      try {
-        const status = await readLocationSyncStatus();
-        if (active) setSyncStatus(status);
-      } catch {
-        if (active) setSyncStatus(null);
-      }
-    };
-
-    void refreshSyncStatus();
-    const interval = setInterval(() => void refreshSyncStatus(), 10_000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [accessToken]);
 
   const refreshSession = useCallback(async () => {
     await sessionQuery.refetch();
@@ -464,11 +264,8 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
           );
         }
 
-        checkedToken.current = null;
         queryClient.removeQueries();
         setAccessToken(mobileToken);
-        setLocationPermissionState('checking');
-        setIsTracking(false);
         return true;
       } catch (loginError) {
         if (!mobileToken) {
@@ -496,99 +293,12 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  const activateBackgroundLocation = useCallback(async (): Promise<boolean> => {
-    setError(null);
-    if (Platform.OS === 'web') {
-      setLocationPermissionState('unsupported');
-      setError('Le suivi en arrière-plan nécessite l’application iOS ou Android.');
-      return false;
-    }
-    if (locationLifecycleInProgress.current) return false;
-
-    locationLifecycleInProgress.current = true;
-    setIsActivatingLocation(true);
-    try {
-      const foreground = await Location.requestForegroundPermissionsAsync();
-      if (!foreground.granted) {
-        const state = foreground.canAskAgain ? 'needs-permission' : 'settings-required';
-        await blockLocation(
-          state,
-          'Autorisez la localisation pendant l’utilisation pour continuer.',
-        );
-        return false;
-      }
-
-      const background = await Location.requestBackgroundPermissionsAsync();
-      if (!background.granted) {
-        const state = background.canAskAgain ? 'needs-permission' : 'settings-required';
-        await blockLocation(
-          state,
-          'Autorisez aussi la localisation en arrière-plan pour rester détectable écran verrouillé.',
-        );
-        return false;
-      }
-
-      if (!(await Location.hasServicesEnabledAsync())) {
-        await blockLocation(
-          'services-disabled',
-          'Activez le service de localisation de votre téléphone.',
-        );
-        return false;
-      }
-
-      await startDriverLocationUpdates();
-      await sendCurrentDriverLocation();
-      if (!(await verifyLocationActivity())) return false;
-      await refetchSession();
-      setIsTracking(true);
-      setLocationPermissionState('ready');
-      return true;
-    } catch (locationError) {
-      await blockLocation('needs-permission', errorMessage(locationError));
-      return false;
-    } finally {
-      locationLifecycleInProgress.current = false;
-      setIsActivatingLocation(false);
-    }
-  }, [blockLocation, refetchSession, verifyLocationActivity]);
-
-  const refreshLocation = useCallback(async (): Promise<boolean> => {
-    if (locationLifecycleInProgress.current) return false;
-    locationLifecycleInProgress.current = true;
-    setError(null);
-    try {
-      await sendCurrentDriverLocation();
-      if (!(await verifyLocationActivity())) return false;
-      await refetchSession();
-      return true;
-    } catch (locationError) {
-      await blockLocation('needs-permission', errorMessage(locationError));
-      return false;
-    } finally {
-      locationLifecycleInProgress.current = false;
-    }
-  }, [blockLocation, refetchSession, verifyLocationActivity]);
-
   const changeAvailability = useCallback(
     async (availability: 'AVAILABLE' | 'PAUSED'): Promise<boolean> => {
       setError(null);
       if (availability === 'AVAILABLE') {
-        if (locationLifecycleInProgress.current) {
-          setError('Une vérification GPS est déjà en cours. Réessayez dans un instant.');
-          return false;
-        }
-        locationLifecycleInProgress.current = true;
-        let locationVerified = false;
-        try {
-          locationVerified = await verifyLocationActivity();
-        } finally {
-          locationLifecycleInProgress.current = false;
-        }
-        if (!locationVerified) return false;
-        if (!isTracking || locationPermissionState !== 'ready') {
-          setError('Activez la localisation et obtenez une position GPS avant de devenir disponible.');
-          return false;
-        }
+        setError('La disponibilité ne peut pas être activée sans suivi GPS.');
+        return false;
       }
       setIsChangingAvailability(true);
       try {
@@ -602,13 +312,7 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
         setIsChangingAvailability(false);
       }
     },
-    [
-      availabilityMutation,
-      isTracking,
-      locationPermissionState,
-      sessionQuery,
-      verifyLocationActivity,
-    ],
+    [availabilityMutation, sessionQuery],
   );
 
   const signOut = useCallback(async (): Promise<boolean> => {
@@ -617,31 +321,20 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       setError('Terminez la course en cours avant de fermer la session chauffeur.');
       return false;
     }
-    if (locationLifecycleInProgress.current) {
-      setError('Une opération GPS est en cours. Réessayez dans un instant.');
-      return false;
-    }
-
-    locationLifecycleInProgress.current = true;
     setIsSigningOut(true);
     try {
       await availabilityMutation.mutateAsync({ data: { availability: 'PAUSED' } });
-      await stopDriverLocationUpdates();
-      setIsTracking(false);
       await revokeMobileSessionMutation.mutateAsync();
       await logoutCookieMutation.mutateAsync();
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
 
-      checkedToken.current = null;
       setAccessToken(null);
-      setLocationPermissionState('checking');
       queryClient.removeQueries({ queryKey: sessionQuery.queryKey });
       return true;
     } catch (signOutError) {
       setError(errorMessage(signOutError));
       return false;
     } finally {
-      locationLifecycleInProgress.current = false;
       setIsSigningOut(false);
     }
   }, [
@@ -653,14 +346,6 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
     sessionQuery.queryKey,
   ]);
 
-  const openSettings = useCallback(async () => {
-    try {
-      await Linking.openSettings();
-    } catch (settingsError) {
-      setError(`Impossible d’ouvrir les réglages : ${errorMessage(settingsError)}`);
-    }
-  }, []);
-
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<DriverSessionContextValue>(
@@ -670,45 +355,31 @@ export function DriverSessionProvider({ children }: { children: ReactNode }) {
       driver,
       isLoadingSession: sessionQuery.isLoading,
       isRefreshingSession: sessionQuery.isFetching,
-      isActivatingLocation,
       isSigningIn,
       isChangingAvailability,
       isSigningOut,
-      locationPermissionState,
-      isTracking,
-      syncStatus,
       error,
       signIn,
-      activateBackgroundLocation,
-      refreshLocation,
       changeAvailability,
       signOut,
-      openSettings,
       refreshSession,
       clearError,
     }),
     [
       accessToken,
-      activateBackgroundLocation,
       changeAvailability,
       clearError,
       driver,
       error,
       isChangingAvailability,
       isHydrated,
-      isActivatingLocation,
       isSigningIn,
       isSigningOut,
-      isTracking,
-      locationPermissionState,
-      openSettings,
-      refreshLocation,
       refreshSession,
       sessionQuery.isLoading,
       sessionQuery.isFetching,
       signIn,
       signOut,
-      syncStatus,
     ],
   );
 

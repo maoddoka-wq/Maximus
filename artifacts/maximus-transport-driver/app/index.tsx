@@ -168,32 +168,11 @@ function LoginScreen() {
             ESPACE CHAUFFEUR
           </Text>
           <Text style={[styles.loginTitle, { color: theme.foreground }]}>
-            Les clients proches peuvent vous trouver.
+            Gérez votre espace chauffeur.
           </Text>
           <Text style={[styles.bodyText, { color: theme.mutedForeground }]}>
             Connectez-vous avec le compte employé associé au module Transport.
           </Text>
-        </View>
-
-        <View
-          style={[
-            styles.locationExplanation,
-            { backgroundColor: theme.sidebar, borderRadius: radius },
-          ]}
-        >
-          <View style={[styles.iconCircle, { backgroundColor: theme.sidebarAccent }]}>
-            <Ionicons name="navigate-outline" size={21} color={theme.sidebarPrimary} />
-          </View>
-          <View style={styles.locationExplanationText}>
-            <Text style={[styles.cardTitle, { color: theme.sidebarForeground }]}>
-              Position en arrière-plan
-            </Text>
-            <Text style={[styles.cardBody, { color: theme.sidebarForeground, opacity: 0.78 }]}>
-              Pendant votre session chauffeur, votre GPS aide à rapprocher les clients d’un chauffeur
-              disponible, même lorsque l’écran est verrouillé. Votre position n’est pas publiée dans
-              un annuaire.
-            </Text>
-          </View>
         </View>
 
         <View style={[styles.formCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -258,7 +237,7 @@ function LoginScreen() {
 
           {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
           {Platform.OS === 'web' ? (
-            <InlineNotice message="Aperçu web uniquement. La connexion chauffeur et le GPS en arrière-plan nécessitent l’application native iOS ou Android." />
+            <InlineNotice message="Aperçu web uniquement. La connexion chauffeur sécurisée nécessite l’application native iOS ou Android." />
           ) : null}
           {!API_ORIGIN ? (
             <InlineNotice message="L’adresse du serveur MAXIMUS n’est pas configurée pour cette version." />
@@ -271,9 +250,6 @@ function LoginScreen() {
             loading={isSigningIn}
             icon="arrow-forward"
           />
-          <Text style={[styles.helperText, { color: theme.mutedForeground }]}>
-            La position est envoyée uniquement par votre session chauffeur sécurisée.
-          </Text>
         </View>
 
         <Text style={[styles.footerText, { color: theme.mutedForeground }]}>
@@ -308,139 +284,18 @@ function LoadingScreen() {
   );
 }
 
-function LocationPermissionScreen() {
-  const theme = useColors();
-  const insets = useSafeAreaInsets();
-  const {
-    locationPermissionState,
-    isTracking,
-    isActivatingLocation,
-    error,
-    activateBackgroundLocation,
-    openSettings,
-    clearError,
-    signOut,
-    isSigningOut,
-  } = useDriverSession();
-
-  const canOpenSettings =
-    locationPermissionState === 'settings-required' ||
-    locationPermissionState === 'services-disabled';
-  const unsupported = locationPermissionState === 'unsupported';
-  const servicesDisabled = locationPermissionState === 'services-disabled';
-
-  return (
-    <View
-      style={[
-        styles.screen,
-        {
-          backgroundColor: theme.background,
-          paddingTop: Platform.OS === 'web' ? 67 : insets.top,
-          paddingBottom: Platform.OS === 'web' ? 34 : insets.bottom,
-        },
-      ]}
-    >
-      <StatusBar style={useColorScheme() === 'dark' ? 'light' : 'dark'} />
-      <ScrollView contentContainerStyle={styles.permissionContent}>
-        <BrandHeader />
-
-        <View style={[styles.permissionIcon, { backgroundColor: theme.secondary }]}>
-          <Ionicons
-            name={unsupported ? 'phone-portrait-outline' : 'location-outline'}
-            size={35}
-            color={theme.primary}
-          />
-        </View>
-
-        <Text style={[styles.loginTitle, { color: theme.foreground }]}>
-          {unsupported
-            ? 'Ouvrez l’application sur votre téléphone.'
-            : servicesDisabled
-              ? 'Activez la localisation pour continuer.'
-              : 'Autorisez le GPS en arrière-plan.'}
-        </Text>
-        <Text style={[styles.bodyText, { color: theme.mutedForeground }]}>
-          {unsupported
-            ? 'La localisation continue écran verrouillé fonctionne dans l’application native iOS ou Android, pas dans l’aperçu web.'
-            : servicesDisabled
-              ? 'La localisation du téléphone est désactivée. Activez-la dans les réglages pour continuer et recevoir des demandes de course.'
-              : 'La localisation est obligatoire pour être détectable par les clients. Autorisez-la pendant l’utilisation et en arrière-plan ; une position GPS doit être obtenue avant de continuer.'}
-        </Text>
-
-        {!unsupported ? (
-          <View style={[styles.permissionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <PermissionRow
-              icon="lock-closed-outline"
-              text="Votre session est protégée par un jeton stocké dans le coffre sécurisé du téléphone."
-            />
-            <PermissionRow
-              icon="people-outline"
-              text="La position sert au rapprochement avec les clients ; elle n’est pas affichée dans un répertoire public."
-            />
-            <PermissionRow
-              icon="battery-half-outline"
-              text="Le suivi reste actif pendant la session et peut augmenter la consommation de batterie."
-            />
-          </View>
-        ) : null}
-
-        {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
-
-        {!unsupported ? (
-          <>
-            {canOpenSettings ? (
-              <PrimaryButton title="Ouvrir les réglages" onPress={() => void openSettings()} icon="settings-outline" />
-            ) : (
-              <PrimaryButton
-                title={isTracking ? 'GPS actif' : 'Activer ma localisation'}
-                onPress={() => void activateBackgroundLocation()}
-                disabled={isTracking}
-                loading={isActivatingLocation || locationPermissionState === 'checking'}
-                icon="navigate"
-              />
-            )}
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSigningOut}
-              onPress={() => void signOut()}
-              style={styles.textButton}
-            >
-              <Text style={[styles.textButtonLabel, { color: theme.mutedForeground }]}>
-                Se déconnecter
-              </Text>
-            </Pressable>
-          </>
-        ) : null}
-      </ScrollView>
-    </View>
-  );
-}
-
-function PermissionRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
-  const theme = useColors();
-  return (
-    <View style={styles.permissionRow}>
-      <Ionicons name={icon} size={19} color={theme.primary} />
-      <Text style={[styles.cardBody, { color: theme.cardForeground, flex: 1 }]}>{text}</Text>
-    </View>
-  );
-}
-
 function DriverDashboard() {
   const theme = useColors();
   const insets = useSafeAreaInsets();
   const {
     driver,
     isRefreshingSession,
-    isTracking,
-    syncStatus,
     error,
     isChangingAvailability,
     isSigningOut,
     changeAvailability,
     signOut,
     refreshSession,
-    refreshLocation,
     clearError,
   } = useDriverSession();
 
@@ -450,13 +305,6 @@ function DriverDashboard() {
       : driver?.availability === 'ON_TRIP'
         ? 'En course'
         : 'En pause';
-  const freshness = driver?.locationUpdatedAt
-    ? new Date(driver.locationUpdatedAt).toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
-
   return (
     <View
       style={[
@@ -481,17 +329,6 @@ function DriverDashboard() {
       >
         <View style={styles.dashboardTop}>
           <BrandHeader />
-          <View style={[styles.livePill, { backgroundColor: isTracking ? theme.secondary : theme.muted }]}>
-            <View
-              style={[
-                styles.liveDot,
-                { backgroundColor: isTracking ? theme.primary : theme.mutedForeground },
-              ]}
-            />
-            <Text style={[styles.liveLabel, { color: theme.foreground }]}>
-              {isTracking ? 'GPS actif' : 'GPS en pause'}
-            </Text>
-          </View>
         </View>
 
         <View style={[styles.welcomePanel, { backgroundColor: theme.sidebar, borderRadius: radius }]}>
@@ -500,7 +337,8 @@ function DriverDashboard() {
             Bonjour{driver?.name ? `, ${driver.name}` : ''}
           </Text>
           <Text style={[styles.cardBody, { color: theme.sidebarForeground, opacity: 0.78 }]}>
-            Votre disponibilité détermine si vous apparaissez aux clients qui recherchent un chauffeur.
+            Le suivi GPS est désactivé dans cette application. Vous pouvez consulter votre statut,
+            mais vous ne pouvez pas devenir disponible ici.
           </Text>
         </View>
 
@@ -538,81 +376,24 @@ function DriverDashboard() {
           </View>
           <Text style={[styles.cardBody, { color: theme.mutedForeground }]}>
             {driver?.availability === 'ON_TRIP'
-              ? 'La position continue d’être envoyée pendant la course. Terminez-la dans MAXIMUS avant de vous déconnecter.'
+              ? 'Cette application ne transmet plus la position GPS. Terminez la course dans MAXIMUS avant de vous déconnecter.'
               : driver?.availability === 'AVAILABLE'
-                ? 'Les clients proches peuvent vous trouver. Mettez-vous en pause si vous ne prenez plus de courses.'
-                : 'Passez en mode disponible lorsque vous êtes prêt à recevoir des demandes.'}
+                ? 'Le suivi GPS est désactivé. La mise en pause automatique évite d’utiliser une ancienne position.'
+                : 'La mise en disponibilité est désactivée dans MAXIMUS Chauffeur car elle nécessite une position GPS récente.'}
           </Text>
-          {driver?.availability !== 'ON_TRIP' ? (
+          {driver?.availability === 'AVAILABLE' ? (
             <PrimaryButton
-              title={driver?.availability === 'AVAILABLE' ? 'Me mettre en pause' : 'Devenir disponible'}
-              onPress={() =>
-                void changeAvailability(
-                  driver?.availability === 'AVAILABLE' ? 'PAUSED' : 'AVAILABLE',
-                )
-              }
+              title="Me mettre en pause"
+              onPress={() => void changeAvailability('PAUSED')}
               loading={isChangingAvailability}
-              disabled={!isTracking && driver?.availability !== 'AVAILABLE'}
-              icon={driver?.availability === 'AVAILABLE' ? 'pause' : 'radio-button-on'}
+              icon="pause"
             />
           ) : null}
         </View>
 
-        <View style={[styles.locationCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.locationCardHeader}>
-            <View style={[styles.iconCircle, { backgroundColor: theme.secondary }]}>
-              <Ionicons name="navigate-outline" size={19} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.cardTitle, { color: theme.cardForeground }]}>Position GPS</Text>
-              <Text style={[styles.cardBody, { color: theme.mutedForeground }]}>
-                {freshness ? `Dernière position reçue à ${freshness}` : 'En attente du premier point GPS'}
-              </Text>
-            </View>
-            <Ionicons
-              name={isTracking ? 'checkmark-circle' : 'alert-circle-outline'}
-              size={22}
-              color={isTracking ? theme.primary : theme.mutedForeground}
-            />
-          </View>
-
-          {syncStatus?.error ? (
-            <InlineNotice message={syncStatus.error} />
-          ) : syncStatus?.receivedAt ? (
-            <Text style={[styles.helperText, { color: theme.mutedForeground }]}>
-              Synchronisation confirmée à{' '}
-              {new Date(syncStatus.receivedAt).toLocaleTimeString('fr-FR', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-              .
-            </Text>
-          ) : null}
-
-          {isTracking ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void refreshLocation()}
-              style={styles.inlineAction}
-            >
-              <Ionicons name="refresh-outline" size={16} color={theme.primary} />
-              <Text style={[styles.inlineActionText, { color: theme.primary }]}>
-                Actualiser maintenant
-              </Text>
-            </Pressable>
-          ) : (
-            <InlineNotice message="Le suivi GPS est arrêté. Réactivez-le depuis les autorisations de localisation." />
-          )}
-        </View>
+        <InlineNotice message="Cette version ne demande plus l’accès au GPS et n’envoie aucune position. La disponibilité ne peut pas être activée ici." />
 
         {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
-
-        <View style={[styles.privacyNote, { borderColor: theme.border }]}>
-          <Ionicons name="shield-checkmark-outline" size={18} color={theme.mutedForeground} />
-          <Text style={[styles.helperText, { color: theme.mutedForeground, flex: 1 }]}>
-            Position utilisée pour le rapprochement client-chauffeur ; aucun annuaire public de chauffeurs n’est créé.
-          </Text>
-        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -677,15 +458,13 @@ function SessionRecoveryScreen() {
 }
 
 export default function DriverHomeScreen() {
-  const { isHydrated, accessToken, isLoadingSession, driver, locationPermissionState } =
-    useDriverSession();
+  const { isHydrated, accessToken, isLoadingSession, driver } = useDriverSession();
 
   if (!API_ORIGIN) return <LoginScreen />;
   if (!isHydrated) return <LoadingScreen />;
   if (!accessToken) return <LoginScreen />;
   if (isLoadingSession && !driver) return <LoadingScreen />;
   if (!driver) return <SessionRecoveryScreen />;
-  if (locationPermissionState !== 'ready') return <LocationPermissionScreen />;
   return <DriverDashboard />;
 }
 
@@ -721,21 +500,6 @@ const styles = StyleSheet.create({
     marginTop: spacing * 2,
   },
   bodyText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 23, marginTop: spacing * 2 },
-  locationExplanation: {
-    flexDirection: 'row',
-    gap: spacing * 3,
-    padding: spacing * 4,
-    marginBottom: spacing * 5,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locationExplanationText: { flex: 1, gap: spacing },
-  cardTitle: { fontFamily: fonts.semibold, fontSize: 15 },
   cardBody: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
   formCard: {
     borderWidth: 1,
@@ -780,29 +544,6 @@ const styles = StyleSheet.create({
     padding: spacing * 3,
   },
   noticeText: { flex: 1, fontFamily: fonts.medium, fontSize: 13, lineHeight: 19 },
-  permissionContent: {
-    flexGrow: 1,
-    paddingHorizontal: spacing * 5,
-    paddingBottom: spacing * 6,
-    gap: spacing * 4,
-  },
-  permissionIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing * 8,
-  },
-  permissionCard: {
-    borderWidth: 1,
-    borderRadius: radius,
-    padding: spacing * 4,
-    gap: spacing * 4,
-  },
-  permissionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing * 3 },
-  textButton: { alignItems: 'center', padding: spacing * 3 },
-  textButtonLabel: { fontFamily: fonts.medium, fontSize: 14 },
   dashboardContent: {
     paddingHorizontal: spacing * 5,
     paddingBottom: spacing * 6,
@@ -814,16 +555,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  livePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing * 1.5,
-    borderRadius: 999,
-    paddingHorizontal: spacing * 2.5,
-    paddingVertical: spacing * 1.5,
-  },
-  liveDot: { width: 7, height: 7, borderRadius: 4 },
-  liveLabel: { fontFamily: fonts.semibold, fontSize: 11 },
   welcomePanel: { padding: spacing * 5, gap: spacing * 2 },
   welcomeTitle: { fontFamily: fonts.bold, fontSize: 25, lineHeight: 32 },
   statusCard: { borderWidth: 1, borderRadius: radius, padding: spacing * 4, gap: spacing * 3 },
@@ -835,23 +566,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  locationCard: { borderWidth: 1, borderRadius: radius, padding: spacing * 4, gap: spacing * 3 },
-  locationCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing * 3 },
-  inlineAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: spacing,
-    paddingVertical: spacing,
-  },
-  inlineActionText: { fontFamily: fonts.semibold, fontSize: 13 },
-  privacyNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing * 2,
-    borderTopWidth: 1,
-    paddingTop: spacing * 3,
   },
   logoutButton: {
     minHeight: 48,

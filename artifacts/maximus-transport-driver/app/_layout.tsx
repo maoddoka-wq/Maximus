@@ -16,7 +16,6 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { DriverSessionProvider } from '@/contexts/DriverSessionContext';
 import { configureMobileApi } from '@/lib/mobile-api';
-import '@/lib/driver-location-task';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
