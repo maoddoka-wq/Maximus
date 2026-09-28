@@ -406,3 +406,17 @@ mtime_ms = 1790381615261
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/cc0208a2-7470-4400-aefc-d0cd9b6ca7da/901e9aa3-a04b-4e8c-905c-7237a671418a"
 storage_version_token = "1790381615839400"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "r5aX9rS6ollfXxpqwuK5b"
+uri = "file://.local/signing-backup/MAXIMUS-Chauffeur-Android-signing-backup.txt"
+type = "text"
+title = "Sauvegarde privée — clé Android MAXIMUS Chauffeur"
+description = "Fichier confidentiel contenant le keystore de signature et les informations de récupération. Télécharge-le et conserve-le dans un gestionnaire de mots de passe ou une sauvegarde chiffrée; ne le commite pas et ne le partage pas."
+logical_id = "84c4b582-c21f-4d3a-86c1-de54dac38e26"
+content_hash = "sha256:f248d838a5851b2d52bd48ccc3f621bb3bf3c287ed0cb315bf80f6da0a0b9edb"
+size = 4545
+mtime_ms = 1790584449977
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/84c4b582-c21f-4d3a-86c1-de54dac38e26/9639be4c-1253-4f31-8ee3-f90e0d0a816c"
+storage_version_token = "1790584560471213"
+content_type = "text/plain"
