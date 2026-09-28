@@ -142,6 +142,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     selfOnly && label === 'Horaires' ? false : canCreateFeature(label);
   const canEditFeature = (label: string) =>
     selfOnly && label === 'Horaires' ? false : hasFeaturePermission(label, 'edit', canEdit);
+  const canCorrectFeature = (label: string) => canCorrect && canEditFeature(label);
   const canValidateAsSupervisor = canValidate && !selfOnly;
   const canValidateFeature = (label: string) => hasFeaturePermission(label, 'validate', canValidateAsSupervisor);
   const canDeleteFeature = (label: string) => hasFeaturePermission(label, 'delete', canDelete);
@@ -223,7 +224,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => {
     const isValidation = status !== item.status && (item.type === 'absence' || item.type === 'leave');
     const allowed = item.type === 'attendance'
-      ? canCorrect
+      ? canCorrectFeature('Pointage')
       : isValidation
         ? canValidateFeature(featureForType[item.type]!)
         : item.type === 'settings'
@@ -246,6 +247,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); }
   };
   const scanClock = async (token: string, action: 'arrival' | 'exit') => {
+    if (!canCreatePresenceFeature('Pointage')) {
+      showAppToast('Votre rôle ne possède pas le droit de créer dans cette fonctionnalité.', 'error');
+      return;
+    }
     try {
       await api.clockScan({ token, action });
       showAppToast(action === 'arrival' ? 'Arrivée enregistrée après scan.' : 'Sortie enregistrée après scan.', 'success');
@@ -262,7 +267,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
      if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(visibleEmployees.map(employee => meta(employee).unit))]} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
       if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canCreate={canCreatePresenceFeature('Pointage')} canGenerateQr={canGenerateQr && canCreatePresenceFeature('Pointage')} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
-     if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} canCorrect={canCorrect} onSelect={setSelected} />;
+      if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} canCorrect={canCorrectFeature('Pointage')} onSelect={setSelected} />;
       if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreateFeature('Absences')} canValidate={canValidateFeature('Absences')} canDelete={canDeleteFeature('Absences')} onCreate={create} onUpdate={update} onRemove={remove} />;
       if (tab === 'schedules') return <SchedulesPanel items={items} employees={visibleEmployees} canCreate={canCreatePresenceFeature('Horaires')} canEdit={canEditFeature('Horaires')} canDelete={selfOnly ? false : canDeleteFeature('Horaires')} onCreate={create} onUpdate={update} onRemove={remove} />;
      if (tab === 'leave') return <LeavePanel items={items} employees={visibleEmployees} date={date} canCreate={canCreateFeature('Congés')} canValidate={canValidateFeature('Congés')} onCreate={create} onUpdate={update} />;
@@ -281,7 +286,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
          />}</div>
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">{error}<button onClick={() => setError('')}><X size={16} /></button></div>}
     {loading ? <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-48 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-48 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div> : render()}
-    {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrect} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}
+     {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrectFeature('Pointage')} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}
   </div>;
 }
 
@@ -310,6 +315,7 @@ function ClockPanel({ rows, selectedEmployee, date, setDate, settings, canGenera
     return <ManagerClockPanel date={date} setDate={setDate} settings={settings} onRequestQr={onRequestQr} />;
   }
 
+  if (!canCreate) return <Empty text="La création de pointages n’est pas autorisée pour votre rôle." />;
   return <EmployeeScannerPanel row={rows.find(item => item.employee.id === selectedEmployee)} date={date} canCreate={canCreate} onScanClock={onScanClock} />;
 }
 

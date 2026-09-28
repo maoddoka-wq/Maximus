@@ -222,7 +222,7 @@ export default function TransportModulePage({
   const canModifyTrips = featurePermissions ? Boolean(featurePermissions.trips?.canModify) : canModify;
   const canCreateDrivers = featurePermissions ? Boolean(featurePermissions.drivers?.canCreate) : canCreate;
   const canModifyDrivers = featurePermissions
-    ? Boolean(featurePermissions.drivers?.canModify || featurePermissions.trips?.canModify)
+    ? Boolean(featurePermissions.drivers?.canModify)
     : canModify;
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
   const canModifyVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canModify) : canModify;

@@ -27,6 +27,12 @@ final class ModuleAuthorization
         'settings',
     ];
 
+    private const DIRECT_PERMISSION_FEATURES = [
+        'settings',
+        'parametres',
+        'finances',
+    ];
+
     public static function allows(
         array $actor,
         string $module,
@@ -120,7 +126,7 @@ final class ModuleAuthorization
         );
 
         if ($feature && in_array($feature, self::STOCK_FEATURE_KEYS, true) && $detailedKeys !== []) {
-            return self::contains($permissions['stocks:'.$feature] ?? [], $required);
+            return self::allowsFeatureCrud($permissions['stocks:'.$feature] ?? [], $action, $feature);
         }
 
         if ($detailedKeys !== []) {
@@ -128,16 +134,15 @@ final class ModuleAuthorization
                 ->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], 'voir'));
         }
 
-        return self::contains($permissions['stocks'] ?? [], $required);
+        return self::allowsFeatureCrud($permissions['stocks'] ?? [], $action, $feature);
     }
 
     private static function allowsPresence(array $permissions, string $action, ?string $feature = null): bool
     {
-        if ($feature !== null && array_key_exists('presence.'.$feature, $permissions)) {
-            return self::contains($permissions['presence.'.$feature], self::stockAction($action));
-        }
-
         $explicitKey = 'presence.'.$action;
+        $explicitActionNames = ['view', 'create', 'edit', 'delete', 'correct', 'validate', 'manage', 'export', 'reports'];
+        $hasExplicitActions = collect($explicitActionNames)
+            ->contains(fn (string $name): bool => array_key_exists('presence.'.$name, $permissions));
         $featureKeys = array_filter(
             array_keys($permissions),
             fn (string $key): bool => str_starts_with($key, 'presence.')
@@ -154,33 +159,33 @@ final class ModuleAuthorization
                 ], true),
         );
 
-        // A feature-specific request must not fall back to another feature's
-        // action. For example, Pointage create cannot authorize Horaires.
-        if ($feature !== null && $featureKeys !== []) {
-            return array_key_exists($explicitKey, $permissions)
-                && self::contains($permissions[$explicitKey], 'allowed');
-        }
-
-        $hasExplicitActions = array_key_exists($explicitKey, $permissions)
-            || count(array_filter(
-                array_keys($permissions),
-                fn (string $key): bool => str_starts_with($key, 'presence.'),
-            )) > 0;
-
-        if ($hasExplicitActions) {
-            if (array_key_exists($explicitKey, $permissions)) {
-                return self::contains($permissions[$explicitKey], 'allowed');
+        if ($feature !== null && array_key_exists('presence.'.$feature, $permissions)) {
+            if (! self::allowsFeatureCrud($permissions['presence.'.$feature], $action, $feature)) {
+                return false;
             }
 
-            $required = self::stockAction($action);
-
-            return collect(array_filter(
-                array_keys($permissions),
-                fn (string $key): bool => str_starts_with($key, 'presence.'),
-            ))->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], $required));
+            return ! $hasExplicitActions || self::allowsExplicitPresenceAction($permissions, $action);
         }
 
-        return self::contains($permissions['presences'] ?? [], self::stockAction($action));
+        // A feature-specific request must not inherit another feature's
+        // generic permissions. Explicit operational rights remain scoped to
+        // their action and still have to satisfy the CRUD ladder.
+        if ($feature !== null && $featureKeys !== []) {
+            return $hasExplicitActions
+                && self::allowsExplicitPresenceAction($permissions, $action);
+        }
+
+        if ($hasExplicitActions) {
+            return self::allowsExplicitPresenceAction($permissions, $action);
+        }
+
+        if ($feature === null && $featureKeys !== []) {
+            return collect($featureKeys)->contains(
+                fn (string $key): bool => self::allowsFeatureCrud($permissions[$key] ?? [], $action, null),
+            );
+        }
+
+        return self::allowsCrud($permissions['presences'] ?? [], $action);
     }
 
     private static function allowsEcommerce(array $permissions, string $action, ?string $feature): bool
@@ -192,7 +197,7 @@ final class ModuleAuthorization
         );
 
         if ($feature && $detailedKeys !== []) {
-            return self::contains($permissions['ecommerce:menu:'.$feature] ?? [], $required);
+            return self::allowsFeatureCrud($permissions['ecommerce:menu:'.$feature] ?? [], $action, $feature);
         }
 
         if ($detailedKeys !== []) {
@@ -200,7 +205,7 @@ final class ModuleAuthorization
                 ->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], 'voir'));
         }
 
-        return self::contains($permissions['ecommerce'] ?? [], $required);
+        return self::allowsFeatureCrud($permissions['ecommerce'] ?? [], $action, $feature);
     }
 
     private static function allowsGeneric(array $permissions, string $module, string $action, ?string $feature): bool
@@ -214,13 +219,13 @@ final class ModuleAuthorization
                 : [$feature];
 
             return collect($featureKeys)
-                ->contains(fn (string $featureKey): bool => self::contains($permissions[$prefix.$featureKey] ?? [], $required));
+                ->contains(fn (string $featureKey): bool => self::allowsFeatureCrud($permissions[$prefix.$featureKey] ?? [], $action, $feature));
         }
         if ($detailed !== []) {
             return $action === 'view' && collect($detailed)->contains(fn (string $key): bool => self::contains($permissions[$key] ?? [], 'voir'));
         }
 
-        return self::contains($permissions[$module] ?? [], $required);
+        return self::allowsFeatureCrud($permissions[$module] ?? [], $action, $feature);
     }
 
     private static function stockAction(string $action): string
@@ -231,6 +236,62 @@ final class ModuleAuthorization
             'modify', 'edit', 'correct', 'delete', 'manage', 'validate', 'export', 'reports' => 'modifier',
             default => $action,
         };
+    }
+
+    private static function allowsCrud(mixed $permissions, string $action): bool
+    {
+        if ($action === 'view') {
+            return self::contains($permissions, 'voir');
+        }
+        if (! in_array($action, ['create', 'modify', 'edit', 'delete', 'correct'], true)) {
+            return self::contains($permissions, self::stockAction($action));
+        }
+        if (! self::contains($permissions, 'voir') || ! self::contains($permissions, 'créer')) {
+            return false;
+        }
+
+        return $action === 'create' || self::contains($permissions, 'modifier');
+    }
+
+    private static function allowsFeatureCrud(mixed $permissions, string $action, ?string $feature): bool
+    {
+        if ($feature !== null && in_array($feature, self::DIRECT_PERMISSION_FEATURES, true)) {
+            return self::contains($permissions, self::stockAction($action));
+        }
+
+        if ($action !== 'view'
+            && ! in_array($action, ['create', 'modify', 'edit', 'delete', 'correct'], true)) {
+            return self::contains($permissions, 'voir')
+                && self::contains($permissions, self::stockAction($action));
+        }
+
+        return self::allowsCrud($permissions, $action);
+    }
+
+    private static function allowsExplicitPresenceAction(array $permissions, string $action): bool
+    {
+        if (! self::contains($permissions['presence.'.$action] ?? [], 'allowed')) {
+            return false;
+        }
+        if ($action === 'view') {
+            return true;
+        }
+        if ($action === 'create' || in_array($action, ['edit', 'delete', 'correct'], true)) {
+            return self::allowsExplicitPresenceCrud($permissions, $action);
+        }
+
+        return self::contains($permissions['presence.view'] ?? [], 'allowed');
+    }
+
+    private static function allowsExplicitPresenceCrud(array $permissions, string $action): bool
+    {
+        if (! self::contains($permissions['presence.view'] ?? [], 'allowed')
+            || ! self::contains($permissions['presence.create'] ?? [], 'allowed')) {
+            return false;
+        }
+
+        return $action === 'create'
+            || self::contains($permissions['presence.edit'] ?? [], 'allowed');
     }
 
     private static function contains(mixed $permissions, string $required): bool

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Models\PresenceItem;
 use App\Support\MaximusAuth;
+use App\Support\ModuleAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -477,6 +478,30 @@ class PresenceTest extends TestCase
                 'action' => 'arrival',
             ])
             ->assertForbidden();
+    }
+
+    public function test_presence_correction_requires_the_full_ladder_and_its_special_permission(): void
+    {
+        $actor = fn (array $permissions): array => [
+            'role' => 'employee',
+            'companyId' => 'kora',
+            'permissions' => $permissions,
+        ];
+
+        $correctWithoutEdit = $actor([
+            'presence.view' => ['allowed'],
+            'presence.create' => ['allowed'],
+            'presence.correct' => ['allowed'],
+        ]);
+        $this->assertFalse(ModuleAuthorization::allows($correctWithoutEdit, 'presences', 'correct'));
+
+        $fullCorrectionAccess = $actor([
+            'presence.view' => ['allowed'],
+            'presence.create' => ['allowed'],
+            'presence.edit' => ['allowed'],
+            'presence.correct' => ['allowed'],
+        ]);
+        $this->assertTrue(ModuleAuthorization::allows($fullCorrectionAccess, 'presences', 'correct'));
     }
 
     private function asActor(string $role = 'company_admin', string $employeeId = 'presence-admin', array $permissions = [], array $sectorIds = []): self

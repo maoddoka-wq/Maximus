@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   employeeHasPresencePermission,
+  effectiveFeaturePermissions,
   employeeRoleMatchesUnit,
   getCommerceTabIds,
   getEmployeeAncestry,
@@ -10,6 +11,7 @@ import {
   getFeaturePermissions,
   restrictRoleToCompany,
   roleHasPermission,
+  hasEffectivePermission,
 } from './employee-permissions';
 import {
   commerceTabDependencies,
@@ -106,6 +108,25 @@ test('respecte les modules autorisés par l’unité avant les permissions du r�
   assert.equal(roleHasPermission(salesRole, nodes[1], 'commerce', 'voir'), true);
   assert.equal(roleHasPermission(salesRole, nodes[1], 'stocks', 'voir'), false);
   assert.equal(roleHasPermission(salesRole, null, 'stocks', 'voir'), true);
+});
+
+test('applique la hiérarchie voir, créer, modifier', () => {
+  const checks = role({ commerce: ['créer', 'modifier'] });
+  const has = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') =>
+    roleHasPermission(checks, nodes[1], moduleId, permission);
+  assert.equal(hasEffectivePermission(has, 'commerce', 'voir'), false);
+  assert.equal(hasEffectivePermission(has, 'commerce', 'créer'), false);
+  assert.equal(hasEffectivePermission(has, 'commerce', 'modifier'), false);
+
+  const createOnly = role({ commerce: ['voir', 'créer'] });
+  const createHas = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') =>
+    roleHasPermission(createOnly, nodes[1], moduleId, permission);
+  assert.equal(hasEffectivePermission(createHas, 'commerce', 'voir'), true);
+  assert.equal(hasEffectivePermission(createHas, 'commerce', 'créer'), true);
+  assert.equal(hasEffectivePermission(createHas, 'commerce', 'modifier'), false);
+  assert.deepEqual(effectiveFeaturePermissions(['créer', 'modifier']), []);
+  assert.deepEqual(effectiveFeaturePermissions(['voir', 'modifier']), ['voir']);
+  assert.deepEqual(effectiveFeaturePermissions(['voir', 'créer', 'modifier']), ['voir', 'créer', 'modifier']);
 });
 
 test('hérite des permissions détaillées du module', () => {
@@ -213,6 +234,28 @@ test('respecte les sous-permissions explicites Présences', () => {
   );
   assert.equal(
     employeeHasPresencePermission(presenceRole, presenceNode, 'create', canPermission),
+    false,
+  );
+});
+
+test('ne transforme pas une correction Présences en droit de modification sans ladder', () => {
+  const correctionOnly = role({
+    'presence.view': ['allowed'],
+    'presence.correct': ['allowed'],
+  });
+  const presenceNode: OrgNode = { ...nodes[1], moduleIds: ['presences'] };
+  const canPermission = (_moduleId: ModuleId, _action: 'voir' | 'créer' | 'modifier') => true;
+
+  assert.equal(
+    employeeHasPresencePermission(correctionOnly, presenceNode, 'correct', canPermission),
+    true,
+  );
+  assert.equal(
+    employeeHasPresencePermission(correctionOnly, presenceNode, 'edit', canPermission),
+    false,
+  );
+  assert.equal(
+    employeeHasPresencePermission(correctionOnly, presenceNode, 'create', canPermission),
     false,
   );
 });

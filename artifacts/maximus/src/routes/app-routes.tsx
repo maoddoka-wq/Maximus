@@ -2,6 +2,7 @@ import type { ComponentType, ReactElement } from 'react';
 import type { ModuleAvailability, ModuleId, SectorPreset, StoreData } from '@/lib/store';
 import type { Employee } from '@/lib/store';
 import type { PresencePermission } from '@/lib/employee-permissions';
+import { effectiveFeaturePermissions, hasEffectivePermission } from '@/lib/employee-permissions';
 import { moduleDescriptorById, moduleIdForPath } from '@/lib/module-registry';
 import { normalizeRoutePath } from '@/lib/navigation';
 import { buildAdminAssistantInsights } from '@/lib/local-assistant';
@@ -247,6 +248,15 @@ export function CompanyRouter({
   const hiddenWorkspaceFeatureSet = new Set(hiddenWorkspaceFeatures ?? []);
   const isWorkspaceFeatureHidden = (featureId: CompanyWorkspaceFeatureId) =>
     hiddenWorkspaceFeatureSet.has(featureId);
+  const effective = (moduleId: ModuleId, permission: 'voir' | 'créer' | 'modifier') =>
+    hasEffectivePermission(hasPermission, moduleId, permission);
+  const effectiveFeatures = (features: Partial<Record<string, string[]>> | undefined) =>
+    features && Object.fromEntries(
+      Object.entries(features).map(([featureId, permissions]) => [
+        featureId,
+        effectiveFeaturePermissions(permissions) ?? [],
+      ]),
+    ) as Partial<Record<string, string[]>> | undefined;
   const routeModuleOverrides: Partial<Record<string, ModuleId>> = {
     '/entreprise/finance': 'finance',
     '/entreprise/rh': 'rh',
@@ -379,26 +389,26 @@ export function CompanyRouter({
       companyId,
       companyUsers: data.employees.filter(item => item.companyId === companyId),
       companyServices: data.orgNodes.filter(node => node.companyId === companyId),
-      canCreate: hasPermission('stocks', 'créer'),
-      canModify: hasPermission('stocks', 'modifier'),
-      stockPermissions,
+      canCreate: effective('stocks', 'créer'),
+      canModify: effective('stocks', 'modifier'),
+      stockPermissions: effectiveFeatures(stockPermissions),
     });
   }
   if (routePath === '/entreprise/ecommerce') {
     return renderCompanyModule(screens.ecommerce, {
       companyId,
-      canCreate: hasPermission('ecommerce', 'créer'),
-      canModify: hasPermission('ecommerce', 'modifier'),
+      canCreate: effective('ecommerce', 'créer'),
+      canModify: effective('ecommerce', 'modifier'),
       allowedFeatureIds: ecommerceFeatureIds,
-      featurePermissions: ecommerceFeaturePermissions,
+      featurePermissions: effectiveFeatures(ecommerceFeaturePermissions),
     });
   }
   if (routePath === '/entreprise/immobilier') {
     return renderCompanyModule(screens.immobilier, {
       companyId,
-      canCreate: hasPermission('immobilier', 'créer'),
-      canModify: hasPermission('immobilier', 'modifier'),
-      featurePermissions: moduleFeaturePermissions?.immobilier,
+      canCreate: effective('immobilier', 'créer'),
+      canModify: effective('immobilier', 'modifier'),
+      featurePermissions: effectiveFeatures(moduleFeaturePermissions?.immobilier),
       activeFeatureId: query.get('feature') ?? 'dashboard',
     });
   }
@@ -407,8 +417,8 @@ export function CompanyRouter({
       data,
       mutate,
       companyId,
-      canCreate: hasPermission('finance', 'créer'),
-      canModify: hasPermission('finance', 'modifier'),
+      canCreate: effective('finance', 'créer'),
+      canModify: effective('finance', 'modifier'),
     });
   }
   if (routePath === '/entreprise/commerce' || routePath === '/entreprise/ventes') {
@@ -416,9 +426,9 @@ export function CompanyRouter({
       companyId,
       data,
       mutate,
-      canCreate: hasPermission('commerce', 'créer') || hasPermission('ventes', 'créer'),
-      canModify: hasPermission('commerce', 'modifier') || hasPermission('ventes', 'modifier'),
-      tabPermissions: commerceTabPermissions,
+      canCreate: effective('commerce', 'créer') || effective('ventes', 'créer'),
+      canModify: effective('commerce', 'modifier') || effective('ventes', 'modifier'),
+      tabPermissions: effectiveFeatures(commerceTabPermissions),
       allowedTabs: commerceTabIds,
       initialTab: routePath === '/entreprise/ventes' ? 'sales' : 'dashboard',
       onNavigate,
@@ -428,10 +438,10 @@ export function CompanyRouter({
     return renderCompanyModule(screens.payroll, {
       companyId,
       employees: data.employees.filter(item => item.companyId === companyId),
-      canCreate: hasPermission('paie', 'créer'),
-      canModify: hasPermission('paie', 'modifier'),
+      canCreate: effective('paie', 'créer'),
+      canModify: effective('paie', 'modifier'),
       visibleFeatureIds: payrollFeatureIds,
-      featurePermissions: payrollFeaturePermissions,
+      featurePermissions: effectiveFeatures(payrollFeaturePermissions),
       activeFeatureId: normalizePayrollFeatureId(query.get('feature') ?? '') ?? 'tableau-de-bord',
       onNavigate,
     });
@@ -441,8 +451,8 @@ export function CompanyRouter({
       companyId,
       employees: employees.filter(item => item.companyId === companyId),
       currentEmployeeId: employee?.id ?? null,
-      canCreate: hasPermission('transport', 'créer'),
-      canModify: hasPermission('transport', 'modifier'),
+      canCreate: effective('transport', 'créer'),
+      canModify: effective('transport', 'modifier'),
       allowedFeatureIds: transportFeatureIds,
       featurePermissions: transportFeaturePermissions,
       initialTab: query.get('tab') ?? undefined,
@@ -457,9 +467,9 @@ export function CompanyRouter({
       moduleId: operationalModule,
       data,
       mutate,
-      canCreate: hasPermission(operationalModule, 'créer'),
-      canModify: hasPermission(operationalModule, 'modifier'),
-      featurePermissions: moduleFeaturePermissions?.[operationalModule],
+      canCreate: effective(operationalModule, 'créer'),
+      canModify: effective(operationalModule, 'modifier'),
+      featurePermissions: effectiveFeatures(moduleFeaturePermissions?.[operationalModule]),
     });
   }
   if (routePath === '/entreprise/rh') {
@@ -469,8 +479,6 @@ export function CompanyRouter({
       companyAdmin,
       employee,
       companyId,
-      canCreate: hasPermission('rh', 'créer'),
-      canModify: hasPermission('rh', 'modifier'),
     });
   }
   if (routePath === '/entreprise/presences') {
@@ -482,14 +490,14 @@ export function CompanyRouter({
       canView: hasPresencePermission('view'),
       canCreate: hasPresencePermission('create'),
       canEdit: hasPresencePermission('edit'),
-      canCorrect: hasPresencePermission('correct'),
-       canValidate: hasPresencePermission('validate') && (companyAdmin || sectorManager),
+      canCorrect: hasPresencePermission('correct') && hasPresencePermission('edit'),
+      canValidate: hasPresencePermission('validate') && (companyAdmin || sectorManager),
       canManage: hasPresencePermission('manage'),
       canGenerateQr: hasPresencePermission('create') && !Boolean(employee && !companyAdmin && !sectorManager),
       canExport: hasPresencePermission('export'),
       canDelete: hasPresencePermission('delete'),
       visibleFeatureIds: presenceFeatureIds,
-      featurePermissions: moduleFeaturePermissions?.presences,
+      featurePermissions: effectiveFeatures(moduleFeaturePermissions?.presences),
       selfOnly: Boolean(employee && !companyAdmin && !sectorManager),
     });
   }
@@ -509,7 +517,7 @@ export function CompanyRouter({
         finance: canViewFeature('finance', 'reports') || canViewFeature('comptabilite', 'reports'),
         activity: canViewFeature('rapports', 'activity') || canViewFeature('rapports', 'reports'),
       },
-      canExport: hasPermission('rapports', 'modifier'),
+      canExport: effective('rapports', 'modifier'),
     });
   }
   return renderScreen(screens.empty, {

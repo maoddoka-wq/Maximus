@@ -7,6 +7,7 @@ use App\Services\EcommerceDomainVerifier;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleCatalog;
 use App\Support\MaximusAuth;
+use App\Support\ModuleAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,34 @@ class EcommerceTest extends TestCase
         ])->assertForbidden();
 
         $this->assertDatabaseMissing('ecommerce_products', ['sku' => 'FORBIDDEN-01']);
+    }
+
+    public function test_ecommerce_crud_requires_the_permission_ladder_on_the_same_feature(): void
+    {
+        $actor = fn (array $permissions): array => [
+            'role' => 'employee',
+            'companyId' => 'kora',
+            'permissions' => ['ecommerce:menu:catalogue' => $permissions],
+        ];
+
+        $viewOnly = $actor(['voir']);
+        $this->assertTrue(ModuleAuthorization::allows($viewOnly, 'ecommerce', 'view', 'catalogue'));
+        $this->assertFalse(ModuleAuthorization::allows($viewOnly, 'ecommerce', 'create', 'catalogue'));
+        $this->assertFalse(ModuleAuthorization::allows($viewOnly, 'ecommerce', 'modify', 'catalogue'));
+        $this->assertFalse(ModuleAuthorization::allows($viewOnly, 'ecommerce', 'delete', 'catalogue'));
+
+        $viewAndCreate = $actor(['voir', 'créer']);
+        $this->assertTrue(ModuleAuthorization::allows($viewAndCreate, 'ecommerce', 'create', 'catalogue'));
+        $this->assertFalse(ModuleAuthorization::allows($viewAndCreate, 'ecommerce', 'modify', 'catalogue'));
+        $this->assertFalse(ModuleAuthorization::allows($viewAndCreate, 'ecommerce', 'delete', 'catalogue'));
+
+        $modifyWithoutCreate = $actor(['voir', 'modifier']);
+        $this->assertFalse(ModuleAuthorization::allows($modifyWithoutCreate, 'ecommerce', 'modify', 'catalogue'));
+        $this->assertFalse(ModuleAuthorization::allows($modifyWithoutCreate, 'ecommerce', 'delete', 'catalogue'));
+
+        $fullAccess = $actor(['voir', 'créer', 'modifier']);
+        $this->assertTrue(ModuleAuthorization::allows($fullAccess, 'ecommerce', 'modify', 'catalogue'));
+        $this->assertTrue(ModuleAuthorization::allows($fullAccess, 'ecommerce', 'delete', 'catalogue'));
     }
 
     public function test_detailed_settings_permission_allows_store_logo_upload(): void

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
+use App\Support\ModuleAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -270,6 +271,18 @@ class TransportTest extends TestCase
 
     public function test_transport_permissions_are_scoped_to_each_feature(): void
     {
+        $actor = fn (array $permissions): array => [
+            'role' => 'employee',
+            'companyId' => 'kora',
+            'permissions' => ['transport:menu:drivers' => $permissions],
+        ];
+        $modifyWithoutCreate = $actor(['voir', 'modifier']);
+        $this->assertFalse(ModuleAuthorization::allows($modifyWithoutCreate, 'transport', 'modify', 'drivers'));
+        $this->assertFalse(ModuleAuthorization::allows($modifyWithoutCreate, 'transport', 'delete', 'drivers'));
+        $this->assertTrue(ModuleAuthorization::allows($actor(['voir', 'créer']), 'transport', 'create', 'drivers'));
+        $this->assertFalse(ModuleAuthorization::allows($actor(['voir', 'créer']), 'transport', 'edit', 'drivers'));
+        $this->assertTrue(ModuleAuthorization::allows($actor(['voir', 'créer', 'modifier']), 'transport', 'delete', 'drivers'));
+
         $request = $this->asActor('employee', [
             'transport:menu:drivers' => ['voir', 'créer', 'modifier'],
         ]);

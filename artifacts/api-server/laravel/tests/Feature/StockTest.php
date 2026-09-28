@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
+use App\Support\ModuleAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -217,6 +218,32 @@ class StockTest extends TestCase
         ])->assertForbidden();
 
         $this->assertDatabaseMissing('stock_products', ['sku' => 'FORBIDDEN-01']);
+    }
+
+    public function test_stock_feature_requires_the_permission_ladder_for_mutations(): void
+    {
+        $actor = fn (array $permissions): array => [
+            'role' => 'employee',
+            'companyId' => 'kora',
+            'permissions' => ['stocks:products' => $permissions],
+        ];
+
+        $viewOnly = $actor(['voir']);
+        $this->assertTrue(ModuleAuthorization::allows($viewOnly, 'stocks', 'view', 'products'));
+        $this->assertFalse(ModuleAuthorization::allows($viewOnly, 'stocks', 'create', 'products'));
+        $this->assertFalse(ModuleAuthorization::allows($viewOnly, 'stocks', 'modify', 'products'));
+        $this->assertFalse(ModuleAuthorization::allows($viewOnly, 'stocks', 'delete', 'products'));
+
+        $viewAndCreate = $actor(['voir', 'créer']);
+        $this->assertTrue(ModuleAuthorization::allows($viewAndCreate, 'stocks', 'create', 'products'));
+        $this->assertFalse(ModuleAuthorization::allows($viewAndCreate, 'stocks', 'modify', 'products'));
+
+        $modifyWithoutCreate = $actor(['voir', 'modifier']);
+        $this->assertFalse(ModuleAuthorization::allows($modifyWithoutCreate, 'stocks', 'modify', 'products'));
+
+        $fullAccess = $actor(['voir', 'créer', 'modifier']);
+        $this->assertTrue(ModuleAuthorization::allows($fullAccess, 'stocks', 'modify', 'products'));
+        $this->assertTrue(ModuleAuthorization::allows($fullAccess, 'stocks', 'delete', 'products'));
     }
 
     private function asActor(string $role = 'company_admin', array $permissions = []): self

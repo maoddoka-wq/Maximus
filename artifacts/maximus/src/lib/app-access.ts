@@ -258,8 +258,13 @@ export function buildAppAccessContext({
       getModuleFeatureOptions(transportModule).map(feature => [
         feature.id,
         {
-          canCreate: companyAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'créer'),
-          canModify: companyAdmin || roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'modifier'),
+          canCreate: companyAdmin
+            || (roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'voir')
+              && roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'créer')),
+          canModify: companyAdmin
+            || (roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'voir')
+              && roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'créer')
+              && roleHasFeaturePermission(accessRole, employeeNode, transportModule.id, feature.id, 'modifier')),
         },
       ]),
     )

@@ -9,6 +9,12 @@ Company payment access must be stored and checked independently from module acti
 
 **How to apply:** Protect every operation that creates a provider charge or payout with the company payment setting. Keep read-only history and reconciliation views available, and leave subscription billing separate because it pays for the platform rather than the company’s own payment capability.
 
+The dedicated `finances` permission remains distinct from the generic CRUD ladder; do not infer or require a create right for a specialized wallet or payment operation.
+
+**Why:** Financial actions use their own authorization and payment-availability controls, and may legitimately have a direct `modifier` permission without a business-record creation right.
+
+**How to apply:** Keep the payment-setting guard and the feature-specific permission check on financial operations. Apply the view/create/modify ladder only to ordinary business-record CRUD.
+
 For dedicated installations, central payment settings must be part of the signed configuration snapshot, applied locally as one transaction, and advance each non-revoked installation’s configuration version when changed.
 
 **Why:** Central and isolated installations have separate databases; changing the administrative value centrally does not update local payment guards unless the sync contract carries it.

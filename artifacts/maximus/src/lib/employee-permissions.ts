@@ -12,6 +12,31 @@ import { stockSubmodules, type Module } from './store';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
+
+/** Applies the permission ladder to a raw module permission check. */
+export function hasEffectivePermission(
+  hasPermission: (moduleId: ModuleId, permission: ModulePermission) => boolean,
+  moduleId: ModuleId,
+  permission: ModulePermission,
+) {
+  if (!hasPermission(moduleId, 'voir')) return false;
+  if (permission === 'voir') return true;
+  if (!hasPermission(moduleId, 'créer')) return false;
+  return permission === 'créer' || hasPermission(moduleId, 'modifier');
+}
+
+/** Removes create/update actions that do not satisfy the complete ladder. */
+export function effectiveFeaturePermissions(permissions: string[] | undefined) {
+  if (!permissions) return permissions;
+  const allowed = new Set(permissions);
+  if (!allowed.has('voir')) {
+    allowed.delete('créer');
+    allowed.delete('modifier');
+  } else if (!allowed.has('créer')) {
+    allowed.delete('modifier');
+  }
+  return [...allowed];
+}
 const presenceOperationalPermissions = new Set<PresencePermission>([
   'view',
   'create',
@@ -201,12 +226,27 @@ export function employeeHasPresencePermission(
   const hasExplicitPermissions = operationalPermissions.some(key => Object.prototype.hasOwnProperty.call(role.modulePermissions, `presence.${key}`));
 
   if (hasExplicitPermissions) {
-    return Boolean(explicitPermission?.length);
+    if (!explicitPermission?.length) return false;
+    if (permission === 'create') {
+      return Boolean(role.modulePermissions['presence.view']?.length
+        && role.modulePermissions['presence.create']?.length);
+    }
+    if (permission === 'edit' || permission === 'delete') {
+      return Boolean(
+        role.modulePermissions['presence.view']?.length
+        && role.modulePermissions['presence.create']?.length
+        && role.modulePermissions['presence.edit']?.length,
+      );
+    }
+    return true;
   }
 
   if (permission === 'view') return hasPermission('presences', 'voir');
-  if (permission === 'create') return hasPermission('presences', 'créer');
-  return hasPermission('presences', 'modifier');
+  return hasEffectivePermission(
+    hasPermission,
+    'presences',
+    permission === 'create' ? 'créer' : 'modifier',
+  );
 }
 
 export function getStockPermissions(
