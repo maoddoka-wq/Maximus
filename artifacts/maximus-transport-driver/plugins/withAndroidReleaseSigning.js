@@ -14,6 +14,7 @@ module.exports = function withAndroidReleaseSigning(config) {
     const releaseSigningConfig = `signingConfigs {
         release {
             storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+            storeType "PKCS12"
             storePassword System.getenv("ANDROID_STORE_PASSWORD")
             keyAlias System.getenv("ANDROID_KEY_ALIAS")
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")

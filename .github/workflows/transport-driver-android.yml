@@ -93,7 +93,7 @@ jobs:
               exit 1
             fi
           done
-          key_path="$GITHUB_WORKSPACE/artifacts/maximus-transport-driver/android/app/upload-key.jks"
+          key_path="$GITHUB_WORKSPACE/artifacts/maximus-transport-driver/android/app/upload-key.p12"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$key_path"
           test -s "$key_path"
           echo "ANDROID_KEYSTORE_PATH=$key_path" >> "$GITHUB_ENV"

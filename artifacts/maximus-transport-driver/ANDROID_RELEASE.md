@@ -12,7 +12,7 @@ Le QR affiché dans Transport lit cette release stable. Son APK est public parce
 
 Avant la première publication, ajouter ces secrets dans les paramètres GitHub du dépôt, sous **Secrets and variables → Actions** :
 
-- `ANDROID_KEYSTORE_BASE64` : keystore Android encodé en Base64
+- `ANDROID_KEYSTORE_BASE64` : keystore Android au format PKCS#12 (`.p12`) encodé en Base64
 - `ANDROID_KEY_ALIAS` : alias de la clé de publication
 - `ANDROID_KEY_PASSWORD` : mot de passe de la clé
 - `ANDROID_STORE_PASSWORD` : mot de passe du keystore
