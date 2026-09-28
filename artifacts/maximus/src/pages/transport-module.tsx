@@ -58,6 +58,21 @@ type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
 type VehicleFormInput = Omit<CreateVehicleInput, 'imageData'> & { imageData?: string };
 
 const publicHexColor = /^#[0-9a-f]{6}$/i;
+const driverGpsOptions: PositionOptions = {
+  enableHighAccuracy: true,
+  maximumAge: 15_000,
+  timeout: 45_000,
+};
+
+const browserLocationError = (code: number) => {
+  if (code === 1) {
+    return 'Autorisez la localisation de ce site et vérifiez aussi l’autorisation de localisation de Chrome dans les réglages Android.';
+  }
+  if (code === 2) {
+    return 'Le téléphone n’a pas transmis de position. Vérifiez que la localisation précise est autorisée pour Chrome, puis réessayez.';
+  }
+  return 'La recherche GPS prend plus de temps que prévu. Gardez cette page ouverte quelques instants ; le navigateur réessaiera automatiquement.';
+};
 
 function colorLuminance(hex: string): number {
   const channels = [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
@@ -215,6 +230,7 @@ export default function TransportModulePage({
   const [driverFullscreenFallback, setDriverFullscreenFallback] = useState(false);
   const driverSpaceRef = useRef<HTMLDivElement | null>(null);
   const autoPauseAttempted = useRef(false);
+  const hasConfirmedDriverLocation = useRef(false);
   const currentDriver = useMemo(
     () => currentEmployeeId ? data?.drivers.find(driver => driver.employeeId === currentEmployeeId) ?? null : null,
     [currentEmployeeId, data?.drivers],
@@ -283,6 +299,8 @@ export default function TransportModulePage({
     }
 
     let disposed = false;
+    let refreshPending = false;
+    hasConfirmedDriverLocation.current = false;
     setLocationActive(false);
 
     const pauseAvailableDriver = async (reason: string) => {
@@ -329,6 +347,7 @@ export default function TransportModulePage({
       try {
         const driver = await api.updateDriverLocation(currentDriverId, coords);
         if (disposed) return;
+        hasConfirmedDriverLocation.current = true;
         setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
         autoPauseAttempted.current = false;
         setLocationError('');
@@ -340,9 +359,13 @@ export default function TransportModulePage({
     };
 
     const handleLocationError = (code: number) => {
-      blockForLocation(code === 1
-        ? 'Autorisez la localisation de ce site dans les réglages du navigateur pour continuer.'
-        : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+      if (disposed) return;
+      const reason = browserLocationError(code);
+      if (hasConfirmedDriverLocation.current) {
+        setLocationError(`${reason} La position reçue précédemment peut être temporairement ancienne.`);
+        return;
+      }
+      blockForLocation(reason);
     };
 
     let watchId: number;
@@ -355,7 +378,7 @@ export default function TransportModulePage({
           });
         },
         ({ code }) => handleLocationError(code),
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
+        driverGpsOptions,
       );
     } catch {
       blockForLocation('Le navigateur n’a pas pu démarrer le suivi GPS. Vérifiez ses autorisations de localisation.');
@@ -364,13 +387,28 @@ export default function TransportModulePage({
       };
     }
 
-    const refreshId = window.setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => void sendLocation({ latitude: coords.latitude, longitude: coords.longitude }),
-        () => blockForLocation('Aucune nouvelle position GPS fiable n’a été reçue. Vérifiez que la localisation reste activée.'),
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
-      );
-    }, trackingIntervalSeconds * 1000);
+    const refreshLocation = () => {
+      if (disposed || refreshPending) return;
+      refreshPending = true;
+      try {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            refreshPending = false;
+            void sendLocation({ latitude: coords.latitude, longitude: coords.longitude });
+          },
+          ({ code }) => {
+            refreshPending = false;
+            handleLocationError(code);
+          },
+          driverGpsOptions,
+        );
+      } catch {
+        refreshPending = false;
+        handleLocationError(2);
+      }
+    };
+
+    const refreshId = window.setInterval(refreshLocation, trackingIntervalSeconds * 1000);
 
     return () => {
       disposed = true;
