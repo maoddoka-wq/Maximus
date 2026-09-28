@@ -18,6 +18,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { useColors } from '@/hooks/useColors';
 import { radius, spacing } from '@/constants/colors';
 import { useDriverSession } from '@/contexts/DriverSessionContext';
+import { DriverTripsPanel } from '@/components/DriverTripsPanel';
 import { API_ORIGIN } from '@/lib/mobile-api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -287,6 +288,7 @@ function LoadingScreen() {
 function DriverDashboard() {
   const theme = useColors();
   const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<'courses' | 'history' | 'account'>('courses');
   const {
     driver,
     isRefreshingSession,
@@ -337,82 +339,131 @@ function DriverDashboard() {
             Bonjour{driver?.name ? `, ${driver.name}` : ''}
           </Text>
           <Text style={[styles.cardBody, { color: theme.sidebarForeground, opacity: 0.78 }]}>
-            Le suivi GPS est désactivé dans cette application. Vous pouvez consulter votre statut,
-            mais vous ne pouvez pas devenir disponible ici.
+            Consultez les courses affectées, acceptez une demande libre et retrouvez votre
+            historique. Cette application n’utilise pas le GPS.
           </Text>
         </View>
 
-        <View style={[styles.statusCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.statusHeading}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.eyebrow, { color: theme.mutedForeground }]}>DISPONIBILITÉ</Text>
-              <Text style={[styles.statusTitle, { color: theme.cardForeground }]}>{statusLabel}</Text>
+        <View style={[styles.dashboardTabs, { backgroundColor: theme.muted }]}>
+          {([
+            { id: 'courses', label: 'Courses', icon: 'car-outline' },
+            { id: 'history', label: 'Historique', icon: 'time-outline' },
+            { id: 'account', label: 'Compte', icon: 'person-outline' },
+          ] as const).map((tab) => {
+            const selected = activeTab === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => setActiveTab(tab.id)}
+                style={({ pressed }) => [
+                  styles.dashboardTab,
+                  {
+                    backgroundColor: selected ? theme.primary : theme.card,
+                    borderColor: selected ? theme.primary : theme.border,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={tab.icon}
+                  size={16}
+                  color={selected ? theme.primaryForeground : theme.mutedForeground}
+                />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.dashboardTabText,
+                    { color: selected ? theme.primaryForeground : theme.mutedForeground },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {activeTab === 'courses' || activeTab === 'history' ? (
+          <DriverTripsPanel view={activeTab} />
+        ) : (
+          <>
+            <View style={[styles.statusCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.statusHeading}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.eyebrow, { color: theme.mutedForeground }]}>DISPONIBILITÉ</Text>
+                  <Text style={[styles.statusTitle, { color: theme.cardForeground }]}>{statusLabel}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor:
+                        driver?.availability === 'AVAILABLE' ? theme.primary : theme.secondary,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      driver?.availability === 'ON_TRIP'
+                        ? 'car-sport'
+                        : driver?.availability === 'AVAILABLE'
+                          ? 'checkmark-circle'
+                          : 'pause-circle'
+                    }
+                    size={18}
+                    color={
+                      driver?.availability === 'AVAILABLE'
+                        ? theme.primaryForeground
+                        : theme.secondaryForeground
+                    }
+                  />
+                </View>
+              </View>
+              <Text style={[styles.cardBody, { color: theme.mutedForeground }]}>
+                {driver?.availability === 'ON_TRIP'
+                  ? 'Une offre ou une course vous est affectée. Acceptez-la, refusez-la ou gérez son avancement dans Courses.'
+                  : driver?.availability === 'AVAILABLE'
+                    ? 'Le GPS n’est pas utilisé ici. La mise en pause automatique évite de conserver une disponibilité sans position récente.'
+                    : 'La disponibilité GPS reste désactivée, mais vous pouvez accepter une demande libre depuis Courses si un véhicule est rattaché à votre profil.'}
+              </Text>
+              {driver?.availability === 'AVAILABLE' ? (
+                <PrimaryButton
+                  title="Me mettre en pause"
+                  onPress={() => void changeAvailability('PAUSED')}
+                  loading={isChangingAvailability}
+                  icon="pause"
+                />
+              ) : null}
             </View>
-            <View
-              style={[
-                styles.statusBadge,
-                {
-                  backgroundColor:
-                    driver?.availability === 'AVAILABLE' ? theme.primary : theme.secondary,
-                },
+
+            <InlineNotice message="Cette version ne demande pas l’accès au GPS et n’envoie aucune position. La disponibilité automatique ne peut pas être activée ici." />
+
+            {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSigningOut}
+              onPress={() => void signOut()}
+              style={({ pressed }) => [
+                styles.logoutButton,
+                { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
               ]}
             >
-              <Ionicons
-                name={
-                  driver?.availability === 'ON_TRIP'
-                    ? 'car-sport'
-                    : driver?.availability === 'AVAILABLE'
-                      ? 'checkmark-circle'
-                      : 'pause-circle'
-                }
-                size={18}
-                color={
-                  driver?.availability === 'AVAILABLE'
-                    ? theme.primaryForeground
-                    : theme.secondaryForeground
-                }
-              />
-            </View>
-          </View>
-          <Text style={[styles.cardBody, { color: theme.mutedForeground }]}>
-            {driver?.availability === 'ON_TRIP'
-              ? 'Cette application ne transmet plus la position GPS. Terminez la course dans MAXIMUS avant de vous déconnecter.'
-              : driver?.availability === 'AVAILABLE'
-                ? 'Le suivi GPS est désactivé. La mise en pause automatique évite d’utiliser une ancienne position.'
-                : 'La mise en disponibilité est désactivée dans MAXIMUS Chauffeur car elle nécessite une position GPS récente.'}
-          </Text>
-          {driver?.availability === 'AVAILABLE' ? (
-            <PrimaryButton
-              title="Me mettre en pause"
-              onPress={() => void changeAvailability('PAUSED')}
-              loading={isChangingAvailability}
-              icon="pause"
-            />
-          ) : null}
-        </View>
-
-        <InlineNotice message="Cette version ne demande plus l’accès au GPS et n’envoie aucune position. La disponibilité ne peut pas être activée ici." />
-
-        {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSigningOut}
-          onPress={() => void signOut()}
-          style={({ pressed }) => [
-            styles.logoutButton,
-            { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          {isSigningOut ? (
-            <ActivityIndicator color={theme.mutedForeground} />
-          ) : (
-            <>
-              <Ionicons name="log-out-outline" size={19} color={theme.mutedForeground} />
-              <Text style={[styles.logoutLabel, { color: theme.mutedForeground }]}>Se déconnecter</Text>
-            </>
-          )}
-        </Pressable>
+              {isSigningOut ? (
+                <ActivityIndicator color={theme.mutedForeground} />
+              ) : (
+                <>
+                  <Ionicons name="log-out-outline" size={19} color={theme.mutedForeground} />
+                  <Text style={[styles.logoutLabel, { color: theme.mutedForeground }]}>
+                    Se déconnecter
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -557,6 +608,24 @@ const styles = StyleSheet.create({
   },
   welcomePanel: { padding: spacing * 5, gap: spacing * 2 },
   welcomeTitle: { fontFamily: fonts.bold, fontSize: 25, lineHeight: 32 },
+  dashboardTabs: {
+    flexDirection: 'row',
+    gap: spacing,
+    padding: spacing,
+    borderRadius: radius,
+  },
+  dashboardTab: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: radius * 0.72,
+    paddingHorizontal: spacing,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing,
+  },
+  dashboardTabText: { fontFamily: fonts.semibold, fontSize: 11 },
   statusCard: { borderWidth: 1, borderRadius: radius, padding: spacing * 4, gap: spacing * 3 },
   statusHeading: { flexDirection: 'row', alignItems: 'center' },
   statusTitle: { fontFamily: fonts.bold, fontSize: 20, marginTop: spacing },

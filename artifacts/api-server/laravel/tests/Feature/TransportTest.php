@@ -963,6 +963,159 @@ class TransportTest extends TestCase
         $this->patchJson('/api/transport/mobile/availability', ['availability' => 'PAUSED'], $headers)->assertStatus(422);
     }
 
+    public function test_mobile_driver_can_accept_start_complete_and_review_trips_without_gps(): void
+    {
+        $driverId = 'mobile-trip-driver';
+        $vehicleId = 'mobile-trip-vehicle';
+        $this->createDriverEmployee($driverId);
+        $this->insertMobileDriver($driverId);
+        $this->insertMobileVehicle($vehicleId, $driverId);
+        $headers = $this->mobileBearerHeaders($driverId);
+
+        $this->insertMobileTrip('mobile-free-trip');
+        $this->getJson('/api/transport/mobile/trips?companyId=another-company', $headers)
+            ->assertOk()
+            ->assertJsonPath('activeTrips', [])
+            ->assertJsonPath('availableTrips.0.id', 'mobile-free-trip')
+            ->assertJsonPath('availableTrips.0.passengerName', null)
+            ->assertJsonPath('availableTrips.0.passengerPhone', null)
+            ->assertJsonPath('availableTrips.0.pickupCodeRequired', false);
+
+        $accepted = $this->postJson(
+            '/api/transport/mobile/trips/mobile-free-trip/accept?companyId=another-company',
+            [],
+            $headers,
+        )->assertOk()
+            ->assertJsonPath('status', 'ASSIGNED')
+            ->assertJsonPath('passengerName', 'Passager mobile')
+            ->assertJsonPath('pickupCodeRequired', true)
+            ->assertJsonPath(
+                'vehicleRegistration',
+                'DK-MOBILE-'.strtoupper(substr(md5($vehicleId), 0, 5)),
+            );
+        $this->assertArrayNotHasKey('pickupCode', $accepted->json());
+
+        $this->patchJson('/api/transport/mobile/trips/mobile-free-trip/start', [
+            'pickupCode' => '0000',
+        ], $headers)->assertStatus(422)
+            ->assertJsonPath('error', 'Le code de prise en charge est incorrect.');
+
+        $this->patchJson('/api/transport/mobile/trips/mobile-free-trip/start', [
+            'pickupCode' => '4821',
+        ], $headers)->assertOk()
+            ->assertJsonPath('status', 'IN_PROGRESS');
+
+        $this->patchJson('/api/transport/mobile/trips/mobile-free-trip/complete', [], $headers)
+            ->assertOk()
+            ->assertJsonPath('status', 'COMPLETED');
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $driverId,
+            'availability' => 'PAUSED',
+        ]);
+        $this->assertDatabaseHas('transport_vehicles', [
+            'id' => $vehicleId,
+            'status' => 'AVAILABLE',
+        ]);
+
+        $this->insertMobileTrip('mobile-office-trip', [
+            'driver_id' => $driverId,
+            'vehicle_id' => $vehicleId,
+            'status' => 'ASSIGNED',
+            'assigned_at' => now(),
+        ]);
+        DB::table('transport_vehicles')->where('id', $vehicleId)->update(['status' => 'ON_TRIP']);
+        DB::table('transport_drivers')->where('id', $driverId)->update(['availability' => 'ON_TRIP']);
+
+        $this->getJson('/api/transport/mobile/trips', $headers)
+            ->assertOk()
+            ->assertJsonPath('activeTrips.0.id', 'mobile-office-trip')
+            ->assertJsonPath('availableTrips', []);
+        $this->patchJson('/api/transport/mobile/trips/mobile-office-trip/start', [
+            'pickupCode' => '4821',
+        ], $headers)->assertOk()
+            ->assertJsonPath('status', 'IN_PROGRESS');
+        $this->patchJson('/api/transport/mobile/trips/mobile-office-trip/complete', [], $headers)
+            ->assertOk()
+            ->assertJsonPath('status', 'COMPLETED');
+
+        $history = $this->getJson('/api/transport/mobile/trips?historyPage=1', $headers)
+            ->assertOk()
+            ->assertJsonPath('historyPage', 1)
+            ->assertJsonPath('historyHasMore', false);
+        $historyIds = collect($history->json('history'))->pluck('id')->all();
+        $this->assertContains('mobile-free-trip', $historyIds);
+        $this->assertContains('mobile-office-trip', $historyIds);
+        $this->assertDatabaseHas('transport_trip_events', [
+            'company_id' => 'kora',
+            'trip_id' => 'mobile-free-trip',
+            'actor_type' => 'driver',
+            'event_type' => 'accepted',
+        ]);
+    }
+
+    public function test_mobile_driver_can_decline_only_own_offer_and_cannot_access_another_company_trip(): void
+    {
+        $driverId = 'mobile-offer-driver';
+        $otherDriverId = 'mobile-offer-other-driver';
+        $vehicleId = 'mobile-offer-vehicle';
+        $otherVehicleId = 'mobile-offer-other-vehicle';
+        $this->createDriverEmployee($driverId);
+        $this->createDriverEmployee($otherDriverId);
+        $this->insertMobileDriver($driverId);
+        $this->insertMobileDriver($otherDriverId);
+        $this->insertMobileVehicle($vehicleId, $driverId);
+        $this->insertMobileVehicle($otherVehicleId, $otherDriverId);
+        $headers = $this->mobileBearerHeaders($driverId);
+
+        $this->insertMobileTrip('mobile-other-offer', [
+            'driver_id' => $otherDriverId,
+            'vehicle_id' => $otherVehicleId,
+            'status' => 'OFFERED',
+            'offer_expires_at' => now()->addMinute(),
+        ]);
+        $this->postJson('/api/transport/mobile/trips/mobile-other-offer/accept', [], $headers)
+            ->assertForbidden();
+
+        $this->insertMobileTrip('mobile-own-offer', [
+            'driver_id' => $driverId,
+            'vehicle_id' => $vehicleId,
+            'status' => 'OFFERED',
+            'offer_expires_at' => now()->addMinute(),
+        ]);
+        $this->getJson('/api/transport/mobile/trips', $headers)
+            ->assertOk()
+            ->assertJsonPath('activeTrips.0.id', 'mobile-own-offer')
+            ->assertJsonPath('activeTrips.0.passengerName', null)
+            ->assertJsonPath('activeTrips.0.pickupCodeRequired', false)
+            ->assertJsonPath('availableTrips', []);
+
+        $this->postJson('/api/transport/mobile/trips/mobile-own-offer/decline', [], $headers)
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+        $this->assertDatabaseHas('transport_trips', [
+            'id' => 'mobile-own-offer',
+            'company_id' => 'kora',
+            'status' => 'REQUESTED',
+            'driver_id' => null,
+            'vehicle_id' => null,
+        ]);
+        $this->getJson('/api/transport/mobile/trips?companyId=another-company', $headers)
+            ->assertOk()
+            ->assertJsonPath('availableTrips.0.id', 'mobile-own-offer');
+
+        $this->insertMobileTrip('mobile-other-company-trip', [
+            'company_id' => 'another-company',
+        ]);
+        $this->patchJson('/api/transport/mobile/trips/mobile-other-company-trip/start', [
+            'pickupCode' => '4821',
+        ], $headers)->assertNotFound();
+        $this->assertDatabaseHas('transport_trips', [
+            'id' => 'mobile-other-company-trip',
+            'company_id' => 'another-company',
+            'status' => 'REQUESTED',
+        ]);
+    }
+
     private function insertMobileDriver(string $id, string $company = 'kora'): void
     {
         DB::table('transport_drivers')->insert([
@@ -970,6 +1123,53 @@ class TransportTest extends TestCase
             'license_number' => 'MOBILE-'.$id, 'employee_id' => $id, 'status' => 'ACTIVE',
             'availability' => 'PAUSED', 'created_at' => now(), 'updated_at' => now(),
         ]);
+    }
+
+    private function insertMobileVehicle(string $id, string $driverId, string $company = 'kora'): void
+    {
+        DB::table('transport_vehicles')->insert([
+            'id' => $id,
+            'company_id' => $company,
+            'registration' => 'DK-MOBILE-'.strtoupper(substr(md5($id), 0, 5)),
+            'model' => 'Toyota Yaris',
+            'vehicle_type' => 'TAXI',
+            'driver_id' => $driverId,
+            'status' => 'AVAILABLE',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function insertMobileTrip(string $id, array $overrides = []): void
+    {
+        DB::table('transport_trips')->insert(array_merge([
+            'id' => $id,
+            'company_id' => 'kora',
+            'reference' => strtoupper($id),
+            'pickup' => 'Plateau',
+            'destination' => 'Fann',
+            'passenger_name' => 'Passager mobile',
+            'passenger_phone' => '+221770000077',
+            'fare' => 2500,
+            'driver_id' => null,
+            'vehicle_id' => null,
+            'status' => 'REQUESTED',
+            'requested_at' => now(),
+            'offer_expires_at' => null,
+            'pickup_code' => '4821',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $overrides));
+    }
+
+    private function mobileBearerHeaders(string $driverId): array
+    {
+        $token = $this->asActor('employee', [], $driverId)
+            ->postJson('/api/transport/mobile/session', [])
+            ->assertCreated()
+            ->json('accessToken');
+
+        return ['Authorization' => 'Bearer '.$token];
     }
 
     private function createDriverEmployee(string $id = 'driver-employee', string $displayName = 'Awa Ndiaye', string $phone = '+221770000000'): string

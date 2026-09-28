@@ -22,13 +22,18 @@ import type {
 import type {
   AuthLoginInput,
   AuthLoginResponse,
+  DriverMobileActionReceipt,
   DriverMobileAvailabilityInput,
   DriverMobileLocationInput,
   DriverMobileLocationReceipt,
   DriverMobileSessionCreated,
   DriverMobileSessionInput,
   DriverMobileSessionStatus,
+  DriverMobileTrip,
+  DriverMobileTripStartInput,
+  DriverMobileTrips,
   GetStockBootstrapParams,
+  GetTransportDriverMobileTripsParams,
   HealthStatus,
   StockBootstrap,
   StockInventory,
@@ -768,6 +773,393 @@ export const useUpdateTransportDriverMobileAvailability = <TError = ErrorType<vo
         TContext
       > => {
       return useMutation(getUpdateTransportDriverMobileAvailabilityMutationOptions(options));
+    }
+
+export const getGetTransportDriverMobileTripsUrl = (params?: GetTransportDriverMobileTripsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/transport/mobile/trips?${stringifiedParams}` : `/api/transport/mobile/trips`
+}
+
+/**
+ * @summary List the authenticated driver's active, available, and historical trips
+ */
+export const getTransportDriverMobileTrips = async (params?: GetTransportDriverMobileTripsParams, options?: Parameters<typeof customFetch>[1]): Promise<DriverMobileTrips> => {
+
+  return customFetch<DriverMobileTrips>(getGetTransportDriverMobileTripsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTransportDriverMobileTripsQueryKey = (params?: GetTransportDriverMobileTripsParams,) => {
+    return [
+    `/api/transport/mobile/trips`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTransportDriverMobileTripsQueryOptions = <TData = Awaited<ReturnType<typeof getTransportDriverMobileTrips>>, TError = ErrorType<void>>(params?: GetTransportDriverMobileTripsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTransportDriverMobileTrips>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTransportDriverMobileTripsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTransportDriverMobileTrips>>> = ({ signal }) => getTransportDriverMobileTrips(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTransportDriverMobileTrips>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTransportDriverMobileTripsQueryResult = NonNullable<Awaited<ReturnType<typeof getTransportDriverMobileTrips>>>
+export type GetTransportDriverMobileTripsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the authenticated driver's active, available, and historical trips
+ */
+
+export function useGetTransportDriverMobileTrips<TData = Awaited<ReturnType<typeof getTransportDriverMobileTrips>>, TError = ErrorType<void>>(
+ params?: GetTransportDriverMobileTripsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTransportDriverMobileTrips>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTransportDriverMobileTripsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAcceptTransportDriverMobileTripUrl = (id: string,) => {
+
+
+
+
+  return `/api/transport/mobile/trips/${id}/accept`
+}
+
+/**
+ * @summary Accept an available request or an offer assigned to the authenticated driver
+ */
+export const acceptTransportDriverMobileTrip = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<DriverMobileTrip> => {
+
+  return customFetch<DriverMobileTrip>(getAcceptTransportDriverMobileTripUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAcceptTransportDriverMobileTripMutationKey = () => ['acceptTransportDriverMobileTrip'] as const;
+
+export const getAcceptTransportDriverMobileTripMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptTransportDriverMobileTrip>>, TError,AcceptTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptTransportDriverMobileTrip>>, TError,AcceptTransportDriverMobileTripMutationVariables, TContext> => {
+
+const mutationKey = getAcceptTransportDriverMobileTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptTransportDriverMobileTrip>>, AcceptTransportDriverMobileTripMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  acceptTransportDriverMobileTrip(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptTransportDriverMobileTripMutationResult = NonNullable<Awaited<ReturnType<typeof acceptTransportDriverMobileTrip>>>
+
+    export type AcceptTransportDriverMobileTripMutationError = ErrorType<void>
+    export type AcceptTransportDriverMobileTripMutationVariables = {id: string}
+
+    /**
+ * @summary Accept an available request or an offer assigned to the authenticated driver
+ */
+export const useAcceptTransportDriverMobileTrip = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptTransportDriverMobileTrip>>, TError,AcceptTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptTransportDriverMobileTrip>>,
+        TError,
+        AcceptTransportDriverMobileTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAcceptTransportDriverMobileTripMutationOptions(options));
+    }
+
+export const getDeclineTransportDriverMobileTripUrl = (id: string,) => {
+
+
+
+
+  return `/api/transport/mobile/trips/${id}/decline`
+}
+
+/**
+ * @summary Decline an offer assigned to the authenticated driver
+ */
+export const declineTransportDriverMobileTrip = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<DriverMobileActionReceipt> => {
+
+  return customFetch<DriverMobileActionReceipt>(getDeclineTransportDriverMobileTripUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeclineTransportDriverMobileTripMutationKey = () => ['declineTransportDriverMobileTrip'] as const;
+
+export const getDeclineTransportDriverMobileTripMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineTransportDriverMobileTrip>>, TError,DeclineTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof declineTransportDriverMobileTrip>>, TError,DeclineTransportDriverMobileTripMutationVariables, TContext> => {
+
+const mutationKey = getDeclineTransportDriverMobileTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof declineTransportDriverMobileTrip>>, DeclineTransportDriverMobileTripMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  declineTransportDriverMobileTrip(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeclineTransportDriverMobileTripMutationResult = NonNullable<Awaited<ReturnType<typeof declineTransportDriverMobileTrip>>>
+
+    export type DeclineTransportDriverMobileTripMutationError = ErrorType<void>
+    export type DeclineTransportDriverMobileTripMutationVariables = {id: string}
+
+    /**
+ * @summary Decline an offer assigned to the authenticated driver
+ */
+export const useDeclineTransportDriverMobileTrip = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineTransportDriverMobileTrip>>, TError,DeclineTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof declineTransportDriverMobileTrip>>,
+        TError,
+        DeclineTransportDriverMobileTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeclineTransportDriverMobileTripMutationOptions(options));
+    }
+
+export const getStartTransportDriverMobileTripUrl = (id: string,) => {
+
+
+
+
+  return `/api/transport/mobile/trips/${id}/start`
+}
+
+/**
+ * @summary Start an assigned trip after validating its pickup code
+ */
+export const startTransportDriverMobileTrip = async (id: string,
+    driverMobileTripStartInput: DriverMobileTripStartInput, options?: Parameters<typeof customFetch>[1]): Promise<DriverMobileTrip> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<DriverMobileTrip>(getStartTransportDriverMobileTripUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(driverMobileTripStartInput)
+  }
+);}
+
+
+
+
+
+export const getStartTransportDriverMobileTripMutationKey = () => ['startTransportDriverMobileTrip'] as const;
+
+export const getStartTransportDriverMobileTripMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startTransportDriverMobileTrip>>, TError,StartTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startTransportDriverMobileTrip>>, TError,StartTransportDriverMobileTripMutationVariables, TContext> => {
+
+const mutationKey = getStartTransportDriverMobileTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startTransportDriverMobileTrip>>, StartTransportDriverMobileTripMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  startTransportDriverMobileTrip(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartTransportDriverMobileTripMutationResult = NonNullable<Awaited<ReturnType<typeof startTransportDriverMobileTrip>>>
+    export type StartTransportDriverMobileTripMutationBody = BodyType<DriverMobileTripStartInput>
+    export type StartTransportDriverMobileTripMutationError = ErrorType<void>
+    export type StartTransportDriverMobileTripMutationVariables = {id: string;data: BodyType<DriverMobileTripStartInput>}
+
+    /**
+ * @summary Start an assigned trip after validating its pickup code
+ */
+export const useStartTransportDriverMobileTrip = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startTransportDriverMobileTrip>>, TError,StartTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startTransportDriverMobileTrip>>,
+        TError,
+        StartTransportDriverMobileTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartTransportDriverMobileTripMutationOptions(options));
+    }
+
+export const getCompleteTransportDriverMobileTripUrl = (id: string,) => {
+
+
+
+
+  return `/api/transport/mobile/trips/${id}/complete`
+}
+
+/**
+ * @summary Complete the authenticated driver's trip
+ */
+export const completeTransportDriverMobileTrip = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<DriverMobileTrip> => {
+
+  return customFetch<DriverMobileTrip>(getCompleteTransportDriverMobileTripUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteTransportDriverMobileTripMutationKey = () => ['completeTransportDriverMobileTrip'] as const;
+
+export const getCompleteTransportDriverMobileTripMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeTransportDriverMobileTrip>>, TError,CompleteTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeTransportDriverMobileTrip>>, TError,CompleteTransportDriverMobileTripMutationVariables, TContext> => {
+
+const mutationKey = getCompleteTransportDriverMobileTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeTransportDriverMobileTrip>>, CompleteTransportDriverMobileTripMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  completeTransportDriverMobileTrip(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteTransportDriverMobileTripMutationResult = NonNullable<Awaited<ReturnType<typeof completeTransportDriverMobileTrip>>>
+
+    export type CompleteTransportDriverMobileTripMutationError = ErrorType<void>
+    export type CompleteTransportDriverMobileTripMutationVariables = {id: string}
+
+    /**
+ * @summary Complete the authenticated driver's trip
+ */
+export const useCompleteTransportDriverMobileTrip = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeTransportDriverMobileTrip>>, TError,CompleteTransportDriverMobileTripMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeTransportDriverMobileTrip>>,
+        TError,
+        CompleteTransportDriverMobileTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompleteTransportDriverMobileTripMutationOptions(options));
     }
 
 export const getGetStockBootstrapUrl = (params?: GetStockBootstrapParams,) => {

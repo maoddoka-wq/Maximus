@@ -146,6 +146,206 @@ export const UpdateTransportDriverMobileAvailabilityResponse = zod.object({
 
 
 /**
+ * @summary List the authenticated driver's active, available, and historical trips
+ */
+export const getTransportDriverMobileTripsQueryHistoryPageDefault = 1;
+
+
+
+export const GetTransportDriverMobileTripsQueryParams = zod.object({
+  "historyPage": zod.coerce.number().int().min(1).default(getTransportDriverMobileTripsQueryHistoryPageDefault)
+})
+
+export const getTransportDriverMobileTripsResponseActiveTripsItemFareMin = 0;
+
+export const getTransportDriverMobileTripsResponseAvailableTripsItemFareMin = 0;
+
+export const getTransportDriverMobileTripsResponseHistoryItemFareMin = 0;
+
+
+
+
+export const GetTransportDriverMobileTripsResponse = zod.object({
+  "activeTrips": zod.array(zod.object({
+  "id": zod.string(),
+  "reference": zod.string(),
+  "pickup": zod.string(),
+  "destination": zod.string(),
+  "passengerName": zod.string().nullable(),
+  "passengerPhone": zod.string().nullable(),
+  "fare": zod.number().int().min(getTransportDriverMobileTripsResponseActiveTripsItemFareMin),
+  "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  "requestedAt": zod.coerce.date(),
+  "offerExpiresAt": zod.coerce.date().nullable(),
+  "pickupCodeRequired": zod.boolean(),
+  "assignedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "vehicleModel": zod.string().nullable(),
+  "vehicleRegistration": zod.string().nullable()
+})),
+  "availableTrips": zod.array(zod.object({
+  "id": zod.string(),
+  "reference": zod.string(),
+  "pickup": zod.string(),
+  "destination": zod.string(),
+  "passengerName": zod.string().nullable(),
+  "passengerPhone": zod.string().nullable(),
+  "fare": zod.number().int().min(getTransportDriverMobileTripsResponseAvailableTripsItemFareMin),
+  "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  "requestedAt": zod.coerce.date(),
+  "offerExpiresAt": zod.coerce.date().nullable(),
+  "pickupCodeRequired": zod.boolean(),
+  "assignedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "vehicleModel": zod.string().nullable(),
+  "vehicleRegistration": zod.string().nullable()
+})),
+  "history": zod.array(zod.object({
+  "id": zod.string(),
+  "reference": zod.string(),
+  "pickup": zod.string(),
+  "destination": zod.string(),
+  "passengerName": zod.string().nullable(),
+  "passengerPhone": zod.string().nullable(),
+  "fare": zod.number().int().min(getTransportDriverMobileTripsResponseHistoryItemFareMin),
+  "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  "requestedAt": zod.coerce.date(),
+  "offerExpiresAt": zod.coerce.date().nullable(),
+  "pickupCodeRequired": zod.boolean(),
+  "assignedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "vehicleModel": zod.string().nullable(),
+  "vehicleRegistration": zod.string().nullable()
+})),
+  "historyPage": zod.number().int().min(1),
+  "historyHasMore": zod.boolean()
+})
+
+
+/**
+ * @summary Accept an available request or an offer assigned to the authenticated driver
+ */
+export const AcceptTransportDriverMobileTripParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const acceptTransportDriverMobileTripResponseFareMin = 0;
+
+
+
+export const AcceptTransportDriverMobileTripResponse = zod.object({
+  "id": zod.string(),
+  "reference": zod.string(),
+  "pickup": zod.string(),
+  "destination": zod.string(),
+  "passengerName": zod.string().nullable(),
+  "passengerPhone": zod.string().nullable(),
+  "fare": zod.number().int().min(acceptTransportDriverMobileTripResponseFareMin),
+  "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  "requestedAt": zod.coerce.date(),
+  "offerExpiresAt": zod.coerce.date().nullable(),
+  "pickupCodeRequired": zod.boolean(),
+  "assignedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "vehicleModel": zod.string().nullable(),
+  "vehicleRegistration": zod.string().nullable()
+})
+
+
+/**
+ * @summary Decline an offer assigned to the authenticated driver
+ */
+export const DeclineTransportDriverMobileTripParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeclineTransportDriverMobileTripResponse = zod.object({
+  "ok": zod.literal(true)
+})
+
+
+/**
+ * @summary Start an assigned trip after validating its pickup code
+ */
+export const StartTransportDriverMobileTripParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const startTransportDriverMobileTripBodyPickupCodeMin = 4;
+export const startTransportDriverMobileTripBodyPickupCodeMax = 4;
+
+
+
+export const StartTransportDriverMobileTripBody = zod.object({
+  "pickupCode": zod.string().min(startTransportDriverMobileTripBodyPickupCodeMin).max(startTransportDriverMobileTripBodyPickupCodeMax).nullish()
+})
+
+export const startTransportDriverMobileTripResponseFareMin = 0;
+
+
+
+export const StartTransportDriverMobileTripResponse = zod.object({
+  "id": zod.string(),
+  "reference": zod.string(),
+  "pickup": zod.string(),
+  "destination": zod.string(),
+  "passengerName": zod.string().nullable(),
+  "passengerPhone": zod.string().nullable(),
+  "fare": zod.number().int().min(startTransportDriverMobileTripResponseFareMin),
+  "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  "requestedAt": zod.coerce.date(),
+  "offerExpiresAt": zod.coerce.date().nullable(),
+  "pickupCodeRequired": zod.boolean(),
+  "assignedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "vehicleModel": zod.string().nullable(),
+  "vehicleRegistration": zod.string().nullable()
+})
+
+
+/**
+ * @summary Complete the authenticated driver's trip
+ */
+export const CompleteTransportDriverMobileTripParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const completeTransportDriverMobileTripResponseFareMin = 0;
+
+
+
+export const CompleteTransportDriverMobileTripResponse = zod.object({
+  "id": zod.string(),
+  "reference": zod.string(),
+  "pickup": zod.string(),
+  "destination": zod.string(),
+  "passengerName": zod.string().nullable(),
+  "passengerPhone": zod.string().nullable(),
+  "fare": zod.number().int().min(completeTransportDriverMobileTripResponseFareMin),
+  "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+  "requestedAt": zod.coerce.date(),
+  "offerExpiresAt": zod.coerce.date().nullable(),
+  "pickupCodeRequired": zod.boolean(),
+  "assignedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "vehicleModel": zod.string().nullable(),
+  "vehicleRegistration": zod.string().nullable()
+})
+
+
+/**
  * @summary Load the stock workspace
  */
 export const getStockBootstrapQueryCompanyIdDefault = `kora`;

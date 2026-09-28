@@ -29,6 +29,7 @@
 - [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
 - [Application chauffeur Android partagée](shared-driver-android.md) — garder un APK unique pour toutes les entreprises; le code entreprise sélectionne le tenant.
 - [Cycle de vie GPS chauffeur](driver-gps-lifecycle.md) — garder le polling d’état en lecture seule et sérialiser chaque démarrage/arrêt natif du suivi.
+- [Parcours de courses chauffeur mobile](mobile-driver-trip-scope.md) — les actions de course utilisent le jeton mobile, sans permission GPS ni affaiblissement des routes employé desktop.
 - [Build Android Expo en CI](android-release-ci.md) — déclarer les dépendances des plugins et éviter l’ancien paquet SDK `tools`.
 - [Limites du défilement mobile](mobile-scroll-boundary.md) — confiner le débordement de page sans supprimer le défilement nécessaire aux tableaux et rails de produits.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.

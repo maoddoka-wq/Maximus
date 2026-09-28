@@ -90,6 +90,71 @@ export interface DriverMobileAvailabilityInput {
   availability: DriverMobileAvailabilityInputAvailability;
 }
 
+export type DriverMobileTripStatus = typeof DriverMobileTripStatus[keyof typeof DriverMobileTripStatus];
+
+
+export const DriverMobileTripStatus = {
+  REQUESTED: 'REQUESTED',
+  OFFERED: 'OFFERED',
+  ASSIGNED: 'ASSIGNED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export interface DriverMobileTrip {
+  id: string;
+  reference: string;
+  pickup: string;
+  destination: string;
+  /** @nullable */
+  passengerName: string | null;
+  /** @nullable */
+  passengerPhone: string | null;
+  /** @minimum 0 */
+  fare: number;
+  status: DriverMobileTripStatus;
+  requestedAt: string;
+  /** @nullable */
+  offerExpiresAt: string | null;
+  pickupCodeRequired: boolean;
+  /** @nullable */
+  assignedAt: string | null;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  updatedAt: string | null;
+  /** @nullable */
+  vehicleModel: string | null;
+  /** @nullable */
+  vehicleRegistration: string | null;
+}
+
+export interface DriverMobileTrips {
+  activeTrips: DriverMobileTrip[];
+  availableTrips: DriverMobileTrip[];
+  history: DriverMobileTrip[];
+  /** @minimum 1 */
+  historyPage: number;
+  historyHasMore: boolean;
+}
+
+export interface DriverMobileTripStartInput {
+  /**
+     * @minLength 4
+     * @maxLength 4
+     * @nullable
+     */
+  pickupCode?: string | null;
+}
+
+export const DriverMobileActionReceiptValue = {
+  ok: true,
+} as const;
+export type DriverMobileActionReceipt = typeof DriverMobileActionReceiptValue;
+
 export interface StockProduct {
   id: string;
   companyId: string;
@@ -168,6 +233,13 @@ export interface StockBootstrap {
   inventoryLines: StockBootstrapInventoryLinesItem[];
   [key: string]: unknown;
  }
+
+export type GetTransportDriverMobileTripsParams = {
+/**
+ * @minimum 1
+ */
+historyPage?: number;
+};
 
 export type GetStockBootstrapParams = {
 companyId?: string;

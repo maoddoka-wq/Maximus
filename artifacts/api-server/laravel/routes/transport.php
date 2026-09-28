@@ -27,6 +27,11 @@ Route::middleware('transport.mobile')->prefix('transport/mobile')->group(functio
     Route::delete('/session', [TransportController::class, 'deleteMobileSession']);
     Route::patch('/location', [TransportController::class, 'updateMobileLocation']);
     Route::patch('/availability', [TransportController::class, 'updateMobileAvailability']);
+    Route::get('/trips', [TransportController::class, 'getMobileTrips']);
+    Route::post('/trips/{id}/accept', [TransportController::class, 'acceptMobileTrip']);
+    Route::post('/trips/{id}/decline', [TransportController::class, 'declineMobileTrip']);
+    Route::patch('/trips/{id}/start', [TransportController::class, 'startMobileTrip']);
+    Route::patch('/trips/{id}/complete', [TransportController::class, 'completeMobileTrip']);
 });
 
 Route::middleware(['maximus.installation.public', 'maximus.public-site'])->group(function (): void {
