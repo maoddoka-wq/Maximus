@@ -11,8 +11,6 @@ import {
   CircleDollarSign,
   ClipboardList,
   Copy,
-  House,
-  ImagePlus,
   LayoutDashboard,
   Megaphone,
   Package,
@@ -63,7 +61,6 @@ type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'categories' | 'comm
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-  { id: 'accueil', label: 'Accueil', icon: House },
   { id: 'catalogue', label: 'Catalogue', icon: Package },
   { id: 'categories', label: 'Catégories', icon: Tags },
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
@@ -290,6 +287,7 @@ export default function EcommerceModulePage({
           name: 'Aperçu boutique',
           description: 'Aperçu administratif sans données de production.',
           status: 'DRAFT',
+          homepageEnabled: true,
           currency: 'XOF',
           ...maximusShopColors,
           logoUrl: '',
@@ -358,7 +356,7 @@ export default function EcommerceModulePage({
   const store = data.store;
   const publicShopUrl = `/shop/${encodeURIComponent(store.slug || slugify(store.name) || 'boutique')}`;
   const navigate = (next: EcommerceTab) => setTab(next);
-  const permissionFeatureId = tab === 'accueil' ? 'parametres' : tab;
+  const permissionFeatureId = tab;
   const currentFeaturePermissions = featurePermissions?.[permissionFeatureId];
   const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
   const currentCanModify = Boolean(canModify && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
@@ -412,7 +410,6 @@ export default function EcommerceModulePage({
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
-      {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}
