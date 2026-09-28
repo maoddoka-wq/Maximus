@@ -99,4 +99,3 @@
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
 - [Cache des chunks Vite sur Render](render-stale-vite-assets.md) — garder `index.html` hors cache et renvoyer 404 pour les assets Vite absents, sinon le fallback HTML casse les imports.
 - [Overrides de sécurité pnpm](pnpm-overrides.md) — mettre les correctifs transitifs dans `package.json` pour qu’ils soient réellement pris en compte par le lockfile.
-- [Expo SecureStore en aperçu web](expo-secure-store-web-preview.md) — garder l’authentification native ; l’aperçu web ne valide ni le coffre sécurisé ni le GPS en arrière-plan.
