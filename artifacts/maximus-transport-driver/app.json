@@ -15,13 +15,17 @@
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "package": "com.maximus.chauffeur",
+      "versionCode": 1
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "./plugins/withAndroidReleaseSigning",
       [
         "expo-location",
         {

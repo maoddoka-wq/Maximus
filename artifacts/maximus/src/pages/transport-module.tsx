@@ -57,6 +57,7 @@ import {
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 import { useQueryTab } from '@/lib/query-tab';
 import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
+import { TransportDriverInstallCard } from '@/components/transport-driver-install-card';
 
 type TransportTab = TransportTabId;
 type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
@@ -730,7 +731,10 @@ export default function TransportModulePage({
          {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={locationActive} error={locationError} onAvailabilityChange={updateAvailability} onPricingModeChange={updatePricingMode} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />{currentDriver && canModifyDrivers && !locationActive && <button type="button" onClick={retryDriverLocation} className="inline-flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-xs font-black text-[hsl(var(--primary-foreground))] shadow-sm hover:brightness-95"><MapPin size={14} />{locationError ? 'Réessayer le GPS' : 'Activer le GPS chauffeur'}</button>}</>}
         {tab === 'vehicles' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
-        {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
+        {tab === 'parametres' && <>
+          <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />
+          <TransportDriverInstallCard />
+        </>}
       </>}
 
       {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} employees={employees} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}

@@ -1,0 +1,138 @@
+name: MAXIMUS Chauffeur Android APK
+
+on:
+  push:
+    tags:
+      - "chauffeur-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier (format MAJOR.MINOR.PATCH)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chauffeur-android-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    name: Build and publish shared Android APK
+    runs-on: ubuntu-latest
+    env:
+      CI: "1"
+      EXPO_PUBLIC_DOMAIN: maximus-erp.onrender.com
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="chauffeur-v$INPUT_VERSION"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Apply release version
+        working-directory: artifacts/maximus-transport-driver
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: node scripts/prepare-release.js "$RELEASE_TAG"
+
+      - name: Generate Android project
+        run: >-
+          pnpm --filter @workspace/maximus-transport-driver exec expo prebuild
+          --platform android --clean --no-install
+
+      - name: Check signing secrets and decode keystore
+        shell: bash
+        working-directory: artifacts/maximus-transport-driver
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_STORE_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Configure the GitHub Actions secret $name before generating a signed APK."
+              exit 1
+            fi
+          done
+          key_path="$GITHUB_WORKSPACE/artifacts/maximus-transport-driver/android/app/upload-key.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$key_path"
+          test -s "$key_path"
+          echo "ANDROID_KEYSTORE_PATH=$key_path" >> "$GITHUB_ENV"
+
+      - name: Build signed APK
+        working-directory: artifacts/maximus-transport-driver/android
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Prepare release file
+        id: apk
+        shell: bash
+        run: |
+          apk="artifacts/maximus-transport-driver/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          cp "$apk" "$RUNNER_TEMP/maximus-chauffeur.apk"
+          echo "path=$RUNNER_TEMP/maximus-chauffeur.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Publish versioned and stable download releases
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          APK_PATH: ${{ steps.apk.outputs.path }}
+        run: |
+          version="${RELEASE_TAG#chauffeur-v}"
+          gh release create "$RELEASE_TAG" "$APK_PATH" \
+            --title "MAXIMUS Chauffeur v$version" \
+            --generate-notes
+
+          stable_title="MAXIMUS Chauffeur v$version"
+          stable_notes="APK Android partagé entre toutes les entreprises. Version publiée : $version."
+          if gh release view android-latest >/dev/null 2>&1; then
+            gh release upload android-latest "$APK_PATH" --clobber
+            gh release edit android-latest --title "$stable_title" --notes "$stable_notes"
+          else
+            gh release create android-latest "$APK_PATH" \
+              --title "$stable_title" \
+              --notes "$stable_notes"
+          fi

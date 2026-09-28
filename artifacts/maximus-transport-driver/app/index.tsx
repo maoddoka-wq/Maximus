@@ -237,9 +237,9 @@ function LoginScreen() {
             value={password}
           />
 
-          <FieldLabel label="Code de connexion entreprise (facultatif)" />
+          <FieldLabel label="Code de connexion entreprise" />
           <TextInput
-            accessibilityLabel="Code de connexion entreprise facultatif"
+            accessibilityLabel="Code de connexion entreprise"
             autoCapitalize="none"
             autoCorrect={false}
             onChangeText={setCompanySlug}
@@ -252,6 +252,9 @@ function LoginScreen() {
             ]}
             value={companySlug}
           />
+          <Text style={[styles.helperText, { color: theme.mutedForeground }]}>
+            Si votre entreprise utilise un code dédié, il sélectionne son espace. Sinon, laissez ce champ vide.
+          </Text>
 
           {error ? <InlineNotice message={error} onDismiss={clearError} /> : null}
           {Platform.OS === 'web' ? (
