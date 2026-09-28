@@ -10,6 +10,7 @@ const subscribers = new Set<() => void>();
 const notify = () => subscribers.forEach((listener) => listener());
 
 export type ClientPwaEntry = { slug?: string; domain?: boolean };
+export type DriverPwaEntry = { slug: string };
 
 export const clientPwaStorageKey = (slug?: string, domain = false) =>
   domain ? 'domain' : encodeURIComponent(slug ?? '');
@@ -29,6 +30,14 @@ export const clientPwaPath = (slug?: string, suffix = '', domain = false) => {
   return `/client-app/shop/${encodeURIComponent(slug)}${normalizedSuffix || '/'}`;
 };
 
+export const driverPwaPath = (slug: string, suffix = '') => {
+  const normalizedSuffix = suffix === ''
+    ? ''
+    : suffix.startsWith('/') ? suffix : `/${suffix}`;
+
+  return `/driver-app/shop/${encodeURIComponent(slug)}${normalizedSuffix || '/'}`;
+};
+
 export function parseClientPwaPath(pathname: string): ClientPwaEntry | null {
   const normalized = pathname.replace(/\/+$/, '') || '/';
   const shopPrefix = '/client-app/shop/';
@@ -46,6 +55,21 @@ export function parseClientPwaPath(pathname: string): ClientPwaEntry | null {
   return normalized === '/client-app' || normalized.startsWith('/client-app/')
     ? { domain: true }
     : null;
+}
+
+export function parseDriverPwaPath(pathname: string): DriverPwaEntry | null {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  const prefix = '/driver-app/shop/';
+  if (!normalized.startsWith(prefix)) return null;
+
+  const encodedSlug = normalized.slice(prefix.length).split('/')[0];
+  if (!encodedSlug) return null;
+  try {
+    const slug = decodeURIComponent(encodedSlug);
+    return slug && !slug.includes('/') ? { slug } : null;
+  } catch {
+    return null;
+  }
 }
 
 export const isStandalonePwa = () =>
@@ -72,6 +96,43 @@ export async function mountClientManifest(manifestUrl: string): Promise<() => vo
   link.href = manifestUrl;
   link.dataset.maximusClientManifest = 'true';
   document.head.appendChild(link);
+
+  return () => {
+    link.remove();
+  };
+}
+
+export async function mountDriverManifest(manifestUrl: string, slug: string): Promise<() => void> {
+  const response = await fetch(manifestUrl, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`Le manifest PWA chauffeur est indisponible (${response.status}).`);
+  }
+
+  const manifest = await response.json() as { id?: unknown; start_url?: unknown; scope?: unknown };
+  const expectedScope = driverPwaPath(slug).replace(/\/+$/, '') + '/';
+  if (
+    typeof manifest.id !== 'string'
+    || typeof manifest.start_url !== 'string'
+    || manifest.scope !== expectedScope
+  ) {
+    throw new Error('Le manifest PWA chauffeur ne correspond pas à cette boutique.');
+  }
+
+  document.querySelectorAll('link[data-maximus-driver-manifest="true"]').forEach((link) => link.remove());
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = manifestUrl;
+  link.dataset.maximusDriverManifest = 'true';
+  document.head.appendChild(link);
+
+  if ('serviceWorker' in navigator) {
+    const driverScope = `${import.meta.env.BASE_URL}driver-app/`;
+    const driverServiceWorker = `${driverScope}sw.js`;
+    await navigator.serviceWorker.register(driverServiceWorker, {
+      scope: driverScope,
+      updateViaCache: 'none',
+    });
+  }
 
   return () => {
     link.remove();

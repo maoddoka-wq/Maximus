@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clientPwaPath, clientPwaStartPath, clientPwaStorageKey, parseClientPwaPath } from './pwa';
+import { clientPwaPath, clientPwaStartPath, clientPwaStorageKey, driverPwaPath, parseClientPwaPath, parseDriverPwaPath } from './pwa';
 
 test('génère une URL de lancement et une identité propres à chaque boutique', () => {
   const startPath = clientPwaStartPath('boutique-senegal');
@@ -31,4 +31,13 @@ test('refuse une route PWA boutique incomplète et accepte ses sous-routes', () 
   assert.equal(parseClientPwaPath('/client-app/shop/'), null);
   assert.equal(parseClientPwaPath('/client-app/shop'), null);
   assert.deepEqual(parseClientPwaPath('/client-app/shop/a/b/'), { slug: 'a' });
+});
+
+test('isole le chemin PWA chauffeur par boutique et refuse un préfixe sans boutique', () => {
+  const path = driverPwaPath('boutique-senegal', '/transport/chauffeur');
+
+  assert.equal(path, '/driver-app/shop/boutique-senegal/transport/chauffeur');
+  assert.deepEqual(parseDriverPwaPath(path), { slug: 'boutique-senegal' });
+  assert.equal(parseDriverPwaPath('/driver-app/shop/'), null);
+  assert.equal(parseDriverPwaPath('/driver-app/shop/%2F'), null);
 });

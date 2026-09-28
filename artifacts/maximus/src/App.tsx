@@ -55,7 +55,7 @@ import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
 import { Card } from '@workspace/maximus-design-system/components/ui/card';
 import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { parseClientPwaPath } from '@/lib/pwa';
+import { parseClientPwaPath, parseDriverPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import {
@@ -1114,6 +1114,10 @@ function AppContent() {
         }}
       />
     );
+  }
+  if (pathname === '/driver-app' || pathname.startsWith('/driver-app/')) {
+    const pwaEntry = parseDriverPwaPath(pathname);
+    if (pwaEntry) return <PublicShopPage slug={pwaEntry.slug} driverApp />;
   }
   if (pathname === '/client-app' || pathname.startsWith('/client-app/')) {
     const pwaEntry = parseClientPwaPath(pathname);
