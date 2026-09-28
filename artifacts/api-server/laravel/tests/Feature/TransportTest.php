@@ -930,6 +930,14 @@ class TransportTest extends TestCase
             ->assertOk()->assertJsonPath('ok', true)->assertJsonStructure(['receivedAt']);
         $this->assertDatabaseHas('transport_drivers', ['id' => $driverId, 'latitude' => 14.7167, 'longitude' => -17.4677]);
         $this->assertDatabaseMissing('transport_drivers', ['id' => $otherId, 'latitude' => 14.7167, 'longitude' => -17.4677]);
+
+        $session = $this->getJson('/api/transport/mobile/session', [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk();
+        $this->assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/',
+            $session->json('driver.locationUpdatedAt'),
+        );
     }
 
     public function test_mobile_availability_requires_fresh_gps_and_refuses_pause_during_active_trip(): void
