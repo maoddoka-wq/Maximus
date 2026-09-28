@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Check, Clock3, Download, Edit3, FileBarChart, Filter, Flashlight, FlashlightOff, History, MapPin, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Settings, Trash2, UserCheck, Users, X, type LucideIcon } from 'lucide-react';
 import QRCode from 'qrcode';
 import QrScanner from 'qr-scanner';
 import { createPresenceApi, type PresenceClockQr, type PresenceItem, type PresenceItemInput, type PresencePayload } from '@/lib/presence-api';
@@ -9,6 +9,7 @@ import { useQueryTab } from '@/lib/query-tab';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import type { Employee, OrgNode } from '@/lib/store';
 import { useAppDialog } from '@/components/confirm-dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@workspace/maximus-design-system/components/ui/dialog';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
@@ -105,8 +106,8 @@ type PresenceKpis = {
   overtime: number;
 };
 
-function Button({ children, onClick, primary = false, disabled = false, danger = false }: { children: React.ReactNode; onClick?: () => void; primary?: boolean; disabled?: boolean; danger?: boolean }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className={`app-action inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90' : danger ? 'border border-[hsl(var(--destructive)/.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'}`}>{children}</button>;
+function Button({ children, onClick, primary = false, disabled = false, danger = false, testId }: { children: React.ReactNode; onClick?: () => void; primary?: boolean; disabled?: boolean; danger?: boolean; testId?: string }) {
+  return <button type="button" data-testid={testId} disabled={disabled} onClick={onClick} className={`app-action inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90' : danger ? 'border border-[hsl(var(--destructive)/.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'}`}>{children}</button>;
 }
 function Field({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; placeholder?: string }) {
   return <label className="block text-xs font-bold">{label}<input type={type} value={value} placeholder={placeholder} onChange={event => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm font-normal outline-none focus:border-[hsl(var(--primary))]" /></label>;
@@ -413,9 +414,14 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
 
 function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: PresenceRow; date: string; canCreate: boolean; onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void> }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerRef = useRef<QrScanner | null>(null);
   const onScanClockRef = useRef(onScanClock);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [flashAvailable, setFlashAvailable] = useState(false);
+  const [flashOn, setFlashOn] = useState(false);
+  const [flashError, setFlashError] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const payload = row?.payload ?? {};
@@ -428,6 +434,10 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
 
   useEffect(() => {
     if (!scannerOpen || !videoRef.current || !action) return;
+    setCameraReady(false);
+    setFlashAvailable(false);
+    setFlashOn(false);
+    setFlashError('');
     let handled = false;
     let cancelled = false;
     const scanAction = action;
@@ -443,8 +453,8 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
         .catch(cause => setError(cause instanceof Error ? cause.message : 'Le QR code n’a pas pu être validé.'))
         .finally(() => setBusy(false));
     }, {
-      highlightScanRegion: true,
-      highlightCodeOutline: true,
+      highlightScanRegion: false,
+      highlightCodeOutline: false,
       returnDetailedScanResult: true,
       maxScansPerSecond: 30,
       preferredCamera: 'environment',
@@ -460,7 +470,16 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
         };
       },
     });
-    void scanner.start().catch(cause => {
+    scannerRef.current = scanner;
+    void scanner.start().then(() => {
+      if (cancelled) return;
+      setCameraReady(true);
+      void scanner.hasFlash().then(available => {
+        if (!cancelled) setFlashAvailable(available);
+      }).catch(() => {
+        if (!cancelled) setFlashAvailable(false);
+      });
+    }).catch(cause => {
       if (!cancelled) {
         setScannerOpen(false);
         setError(cause instanceof Error ? cause.message : 'Accès à la caméra impossible.');
@@ -468,12 +487,25 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
     });
     return () => {
       cancelled = true;
+      if (scannerRef.current === scanner) scannerRef.current = null;
       scanner.stop();
       scanner.destroy();
     };
   }, [scannerOpen, action]);
 
-  return <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+  const toggleFlash = async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+    setFlashError('');
+    try {
+      await scanner.toggleFlash();
+      setFlashOn(scanner.isFlashOn());
+    } catch {
+      setFlashError('La lampe torche n’a pas pu être activée.');
+    }
+  };
+
+  return <>
     <Panel title="Pointage employé">
       <div className="space-y-4">
         <div className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5">
@@ -485,18 +517,67 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
           <p className="mt-2 text-lg font-bold">{action === null ? 'Journée terminée' : `Scanner pour ${actionLabel}`}</p>
           <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Le QR code est présenté par le gérant des Présences. Votre compte connecté est utilisé automatiquement.</p>
         </div>
-        <Button primary disabled={!canCreate || action === null || busy || scannerOpen} onClick={() => { setMessage(''); setError(''); setScannerOpen(true); }}>
+        <Button testId="button-open-attendance-scanner" primary disabled={!canCreate || action === null || busy || scannerOpen} onClick={() => { setMessage(''); setError(''); setScannerOpen(true); }}>
           <QrCodeIcon />{scannerOpen ? 'Scanner en cours…' : busy ? 'Validation…' : 'Scanner le QR code'}
         </Button>
-        {message ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p> : null}
-        {error ? <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+        {message ? <p data-testid="status-attendance-scan-message" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p> : null}
+        {error ? <p data-testid="status-attendance-scan-error" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
         <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Date sélectionnée : {displayDate(date)}. Le serveur vérifie la validité du QR code et la séquence arrivée puis sortie.</p>
       </div>
     </Panel>
-    <Panel title="Scanner">
-      {scannerOpen ? <div className="space-y-3"><div className="overflow-hidden rounded-2xl bg-black"><video ref={videoRef} className="aspect-square w-full object-cover" muted playsInline /></div><p className="text-center text-xs text-[hsl(var(--muted-foreground))]">Cadrez le QR code du gérant dans la zone caméra.</p><Button onClick={() => setScannerOpen(false)}>Fermer le scanner</Button></div> : <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed p-6 text-center"><QrCodeIcon size={52} /><p className="mt-4 font-bold">Scanner le QR code du gérant</p><p className="mt-2 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">Le scan est disponible uniquement tant que l’arrivée ou la sortie attendue n’est pas déjà enregistrée.</p></div>}
-    </Panel>
-  </div>;
+    <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
+      <DialogContent
+        data-testid="dialog-attendance-scanner"
+        className="!fixed !inset-0 !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 !gap-0 !overflow-hidden !rounded-none !border-0 !bg-[hsl(var(--sidebar))] !p-0 !shadow-none sm:!rounded-none [&>button]:hidden"
+      >
+        <DialogTitle className="sr-only">Scanner le QR code de pointage</DialogTitle>
+        <DialogDescription className="sr-only">Cadrez le QR code affiché par le responsable pour enregistrer votre pointage.</DialogDescription>
+        <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden text-[hsl(var(--sidebar-foreground))]">
+          <video ref={videoRef} data-testid="video-attendance-scanner" className="absolute inset-0 h-full w-full object-cover" muted playsInline autoPlay />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[hsl(var(--sidebar)/.2)]" />
+
+          <header className="relative z-20 flex items-center justify-between px-5 pb-3" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
+            <DialogClose asChild>
+              <button
+                type="button"
+                data-testid="button-close-attendance-scanner"
+                aria-label="Fermer le scanner"
+                className="flex size-11 items-center justify-center rounded-full border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/.78)] text-[hsl(var(--sidebar-foreground))] shadow-sm backdrop-blur-sm transition hover:bg-[hsl(var(--sidebar-accent))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--sidebar-ring))]"
+              >
+                <X size={20} />
+              </button>
+            </DialogClose>
+            {flashAvailable ? (
+              <button
+                type="button"
+                data-testid="button-toggle-attendance-scanner-flash"
+                aria-label={flashOn ? 'Éteindre la lampe torche' : 'Allumer la lampe torche'}
+                aria-pressed={flashOn}
+                onClick={() => void toggleFlash()}
+                className="flex size-11 items-center justify-center rounded-full border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/.78)] text-[hsl(var(--sidebar-foreground))] shadow-sm backdrop-blur-sm transition hover:bg-[hsl(var(--sidebar-accent))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--sidebar-ring))]"
+              >
+                {flashOn ? <Flashlight size={19} /> : <FlashlightOff size={19} />}
+              </button>
+            ) : <span aria-hidden="true" className="size-11" />}
+          </header>
+
+          <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-5">
+            <div aria-hidden="true" className="size-[min(86vw,24rem,calc(100dvh-12rem))] rounded-[2rem] border-[3px] border-[hsl(var(--primary))] shadow-[0_0_0_9999px_hsl(var(--sidebar)/.48)]" />
+          </div>
+
+          <footer className="relative z-20 flex flex-col items-center gap-3 px-6 pt-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
+            <p data-testid="text-attendance-scanner-instruction" aria-live="polite" className="rounded-full border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar)/.82)] px-5 py-3 text-center text-sm font-semibold shadow-sm backdrop-blur-sm">
+              {cameraReady ? 'Cadrez le QR code du responsable' : 'Activation de la caméra…'}
+            </p>
+            <p className="text-center text-xs text-[hsl(var(--sidebar-foreground)/.85)]">
+              {action === 'arrival' ? 'Pointage de votre arrivée' : 'Pointage de votre sortie'} · Lecture automatique
+            </p>
+            {flashError ? <p role="status" className="rounded-lg bg-[hsl(var(--destructive))] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive-foreground))]">{flashError}</p> : null}
+          </footer>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>;
 }
 
 function QrCodeIcon({ size = 16 }: { size?: number }) {
