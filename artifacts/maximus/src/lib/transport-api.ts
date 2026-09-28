@@ -118,36 +118,6 @@ export interface TransportBootstrap {
   modeEvents: DriverModeEvent[];
 }
 
-export interface DriverPortalProfile {
-  id: string;
-  name: string;
-  phone: string | null;
-  availability: DriverAvailability;
-  locationUpdatedAt: string | null;
-}
-
-export interface DriverPortalTrip {
-  id: string;
-  reference: string;
-  pickup: string;
-  destination: string;
-  passengerName: string;
-  passengerPhone: string;
-  fare: number;
-  status: TripStatus;
-  requestedAt: string;
-  offerExpiresAt: string | null;
-  pickupCodeRequired: boolean;
-}
-
-export interface DriverPortalBootstrap {
-  driver: DriverPortalProfile;
-  trips: DriverPortalTrip[];
-  serverNow: string;
-}
-
-export type DriverPortalTripStatus = Extract<TripStatus, 'REQUESTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED'>;
-
 export interface CreateDriverInput {
   employeeId: string;
   licenseNumber: string;
@@ -331,36 +301,6 @@ export const createTransportApi = (companyId: string) => {
       }),
   };
 };
-
-export const createDriverPortalApi = (slug: string) => ({
-  validateSession: () => request<{ driver: DriverPortalProfile }>(
-    `/shop/${encodeURIComponent(slug)}/transport/driver/session`,
-    { cache: 'no-store' },
-  ),
-  bootstrap: () => request<DriverPortalBootstrap>('/transport/driver/bootstrap'),
-  updateLocation: (body: {
-    latitude: number;
-    longitude: number;
-    accuracy: number;
-    capturedAt: string;
-  }) => request<{ driver: DriverPortalProfile }>('/transport/driver/location', {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
-  }),
-  updateAvailability: (availability: Extract<DriverAvailability, 'AVAILABLE' | 'PAUSED'>) =>
-    request<{ driver: DriverPortalProfile }>('/transport/driver/availability', {
-      method: 'PATCH',
-      body: JSON.stringify({ availability }),
-      headers: { 'Content-Type': 'application/json' },
-    }),
-  updateTripStatus: (id: string, status: DriverPortalTripStatus, pickupCode?: string) =>
-    request<Trip>(`/transport/driver/trips/${encodeURIComponent(id)}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, ...(pickupCode ? { pickupCode } : {}) }),
-      headers: { 'Content-Type': 'application/json' },
-    }),
-});
 
 export const createPublicTransportApi = (slug?: string, domain = false) => ({
   getSettings: () => request<{ heroImageUrl: string; heroImageUrls?: string[]; primaryColor?: string; accentColor?: string }>(

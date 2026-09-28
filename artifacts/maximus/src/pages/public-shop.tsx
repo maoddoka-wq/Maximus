@@ -23,8 +23,7 @@ import { createPublicTransportApi, type PublicTransportPlace, type PublicTranspo
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
 import { buildPublicTransportShareUrl, parsePublicTransportShareUrl } from '@/lib/transport-share-link';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
-import { canInstallPwa, clearClientPwaInstalled, clientPwaPath, clientPwaStorageKey, driverPwaPath, hasInstalledClientPwa, isIosDevice, isStandalonePwa, markClientPwaInstalled, mountClientManifest, mountDriverManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
-import { TransportDriverPwaPage } from '@/pages/transport-driver-pwa';
+import { canInstallPwa, clientPwaPath, clientPwaStorageKey, isIosDevice, isStandalonePwa, mountClientManifest, promptPwaInstall, subscribeToPwaInstall } from '@/lib/pwa';
 import { tokens as transportDesignTokens } from '@workspace/maximus-transport-public/tokens';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
@@ -236,7 +235,7 @@ const isWithinDakar = (latitude: number, longitude: number) =>
   && longitude >= DAKAR_BOUNDS.minLongitude
   && longitude <= DAKAR_BOUNDS.maxLongitude;
 
-export default function PublicShopPage({ slug, domain = false, clientApp = false, driverApp = false }: { slug?: string; domain?: boolean; clientApp?: boolean; driverApp?: boolean }) {
+export default function PublicShopPage({ slug, domain = false, clientApp = false }: { slug?: string; domain?: boolean; clientApp?: boolean }) {
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const routePath = location.split('?')[0];
@@ -282,9 +281,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   });
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
-  const [clientPwaInstalled, setClientPwaInstalled] = useState(false);
   const [manifestReady, setManifestReady] = useState(false);
-  const [driverManifestReady, setDriverManifestReady] = useState(false);
   const paymentReturn = useMemo(() => {
     const query = new URLSearchParams(search);
     const result = query.get('payment');
@@ -316,7 +313,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const isTransportRoute = routePath.endsWith('/transport');
   const isDeliveryRoute = routePath.endsWith('/livraison');
   const isImmobilierRoute = routePath.endsWith('/immobilier');
-  const isDriverPortalRoute = routePath.endsWith('/transport/chauffeur');
   const productDetailSlug = useMemo(() => {
     const match = routePath.match(/\/produit\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -325,40 +321,6 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   useEffect(() => subscribeToPwaInstall(() => setInstallAvailable(canInstallPwa())), []);
 
   useEffect(() => {
-    const currentSlug = data?.store.slug;
-    if (driverApp || isDriverPortalRoute || !currentSlug) {
-      setClientPwaInstalled(false);
-      return undefined;
-    }
-
-    const markInstalled = () => {
-      markClientPwaInstalled(currentSlug, domain);
-      setClientPwaInstalled(true);
-      setInstallAvailable(false);
-    };
-    const clearStaleInstallation = () => {
-      if (!canInstallPwa()) return;
-      clearClientPwaInstalled(currentSlug, domain);
-      setClientPwaInstalled(false);
-    };
-
-    setClientPwaInstalled(hasInstalledClientPwa(currentSlug, domain));
-    if (clientApp && isStandalonePwa()) markInstalled();
-    clearStaleInstallation();
-    window.addEventListener('appinstalled', markInstalled);
-    window.addEventListener('beforeinstallprompt', clearStaleInstallation);
-
-    return () => {
-      window.removeEventListener('appinstalled', markInstalled);
-      window.removeEventListener('beforeinstallprompt', clearStaleInstallation);
-    };
-  }, [clientApp, data?.store.slug, domain, driverApp, isDriverPortalRoute]);
-
-  useEffect(() => {
-    if (driverApp || isDriverPortalRoute) {
-      setManifestReady(false);
-      return undefined;
-    }
     if (!data?.store.name.trim()) {
       setManifestReady(false);
       return undefined;
@@ -385,34 +347,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       cancelled = true;
       cleanup?.();
     };
-  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, driverApp, isDriverPortalRoute, slug]);
-
-  useEffect(() => {
-    if ((!driverApp && !isDriverPortalRoute) || !data?.store.name.trim() || !data.store.slug) {
-      setDriverManifestReady(false);
-      return undefined;
-    }
-    const manifestUrl = `/api/shop/${encodeURIComponent(data.store.slug)}/transport/driver/manifest.webmanifest`;
-    let cancelled = false;
-    let cleanup: (() => void) | undefined;
-    setDriverManifestReady(false);
-    void mountDriverManifest(manifestUrl, data.store.slug)
-      .then(unmount => {
-        if (cancelled) {
-          unmount();
-          return;
-        }
-        cleanup = unmount;
-        setDriverManifestReady(true);
-      })
-      .catch(error => {
-        if (!cancelled) console.warn('Le manifest PWA chauffeur n’a pas pu être validé.', error);
-      });
-    return () => {
-      cancelled = true;
-      cleanup?.();
-    };
-  }, [data?.store.name, data?.store.slug, driverApp, isDriverPortalRoute]);
+  }, [data?.store.logoUrl, data?.store.name, data?.store.slug, domain, slug]);
 
   useEffect(() => {
     if (routePath.endsWith('/inscription-client')) setAuthMode('register');
@@ -428,11 +363,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [logoPreviewOpen]);
 
-  const shopPath = (suffix = '') => driverApp
-    ? driverPwaPath(slug ?? data?.store.slug ?? '', suffix)
-    : clientApp
-      ? clientPwaPath(slug, suffix, domain)
-      : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
+  const shopPath = (suffix = '') => clientApp
+    ? clientPwaPath(slug, suffix, domain)
+    : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
   const go = (suffix: string) => {
     setLocation(shopPath(suffix));
   };
@@ -831,14 +764,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const installClientApp = async () => {
     if (isIosDevice()) return;
     const installed = await promptPwaInstall();
-    if (installed) {
-      if (data?.store.slug) {
-        markClientPwaInstalled(data.store.slug, domain);
-        setClientPwaInstalled(true);
-      }
-      setInstallAvailable(false);
-      showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
-    }
+    if (installed) showAppToast('MAXIMUS est maintenant installé sur votre appareil.', 'success');
   };
 
   if (loading) return <div className="min-h-screen bg-[hsl(var(--background))] p-6"><div className="mx-auto max-w-6xl animate-pulse"><div className="h-12 w-64 rounded bg-[hsl(var(--muted))]" /><div className="mt-8 h-64 rounded-3xl bg-[hsl(var(--muted))]" /></div></div>;
@@ -867,7 +793,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   });
   const isHomeRoute = routePath === shopPath('') || routePath === shopPath('/accueil');
   const isCatalogRoute = routePath === shopPath('/boutique');
-    const publicNav = driverApp || isDriverPortalRoute ? [] : [
+    const publicNav = [
       ...(store.homepageEnabled ? [{ label: 'Accueil', path: '/accueil' }] : []),
      { label: 'Boutique', path: '/boutique' },
      ...(enabledFeatures.location ? [{ label: 'Location', path: '/location' }] : []),
@@ -888,17 +814,13 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     const primaryMobileNav = publicNav.filter(item => ['/accueil', '/boutique', '/panier'].includes(item.path));
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
-      const mobileNavVisible = !isAuthRoute && !submitted && !isTransportRoute && !isDriverPortalRoute && !driverApp;
+     const mobileNavVisible = !isAuthRoute && !submitted && !isTransportRoute;
      const mobileNavBottomPadding = mobileNavVisible
        ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
        : 'pb-4 sm:pb-9';
-    const theme = publicShopTheme(store);
-    const transportTheme = publicTransportTheme({
-      primaryColor: store.transportPrimaryColor,
-      accentColor: store.transportAccentColor,
-    });
+   const theme = publicShopTheme(store);
      return <div className="public-shop-shell min-h-[100dvh] w-full min-w-0 overflow-x-clip bg-[hsl(var(--muted)/.22)]" style={{ '--shop-primary': theme.primary, '--shop-accent': theme.accent, '--shop-primary-foreground': theme.primaryForeground, '--shop-accent-foreground': theme.accentForeground } as React.CSSProperties}>
-      {!isDriverPortalRoute && <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
+     <header className="relative border-b border-black/5 bg-white/95 text-[hsl(var(--foreground))] shadow-[0_1px_0_rgba(15,23,42,.03)] backdrop-blur">
        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 max-w-full shrink items-center gap-3 sm:max-w-[calc(100%-3rem)]">
               <button type="button" onClick={() => canOpenSellerCard && setLogoPreviewOpen(true)} disabled={!canOpenSellerCard} aria-label={canOpenSellerCard ? `Voir la fiche de ${seller.name || store.name}` : undefined} className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--shop-accent)] p-1.5 transition hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-[var(--shop-primary)]/50 disabled:cursor-default disabled:hover:scale-100">
@@ -915,7 +837,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              })}
          </nav>
        </div>
-      </header>}
+     </header>
       {logoPreviewOpen && canOpenSellerCard && <div role="dialog" aria-modal="true" aria-label={`Fiche de ${seller.name || store.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setLogoPreviewOpen(false); }}>
          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-8">
            <button type="button" onClick={() => setLogoPreviewOpen(false)} aria-label="Fermer la fiche vendeur" className="absolute right-3 top-3 rounded-full p-2 text-[hsl(var(--muted-foreground))] transition hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><X size={20} /></button>
@@ -938,7 +860,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        </div>}
         <main className={`shop-main mx-auto w-full min-w-0 max-w-7xl overflow-x-clip px-4 pt-4 sm:px-6 sm:pt-9 lg:px-8 lg:pb-9 ${mobileNavBottomPadding}`}>
       {error && <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Fermer"><X size={16} /></button></div>}
-        {!driverApp && !isDriverPortalRoute && !clientPwaInstalled && !hasInstalledClientPwa(store.slug, domain) && !isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+       {!isStandalonePwa() && manifestReady && (installAvailable || isIosDevice()) && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--shop-primary)] text-[var(--shop-primary-foreground)]"><Download size={18} /></span>
           <div>
@@ -956,27 +878,9 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
               : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} attachments={orderAttachments} setAttachments={setOrderAttachments} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
               : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onDownloadAttachment={(orderId, attachmentId) => void runCustomerAction(() => api.downloadOrderAttachment(orderId, attachmentId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
-               : isDriverPortalRoute ? <div className="transport-public-shell min-h-[70vh] rounded-xl border border-border bg-background text-foreground" style={{
-                 ...transportDesignVariables(transportTheme),
-                 fontFamily: transportDesignTokens.fontFamily.sans.join(', '),
-                 '--transport-primary': transportTheme.primary,
-                 '--transport-accent': transportTheme.accent,
-                 '--transport-primary-foreground': transportTheme.primaryForeground,
-                 '--transport-accent-foreground': transportTheme.accentForeground,
-               } as React.CSSProperties}>
-                 <TransportDriverPwaPage
-                   slug={store.slug}
-                   storeName={store.name}
-                   logoUrl={store.logoUrl || null}
-                   installAvailable={driverManifestReady && installAvailable && !isStandalonePwa()}
-                   installInstructions={driverManifestReady && isIosDevice() && !isStandalonePwa()}
-                   onInstall={() => void promptPwaInstall()}
-                   onOpenTransport={() => go('/transport')}
-                 />
-               </div>
-             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
+            : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
-              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} onDriverAccess={() => setLocation(driverPwaPath(store.slug, '/transport/chauffeur'))} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
+             : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
               : isImmobilierRoute ? enabledFeatures.immobilier ? <PublicImmobilierPage listings={data.immobilierListings ?? []} store={store} slug={slug} domain={domain} form={immobilierForm} setForm={setImmobilierForm} submitted={immobilierSubmitted} onSubmitted={() => setImmobilierSubmitted(true)} /> : <FeatureUnavailable title="Immobilier non activé" text="Cette entreprise n’a pas encore autorisé la vitrine immobilière." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
          : isHomeRoute && !store.homepageEnabled ? <DisabledHomepage />
@@ -1249,7 +1153,7 @@ function PublicTransportLocationPreview({
   </div>;
 }
 
-function TransportPublicPage({ store, slug, domain, onBack, onDriverAccess }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void; onDriverAccess: () => void }) {
+function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicShopBootstrap['store']; slug?: string; domain?: boolean; onBack: () => void }) {
   const phone = store.seller?.phone?.trim() ?? '';
   const whatsapp = whatsappNumber(phone);
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour ${store.name}, je souhaite demander une course Taxi.`)}` : '';
@@ -1754,28 +1658,22 @@ function TransportPublicPage({ store, slug, domain, onBack, onDriverAccess }: { 
       '--transport-accent-foreground': theme.accentForeground,
     } as React.CSSProperties}
      >
-      <header className="grid min-w-0 gap-3 border-b border-border bg-card px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-6">
-        <TransportButton data-testid="button-back-to-shop" type="button" variant="ghost" size="sm" onClick={onBack} className="justify-self-start">
-          <ArrowLeft size={16} /> MAXIMUS Transport
-        </TransportButton>
-        <span className="inline-flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--transport-accent)]" />
-          Dakar · Mobilité locale
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
+       <TransportButton data-testid="button-back-to-shop" type="button" variant="ghost" size="sm" onClick={onBack}>
+         <ArrowLeft size={16} /> MAXIMUS Transport
+      </TransportButton>
+      <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[var(--transport-accent)]" /> Dakar · Mobilité locale</span>
+        <span
+          className={`inline-flex items-center gap-1.5 text-xs font-semibold ${locationState === 'ready' ? 'text-primary' : locationState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+          aria-live="polite"
+          title={locationState === 'ready' && position ? `GPS actif · précision ${Math.round(position.accuracy)} mètres` : undefined}
+        >
+          <MapPin size={13} />
+          {locationState === 'ready' && position ? `GPS actif · ${Math.round(position.accuracy)} m` : locationState === 'locating' ? 'GPS en recherche' : locationState === 'error' ? 'GPS indisponible' : 'GPS inactif'}
         </span>
-        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <span
-            className={`inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold ${locationState === 'ready' ? 'text-primary' : locationState === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
-            aria-live="polite"
-            title={locationState === 'ready' && position ? `GPS actif · précision ${Math.round(position.accuracy)} mètres` : undefined}
-          >
-            <MapPin size={13} className="shrink-0" />
-            {locationState === 'ready' && position ? `GPS actif · ${Math.round(position.accuracy)} m` : locationState === 'locating' ? 'GPS en recherche' : locationState === 'error' ? 'GPS indisponible' : 'GPS inactif'}
-          </span>
-          <TransportButton type="button" variant="outline" size="sm" onClick={onDriverAccess} className="w-full justify-center whitespace-nowrap sm:w-auto">
-            <UserRound size={15} /> Espace chauffeur
-          </TransportButton>
-        </div>
-      </header>
+      </div>
+    </header>
        {showHero && <div className="relative overflow-hidden border-b border-border bg-accent">
         <div className="relative aspect-[16/7] w-full sm:aspect-[16/5]">
         <img src={heroImageUrls[heroImageIndex] ?? '/taxi-transport-hero.jpg'} alt="Taxi Urbain à Dakar" className="h-full w-full object-cover" />

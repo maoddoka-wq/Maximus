@@ -5,10 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'])->prefix('transport')->group(function (): void {
     Route::get('/bootstrap', [TransportController::class, 'bootstrap']);
-    Route::get('/driver/bootstrap', [TransportController::class, 'driverBootstrap']);
-    Route::patch('/driver/location', [TransportController::class, 'updateDriverPortalLocation']);
-    Route::patch('/driver/availability', [TransportController::class, 'updateDriverPortalAvailability']);
-    Route::patch('/driver/trips/{id}/status', [TransportController::class, 'updateDriverPortalTripStatus']);
     Route::post('/drivers', [TransportController::class, 'createDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
     Route::patch('/drivers/{id}/availability', [TransportController::class, 'updateDriverAvailability']);
@@ -34,9 +30,6 @@ Route::middleware('transport.mobile')->prefix('transport/mobile')->group(functio
 });
 
 Route::middleware(['maximus.installation.public', 'maximus.public-site'])->group(function (): void {
-Route::get('/shop/{slug}/transport/driver/manifest.webmanifest', [TransportController::class, 'publicDriverManifest'])->middleware('throttle:orders');
-Route::get('/shop/{slug}/transport/driver/session', [TransportController::class, 'publicDriverSession'])
-    ->middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport', 'throttle:login']);
 Route::post('/shop/{slug}/transport/trips', [TransportController::class, 'createPublicTrip'])->middleware('throttle:orders');
 Route::post('/shop/{slug}/transport/quote', [TransportController::class, 'quotePublicTrip'])->middleware('throttle:orders');
 Route::get('/shop/{slug}/transport/places', [TransportController::class, 'suggestPublicTransportPlaces'])->middleware('throttle:orders');

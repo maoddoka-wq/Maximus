@@ -14,21 +14,6 @@ class TransportTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        DB::table('company_public_site_access')->updateOrInsert(
-            ['company_id' => 'kora'],
-            [
-                'enabled' => true,
-                'updated_by' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        );
-    }
-
     public function test_taxi_cycle_is_persisted_and_vehicle_returns_to_available_after_completion(): void
     {
         $request = $this->asActor();
@@ -309,7 +294,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('trackingIntervalSeconds', 10)
             ->assertJsonPath('baseFare', 750)
             ->assertJsonPath('pricePerKm', 425)
-            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image/0');
+            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image');
         $request->get('/api/transport/settings/hero-image?companyId=kora')
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png');
@@ -320,7 +305,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('settings.trackingIntervalSeconds', 10)
             ->assertJsonPath('settings.baseFare', 750)
             ->assertJsonPath('settings.pricePerKm', 425)
-            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image/0');
+            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image');
 
         $request->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,
@@ -968,122 +953,6 @@ class TransportTest extends TestCase
             'status' => 'OFFERED', 'requested_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->patchJson('/api/transport/mobile/availability', ['availability' => 'PAUSED'], $headers)->assertStatus(422);
-    }
-
-    public function test_driver_portal_only_returns_and_updates_the_authenticated_drivers_trips(): void
-    {
-        $employeeId = 'portal-driver-one';
-        $otherEmployeeId = 'portal-driver-two';
-        $this->createDriverEmployee($employeeId);
-        $this->createDriverEmployee($otherEmployeeId);
-        $this->insertMobileDriver($employeeId);
-        $this->insertMobileDriver($otherEmployeeId);
-        DB::table('transport_drivers')->where('id', $employeeId)->update([
-            'latitude' => 14.7167,
-            'longitude' => -17.4677,
-            'location_updated_at' => now(),
-        ]);
-
-        $ownTripId = 'portal-owned-offer';
-        $otherTripId = 'portal-other-offer';
-        foreach ([[$ownTripId, $employeeId], [$otherTripId, $otherEmployeeId]] as [$tripId, $driverId]) {
-            DB::table('transport_trips')->insert([
-                'id' => $tripId,
-                'company_id' => 'kora',
-                'reference' => strtoupper($tripId),
-                'pickup' => 'Plateau',
-                'destination' => 'Fann',
-                'passenger_name' => 'Passager portail',
-                'passenger_phone' => '+221770000000',
-                'fare' => 2500,
-                'driver_id' => $driverId,
-                'status' => 'OFFERED',
-                'pickup_code' => $tripId === $ownTripId ? '4821' : null,
-                'requested_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        $request = $this->asActor('employee', [], $employeeId);
-        $bootstrap = $request->getJson('/api/transport/driver/bootstrap')
-            ->assertOk()
-            ->assertJsonPath('driver.id', $employeeId)
-            ->assertJsonCount(1, 'trips');
-        $this->assertSame($ownTripId, $bootstrap->json('trips.0.id'));
-        $bootstrap->assertJsonPath('trips.0.pickupCodeRequired', true)
-            ->assertJsonMissingPath('trips.0.pickupCode')
-            ->assertJsonMissingPath('trips.0.companyId')
-            ->assertJsonMissingPath('trips.0.driverId')
-            ->assertJsonMissingPath('trips.0.pickupLatitude');
-
-        $request->patchJson('/api/transport/driver/trips/'.$ownTripId.'/status', [
-            'status' => 'REQUESTED',
-        ])->assertOk()
-            ->assertJsonPath('status', 'REQUESTED')
-            ->assertJsonPath('pickupCodeRequired', true)
-            ->assertJsonMissingPath('pickupCode')
-            ->assertJsonMissingPath('companyId')
-            ->assertJsonMissingPath('driverId');
-        $request->patchJson('/api/transport/driver/trips/'.$otherTripId.'/status', [
-            'status' => 'REQUESTED',
-        ])->assertNotFound();
-
-        $this->assertDatabaseHas('transport_trips', [
-            'id' => $ownTripId,
-            'status' => 'REQUESTED',
-            'driver_id' => null,
-        ]);
-        $this->assertDatabaseHas('transport_trips', [
-            'id' => $otherTripId,
-            'status' => 'OFFERED',
-            'driver_id' => $otherEmployeeId,
-        ]);
-    }
-
-    public function test_driver_portal_manifest_and_session_use_the_published_store_and_employee_session(): void
-    {
-        ModuleCatalog::ensureCompanyAccess('kora');
-        DB::table('maximus_company_modules')
-            ->where('company_id', 'kora')
-            ->where('module_id', 'transport')
-            ->update([
-                'feature_ids' => json_encode(['overview']),
-                'configuration' => json_encode(['featureScope' => 'explicit']),
-            ]);
-        DB::table('ecommerce_stores')->insert([
-            'id' => 'store-kora-driver-portal',
-            'company_id' => 'kora',
-            'slug' => 'kora-driver-portal',
-            'name' => 'Kora Taxi',
-            'description' => 'Taxi',
-            'status' => 'PUBLISHED',
-            'currency' => 'XOF',
-            'primary_color' => '#111827',
-            'accent_color' => '#f59e0b',
-            'logo_url' => '',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $employeeId = 'portal-session-driver';
-        $this->createDriverEmployee($employeeId);
-        $this->insertMobileDriver($employeeId);
-        $request = $this->asActor('employee', [], $employeeId);
-
-        $manifest = $this->getJson('/api/shop/kora-driver-portal/transport/driver/manifest.webmanifest')
-            ->assertOk()
-            ->assertHeader('Content-Type', 'application/manifest+json')
-            ->json();
-        $this->assertSame('/driver-app/shop/kora-driver-portal/', $manifest['id']);
-        $this->assertSame('/driver-app/shop/kora-driver-portal/transport/chauffeur', $manifest['start_url']);
-        $this->assertSame($manifest['id'], $manifest['scope']);
-
-        $request->getJson('/api/shop/kora-driver-portal/transport/driver/session')
-            ->assertOk()
-            ->assertJsonPath('driver.id', $employeeId)
-            ->assertJsonMissingPath('driver.companyId')
-            ->assertJsonMissingPath('driver.employeeId');
     }
 
     private function insertMobileDriver(string $id, string $company = 'kora'): void
