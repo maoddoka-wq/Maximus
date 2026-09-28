@@ -8,6 +8,8 @@ Le workflow GitHub Actions `MAXIMUS Chauffeur Android APK` se lance avec un tag 
 
 Le QR affiché dans Transport lit cette release stable. Son APK est public parce que le dépôt GitHub est public; ne placez aucun secret ou identifiant chauffeur dans le lien.
 
+L’application installée vérifie cette même release stable au démarrage, au plus une fois toutes les six heures. Si la version publiée est plus récente, elle propose le téléchargement de l’APK. Android demande ensuite de confirmer l’installation; une installation silencieuse n’est pas possible avec ce mode de distribution.
+
 ## Préparer la signature
 
 Avant la première publication, ajouter ces secrets dans les paramètres GitHub du dépôt, sous **Secrets and variables → Actions** :

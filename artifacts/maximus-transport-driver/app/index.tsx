@@ -19,6 +19,7 @@ import { useColors } from '@/hooks/useColors';
 import { radius, spacing } from '@/constants/colors';
 import { useDriverSession } from '@/contexts/DriverSessionContext';
 import { DriverTripsPanel } from '@/components/DriverTripsPanel';
+import { DriverAppUpdatePrompt } from '@/components/DriverAppUpdatePrompt';
 import { API_ORIGIN } from '@/lib/mobile-api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -511,12 +512,24 @@ function SessionRecoveryScreen() {
 export default function DriverHomeScreen() {
   const { isHydrated, accessToken, isLoadingSession, driver } = useDriverSession();
 
-  if (!API_ORIGIN) return <LoginScreen />;
-  if (!isHydrated) return <LoadingScreen />;
-  if (!accessToken) return <LoginScreen />;
-  if (isLoadingSession && !driver) return <LoadingScreen />;
-  if (!driver) return <SessionRecoveryScreen />;
-  return <DriverDashboard />;
+  return (
+    <>
+      <DriverAppUpdatePrompt />
+      {!API_ORIGIN ? (
+        <LoginScreen />
+      ) : !isHydrated ? (
+        <LoadingScreen />
+      ) : !accessToken ? (
+        <LoginScreen />
+      ) : isLoadingSession && !driver ? (
+        <LoadingScreen />
+      ) : !driver ? (
+        <SessionRecoveryScreen />
+      ) : (
+        <DriverDashboard />
+      )}
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
