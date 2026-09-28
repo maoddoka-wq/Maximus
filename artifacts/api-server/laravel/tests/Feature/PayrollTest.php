@@ -166,7 +166,7 @@ class PayrollTest extends TestCase
 
         $permissions = [
             'paie' => ['voir'],
-            'paie:menu:solde-de-paie' => ['voir', 'modifier'],
+            'paie:menu:solde-de-paie' => ['voir', 'créer', 'modifier'],
         ];
         $this->asActor('employee', $permissions)->postJson('/api/payroll/wallet/topups?companyId=kora', [
             'amount' => 100000,

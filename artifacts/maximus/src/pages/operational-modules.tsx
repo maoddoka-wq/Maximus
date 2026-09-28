@@ -359,11 +359,18 @@ export function OperationalModulePage({
   const config = configs.find(item => item.id === moduleId);
   if (!config) return null;
 
+  // An operational screen owns one feature. Never aggregate permissions from
+  // sibling features: that would let a create/edit grant leak across screens.
+  const scopedPermissions = featurePermissions?.[config.id];
   const scopedCanCreate = featurePermissions
-    ? Object.values(featurePermissions).some(permissions => permissions?.includes('créer'))
+    ? Boolean(scopedPermissions?.includes('voir') && scopedPermissions.includes('créer'))
     : canCreate;
   const scopedCanModify = featurePermissions
-    ? Object.values(featurePermissions).some(permissions => permissions?.includes('modifier'))
+    ? Boolean(
+      scopedPermissions?.includes('voir')
+      && scopedPermissions.includes('créer')
+      && scopedPermissions.includes('modifier'),
+    )
     : canModify;
 
   return (

@@ -129,11 +129,20 @@ class PresenceController extends Controller
             || array_key_exists('workDate', $input)
             || array_key_exists('startDate', $input)
             || array_key_exists('endDate', $input);
+        // Every mutation of an existing item is subject to the complete
+        // presence CRUD ladder. Validation/correction/management are
+        // additional capabilities, never substitutes for create or edit.
+        $hasCrudRights = is_array($actorData)
+            && $feature !== null
+            && ModuleAuthorization::allows($actorData, 'presences', 'view', $feature)
+            && ModuleAuthorization::allows($actorData, 'presences', 'create', $feature)
+            && ModuleAuthorization::allows($actorData, 'presences', 'edit', $feature);
         $allowed = is_array($actorData)
             && $feature !== null
             && $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
             && ! (($actorData['role'] ?? null) === 'employee' && $item->type === 'schedule')
             && ! ($requiresValidation && ($actorData['role'] ?? null) === 'employee')
+            && $hasCrudRights
             && ($item->type === 'attendance'
                 ? ModuleAuthorization::allows($actorData, 'presences', 'correct', $feature)
                 : (! $requiresValidation || ModuleAuthorization::allows($actorData, 'presences', 'validate', $feature))
@@ -186,10 +195,15 @@ class PresenceController extends Controller
             return response()->json(['error' => 'L’historique est généré par le serveur.'], 403);
         }
         $actorData = $request->attributes->get('authActor');
+        $feature = $this->featureForType($item->type);
         if (! is_array($actorData)
             || (($actorData['role'] ?? null) === 'employee' && $item->type === 'schedule')
             || ! $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
-            || ! ModuleAuthorization::allows($actorData, 'presences', 'delete', $this->featureForType($item->type))) {
+            || $feature === null
+            || ! ModuleAuthorization::allows($actorData, 'presences', 'view', $feature)
+            || ! ModuleAuthorization::allows($actorData, 'presences', 'create', $feature)
+            || ! ModuleAuthorization::allows($actorData, 'presences', 'edit', $feature)
+            || ! ModuleAuthorization::allows($actorData, 'presences', 'delete', $feature)) {
             return $this->forbidden();
         }
 

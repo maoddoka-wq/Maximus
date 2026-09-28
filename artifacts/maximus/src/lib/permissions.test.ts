@@ -11,6 +11,7 @@ import {
   getFeaturePermissions,
   restrictRoleToCompany,
   roleHasPermission,
+  roleHasFeaturePermission,
   hasEffectivePermission,
 } from './employee-permissions';
 import {
@@ -146,6 +147,36 @@ test('borne les actions à la fonctionnalité demandée', () => {
   assert.deepEqual(getFeaturePermissions(salesRole, nodes[1], 'commerce', 'sales'), ['voir', 'créer']);
 });
 
+test('applique le ladder à chaque fonctionnalité et refuse le fallback vers une autre rubrique', () => {
+  const ecommerceNode = { ...nodes[1], moduleIds: ['ecommerce'] };
+  const employeeRole = role({
+    ecommerce: ['voir', 'créer', 'modifier'],
+    'ecommerce:menu:catalogue': ['voir', 'modifier'],
+    'ecommerce:menu:commandes': ['voir', 'créer', 'modifier'],
+  });
+
+  assert.deepEqual(
+    getFeaturePermissions(employeeRole, ecommerceNode, 'ecommerce', 'catalogue'),
+    ['voir'],
+  );
+  assert.equal(
+    roleHasFeaturePermission(employeeRole, ecommerceNode, 'ecommerce', 'catalogue', 'modifier'),
+    false,
+  );
+  assert.deepEqual(
+    getFeaturePermissions(employeeRole, ecommerceNode, 'ecommerce', 'clients'),
+    [],
+  );
+  assert.equal(
+    roleHasFeaturePermission(employeeRole, ecommerceNode, 'ecommerce', 'clients', 'voir'),
+    false,
+  );
+  assert.equal(
+    roleHasFeaturePermission(employeeRole, ecommerceNode, 'ecommerce', 'commandes', 'modifier'),
+    true,
+  );
+});
+
 test('respecte une permission détaillée explicitement vide', () => {
   const restrictedRole = role({
     ecommerce: ['voir', 'créer', 'modifier'],
@@ -175,7 +206,7 @@ test('expose uniquement les sous-rubriques Stocks permises', () => {
 
 test('utilise les permissions racine Stocks quand aucune permission détaillée n’existe', () => {
   const permissions = getStockPermissions(
-    role({ stocks: ['voir', 'modifier'] }, { sectorId: 'unit-company' }),
+    role({ stocks: ['voir', 'créer', 'modifier'] }, { sectorId: 'unit-company' }),
     true,
   );
 
@@ -238,7 +269,7 @@ test('respecte les sous-permissions explicites Présences', () => {
   );
 });
 
-test('ne transforme pas une correction Présences en droit de modification sans ladder', () => {
+test('les opérations spéciales Présences exigent le ladder complet', () => {
   const correctionOnly = role({
     'presence.view': ['allowed'],
     'presence.correct': ['allowed'],
@@ -248,7 +279,7 @@ test('ne transforme pas une correction Présences en droit de modification sans 
 
   assert.equal(
     employeeHasPresencePermission(correctionOnly, presenceNode, 'correct', canPermission),
-    true,
+    false,
   );
   assert.equal(
     employeeHasPresencePermission(correctionOnly, presenceNode, 'edit', canPermission),
@@ -257,6 +288,35 @@ test('ne transforme pas une correction Présences en droit de modification sans 
   assert.equal(
     employeeHasPresencePermission(correctionOnly, presenceNode, 'create', canPermission),
     false,
+  );
+  const fullRights = role({
+    'presence.view': ['allowed'],
+    'presence.create': ['allowed'],
+    'presence.edit': ['allowed'],
+    'presence.correct': ['allowed'],
+  });
+  assert.equal(
+    employeeHasPresencePermission(fullRights, presenceNode, 'correct', canPermission),
+    true,
+  );
+});
+
+test('export Présences exige la lecture ainsi que le droit d’export', () => {
+  const presenceNode: OrgNode = { ...nodes[1], moduleIds: ['presences'] };
+  const canPermission = (_moduleId: ModuleId, _action: 'voir' | 'créer' | 'modifier') => true;
+  const exportOnly = role({ 'presence.export': ['allowed'] });
+  const viewAndExport = role({
+    'presence.view': ['allowed'],
+    'presence.export': ['allowed'],
+  });
+
+  assert.equal(
+    employeeHasPresencePermission(exportOnly, presenceNode, 'export', canPermission),
+    false,
+  );
+  assert.equal(
+    employeeHasPresencePermission(viewAndExport, presenceNode, 'export', canPermission),
+    true,
   );
 });
 
@@ -366,8 +426,7 @@ test('ne rend pas les prérequis visibles sans permission explicite', () => {
     'stocks:entries': ['créer'],
   });
   const stockPermissions = getStockPermissions(stockRole, true) ?? {};
-  assert.equal(stockPermissions.entries?.includes('créer'), true);
-  assert.equal(stockPermissions.entries?.includes('voir'), true);
+  assert.equal(stockPermissions.entries, undefined);
   assert.equal(stockPermissions.products, undefined);
 });
 

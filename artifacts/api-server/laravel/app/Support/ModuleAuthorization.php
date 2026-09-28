@@ -27,12 +27,6 @@ final class ModuleAuthorization
         'settings',
     ];
 
-    private const DIRECT_PERMISSION_FEATURES = [
-        'settings',
-        'parametres',
-        'finances',
-    ];
-
     public static function allows(
         array $actor,
         string $module,
@@ -119,7 +113,6 @@ final class ModuleAuthorization
 
     private static function allowsStock(array $permissions, string $action, ?string $feature): bool
     {
-        $required = self::stockAction($action);
         $detailedKeys = array_filter(
             array_keys($permissions),
             fn (string $key): bool => str_starts_with($key, 'stocks:'),
@@ -210,7 +203,6 @@ final class ModuleAuthorization
 
     private static function allowsGeneric(array $permissions, string $module, string $action, ?string $feature): bool
     {
-        $required = self::stockAction($action);
         $prefix = $module.':menu:';
         $detailed = array_filter(array_keys($permissions), fn (string $key): bool => str_starts_with($key, $prefix));
         if ($feature && $detailed !== []) {
@@ -231,40 +223,27 @@ final class ModuleAuthorization
     private static function stockAction(string $action): string
     {
         return match ($action) {
-            'view' => 'voir',
-            'create' => 'créer',
-            'modify', 'edit', 'correct', 'delete', 'manage', 'validate', 'export', 'reports' => 'modifier',
-            default => $action,
+            'view', 'read', 'export', 'reports', 'download' => 'voir',
+            'create', 'insert', 'store', 'add' => 'créer',
+            default => 'modifier',
         };
     }
 
     private static function allowsCrud(mixed $permissions, string $action): bool
     {
-        if ($action === 'view') {
+        $required = self::stockAction($action);
+        if ($required === 'voir') {
             return self::contains($permissions, 'voir');
-        }
-        if (! in_array($action, ['create', 'modify', 'edit', 'delete', 'correct'], true)) {
-            return self::contains($permissions, self::stockAction($action));
         }
         if (! self::contains($permissions, 'voir') || ! self::contains($permissions, 'créer')) {
             return false;
         }
 
-        return $action === 'create' || self::contains($permissions, 'modifier');
+        return $required === 'créer' || self::contains($permissions, 'modifier');
     }
 
     private static function allowsFeatureCrud(mixed $permissions, string $action, ?string $feature): bool
     {
-        if ($feature !== null && in_array($feature, self::DIRECT_PERMISSION_FEATURES, true)) {
-            return self::contains($permissions, self::stockAction($action));
-        }
-
-        if ($action !== 'view'
-            && ! in_array($action, ['create', 'modify', 'edit', 'delete', 'correct'], true)) {
-            return self::contains($permissions, 'voir')
-                && self::contains($permissions, self::stockAction($action));
-        }
-
         return self::allowsCrud($permissions, $action);
     }
 
@@ -273,14 +252,14 @@ final class ModuleAuthorization
         if (! self::contains($permissions['presence.'.$action] ?? [], 'allowed')) {
             return false;
         }
-        if ($action === 'view') {
-            return true;
+        $required = self::stockAction($action);
+        if ($required === 'voir') {
+            return self::contains($permissions['presence.view'] ?? [], 'allowed');
         }
-        if ($action === 'create' || in_array($action, ['edit', 'delete', 'correct'], true)) {
-            return self::allowsExplicitPresenceCrud($permissions, $action);
-        }
-
-        return self::contains($permissions['presence.view'] ?? [], 'allowed');
+        return self::allowsExplicitPresenceCrud(
+            $permissions,
+            $required === 'créer' ? 'create' : 'modify',
+        );
     }
 
     private static function allowsExplicitPresenceCrud(array $permissions, string $action): bool

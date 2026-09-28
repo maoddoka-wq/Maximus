@@ -256,7 +256,7 @@ class TransportController extends Controller
 
     public function updateDriverLocation(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
+        if (! $this->allowed($request, 'modify', 'drivers')) {
             return $this->forbidden();
         }
 
@@ -296,7 +296,7 @@ class TransportController extends Controller
 
     public function updateDriverAvailability(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
+        if (! $this->allowed($request, 'modify', 'drivers')) {
             return $this->forbidden();
         }
 
@@ -338,7 +338,7 @@ class TransportController extends Controller
 
     public function updateDriverPricingMode(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
+        if (! $this->allowed($request, 'modify', 'drivers')) {
             return $this->forbidden();
         }
 

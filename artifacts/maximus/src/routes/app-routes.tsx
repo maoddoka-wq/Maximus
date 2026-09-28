@@ -296,6 +296,14 @@ export function CompanyRouter({
         action: () => onBack('/entreprise/dashboard'),
       });
     }
+    const controlPermissions = moduleFeaturePermissions?.controle?.controle ?? [];
+    if (!companyAdmin && !controlPermissions.includes('voir')) {
+      return renderScreen(screens.empty, {
+        title: 'Accès non autorisé',
+        text: 'Votre rôle ne possède pas la permission Voir pour le contrôle et la coordination.',
+        action: () => onBack('/entreprise/dashboard'),
+      });
+    }
     return renderScreen(screens.control, {
       data,
       companyId,
@@ -304,6 +312,7 @@ export function CompanyRouter({
       isAdmin: false,
       companyAdmin,
       sectorManager,
+      controlPermissions,
       mutate,
       notify,
       actorName: employee ? `${employee.firstName} ${employee.lastName}` : data.companies.find(item => item.id === companyId)?.manager,

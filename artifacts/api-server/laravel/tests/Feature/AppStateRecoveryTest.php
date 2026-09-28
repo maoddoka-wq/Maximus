@@ -525,6 +525,7 @@ class AppStateRecoveryTest extends TestCase
             'email' => 'shared-data@example.test',
             'status' => 'ACTIF',
         ]);
+        ModuleCatalog::ensureCompanyAccess($company->id, ['commerce']);
         $employee = AuthUser::query()->create([
             'id' => 'shared-data-employee',
             'email' => 'shared-data.employee@example.test',

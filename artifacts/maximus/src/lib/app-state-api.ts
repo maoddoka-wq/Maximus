@@ -41,9 +41,9 @@ async function request<T>(path: string, init?: RequestInit, options: { timeoutMs
 
 export const appStateApi = {
   bootstrap: () => request<AppStateResponse>('/app-state/bootstrap', undefined, { timeoutMs: 20_000 }),
-  save: (data: StoreData, version: number) =>
+  save: (data: StoreData, version: number, deleted: Array<{ collection: string; ids: string[] }> = []) =>
     request<{ ok: true; version: number }>('/app-state', {
       method: 'PUT',
-      body: JSON.stringify({ data, version }),
+      body: JSON.stringify({ data, version, deleted }),
     }),
 };

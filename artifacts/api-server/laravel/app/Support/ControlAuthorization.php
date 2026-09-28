@@ -4,6 +4,40 @@ namespace App\Support;
 
 final class ControlAuthorization
 {
+    private const PERMISSION_KEY = 'controle';
+
+    private static function permissions(array $actor): array
+    {
+        $permissions = $actor['permissions'] ?? [];
+        return is_array($permissions) && is_array($permissions[self::PERMISSION_KEY] ?? null)
+            ? $permissions[self::PERMISSION_KEY]
+            : [];
+    }
+
+    private static function isBypass(array $actor): bool
+    {
+        return in_array($actor['role'] ?? null, ['maximus_admin', 'company_admin'], true);
+    }
+
+    private static function allowsCrud(array $actor, string $action): bool
+    {
+        if (self::isBypass($actor)) {
+            return true;
+        }
+        $permissions = self::permissions($actor);
+        if ($action === 'view') {
+            return in_array('voir', $permissions, true);
+        }
+        if ($action === 'create') {
+            return in_array('voir', $permissions, true)
+                && in_array('créer', $permissions, true);
+        }
+
+        return in_array('voir', $permissions, true)
+            && in_array('créer', $permissions, true)
+            && in_array('modifier', $permissions, true);
+    }
+
     public static function isValid(array $actor): bool
     {
         if (($actor['role'] ?? null) === 'maximus_admin') {
@@ -27,7 +61,7 @@ final class ControlAuthorization
 
     public static function canRead(array $actor, ?string $companyId = null, ?array $task = null): bool
     {
-        if (! self::isValid($actor)) {
+        if (! self::isValid($actor) || ! self::allowsCrud($actor, 'view')) {
             return false;
         }
 
@@ -60,7 +94,8 @@ final class ControlAuthorization
             return true;
         }
 
-        if (! self::canRead($actor, $input['companyId'] ?? null)) {
+        if (! self::allowsCrud($actor, 'create')
+            || ! self::canRead($actor, $input['companyId'] ?? null)) {
             return false;
         }
 
@@ -75,6 +110,7 @@ final class ControlAuthorization
 
     public static function canUpdate(array $actor, array $task): bool
     {
-        return self::canRead($actor, $task['companyId'] ?? null, $task);
+        return self::allowsCrud($actor, 'update')
+            && self::canRead($actor, $task['companyId'] ?? null, $task);
     }
 }

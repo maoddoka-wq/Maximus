@@ -441,6 +441,7 @@ function AppContent() {
   const location = search ? `${pathname}?${search}` : pathname;
   const dataRef = useRef(data);
   const appStateSaveQueue = useRef(Promise.resolve());
+  const pendingAppStateDeletes = useRef<Array<{ session: Session; collection: string; ids: string[] }>>([]);
   const appStateVersionRef = useRef(appStateVersion);
   const appStateRefreshRef = useRef<{ session: Session; promise: Promise<boolean> } | null>(null);
   const sessionRef = useRef<Session | null>(session);
@@ -452,6 +453,10 @@ function AppContent() {
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
   sessionRef.current = session;
+  useEffect(() => {
+    pendingAppStateDeletes.current = pendingAppStateDeletes.current
+      .filter(deletion => deletion.session === session);
+  }, [session]);
   const intelligentRegistrationEnabled = isPublicIntelligentRegistrationEnabled(
     publicRegistrationEnabled,
     installationProfile?.registrationEnabled,
@@ -656,6 +661,28 @@ function AppContent() {
     const next = structuredClone(previous) as StoreData;
     fn(next);
     const safeNext = sanitizeStoreData(next);
+    const deletions = [
+      'employees', 'roles', 'orgNodes', 'products', 'movements', 'sales', 'activities', 'purchaseOrders',
+      'supplierRecords', 'deliveries', 'businessDocuments', 'accountingEntries',
+      'payrollSlips', 'crmOpportunities',
+    ].flatMap(collection => {
+      const before = (previous as unknown as Record<string, unknown>)[collection];
+      const after = (safeNext as unknown as Record<string, unknown>)[collection];
+      if (!Array.isArray(before) || !Array.isArray(after)) return [];
+      const nextIds = new Set(after.map(item => (item as { id?: unknown })?.id).filter(Boolean).map(String));
+      const ids = before
+        .map(item => (item as { id?: unknown })?.id)
+        .filter((id): id is string => Boolean(id) && !nextIds.has(String(id)))
+        .map(String);
+      return ids.length ? [{ collection, ids }] : [];
+    });
+    const deleteSession = session;
+    if (deleteSession && persist && deletions.length) {
+      pendingAppStateDeletes.current = [
+        ...pendingAppStateDeletes.current,
+        ...deletions.map(deletion => ({ ...deletion, session: deleteSession })),
+      ];
+    }
     const mutationVersion = ++localMutationVersionRef.current;
     const mutationSession = session;
     const successMessage = mutationSuccessMessage(message, Boolean(session), persist);
@@ -665,8 +692,28 @@ function AppContent() {
       appStateSaveQueue.current = appStateSaveQueue.current
         .catch(() => undefined)
         .then(async () => {
-          if (sessionRef.current !== mutationSession) return null;
-          const { version } = await appStateApi.save(dataRef.current, appStateVersionRef.current);
+          if (sessionRef.current !== mutationSession) {
+            pendingAppStateDeletes.current = pendingAppStateDeletes.current
+              .filter(deletion => deletion.session !== mutationSession);
+            return null;
+          }
+          const deleted = pendingAppStateDeletes.current
+            .filter(deletion => deletion.session === mutationSession)
+            .map(({ collection, ids }) => ({ collection, ids }));
+          pendingAppStateDeletes.current = pendingAppStateDeletes.current
+            .filter(deletion => deletion.session !== mutationSession);
+          let version: number;
+          try {
+            ({ version } = await appStateApi.save(dataRef.current, appStateVersionRef.current, deleted));
+          } catch (error) {
+            if (mutationSession && sessionRef.current === mutationSession) {
+              pendingAppStateDeletes.current = [
+                ...deleted.map(deletion => ({ ...deletion, session: mutationSession })),
+                ...pendingAppStateDeletes.current,
+              ];
+            }
+            throw error;
+          }
           if (sessionRef.current !== mutationSession) return null;
           return version;
         })

@@ -7,6 +7,7 @@ use App\Models\AuthUser;
 use App\Models\Company;
 use App\Support\ModuleCatalog;
 use App\Services\PublicRegistrationPolicy;
+use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,40 @@ class AppStateController extends Controller
         'accountingEntries',
         'payrollSlips',
         'crmOpportunities',
+    ];
+
+    /** Every writable app-state collection has one explicit permission owner. */
+    private const COLLECTION_PERMISSION_MODULES = [
+        'products' => 'stocks',
+        'movements' => 'stocks',
+        'sales' => 'ventes',
+        'activities' => 'presences',
+        'purchaseOrders' => 'achats',
+        'supplierRecords' => 'fournisseurs',
+        'deliveries' => 'logistique',
+        'businessDocuments' => 'documents',
+        'accountingEntries' => 'comptabilite',
+        'payrollSlips' => 'paie',
+        'crmOpportunities' => 'crm',
+        'employees' => 'rh',
+        'roles' => 'rh',
+        'orgNodes' => 'rh',
+    ];
+    private const COLLECTION_FEATURES = [
+        'products' => ['stocks', 'products'],
+        'movements' => ['stocks', 'entries'],
+        'sales' => ['ventes', 'ventes'],
+        'activities' => ['presences', 'pointage'],
+        'purchaseOrders' => ['achats', 'achats'],
+        'supplierRecords' => ['fournisseurs', 'fournisseurs'],
+        'deliveries' => ['logistique', 'logistique'],
+        'businessDocuments' => ['documents', 'documents'],
+        'accountingEntries' => ['comptabilite', 'comptabilite'],
+        'payrollSlips' => ['paie', 'préparer-une-paie'],
+        'crmOpportunities' => ['crm', 'crm'],
+        'employees' => ['rh', 'rh'],
+        'roles' => ['rh', 'rh'],
+        'orgNodes' => ['rh', 'rh'],
     ];
 
     public function registrationCatalog(PublicRegistrationPolicy $registrationPolicy): JsonResponse
@@ -329,6 +364,10 @@ class AppStateController extends Controller
         $data = $request->validate([
             'data' => ['required', 'array'],
             'version' => ['nullable', 'integer', 'min:0'],
+            'deleted' => ['sometimes', 'array'],
+            'deleted.*.collection' => ['required', 'string'],
+            'deleted.*.ids' => ['required', 'array'],
+            'deleted.*.ids.*' => ['string'],
         ]);
 
         return DB::transaction(function () use ($actor, $data): JsonResponse {
@@ -342,6 +381,7 @@ class AppStateController extends Controller
             $currentPayload = is_array($currentPayload) ? $currentPayload : [];
 
             $incomingState = $this->stripCredentials($data['data']);
+            $deleted = is_array($data['deleted'] ?? null) ? $data['deleted'] : [];
             if (($actor['role'] ?? null) !== 'maximus_admin') {
                 if (!in_array($actor['role'] ?? null, ['company_admin', 'sector_manager', 'employee'], true)) {
                     return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
@@ -357,9 +397,16 @@ class AppStateController extends Controller
                         $incomingState,
                         $companyId,
                         is_array($actor['sectorIds'] ?? null) ? $actor['sectorIds'] : [],
+                        $deleted,
                     )) {
                     return response()->json([
                         'error' => 'La modification demandée sort du périmètre des secteurs administrés.',
+                    ], 403);
+                }
+
+                if (! $this->stateMutationAuthorized($actor, $currentPayload, $incomingState, $deleted)) {
+                    return response()->json([
+                        'error' => 'Vous ne disposez pas des droits nécessaires pour cette opération.',
                     ], 403);
                 }
 
@@ -372,6 +419,7 @@ class AppStateController extends Controller
                     $companyId,
                     $employeeCollections,
                 );
+                $this->applyExplicitDeletes($currentPayload, $deleted, (string) ($actor['companyId'] ?? ''));
             } else {
                 $currentPayload = $incomingState;
             }
@@ -401,11 +449,180 @@ class AppStateController extends Controller
         });
     }
 
+    /**
+     * App-state is a whole-state snapshot API. Authorize the delta, rather than
+     * trusting the client to send only the record it intended to change.
+     */
+    private function stateMutationAuthorized(array $actor, array $current, array $incoming, array $deleted = []): bool
+    {
+        $role = $actor['role'] ?? null;
+        if (in_array($role, ['company_admin', 'maximus_admin'], true)) {
+            return true;
+        }
+        if (! in_array($role, ['employee', 'sector_manager'], true)) {
+            return false;
+        }
+
+        $allowedCollections = $role === 'employee'
+            ? self::EMPLOYEE_WRITABLE_COLLECTIONS
+            : array_keys(self::COLLECTION_PERMISSION_MODULES);
+        $keys = array_unique(array_merge(array_keys($current), array_keys($incoming)));
+        foreach ($keys as $key) {
+            if (! array_key_exists($key, $incoming)) {
+                // Omission is not deletion: clients may submit partial snapshots.
+                continue;
+            }
+            if (! is_array($incoming[$key]) || ! array_is_list($incoming[$key])) {
+                return false;
+            }
+            if (! array_key_exists($key, self::COLLECTION_PERMISSION_MODULES)) {
+                // Shared catalog and unknown keys are never writable by staff.
+                if (($current[$key] ?? null) !== $incoming[$key]) {
+                    return false;
+                }
+                continue;
+            }
+            $before = $this->recordsById($current[$key] ?? []);
+            $after = $this->recordsById($incoming[$key]);
+            if (! in_array($key, $allowedCollections, true)) {
+                foreach ($after as $id => $record) {
+                    if (! isset($before[$id]) || ! $this->sameStateRecord($before[$id], $record)) {
+                        return false;
+                    }
+                }
+                continue;
+            }
+            foreach ($incoming[$key] as $record) {
+                if (! is_array($record) || ! isset($record['id'])) {
+                    return false;
+                }
+            }
+            foreach ($after as $id => $new) {
+                $old = $before[$id] ?? null;
+                if ($old !== null && $new !== null && $this->sameStateRecord($old, $new)) {
+                    continue;
+                }
+                $needed = $old === null ? 'create' : 'modify';
+                if (! $this->allowsCollectionAction($actor, $key, $needed, $new ?? $old)) {
+                    return false;
+                }
+            }
+        }
+        foreach ($deleted as $request) {
+            $key = is_array($request) ? (string) ($request['collection'] ?? '') : '';
+            if (! in_array($key, $allowedCollections, true)
+                || ! isset(self::COLLECTION_FEATURES[$key])
+                || ! is_array($request['ids'] ?? null)) {
+                return false;
+            }
+            foreach ((array) ($request['ids'] ?? []) as $id) {
+                $record = $this->recordsById($current[$key] ?? [])[(string) $id] ?? null;
+                if ($record !== null) {
+                    if (! $this->belongsToCompany($record, (string) ($actor['companyId'] ?? ''), $key)
+                        || ! $this->allowsCollectionAction($actor, $key, 'modify', $record)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private function recordsById(mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return [];
+        }
+        $records = [];
+        foreach ($value as $record) {
+            if (is_array($record) && isset($record['id'])) {
+                $records[(string) $record['id']] = $record;
+            }
+        }
+        return $records;
+    }
+
+    private function allowsCollectionAction(array $actor, string $collection, string $action, mixed $record = null): bool
+    {
+        if (in_array($collection, ['products', 'sales', 'purchaseOrders', 'supplierRecords'], true)) {
+            $owners = match ($collection) {
+                'products' => [['stocks', 'products'], ['commerce', 'products']],
+                'sales' => [['commerce', 'sales'], ['ventes', 'ventes']],
+                'purchaseOrders' => [['commerce', 'purchases'], ['achats', 'achats']],
+                'supplierRecords' => [['commerce', 'suppliers'], ['fournisseurs', 'fournisseurs']],
+            };
+            return $this->allowsAnyModuleAction($actor, $owners, $action);
+        }
+        if ($collection === 'activities' && is_array($record)) {
+            $moduleLabel = mb_strtolower(trim((string) ($record['module'] ?? '')));
+            $owners = match ($moduleLabel) {
+                'commerce', 'gestion commerciale' => [['commerce', 'sales'], ['ventes', 'ventes']],
+                'achats' => [['commerce', 'purchases'], ['achats', 'achats']],
+                default => [],
+            };
+            return $this->allowsAnyModuleAction($actor, $owners, $action);
+        }
+        [$module, $feature] = self::COLLECTION_FEATURES[$collection] ?? [null, null];
+        if (! $module || ! $feature) {
+            return false;
+        }
+        if ($collection === 'movements' && is_array($record)) {
+            $type = mb_strtoupper(trim((string) ($record['type'] ?? $record['movementType'] ?? '')));
+            $features = match ($type) {
+                'ENTRÉE', 'ACHAT', 'RETOUR CLIENT', 'AJUSTEMENT+' => ['entries'],
+                'SORTIE', 'VENTE', 'AJUSTEMENT-', 'PERTE', 'RETOUR FOURNISSEUR' => ['exits'],
+                'TRANSFERT' => ['entries', 'exits'],
+                default => [],
+            };
+            if ($features === []) {
+                return false;
+            }
+            foreach ($features as $movementFeature) {
+                if (! ModuleAuthorization::allows($actor, $module, 'view', $movementFeature)
+                    || ! ModuleAuthorization::allows($actor, $module, $action, $movementFeature)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return ModuleAuthorization::allows($actor, $module, 'view', $feature)
+            && ModuleAuthorization::allows($actor, $module, $action, $feature);
+    }
+
+    private function allowsAnyModuleAction(array $actor, array $owners, string $action): bool
+    {
+        foreach ($owners as [$module, $feature]) {
+            if (ModuleAuthorization::allows($actor, $module, 'view', $feature)
+                && ModuleAuthorization::allows($actor, $module, $action, $feature)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function applyExplicitDeletes(array &$state, array $deleted, string $companyId): void
+    {
+        foreach ($deleted as $request) {
+            $collection = is_array($request) ? (string) ($request['collection'] ?? '') : '';
+            if (! isset(self::COLLECTION_FEATURES[$collection]) || ! isset($state[$collection]) || ! is_array($state[$collection])) {
+                continue;
+            }
+            $ids = array_fill_keys(array_map('strval', (array) ($request['ids'] ?? [])), true);
+            $state[$collection] = array_values(array_filter(
+                $state[$collection],
+                fn (mixed $record): bool => ! is_array($record)
+                    || ! isset($ids[(string) ($record['id'] ?? '')])
+                    || ! $this->belongsToCompany($record, $companyId, $collection),
+            ));
+        }
+    }
+
     private function managerStateWriteWithinScope(
         array $current,
         array $incoming,
         string $companyId,
         array $sectorIds,
+        array $deleted = [],
     ): bool {
         $currentNodes = collect($current['orgNodes'] ?? [])
             ->filter(fn (mixed $item): bool => is_array($item) && ($item['companyId'] ?? null) === $companyId)
@@ -434,14 +651,14 @@ class AppStateController extends Controller
         } while ($added);
 
         $currentByCollection = [];
-        foreach (['companies', 'employees', 'roles', 'orgNodes'] as $collection) {
+        foreach (array_keys(self::COLLECTION_PERMISSION_MODULES) as $collection) {
             $currentByCollection[$collection] = collect($current[$collection] ?? [])
                 ->filter(fn (mixed $item): bool => is_array($item) && isset($item['id']))
                 ->keyBy(fn (array $item): string => (string) $item['id'])
                 ->all();
         }
 
-        foreach (['companies', 'employees', 'roles', 'orgNodes'] as $collection) {
+        foreach (array_keys(self::COLLECTION_PERMISSION_MODULES) as $collection) {
             foreach (($incoming[$collection] ?? []) as $item) {
                 if (!is_array($item) || !isset($item['id'])) {
                     return false;
@@ -465,6 +682,29 @@ class AppStateController extends Controller
                     ? false
                     : isset($allowedNodes[(string) $sectorId]) || isset($allowedNodes[(string) $oldSectorId]);
                 if (!$inside && !$this->sameStateRecord($existing, $item)) {
+                    return false;
+                }
+            }
+        }
+
+        foreach ($deleted as $request) {
+            $collection = is_array($request) ? (string) ($request['collection'] ?? '') : '';
+            if (! isset(self::COLLECTION_PERMISSION_MODULES[$collection])) {
+                return false;
+            }
+            foreach ((array) ($request['ids'] ?? []) as $id) {
+                $record = $currentByCollection[$collection][(string) $id] ?? null;
+                if (! is_array($record)) {
+                    continue;
+                }
+                $recordCompanyId = $record['companyId'] ?? $record['company_id'] ?? null;
+                if ($recordCompanyId !== null && (string) $recordCompanyId !== $companyId) {
+                    return false;
+                }
+                $sectorId = $collection === 'orgNodes'
+                    ? (string) $id
+                    : (string) ($record['sectorId'] ?? $record['sector_id'] ?? '');
+                if (! isset($allowedNodes[$sectorId])) {
                     return false;
                 }
             }
@@ -781,8 +1021,11 @@ class AppStateController extends Controller
 
             $ids = $incomingCompanyRecords->pluck('id')->filter()->all();
             $preserved = $existing->filter(
-                fn (mixed $item): bool => !$this->belongsToCompany($item, $companyId, $key)
-                    && (!is_array($item) || !in_array($item['id'] ?? null, $ids, true)),
+                // App-state is company-scoped, not a guaranteed full tenant
+                // snapshot for every actor. Omission is therefore ambiguous;
+                // explicit deletion intent is required before removing data.
+                fn (mixed $item): bool => ! $this->belongsToCompany($item, $companyId, $key)
+                    || (is_array($item) && !in_array($item['id'] ?? null, $ids, true)),
             );
             $current[$key] = $preserved->concat($incomingCompanyRecords)->values()->all();
         }

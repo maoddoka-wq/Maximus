@@ -337,6 +337,43 @@ class PresenceTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_presence_create_only_cannot_delete_an_existing_item(): void
+    {
+        $request = $this->asActor('employee', 'presence-employee', [
+            'presence.horaires' => ['voir', 'créer'],
+        ]);
+        $item = PresenceItem::query()->create([
+            'id' => 'presence-schedule-delete-protected',
+            'company_id' => 'kora',
+            'type' => 'schedule',
+            'employee_id' => 'presence-employee',
+            'status' => 'ACTIF',
+            'payload' => ['shift' => 'matin'],
+            'created_by' => 'Admin',
+            'updated_by' => 'Admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request->deleteJson('/api/presence/items/'.$item->id, [
+            'companyId' => 'kora',
+        ])->assertForbidden();
+        $this->assertDatabaseHas('presence_items', ['id' => $item->id]);
+    }
+
+    public function test_presence_view_only_cannot_create_an_item(): void
+    {
+        $this->asActor('employee', 'presence-employee', [
+            'presence.horaires' => ['voir'],
+        ])->postJson('/api/presence/items', [
+            'companyId' => 'kora',
+            'type' => 'schedule',
+            'employeeId' => 'presence-employee',
+            'status' => 'ACTIF',
+            'payload' => ['shift' => 'matin'],
+        ])->assertForbidden();
+    }
+
     public function test_presence_status_update_requires_modify_for_non_validation_items(): void
     {
         $request = $this->asActor('employee', 'presence-employee', [

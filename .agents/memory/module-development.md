@@ -57,6 +57,12 @@ Le registre de module doit dériver l’identité métier du catalogue et porter
 
 **How to apply:** Lorsqu’un module est ajouté, enregistrer son identifiant dans le catalogue et sa configuration d’exécution dans le registre, puis laisser les tests de parité vérifier la route et la navigation.
 
+Un identifiant présent dans le frontend ou dans le propriétaire CRUD d’AppState ne suffit pas à activer un module intégré. Ne pas ajouter automatiquement au catalogue serveur les modules opérationnels absents sans confirmation de leur périmètre produit.
+
+**Why:** Une activation change les droits et les fonctionnalités disponibles aux entreprises ; un ajout partiel peut afficher un module que le serveur refuse, ou accorder un accès non validé.
+
+**How to apply:** Confirmer les modules à prendre en charge, définir leurs fonctionnalités et packs canoniques, puis les publier et provisionner explicitement. Jusque-là, garder leur accès fermé sauf publication explicite comme module personnalisé.
+
 Les capacités de fulfillment d’un module e-commerce, comme la vente physique ou numérique, ne sont pas des onglets de navigation.
 
 **Why:** Une permission de type produit sert à contrôler les opérations autorisées dans le catalogue ; l’exposer comme page crée des liens dupliqués et des routes sans écran correspondant.

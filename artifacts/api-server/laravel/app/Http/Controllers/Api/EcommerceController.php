@@ -451,7 +451,7 @@ class EcommerceController extends Controller
 
     public function uploadProductImage(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+        if (! $this->allowed($request, 'modify', 'catalogue')) {
             return $this->forbidden();
         }
 
@@ -496,7 +496,7 @@ class EcommerceController extends Controller
 
     public function uploadProductGallery(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+        if (! $this->allowed($request, 'modify', 'catalogue')) {
             return $this->forbidden();
         }
 
@@ -513,7 +513,7 @@ class EcommerceController extends Controller
 
     public function deleteProductGalleryImage(Request $request, string $id, string $imageId): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+        if (! $this->allowed($request, 'modify', 'catalogue')) {
             return $this->forbidden();
         }
 
@@ -531,7 +531,7 @@ class EcommerceController extends Controller
 
     public function uploadDigitalFile(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'catalogue') && ! $this->allowed($request, 'create', 'catalogue')) {
+        if (! $this->allowed($request, 'modify', 'catalogue')) {
             return $this->forbidden();
         }
 
@@ -789,7 +789,7 @@ class EcommerceController extends Controller
 
     public function uploadRentalImage(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'location') && ! $this->allowed($request, 'create', 'location')) {
+        if (! $this->allowed($request, 'modify', 'location')) {
             return $this->forbidden();
         }
 
@@ -834,7 +834,7 @@ class EcommerceController extends Controller
 
     public function uploadRentalGallery(Request $request, string $id): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'location') && ! $this->allowed($request, 'create', 'location')) {
+        if (! $this->allowed($request, 'modify', 'location')) {
             return $this->forbidden();
         }
 
@@ -851,7 +851,7 @@ class EcommerceController extends Controller
 
     public function deleteRentalGalleryImage(Request $request, string $id, string $imageId): JsonResponse
     {
-        if (! $this->allowed($request, 'modify', 'location') && ! $this->allowed($request, 'create', 'location')) {
+        if (! $this->allowed($request, 'modify', 'location')) {
             return $this->forbidden();
         }
 

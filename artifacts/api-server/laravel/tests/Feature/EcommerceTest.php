@@ -109,7 +109,7 @@ class EcommerceTest extends TestCase
     {
         Storage::fake('public');
         $request = $this->asActor('employee', [
-            'ecommerce:menu:parametres' => ['voir', 'modifier'],
+            'ecommerce:menu:parametres' => ['voir', 'créer', 'modifier'],
         ]);
 
         $response = $request->post('/api/ecommerce/store/logo?companyId=kora', [
@@ -562,6 +562,39 @@ class EcommerceTest extends TestCase
             'image_url' => $secondUrl,
         ]);
         $this->assertNotEmpty(DB::table('ecommerce_products')->where('id', $product->json('id'))->value('image_data'));
+    }
+
+    public function test_create_only_users_cannot_add_media_to_existing_catalogue_or_location_records(): void
+    {
+        Storage::fake('public');
+        $request = $this->asActor('employee', [
+            'ecommerce:menu:catalogue' => ['voir', 'créer'],
+            'ecommerce:menu:location' => ['voir', 'créer'],
+        ]);
+
+        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
+            'name' => 'Produit sans média',
+            'slug' => 'produit-sans-media',
+            'sku' => 'NO-MEDIA-01',
+            'price' => 1200,
+            'stock' => 1,
+        ])->assertCreated();
+
+        $request->post('/api/ecommerce/products/'.$product->json('id').'/image?companyId=kora', [
+            'image' => UploadedFile::fake()->image('interdit.jpg'),
+        ])->assertForbidden();
+
+        $rental = $request->postJson('/api/ecommerce/rentals?companyId=kora', [
+            'name' => 'Location sans média',
+            'category' => 'Citadine',
+            'price' => 15000,
+            'billingUnit' => 'JOUR',
+            'availability' => 1,
+        ])->assertCreated();
+
+        $request->post('/api/ecommerce/rentals/'.$rental->json('id').'/image?companyId=kora', [
+            'image' => UploadedFile::fake()->image('interdit-location.jpg'),
+        ])->assertForbidden();
     }
 
     public function test_company_admin_can_upload_a_store_logo_without_using_the_company_logo(): void

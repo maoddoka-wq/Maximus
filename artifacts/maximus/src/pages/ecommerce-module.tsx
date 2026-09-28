@@ -362,7 +362,7 @@ export default function EcommerceModulePage({
   const permissionFeatureId = tab === 'accueil' ? 'parametres' : tab;
   const currentFeaturePermissions = featurePermissions?.[permissionFeatureId];
   const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
-  const currentCanModify = Boolean(canModify && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
+  const currentCanModify = Boolean(canModify && currentCanCreate && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
 
   return (
     <div className="space-y-5" data-testid="ecommerce-module" aria-busy={Boolean(pendingAction)}>
@@ -513,6 +513,10 @@ function RentalVehiclesTab({ data, canCreate, canModify, run }: { data: Ecommerc
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canModify && (form.imageFile || form.galleryFiles.length > 0)) {
+      await alert({ title: 'Droit Modifier requis', description: 'L’ajout de médias à une fiche existante nécessite le droit Modifier.', confirmLabel: 'Compris' });
+      return;
+    }
     const price = Number(form.price);
     const availability = Number(form.availability);
     if (!form.name.trim() || (!form.categoryId && !form.category.trim()) || !Number.isInteger(price) || price < 0 || !Number.isInteger(availability) || availability < 0) {
@@ -533,10 +537,10 @@ function RentalVehiclesTab({ data, canCreate, canModify, run }: { data: Ecommerc
       ? await run(() => createEcommerceApi(data.store.companyId).createRental(body), 'Location ajoutée.')
       : editing ? await run(() => createEcommerceApi(data.store.companyId).updateRental(editing.id, body), 'Location mise à jour.') : undefined;
     if (result) setEditing(null);
-    if (result && form.imageFile) {
+    if (result && canModify && form.imageFile) {
       await run(() => createEcommerceApi(data.store.companyId).uploadRentalImage((result as EcommerceRental).id, form.imageFile as File), 'Location et photo enregistrées.');
     }
-    if (result && form.galleryFiles.length > 0) {
+    if (result && canModify && form.galleryFiles.length > 0) {
       await run(() => createEcommerceApi(data.store.companyId).uploadRentalGallery((result as EcommerceRental).id, form.galleryFiles), 'Galerie de la location enregistrée.');
     }
   };
@@ -890,6 +894,10 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
   };
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canModify && (form.imageFile || form.galleryFiles.length > 0 || form.digitalFile)) {
+      await alert({ title: 'Droit Modifier requis', description: 'L’ajout de médias à une fiche existante nécessite le droit Modifier.', confirmLabel: 'Compris' });
+      return;
+    }
     const price = Number(form.price);
     const stock = form.fulfillmentType === 'DIGITAL' ? 1 : Number(form.stock);
     const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null;
@@ -923,13 +931,13 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
         : undefined;
     if (!saved) return;
     const savedProduct = saved as EcommerceProduct;
-    if (form.imageFile) {
+    if (canModify && form.imageFile) {
       await run(() => api.uploadProductImage(savedProduct.id, form.imageFile as File), 'Produit et photo enregistrés.');
     }
-    if (form.galleryFiles.length > 0) {
+    if (canModify && form.galleryFiles.length > 0) {
       await run(() => api.uploadProductGallery(savedProduct.id, form.galleryFiles), 'Galerie du produit enregistrée.');
     }
-    if (form.digitalFile) {
+    if (canModify && form.digitalFile) {
       const uploaded = await run(() => api.uploadDigitalFile(savedProduct.id, form.digitalFile as File), 'Produit numérique et fichier enregistrés.');
       if (!uploaded) return;
       if (requestedStatus === 'PUBLISHED' && bodyStatus !== 'PUBLISHED') {
@@ -949,7 +957,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
          {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreateProduct && !query ? <button type="button" onClick={openNewProduct} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Produit</th><th className="px-4">Référence</th><th className="px-4">Prix</th><th className="px-4">Stock</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{filtered.map(product => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.category}{product.featured ? ' · Vedette' : ''}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}</td><td className="px-4 py-3 font-bold">{money(product.price, data.store.currency)}</td><td className={`px-4 py-3 font-bold ${product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}`}>{product.stock}</td><td className="px-4 py-3"><StatusPill value={product.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={13} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
     </Panel>
      {chooserOpen && <Modal title="Choisir le type de produit" onClose={() => setChooserOpen(false)}><div className={`grid gap-3 ${canSellPhysical && canSellDigital ? 'sm:grid-cols-2' : ''}`}>{canSellPhysical && <button type="button" onClick={() => open(undefined, 'PHYSICAL')} className="rounded-2xl border p-5 text-left transition hover:border-[hsl(var(--primary))]"><Package size={25} className="text-[hsl(var(--primary))]" /><strong className="mt-3 block">Produit physique</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">Gérez le stock, la livraison et la vente d’un article matériel.</span></button>}{canSellDigital && <button type="button" onClick={() => open(undefined, 'DIGITAL')} className="rounded-2xl border p-5 text-left transition hover:border-[hsl(var(--primary))]"><ArrowDownToLine size={25} className="text-[hsl(var(--primary))]" /><strong className="mt-3 block">Produit numérique</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">Joignez un fichier privé, délivré uniquement après paiement confirmé.</span></button>}</div></Modal>}
-      {modal && <ProductModal modal={modal} form={form} categories={data.categories} setForm={setForm} onClose={() => setModal(null)} onSave={save} onRemoveGallery={async url => {
+      {modal && <ProductModal modal={modal} form={form} categories={data.categories} canModify={canModify} setForm={setForm} onClose={() => setModal(null)} onSave={save} onRemoveGallery={async url => {
         const imageId = url.split('/').pop();
         if (!imageId || !url.includes('/api/gallery-images/') || modal === 'new') return;
         const result = await run(() => createEcommerceApi(data.store.companyId).deleteProductGalleryImage(modal.id, imageId), 'Image supprimée de la galerie.');
@@ -958,7 +966,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
   </div>;
 }
 
- function ProductModal({ modal, form, categories, setForm, onClose, onSave, onRemoveGallery }: { modal: EcommerceProduct | 'new'; form: ProductForm; categories: EcommerceCategory[]; setForm: (value: ProductForm) => void; onClose: () => void; onSave: (event: FormEvent) => void; onRemoveGallery: (url: string) => void }) {
+ function ProductModal({ modal, form, categories, canModify, setForm, onClose, onSave, onRemoveGallery }: { modal: EcommerceProduct | 'new'; form: ProductForm; categories: EcommerceCategory[]; canModify: boolean; setForm: (value: ProductForm) => void; onClose: () => void; onSave: (event: FormEvent) => void; onRemoveGallery: (url: string) => void }) {
   const patch = (updates: Partial<ProductForm>) => setForm({ ...form, ...updates });
   const [, setSlugManuallyEdited] = useState(modal !== 'new');
   const changeName = (value: string) => patch({ name: value, ...(modal === 'new' ? { slug: slugify(value) } : {}) });

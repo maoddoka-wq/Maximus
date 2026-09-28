@@ -27,6 +27,7 @@ export function ControlTaskList({
   onStatusFilterChange,
   onModuleFilterChange,
   onUpdate,
+  canUpdate,
 }: {
   tasks: ControlTask[];
   statusFilter: 'TOUS' | ControlTaskStatus;
@@ -34,6 +35,7 @@ export function ControlTaskList({
   onStatusFilterChange: (value: 'TOUS' | ControlTaskStatus) => void;
   onModuleFilterChange: (value: 'TOUS' | ModuleId) => void;
   onUpdate: (taskId: string, status: ControlTaskStatus) => void;
+  canUpdate: boolean;
 }) {
   return <div className="card-surface rounded-2xl border">
     <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -65,9 +67,9 @@ export function ControlTaskList({
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {task.status === 'À FAIRE' && <button type="button" onClick={() => onUpdate(task.id, task.requiresApproval ? 'VALIDÉ' : 'EN COURS')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">{task.requiresApproval ? 'Valider' : 'Démarrer'}</button>}
-              {task.status === 'À FAIRE' && task.requiresApproval && <button type="button" onClick={() => onUpdate(task.id, 'REFUSÉ')} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700">Refuser</button>}
-              {task.status === 'EN COURS' && <button type="button" onClick={() => onUpdate(task.id, 'TERMINÉ')} className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]">Terminer</button>}
+              {canUpdate && task.status === 'À FAIRE' && <button type="button" onClick={() => onUpdate(task.id, task.requiresApproval ? 'VALIDÉ' : 'EN COURS')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">{task.requiresApproval ? 'Valider' : 'Démarrer'}</button>}
+              {canUpdate && task.status === 'À FAIRE' && task.requiresApproval && <button type="button" onClick={() => onUpdate(task.id, 'REFUSÉ')} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700">Refuser</button>}
+              {canUpdate && task.status === 'EN COURS' && <button type="button" onClick={() => onUpdate(task.id, 'TERMINÉ')} className="rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))]">Terminer</button>}
             </div>
           </div>
         </article>

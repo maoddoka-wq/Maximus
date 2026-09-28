@@ -81,6 +81,7 @@ class ControlTest extends TestCase
             'role' => 'employee',
             'company_id' => 'kora',
             'employee_id' => 'employee-1',
+            'permissions' => ['controle' => ['voir']],
         ]);
 
         $request->postJson('/api/control/tasks', [
@@ -114,6 +115,7 @@ class ControlTest extends TestCase
             'role' => 'employee',
             'company_id' => 'kora',
             'employee_id' => 'employee-1',
+            'permissions' => ['controle' => ['voir']],
         ]);
 
         ControlTask::query()->create([
@@ -165,6 +167,53 @@ class ControlTest extends TestCase
         $request->getJson('/api/control/bootstrap?scope=admin')
             ->assertOk()
             ->assertJsonCount(0, 'tasks');
+
+        $request->postJson('/api/control/tasks', [
+            'companyId' => 'another-company',
+            'sectorId' => 'logistique',
+            'title' => 'Hors entreprise',
+            'description' => 'Cette tâche ne doit pas franchir la limite du tenant.',
+            'assigneeEmployeeId' => 'employee-1',
+        ])->assertForbidden();
+    }
+
+    public function test_control_uses_the_strict_permission_ladder_for_non_admins(): void
+    {
+        $base = [
+            'id' => 'sector-control',
+            'email' => 'sector-control@kora.demo',
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => 'kora',
+            'sector_ids' => ['logistique'],
+            'permissions' => ['controle' => ['voir']],
+        ];
+        $viewOnly = $this->asActor($base);
+        $viewOnly->getJson('/api/control/bootstrap?companyId=kora')->assertOk();
+        $viewOnly->postJson('/api/control/tasks', [
+            'companyId' => 'kora', 'sectorId' => 'logistique', 'title' => 'Refusée',
+            'description' => 'Création sans droit.', 'assigneeEmployeeId' => 'employee-1',
+        ])->assertForbidden();
+
+        $createOnly = $this->asActor(array_merge($base, [
+            'id' => 'sector-control-create',
+            'email' => 'sector-control-create@kora.demo',
+            'permissions' => ['controle' => ['voir', 'créer']],
+        ]));
+        $created = $createOnly->postJson('/api/control/tasks', [
+            'companyId' => 'kora', 'sectorId' => 'logistique', 'title' => 'Créée',
+            'description' => 'Création autorisée.', 'assigneeEmployeeId' => 'employee-1',
+        ])->assertCreated();
+        $createOnly->patchJson('/api/control/tasks/'.$created->json('id').'/status', ['status' => 'EN COURS'])
+            ->assertForbidden();
+
+        $full = $this->asActor(array_merge($base, [
+            'id' => 'sector-control-full',
+            'email' => 'sector-control-full@kora.demo',
+            'permissions' => ['controle' => ['voir', 'créer', 'modifier']],
+        ]));
+        $full->patchJson('/api/control/tasks/'.$created->json('id').'/status', ['status' => 'EN COURS'])
+            ->assertOk();
     }
 
     private function asActor(array $attributes): self

@@ -310,6 +310,27 @@ class TransportTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_trip_permission_cannot_mutate_driver_records(): void
+    {
+        $admin = $this->asActor();
+        $driver = $admin->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $this->createDriverEmployee('cross-feature-driver'),
+            'licenseNumber' => 'SN-CROSS-001',
+        ])->assertCreated();
+
+        $tripOnly = $this->asActor('sector_manager', [
+            'transport:menu:trips' => ['voir', 'créer', 'modifier'],
+        ]);
+
+        $tripOnly->patchJson('/api/transport/drivers/'.$driver->json('id').'/availability?companyId=kora', [
+            'availability' => 'PAUSED',
+        ])->assertForbidden();
+        $tripOnly->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
+            'latitude' => 14.67,
+            'longitude' => -17.44,
+        ])->assertForbidden();
+    }
+
     public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
     {
         Http::fake();

@@ -72,6 +72,7 @@ export function ControlCenterPage({
   employeeId,
   scopeNodeId,
   actorName,
+  controlPermissions,
   mutate,
   notify,
 }: {
@@ -83,6 +84,7 @@ export function ControlCenterPage({
   employeeId?: string;
   scopeNodeId?: string;
   actorName?: string;
+  controlPermissions?: string[];
   mutate: (fn: (data: StoreData) => void, message?: string, persist?: boolean) => void;
   notify: (message: string) => void;
 }) {
@@ -170,7 +172,12 @@ export function ControlCenterPage({
     node.companyId === targetCompanyId
     && (!sectorManager || isDescendantOrSelf(data.orgNodes, node.id, scopeNodeId, companyId ?? '')),
   );
-  const canCreate = isAdmin || Boolean(companyAdmin) || Boolean(sectorManager);
+  const canCreate = isAdmin || Boolean(companyAdmin) || (controlPermissions?.includes('voir') === true && controlPermissions.includes('créer'));
+  const canUpdate = isAdmin || Boolean(companyAdmin) || (
+    controlPermissions?.includes('voir') === true
+    && controlPermissions.includes('créer')
+    && controlPermissions.includes('modifier')
+  );
 
   const updateTask = async (taskId: string, status: ControlTaskStatus) => {
     const task = accessibleTasks.find(candidate => candidate.id === taskId);
@@ -277,6 +284,7 @@ export function ControlCenterPage({
           onStatusFilterChange={setStatusFilter}
           onModuleFilterChange={setModuleFilter}
           onUpdate={(taskId, status) => void updateTask(taskId, status)}
+          canUpdate={canUpdate}
         />
       )}
 

@@ -134,20 +134,24 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const hasFeaturePermission = (label: string, permission: Permission, fallback: boolean) => {
     const values = featurePermissions?.[featureSlug(label)];
     if (!values) return fallback;
-    const required = permission === 'view' ? 'voir' : permission === 'create' ? 'créer' : 'modifier';
-    return values.includes(required);
+    if (permission === 'view') return values.includes('voir');
+    if (permission === 'create') return values.includes('voir') && values.includes('créer');
+    // Exports are read-only and retain the existing view/export policy.
+    if (permission === 'export' || permission === 'reports') return values.includes('voir') && values.includes('modifier');
+    // Mutating an existing item always requires the complete CRUD ladder.
+    return values.includes('voir') && values.includes('créer') && values.includes('modifier');
   };
-  const canCreateFeature = (label: string) => hasFeaturePermission(label, 'create', canCreate);
+  const canCreateFeature = (label: string) => hasFeaturePermission(label, 'create', canView && canCreate);
   const canCreatePresenceFeature = (label: string) =>
     selfOnly && label === 'Horaires' ? false : canCreateFeature(label);
   const canEditFeature = (label: string) =>
-    selfOnly && label === 'Horaires' ? false : hasFeaturePermission(label, 'edit', canEdit);
+    selfOnly && label === 'Horaires' ? false : hasFeaturePermission(label, 'edit', canView && canCreate && canEdit);
   const canCorrectFeature = (label: string) => canCorrect && canEditFeature(label);
   const canValidateAsSupervisor = canValidate && !selfOnly;
-  const canValidateFeature = (label: string) => hasFeaturePermission(label, 'validate', canValidateAsSupervisor);
-  const canDeleteFeature = (label: string) => hasFeaturePermission(label, 'delete', canDelete);
-  const canExportFeature = (label: string) => hasFeaturePermission(label, 'export', canExport);
-  const canManageAsSupervisor = canManage && !selfOnly;
+  const canValidateFeature = (label: string) => hasFeaturePermission(label, 'validate', canValidateAsSupervisor && canView && canCreate && canEdit);
+  const canDeleteFeature = (label: string) => hasFeaturePermission(label, 'delete', canView && canCreate && canEdit && canDelete);
+  const canExportFeature = (label: string) => hasFeaturePermission(label, 'export', canView && canExport);
+  const canManageAsSupervisor = canManage && !selfOnly && canView && canCreate && canEdit;
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(([id]) => id),
     defaultTab: tabs[0]?.[0] ?? 'dashboard',

@@ -149,14 +149,28 @@ export function roleHasPermission(
 ) {
   if (!role || !unitAllowsModule(employeeNode, moduleId)) return false;
 
-  if (role.modulePermissions[moduleId]?.includes(permission)) {
-    return true;
+  const detailedPrefix = moduleId === 'stocks'
+    ? 'stocks:'
+    : moduleId === 'presences'
+      ? 'presence.'
+      : `${moduleId}:menu:`;
+  const detailedKeys = Object.keys(role.modulePermissions).filter(key =>
+    key.startsWith(detailedPrefix)
+    && (moduleId !== 'presences'
+      || !presenceOperationalPermissions.has(key.slice(detailedPrefix.length) as PresencePermission)),
+  );
+  const hasDetailedPermissions = moduleId === 'commerce'
+    ? hasDetailedCommercePermissions(role.modulePermissions)
+    : detailedKeys.length > 0;
+
+  if (hasDetailedPermissions) {
+    return detailedKeys.some(key =>
+      (effectiveFeaturePermissions(role.modulePermissions[key]) ?? []).includes(permission),
+    );
   }
 
-  const detailedPrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:`;
-  return Object.entries(role.modulePermissions)
-    .filter(([key]) => key.startsWith(detailedPrefix))
-    .some(([, permissions]) => permissions.includes(permission));
+  const modulePermissions = effectiveFeaturePermissions(role.modulePermissions[moduleId]) ?? [];
+  return modulePermissions.includes(permission);
 }
 
 export function roleHasFeaturePermission(
@@ -167,22 +181,7 @@ export function roleHasFeaturePermission(
   permission: ModulePermission,
 ) {
   if (!role || !unitAllowsModule(employeeNode, moduleId)) return false;
-  const featurePrefix = moduleId === 'presences' ? 'presence.' : `${moduleId}:menu:`;
-  const hasDetailedPermissions = Object.keys(role.modulePermissions)
-    .some(key => key.startsWith(featurePrefix)
-      && (moduleId !== 'presences'
-        || !presenceOperationalPermissions.has(key.slice(featurePrefix.length) as PresencePermission)));
-  if (!hasDetailedPermissions) {
-    if (moduleId === 'presences') {
-      return false;
-    }
-    return role.modulePermissions[moduleId]?.includes(permission) ?? false;
-  }
-
-  const featureKey = moduleId === 'presences'
-    ? `presence.${featureSlug(featureId)}`
-    : permissionFeatureKey(moduleId, featureId);
-  return role.modulePermissions[featureKey]?.includes(permission) ?? false;
+  return getFeaturePermissions(role, employeeNode, moduleId, featureId).includes(permission);
 }
 
 /**
@@ -207,10 +206,21 @@ export function getFeaturePermissions(
         : [permissionFeatureKey(moduleId, featureId)];
   const detailedKey = keys.find(key => Object.prototype.hasOwnProperty.call(role.modulePermissions, key));
   if (detailedKey) {
-    return [...new Set(role.modulePermissions[detailedKey] ?? [])];
+    return effectiveFeaturePermissions([...new Set(role.modulePermissions[detailedKey] ?? [])]) ?? [];
   }
   if (moduleId === 'presences') return [];
-  return [...(role.modulePermissions[moduleId] ?? [])];
+
+  const detailedPrefix = moduleId === 'stocks'
+    ? 'stocks:'
+    : moduleId === 'commerce'
+      ? null
+      : `${moduleId}:menu:`;
+  const hasDetailedPermissions = moduleId === 'commerce'
+    ? hasDetailedCommercePermissions(role.modulePermissions)
+    : Object.keys(role.modulePermissions).some(key => key.startsWith(detailedPrefix ?? ''));
+  if (hasDetailedPermissions) return [];
+
+  return effectiveFeaturePermissions(role.modulePermissions[moduleId] ?? []) ?? [];
 }
 
 export function employeeHasPresencePermission(
@@ -227,18 +237,19 @@ export function employeeHasPresencePermission(
 
   if (hasExplicitPermissions) {
     if (!explicitPermission?.length) return false;
+    if (permission === 'view') return true;
+    if (permission === 'export' || permission === 'reports') {
+      return Boolean(role.modulePermissions['presence.view']?.length);
+    }
     if (permission === 'create') {
       return Boolean(role.modulePermissions['presence.view']?.length
         && role.modulePermissions['presence.create']?.length);
     }
-    if (permission === 'edit' || permission === 'delete') {
-      return Boolean(
-        role.modulePermissions['presence.view']?.length
-        && role.modulePermissions['presence.create']?.length
-        && role.modulePermissions['presence.edit']?.length,
-      );
-    }
-    return true;
+    return Boolean(
+      role.modulePermissions['presence.view']?.length
+      && role.modulePermissions['presence.create']?.length
+      && role.modulePermissions['presence.edit']?.length,
+    );
   }
 
   if (permission === 'view') return hasPermission('presences', 'voir');
@@ -262,7 +273,7 @@ export function getStockPermissions(
     .filter(([featureId, permissions]) => permissions && (!selected || selected.has(featureId)));
   const rootPermissions = role.modulePermissions.stocks;
 
-  const permissions = Object.fromEntries(
+  const rawPermissions = Object.fromEntries(
     detailed.length > 0
       ? detailed
       : (selected
@@ -273,20 +284,14 @@ export function getStockPermissions(
       ).filter(([, permissions]) => permissions),
   ) as Record<string, string[]>;
 
-  if (detailed.length === 0) return permissions;
-  if (selected) {
-    Object.keys(permissions).forEach(featureId => {
-      permissions[featureId] = [...new Set(['voir', ...permissions[featureId]])];
-    });
-    return permissions;
-  }
-
-  stockSubmodules.forEach(submodule => {
-    if (!(permissions[submodule.id] ?? []).length) return;
-    permissions[submodule.id] = [...new Set(['voir', ...permissions[submodule.id]])];
-  });
-
-  return permissions;
+  return Object.fromEntries(
+    Object.entries(rawPermissions)
+      .map(([featureId, permissions]) => [
+        featureId,
+        effectiveFeaturePermissions(permissions) ?? [],
+      ] as const)
+      .filter(([, permissions]) => permissions.length > 0),
+  );
 }
 
 export function getCommerceTabIds(
