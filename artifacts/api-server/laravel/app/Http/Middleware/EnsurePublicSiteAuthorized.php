@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Http\Controllers\Api\EcommerceController;
 use App\Services\EcommerceDomainVerifier;
 use Closure;
 use Illuminate\Http\Request;
@@ -27,9 +26,6 @@ final class EnsurePublicSiteAuthorized
         } else {
             $domain = $this->domainVerifier->activeForHost($request->getHost());
             if (! $domain) {
-                if ($route?->getActionName() === EcommerceController::class.'@publicBootstrapByDomain') {
-                    return $next($request);
-                }
                 return $this->notFound();
             }
             $storeQuery->where('company_id', (string) $domain->company_id);

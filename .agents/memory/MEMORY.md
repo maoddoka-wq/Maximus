@@ -27,10 +27,6 @@
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
 - [Champs vides du catalogue](catalogue-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel peut les convertir en null.
 - [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
-- [Application chauffeur Android partagée](shared-driver-android.md) — garder un APK unique pour toutes les entreprises; le code entreprise sélectionne le tenant.
-- [Cycle de vie GPS chauffeur](driver-gps-lifecycle.md) — garder le polling d’état en lecture seule, sérialiser la tâche native et rejeter les positions reçues en retard.
-- [Parcours de courses chauffeur mobile](mobile-driver-trip-scope.md) — droits Transport contrôlés côté serveur et GPS récent sur les transitions sensibles, sans changer le parcours desktop.
-- [Build Android Expo en CI](android-release-ci.md) — déclarer les dépendances des plugins et éviter l’ancien paquet SDK `tools`.
 - [Limites du défilement mobile](mobile-scroll-boundary.md) — confiner le débordement de page sans supprimer le défilement nécessaire aux tableaux et rails de produits.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
@@ -103,5 +99,3 @@
 - [Planches de contact ImageMagick](imagemagick-contact-sheets.md) — fournir explicitement une police à `montage` si la police par défaut est introuvable.
 - [Cache des chunks Vite sur Render](render-stale-vite-assets.md) — garder `index.html` hors cache et renvoyer 404 pour les assets Vite absents, sinon le fallback HTML casse les imports.
 - [Overrides de sécurité pnpm](pnpm-overrides.md) — mettre les correctifs transitifs dans `package.json` pour qu’ils soient réellement pris en compte par le lockfile.
-- [Expo SecureStore en aperçu web](expo-secure-store-web-preview.md) — garder l’authentification native ; l’aperçu web ne valide ni le coffre sécurisé ni le GPS en arrière-plan.
-- [Consultation des docs API](public-api-doc-access.md) — après un 402 des outils web, un fetch direct via CodeExecution peut encore atteindre la documentation.

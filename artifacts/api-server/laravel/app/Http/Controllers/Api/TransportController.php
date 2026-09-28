@@ -5,13 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Support\CompanyRegistry;
-use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -257,584 +254,6 @@ class TransportController extends Controller
         return response()->json($this->driver((object) $row), 201);
     }
 
-    public function createMobileSession(Request $request): JsonResponse
-    {
-        $actor = $request->attributes->get('authActor');
-        if (($actor['role'] ?? null) !== 'employee' || empty($actor['employeeId'])) {
-            return response()->json(['error' => 'Seul un employé chauffeur peut ouvrir une session mobile.'], 403);
-        }
-        $company = (string) $request->attributes->get('companyId');
-        $driver = DB::table('transport_drivers')->where('company_id', $company)
-            ->where('employee_id', $actor['employeeId'])->where('status', 'ACTIVE')->first();
-        if (! $driver) {
-            return response()->json(['error' => 'Votre compte n’est pas lié à un chauffeur actif.'], 403);
-        }
-        $employee = AuthUser::query()->whereKey($actor['employeeId'])
-            ->where('company_id', $company)->where('role', 'employee')->where('status', 'ACTIF')->first();
-        if (! $employee) {
-            return response()->json(['error' => 'Votre compte employé n’est plus actif.'], 403);
-        }
-        $request->attributes->set('authActor', MaximusAuth::actor($employee));
-
-        $input = $this->validated($request, ['deviceName' => ['nullable', 'string', 'max:120']]);
-        $plain = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-        $expires = Carbon::now()->addDays(30);
-        DB::transaction(function () use ($company, $driver, $actor, $input, $plain, $expires): void {
-            DB::table('transport_mobile_tokens')->where('company_id', $company)->where('driver_id', $driver->id)
-                ->whereNull('revoked_at')->update(['revoked_at' => Carbon::now()]);
-            DB::table('transport_mobile_tokens')->insert([
-                'id' => $this->id('mobile-token'),
-                'token_hash' => hash('sha256', $plain),
-                'company_id' => $company, 'driver_id' => $driver->id, 'employee_id' => $actor['employeeId'],
-                'device_name' => $input['deviceName'] ?? null, 'expires_at' => $expires,
-                'created_at' => Carbon::now(), 'last_used_at' => null, 'revoked_at' => null,
-            ]);
-        });
-        return response()->json([
-            'accessToken' => $plain,
-            'expiresAt' => $expires->toISOString(),
-            'driver' => $this->mobileDriver($driver),
-            'capabilities' => $this->mobileCapabilities($request),
-        ], 201);
-    }
-
-    public function getMobileSession(Request $request): JsonResponse
-    {
-        $driver = $request->attributes->get('transportMobileDriver');
-        return response()->json([
-            'driver' => $this->mobileDriver($driver),
-            'capabilities' => $this->mobileCapabilities($request),
-        ]);
-    }
-
-    public function deleteMobileSession(Request $request): Response
-    {
-        DB::table('transport_mobile_tokens')->where('id', $request->attributes->get('transportMobileToken')->id)
-            ->update(['revoked_at' => Carbon::now()]);
-        return response()->noContent();
-    }
-
-    public function updateMobileLocation(Request $request): JsonResponse
-    {
-        if (! $this->mobileCanUpdateGps($request)) {
-            return $this->forbidden();
-        }
-
-        $driver = $request->attributes->get('transportMobileDriver');
-        $input = $this->validated($request, [
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'capturedAt' => ['required', 'date'],
-        ]);
-        $captured = Carbon::parse($input['capturedAt']);
-        if (! $this->isWithinDakar((float) $input['latitude'], (float) $input['longitude'])
-            || $captured->lt(Carbon::now()->subMinutes(2))
-            || $captured->gt(Carbon::now()->addSeconds(30))) {
-            return response()->json(['error' => 'Position GPS invalide, hors zone ou obsolète.'], 422);
-        }
-        $received = Carbon::now();
-        $persistedAt = $captured->gt($received) ? $received->copy() : $captured;
-        $updated = DB::table('transport_drivers')
-            ->where('company_id', $driver->company_id)
-            ->where('id', $driver->id)
-            ->where(function ($query) use ($persistedAt): void {
-                $query->whereNull('location_updated_at')
-                    ->orWhere('location_updated_at', '<=', $persistedAt);
-            })
-            ->update([
-                'latitude' => (float) $input['latitude'],
-                'longitude' => (float) $input['longitude'],
-                'location_updated_at' => $persistedAt,
-                'updated_at' => $received,
-            ]);
-        if ($updated === 0) {
-            return response()->json(['error' => 'Une position GPS plus récente a déjà été reçue.'], 409);
-        }
-
-        return response()->json([
-            'ok' => true,
-            'capturedAt' => $captured->toISOString(),
-            'receivedAt' => $received->toISOString(),
-        ]);
-    }
-
-    public function updateMobileAvailability(Request $request): JsonResponse
-    {
-        $driver = $request->attributes->get('transportMobileDriver');
-        $input = $this->validated($request, ['availability' => ['required', Rule::in(['AVAILABLE', 'PAUSED'])]]);
-        if ($input['availability'] === 'AVAILABLE' && ! $this->mobileCanUpdateGps($request)) {
-            return $this->forbidden();
-        }
-
-        $company = (string) $driver->company_id;
-        if ($input['availability'] === 'AVAILABLE'
-            && ! $this->hasFreshMobileLocation($driver)) {
-            return response()->json(['error' => 'Une position GPS récente est nécessaire pour être disponible.'], 422);
-        }
-        if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')->where('company_id', $company)
-            ->where('driver_id', $driver->id)->whereIn('status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS'])->exists()) {
-            return response()->json(['error' => 'Terminez la course en cours avant de passer en pause.'], 422);
-        }
-        DB::table('transport_drivers')->where('id', $driver->id)->update([
-            'availability' => $input['availability'], 'availability_updated_at' => Carbon::now(), 'updated_at' => Carbon::now(),
-        ]);
-        return response()->json([
-            'driver' => $this->mobileDriver(DB::table('transport_drivers')->where('id', $driver->id)->first()),
-            'capabilities' => $this->mobileCapabilities($request),
-        ]);
-    }
-
-    public function getMobileTrips(Request $request): JsonResponse
-    {
-        if (! $this->allowed($request, 'voir', 'trips')) {
-            return $this->forbidden();
-        }
-
-        $driver = $request->attributes->get('transportMobileDriver');
-        $company = (string) $driver->company_id;
-        $input = $this->validated($request, [
-            'historyPage' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
-        ]);
-        $historyPage = (int) ($input['historyPage'] ?? 1);
-        $historyPageSize = 20;
-
-        $this->expireOffers($company);
-
-        $activeTrips = DB::table('transport_trips')
-            ->where('company_id', $company)
-            ->where('driver_id', $driver->id)
-            ->whereIn('status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS'])
-            ->orderBy('requested_at')
-            ->get();
-
-        $availableTrips = $activeTrips->isEmpty()
-            ? DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->whereNull('driver_id')
-                ->where('status', 'REQUESTED')
-                ->orderBy('requested_at')
-                ->get()
-            : collect();
-
-        $historyRows = DB::table('transport_trips')
-            ->where('company_id', $company)
-            ->where('driver_id', $driver->id)
-            ->whereIn('status', ['COMPLETED', 'CANCELLED'])
-            ->orderByRaw('COALESCE(completed_at, updated_at) DESC')
-            ->orderByDesc('id')
-            ->offset(($historyPage - 1) * $historyPageSize)
-            ->limit($historyPageSize + 1)
-            ->get();
-        $historyHasMore = $historyRows->count() > $historyPageSize;
-        $history = $historyRows->take($historyPageSize);
-
-        return response()->json([
-            'activeTrips' => $activeTrips
-                ->map(fn (object $trip): array => $this->mobileTrip($trip, $trip->status !== 'OFFERED'))
-                ->values(),
-            'availableTrips' => $availableTrips
-                ->map(fn (object $trip): array => $this->mobileTrip($trip, false))
-                ->values(),
-            'history' => $history
-                ->map(fn (object $trip): array => $this->mobileTrip($trip, false))
-                ->values(),
-            'historyPage' => $historyPage,
-            'historyHasMore' => $historyHasMore,
-        ]);
-    }
-
-    public function acceptMobileTrip(Request $request, string $id): JsonResponse
-    {
-        if (! $this->allowed($request, 'modifier', 'trips')) {
-            return $this->forbidden();
-        }
-
-        $driver = $request->attributes->get('transportMobileDriver');
-        $company = (string) $driver->company_id;
-        $this->expireOffers($company);
-
-        $failure = null;
-        $failureStatus = 422;
-        DB::transaction(function () use ($id, $company, $driver, &$failure, &$failureStatus): void {
-            $trip = DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->lockForUpdate()
-                ->first();
-            if (! $trip) {
-                $failure = 'Course introuvable.';
-                $failureStatus = 404;
-                return;
-            }
-
-            $lockedDriver = DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->where('status', 'ACTIVE')
-                ->lockForUpdate()
-                ->first();
-            if (! $lockedDriver) {
-                $failure = 'Votre profil chauffeur n’est plus actif.';
-                $failureStatus = 403;
-                return;
-            }
-
-            $isTargetedOffer = $trip->status === 'OFFERED' && $trip->driver_id === $driver->id;
-            $isFreeRequest = $trip->status === 'REQUESTED' && $trip->driver_id === null;
-            if (! $isTargetedOffer && ! $isFreeRequest) {
-                if ($trip->status === 'OFFERED' && $trip->driver_id !== $driver->id) {
-                    $failure = 'Cette offre est réservée à un autre chauffeur.';
-                    $failureStatus = 403;
-                } else {
-                    $failure = 'Cette course n’est plus disponible.';
-                }
-                return;
-            }
-            if ($isTargetedOffer && $trip->offer_expires_at !== null
-                && Carbon::parse($trip->offer_expires_at)->lte(Carbon::now())) {
-                $failure = 'Cette offre a expiré. Actualisez la liste des courses.';
-                return;
-            }
-            if (! $this->hasFreshMobileLocation($lockedDriver)) {
-                $failure = 'Une position GPS récente est nécessaire pour accepter une course.';
-                return;
-            }
-
-            $hasOtherActiveTrip = DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('driver_id', $driver->id)
-                ->where('id', '!=', $id)
-                ->whereIn('status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS'])
-                ->exists();
-            if ($hasOtherActiveTrip) {
-                $failure = 'Terminez ou refusez votre course en cours avant d’en accepter une autre.';
-                return;
-            }
-
-            $vehicleQuery = DB::table('transport_vehicles')
-                ->where('company_id', $company)
-                ->where('driver_id', $driver->id)
-                ->where('status', 'AVAILABLE')
-                ->lockForUpdate();
-            if ($isTargetedOffer) {
-                $vehicleQuery->where('id', $trip->vehicle_id);
-            }
-            $vehicle = $vehicleQuery->first();
-            if (! $vehicle) {
-                $failure = 'Aucun véhicule disponible n’est rattaché à votre profil chauffeur.';
-                return;
-            }
-
-            DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->update([
-                    'driver_id' => $driver->id,
-                    'vehicle_id' => $vehicle->id,
-                    'pricing_mode' => $lockedDriver->pricing_mode === 'STORM' ? 'STORM' : 'NORMAL',
-                    'status' => 'ASSIGNED',
-                    'offer_expires_at' => null,
-                    'assigned_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            DB::table('transport_vehicles')
-                ->where('company_id', $company)
-                ->where('id', $vehicle->id)
-                ->update(['status' => 'ON_TRIP', 'updated_at' => now()]);
-            DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->update([
-                    'availability' => 'ON_TRIP',
-                    'availability_updated_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-            $this->logTripEvent(
-                $company,
-                $id,
-                $isTargetedOffer ? 'offer_accepted' : 'accepted',
-                $trip->status,
-                'ASSIGNED',
-                ['driverId' => $driver->id, 'vehicleId' => $vehicle->id],
-                'driver',
-                (string) $driver->id,
-            );
-        });
-
-        if ($failure !== null) {
-            return response()->json(['error' => $failure], $failureStatus);
-        }
-
-        $trip = DB::table('transport_trips')
-            ->where('company_id', $company)
-            ->where('id', $id)
-            ->first();
-
-        return response()->json($this->mobileTrip($trip, true));
-    }
-
-    public function declineMobileTrip(Request $request, string $id): JsonResponse
-    {
-        if (! $this->allowed($request, 'modifier', 'trips')) {
-            return $this->forbidden();
-        }
-
-        $driver = $request->attributes->get('transportMobileDriver');
-        $company = (string) $driver->company_id;
-        $this->expireOffers($company);
-
-        $failure = null;
-        $failureStatus = 422;
-        DB::transaction(function () use ($id, $company, $driver, &$failure, &$failureStatus): void {
-            $trip = DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->lockForUpdate()
-                ->first();
-            if (! $trip) {
-                $failure = 'Course introuvable.';
-                $failureStatus = 404;
-                return;
-            }
-            if ($trip->status !== 'OFFERED' || $trip->driver_id !== $driver->id) {
-                $failure = 'Cette offre ne vous est pas destinée ou n’est plus active.';
-                if ($trip->status === 'OFFERED' && $trip->driver_id !== $driver->id) {
-                    $failureStatus = 403;
-                }
-                return;
-            }
-
-            $lockedDriver = DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->where('status', 'ACTIVE')
-                ->lockForUpdate()
-                ->first();
-            if (! $lockedDriver) {
-                $failure = 'Votre profil chauffeur n’est plus actif.';
-                $failureStatus = 403;
-                return;
-            }
-
-            DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->update([
-                    'status' => 'REQUESTED',
-                    'driver_id' => null,
-                    'vehicle_id' => null,
-                    'offer_expires_at' => null,
-                    'updated_at' => now(),
-                ]);
-            if ($trip->vehicle_id !== null) {
-                DB::table('transport_vehicles')
-                    ->where('company_id', $company)
-                    ->where('id', $trip->vehicle_id)
-                    ->where('status', 'ON_TRIP')
-                    ->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
-            }
-            DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->update([
-                    'availability' => 'PAUSED',
-                    'availability_updated_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-            $this->logTripEvent(
-                $company,
-                $id,
-                'offer_declined',
-                'OFFERED',
-                'REQUESTED',
-                ['driverId' => $driver->id],
-                'driver',
-                (string) $driver->id,
-            );
-        });
-
-        if ($failure !== null) {
-            return response()->json(['error' => $failure], $failureStatus);
-        }
-
-        return response()->json(['ok' => true]);
-    }
-
-    public function startMobileTrip(Request $request, string $id): JsonResponse
-    {
-        if (! $this->allowed($request, 'modifier', 'trips')) {
-            return $this->forbidden();
-        }
-
-        $driver = $request->attributes->get('transportMobileDriver');
-        $company = (string) $driver->company_id;
-
-        $failure = null;
-        $failureStatus = 422;
-        DB::transaction(function () use ($id, $company, $driver, &$failure, &$failureStatus): void {
-            $trip = DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->lockForUpdate()
-                ->first();
-            if (! $trip) {
-                $failure = 'Course introuvable.';
-                $failureStatus = 404;
-                return;
-            }
-            if ($trip->driver_id !== $driver->id) {
-                $failure = 'Vous ne pouvez démarrer que vos propres courses.';
-                $failureStatus = 403;
-                return;
-            }
-            if ($trip->status === 'IN_PROGRESS') {
-                return;
-            }
-            if ($trip->status !== 'ASSIGNED') {
-                $failure = 'Seule une course affectée peut être démarrée.';
-                return;
-            }
-            $lockedDriver = DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->where('status', 'ACTIVE')
-                ->lockForUpdate()
-                ->first();
-            if (! $lockedDriver) {
-                $failure = 'Votre profil chauffeur n’est plus actif.';
-                $failureStatus = 403;
-                return;
-            }
-            if (! $this->hasFreshMobileLocation($lockedDriver)) {
-                $failure = 'Une position GPS récente est nécessaire pour démarrer la course.';
-                return;
-            }
-
-            DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->update(['status' => 'IN_PROGRESS', 'started_at' => now(), 'updated_at' => now()]);
-            $this->logTripEvent(
-                $company,
-                $id,
-                'status_changed',
-                'ASSIGNED',
-                'IN_PROGRESS',
-                [],
-                'driver',
-                (string) $driver->id,
-            );
-        });
-
-        if ($failure !== null) {
-            return response()->json(['error' => $failure], $failureStatus);
-        }
-
-        $trip = DB::table('transport_trips')
-            ->where('company_id', $company)
-            ->where('id', $id)
-            ->first();
-
-        return response()->json($this->mobileTrip($trip, true));
-    }
-
-    public function completeMobileTrip(Request $request, string $id): JsonResponse
-    {
-        if (! $this->allowed($request, 'modifier', 'trips')) {
-            return $this->forbidden();
-        }
-
-        $driver = $request->attributes->get('transportMobileDriver');
-        $company = (string) $driver->company_id;
-
-        $failure = null;
-        $failureStatus = 422;
-        DB::transaction(function () use ($id, $company, $driver, &$failure, &$failureStatus): void {
-            $trip = DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->lockForUpdate()
-                ->first();
-            if (! $trip) {
-                $failure = 'Course introuvable.';
-                $failureStatus = 404;
-                return;
-            }
-            if ($trip->driver_id !== $driver->id) {
-                $failure = 'Vous ne pouvez terminer que vos propres courses.';
-                $failureStatus = 403;
-                return;
-            }
-            if ($trip->status === 'COMPLETED') {
-                return;
-            }
-            if ($trip->status !== 'IN_PROGRESS') {
-                $failure = 'Démarrez la course avant de la terminer.';
-                return;
-            }
-            $lockedDriver = DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->where('status', 'ACTIVE')
-                ->lockForUpdate()
-                ->first();
-            if (! $lockedDriver) {
-                $failure = 'Votre profil chauffeur n’est plus actif.';
-                $failureStatus = 403;
-                return;
-            }
-            if (! $this->hasFreshMobileLocation($lockedDriver)) {
-                $failure = 'Une position GPS récente est nécessaire pour terminer la course.';
-                return;
-            }
-
-            DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('id', $id)
-                ->update(['status' => 'COMPLETED', 'completed_at' => now(), 'updated_at' => now()]);
-            if ($trip->vehicle_id !== null) {
-                DB::table('transport_vehicles')
-                    ->where('company_id', $company)
-                    ->where('id', $trip->vehicle_id)
-                    ->where('status', 'ON_TRIP')
-                    ->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
-            }
-            DB::table('transport_drivers')
-                ->where('company_id', $company)
-                ->where('id', $driver->id)
-                ->update([
-                    'availability' => 'PAUSED',
-                    'availability_updated_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-            $this->logTripEvent(
-                $company,
-                $id,
-                'status_changed',
-                'IN_PROGRESS',
-                'COMPLETED',
-                [],
-                'driver',
-                (string) $driver->id,
-            );
-        });
-
-        if ($failure !== null) {
-            return response()->json(['error' => $failure], $failureStatus);
-        }
-
-        $trip = DB::table('transport_trips')
-            ->where('company_id', $company)
-            ->where('id', $id)
-            ->first();
-
-        return response()->json($this->mobileTrip($trip, false));
-    }
-
     public function updateDriverLocation(Request $request, string $id): JsonResponse
     {
         if (! $this->allowed($request, 'modify', 'drivers') && ! $this->allowed($request, 'modify', 'trips')) {
@@ -899,11 +318,6 @@ class TransportController extends Controller
         }
         if ($driver->status !== 'ACTIVE') {
             return response()->json(['error' => 'Un chauffeur inactif ne peut pas se rendre disponible.'], 422);
-        }
-        if ($input['availability'] === 'AVAILABLE'
-            && (! $driver->location_updated_at || Carbon::parse($driver->location_updated_at)
-                ->lt(Carbon::now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes'])))) {
-            return response()->json(['error' => 'Une position GPS récente est nécessaire pour être disponible.'], 422);
         }
         if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')
             ->where('company_id', $company)
@@ -1568,16 +982,12 @@ class TransportController extends Controller
         }
         $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'employee') {
-            $driver = DB::table('transport_drivers')
+            $driverId = DB::table('transport_drivers')
                 ->where('company_id', $company)
                 ->where('employee_id', $actor['employeeId'] ?? null)
-                ->first();
-            if (! $driver || $trip->driver_id !== $driver->id) {
+                ->value('id');
+            if (! $driverId || $trip->driver_id !== $driverId) {
                 return response()->json(['error' => 'Vous ne pouvez modifier que vos propres courses.'], 403);
-            }
-            if (! $driver->location_updated_at || Carbon::parse($driver->location_updated_at)
-                ->lt(Carbon::now()->subMinutes($this->transportSettings($company)['gpsValidityMinutes']))) {
-                return response()->json(['error' => 'Une position GPS récente est nécessaire pour continuer la course.'], 422);
             }
         }
         $failure = null;
@@ -1806,56 +1216,6 @@ class TransportController extends Controller
         ];
     }
 
-    private function mobileDriver(object $row): array
-    {
-        $onTrip = DB::table('transport_trips')
-            ->where('company_id', $row->company_id)
-            ->where('driver_id', $row->id)
-            ->whereIn('status', ['OFFERED', 'ASSIGNED', 'IN_PROGRESS'])
-            ->exists();
-
-        return [
-            'id' => $row->id,
-            'name' => $row->name,
-            'availability' => $onTrip ? 'ON_TRIP' : ($row->availability ?? 'AVAILABLE'),
-            'locationUpdatedAt' => $row->location_updated_at
-                ? Carbon::parse($row->location_updated_at)->toISOString()
-                : null,
-        ];
-    }
-
-    private function mobileCapabilities(Request $request): array
-    {
-        $canViewTrips = $this->allowed($request, 'voir', 'trips');
-        $canOperateTrips = $canViewTrips && $this->allowed($request, 'modifier', 'trips');
-        $canUpdateGps = $this->mobileCanUpdateGps($request);
-
-        return [
-            'canViewTrips' => $canViewTrips,
-            'canOperateTrips' => $canOperateTrips,
-            'canUpdateGps' => $canUpdateGps,
-            'gpsValidityMinutes' => $this->transportSettings($this->company($request))['gpsValidityMinutes'],
-        ];
-    }
-
-    private function mobileCanUpdateGps(Request $request): bool
-    {
-        return $this->allowed($request, 'modifier', 'drivers')
-            || $this->allowed($request, 'modifier', 'trips');
-    }
-
-    private function hasFreshMobileLocation(object $driver): bool
-    {
-        if (! $driver->location_updated_at) {
-            return false;
-        }
-
-        $validityMinutes = $this->transportSettings((string) $driver->company_id)['gpsValidityMinutes'];
-
-        return Carbon::parse($driver->location_updated_at)
-            ->gte(Carbon::now()->subMinutes($validityMinutes));
-    }
-
     private function driverModeEvent(object $event): array
     {
         return [
@@ -1934,37 +1294,6 @@ class TransportController extends Controller
             'vehicleRegistration' => null,
             'vehicleType' => null,
             'vehicleImageUrl' => null,
-        ];
-    }
-
-    private function mobileTrip(object $row, bool $includePassengerDetails): array
-    {
-        $vehicle = $row->vehicle_id
-            ? DB::table('transport_vehicles')
-                ->where('company_id', $row->company_id)
-                ->where('id', $row->vehicle_id)
-                ->first()
-            : null;
-        $showPassengerDetails = $includePassengerDetails
-            && in_array($row->status, ['ASSIGNED', 'IN_PROGRESS'], true);
-
-        return [
-            'id' => $row->id,
-            'reference' => $row->reference,
-            'pickup' => $row->pickup,
-            'destination' => $row->destination,
-            'passengerName' => $showPassengerDetails ? ($row->passenger_name ?? null) : null,
-            'passengerPhone' => $showPassengerDetails ? ($row->passenger_phone ?? null) : null,
-            'fare' => (int) $row->fare,
-            'status' => $row->status,
-            'requestedAt' => $row->requested_at,
-            'offerExpiresAt' => $row->offer_expires_at ?? null,
-            'assignedAt' => $row->assigned_at ?? null,
-            'startedAt' => $row->started_at ?? null,
-            'completedAt' => $row->completed_at ?? null,
-            'updatedAt' => $row->updated_at ?? null,
-            'vehicleModel' => $vehicle?->model,
-            'vehicleRegistration' => $vehicle?->registration,
         ];
     }
 
@@ -3094,32 +2423,23 @@ class TransportController extends Controller
 
     private function expireOffers(string $company): void
     {
-        DB::transaction(function () use ($company): void {
-            $expired = DB::table('transport_trips')
-                ->where('company_id', $company)
-                ->where('status', 'OFFERED')
-                ->whereNotNull('offer_expires_at')
-                ->where('offer_expires_at', '<=', now())
-                ->lockForUpdate()
-                ->get();
+        $expired = DB::table('transport_trips')
+            ->where('company_id', $company)
+            ->where('status', 'OFFERED')
+            ->whereNotNull('offer_expires_at')
+            ->where('offer_expires_at', '<=', now())
+            ->lockForUpdate()
+            ->get();
 
-            foreach ($expired as $trip) {
-                $updated = DB::table('transport_trips')
-                    ->where('company_id', $company)
-                    ->where('id', $trip->id)
-                    ->where('status', 'OFFERED')
-                    ->whereNotNull('offer_expires_at')
-                    ->where('offer_expires_at', '<=', now())
-                    ->update([
+        foreach ($expired as $trip) {
+            DB::transaction(function () use ($company, $trip): void {
+                DB::table('transport_trips')->where('id', $trip->id)->update([
                     'status' => 'REQUESTED',
                     'driver_id' => null,
                     'vehicle_id' => null,
                     'offer_expires_at' => null,
                     'updated_at' => now(),
                 ]);
-                if ($updated === 0) {
-                    continue;
-                }
                 if ($trip->driver_id !== null) {
                     DB::table('transport_drivers')->where('company_id', $company)->where('id', $trip->driver_id)->update([
                         'availability' => 'AVAILABLE',
@@ -3128,8 +2448,8 @@ class TransportController extends Controller
                     ]);
                 }
                 $this->logTripEvent($company, (string) $trip->id, 'offer_expired', 'OFFERED', 'REQUESTED');
-            }
-        });
+            });
+        }
     }
 
     private function logTripEvent(
@@ -3139,8 +2459,6 @@ class TransportController extends Controller
         ?string $fromStatus,
         ?string $toStatus,
         array $metadata = [],
-        string $actorType = 'system',
-        ?string $actorId = null,
     ): void {
         if (! DB::getSchemaBuilder()->hasTable('transport_trip_events')) {
             return;
@@ -3149,8 +2467,8 @@ class TransportController extends Controller
             'id' => $this->id('trip-event'),
             'company_id' => $company,
             'trip_id' => $tripId,
-            'actor_type' => $actorType,
-            'actor_id' => $actorId,
+            'actor_type' => 'system',
+            'actor_id' => null,
             'event_type' => $eventType,
             'from_status' => $fromStatus,
             'to_status' => $toStatus,

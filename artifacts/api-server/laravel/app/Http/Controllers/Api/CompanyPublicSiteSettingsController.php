@@ -71,7 +71,12 @@ final class CompanyPublicSiteSettingsController extends Controller
         }
 
         $store = $this->ensureStore($companyId);
-        $currentCount = count($this->heroImages($store));
+        $currentCount = DB::table('ecommerce_gallery_images')
+            ->where('company_id', $companyId)
+            ->where('owner_type', 'store')
+            ->where('owner_id', $store->id)
+            ->where('collection', 'hero')
+            ->count();
         $remaining = 12 - $currentCount;
         if ($remaining <= 0) {
             return response()->json(['error' => 'La bannière contient déjà 12 images.'], 422);

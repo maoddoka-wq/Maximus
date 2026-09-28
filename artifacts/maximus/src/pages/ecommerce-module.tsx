@@ -115,7 +115,6 @@ function normalizeEcommerceBootstrap(value: EcommerceBootstrap, companyId: strin
       name: 'Votre boutique',
       description: '',
       status: 'DRAFT',
-          homepageEnabled: true,
       currency: 'XOF',
       ...maximusShopColors,
       logoUrl: '',
@@ -291,7 +290,6 @@ export default function EcommerceModulePage({
           name: 'Aperçu boutique',
           description: 'Aperçu administratif sans données de production.',
           status: 'DRAFT',
-          homepageEnabled: true,
           currency: 'XOF',
           ...maximusShopColors,
           logoUrl: '',
@@ -414,7 +412,7 @@ export default function EcommerceModulePage({
 
       {visibleTabs.length === 0 ? <Empty icon={ShoppingBag} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité e-commerce." /> : <>
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
-      {tab === 'accueil' && <HomePanel />}
+      {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}
@@ -1129,17 +1127,44 @@ function DeliveryZoneManager({ data, canCreate, canModify, run }: { data: Ecomme
   </Panel>;
 }
 
-function HomePanel() {
+function HomePanel({ store, canModify, run }: { store: EcommerceStore; canModify: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<unknown | undefined> }) {
+  const [heroFiles, setHeroFiles] = useState<File[]>([]);
+  const api = createEcommerceApi(store.companyId);
+  const remainingSlots = Math.max(0, 12 - store.heroImages.length);
+
+  const upload = async () => {
+    if (heroFiles.length === 0 || !canModify) return;
+    const result = await run(() => api.uploadStoreHeroImages(heroFiles), 'Images de l’accueil ajoutées.');
+    if (result) setHeroFiles([]);
+  };
+
+  const remove = (url: string) => {
+    const imageId = url.split('/').pop();
+    if (imageId) void run(() => api.deleteStoreHeroImage(imageId), 'Image supprimée de l’accueil.');
+  };
+
   return <div className="space-y-5 fade-up">
-    <Panel
-      title="Page d’accueil publique"
-      description="L’identité, les couleurs et la bannière de votre page d’accueil se configurent dans Organisation et accès → Site public."
-    >
-      <div className="flex max-w-3xl items-start gap-3 rounded-xl border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.04)] p-4">
-        <ImagePlus size={18} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
-        <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-          Ces réglages sont disponibles même si le module E-commerce n’est pas activé. Les options de commande restent ici, dans les paramètres E-commerce.
-        </p>
+    <Panel title="Accueil de la boutique" description="Ajoutez les images qui s’affichent dans la bannière de votre accueil public.">
+      <div className="max-w-4xl space-y-5">
+        <div className="rounded-2xl border border-[hsl(var(--primary)/.25)] bg-[hsl(var(--primary)/.05)] p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-bold"><ImagePlus size={17} className="text-[hsl(var(--primary))]" />Images de la bannière</div>
+              <p className="mt-1.5 max-w-xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">Sélectionnez une ou plusieurs images. Elles seront ajoutées à celles déjà présentes et défileront horizontalement sur l’accueil public.</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-bold">{store.heroImages.length}/12 images</span>
+          </div>
+          <label className={`mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-8 text-center transition ${!canModify || remainingSlots === 0 ? 'cursor-not-allowed opacity-50' : 'border-[hsl(var(--primary)/.35)] hover:bg-[hsl(var(--primary)/.06)]'}`}>
+            <ImagePlus size={24} className="text-[hsl(var(--primary))]" />
+            <span className="mt-2 text-sm font-bold">{remainingSlots === 0 ? 'Limite de 12 images atteinte' : 'Ajouter des images à l’accueil'}</span>
+            <span className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{remainingSlots > 0 ? `Jusqu’à ${remainingSlots} image(s) supplémentaire(s) · JPG, PNG ou WebP` : 'Supprimez une image pour en ajouter une nouvelle.'}</span>
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!canModify || remainingSlots === 0} onChange={event => setHeroFiles(Array.from(event.target.files ?? []).slice(0, remainingSlots))} className="sr-only" />
+          </label>
+          {heroFiles.length > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5"><p className="text-xs font-semibold text-[hsl(var(--primary))]">{heroFiles.length} nouvelle(s) image(s) sélectionnée(s)</p><button type="button" onClick={() => void upload()} disabled={!canModify} className="inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"><Check size={14} />Enregistrer les images</button></div>}
+        </div>
+        {store.heroImages.length > 0
+          ? <div><p className="text-xs font-bold">Images actuellement affichées</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{store.heroImages.map((url, index) => <div key={url} className="group relative overflow-hidden rounded-xl border bg-[hsl(var(--muted)/.25)]"><img src={url} alt={`Image d’accueil ${index + 1}`} className="aspect-[4/3] w-full object-cover" /><button type="button" disabled={!canModify} onClick={() => remove(url)} className="absolute right-2 top-2 rounded-full bg-[hsl(var(--destructive))] px-2 py-1 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Supprimer l’image d’accueil ${index + 1}`}>×</button></div>)}</div></div>
+          : <div className="rounded-xl border border-dashed px-5 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Aucune image personnalisée. L’accueil public utilise actuellement son visuel par défaut.</div>}
       </div>
     </Panel>
   </div>;

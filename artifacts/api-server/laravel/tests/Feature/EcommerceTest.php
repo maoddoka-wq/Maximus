@@ -17,23 +17,6 @@ class EcommerceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        foreach (['kora', 'other-company'] as $companyId) {
-            DB::table('company_public_site_access')->updateOrInsert(
-                ['company_id' => $companyId],
-                [
-                    'enabled' => true,
-                    'updated_by' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ],
-            );
-        }
-    }
-
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {
         $this->getJson('/api/ecommerce/bootstrap?companyId=kora')->assertUnauthorized();
@@ -113,8 +96,7 @@ class EcommerceTest extends TestCase
 
         $this->getJson('/api/shop/kora-documents')
             ->assertOk()
-            ->assertJsonPath('store.allowOrderAttachments', true)
-            ->assertJsonPath('store.homepageEnabled', true);
+            ->assertJsonPath('store.allowOrderAttachments', true);
     }
 
     public function test_categories_are_persistent_and_products_are_linked_to_them(): void
