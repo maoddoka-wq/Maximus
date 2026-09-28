@@ -31,7 +31,7 @@
     "react-icons": "^5.4.0",
     "tailwindcss": "catalog:",
     "vite": "catalog:",
-    "wouter": "^3.3.5",
+    "wouter": "^3.11.0",
     "zod": "catalog:"
   },
   "dependencies": {
