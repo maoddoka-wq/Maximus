@@ -49,6 +49,11 @@ import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
+import {
+  driverGpsOptions,
+  getDriverGpsErrorMessage,
+  shouldBlockDriverWorkspaceOnGpsError,
+} from '@/lib/driver-geolocation';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 import { useQueryTab } from '@/lib/query-tab';
 import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
@@ -58,21 +63,6 @@ type DialogKind = 'driver' | 'vehicle' | 'trip' | null;
 type VehicleFormInput = Omit<CreateVehicleInput, 'imageData'> & { imageData?: string };
 
 const publicHexColor = /^#[0-9a-f]{6}$/i;
-const driverGpsOptions: PositionOptions = {
-  enableHighAccuracy: true,
-  maximumAge: 15_000,
-  timeout: 45_000,
-};
-
-const browserLocationError = (code: number) => {
-  if (code === 1) {
-    return 'Autorisez la localisation de ce site et vérifiez aussi l’autorisation de localisation de Chrome dans les réglages Android.';
-  }
-  if (code === 2) {
-    return 'Le téléphone n’a pas transmis de position. Vérifiez que la localisation précise est autorisée pour Chrome, puis réessayez.';
-  }
-  return 'La recherche GPS prend plus de temps que prévu. Gardez cette page ouverte quelques instants ; le navigateur réessaiera automatiquement.';
-};
 
 function colorLuminance(hex: string): number {
   const channels = [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
@@ -360,8 +350,8 @@ export default function TransportModulePage({
 
     const handleLocationError = (code: number) => {
       if (disposed) return;
-      const reason = browserLocationError(code);
-      if (hasConfirmedDriverLocation.current) {
+      const reason = getDriverGpsErrorMessage(code);
+      if (!shouldBlockDriverWorkspaceOnGpsError(hasConfirmedDriverLocation.current)) {
         setLocationError(`${reason} La position reçue précédemment peut être temporairement ancienne.`);
         return;
       }
