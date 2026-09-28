@@ -1326,7 +1326,9 @@ class TransportController extends Controller
             'id' => $row->id,
             'name' => $row->name,
             'availability' => $onTrip ? 'ON_TRIP' : ($row->availability ?? 'AVAILABLE'),
-            'locationUpdatedAt' => $row->location_updated_at ?? null,
+            'locationUpdatedAt' => $row->location_updated_at
+                ? Carbon::parse($row->location_updated_at)->toISOString()
+                : null,
         ];
     }
 

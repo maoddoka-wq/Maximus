@@ -53,6 +53,14 @@ async function saveSyncStatus(
   );
 }
 
+async function recordBackgroundTaskError(message: string): Promise<void> {
+  try {
+    await saveSyncStatus({ error: message });
+  } catch (storageError) {
+    console.error('Impossible d’enregistrer l’erreur de synchronisation GPS.', storageError);
+  }
+}
+
 export async function readLocationSyncStatus(): Promise<LocationSyncStatus | null> {
   const raw = await AsyncStorage.getItem(LOCATION_SYNC_STATUS_KEY);
   if (!raw) return null;
@@ -101,33 +109,47 @@ export async function sendCurrentDriverLocation(): Promise<void> {
   await submitLocation(location);
 }
 
+let locationTransitionQueue: Promise<void> = Promise.resolve();
+
+function serializeLocationTransition(
+  operation: () => Promise<void>,
+): Promise<void> {
+  const transition = locationTransitionQueue.then(operation, operation);
+  locationTransitionQueue = transition.catch(() => undefined);
+  return transition;
+}
+
 export async function startDriverLocationUpdates(): Promise<void> {
   if (Platform.OS === 'web') {
     throw new Error('Le suivi GPS en arrière-plan nécessite l’application iOS ou Android.');
   }
 
-  if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)) return;
+  await serializeLocationTransition(async () => {
+    if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)) return;
 
-  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.High,
-    timeInterval: 15_000,
-    distanceInterval: 25,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: 'MAXIMUS Chauffeur',
-      notificationBody: 'Votre position aide les clients proches à trouver un chauffeur disponible.',
-      notificationColor: '#ebab0a',
-    },
+    await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+      accuracy: Location.Accuracy.High,
+      timeInterval: 15_000,
+      distanceInterval: 25,
+      pausesUpdatesAutomatically: false,
+      showsBackgroundLocationIndicator: true,
+      foregroundService: {
+        notificationTitle: 'MAXIMUS Chauffeur',
+        notificationBody: 'Votre position aide les clients proches à trouver un chauffeur disponible.',
+        notificationColor: '#ebab0a',
+      },
+    });
   });
 }
 
 export async function stopDriverLocationUpdates(): Promise<void> {
   if (Platform.OS === 'web') return;
 
-  if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)) {
-    await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-  }
+  await serializeLocationTransition(async () => {
+    if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME)) {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    }
+  });
 }
 
 if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(LOCATION_TASK_NAME)) {
@@ -135,7 +157,7 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(LOCATION_TASK_NAME)) {
     LOCATION_TASK_NAME,
     async ({ data, error }) => {
       if (error) {
-        await saveSyncStatus({ error: error.message });
+        await recordBackgroundTaskError(error.message);
         return;
       }
 
@@ -147,11 +169,19 @@ if (Platform.OS !== 'web' && !TaskManager.isTaskDefined(LOCATION_TASK_NAME)) {
       try {
         await submitLocation(latest);
       } catch (taskError) {
-        await saveSyncStatus({ error: messageFrom(taskError) });
+        await recordBackgroundTaskError(messageFrom(taskError));
 
         if ([401, 403].includes(statusFrom(taskError) ?? 0)) {
-          await stopDriverLocationUpdates();
-          await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+          try {
+            await stopDriverLocationUpdates();
+          } catch (stopError) {
+            console.error('Impossible d’arrêter le suivi GPS après un refus de session.', stopError);
+          }
+          try {
+            await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+          } catch (storageError) {
+            console.error('Impossible de supprimer le jeton mobile refusé.', storageError);
+          }
         }
       }
     },
