@@ -339,13 +339,17 @@ export default function TransportModulePage({
     let sendingLocation = false;
     let nextPositionRequestId = 0;
     let activePositionRequestId: number | null = null;
+    let trackingStopped = false;
+    let gpsTimeout: ReturnType<typeof createTransportGpsTimeout> | undefined;
     const stopLocationTracking = (message: string) => {
-      if (disposed) return;
+      if (disposed || trackingStopped) return;
+      trackingStopped = true;
+      gpsTimeout?.cancel();
       setLocationActive(false);
       setLocationError(message);
       setLocationRequested(false);
     };
-    const gpsTimeout = createTransportGpsTimeout(() => {
+    gpsTimeout = createTransportGpsTimeout(() => {
       stopLocationTracking('Aucune position GPS utilisable reçue en une minute. Vérifiez la localisation du téléphone, puis réessayez.');
     });
     const geolocationOptions: PositionOptions = {
@@ -355,17 +359,17 @@ export default function TransportModulePage({
     };
 
     const flushLocationQueue = async () => {
-      if (sendingLocation || disposed) return;
+      if (sendingLocation || disposed || trackingStopped) return;
       sendingLocation = true;
       try {
-        while (!disposed && pendingSample) {
+        while (!disposed && !trackingStopped && pendingSample) {
           const sample = pendingSample;
           pendingSample = null;
           try {
             const driver = await api.updateDriverLocation(currentDriverId, sample);
-            if (disposed || sample.timestamp !== lastObservedTimestamp) continue;
+            if (disposed || trackingStopped || sample.timestamp !== lastObservedTimestamp) continue;
             lastServerLocationAt = Date.now();
-            gpsTimeout.reset();
+            gpsTimeout?.reset();
             setData(current => current ? {
               ...current,
               drivers: current.drivers.map(item => item.id === driver.id ? driver : item),
@@ -373,19 +377,19 @@ export default function TransportModulePage({
             setLocationActive(true);
             setLocationError('');
           } catch (cause) {
-            if (disposed || sample.timestamp !== lastObservedTimestamp) continue;
+            if (disposed || trackingStopped || sample.timestamp !== lastObservedTimestamp) continue;
             setLocationActive(false);
             setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
           }
         }
       } finally {
         sendingLocation = false;
-        if (!disposed && pendingSample) void flushLocationQueue();
+        if (!disposed && !trackingStopped && pendingSample) void flushLocationQueue();
       }
     };
 
     const sendLocation = (sample: GpsSample) => {
-      if (disposed || !isNewerTransportGpsSample(lastObservedTimestamp, sample.timestamp)) return;
+      if (disposed || trackingStopped || !isNewerTransportGpsSample(lastObservedTimestamp, sample.timestamp)) return;
       lastObservedTimestamp = sample.timestamp;
       if (!isRecentTransportGpsSample(sample.timestamp)) {
         if (Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) return;
