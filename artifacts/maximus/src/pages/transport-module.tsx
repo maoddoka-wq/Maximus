@@ -828,6 +828,7 @@ function DriverTripTracking({ trip, driver, vehicle, gpsValidityMinutes }: {
           driver={driverPoint}
           routeGeometry={hasPickupCoordinates ? trip.routeGeometry : null}
           pickupRouteGeometry={driverPoint ? trip.pickupRouteGeometry : null}
+          showClientStopMarker={false}
           className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]"
         />
       : <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-900">
