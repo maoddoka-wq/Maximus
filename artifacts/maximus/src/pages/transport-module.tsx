@@ -1111,13 +1111,19 @@ function DriverGpsStatus({
       </Button>}
       {driver && canControl && <div className="flex flex-wrap gap-2">
         <Button
+          data-testid="button-driver-availability"
           type="button"
           size="sm"
           variant={driver.availability === 'AVAILABLE' ? 'default' : 'outline'}
-          disabled={pending || driver.status !== 'ACTIVE' || driver.availability === 'ON_TRIP' || !canMakeAvailable}
-          onClick={() => onAvailabilityChange('AVAILABLE')}
+          disabled={pending || driver.status !== 'ACTIVE' || driver.availability === 'ON_TRIP'}
+          title={!canMakeAvailable ? error || 'Une position GPS précise est nécessaire avant de vous rendre disponible.' : undefined}
+          onClick={() => canMakeAvailable
+            ? onAvailabilityChange('AVAILABLE')
+            : onActivate()}
         >
-          {driver.availability === 'AVAILABLE' ? 'Disponible' : 'Me rendre disponible'}
+          {!canMakeAvailable
+            ? 'Trouver une position précise'
+            : driver.availability === 'AVAILABLE' ? 'Disponible' : 'Me rendre disponible'}
         </Button>
         <Button
           type="button"
