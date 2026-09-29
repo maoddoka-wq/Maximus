@@ -662,6 +662,7 @@ export default function TransportModulePage({
         fresh={currentDriverGpsFresh}
         requested={locationRequested}
         error={locationError}
+        notice={locationNotice}
         canControl={canModifyDrivers}
         preview={preview}
         gpsValidityMinutes={gpsValidityMinutes}
@@ -863,6 +864,7 @@ function DriverGpsStatus({
   fresh,
   requested,
   error,
+  notice,
   canControl,
   preview,
   gpsValidityMinutes,
@@ -875,6 +877,7 @@ function DriverGpsStatus({
   fresh: boolean;
   requested: boolean;
   error: string;
+  notice: string;
   canControl: boolean;
   preview: boolean;
   gpsValidityMinutes: number;
@@ -891,11 +894,11 @@ function DriverGpsStatus({
         : error
           ? 'GPS indisponible'
           : active
-            ? 'GPS actif'
+            ? notice ? 'GPS actif · mise à jour retardée' : 'GPS actif'
             : fresh
-              ? 'Position récente · suivi à relancer'
+              ? notice ? 'Position récente · reprise en cours' : 'Position récente · suivi à relancer'
               : requested
-                ? 'Recherche de position GPS'
+                ? notice ? 'GPS en attente' : 'Recherche de position GPS'
                 : 'GPS à activer';
   const description = !driver
     ? 'Ce compte employé doit être lié à un profil chauffeur par un administrateur.'
@@ -906,11 +909,15 @@ function DriverGpsStatus({
         : error
           ? error
           : active
-            ? 'Votre position est reçue par le serveur et partagée pour les demandes Taxi.'
+            ? notice
+              ? 'La dernière position est partagée. Le navigateur retarde le prochain point et le suivi réessaie automatiquement.'
+              : 'Votre position est reçue par le serveur et partagée pour les demandes Taxi.'
             : fresh
-              ? 'La dernière position est récente, mais le suivi de cet appareil doit être réactivé.'
+              ? notice
+                ? 'La dernière position reste valide pour les demandes Taxi. Le navigateur réessaie automatiquement.'
+                : 'La dernière position est récente, mais le suivi de cet appareil doit être réactivé.'
               : requested
-                ? 'Le navigateur attend une position GPS et son autorisation.'
+                ? notice || 'Le navigateur attend une position GPS et son autorisation.'
                 : 'Activez la localisation pour recevoir des demandes de course.';
   const canStartTracking = Boolean(driver && driver.status === 'ACTIVE' && canControl && !preview);
   const canMakeAvailable = preview || fresh;
@@ -925,7 +932,7 @@ function DriverGpsStatus({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-bold">GPS du chauffeur</h2>
-          <Badge variant={active ? 'default' : error ? 'destructive' : 'secondary'}>{status}</Badge>
+          <Badge variant={error ? 'destructive' : active ? 'default' : 'secondary'}>{status}</Badge>
         </div>
         <p className="mt-1 text-sm leading-5 text-[hsl(var(--muted-foreground))]">{description}</p>
         {driver && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
@@ -935,7 +942,7 @@ function DriverGpsStatus({
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
       {canStartTracking && !active && <Button type="button" size="sm" onClick={onActivate} disabled={pending}>
-        <MapPin size={14} />{error ? 'Réessayer le GPS' : 'Activer le GPS'}
+        <MapPin size={14} />{error || notice ? 'Réessayer le GPS' : 'Activer le GPS'}
       </Button>}
       {driver && canControl && <div className="flex flex-wrap gap-2">
         <Button
