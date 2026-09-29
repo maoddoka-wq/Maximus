@@ -21,6 +21,12 @@ Un employé lié à une fiche chauffeur peut publier son propre GPS et gérer sa
 
 **How to apply:** Pour le GPS et la disponibilité seulement, accepter les droits de modification des Courses pour la fiche liée à l’employé authentifié ; garder le contrôle Chauffeurs pour les profils des autres personnes.
 
+Sur téléphone, un premier relevé GPS peut tarder ; distinguer une recherche lente d’un échec et signaler immédiatement un refus d’autorisation.
+
+**Why:** Un GPS froid peut mettre plus longtemps à obtenir un point précis que le délai d’attente court d’un navigateur, alors que le suivi est encore en cours.
+
+**How to apply:** Garder un état de recherche pendant l’acquisition, puis n’indiquer le GPS actif et la disponibilité qu’après l’acceptation d’une position récente par l’API.
+
 Ne jamais republier périodiquement la dernière position GPS connue en la faisant passer pour une nouvelle ; les décimales PostgreSQL doivent aussi être converties en nombres avant de les exposer aux cartes.
 
 **Why:** Republier une position mémorisée rafraîchit artificiellement `location_updated_at` et permettait de distribuer un point obsolète ; les colonnes décimales peuvent être sérialisées comme chaînes et perturber les composants cartographiques.
