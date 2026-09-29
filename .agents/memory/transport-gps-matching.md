@@ -21,6 +21,12 @@ Ne jamais republier périodiquement la dernière position GPS connue en la faisa
 
 **How to apply:** Demander une nouvelle lecture GPS lors des rafraîchissements, refuser côté serveur les positions hors Dakar, et caster latitude/longitude dans chaque payload Transport.
 
+Le suivi GPS dans un navigateur mobile ne peut pas garantir des relevés continus écran verrouillé : Android peut suspendre les timers et callbacks de la page. Une erreur temporaire de lecture ne doit pas invalider immédiatement un dernier point encore frais ; reprendre la lecture au retour au premier plan, sans republier une position en cache pour rafraîchir artificiellement son horodatage.
+
+**Why:** Un point valide pendant cinq minutes peut coexister avec un délai ou un timeout ponctuel du navigateur. Confondre les deux affiche à tort « GPS indisponible », tandis qu’une position mise en cache peut donner une impression trompeuse de suivi continu.
+
+**How to apply:** Afficher un état de reprise pour les timeouts/positions temporairement indisponibles, réserver l’état bloqué aux refus explicites et aux erreurs d’acceptation, et demander une nouvelle lecture après `visibilitychange` ou `focus`. Pour un suivi garanti écran verrouillé, prévoir une application native avec autorisation de localisation en arrière-plan.
+
 Le bouton de guidage chauffeur doit ouvrir uniquement la première étape, depuis la position actuelle du téléphone vers les coordonnées GPS de l’arrêt client ; la destination finale ne devient une étape qu’après la prise en charge.
 
 **Why:** utiliser la destination finale comme cible initiale, avec l’arrêt client comme waypoint, envoyait le chauffeur vers le mauvais lieu malgré des coordonnées valides.

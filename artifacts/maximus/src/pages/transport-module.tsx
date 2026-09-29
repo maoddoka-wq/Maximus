@@ -329,7 +329,7 @@ export default function TransportModulePage({
             setLocationNotice('Le navigateur retarde la prochaine lecture GPS. Une nouvelle tentative est en cours.');
           }
         },
-        { enableHighAccuracy: true, maximumAge: trackingIntervalSeconds * 1000, timeout: 15_000 },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
       );
     };
     const sendLocation = (coords: { latitude: number; longitude: number }) => {
