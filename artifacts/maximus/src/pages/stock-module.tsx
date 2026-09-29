@@ -559,7 +559,7 @@ function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductFor
       <Input label="Catégorie" value={form.category} onChange={value => update('category', value)} />
       <Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} />
       <Input label="Unité" value={form.unit} onChange={value => update('unit', value)} />
-      <div className="sm:col-span-2 flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <span className="shrink-0 text-xs font-bold">Photo</span>
         <label htmlFor="stock-product-image" aria-label={imageFile || form.imageUrl ? 'Remplacer la photo de l’article' : 'Ajouter une photo à l’article'} className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.35)] px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.6)]">
           <Upload size={14} aria-hidden="true" />
