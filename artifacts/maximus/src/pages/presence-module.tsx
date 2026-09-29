@@ -12,6 +12,12 @@ import { useAppDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@workspace/maximus-design-system/components/ui/dialog';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
+import {
+  CAMERA_START_TIMEOUT_ERROR,
+  getCameraStartupErrorMessage,
+  stopCameraStream,
+  withCameraStartupTimeout,
+} from '@/lib/qr-camera';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
 type Tab = (typeof presenceFeatureDefinitions)[number]['tab'];
@@ -415,6 +421,7 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
 function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: PresenceRow; date: string; canCreate: boolean; onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void> }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
+  const cameraRequestRef = useRef<Promise<MediaStream> | null>(null);
   const onScanClockRef = useRef(onScanClock);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -434,6 +441,12 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
 
   useEffect(() => {
     if (!scannerOpen || !videoRef.current || !action) return;
+    const cameraRequest = cameraRequestRef.current;
+    if (!cameraRequest) {
+      setScannerOpen(false);
+      setError('Appuyez de nouveau sur « Scanner le QR code » pour autoriser la caméra.');
+      return;
+    }
     setCameraReady(false);
     setFlashAvailable(false);
     setFlashOn(false);
@@ -471,8 +484,22 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
       },
     });
     scannerRef.current = scanner;
-    void scanner.start().then(() => {
-      if (cancelled) return;
+    let startupTimedOut = false;
+    const startup = cameraRequest.then(stream => {
+      if (cancelled || startupTimedOut || cameraRequestRef.current !== cameraRequest) {
+        stopCameraStream(stream);
+        return;
+      }
+      const video = videoRef.current;
+      if (!video) {
+        stopCameraStream(stream);
+        throw new Error('Video element is unavailable.');
+      }
+      video.srcObject = stream;
+      return scanner.start();
+    });
+    void withCameraStartupTimeout(startup).then(() => {
+      if (cancelled || startupTimedOut) return;
       setCameraReady(true);
       void scanner.hasFlash().then(available => {
         if (!cancelled) setFlashAvailable(available);
@@ -480,18 +507,58 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
         if (!cancelled) setFlashAvailable(false);
       });
     }).catch(cause => {
+      startupTimedOut = cause instanceof Error && cause.message === CAMERA_START_TIMEOUT_ERROR;
       if (!cancelled) {
         setScannerOpen(false);
-        setError(cause instanceof Error ? cause.message : 'Accès à la caméra impossible.');
+        setError(getCameraStartupErrorMessage(cause));
       }
     });
     return () => {
       cancelled = true;
+      if (cameraRequestRef.current === cameraRequest) cameraRequestRef.current = null;
       if (scannerRef.current === scanner) scannerRef.current = null;
       scanner.stop();
       scanner.destroy();
+      const video = videoRef.current;
+      if (video?.srcObject instanceof MediaStream) {
+        stopCameraStream(video.srcObject);
+        video.srcObject = null;
+      }
     };
   }, [scannerOpen, action]);
+
+  const openScanner = () => {
+    setMessage('');
+    setError('');
+    setCameraReady(false);
+    setFlashError('');
+    if (!window.isSecureContext) {
+      setError('La caméra nécessite une connexion sécurisée en HTTPS.');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Ce navigateur ne donne pas accès à la caméra. Ouvrez MAXIMUS dans un navigateur récent.');
+      return;
+    }
+
+    try {
+      const request = navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+      cameraRequestRef.current = request;
+      void request.then(stream => {
+        if (cameraRequestRef.current !== request) stopCameraStream(stream);
+      }).catch(() => {});
+      setScannerOpen(true);
+    } catch (cause) {
+      setError(getCameraStartupErrorMessage(cause));
+    }
+  };
 
   const toggleFlash = async () => {
     const scanner = scannerRef.current;
@@ -517,7 +584,7 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
           <p className="mt-2 text-lg font-bold">{action === null ? 'Journée terminée' : `Scanner pour ${actionLabel}`}</p>
           <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">Le QR code est présenté par le gérant des Présences. Votre compte connecté est utilisé automatiquement.</p>
         </div>
-        <Button testId="button-open-attendance-scanner" primary disabled={!canCreate || action === null || busy || scannerOpen} onClick={() => { setMessage(''); setError(''); setScannerOpen(true); }}>
+        <Button testId="button-open-attendance-scanner" primary disabled={!canCreate || action === null || busy || scannerOpen} onClick={openScanner}>
           <QrCodeIcon />{scannerOpen ? 'Scanner en cours…' : busy ? 'Validation…' : 'Scanner le QR code'}
         </Button>
         {message ? <p data-testid="status-attendance-scan-message" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p> : null}
@@ -525,7 +592,10 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
         <p className="rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Date sélectionnée : {displayDate(date)}. Le serveur vérifie la validité du QR code et la séquence arrivée puis sortie.</p>
       </div>
     </Panel>
-    <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
+    <Dialog open={scannerOpen} onOpenChange={open => {
+      if (!open) cameraRequestRef.current = null;
+      setScannerOpen(open);
+    }}>
       <DialogContent
         data-testid="dialog-attendance-scanner"
         className="!fixed !inset-0 !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 !gap-0 !overflow-hidden !rounded-none !border-0 !bg-[hsl(var(--sidebar))] !p-0 !shadow-none sm:!rounded-none [&>button]:hidden"
