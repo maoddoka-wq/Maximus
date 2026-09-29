@@ -185,9 +185,9 @@ export const modules: Module[] = [
   { id: 'transport', name: 'Transport', description: 'Organiser les chauffeurs, les véhicules et les courses Taxi.', features: ['Vue d’ensemble', 'Courses', 'Chauffeurs', 'Véhicules', 'Historique', 'Paramètres'], featurePacks: [
     { id: 'transport-consultation', name: 'Consultation Taxi', description: 'Suivre l’activité Taxi, les courses et la flotte.', featureIds: ['overview', 'trips', 'drivers', 'vehicles'] },
     { id: 'transport-gestion', name: 'Gestionnaire Taxi', description: 'Gérer les courses, les chauffeurs et les véhicules.', featureIds: ['overview', 'trips', 'drivers', 'vehicles'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'] } },
-    { id: 'transport-chauffeur', name: 'Espace chauffeur Taxi', description: 'Suivre ses courses, son historique et les paramètres opérationnels.', featureIds: ['overview', 'trips', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'modifier'], historique: ['voir'], parametres: ['voir'] } },
-    { id: 'transport-employe', name: 'Employé Transport', description: 'Suivre les courses et l’activité de la flotte sans administrer les chauffeurs.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique'], featurePermissions: { overview: ['voir'], trips: ['voir', 'modifier'], drivers: ['voir'], vehicles: ['voir'], historique: ['voir'] } },
-    { id: 'transport-manager', name: 'Manager Transport', description: 'Piloter les courses, les chauffeurs, les véhicules et l’historique Taxi.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'], historique: ['voir'], parametres: ['voir', 'modifier'] } },
+    { id: 'transport-chauffeur', name: 'Espace chauffeur Taxi', description: 'Suivre ses courses, son historique et les paramètres opérationnels.', featureIds: ['overview', 'trips', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], historique: ['voir'], parametres: ['voir'] } },
+    { id: 'transport-employe', name: 'Employé Transport', description: 'Suivre les courses et l’activité de la flotte sans administrer les chauffeurs.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir'], vehicles: ['voir'], historique: ['voir'] } },
+    { id: 'transport-manager', name: 'Manager Transport', description: 'Piloter les courses, les chauffeurs, les véhicules et l’historique Taxi.', featureIds: ['overview', 'trips', 'drivers', 'vehicles', 'historique', 'parametres'], featurePermissions: { overview: ['voir'], trips: ['voir', 'créer', 'modifier'], drivers: ['voir', 'créer', 'modifier'], vehicles: ['voir', 'créer', 'modifier'], historique: ['voir'], parametres: ['voir'] } },
   ], status: 'ACTIF' },
   {
     id: 'immobilier',
@@ -345,7 +345,11 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
   const customModules = [...publishedModules, ...draftModules].filter(
     (module, index, all) => all.findIndex(candidate => candidate.id === module.id) === index,
   );
-  const catalogModules = [...modules, ...customModules];
+  const builtInModuleIds = new Set(modules.map(module => module.id));
+  const catalogModules = [
+    ...modules,
+    ...customModules.filter(module => !builtInModuleIds.has(module.id)),
+  ];
   return catalogModules
     .filter(module => !data.removedModules?.includes(module.id))
     .map(module => {
@@ -385,6 +389,9 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
           featurePermissions: normalizePayrollPermissionMap(pack.featurePermissions),
         }));
       }
+      const uniqueFeaturePacks = (featurePacks ?? []).filter(
+        (pack, index, all) => all.findIndex(candidate => candidate.id === pack.id) === index,
+      );
 
       return {
         ...module,
@@ -402,7 +409,7 @@ export function getConfiguredModules(data: Pick<StoreData, 'moduleOverrides' | '
                 !Array.isArray(override.featureDependencies)
               ? override.featureDependencies
               : module.featureDependencies,
-        featurePacks,
+        featurePacks: uniqueFeaturePacks,
       };
     });
 }

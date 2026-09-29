@@ -2,8 +2,12 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\DB;
+
 final class ModuleAuthorization
 {
+    private const UNIT_SCOPE_STATE_ATTRIBUTE = 'maximus.unit-module-scope-state';
+
     private const PAYROLL_FEATURE_ALIASES = [
         'tableau-de-bord' => ['tableau-de-bord', 'dashboard'],
         'bénéficiaires' => ['bénéficiaires', 'beneficiaires'],
@@ -49,6 +53,10 @@ final class ModuleAuthorization
         }
         if (($actor['role'] ?? null) === 'company_admin') {
             return true;
+        }
+
+        if (! UnitModuleScope::allowsModule(self::workspaceState(), $actor, $module)) {
+            return false;
         }
 
         $permissions = $actor['permissions'] ?? null;
@@ -282,5 +290,26 @@ final class ModuleAuthorization
         return $required === 'allowed'
             ? $permissions !== []
             : in_array($required, $permissions, true);
+    }
+
+    private static function workspaceState(): array
+    {
+        $request = app()->bound('request') ? app('request') : null;
+        if ($request && $request->attributes->has(self::UNIT_SCOPE_STATE_ATTRIBUTE)) {
+            return $request->attributes->get(self::UNIT_SCOPE_STATE_ATTRIBUTE);
+        }
+
+        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first(['payload']);
+        $payload = $row?->payload;
+        $state = is_string($payload)
+            ? json_decode($payload, true, 512, JSON_THROW_ON_ERROR)
+            : ($payload ?? []);
+        $state = is_array($state) ? $state : [];
+
+        if ($request) {
+            $request->attributes->set(self::UNIT_SCOPE_STATE_ATTRIBUTE, $state);
+        }
+
+        return $state;
     }
 }

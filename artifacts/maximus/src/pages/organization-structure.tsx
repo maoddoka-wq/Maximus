@@ -10,7 +10,13 @@ import {
   type OrgNode,
   type StoreData,
 } from '@/lib/store';
-import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
+import { getModuleFeatureOptions, getModulePackError } from '@/lib/module-features';
+import { getSelectableUnitModuleIds } from '@/lib/organization-module-scope';
+import {
+  getFeaturesAfterPackChange,
+  getFeatureIdsForSelectedPacks,
+  toggleOrganizationFeatureSelection,
+} from '@/lib/organization-feature-selection';
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
 import { getOrganizationSubtreeIds, unitHasAssignmentsInSubtree } from '@/lib/organization-deletion';
 import { ActionButton, Field, Modal } from './organization-shared';
@@ -200,6 +206,13 @@ function StructureFormModal({
     moduleFeatures: Object.fromEntries(Object.entries(initialData?.moduleFeatures ?? {}).map(([moduleId, featureIds]) => [moduleId, [...(featureIds ?? [])]])) as Partial<Record<ModuleId, string[]>>,
   });
   const parentOptions = allNodes.filter(node => node.id !== initialData?.id);
+  const selectableModuleIds = getSelectableUnitModuleIds(
+    allNodes,
+    formData.parentId,
+    availableModules.map(module => module.id),
+  );
+  const selectableModules = availableModules.filter(module => selectableModuleIds.has(module.id));
+  const moduleSelectionsOutsideParent = formData.moduleIds.filter(moduleId => !selectableModuleIds.has(moduleId));
 
   const isCyclic = (parentId: string) => {
     let current = allNodes.find(node => node.id === parentId);
@@ -223,11 +236,36 @@ function StructureFormModal({
       setError('Cette unité ne peut pas être placée sous l’un de ses descendants.');
       return;
     }
+    const moduleIds = [...new Set(formData.moduleIds)]
+      .filter(moduleId => selectableModuleIds.has(moduleId));
+    const modulePackIds = Object.fromEntries(
+      Object.entries(formData.modulePackIds)
+        .filter(([moduleId]) => selectableModuleIds.has(moduleId as ModuleId))
+        .map(([moduleId, packIds]) => {
+          const module = availableModules.find(candidate => candidate.id === moduleId);
+          const validPackIds = new Set((module?.featurePacks ?? []).map(pack => pack.id));
+          return [moduleId, [...new Set(packIds ?? [])].filter(packId => validPackIds.has(packId))];
+        })
+        .filter(([, packIds]) => packIds.length > 0),
+    ) as Partial<Record<ModuleId, string[]>>;
+    const moduleFeatures = Object.fromEntries(
+      Object.entries(formData.moduleFeatures)
+        .filter(([moduleId]) => selectableModuleIds.has(moduleId as ModuleId))
+        .map(([moduleId, featureIds]) => {
+          const module = availableModules.find(candidate => candidate.id === moduleId);
+          return [moduleId, module ? [...new Set(getModuleFeatureOptions(module)
+            .filter(feature => (featureIds ?? []).includes(feature.id))
+            .map(feature => feature.id))] : []];
+        }),
+    ) as Partial<Record<ModuleId, string[]>>;
     onSave({
       ...formData,
       name: formData.name.trim(),
       code: formData.code.trim().toUpperCase(),
       parentId: formData.parentId || null,
+      moduleIds,
+      modulePackIds,
+      moduleFeatures,
     });
   };
 
@@ -244,18 +282,21 @@ function StructureFormModal({
             <option value="">Aucune (Racine)</option>
             {parentOptions.map(node => <option key={node.id} value={node.id}>{node.name}</option>)}
           </select>
-          <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">L’unité parente permet de construire la hiérarchie.</span>
+          <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Une unité enfant ne peut utiliser que les modules autorisés par ses parents.</span>
         </label>
       </div>
        <div className="mt-2 border-t pt-4">
         <div className="flex items-center justify-between gap-3">
-          <div><label className="block text-sm font-semibold">Modules autorisés pour cette unité</label><p className="mt-1 text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Ces modules pourront ensuite être attribués aux rôles de cette unité.</p></div>
-          <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">{formData.moduleIds.length} sélectionné(s)</span>
+           <div><label className="block text-sm font-semibold">Modules autorisés pour cette unité</label><p className="mt-1 text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Ces modules pourront ensuite être attribués aux rôles de cette unité. Une unité enfant ne peut pas dépasser les choix de sa branche parente.</p></div>
+           <span className="mono shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]">{formData.moduleIds.filter(moduleId => selectableModuleIds.has(moduleId)).length} sélectionné(s)</span>
         </div>
-        {availableModules.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
-           {availableModules.map(module => {
+         {moduleSelectionsOutsideParent.length > 0 && <p role="status" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] p-3 text-xs text-[hsl(var(--destructive))]">Certains modules enregistrés ne sont plus autorisés par l’unité parente. Ils seront retirés de cette unité à l’enregistrement.</p>}
+         {selectableModules.length > 0 ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {selectableModules.map(module => {
             const enabled = formData.moduleIds.includes(module.id);
              const packs = module.featurePacks ?? [];
+              const selectedPackIds = formData.modulePackIds[module.id] ?? [];
+              const packError = getModulePackError(module, selectedPackIds);
              return <div key={module.id} className={`rounded-lg border p-3 transition ${enabled ? 'border-[hsl(var(--primary)/.5)] bg-[hsl(var(--primary)/.06)]' : 'hover:bg-[hsl(var(--muted)/.5)]'}`}>
                <label className="flex cursor-pointer items-start gap-3">
                  <input data-testid={`checkbox-org-module-${module.id}`} type="checkbox" checked={enabled} onChange={() => setFormData(current => {
@@ -270,28 +311,48 @@ function StructureFormModal({
                  })} className="mt-0.5 accent-[hsl(var(--primary))]" />
                  <span><strong className="block text-xs">{module.name}</strong><small className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{enabled ? 'Sélectionnez les packs de ce module.' : module.description}</small></span>
                </label>
-               {enabled && packs.length > 0 && <div className="mt-3 border-t pt-2">{packs.map(pack => {
-                 const selected = formData.modulePackIds[module.id]?.includes(pack.id) ?? false;
+                {enabled && packs.length > 0 && <div className="mt-3 border-t pt-2">{packs.map(pack => {
+                  const selected = selectedPackIds.includes(pack.id);
                  return <label key={pack.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--card))]"><input data-testid={`checkbox-org-pack-${module.id}-${pack.id}`} type="checkbox" checked={selected} onChange={() => setFormData(current => {
                    const currentIds = current.modulePackIds[module.id] ?? [];
-                   const nextIds = currentIds.includes(pack.id) ? currentIds.filter(id => id !== pack.id) : [...currentIds, pack.id];
-                    const selectedPacks = packs.filter(candidate => nextIds.includes(candidate.id));
-                    const featureIds = selectedPacks.flatMap(candidate => candidate.featureIds);
-                    return { ...current, modulePackIds: { ...current.modulePackIds, [module.id]: nextIds }, moduleFeatures: { ...current.moduleFeatures, [module.id]: [...getEffectiveModuleFeatureIds(module, featureIds)] } };
-                 })} className="mt-0.5 accent-[hsl(var(--primary))]" /><span><strong className="block">{pack.name}</strong><span className="text-[9px] text-[hsl(var(--muted-foreground))]">{pack.featureIds.length} fonctionnalité(s)</span></span></label>;
+                    const nextIds = [...new Set(currentIds.includes(pack.id) ? currentIds.filter(id => id !== pack.id) : [...currentIds, pack.id])];
+                    const hasExplicitFeatureSelection = Object.prototype.hasOwnProperty.call(current.moduleFeatures, module.id);
+                    const nextFeatures = getFeaturesAfterPackChange(
+                      module,
+                      nextIds,
+                      current.moduleFeatures[module.id],
+                      hasExplicitFeatureSelection,
+                    );
+                    const moduleFeatures = { ...current.moduleFeatures };
+                    if (nextFeatures === undefined) delete moduleFeatures[module.id];
+                    else moduleFeatures[module.id] = nextFeatures;
+                    return {
+                      ...current,
+                      modulePackIds: { ...current.modulePackIds, [module.id]: nextIds },
+                      moduleFeatures,
+                    };
+                  })} className="mt-0.5 accent-[hsl(var(--primary))]" /><span><strong className="block">{pack.name}</strong><span className="text-[9px] text-[hsl(var(--muted-foreground))]">{getFeatureIdsForSelectedPacks(module, [pack.id]).length} fonctionnalité(s)</span></span></label>;
                })}</div>}
                {enabled && packs.length === 0 && <p className="mt-3 border-t pt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Aucun pack configuré dans ce module.</p>}
-                {enabled && (packs.length === 0 || (formData.modulePackIds[module.id]?.length ?? 0) > 0) && <div className="mt-3 border-t pt-2"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités de l’unité</p><div className="grid gap-1 sm:grid-cols-2">{getModuleFeatureOptions(module).map(feature => {
-                  const selected = (formData.moduleFeatures[module.id] ?? []).includes(feature.id);
+                 {enabled && <>
+                   {packError && <p role="alert" className="mt-3 rounded-lg bg-[hsl(var(--destructive)/.08)] p-3 text-[10px] leading-4 text-[hsl(var(--destructive))]">{packError} Les fonctionnalités individuelles restent sélectionnables ci-dessous.</p>}
+                   <div className="mt-3 border-t pt-2"><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Fonctionnalités de l’unité</p><div className="grid gap-1 sm:grid-cols-2">{getModuleFeatureOptions(module).map(feature => {
+                   const selected = (formData.moduleFeatures[module.id] ?? getModuleFeatureOptions(module).map(item => item.id)).includes(feature.id);
                   return <label key={feature.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-[10px] hover:bg-[hsl(var(--card))]"><input data-testid={`checkbox-org-feature-${module.id}-${feature.id}`} type="checkbox" checked={selected} onChange={() => setFormData(current => {
-                    const currentIds = new Set(current.moduleFeatures[module.id] ?? getModuleFeatureOptions(module).map(item => item.id));
-                    if (currentIds.has(feature.id)) currentIds.delete(feature.id); else currentIds.add(feature.id);
-                    return { ...current, moduleFeatures: { ...current.moduleFeatures, [module.id]: [...getEffectiveModuleFeatureIds(module, [...currentIds])] } };
+                     const currentIds = current.moduleFeatures[module.id] ?? getModuleFeatureOptions(module).map(item => item.id);
+                     return {
+                       ...current,
+                       moduleFeatures: {
+                         ...current.moduleFeatures,
+                         [module.id]: toggleOrganizationFeatureSelection(module, currentIds, feature.id),
+                       },
+                     };
                   })} className="mt-0.5 accent-[hsl(var(--primary))]" /><span>{feature.label}</span></label>;
-                })}</div><p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Le pack propose un rôle de départ ; vous pouvez ajouter ou retirer des fonctionnalités.</p></div>}
+                 })}</div><p className="mt-2 text-[10px] text-[hsl(var(--muted-foreground))]">Le pack propose un rôle de départ ; vous pouvez ajouter ou retirer des fonctionnalités, même sans pack.</p></div>
+                 </>}
              </div>;
           })}
-        </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.</p>}
+         </div> : <p className="mt-3 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">{availableModules.length > 0 ? 'L’unité parente ne possède aucun module autorisé.' : 'Aucun module n’est encore autorisé pour cette entreprise. Les modules doivent d’abord être activés au niveau de l’entreprise par MAXIMUS.'}</p>}
       </div>
        <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row">
         <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))]">Annuler</button>

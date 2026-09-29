@@ -79,6 +79,38 @@ test('conserve les permissions du pack Transport dans un secteur', () => {
   assert.deepEqual(role.modulePermissions['transport:menu:vehicles'], ['voir', 'créer', 'modifier']);
 });
 
+test('ne conserve qu’un seul rôle automatique par pack et préserve les affectations des doublons', () => {
+  const { data, company } = createData();
+  const node = createStockUnit();
+  synchronizeUnitPackRoles(data, company, node);
+
+  const generatedRole = data.roles.find(role => role.packId === 'stock-gestion');
+  assert.ok(generatedRole);
+  const duplicateRole = { ...generatedRole, id: 'duplicate-stock-pack-role' };
+  data.roles.push(duplicateRole);
+  data.employees.push({
+    id: 'duplicate-role-employee',
+    firstName: 'Employé',
+    lastName: 'Affecté',
+    email: 'duplicate@example.test',
+    phone: '',
+    position: 'Magasinier',
+    department: node.name,
+    subDepartment: '',
+    role: duplicateRole.name,
+    roleId: duplicateRole.id,
+    status: 'ACTIF',
+    companyId: company.id,
+    sectorId: node.id,
+  });
+
+  synchronizeUnitPackRoles(data, company, node);
+
+  assert.equal(data.roles.filter(role => role.packId === 'stock-gestion').length, 1);
+  assert.equal(data.roles.find(role => role.id === duplicateRole.id)?.packId, undefined);
+  assert.equal(data.employees.find(employee => employee.id === 'duplicate-role-employee')?.roleId, duplicateRole.id);
+});
+
 test('supprime un rôle automatique retiré lorsqu’il n’est pas affecté', () => {
   const { data, company } = createData();
   const node = createStockUnit();

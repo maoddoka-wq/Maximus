@@ -208,7 +208,11 @@ export function validateCatalogDraft(data: StoreData): CatalogValidation {
     const packNames = featurePacks
       .map(pack => typeof pack?.name === 'string' ? pack.name.trim().toLowerCase() : '')
       .filter(Boolean);
+    const packIds = featurePacks
+      .map(pack => typeof pack?.id === 'string' ? pack.id.trim() : '')
+      .filter(Boolean);
     if (new Set(packNames).size !== packNames.length) errors.push(`Le module « ${moduleId} » contient des packs portant le même nom.`);
+    if (new Set(packIds).size !== packIds.length) errors.push(`Le module « ${moduleId} » contient des identifiants de packs en double.`);
     if (Array.isArray(override?.features) && override.features.length === 0) {
       errors.push(`Le module « ${moduleId} » ne contient aucune fonctionnalité.`);
     }

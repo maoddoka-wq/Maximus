@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuthUser;
 use App\Models\Company;
 use App\Support\MaximusAuth;
+use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -114,6 +115,65 @@ class ModuleAccessTest extends TestCase
         $this->asCompanyAdmin()
             ->patchJson('/api/modules/stocks/access', ['status' => 'INACTIF'])
             ->assertForbidden();
+    }
+
+    public function test_employee_module_access_is_limited_by_every_organization_ancestor(): void
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'stocks')
+            ->update(['status' => 'ACTIF']);
+        $this->saveOrganizationState([
+            'employees' => [[
+                'id' => 'employee-1',
+                'companyId' => 'kora',
+                'sectorId' => 'child',
+            ]],
+            'orgNodes' => [
+                ['id' => 'root', 'companyId' => 'kora', 'parentId' => null, 'moduleIds' => ['transport']],
+                ['id' => 'parent', 'companyId' => 'kora', 'parentId' => 'root', 'moduleIds' => ['stocks']],
+                ['id' => 'child', 'companyId' => 'kora', 'parentId' => 'parent', 'moduleIds' => ['stocks']],
+            ],
+        ]);
+
+        $actor = [
+            'role' => 'employee',
+            'companyId' => 'kora',
+            'employeeId' => 'employee-1',
+            'sectorIds' => ['child'],
+            'permissions' => ['stocks' => ['voir']],
+        ];
+
+        $this->assertFalse(ModuleAuthorization::allows($actor, 'stocks', 'view'));
+    }
+
+    public function test_employee_can_use_module_present_on_the_unit_and_all_its_ancestors(): void
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'stocks')
+            ->update(['status' => 'ACTIF']);
+        $this->saveOrganizationState([
+            'employees' => [[
+                'id' => 'employee-2',
+                'companyId' => 'kora',
+                'sectorId' => 'child',
+            ]],
+            'orgNodes' => [
+                ['id' => 'parent', 'companyId' => 'kora', 'parentId' => null, 'moduleIds' => ['stocks']],
+                ['id' => 'child', 'companyId' => 'kora', 'parentId' => 'parent', 'moduleIds' => ['stocks']],
+            ],
+        ]);
+
+        $actor = [
+            'role' => 'employee',
+            'companyId' => 'kora',
+            'employeeId' => 'employee-2',
+            'sectorIds' => ['child'],
+            'permissions' => ['stocks' => ['voir']],
+        ];
+
+        $this->assertTrue(ModuleAuthorization::allows($actor, 'stocks', 'view'));
     }
 
     public function test_presence_catalog_matches_the_current_eight_feature_contract(): void
@@ -280,5 +340,19 @@ class ModuleAccessTest extends TestCase
         ]);
 
         return $this->withCredentials()->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    private function saveOrganizationState(array $state): void
+    {
+        DB::table('maximus_app_states')->updateOrInsert(
+            ['scope' => 'workspace'],
+            [
+                'company_id' => null,
+                'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'version' => 1,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+        );
     }
 }

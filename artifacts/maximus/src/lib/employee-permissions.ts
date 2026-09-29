@@ -8,7 +8,8 @@ import {
 } from './commerce-permissions';
 import { featureSlug, permissionFeatureKey } from './permission-keys';
 import { getModuleFeatureOptions, normalizeModuleFeatureIds } from './module-features';
-import { stockSubmodules, type Module } from './store';
+import { modules, stockSubmodules, type Module } from './store';
+import { normalizePermissionLadder } from './permission-ladder';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
@@ -36,6 +37,35 @@ export function effectiveFeaturePermissions(permissions: string[] | undefined) {
     allowed.delete('modifier');
   }
   return [...allowed];
+}
+
+/** Repairs old Transport role keys that were saved from translated labels. */
+export function normalizeTransportRolePermissions(role: Role | null | undefined): Role | null {
+  if (!role) return null;
+
+  const transport = modules.find(module => module.id === 'transport');
+  if (!transport) return role;
+
+  const modulePermissions = { ...role.modulePermissions };
+  getModuleFeatureOptions(transport).forEach(feature => {
+    const canonicalKey = permissionFeatureKey('transport', feature.id);
+    const legacyKey = permissionFeatureKey('transport', feature.label);
+    if (legacyKey === canonicalKey || !modulePermissions[legacyKey]) return;
+
+    modulePermissions[canonicalKey] = [
+      ...new Set([...(modulePermissions[canonicalKey] ?? []), ...modulePermissions[legacyKey]]),
+    ];
+    delete modulePermissions[legacyKey];
+  });
+
+  getModuleFeatureOptions(transport).forEach(feature => {
+    const key = permissionFeatureKey('transport', feature.id);
+    const permissions = normalizePermissionLadder(modulePermissions[key]);
+    if (permissions.length > 0) modulePermissions[key] = permissions;
+    else delete modulePermissions[key];
+  });
+
+  return { ...role, modulePermissions };
 }
 const presenceOperationalPermissions = new Set<PresencePermission>([
   'view',

@@ -184,6 +184,21 @@ test('bloque la publication d’un catalogue incohérent', () => {
   assert.ok(validation.errors.some(error => error.includes('pack absent')));
 });
 
+test('bloque les identifiants de packs dupliqués dans le catalogue', () => {
+  const data = fixture();
+  updateCatalogDraft(data, draft => {
+    draft.moduleOverrides.stocks = {
+      featurePacks: [
+        { id: 'duplicate-pack', name: 'Gestion courante', featureIds: ['products'] },
+        { id: 'duplicate-pack', name: 'Gestion avancée', featureIds: ['entries'] },
+      ],
+    };
+  });
+
+  const validation = validateCatalogDraft(data);
+  assert.ok(validation.errors.some(error => error.includes('identifiants de packs en double')));
+});
+
 test('signale un brouillon de catalogue ancien sans faire planter sa validation', () => {
   const data = fixture();
   updateCatalogDraft(data, draft => {

@@ -9,6 +9,7 @@ import {
   getFeaturePermissions,
   getStockPermissions,
   restrictRoleToCompany,
+  normalizeTransportRolePermissions,
   roleHasFeaturePermission,
   roleHasPermission,
   type ModulePermission,
@@ -17,6 +18,7 @@ import {
 import { commerceTabDefinitions } from './commerce-permissions';
 import { getConfiguredModules } from './store';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from './module-features';
+import { getEffectiveUnitModuleIds } from './organization-module-scope';
 import { buildSidebarFeatureGroups } from './sidebar-navigation';
 import type { ServerModuleAccess } from './module-api';
 
@@ -78,7 +80,10 @@ export function buildAppAccessContext({
     sectorTestCompanyId && activeCompany?.managerRoleId
       ? data.roles.find(role => role.id === activeCompany.managerRoleId) ?? null
       : null;
-  const accessRole = restrictRoleToCompany(rawEmployeeRole ?? rawTestCompanyRole, activeCompany);
+  const accessRole = restrictRoleToCompany(
+    normalizeTransportRolePermissions(rawEmployeeRole ?? rawTestCompanyRole),
+    activeCompany,
+  );
   const moduleStatus = (moduleId: ModuleId): ModuleAvailability =>
     serverModuleAccess?.find((item) => item.id === moduleId)?.status ??
     serverModuleStatuses?.[moduleId] ??
@@ -174,11 +179,18 @@ export function buildAppAccessContext({
       .map(module => [module.id, companySelectedFeatureIds(module)] as const)
       .filter(([, featureIds]) => featureIds !== undefined),
   ) as Partial<Record<ModuleId, string[]>>;
-  const employeeNode = employee?.sectorId
+  const rawEmployeeNode = employee?.sectorId
     ? data.orgNodes.find(node => node.id === employee.sectorId && node.companyId === employee.companyId) ?? null
     : sectorTestCompanyId && accessRole?.sectorId
       ? data.orgNodes.find(node => node.id === accessRole.sectorId && node.companyId === companyId) ?? null
       : null;
+  const effectiveUnitModuleIds = getEffectiveUnitModuleIds(data.orgNodes, rawEmployeeNode);
+  const employeeNode = rawEmployeeNode
+    ? {
+        ...rawEmployeeNode,
+        moduleIds: effectiveUnitModuleIds ? [...effectiveUnitModuleIds] : rawEmployeeNode.moduleIds,
+      }
+    : null;
   const employeeAncestry = getEmployeeAncestry(data.orgNodes, employeeNode);
   const accessRoleMatchesScope = sectorTestCompanyId
     ? Boolean(accessRole && employeeNode && accessRole.companyId === companyId && accessRole.sectorId === employeeNode.id)

@@ -9,6 +9,14 @@ import {
 } from '@/lib/commerce-permissions';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import { presenceFeatureDefinitions } from '@/lib/presence-features';
+import { getModuleFeatureOptions } from '@/lib/module-features';
+import { normalizePermissionLadder, togglePermissionLadder } from '@/lib/permission-ladder';
+import { getEffectiveUnitModuleIds } from '@/lib/organization-module-scope';
+import {
+  getModuleIdForRolePermission,
+  getUnitFeatureIds,
+  restrictRoleToUnitScope,
+} from '@/lib/organization-role-scope';
 import {
   getConfiguredModules,
   type Company,
@@ -21,7 +29,7 @@ import {
   type StoreData,
 } from '@/lib/store';
 import { authApi } from '@/lib/auth-api';
-import { restrictRoleToCompany } from '@/lib/employee-permissions';
+import { normalizeTransportRolePermissions, restrictRoleToCompany } from '@/lib/employee-permissions';
 import { permissionLabel } from './organization-shared-utils';
 import { ActionButton, Field, Modal } from './organization-shared';
 
@@ -95,8 +103,10 @@ export function RolesTab({
       {companyNodes.length === 0 && <p className="mb-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord au moins une unité dans l’onglet Structure & Unités.</p>}
       <div className="space-y-3">
         {companyRoles.map(role => {
-          const effectiveRole = restrictRoleToCompany(role, company) ?? role;
+          const normalizedRole = normalizeTransportRolePermissions(role) ?? role;
           const sector = companyNodes.find(node => node.id === role.sectorId);
+          const unitBoundRole = restrictRoleToUnitScope(normalizedRole, sector, companyNodes, moduleDefinitions);
+          const effectiveRole = restrictRoleToCompany(unitBoundRole, company) ?? unitBoundRole;
           const sourceModule = role.packModuleId ? moduleDefinitions.find(module => module.id === role.packModuleId) : undefined;
           const sourcePack = sourceModule?.featurePacks?.find(pack => pack.id === role.packId);
           const assignedEmployees = data.employees.filter(employee => employee.roleId === role.id);
@@ -317,18 +327,28 @@ function RoleFormModal({
 }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const initialSectorId = initialData?.sectorId || (allNodes[0]?.id ?? '');
+  const initialNode = allNodes.find(node => node.id === initialSectorId);
+  const normalizedInitialRole = normalizeTransportRolePermissions(initialData);
+  const scopedInitialRole = normalizedInitialRole
+    ? restrictRoleToUnitScope(normalizedInitialRole, initialNode, allNodes, moduleDefinitions)
+    : null;
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     description: initialData?.description || '',
-    sectorId: initialData?.sectorId || (allNodes[0]?.id ?? ''),
-    modulePermissions: restrictRoleToCompany(initialData, company)?.modulePermissions || {},
+    sectorId: initialSectorId,
+    modulePermissions: restrictRoleToCompany(
+      scopedInitialRole,
+      company,
+    )?.modulePermissions || {},
   });
   const selectedNode = allNodes.find(node => node.id === formData.sectorId);
+  const selectedUnitModuleIds = getEffectiveUnitModuleIds(allNodes, selectedNode);
   const companyModules = moduleDefinitions.filter(module => company.allowedModules.includes(module.id));
   const requestedModuleIds = company.requestedModules.length ? new Set(company.requestedModules) : null;
   const availableModules = companyModules
     .filter(module => !requestedModuleIds || requestedModuleIds.has(module.id))
-    .filter(module => selectedNode?.moduleIds === undefined || selectedNode.moduleIds.includes(module.id));
+    .filter(module => !selectedUnitModuleIds || selectedUnitModuleIds.has(module.id));
 
   const featurePermissionKeys = (moduleId: ModuleId, feature: string) =>
     moduleId === 'commerce'
@@ -342,10 +362,10 @@ function RoleFormModal({
       const permissionKeys = featurePermissionKeys(moduleId, feature);
       const key = permissionKeys[0];
       const current = [...new Set(permissionKeys.flatMap(permissionKey => previous.modulePermissions[permissionKey] || []))];
-      const next = current.includes(permission) ? current.filter(value => value !== permission) : [...current, permission];
+      const next = togglePermissionLadder(current, permission);
       const modulePermissions = { ...previous.modulePermissions };
       permissionKeys.forEach(permissionKey => delete modulePermissions[permissionKey]);
-      if (next.length) modulePermissions[key] = [...new Set(['voir', ...next])];
+      if (next.length) modulePermissions[key] = next;
       else delete modulePermissions[key];
       if (moduleId === 'presences') {
         delete modulePermissions[moduleId];
@@ -361,9 +381,9 @@ function RoleFormModal({
     setFormData(previous => {
       const key = `stocks:${submoduleId}`;
       const current = previous.modulePermissions[key] || [];
-      const next = current.includes(permission) ? current.filter(value => value !== permission) : [...current, permission];
+      const next = togglePermissionLadder(current, permission);
       const modulePermissions = { ...previous.modulePermissions };
-      if (next.length) modulePermissions[key] = permission === 'voir' ? next : [...new Set(['voir', ...next])];
+      if (next.length) modulePermissions[key] = next;
       else delete modulePermissions[key];
       return { ...previous, modulePermissions };
     });
@@ -381,16 +401,26 @@ function RoleFormModal({
       return;
     }
     const moduleIds = new Set<string>(moduleDefinitions.map(module => module.id));
-    const modulePermissions = Object.fromEntries(
-      Object.entries(formData.modulePermissions)
-        .map(([key, permissions]) => [
-          key,
-          moduleIds.has(key) ? [...new Set(permissions)] : permissions,
-        ] as const)
-        .filter(([key]) => !moduleIds.has(key))
-        .filter(([, permissions]) => permissions.length > 0),
+    const selectedModuleIds = new Set(availableModules.map(module => module.id));
+    const modulePermissionEntries = Object.entries(formData.modulePermissions)
+      .map(([key, permissions]) => [
+        key,
+        moduleIds.has(key) ? [...new Set(permissions)] : permissions,
+      ] as const)
+      .filter(([key]) => !moduleIds.has(key))
+      .filter(([, permissions]) => permissions.length > 0)
+      .filter(([key]) => {
+        const moduleId = getModuleIdForRolePermission(key, moduleDefinitions);
+        return Boolean(moduleId && selectedModuleIds.has(moduleId));
+      });
+    const modulePermissions = Object.fromEntries(modulePermissionEntries);
+    const unitBoundRole = restrictRoleToUnitScope(
+      { id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions },
+      selectedNode,
+      allNodes,
+      moduleDefinitions,
     );
-    const boundedRole = restrictRoleToCompany({ id: initialData?.id ?? '', name, description: formData.description, sectorId: formData.sectorId, modulePermissions }, company);
+    const boundedRole = restrictRoleToCompany(unitBoundRole, company);
     setError('');
     setSaving(true);
     try {
@@ -417,7 +447,7 @@ function RoleFormModal({
       <div className="mt-4 border-t pt-4">
         <div className="mb-4">
           <h3 className="text-sm font-bold">Droits d’accès</h3>
-          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les droits généraux du module et ceux de chaque sous-fonctionnalité sont configurables séparément. Les droits restent limités aux éléments choisis par l’entreprise.</p>
+          <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les droits généraux du module et ceux de chaque sous-fonctionnalité sont configurables séparément, dans la limite des modules et fonctionnalités autorisés pour l’unité et l’entreprise.</p>
         </div>
         <div className="max-h-[calc(100dvh-13rem)] space-y-4 overflow-y-auto pr-1">
           {availableModules.map(module => (
@@ -425,6 +455,7 @@ function RoleFormModal({
               key={module.id}
               module={module}
               modulePermissions={formData.modulePermissions}
+              allowedFeatureIds={getUnitFeatureIds(selectedNode, module)}
               onToggleFeature={toggleFeaturePermission}
               onToggleStock={toggleStockPermission}
             />
@@ -486,11 +517,13 @@ function PermissionToggleGroup({
 function ModulePermissionCard({
   module,
   modulePermissions,
+  allowedFeatureIds,
   onToggleFeature,
   onToggleStock,
 }: {
   module: Module;
   modulePermissions: Record<string, string[]>;
+  allowedFeatureIds: ReadonlySet<string> | undefined;
   onToggleFeature: (moduleId: ModuleId, feature: string, permission: Permission) => void;
   onToggleStock: (submoduleId: string, permission: Permission) => void;
 }) {
@@ -498,7 +531,10 @@ function ModulePermissionCard({
     ? commerceTabDefinitions
     : module.id === 'presences'
       ? presenceFeatureDefinitions.map(feature => ({ id: featureSlug(feature.label), label: feature.label }))
-    : module.features.map(feature => ({ id: feature, label: feature }));
+      : getModuleFeatureOptions(module);
+  const visibleFeatures = allowedFeatureIds
+    ? features.filter(feature => allowedFeatureIds.has(feature.id))
+    : features;
 
   return (
     <section className="overflow-hidden rounded-xl border bg-[hsl(var(--card))]">
@@ -516,12 +552,18 @@ function ModulePermissionCard({
         {module.id !== 'stocks' && (
           <FeaturePermissionList
             module={module}
-            features={features}
+            features={visibleFeatures}
             modulePermissions={modulePermissions}
             onToggle={onToggleFeature}
           />
         )}
-        {module.id === 'stocks' && <StockPermissionList modulePermissions={modulePermissions} onToggle={onToggleStock} />}
+        {module.id === 'stocks' && (
+          <StockPermissionList
+            modulePermissions={modulePermissions}
+            allowedFeatureIds={allowedFeatureIds}
+            onToggle={onToggleStock}
+          />
+        )}
       </div>
     </section>
   );
@@ -547,7 +589,9 @@ function FeaturePermissionList({
         </div>
          <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{features.length} élément{features.length > 1 ? 's' : ''}</span>
       </div>
-      <div className="grid gap-2">
+      {features.length === 0
+        ? <p className="rounded-lg bg-[hsl(var(--muted)/.35)] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucune fonctionnalité n’est autorisée pour cette unité dans ce module.</p>
+        : <div className="grid gap-2">
         {features.map(feature => {
           const key = module.id === 'commerce'
             ? commerceTabPermissionKey(feature.id as CommerceTabId)
@@ -556,7 +600,7 @@ function FeaturePermissionList({
               : permissionFeatureKey(module.id, feature.id);
           const activePermissions = module.id === 'commerce'
             ? [...new Set(commerceTabPermissionKeys(feature.id as CommerceTabId).flatMap(permissionKey => modulePermissions[permissionKey] || []))]
-            : modulePermissions[key] || [];
+            : normalizePermissionLadder(modulePermissions[key]);
           return (
             <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -566,26 +610,34 @@ function FeaturePermissionList({
             </div>
           );
         })}
-      </div>
+        </div>}
     </div>
   );
 }
 
 function StockPermissionList({
   modulePermissions,
+  allowedFeatureIds,
   onToggle,
 }: {
   modulePermissions: Record<string, string[]>;
+  allowedFeatureIds: ReadonlySet<string> | undefined;
   onToggle: (submoduleId: string, permission: Permission) => void;
 }) {
+  const visibleSubmodules = allowedFeatureIds
+    ? stockSubmodules.filter(submodule => allowedFeatureIds.has(submodule.id))
+    : stockSubmodules;
+
   return (
     <div>
       <div className="mb-2">
          <h5 className="text-sm font-bold">Sous-fonctions de Gestion de stock</h5>
          <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Ces règles précisent les droits de l’employé dans son unité.</p>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {stockSubmodules.map(submodule => {
+      {visibleSubmodules.length === 0
+        ? <p className="rounded-lg bg-[hsl(var(--muted)/.35)] p-3 text-xs text-[hsl(var(--muted-foreground))]">Aucune fonctionnalité Stock n’est autorisée pour cette unité.</p>
+        : <div className="grid gap-2 sm:grid-cols-2">
+        {visibleSubmodules.map(submodule => {
           const key = `stocks:${submodule.id}`;
           return (
             <div key={key} className="flex flex-col gap-3 rounded-lg border bg-[hsl(var(--muted)/.16)] px-3 py-3">
@@ -596,7 +648,7 @@ function StockPermissionList({
             </div>
           );
         })}
-      </div>
+        </div>}
     </div>
   );
 }

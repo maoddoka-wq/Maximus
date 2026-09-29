@@ -78,6 +78,72 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
+test('applique aux accès employés la limite de modules définie par les unités parentes', () => {
+  const { data, company, employee } = createAccessFixture();
+  const child = data.orgNodes[0]!;
+  company.allowedModules = ['commerce', 'stocks'];
+  company.requestedModules = ['commerce', 'stocks'];
+  child.parentId = 'parent-unit';
+  child.moduleIds = ['commerce', 'stocks'];
+  data.orgNodes.push({
+    id: 'parent-unit',
+    companyId: company.id,
+    name: 'Unité parente',
+    parentId: null,
+    moduleIds: ['commerce'],
+  });
+  data.roles[0]!.modulePermissions = {
+    commerce: ['voir'],
+    stocks: ['voir'],
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `employee:${employee.id}`,
+    employee,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.allowed, ['commerce']);
+  assert.equal(access.hasPermission('stocks', 'voir'), false);
+});
+
+test('les droits Transport suivent les trois niveaux même pour une ancienne clé Courses', () => {
+  const { data, company, employee } = createAccessFixture();
+  company.allowedModules = ['transport'];
+  company.requestedModules = ['transport'];
+  data.orgNodes[0]!.moduleIds = ['transport'];
+  const role = data.roles[0]!;
+
+  const cases = [
+    { permissions: ['voir'], canCreate: false, canModify: false },
+    { permissions: ['voir', 'créer'], canCreate: true, canModify: false },
+    { permissions: ['voir', 'créer', 'modifier'], canCreate: true, canModify: true },
+  ] as const;
+
+  for (const item of cases) {
+    role.modulePermissions = {
+      transport: ['voir'],
+      'transport:menu:courses': [...item.permissions],
+    };
+    const access = buildAppAccessContext({
+      data,
+      session: `employee:${employee.id}`,
+      employee,
+      activeCompanyId: company.id,
+      activeCompany: company,
+      sectorTestCompanyId: null,
+      serverModuleStatuses: null,
+    });
+
+    assert.equal(access.transportFeaturePermissions?.trips.canCreate, item.canCreate);
+    assert.equal(access.transportFeaturePermissions?.trips.canModify, item.canModify);
+  }
+});
+
 test('borne Présences au dossier de l’employé et aux fonctionnalités de son rôle', () => {
   const { data, company, employee } = createAccessFixture();
   const node = data.orgNodes[0]!;

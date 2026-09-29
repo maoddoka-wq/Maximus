@@ -155,6 +155,9 @@ export function getModulePackError(module: Module, packIds: readonly string[]): 
     if (!pack) return `Le pack « ${id} » n’est plus publié. Retirez-le puis choisissez à nouveau.`;
     const missing = pack.featureIds.filter(value => normalizeModuleFeatureIds(module, [value]).length === 0);
     if (missing.length) return `Le pack « ${pack.name} » référence une fonctionnalité absente : ${missing.join(', ')}. Choisissez un autre pack ou des fonctionnalités individuelles.`;
+    if (normalizeModuleFeatureIds(module, pack.featureIds).length === 0) {
+      return `Le pack « ${pack.name} » ne contient aucune fonctionnalité reconnue. Choisissez un autre pack ou des fonctionnalités individuelles.`;
+    }
   }
   return null;
 }

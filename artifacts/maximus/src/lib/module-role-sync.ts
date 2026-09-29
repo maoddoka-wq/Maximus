@@ -90,22 +90,25 @@ function hasRoleAssignment(data: StoreData, company: Company | undefined, roleId
 export function synchronizeUnitPackRoles(data: StoreData, company: Company, node: OrgNode) {
   const modules = getConfiguredModules(data);
   const desiredRoleKeys = new Set<string>();
+  const canonicalRoleIds = new Map<string, string>();
   const selectedPackIds = node.modulePackIds ?? {};
 
   Object.entries(selectedPackIds).forEach(([moduleId, packIds]) => {
     const module = modules.find(candidate => candidate.id === moduleId);
     if (!module) return;
-    (packIds ?? []).forEach(packId => {
+    [...new Set(packIds ?? [])].forEach(packId => {
       const pack = module.featurePacks?.find(candidate => candidate.id === packId);
       if (!pack) return;
 
       const roleKey = `${module.id}:${pack.id}`;
       desiredRoleKeys.add(roleKey);
-      const roleIndex = data.roles.findIndex(role => samePackRole(role, node, module.id, pack.id));
-      const existingRole = roleIndex === -1 ? undefined : data.roles[roleIndex];
+      const matchingRoles = data.roles.filter(role => samePackRole(role, node, module.id, pack.id));
+      const expectedRoleId = automaticRoleId(node.id, module.id, pack.id);
+      const existingRole = matchingRoles.find(role => role.id === expectedRoleId) ?? matchingRoles[0];
+      const roleIndex = existingRole ? data.roles.findIndex(role => role.id === existingRole.id) : -1;
       const selectedFeatureIds = node.moduleFeatures?.[module.id] ?? pack.featureIds;
       const nextRole: Role = {
-        id: existingRole?.id ?? automaticRoleId(node.id, module.id, pack.id),
+        id: existingRole?.id ?? expectedRoleId,
         companyId: node.companyId,
         sectorId: node.id,
         name: pack.name,
@@ -117,13 +120,14 @@ export function synchronizeUnitPackRoles(data: StoreData, company: Company, node
 
       if (roleIndex === -1) data.roles.push(nextRole);
       else data.roles[roleIndex] = nextRole;
+      canonicalRoleIds.set(roleKey, nextRole.id);
     });
   });
 
   data.roles = data.roles.filter(role => {
     if (role.companyId !== node.companyId || role.sectorId !== node.id || !role.packId || !role.packModuleId) return true;
     const roleKey = `${role.packModuleId}:${role.packId}`;
-    if (desiredRoleKeys.has(roleKey)) return true;
+    if (desiredRoleKeys.has(roleKey) && canonicalRoleIds.get(roleKey) === role.id) return true;
     if (hasRoleAssignment(data, company, role.id)) {
       delete role.packId;
       delete role.packModuleId;

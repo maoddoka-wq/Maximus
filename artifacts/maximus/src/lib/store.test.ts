@@ -314,6 +314,33 @@ test('isole les écrans de fonctionnalités des overrides de modules incomplets'
   assert.ok(Array.isArray(presences?.featurePacks));
 });
 
+test('évite les modules et packs dupliqués dans le catalogue configuré', () => {
+  const configured = getConfiguredModules({
+    removedModules: [],
+    customModules: [{
+      id: 'stocks',
+      name: 'Copie personnalisée du stock',
+      description: 'Entrée de catalogue en double',
+      features: ['Copie'],
+      status: 'ACTIF',
+      featurePacks: [{ id: 'stock-gestion', name: 'Copie du pack', featureIds: ['products'] }],
+    }],
+    moduleOverrides: {
+      stocks: {
+        featurePacks: [
+          { id: 'stock-gestion', name: 'Gestion du stock', featureIds: ['products'] },
+          { id: 'stock-gestion', name: 'Gestion du stock (copie)', featureIds: ['entries'] },
+        ],
+      },
+    },
+  });
+  const stocks = configured.filter(module => module.id === 'stocks');
+
+  assert.equal(stocks.length, 1);
+  assert.deepEqual(stocks[0]?.featurePacks?.map(pack => pack.id), ['stock-gestion']);
+  assert.equal(stocks[0]?.featurePacks?.[0]?.name, 'Gestion du stock');
+});
+
 test('retire les demandes en attente de l’annuaire des entreprises', () => {
   const companies = emptyStoreData().companies.concat([
     {
