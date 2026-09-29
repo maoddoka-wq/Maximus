@@ -56,4 +56,9 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
     ],
 
+    'github' => [
+        'mobile_release_repository' => env('MAXIMUS_GITHUB_RELEASE_REPOSITORY', 'maoddoka-wq/Maximus'),
+        'mobile_release_token' => env('MAXIMUS_GITHUB_READ_TOKEN'),
+    ],
+
 ];

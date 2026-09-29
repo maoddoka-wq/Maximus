@@ -36,6 +36,10 @@ services:
         value: maximus-erp.onrender.com
       - key: MAXIMUS_CENTRAL_PUBLIC_URL
         value: https://maximus-erp.onrender.com
+      - key: MAXIMUS_GITHUB_RELEASE_REPOSITORY
+        value: maoddoka-wq/Maximus
+      - key: MAXIMUS_GITHUB_READ_TOKEN
+        sync: false
       - key: CACHE_STORE
         value: database
       - key: DIGITAL_STORAGE_PATH

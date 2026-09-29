@@ -13,6 +13,10 @@ class AuthenticateMaximus
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->bearerToken() !== null) {
+            return app(AuthenticateMaximusMobileToken::class)->handle($request, $next);
+        }
+
         $user = MaximusAuth::userFromRequest($request);
 
         if (!$user) {

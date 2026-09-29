@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
@@ -65,6 +66,11 @@ Route::prefix('onboarding/drafts')->middleware(['maximus.central', 'throttle:onb
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/mobile/login', [MobileAuthController::class, 'login'])->middleware('throttle:login');
+    Route::middleware('maximus.auth')->group(function (): void {
+        Route::get('/mobile/session', [MobileAuthController::class, 'session']);
+        Route::post('/mobile/logout', [MobileAuthController::class, 'logout']);
+    });
     Route::get('/company-login/{slug}', [AuthController::class, 'companyLoginInfo'])
         ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
     Route::post('/company-login/{slug}', [AuthController::class, 'companyLogin'])

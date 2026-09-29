@@ -11,7 +11,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@expo-google-fonts/inter": "^0.4.0",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@stardazed/streams-text-encoding": "^1.0.2",
@@ -53,5 +52,13 @@
     "typescript": "~6.0.3",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
+  },
+  "dependencies": {
+    "@expo-google-fonts/dm-sans": "^0.4.2",
+    "@workspace/maximus-design-system": "workspace:*",
+    "expo-file-system": "57.0.6",
+    "expo-intent-launcher": "57.0.1",
+    "expo-secure-store": "57.0.3",
+    "expo-task-manager": "57.0.20"
   }
 }

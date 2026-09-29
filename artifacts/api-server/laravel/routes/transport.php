@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\TransportController;
+use App\Http\Controllers\Api\TransportMobileReleaseController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:transport'])->prefix('transport')->group(function (): void {
     Route::get('/bootstrap', [TransportController::class, 'bootstrap']);
+    Route::get('/mobile/releases/latest', [TransportMobileReleaseController::class, 'latest'])->middleware('throttle:30,1');
+    Route::get('/mobile/releases/latest/download', [TransportMobileReleaseController::class, 'download'])->middleware('throttle:10,1');
     Route::post('/drivers', [TransportController::class, 'createDriver']);
     Route::patch('/drivers/{id}/location', [TransportController::class, 'updateDriverLocation']);
     Route::patch('/drivers/{id}/availability', [TransportController::class, 'updateDriverAvailability']);

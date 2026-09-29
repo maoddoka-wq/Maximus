@@ -12,6 +12,10 @@ tags:
     description: Health operations
   - name: stock
     description: Stock management operations
+  - name: mobile-auth
+    description: Authentication for the MAXIMUS Chauffeur Android app
+  - name: transport
+    description: Driver transport operations
 paths:
   /healthz:
     get:
@@ -148,7 +152,187 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StockInventory"
+  /auth/mobile/login:
+    post:
+      operationId: mobileLogin
+      tags: [mobile-auth]
+      summary: Sign in to MAXIMUS Chauffeur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MobileLoginInput"
+      responses:
+        "200":
+          description: Authenticated driver session and company identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobileSession"
+        "401":
+          description: Invalid credentials
+        "403":
+          description: Account is not authorized for the driver app
+  /auth/mobile/session:
+    get:
+      operationId: mobileSession
+      tags: [mobile-auth]
+      summary: Restore the current driver session
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Current driver identity and company branding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobileSessionInfo"
+        "401":
+          description: Missing, expired, or revoked token
+  /auth/mobile/logout:
+    post:
+      operationId: mobileLogout
+      tags: [mobile-auth]
+      summary: Revoke the current device session
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          description: Missing, expired, or revoked token
+  /transport/bootstrap:
+    get:
+      operationId: getTransportBootstrap
+      tags: [transport]
+      summary: Load the signed-in driver's authorized transport data
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Driver, vehicles, assigned trips, and transport settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransportBootstrap"
+        "403":
+          description: Transport module or view permission is unavailable
+  /transport/drivers/{id}/location:
+    patch:
+      operationId: updateTransportDriverLocation
+      tags: [transport]
+      summary: Update the authenticated driver's own GPS position
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransportDriverLocationInput"
+      responses:
+        "200":
+          description: Updated driver
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransportDriver"
+        "403":
+          description: Driver update permission is unavailable
+  /transport/drivers/{id}/availability:
+    patch:
+      operationId: updateTransportDriverAvailability
+      tags: [transport]
+      summary: Change the authenticated driver's availability
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransportDriverAvailabilityInput"
+      responses:
+        "200":
+          description: Updated driver
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransportDriver"
+        "403":
+          description: Driver update permission is unavailable
+  /transport/trips/{id}/status:
+    patch:
+      operationId: updateTransportTripStatus
+      tags: [transport]
+      summary: Update the status of the authenticated driver's own trip
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransportTripStatusInput"
+      responses:
+        "200":
+          description: Updated trip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransportTrip"
+        "403":
+          description: Trip update permission is unavailable
+  /transport/mobile/releases/latest:
+    get:
+      operationId: getLatestChauffeurRelease
+      tags: [transport]
+      summary: Get metadata for the latest signed chauffeur app release
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Latest APK release details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChauffeurRelease"
+        "404":
+          description: No APK release has been published
+        "503":
+          description: Release access is not configured on the server
+  /transport/mobile/releases/latest/download:
+    get:
+      operationId: downloadLatestChauffeurRelease
+      tags: [transport]
+      summary: Download the latest chauffeur APK through the authenticated API
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Signed Android package
+          content:
+            application/vnd.android.package-archive:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: No APK release has been published
+        "503":
+          description: Release access is not configured on the server
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
   parameters:
     ResourceId:
       name: id
@@ -227,6 +411,133 @@ components:
               productId: { type: string }
               actualQuantity: { type: integer, minimum: 0 }
       required: [warehouseId, lines]
+    MobileLoginInput:
+      type: object
+      additionalProperties: false
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+        companySlug: { type: string, nullable: true }
+        deviceName: { type: string, maxLength: 100 }
+      required: [email, password]
+    TransportDriverLocationInput:
+      type: object
+      additionalProperties: false
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+      required: [latitude, longitude]
+    TransportDriverAvailabilityInput:
+      type: object
+      additionalProperties: false
+      properties:
+        availability: { type: string, enum: [AVAILABLE, PAUSED] }
+      required: [availability]
+    TransportTripStatusInput:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [REQUESTED, OFFERED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        pickupCode: { type: string, minLength: 4, maxLength: 4 }
+      required: [status]
+    MobileUser:
+      type: object
+      additionalProperties: true
+      properties:
+        role: { type: string }
+        displayName: { type: string }
+        companyId: { type: string }
+        employeeId: { type: string }
+        sectorIds: { type: array, items: { type: string } }
+        permissions: { type: object, additionalProperties: true }
+      required: [role, displayName, companyId, employeeId]
+    MobileCompany:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        name: { type: string }
+        profilePhoto: { type: string, nullable: true }
+        primaryColor: { type: string, nullable: true }
+        accentColor: { type: string, nullable: true }
+      required: [id, name]
+    MobileSession:
+      type: object
+      additionalProperties: true
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+        user: { $ref: "#/components/schemas/MobileUser" }
+        company: { $ref: "#/components/schemas/MobileCompany" }
+        capabilities:
+          type: object
+          properties:
+            updateLocation: { type: boolean }
+            updateAvailability: { type: boolean }
+            updateTrips: { type: boolean }
+      required: [token, expiresAt, user, company, capabilities]
+    MobileSessionInfo:
+      type: object
+      additionalProperties: true
+      properties:
+        expiresAt: { type: string, format: date-time }
+        user: { $ref: "#/components/schemas/MobileUser" }
+        company: { $ref: "#/components/schemas/MobileCompany" }
+        capabilities:
+          type: object
+          properties:
+            updateLocation: { type: boolean }
+            updateAvailability: { type: boolean }
+            updateTrips: { type: boolean }
+      required: [expiresAt, user, company, capabilities]
+    TransportDriver:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        availability: { type: string, enum: [AVAILABLE, PAUSED, ON_TRIP] }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        locationUpdatedAt: { type: string, nullable: true }
+      required: [id, name, status, availability]
+    TransportTrip:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        reference: { type: string }
+        pickup: { type: string }
+        destination: { type: string }
+        passengerName: { type: string }
+        passengerPhone: { type: string }
+        fare: { type: integer }
+        status: { type: string, enum: [REQUESTED, OFFERED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        requestedAt: { type: string }
+        pickupCode: { type: string, nullable: true }
+      required: [id, reference, pickup, destination, passengerName, passengerPhone, fare, status, requestedAt]
+    TransportBootstrap:
+      type: object
+      additionalProperties: true
+      properties:
+        drivers: { type: array, items: { $ref: "#/components/schemas/TransportDriver" } }
+        vehicles: { type: array, items: { type: object, additionalProperties: true } }
+        trips: { type: array, items: { $ref: "#/components/schemas/TransportTrip" } }
+        metrics: { type: object, additionalProperties: true }
+        settings: { type: object, additionalProperties: true }
+      required: [drivers, vehicles, trips, metrics, settings]
+    ChauffeurRelease:
+      type: object
+      additionalProperties: true
+      properties:
+        version: { type: string }
+        name: { type: string }
+        publishedAt: { type: string, format: date-time }
+        sizeBytes: { type: integer, minimum: 0 }
+        sha256: { type: string, nullable: true }
+      required: [version, name, publishedAt, sizeBytes]
     StockBootstrap:
       type: object
       additionalProperties: true
