@@ -89,6 +89,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     void saveTrackedDriverId(driver.id);
 
     if (!canUpdateLocation) {
+      void stopDriverLocationTracking().catch(() => undefined);
       setGpsState('attention');
       setGpsMessage('Votre compte ne permet pas le partage de position.');
       return () => {
@@ -372,36 +373,40 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 onEnableGps={enableGpsAgain}
               />
 
-              <View style={styles.sectionHeading}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Mes courses</Text>
-                <View style={[styles.countBadge, { backgroundColor: colors.muted }]}>
-                  <Text style={[styles.countText, { color: colors.foreground }]}>{activeTrips.length}</Text>
-                </View>
-              </View>
+              {session.capabilities?.viewTrips ? (
+                <>
+                  <View style={styles.sectionHeading}>
+                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Mes courses</Text>
+                    <View style={[styles.countBadge, { backgroundColor: colors.muted }]}>
+                      <Text style={[styles.countText, { color: colors.foreground }]}>{activeTrips.length}</Text>
+                    </View>
+                  </View>
 
-              {activeTrips.length ? (
-                <View style={styles.tripList}>
-                  {activeTrips.map((trip) => (
-                    <TripCard
-                      key={trip.id}
-                      trip={trip}
-                      colors={colors}
-                      canUpdate={canUpdateTrips}
-                      isBusy={tripBusyId === trip.id}
-                      onUpdateStatus={(status, pickupCode) =>
-                        updateTripStatus(trip.id, status, pickupCode)
-                      }
-                    />
-                  ))}
-                </View>
-              ) : (
-                <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Aucune course à traiter</Text>
-                  <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
-                    Les nouvelles courses attribuées apparaîtront ici.
-                  </Text>
-                </View>
-              )}
+                  {activeTrips.length ? (
+                    <View style={styles.tripList}>
+                      {activeTrips.map((trip) => (
+                        <TripCard
+                          key={trip.id}
+                          trip={trip}
+                          colors={colors}
+                          canUpdate={canUpdateTrips}
+                          isBusy={tripBusyId === trip.id}
+                          onUpdateStatus={(status, pickupCode) =>
+                            updateTripStatus(trip.id, status, pickupCode)
+                          }
+                        />
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Aucune course à traiter</Text>
+                      <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
+                        Les nouvelles courses attribuées apparaîtront ici.
+                      </Text>
+                    </View>
+                  )}
+                </>
+              ) : null}
             </>
           )}
 

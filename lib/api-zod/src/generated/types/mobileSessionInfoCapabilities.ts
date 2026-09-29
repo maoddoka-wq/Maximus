@@ -7,6 +7,7 @@
  */
 
 export type MobileSessionInfoCapabilities = {
+  viewTrips?: boolean;
   updateLocation?: boolean;
   updateAvailability?: boolean;
   updateTrips?: boolean;

@@ -206,6 +206,7 @@ export const MobileLoginResponse = zod.object({
   "accentColor": zod.string().nullish()
 }),
   "capabilities": zod.object({
+  "viewTrips": zod.boolean().optional(),
   "updateLocation": zod.boolean().optional(),
   "updateAvailability": zod.boolean().optional(),
   "updateTrips": zod.boolean().optional()
@@ -234,6 +235,7 @@ export const MobileSessionResponse = zod.object({
   "accentColor": zod.string().nullish()
 }),
   "capabilities": zod.object({
+  "viewTrips": zod.boolean().optional(),
   "updateLocation": zod.boolean().optional(),
   "updateAvailability": zod.boolean().optional(),
   "updateTrips": zod.boolean().optional()

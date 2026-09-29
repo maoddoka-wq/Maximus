@@ -472,6 +472,7 @@ components:
         capabilities:
           type: object
           properties:
+            viewTrips: { type: boolean }
             updateLocation: { type: boolean }
             updateAvailability: { type: boolean }
             updateTrips: { type: boolean }
@@ -486,6 +487,7 @@ components:
         capabilities:
           type: object
           properties:
+            viewTrips: { type: boolean }
             updateLocation: { type: boolean }
             updateAvailability: { type: boolean }
             updateTrips: { type: boolean }

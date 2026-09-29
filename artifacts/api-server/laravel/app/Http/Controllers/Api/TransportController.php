@@ -61,18 +61,29 @@ class TransportController extends Controller
         }
 
         $company = $this->company($request);
+        $actor = $request->attributes->get('authActor');
+        $canViewOverview = $this->allowed($request, 'view', 'overview');
+        $canViewDrivers = $this->allowed($request, 'view', 'drivers');
+        $canViewVehicles = $this->allowed($request, 'view', 'vehicles');
+        $canViewTrips = $this->allowed($request, 'view', 'trips');
+        $canViewHistory = $this->allowed($request, 'view', 'historique');
         $this->expireOffers($company);
-        $drivers = DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get();
-        $vehicles = DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get();
-        $trips = DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get();
-        $modeEvents = DB::getSchemaBuilder()->hasTable('transport_driver_mode_events')
+        $drivers = $canViewDrivers
+            ? DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get()
+            : collect();
+        $vehicles = $canViewVehicles
+            ? DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get()
+            : collect();
+        $trips = $canViewTrips
+            ? DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get()
+            : collect();
+        $modeEvents = $canViewHistory && DB::getSchemaBuilder()->hasTable('transport_driver_mode_events')
             ? DB::table('transport_driver_mode_events')
                 ->where('company_id', $company)
                 ->orderByDesc('created_at')
                 ->limit(100)
                 ->get()
             : collect();
-        $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'employee') {
             $driver = $drivers->firstWhere('employee_id', $actor['employeeId'] ?? null);
             $drivers = $driver ? collect([$driver]) : collect();
@@ -98,12 +109,20 @@ class TransportController extends Controller
             'vehicles' => $vehicles->map(fn ($row) => $this->vehicle($row))->values(),
             'trips' => $trips->map(fn ($row) => $this->trip($row, $row->driver_id ? $tripDrivers->get($row->driver_id) : null))->values(),
             'metrics' => [
-                'activeDrivers' => $drivers->where('status', 'ACTIVE')->count(),
-                'availableVehicles' => $vehicles->where('status', 'AVAILABLE')->count(),
-                'todayTrips' => $trips->filter(fn ($row) => $row->requested_at && $row->requested_at >= $today)->count(),
-                'todayRevenue' => $trips
-                    ->filter(fn ($row) => $row->status === 'COMPLETED' && $row->requested_at && $row->requested_at >= $today)
-                    ->sum('fare'),
+                'activeDrivers' => $canViewOverview && $canViewDrivers
+                    ? $drivers->where('status', 'ACTIVE')->count()
+                    : 0,
+                'availableVehicles' => $canViewOverview && $canViewVehicles
+                    ? $vehicles->where('status', 'AVAILABLE')->count()
+                    : 0,
+                'todayTrips' => $canViewOverview && $canViewTrips
+                    ? $trips->filter(fn ($row) => $row->requested_at && $row->requested_at >= $today)->count()
+                    : 0,
+                'todayRevenue' => $canViewOverview && $canViewTrips
+                    ? $trips
+                        ->filter(fn ($row) => $row->status === 'COMPLETED' && $row->requested_at && $row->requested_at >= $today)
+                        ->sum('fare')
+                    : 0,
             ],
             'settings' => $this->transportSettings($company),
             'modeEvents' => ($actor['role'] ?? null) === 'employee'

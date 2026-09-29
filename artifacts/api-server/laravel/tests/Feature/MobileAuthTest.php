@@ -48,7 +48,10 @@ class MobileAuthTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('user.employeeId', $employee->employee_id)
             ->assertJsonPath('company.id', 'kora')
-            ->assertJsonPath('capabilities.updateLocation', true);
+            ->assertJsonPath('capabilities.viewTrips', true)
+            ->assertJsonPath('capabilities.updateLocation', true)
+            ->assertJsonPath('capabilities.updateAvailability', true)
+            ->assertJsonPath('capabilities.updateTrips', true);
 
         $plainToken = $login->json('token');
         $this->assertIsString($plainToken);
@@ -129,6 +132,80 @@ class MobileAuthTest extends TestCase
             'password' => 'correct-horse-battery',
         ])->assertForbidden()
             ->assertJsonPath('error', 'Cette application est réservée aux chauffeurs avec un compte employé MAXIMUS.');
+    }
+
+    public function test_mobile_session_and_bootstrap_apply_revoked_transport_features(): void
+    {
+        $this->enableTransport();
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'transport')
+            ->update(['feature_ids' => json_encode(['overview', 'trips', 'drivers', 'vehicles'])]);
+
+        $employee = $this->createUser(
+            id: 'mobile-driver-feature-access',
+            role: 'employee',
+            permissions: [
+                'transport:menu:drivers' => ['voir', 'créer', 'modifier'],
+                'transport:menu:trips' => ['voir', 'créer', 'modifier'],
+            ],
+        );
+        $adminRequest = $this->companyAdminRequest();
+        $driver = $adminRequest->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employee->employee_id,
+            'licenseNumber' => 'SN-MOBILE-FEATURE-001',
+        ])->assertCreated();
+        $vehicle = $adminRequest->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-MOBILE-001',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
+        $trip = $adminRequest->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Plateau',
+            'destination' => 'Almadies',
+            'passengerName' => 'Passager Mobile',
+            'passengerPhone' => '+221770000001',
+            'fare' => 3500,
+            'driverId' => $driver->json('id'),
+            'vehicleId' => $vehicle->json('id'),
+        ])->assertCreated();
+
+        $login = $this->postJson('/api/auth/mobile/login', [
+            'email' => $employee->email,
+            'password' => 'correct-horse-battery',
+        ])->assertOk()
+            ->assertJsonPath('capabilities.viewTrips', true);
+        $headers = ['Authorization' => 'Bearer '.$login->json('token')];
+        $this->getJson('/api/transport/bootstrap', $headers)
+            ->assertOk()
+            ->assertJsonCount(1, 'trips');
+
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'transport')
+            ->update(['feature_ids' => json_encode(['overview', 'drivers', 'vehicles'])]);
+
+        $this->getJson('/api/auth/mobile/session', $headers)
+            ->assertOk()
+            ->assertJsonPath('capabilities.viewTrips', false)
+            ->assertJsonPath('capabilities.updateTrips', false);
+        $this->getJson('/api/transport/bootstrap', $headers)
+            ->assertOk()
+            ->assertJsonCount(0, 'trips')
+            ->assertJsonPath('metrics.todayTrips', 0);
+        $this->patchJson('/api/transport/trips/'.$trip->json('id').'/status', [
+            'status' => 'COMPLETED',
+        ], $headers)->assertForbidden();
+
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'transport')
+            ->update(['feature_ids' => json_encode(['overview', 'vehicles'])]);
+
+        $this->getJson('/api/auth/mobile/session', $headers)->assertForbidden();
+        $this->getJson('/api/transport/bootstrap', $headers)->assertForbidden();
     }
 
     private function enableTransport(): void

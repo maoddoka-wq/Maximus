@@ -143,6 +143,7 @@ export interface MobileCompany {
  }
 
 export type MobileSessionCapabilities = {
+  viewTrips?: boolean;
   updateLocation?: boolean;
   updateAvailability?: boolean;
   updateTrips?: boolean;
@@ -158,6 +159,7 @@ export interface MobileSession {
  }
 
 export type MobileSessionInfoCapabilities = {
+  viewTrips?: boolean;
   updateLocation?: boolean;
   updateAvailability?: boolean;
   updateTrips?: boolean;

@@ -7,6 +7,7 @@ use App\Models\MobileAuthToken;
 use App\Support\CompanyRegistry;
 use App\Support\MaximusAuth;
 use App\Support\ModuleCatalog;
+use App\Support\ModuleAuthorization;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -48,6 +49,11 @@ class AuthenticateMaximusMobileToken
             return response()->json(['error' => 'Compte chauffeur inactif ou accès Transport retiré.'], 403);
         }
 
+        $actor = MaximusAuth::actor($user);
+        if (! ModuleAuthorization::allows($actor, 'transport', 'view', 'drivers')) {
+            return response()->json(['error' => 'L’accès Chauffeurs a été retiré pour ce compte.'], 403);
+        }
+
         $driverExists = \Illuminate\Support\Facades\DB::table('transport_drivers')
             ->where('company_id', $user->company_id)
             ->where('employee_id', $user->employee_id)
@@ -63,7 +69,7 @@ class AuthenticateMaximusMobileToken
 
         $request->attributes->set('mobileAuthToken', $token);
         $request->attributes->set('authUser', $user);
-        $request->attributes->set('authActor', MaximusAuth::actor($user));
+        $request->attributes->set('authActor', $actor);
 
         return $next($request);
     }

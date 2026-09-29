@@ -6,9 +6,14 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { mobileLogin, mobileLogout, mobileSession } from '@workspace/api-client-react';
+import {
+  getGetTransportBootstrapQueryKey,
+  mobileLogin,
+  mobileLogout,
+  mobileSession,
+} from '@workspace/api-client-react';
 import type {
   MobileSessionInfo,
 } from '@workspace/api-client-react';
@@ -73,9 +78,35 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     }
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const token = await readMobileToken();
+    if (!token) return;
+
+    try {
+      const refreshed = await mobileSession();
+      setSession(refreshed);
+      setStatus('signed-in');
+      void queryClient.invalidateQueries({ queryKey: getGetTransportBootstrapQueryKey() });
+    } catch (error) {
+      if (httpStatus(error) !== 401 && httpStatus(error) !== 403) return;
+      await stopDriverLocationTracking();
+      await clearMobileCredentials();
+      queryClient.clear();
+      setSession(null);
+      setStatus('signed-out');
+    }
+  }, [queryClient]);
+
   useEffect(() => {
     void retrySession();
   }, [retrySession]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') void refreshSession();
+    });
+    return () => subscription.remove();
+  }, [refreshSession]);
 
   const signIn = useCallback(
     async ({ email, password, companySlug }: SignInDetails) => {

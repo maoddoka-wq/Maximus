@@ -192,6 +192,7 @@ class MobileAuthController extends Controller
                 'accentColor' => $company->accent_color,
             ],
             'capabilities' => [
+                'viewTrips' => ModuleAuthorization::allows($actor, 'transport', 'view', 'trips'),
                 'updateLocation' => ModuleAuthorization::allows($actor, 'transport', 'modify', 'drivers'),
                 'updateAvailability' => ModuleAuthorization::allows($actor, 'transport', 'modify', 'drivers'),
                 'updateTrips' => ModuleAuthorization::allows($actor, 'transport', 'modify', 'trips'),
