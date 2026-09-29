@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, Image as ImageIcon, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, Upload, UserRound, Users, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, Upload, UserRound, Users, Warehouse, X } from 'lucide-react';
 import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrapScope, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
@@ -543,18 +543,7 @@ function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductFor
   const [form, setForm] = useState<ProductForm>({ ...blankProduct, ...value });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageError, setImageError] = useState('');
-  const [imagePreview, setImagePreview] = useState(form.imageUrl);
   const update = (key: keyof ProductForm, nextValue: string | number | null) => setForm(current => ({ ...current, [key]: nextValue }));
-
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreview(form.imageUrl);
-      return;
-    }
-    const previewUrl = URL.createObjectURL(imageFile);
-    setImagePreview(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [form.imageUrl, imageFile]);
 
   const save = () => {
     if ('id' in value ? !canModify : !canCreate) return;
@@ -570,17 +559,21 @@ function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductFor
       <Input label="Catégorie" value={form.category} onChange={value => update('category', value)} />
       <Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} />
       <Input label="Unité" value={form.unit} onChange={value => update('unit', value)} />
-      <div className="sm:col-span-2">
-        <label htmlFor="stock-product-image" className="block text-xs font-bold">Photo de l’article</label>
-        <label htmlFor="stock-product-image" className="mt-2 flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-[hsl(var(--muted)/.35)] p-3 transition hover:bg-[hsl(var(--muted)/.6)]">
-          {imagePreview
-            ? <img src={imagePreview} alt={`Aperçu de ${form.name || 'l’article'}`} className="h-20 w-20 shrink-0 rounded-lg object-cover" />
-            : <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))]"><ImageIcon size={23} aria-hidden="true" /></span>}
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold">{imageFile?.name ?? (form.imageUrl ? 'Photo actuelle' : 'Aucune photo sélectionnée')}</span>
-            <span className="mt-1 block text-xs font-normal text-[hsl(var(--muted-foreground))]">JPG, PNG ou WebP · 1,8 Mo maximum</span>
-            <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[hsl(var(--primary))]"><Upload size={14} aria-hidden="true" />{imageFile || form.imageUrl ? 'Choisir une autre photo' : 'Choisir une photo'}</span>
-          </span>
+      <div className="sm:col-span-2 flex min-w-0 items-center gap-3">
+        <span className="shrink-0 text-xs font-bold">Photo</span>
+        <label htmlFor="stock-product-image" aria-label={imageFile || form.imageUrl ? 'Remplacer la photo de l’article' : 'Ajouter une photo à l’article'} className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.35)] px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.6)]">
+          <Upload size={14} aria-hidden="true" />
+          {imageFile || form.imageUrl ? 'Remplacer' : 'Choisir'}
+        </label>
+        <span
+          id={imageError ? 'stock-product-image-error' : undefined}
+          role={imageError ? 'alert' : undefined}
+          title={imageError || imageFile?.name || undefined}
+          className={`min-w-0 flex-1 truncate text-xs ${imageError ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--muted-foreground))]'}`}
+        >
+          {imageError || imageFile?.name || (form.imageUrl ? 'Photo actuelle' : 'Aucune photo sélectionnée')}
+        </span>
+        <span id="stock-product-image-help" className="sr-only">Formats JPG, PNG ou WebP · 1,8 Mo maximum.</span>
           <input
             id="stock-product-image"
             type="file"
@@ -604,9 +597,6 @@ function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductFor
               setImageFile(file);
             }}
           />
-        </label>
-        <p id="stock-product-image-help" className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">La photo sera enregistrée avec l’article.</p>
-        {imageError && <p id="stock-product-image-error" role="alert" className="mt-1 text-xs text-[hsl(var(--destructive))]">{imageError}</p>}
       </div>
       <Input label="Prix d’achat (FCFA)" type="number" value={String(form.purchasePrice)} onChange={value => update('purchasePrice', Number(value))} />
       <Input label="Prix de vente (FCFA)" type="number" value={String(form.salePrice)} onChange={value => update('salePrice', Number(value))} />
