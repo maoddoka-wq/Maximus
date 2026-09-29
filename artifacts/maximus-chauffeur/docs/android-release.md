@@ -17,4 +17,4 @@ Conserver le même keystore pour toutes les versions. Le remplacer empêche Andr
 
 Le service Laravel utilise `MAXIMUS_GITHUB_READ_TOKEN` pour lire et télécharger les releases du dépôt configuré par `MAXIMUS_GITHUB_RELEASE_REPOSITORY` (par défaut `maoddoka-wq/Maximus`). Ajouter un jeton en lecture seule limité à ce dépôt dans l’environnement Render du service API. Ne pas placer ce jeton dans l’application mobile ou dans GitHub Actions.
 
-Après configuration des secrets, créer puis pousser un tag `chauffeur-vMAJOR.MINOR.PATCH`, par exemple `chauffeur-v1.0.5`. GitHub Actions construit et publie l’APK; Render peut ensuite le servir aux chauffeurs authentifiés.
+Après configuration des secrets, créer puis pousser un tag `chauffeur-vMAJOR.MINOR.PATCH`. GitHub Actions construit et publie l’APK; Render peut ensuite le servir aux chauffeurs authentifiés.
