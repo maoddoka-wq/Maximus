@@ -63,13 +63,20 @@ class StockController extends Controller
         if (! $this->allowed($request, 'create', 'products')) {
             return $this->forbidden();
         }
-        $input = $this->productInput($request);
+        $input = $this->normalizeProductInput($this->productInput($request));
         $company = $this->company($request);
         if (! empty($input['supplierId']) && ! $this->activeResourceExists('stock_suppliers', $input['supplierId'], $company)) {
             return $this->notFound('Fournisseur introuvable');
         }
         $row = array_merge($this->productDefaults($company), $this->snake($input));
         $row['id'] = $this->id('product');
+        $image = $this->uploadedProductImage($request);
+        if ($image instanceof JsonResponse) {
+            return $image;
+        }
+        if ($image !== null) {
+            $row = array_merge($row, $image, ['image_url' => $this->productImageUrl($row['id'])]);
+        }
         $row['created_at'] = now();
         $row['updated_at'] = now();
         DB::table('stock_products')->insert($row);
@@ -82,7 +89,7 @@ class StockController extends Controller
         if (! $this->allowed($request, 'modify', 'products')) {
             return $this->forbidden();
         }
-        $input = $this->productInput($request, true);
+        $input = $this->normalizeProductInput($this->productInput($request, true));
         $row = DB::table('stock_products')->where('id', $id)->where('company_id', $this->company($request))->first();
         if (! $row) {
             return $this->notFound('Produit introuvable');
@@ -92,10 +99,43 @@ class StockController extends Controller
             && ! $this->activeResourceExists('stock_suppliers', $input['supplierId'], $this->company($request))) {
             return $this->notFound('Fournisseur introuvable');
         }
+        $image = $this->uploadedProductImage($request);
+        if ($image instanceof JsonResponse) {
+            return $image;
+        }
+        if ($image !== null) {
+            $changes = array_merge($changes, $image, ['image_url' => $this->productImageUrl($id)]);
+        }
         $changes['updated_at'] = now();
         DB::table('stock_products')->where('id', $id)->update($changes);
 
         return response()->json($this->product(DB::table('stock_products')->where('id', $id)->first()));
+    }
+
+    public function productImage(Request $request, string $id)
+    {
+        if (! $this->allowed($request, 'view', 'products')) {
+            return $this->forbidden();
+        }
+
+        $product = DB::table('stock_products')
+            ->where('id', $id)
+            ->where('company_id', $this->company($request))
+            ->first(['image_data', 'image_mime']);
+        if (! $product || ! is_string($product->image_data) || $product->image_data === '') {
+            return $this->notFound('Image introuvable');
+        }
+
+        $contents = base64_decode($product->image_data, true);
+        if (! is_string($contents) || $contents === '') {
+            return $this->notFound('Image introuvable');
+        }
+
+        return response($contents, 200, [
+            'Content-Type' => is_string($product->image_mime) && $product->image_mime !== '' ? $product->image_mime : 'application/octet-stream',
+            'Cache-Control' => 'private, no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function archiveProduct(Request $request, string $id): JsonResponse
@@ -496,6 +536,56 @@ class StockController extends Controller
         return $this->validated($request, [
             'name' => array_merge($required, ['string', 'min:1']), 'category' => ['nullable', 'string'], 'subcategory' => ['nullable', 'string'], 'brand' => ['nullable', 'string'], 'sku' => array_merge($required, ['string', 'min:1']), 'barcode' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'unit' => ['nullable', 'string'], 'purchasePrice' => ['nullable', 'integer', 'min:0'], 'salePrice' => ['nullable', 'integer', 'min:0'], 'minStock' => ['nullable', 'integer', 'min:0'], 'maxStock' => ['nullable', 'integer', 'min:0'], 'supplierId' => ['nullable', 'string'], 'description' => ['nullable', 'string'],
         ]);
+    }
+
+    private function normalizeProductInput(array $input): array
+    {
+        $defaults = [
+            'category' => 'Divers',
+            'subcategory' => '',
+            'brand' => '',
+            'barcode' => '',
+            'imageUrl' => '',
+            'unit' => 'unité',
+            'description' => '',
+        ];
+        foreach ($defaults as $key => $default) {
+            if (array_key_exists($key, $input) && $input[$key] === null) {
+                $input[$key] = $default;
+            }
+        }
+
+        return $input;
+    }
+
+    private function uploadedProductImage(Request $request): array|JsonResponse|null
+    {
+        if (! $request->hasFile('image')) {
+            if ($request->input('_imageUploadExpected') === '1') {
+                return response()->json(['error' => 'La photo est trop volumineuse ou n’a pas pu être reçue. La limite est de 1,8 Mo.'], 422);
+            }
+
+            return null;
+        }
+
+        $input = $this->validated($request, [
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:1800'],
+        ]);
+        $file = $input['image'];
+        $contents = $file->get();
+        if (! is_string($contents) || $contents === '') {
+            return response()->json(['error' => 'La photo n’a pas pu être lue après son envoi.'], 500);
+        }
+
+        return [
+            'image_data' => base64_encode($contents),
+            'image_mime' => $file->getMimeType() ?: 'application/octet-stream',
+        ];
+    }
+
+    private function productImageUrl(string $id): string
+    {
+        return '/api/stock/products/'.rawurlencode($id).'/image';
     }
 
     private function supplierInput(Request $request, bool $partial = false): array

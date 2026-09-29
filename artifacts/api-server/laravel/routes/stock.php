@@ -7,6 +7,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:stocks'])-
     Route::get('/bootstrap', [StockController::class, 'bootstrap']);
     Route::post('/products', [StockController::class, 'createProduct']);
     Route::patch('/products/{id}', [StockController::class, 'updateProduct']);
+    Route::get('/products/{id}/image', [StockController::class, 'productImage']);
     Route::delete('/products/{id}', [StockController::class, 'archiveProduct']);
     Route::post('/suppliers', [StockController::class, 'createSupplier']);
     Route::patch('/suppliers/{id}', [StockController::class, 'updateSupplier']);

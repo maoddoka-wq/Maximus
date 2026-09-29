@@ -6,6 +6,7 @@ use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use App\Support\ModuleAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -85,6 +86,64 @@ class StockTest extends TestCase
         $this->assertDatabaseHas('stock_audit_logs', [
             'user_name' => 'Gestionnaire Stock',
         ]);
+    }
+
+    public function test_stock_product_image_upload_is_saved_and_served_from_the_company_scoped_route(): void
+    {
+        $request = $this->asActor();
+        $product = $request->post('/api/stock/products', [
+            'name' => 'Article avec photo',
+            'sku' => 'PHOTO-001',
+            'image' => UploadedFile::fake()->image('article.png', 24, 24),
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $productId = $product->json('id');
+        $imageUrl = '/api/stock/products/'.$productId.'/image';
+        $product->assertJsonPath('imageUrl', $imageUrl);
+        $this->assertNotEmpty(DB::table('stock_products')->where('id', $productId)->value('image_data'));
+        $this->assertSame('image/png', DB::table('stock_products')->where('id', $productId)->value('image_mime'));
+
+        $request->get($imageUrl)
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+        $request->post('/api/stock/products/'.$productId, [
+            '_method' => 'PATCH',
+            'brand' => 'Photo mise à jour',
+            'image' => UploadedFile::fake()->image('article-modifie.png', 32, 32),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('brand', 'Photo mise à jour')
+            ->assertJsonPath('imageUrl', $imageUrl);
+        $this->assertNotEmpty(DB::table('stock_products')->where('id', $productId)->value('image_data'));
+    }
+
+    public function test_stock_product_rejects_non_image_uploads(): void
+    {
+        $this->asActor()
+            ->post('/api/stock/products', [
+                'name' => 'Fichier interdit',
+                'sku' => 'PHOTO-INVALID',
+                'image' => UploadedFile::fake()->create('document.txt', 1, 'text/plain'),
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseMissing('stock_products', ['sku' => 'PHOTO-INVALID']);
+    }
+
+    public function test_stock_product_rejects_images_above_the_upload_limit(): void
+    {
+        $this->asActor()
+            ->post('/api/stock/products', [
+                'name' => 'Photo trop volumineuse',
+                'sku' => 'PHOTO-TOO-LARGE',
+                '_imageUploadExpected' => '1',
+                'image' => UploadedFile::fake()->image('article.png', 24, 24)->size(1801),
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseMissing('stock_products', ['sku' => 'PHOTO-TOO-LARGE']);
     }
 
     public function test_inventory_validation_applies_only_the_difference(): void

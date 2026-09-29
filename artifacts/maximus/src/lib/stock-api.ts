@@ -41,11 +41,32 @@ export interface StockInventoryLine { id: string; inventoryId: string; productId
 export interface StockBootstrap { products: StockProduct[]; warehouses: StockWarehouse[]; locations: StockLocation[]; suppliers: StockSupplier[]; balances: StockBalance[]; movements: StockMovement[]; requests: StockRequest[]; inventories: StockInventory[]; inventoryLines: StockInventoryLine[]; }
 export type StockBootstrapScope = 'all' | 'core' | 'operations' | 'inventory';
 
+type StockProductInput = Omit<StockProduct, 'id' | 'companyId' | 'archived'> & { imageFile?: File | null };
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return requestJson<T>(path, init, { fallbackMessage: 'Une erreur est survenue.' });
 }
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
+const productRequest = (method: 'POST' | 'PATCH', body: Partial<StockProduct> & { imageFile?: File | null }): RequestInit => {
+  const { imageFile, ...fields } = body;
+  if (!imageFile) {
+    return { method, body: JSON.stringify(fields), headers: { 'Content-Type': 'application/json' } };
+  }
+
+  const formData = new FormData();
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value === undefined) return;
+    formData.append(key, value === null ? '' : String(value));
+  });
+  formData.append('_imageUploadExpected', '1');
+  formData.append('image', imageFile);
+  if (method === 'PATCH') {
+    formData.append('_method', 'PATCH');
+    return { method: 'POST', body: formData };
+  }
+  return { method: 'POST', body: formData };
+};
 
 export type StockApi = ReturnType<typeof createStockApi>;
 
@@ -53,8 +74,8 @@ export const createStockApi = (companyId: string) => {
   const withCompany = (path: string) => `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
   return {
     bootstrap: (scope: StockBootstrapScope = 'all') => request<Partial<StockBootstrap>>(withCompany(`/stock/bootstrap?scope=${scope}`)),
-    createProduct: (body: Omit<StockProduct, 'id' | 'companyId' | 'archived'>) => request<StockProduct>(withCompany('/stock/products'), json(body)),
-    updateProduct: (id: string, body: Partial<StockProduct>) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+    createProduct: (body: StockProductInput) => request<StockProduct>(withCompany('/stock/products'), productRequest('POST', body)),
+    updateProduct: (id: string, body: Partial<StockProduct> & { imageFile?: File | null }) => request<StockProduct>(withCompany(`/stock/products/${id}`), productRequest('PATCH', body)),
     archiveProduct: (id: string) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'DELETE' }),
     createWarehouse: (body: { name: string; manager: string; address: string }) => request<StockWarehouse>(withCompany('/stock/warehouses'), json(body)),
     updateWarehouse: (id: string, body: Partial<StockWarehouse>) => request<StockWarehouse>(withCompany(`/stock/warehouses/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
