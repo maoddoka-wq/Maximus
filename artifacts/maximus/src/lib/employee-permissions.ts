@@ -392,9 +392,7 @@ export function getSelectedFeatureIds(
   if (explicitFeatureIds) {
     const selected = normalizeModuleFeatureIds(module, explicitFeatureIds)
       .filter(featureId => validFeatureIds.has(featureId));
-    return packFeatureIds
-      ? new Set(selected.filter(featureId => packFeatureIds.has(featureId)))
-      : new Set(selected);
+    return new Set(selected);
   }
   if (packFeatureIds) {
     return packFeatureIds;
