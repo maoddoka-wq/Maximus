@@ -44,7 +44,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           version="${GITHUB_REF_NAME#chauffeur-v}"
@@ -53,7 +53,7 @@ jobs:
             exit 1
           fi
 
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD; do
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_STORE_PASSWORD ANDROID_KEY_PASSWORD; do
             if [[ -z "${!name}" ]]; then
               echo "Required GitHub Actions secret is missing: $name"
               exit 1
@@ -72,11 +72,20 @@ jobs:
           const fs = require('node:fs');
           const path = 'app.json';
           const config = JSON.parse(fs.readFileSync(path, 'utf8'));
-          const versionCode = Number(process.env.GITHUB_RUN_NUMBER);
-          if (!Number.isSafeInteger(versionCode) || versionCode < 1) {
-            throw new Error('GitHub Actions provided an invalid Android version code.');
+          const releaseVersion = process.env.RELEASE_VERSION;
+          const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(releaseVersion ?? '');
+          if (!match) {
+            throw new Error('Release version must use MAJOR.MINOR.PATCH without leading zeroes.');
           }
-          config.expo.version = process.env.RELEASE_VERSION;
+          const [major, minor, patch] = match.slice(1).map(Number);
+          if (major > 2000 || minor > 999 || patch > 999) {
+            throw new Error('Release version exceeds Android versionCode limits.');
+          }
+          const versionCode = major * 1_000_000 + minor * 1_000 + patch;
+          if (!Number.isSafeInteger(versionCode) || versionCode < 1) {
+            throw new Error('Release version produced an invalid Android version code.');
+          }
+          config.expo.version = releaseVersion;
           config.expo.android.versionCode = versionCode;
           fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
           NODE
@@ -96,7 +105,7 @@ jobs:
           releaseDirectory: artifacts/maximus-chauffeur/android/app/build/outputs/apk/release
           signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           alias: ${{ secrets.ANDROID_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyStorePassword: ${{ secrets.ANDROID_STORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Name the APK asset
