@@ -13,7 +13,6 @@ type TaxiRouteMapProps = {
   routeGeometry?: GeoJsonLineString | null;
   pickupRouteGeometry?: GeoJsonLineString | null;
   displayMode?: 'trip' | 'location';
-  showClientStopMarker?: boolean;
   className?: string;
 };
 
@@ -76,7 +75,6 @@ export function TaxiRouteMap({
   routeGeometry,
   pickupRouteGeometry,
   displayMode = 'trip',
-  showClientStopMarker = true,
   className = 'h-64',
 }: TaxiRouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -148,27 +146,23 @@ export function TaxiRouteMap({
     if (routeGeometry) addRoute(layers, bounds, routeGeometry, '#f59e0b');
     if (driver) addMarker(layers, bounds, driver, driverIcon, 'Position du taxi');
     if (clientStop) {
-      if (showClientStopMarker) {
-        addMarker(
-          layers,
-          bounds,
-          clientStop,
-          displayMode === 'location' ? currentLocationIcon : clientStopIcon,
-          displayMode === 'location' ? 'Position GPS exacte du client' : 'Arrêt du client',
-        );
-      } else {
-        bounds.extend([clientStop.latitude, clientStop.longitude]);
-      }
+      addMarker(
+        layers,
+        bounds,
+        clientStop,
+        displayMode === 'location' ? currentLocationIcon : clientStopIcon,
+        displayMode === 'location' ? 'Position GPS exacte du client' : 'Arrêt du client',
+      );
     }
     if (destination) addMarker(layers, bounds, destination, destinationIcon, 'Destination');
 
-    const viewportKey = JSON.stringify({ clientStop, destination, routeGeometry, pickupRouteGeometry, displayMode, showClientStopMarker });
+    const viewportKey = JSON.stringify({ clientStop, destination, routeGeometry, pickupRouteGeometry, displayMode });
     if (bounds.isValid() && viewportKeyRef.current !== viewportKey) {
       viewportBoundsRef.current = bounds;
       map.fitBounds(bounds.pad(0.12), { maxZoom: 16, animate: true });
       viewportKeyRef.current = viewportKey;
     }
-  }, [clientStop, destination, displayMode, driver, mapReady, pickupRouteGeometry, routeGeometry, showClientStopMarker]);
+  }, [clientStop, destination, displayMode, driver, mapReady, pickupRouteGeometry, routeGeometry]);
 
   const recenter = () => {
     const map = mapRef.current;
@@ -196,10 +190,10 @@ export function TaxiRouteMap({
        <div key={expanded ? 'expanded-map' : 'inline-map'} ref={containerRef} className={`w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm ${expanded ? 'h-full min-h-[20rem]' : className}`} aria-label={displayMode === 'location' ? 'Carte montrant votre position GPS exacte' : 'Carte du trajet Taxi'} />
        {!expanded && <div className="absolute right-3 top-3 flex items-center gap-1.5"><button type="button" onClick={recenter} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white/95 text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Recentrer la carte"><LocateFixed size={15} /></button><button type="button" onClick={() => setExpanded(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] font-black text-slate-800 shadow-md backdrop-blur hover:bg-white" aria-label="Agrandir la carte"><Maximize2 size={14} />Agrandir</button></div>}
     </div>
-      {displayMode !== 'location' && <div className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600 ${expanded ? 'rounded-xl bg-white px-3 py-2.5 shadow-lg' : ''}`}>
+     {displayMode !== 'location' && <div className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-600 ${expanded ? 'rounded-xl bg-white px-3 py-2.5 shadow-lg' : ''}`}>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-600 ring-2 ring-sky-100" />Taxi → arrêt client</span>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-amber-100" />Arrêt → destination</span>
-       {showClientStopMarker && <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-red-100" />Arrêt client</span>}
+      <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-red-100" />Arrêt client</span>
      </div>}
   </div>;
 }

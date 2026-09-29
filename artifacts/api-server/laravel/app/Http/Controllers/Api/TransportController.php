@@ -256,18 +256,15 @@ class TransportController extends Controller
 
     public function updateDriverLocation(Request $request, string $id): JsonResponse
     {
-        $company = $this->company($request);
-        $actor = $request->attributes->get('authActor');
-        $canUpdateOwnDriver = $this->mayUpdateOwnDriverThroughTrips($request, $company, $id);
-        if (! $this->allowed($request, 'modify', 'drivers') && ! $canUpdateOwnDriver) {
+        if (! $this->allowed($request, 'modify', 'drivers')) {
             return $this->forbidden();
         }
 
         $input = $this->validated($request, [
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'between:0,100'],
         ]);
+        $company = $this->company($request);
         if (! $this->isWithinDakar((float) $input['latitude'], (float) $input['longitude'])) {
             return response()->json(['error' => 'La position GPS doit se trouver dans la zone de Dakar.'], 422);
         }
@@ -279,6 +276,7 @@ class TransportController extends Controller
             return response()->json(['error' => 'Chauffeur introuvable.'], 404);
         }
 
+        $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'employee' && ($driver->employee_id ?? null) !== ($actor['employeeId'] ?? null)) {
             return response()->json(['error' => 'Vous ne pouvez mettre à jour que votre propre position.'], 403);
         }
@@ -298,16 +296,14 @@ class TransportController extends Controller
 
     public function updateDriverAvailability(Request $request, string $id): JsonResponse
     {
-        $company = $this->company($request);
-        $actor = $request->attributes->get('authActor');
-        $canUpdateOwnDriver = $this->mayUpdateOwnDriverThroughTrips($request, $company, $id);
-        if (! $this->allowed($request, 'modify', 'drivers') && ! $canUpdateOwnDriver) {
+        if (! $this->allowed($request, 'modify', 'drivers')) {
             return $this->forbidden();
         }
 
         $input = $this->validated($request, [
             'availability' => ['required', Rule::in(['AVAILABLE', 'PAUSED'])],
         ]);
+        $company = $this->company($request);
         $driver = DB::table('transport_drivers')
             ->where('company_id', $company)
             ->where('id', $id)
@@ -316,6 +312,7 @@ class TransportController extends Controller
             return response()->json(['error' => 'Chauffeur introuvable.'], 404);
         }
 
+        $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'employee' && ($driver->employee_id ?? null) !== ($actor['employeeId'] ?? null)) {
             return response()->json(['error' => 'Vous ne pouvez modifier que votre propre disponibilité.'], 403);
         }
@@ -1574,15 +1571,11 @@ class TransportController extends Controller
     private function publicTrip(object $row, ?object $driver, ?object $vehicle, ?string $vehicleImageUrl = null): array
     {
         $trip = $this->trip($row, $driver);
-        $driverGpsFresh = $driver !== null && $this->driverHasFreshGps($driver, (string) $row->company_id);
         return [
             ...$trip,
             'pickupCode' => $row->pickup_code ?? null,
-            'pickupRouteDistanceKm' => $driverGpsFresh ? $trip['pickupRouteDistanceKm'] : null,
-            'pickupEtaMinutes' => $driverGpsFresh ? $trip['pickupEtaMinutes'] : null,
-            'pickupRouteGeometry' => $driverGpsFresh ? $trip['pickupRouteGeometry'] : null,
-            'driverLatitude' => $driverGpsFresh && $driver?->latitude !== null ? (float) $driver->latitude : null,
-            'driverLongitude' => $driverGpsFresh && $driver?->longitude !== null ? (float) $driver->longitude : null,
+            'driverLatitude' => $driver?->latitude === null ? null : (float) $driver->latitude,
+            'driverLongitude' => $driver?->longitude === null ? null : (float) $driver->longitude,
             'vehicleModel' => $vehicle?->model,
             'vehicleRegistration' => $vehicle?->registration,
             'vehicleType' => $vehicle?->vehicle_type,
@@ -1899,7 +1892,7 @@ class TransportController extends Controller
                 ? 'Le chauffeur le plus proche a reçu votre demande. Il doit la valider pour démarrer la course.'
                 : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.');
         if ($response['routePending']) {
-            $message .= ' L’itinéraire sera finalisé dès que le service cartographique répondra.';
+            $message .= ' Le tarif et l’itinéraire seront finalisés dès que le service cartographique répondra.';
         }
 
         return response()->json([
@@ -2456,8 +2449,7 @@ class TransportController extends Controller
         $updatedAt = \Illuminate\Support\Carbon::parse($driver->location_updated_at);
         $validityMinutes = $this->transportSettings($company)['gpsValidityMinutes'];
 
-        return $updatedAt->greaterThanOrEqualTo(now()->subMinutes($validityMinutes))
-            && $updatedAt->lessThanOrEqualTo(now()->addSeconds(30));
+        return $updatedAt->greaterThanOrEqualTo(now()->subMinutes($validityMinutes));
     }
 
     private function transportColor(array $settings, string $key): string
@@ -2556,25 +2548,6 @@ class TransportController extends Controller
         $actor = $request->attributes->get('authActor');
 
         return is_array($actor) && ModuleAuthorization::allows($actor, 'transport', $action, $feature);
-    }
-
-    private function mayUpdateOwnDriverThroughTrips(Request $request, string $company, string $driverId): bool
-    {
-        $actor = $request->attributes->get('authActor');
-        if (
-            ! is_array($actor)
-            || ($actor['role'] ?? null) !== 'employee'
-            || empty($actor['employeeId'])
-            || ! $this->allowed($request, 'modify', 'trips')
-        ) {
-            return false;
-        }
-
-        return DB::table('transport_drivers')
-            ->where('company_id', $company)
-            ->where('id', $driverId)
-            ->where('employee_id', $actor['employeeId'])
-            ->exists();
     }
 
     private function forbidden(): JsonResponse

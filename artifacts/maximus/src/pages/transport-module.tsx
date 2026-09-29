@@ -52,13 +52,6 @@ import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
-import {
-  createTransportGpsTimeout,
-  isNewerTransportGpsSample,
-  isRecentTransportGpsSample,
-  isTransportGpsAccuracyAcceptable,
-  TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS,
-} from '@/lib/transport-gps-quality';
 import { useQueryTab } from '@/lib/query-tab';
 import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
 
@@ -130,10 +123,8 @@ const isWithinDakar = (latitude: number, longitude: number) =>
 const isDriverGpsFresh = (locationUpdatedAt: string | null | undefined, validityMinutes: number) => {
   if (!locationUpdatedAt) return false;
   const updatedAt = Date.parse(locationUpdatedAt);
-  const age = Date.now() - updatedAt;
   return Number.isFinite(updatedAt)
-    && age >= -30_000
-    && age <= Math.max(1, validityMinutes) * 60_000;
+    && Date.now() - updatedAt <= Math.max(1, validityMinutes) * 60_000;
 };
 
 const driverGpsAgeLabel = (locationUpdatedAt: string | null | undefined) => {
@@ -257,11 +248,6 @@ export default function TransportModulePage({
   const canModifyDrivers = featurePermissions
     ? Boolean(featurePermissions.drivers?.canModify)
     : canModify;
-  const canControlCurrentDriver = canModifyDrivers || Boolean(
-    currentEmployeeId
-    && currentDriver?.employeeId === currentEmployeeId
-    && canModifyTrips,
-  );
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
   const canModifyVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canModify) : canModify;
   const canModifySettings = featurePermissions ? Boolean(featurePermissions.parametres?.canModify) : canModify;
@@ -311,14 +297,14 @@ export default function TransportModulePage({
 
   useEffect(() => {
     const shouldTrack = !preview
-      && Boolean(currentEmployeeId && currentDriverId && currentDriver?.status === 'ACTIVE' && canControlCurrentDriver);
+      && Boolean(currentEmployeeId && currentDriverId && currentDriver?.status === 'ACTIVE' && canModifyDrivers);
     setLocationError('');
     setLocationActive(false);
     setLocationRequested(shouldTrack);
-  }, [canControlCurrentDriver, currentDriver?.status, currentDriverId, currentEmployeeId, preview]);
+  }, [canModifyDrivers, currentDriver?.status, currentDriverId, currentEmployeeId, preview]);
 
   useEffect(() => {
-    if (preview || !locationRequested || !currentDriverId || !canControlCurrentDriver || !navigator.geolocation) {
+    if (preview || !locationRequested || !currentDriverId || !canModifyDrivers || !navigator.geolocation) {
       setLocationActive(false);
       if (!preview && locationRequested && !navigator.geolocation) {
         setLocationError('Ce navigateur ne prend pas en charge la géolocalisation.');
@@ -326,167 +312,58 @@ export default function TransportModulePage({
       return undefined;
     }
     let disposed = false;
-    const gpsSearchStartedAt = Date.now();
-    type GpsSample = {
-      latitude: number;
-      longitude: number;
-      accuracy: number;
-      timestamp: number;
-    };
-    let lastObservedTimestamp: number | null = null;
-    let lastServerLocationAt = 0;
-    let pendingSample: GpsSample | null = null;
-    let sendingLocation = false;
-    let nextPositionRequestId = 0;
-    let activePositionRequestId: number | null = null;
-    let trackingStopped = false;
-    let lastGpsAcquisitionIssue = '';
-    let gpsTimeout: ReturnType<typeof createTransportGpsTimeout> | undefined;
-    const stopLocationTracking = (message: string) => {
-      if (disposed || trackingStopped) return;
-      trackingStopped = true;
-      gpsTimeout?.cancel();
-      setLocationActive(false);
-      setLocationError(message);
-      setLocationRequested(false);
-    };
-    gpsTimeout = createTransportGpsTimeout(() => {
-      stopLocationTracking(lastGpsAcquisitionIssue
-        || 'Aucune position GPS utilisable reçue en une minute. Vérifiez l’autorisation et la localisation précise du navigateur, puis réessayez.');
-    });
-    const geolocationOptions: PositionOptions = {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS,
-    };
-
-    const flushLocationQueue = async () => {
-      if (sendingLocation || disposed || trackingStopped) return;
-      sendingLocation = true;
-      try {
-        while (!disposed && !trackingStopped && pendingSample) {
-          const sample = pendingSample;
-          pendingSample = null;
-          try {
-            const driver = await api.updateDriverLocation(currentDriverId, sample);
-            if (disposed || trackingStopped || sample.timestamp !== lastObservedTimestamp) continue;
-            lastServerLocationAt = Date.now();
-            gpsTimeout?.reset();
-            setData(current => current ? {
-              ...current,
-              drivers: current.drivers.map(item => item.id === driver.id ? driver : item),
-            } : current);
-            setLocationActive(true);
-            setLocationError('');
-          } catch (cause) {
-            if (disposed || trackingStopped || sample.timestamp !== lastObservedTimestamp) continue;
-            setLocationActive(false);
-            setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
-          }
-        }
-      } finally {
-        sendingLocation = false;
-        if (!disposed && !trackingStopped && pendingSample) void flushLocationQueue();
-      }
-    };
-
-    const sendLocation = (sample: GpsSample) => {
-      if (disposed || trackingStopped || !isNewerTransportGpsSample(lastObservedTimestamp, sample.timestamp)) return;
-      lastObservedTimestamp = sample.timestamp;
-      if (!isRecentTransportGpsSample(sample.timestamp)) {
-        lastGpsAcquisitionIssue = 'Le téléphone renvoie une ancienne position GPS. Activez la localisation précise du navigateur, puis réessayez.';
-        setLocationError(lastGpsAcquisitionIssue);
-        if (Date.now() - gpsSearchStartedAt >= TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) {
-          stopLocationTracking(lastGpsAcquisitionIssue);
-        }
+    const sendLocation = (coords: { latitude: number; longitude: number }) => {
+      if (disposed || !isWithinDakar(coords.latitude, coords.longitude)) {
+        setLocationActive(false);
+        setLocationError('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
         return;
       }
-      if (!isTransportGpsAccuracyAcceptable(sample.accuracy)) {
-        lastGpsAcquisitionIssue = `Signal GPS trop imprécis (${Math.round(sample.accuracy)} m). Autorisez la position précise pour ce navigateur, puis réessayez.`;
-        setLocationError(lastGpsAcquisitionIssue);
-        if (Date.now() - gpsSearchStartedAt >= TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) {
-          stopLocationTracking(lastGpsAcquisitionIssue);
-        }
-        return;
-      }
-      lastGpsAcquisitionIssue = '';
-      setLocationError('');
-      if (!isWithinDakar(sample.latitude, sample.longitude)) {
-        stopLocationTracking('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
-        return;
-      }
-      pendingSample = sample;
-      void flushLocationQueue();
+      void api.updateDriverLocation(currentDriverId, coords).then(driver => {
+        if (disposed) return;
+        setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
+        setLocationActive(true);
+        setLocationError('');
+      }).catch(cause => {
+        if (disposed) return;
+        setLocationActive(false);
+        setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
+      });
     };
-
-    const handlePosition = (position: GeolocationPosition) => sendLocation({
-      timestamp: position.timestamp,
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-    });
-    const handlePositionError = ({ code }: GeolocationPositionError) => {
-      if (disposed) return;
-      if (code === 1) {
-        stopLocationTracking('Autorisez la localisation précise pour ce site dans les réglages du navigateur, puis réessayez.');
-        return;
-      }
-      lastGpsAcquisitionIssue = code === 3
-        ? 'Le GPS met du temps à répondre. Vérifiez que la position précise est autorisée pour le navigateur.'
-        : 'Le téléphone ne renvoie pas de position. Vérifiez la localisation précise et l’autorisation du navigateur.';
-      setLocationError(lastGpsAcquisitionIssue);
-      if (Date.now() - lastServerLocationAt >= trackingIntervalSeconds * 3_000
-        && Date.now() - gpsSearchStartedAt >= TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) {
-        stopLocationTracking(lastGpsAcquisitionIssue);
-      }
-    };
-    const requestCurrentPosition = (force = false) => {
-      if (
-        disposed
-        || document.visibilityState !== 'visible'
-        || (activePositionRequestId !== null && !force)
-      ) return;
-      const requestId = ++nextPositionRequestId;
-      activePositionRequestId = requestId;
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          if (disposed || activePositionRequestId !== requestId) return;
-          activePositionRequestId = null;
-          handlePosition(position);
-        },
-        error => {
-          if (disposed || activePositionRequestId !== requestId) return;
-          activePositionRequestId = null;
-          handlePositionError(error);
-        },
-        geolocationOptions,
-      );
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') requestCurrentPosition(true);
-    };
-    const handleFocus = () => requestCurrentPosition(true);
-
     const watchId = navigator.geolocation.watchPosition(
-      handlePosition,
-      handlePositionError,
-      geolocationOptions,
+      ({ coords }) => {
+        sendLocation({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+      },
+      ({ code }) => {
+        setLocationActive(false);
+        setLocationError(code === 1
+          ? 'Autorisez la localisation pour être proposé aux clients proches.'
+          : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
     );
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('pageshow', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    requestCurrentPosition();
-    const refreshId = window.setInterval(requestCurrentPosition, trackingIntervalSeconds * 1000);
+    const refreshId = window.setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          sendLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        },
+        () => {
+          if (!disposed) {
+            setLocationActive(false);
+            setLocationError('Aucune nouvelle position GPS fiable n’a été reçue.');
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
+      );
+    }, trackingIntervalSeconds * 1000);
     return () => {
       disposed = true;
-      gpsTimeout.cancel();
       navigator.geolocation.clearWatch(watchId);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('pageshow', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.clearInterval(refreshId);
     };
-  }, [api, canControlCurrentDriver, currentDriverId, locationAttempt, locationRequested, preview, trackingIntervalSeconds]);
+  }, [api, canModifyDrivers, currentDriverId, locationAttempt, locationRequested, preview, trackingIntervalSeconds]);
 
   const activateDriverGps = () => {
     setLocationError('');
@@ -609,7 +486,6 @@ export default function TransportModulePage({
     if (status === trip.status || !canModifyTrips) return;
     if (preview) {
       setData(current => current ? { ...current, trips: current.trips.map(item => item.id === trip.id ? { ...item, status } : item) } : current);
-      if (status === 'ASSIGNED') setTab('trips');
       showAppToast('Statut de la course mis à jour.', 'success');
       return;
     }
@@ -642,7 +518,6 @@ export default function TransportModulePage({
               : current.metrics,
         };
       });
-      if (status === 'ASSIGNED') setTab('trips');
       showAppToast(status === 'ASSIGNED' ? 'Course validée. Vous pouvez rejoindre le client.' : 'Statut de la course mis à jour.', 'success');
       // La réponse de l’action est affichée sans attendre le bootstrap complet.
       // Le rafraîchissement complet réconcilie les autres indicateurs en arrière-plan.
@@ -765,7 +640,7 @@ export default function TransportModulePage({
         fresh={currentDriverGpsFresh}
         requested={locationRequested}
         error={locationError}
-        canControl={canControlCurrentDriver}
+        canControl={canModifyDrivers}
         preview={preview}
         gpsValidityMinutes={gpsValidityMinutes}
         pending={Boolean(pendingAction)}
@@ -783,10 +658,10 @@ export default function TransportModulePage({
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}
-        {canOperateTrips && tab === 'trips' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} gpsValidityMinutes={gpsValidityMinutes} />}
-          {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canControlCurrentDriver ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />}</>}
+        {canOperateTrips && tab === 'trips' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
+          {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />}</>}
         {tab === 'trips' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
-        {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canControlCurrentDriver ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
+          {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
         {tab === 'vehicles' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
         {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
@@ -844,77 +719,14 @@ function DriverRequestCard({ trip, vehicle, driver, pending, onAccept, onDecline
   return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {trip.routePending ? 'Tarif en cours de calcul' : money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p>{remainingSeconds !== null && <p className={`mt-2 text-xs font-black ${remainingSeconds <= 20 ? 'text-rose-700' : 'text-amber-700'}`}>Réponse requise dans {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}</p>}</div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onDecline(trip)} disabled={pending} className="inline-flex items-center justify-center rounded-xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-70">Refuser</button><button type="button" onClick={() => onAccept(trip)} disabled={pending} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm disabled:cursor-wait disabled:opacity-70">{pending ? <RefreshCw size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}{pending ? 'Validation…' : 'Valider la course'}</button></div></div></section>;
 }
 
-function DriverTripTracking({ trip, driver, vehicle, gpsValidityMinutes }: {
-  trip: Trip | null;
-  driver: Driver | null;
-  vehicle: Vehicle | null;
-  gpsValidityMinutes: number;
-}) {
+function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driver: Driver | null; vehicle: Vehicle | null }) {
   if (!trip) return null;
-
-  const hasPickupCoordinates = trip.pickupLatitude !== null
-    && trip.pickupLatitude !== undefined
-    && trip.pickupLongitude !== null
-    && trip.pickupLongitude !== undefined;
-  const hasDriverCoordinates = driver?.latitude !== null
-    && driver?.latitude !== undefined
-    && driver?.longitude !== null
-    && driver?.longitude !== undefined;
-  const freshDriver = driver
-    && hasDriverCoordinates
-    && isDriverGpsFresh(driver.locationUpdatedAt, gpsValidityMinutes)
-    ? driver
-    : null;
-  const driverPoint = freshDriver
-    ? { latitude: freshDriver.latitude!, longitude: freshDriver.longitude! }
-    : null;
-  const remainingDistance = driverPoint && hasPickupCoordinates
-    ? distanceInKm(driverPoint.latitude, driverPoint.longitude, trip.pickupLatitude!, trip.pickupLongitude!)
-    : null;
-  const visibleDistance = driverPoint && hasPickupCoordinates
-    ? trip.pickupRouteDistanceKm ?? remainingDistance ?? trip.matchedDistanceKm ?? null
-    : null;
-  const routeUrl = buildDriverNavigationUrl(trip, freshDriver);
-  const hasMapPoint = hasPickupCoordinates || Boolean(driverPoint);
-
-  return <section className="card-surface overflow-hidden p-5">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 items-start gap-3">
-        {vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover" />}
-        <div>
-          <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Guidage chauffeur</p>
-          <h2 className="mt-1 text-lg font-black">Rejoindre l’arrêt client</h2>
-          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p>
-          {visibleDistance !== null
-            ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p>
-            : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur et l’arrêt client sont géolocalisés</p>}
-          {driverPoint && trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined
-            && <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>}
-        </div>
-      </div>
-      <a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Lancer le guidage</a>
-    </div>
-
-    {hasMapPoint
-      ? <TaxiRouteMap
-          clientStop={hasPickupCoordinates ? { latitude: trip.pickupLatitude!, longitude: trip.pickupLongitude! } : null}
-          destination={hasPickupCoordinates && trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined
-            ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude }
-            : null}
-          driver={driverPoint}
-          routeGeometry={hasPickupCoordinates ? trip.routeGeometry : null}
-          pickupRouteGeometry={driverPoint ? trip.pickupRouteGeometry : null}
-          showClientStopMarker={false}
-          className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]"
-        />
-      : <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-900">
-          <p className="font-bold">Carte en attente d’une position GPS fiable</p>
-          <p className="mt-1">Le point de départ ou la position actuelle du chauffeur n’est pas disponible. Le guidage s’affichera dès qu’une coordonnée GPS valide sera reçue.</p>
-        </div>}
-    {!hasPickupCoordinates && <p className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs leading-5 text-amber-900">Cette course ne contient pas les coordonnées GPS de l’arrêt client. La carte ne peut pas calculer le trajet vers le client; faites corriger le point de départ avant de démarrer.</p>}
-    {!driverPoint && <p className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs leading-5 text-amber-900">La position actuelle du chauffeur est absente ou trop ancienne. La carte ne l’affichera pas comme une position en direct.</p>}
-    <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Itinéraire complet : la voiture rejoint l’arrêt client, puis le trajet continue jusqu’à la destination. GPS, distance et ETA actualisés automatiquement.</p>
-  </section>;
+  const remainingDistance = trip.pickupRouteDistanceKm ?? (trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined
+    ? distanceInKm(driver.latitude, driver.longitude, trip.pickupLatitude, trip.pickupLongitude)
+    : null);
+  const visibleDistance = remainingDistance ?? trip.matchedDistanceKm ?? null;
+  const routeUrl = buildDriverNavigationUrl(trip, driver);
+  return <section className="card-surface overflow-hidden p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Guidage chauffeur</p><h2 className="mt-1 text-lg font-black">Rejoindre l’arrêt client</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p>{visibleDistance !== null ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p> : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur est actif</p>}{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined && <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>}</div></div><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Lancer le guidage</a></div>{trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && <TaxiRouteMap clientStop={{ latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }} destination={trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude } : null} driver={driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined ? { latitude: driver.latitude, longitude: driver.longitude } : null} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]" />}<p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Itinéraire complet : la voiture rejoint l’arrêt client, puis le trajet continue jusqu’à la destination. GPS, distance et ETA actualisés automatiquement.</p></section>;
 }
 
 function distanceInKm(latitudeA: number, longitudeA: number, latitudeB: number, longitudeB: number): number {
@@ -1067,8 +879,8 @@ function DriverGpsStatus({
     ? 'Ce compte employé doit être lié à un profil chauffeur par un administrateur.'
     : driver.status !== 'ACTIVE'
       ? 'Le profil chauffeur est inactif. Contactez un administrateur pour rétablir son accès.'
-        : !canControl
-          ? 'Le compte doit pouvoir gérer ses courses ou recevoir le droit de modification des Chauffeurs pour partager sa position.'
+      : !canControl
+        ? 'Ce compte doit recevoir le droit de modification des Chauffeurs pour partager sa position.'
         : error
           ? error
           : active
@@ -1076,15 +888,9 @@ function DriverGpsStatus({
             : fresh
               ? 'La dernière position est récente, mais le suivi de cet appareil doit être réactivé.'
               : requested
-                ? 'La recherche peut prendre jusqu’à une minute. Autorisez la localisation précise pour ce navigateur et gardez cette page ouverte.'
+                ? 'Le navigateur attend une position GPS et son autorisation.'
                 : 'Activez la localisation pour recevoir des demandes de course.';
-  const canStartTracking = Boolean(
-    driver
-    && driver.status === 'ACTIVE'
-    && canControl
-    && !preview
-    && !active,
-  );
+  const canStartTracking = Boolean(driver && driver.status === 'ACTIVE' && canControl && !preview);
   const canMakeAvailable = preview || fresh;
 
   return <section
@@ -1106,24 +912,18 @@ function DriverGpsStatus({
       </div>
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-      {canStartTracking && <Button data-testid="button-retry-driver-gps" type="button" size="sm" onClick={onActivate} disabled={pending}>
-        <MapPin size={14} />{error ? 'Réessayer le GPS' : requested ? 'Relancer le GPS' : 'Activer le GPS'}
+      {canStartTracking && !active && <Button type="button" size="sm" onClick={onActivate} disabled={pending}>
+        <MapPin size={14} />{error ? 'Réessayer le GPS' : 'Activer le GPS'}
       </Button>}
       {driver && canControl && <div className="flex flex-wrap gap-2">
         <Button
-          data-testid="button-driver-availability"
           type="button"
           size="sm"
           variant={driver.availability === 'AVAILABLE' ? 'default' : 'outline'}
-          disabled={pending || driver.status !== 'ACTIVE' || driver.availability === 'ON_TRIP'}
-          title={!canMakeAvailable ? error || 'Une position GPS précise est nécessaire avant de vous rendre disponible.' : undefined}
-          onClick={() => canMakeAvailable
-            ? onAvailabilityChange('AVAILABLE')
-            : onActivate()}
+          disabled={pending || driver.status !== 'ACTIVE' || driver.availability === 'ON_TRIP' || !canMakeAvailable}
+          onClick={() => onAvailabilityChange('AVAILABLE')}
         >
-          {!canMakeAvailable
-            ? 'Trouver une position précise'
-            : driver.availability === 'AVAILABLE' ? 'Disponible' : 'Me rendre disponible'}
+          {driver.availability === 'AVAILABLE' ? 'Disponible' : 'Me rendre disponible'}
         </Button>
         <Button
           type="button"
