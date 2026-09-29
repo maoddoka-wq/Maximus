@@ -228,6 +228,7 @@ export default function TransportModulePage({
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [locationError, setLocationError] = useState('');
+  const [locationNotice, setLocationNotice] = useState('');
   const [locationActive, setLocationActive] = useState(false);
   const [locationRequested, setLocationRequested] = useState(false);
   const [locationAttempt, setLocationAttempt] = useState(0);
@@ -299,6 +300,7 @@ export default function TransportModulePage({
     const shouldTrack = !preview
       && Boolean(currentEmployeeId && currentDriverId && currentDriver?.status === 'ACTIVE' && canModifyDrivers);
     setLocationError('');
+    setLocationNotice('');
     setLocationActive(false);
     setLocationRequested(shouldTrack);
   }, [canModifyDrivers, currentDriver?.status, currentDriverId, currentEmployeeId, preview]);
@@ -312,9 +314,28 @@ export default function TransportModulePage({
       return undefined;
     }
     let disposed = false;
+    let positionRequestInFlight = false;
+    const requestPosition = () => {
+      if (disposed || positionRequestInFlight) return;
+      positionRequestInFlight = true;
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          positionRequestInFlight = false;
+          sendLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        },
+        () => {
+          positionRequestInFlight = false;
+          if (!disposed) {
+            setLocationNotice('Le navigateur retarde la prochaine lecture GPS. Une nouvelle tentative est en cours.');
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: trackingIntervalSeconds * 1000, timeout: 15_000 },
+      );
+    };
     const sendLocation = (coords: { latitude: number; longitude: number }) => {
       if (disposed || !isWithinDakar(coords.latitude, coords.longitude)) {
         setLocationActive(false);
+        setLocationNotice('');
         setLocationError('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
         return;
       }
@@ -323,9 +344,11 @@ export default function TransportModulePage({
         setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
         setLocationActive(true);
         setLocationError('');
+        setLocationNotice('');
       }).catch(cause => {
         if (disposed) return;
         setLocationActive(false);
+        setLocationNotice('');
         setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
       });
     };
@@ -337,36 +360,35 @@ export default function TransportModulePage({
         });
       },
       ({ code }) => {
-        setLocationActive(false);
-        setLocationError(code === 1
-          ? 'Autorisez la localisation pour être proposé aux clients proches.'
-          : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+        if (code === 1) {
+          setLocationActive(false);
+          setLocationNotice('');
+          setLocationError('Autorisez la localisation pour être proposé aux clients proches.');
+          return;
+        }
+        setLocationNotice('Le navigateur retarde la prochaine lecture GPS. Une nouvelle tentative est en cours.');
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
     );
-    const refreshId = window.setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          sendLocation({ latitude: coords.latitude, longitude: coords.longitude });
-        },
-        () => {
-          if (!disposed) {
-            setLocationActive(false);
-            setLocationError('Aucune nouvelle position GPS fiable n’a été reçue.');
-          }
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
-      );
-    }, trackingIntervalSeconds * 1000);
+    requestPosition();
+    const refreshId = window.setInterval(requestPosition, trackingIntervalSeconds * 1000);
+    const resumeTracking = () => {
+      if (document.visibilityState === 'visible') requestPosition();
+    };
+    document.addEventListener('visibilitychange', resumeTracking);
+    window.addEventListener('focus', resumeTracking);
     return () => {
       disposed = true;
       navigator.geolocation.clearWatch(watchId);
       window.clearInterval(refreshId);
+      document.removeEventListener('visibilitychange', resumeTracking);
+      window.removeEventListener('focus', resumeTracking);
     };
   }, [api, canModifyDrivers, currentDriverId, locationAttempt, locationRequested, preview, trackingIntervalSeconds]);
 
   const activateDriverGps = () => {
     setLocationError('');
+    setLocationNotice('');
     setLocationActive(false);
     setLocationRequested(true);
     setLocationAttempt(attempt => attempt + 1);
