@@ -56,6 +56,7 @@ import {
   isNewerTransportGpsSample,
   isRecentTransportGpsSample,
   isTransportGpsAccuracyAcceptable,
+  TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS,
 } from '@/lib/transport-gps-quality';
 import { useQueryTab } from '@/lib/query-tab';
 import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
@@ -324,6 +325,7 @@ export default function TransportModulePage({
       return undefined;
     }
     let disposed = false;
+    const gpsSearchStartedAt = Date.now();
     type GpsSample = {
       latitude: number;
       longitude: number;
@@ -339,7 +341,7 @@ export default function TransportModulePage({
     const geolocationOptions: PositionOptions = {
       enableHighAccuracy: true,
       maximumAge: 0,
-      timeout: 15_000,
+      timeout: TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS,
     };
 
     const flushLocationQueue = async () => {
@@ -375,11 +377,13 @@ export default function TransportModulePage({
       if (disposed || !isNewerTransportGpsSample(lastObservedTimestamp, sample.timestamp)) return;
       lastObservedTimestamp = sample.timestamp;
       if (!isRecentTransportGpsSample(sample.timestamp)) {
+        if (Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) return;
         setLocationActive(false);
         setLocationError('Le relevé GPS reçu est trop ancien. Attendez une nouvelle position.');
         return;
       }
       if (!isTransportGpsAccuracyAcceptable(sample.accuracy)) {
+        if (Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) return;
         setLocationActive(false);
         setLocationError(`Signal GPS trop imprécis (${Math.round(sample.accuracy)} m). Attendez une précision de 100 m ou mieux.`);
         return;
@@ -401,7 +405,10 @@ export default function TransportModulePage({
     });
     const handlePositionError = ({ code }: GeolocationPositionError) => {
       if (disposed) return;
-      if (code !== 1 && Date.now() - lastServerLocationAt < trackingIntervalSeconds * 3_000) return;
+      if (code !== 1 && (
+        Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS
+        || Date.now() - lastServerLocationAt < trackingIntervalSeconds * 3_000
+      )) return;
       if (code === 1) setLocationActive(false);
       setLocationError(code === 1
         ? 'Autorisez la localisation pour être proposé aux clients proches.'
@@ -1042,9 +1049,15 @@ function DriverGpsStatus({
             : fresh
               ? 'La dernière position est récente, mais le suivi de cet appareil doit être réactivé.'
               : requested
-                ? 'Le navigateur attend une position GPS et son autorisation.'
+                ? 'La recherche peut prendre jusqu’à une minute. Gardez cette page ouverte et vérifiez que la localisation du téléphone est activée.'
                 : 'Activez la localisation pour recevoir des demandes de course.';
-  const canStartTracking = Boolean(driver && driver.status === 'ACTIVE' && canControl && !preview);
+  const canStartTracking = Boolean(
+    driver
+    && driver.status === 'ACTIVE'
+    && canControl
+    && !preview
+    && (!requested || error),
+  );
   const canMakeAvailable = preview || fresh;
 
   return <section
