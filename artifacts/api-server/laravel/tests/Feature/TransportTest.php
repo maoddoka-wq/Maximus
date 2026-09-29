@@ -418,6 +418,56 @@ class TransportTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_employee_with_trip_permission_can_update_only_their_own_driver_gps_and_availability(): void
+    {
+        $admin = $this->asActor();
+        $employeeId = $this->createDriverEmployee('self-gps-driver');
+        $ownDriver = $admin->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employeeId,
+            'licenseNumber' => 'SN-SELF-GPS-001',
+        ])->assertCreated();
+        $otherDriver = $admin->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $this->createDriverEmployee('other-self-gps-driver'),
+            'licenseNumber' => 'SN-OTHER-GPS-001',
+        ])->assertCreated();
+
+        $employee = $this->asActor('employee', [
+            'transport:menu:trips' => ['voir', 'créer', 'modifier'],
+        ], $employeeId);
+
+        $employee->patchJson('/api/transport/drivers/'.$ownDriver->json('id').'/location?companyId=kora', [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+            'accuracy' => 20,
+        ])->assertOk();
+        $employee->patchJson('/api/transport/drivers/'.$ownDriver->json('id').'/availability?companyId=kora', [
+            'availability' => 'AVAILABLE',
+        ])->assertOk()->assertJsonPath('availability', 'AVAILABLE');
+
+        $employee->patchJson('/api/transport/drivers/'.$otherDriver->json('id').'/location?companyId=kora', [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+            'accuracy' => 20,
+        ])->assertForbidden();
+        $employee->patchJson('/api/transport/drivers/'.$otherDriver->json('id').'/availability?companyId=kora', [
+            'availability' => 'AVAILABLE',
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $ownDriver->json('id'),
+            'employee_id' => $employeeId,
+            'availability' => 'AVAILABLE',
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+        ]);
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $otherDriver->json('id'),
+            'availability' => 'PAUSED',
+            'latitude' => null,
+            'longitude' => null,
+        ]);
+    }
+
     public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
     {
         Http::fake();

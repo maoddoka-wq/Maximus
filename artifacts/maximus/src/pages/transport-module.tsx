@@ -54,6 +54,7 @@ import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 import {
   isNewerTransportGpsSample,
+  isRecentTransportGpsSample,
   isTransportGpsAccuracyAcceptable,
 } from '@/lib/transport-gps-quality';
 import { useQueryTab } from '@/lib/query-tab';
@@ -254,6 +255,11 @@ export default function TransportModulePage({
   const canModifyDrivers = featurePermissions
     ? Boolean(featurePermissions.drivers?.canModify)
     : canModify;
+  const canControlCurrentDriver = canModifyDrivers || Boolean(
+    currentEmployeeId
+    && currentDriver?.employeeId === currentEmployeeId
+    && canModifyTrips,
+  );
   const canCreateVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canCreate) : canCreate;
   const canModifyVehicles = featurePermissions ? Boolean(featurePermissions.vehicles?.canModify) : canModify;
   const canModifySettings = featurePermissions ? Boolean(featurePermissions.parametres?.canModify) : canModify;
@@ -303,14 +309,14 @@ export default function TransportModulePage({
 
   useEffect(() => {
     const shouldTrack = !preview
-      && Boolean(currentEmployeeId && currentDriverId && currentDriver?.status === 'ACTIVE' && canModifyDrivers);
+      && Boolean(currentEmployeeId && currentDriverId && currentDriver?.status === 'ACTIVE' && canControlCurrentDriver);
     setLocationError('');
     setLocationActive(false);
     setLocationRequested(shouldTrack);
-  }, [canModifyDrivers, currentDriver?.status, currentDriverId, currentEmployeeId, preview]);
+  }, [canControlCurrentDriver, currentDriver?.status, currentDriverId, currentEmployeeId, preview]);
 
   useEffect(() => {
-    if (preview || !locationRequested || !currentDriverId || !canModifyDrivers || !navigator.geolocation) {
+    if (preview || !locationRequested || !currentDriverId || !canControlCurrentDriver || !navigator.geolocation) {
       setLocationActive(false);
       if (!preview && locationRequested && !navigator.geolocation) {
         setLocationError('Ce navigateur ne prend pas en charge la géolocalisation.');
@@ -325,8 +331,16 @@ export default function TransportModulePage({
       timestamp: number;
     };
     let lastObservedTimestamp: number | null = null;
+    let lastServerLocationAt = 0;
     let pendingSample: GpsSample | null = null;
     let sendingLocation = false;
+    let nextPositionRequestId = 0;
+    let activePositionRequestId: number | null = null;
+    const geolocationOptions: PositionOptions = {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15_000,
+    };
 
     const flushLocationQueue = async () => {
       if (sendingLocation || disposed) return;
@@ -338,6 +352,7 @@ export default function TransportModulePage({
           try {
             const driver = await api.updateDriverLocation(currentDriverId, sample);
             if (disposed || sample.timestamp !== lastObservedTimestamp) continue;
+            lastServerLocationAt = Date.now();
             setData(current => current ? {
               ...current,
               drivers: current.drivers.map(item => item.id === driver.id ? driver : item),
@@ -359,6 +374,11 @@ export default function TransportModulePage({
     const sendLocation = (sample: GpsSample) => {
       if (disposed || !isNewerTransportGpsSample(lastObservedTimestamp, sample.timestamp)) return;
       lastObservedTimestamp = sample.timestamp;
+      if (!isRecentTransportGpsSample(sample.timestamp)) {
+        setLocationActive(false);
+        setLocationError('Le relevé GPS reçu est trop ancien. Attendez une nouvelle position.');
+        return;
+      }
       if (!isTransportGpsAccuracyAcceptable(sample.accuracy)) {
         setLocationActive(false);
         setLocationError(`Signal GPS trop imprécis (${Math.round(sample.accuracy)} m). Attendez une précision de 100 m ou mieux.`);
@@ -373,44 +393,66 @@ export default function TransportModulePage({
       void flushLocationQueue();
     };
 
-    const watchId = navigator.geolocation.watchPosition(
-      position => sendLocation({
-        timestamp: position.timestamp,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      }),
-      ({ code }) => {
-        setLocationActive(false);
-        setLocationError(code === 1
-          ? 'Autorisez la localisation pour être proposé aux clients proches.'
-          : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
-    );
-    const refreshId = window.setInterval(() => {
+    const handlePosition = (position: GeolocationPosition) => sendLocation({
+      timestamp: position.timestamp,
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+    });
+    const handlePositionError = ({ code }: GeolocationPositionError) => {
+      if (disposed) return;
+      if (code !== 1 && Date.now() - lastServerLocationAt < trackingIntervalSeconds * 3_000) return;
+      if (code === 1) setLocationActive(false);
+      setLocationError(code === 1
+        ? 'Autorisez la localisation pour être proposé aux clients proches.'
+        : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+    };
+    const requestCurrentPosition = (force = false) => {
+      if (
+        disposed
+        || document.visibilityState !== 'visible'
+        || (activePositionRequestId !== null && !force)
+      ) return;
+      const requestId = ++nextPositionRequestId;
+      activePositionRequestId = requestId;
       navigator.geolocation.getCurrentPosition(
-        position => sendLocation({
-          timestamp: position.timestamp,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        }),
-        () => {
-          if (!disposed) {
-            setLocationActive(false);
-            setLocationError('Aucune nouvelle position GPS fiable n’a été reçue.');
-          }
+        position => {
+          if (disposed || activePositionRequestId !== requestId) return;
+          activePositionRequestId = null;
+          handlePosition(position);
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
+        error => {
+          if (disposed || activePositionRequestId !== requestId) return;
+          activePositionRequestId = null;
+          handlePositionError(error);
+        },
+        geolocationOptions,
       );
-    }, trackingIntervalSeconds * 1000);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') requestCurrentPosition(true);
+    };
+    const handleFocus = () => requestCurrentPosition(true);
+
+    const watchId = navigator.geolocation.watchPosition(
+      handlePosition,
+      handlePositionError,
+      geolocationOptions,
+    );
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    requestCurrentPosition();
+    const refreshId = window.setInterval(requestCurrentPosition, trackingIntervalSeconds * 1000);
     return () => {
       disposed = true;
       navigator.geolocation.clearWatch(watchId);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.clearInterval(refreshId);
     };
-  }, [api, canModifyDrivers, currentDriverId, locationAttempt, locationRequested, preview, trackingIntervalSeconds]);
+  }, [api, canControlCurrentDriver, currentDriverId, locationAttempt, locationRequested, preview, trackingIntervalSeconds]);
 
   const activateDriverGps = () => {
     setLocationError('');
@@ -689,7 +731,7 @@ export default function TransportModulePage({
         fresh={currentDriverGpsFresh}
         requested={locationRequested}
         error={locationError}
-        canControl={canModifyDrivers}
+        canControl={canControlCurrentDriver}
         preview={preview}
         gpsValidityMinutes={gpsValidityMinutes}
         pending={Boolean(pendingAction)}
@@ -708,9 +750,9 @@ export default function TransportModulePage({
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}
         {canOperateTrips && tab === 'trips' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} gpsValidityMinutes={gpsValidityMinutes} />}
-          {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />}</>}
+          {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canControlCurrentDriver ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />}</>}
         {tab === 'trips' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
-          {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
+        {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canControlCurrentDriver ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
         {tab === 'vehicles' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
         {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
@@ -991,8 +1033,8 @@ function DriverGpsStatus({
     ? 'Ce compte employé doit être lié à un profil chauffeur par un administrateur.'
     : driver.status !== 'ACTIVE'
       ? 'Le profil chauffeur est inactif. Contactez un administrateur pour rétablir son accès.'
-      : !canControl
-        ? 'Ce compte doit recevoir le droit de modification des Chauffeurs pour partager sa position.'
+        : !canControl
+          ? 'Le compte doit pouvoir gérer ses courses ou recevoir le droit de modification des Chauffeurs pour partager sa position.'
         : error
           ? error
           : active
